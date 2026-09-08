@@ -59,3 +59,11 @@ def as_sequence(value: JsonValue) -> Sequence[JsonValue]:
     if isinstance(value, str | Mapping):
         return []
     return value if isinstance(value, Sequence) else []
+
+
+def as_strs(value: JsonValue) -> list[str]:
+    """Chaînes non vides portées par la liste `value`.
+
+    Sert les champs qui énumèrent du texte — mots-clés, codes de collection, pays. Un élément d'une autre nature est écarté comme le serait la valeur seule.
+    """
+    return [texte for element in as_sequence(value) if (texte := as_str(element))]

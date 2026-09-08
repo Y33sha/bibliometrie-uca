@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.fetch_stale import (
     FetchOutcome,
 )
 from domain.publications.identifiers import clean_doi
-from domain.types import as_mapping
+from domain.types import as_mapping, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
@@ -58,4 +58,4 @@ class CrossrefFetchStaleAdapter(BaseFetchStaleAdapter):
         message = data.get("message")
         if not isinstance(message, dict):
             return None
-        return FetchedRecord(doi=clean_doi(message.get("DOI")), raw_data=message)
+        return FetchedRecord(doi=clean_doi(as_str(message.get("DOI"))), raw_data=message)

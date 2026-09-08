@@ -6,8 +6,13 @@ Elles s'appliquent aux relevés d'une ligne et d'une colonne — un `COUNT`, un 
 """
 
 from datetime import datetime
+from typing import Protocol
 
-from sqlalchemy import Result
+
+class ReleveScalaire(Protocol):
+    """Un relevé rendant une valeur unique."""
+
+    def scalar_one(self) -> object: ...
 
 
 def row_int(value: object) -> int:
@@ -20,12 +25,12 @@ def row_int(value: object) -> int:
     return value
 
 
-def scalar_int(result: Result[tuple[object, ...]]) -> int:
+def scalar_int(result: ReleveScalaire) -> int:
     """L'entier unique du relevé."""
     return row_int(result.scalar_one())
 
 
-def scalar_datetime_or_none(result: Result[tuple[object, ...]]) -> datetime | None:
+def scalar_datetime_or_none(result: ReleveScalaire) -> datetime | None:
     """L'instant unique du relevé, ou `None` — le cas d'un agrégat sur un ensemble vide."""
     value = result.scalar_one()
     if value is None or isinstance(value, datetime):

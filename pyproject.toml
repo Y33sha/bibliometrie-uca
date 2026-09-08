@@ -524,6 +524,14 @@ matches = "infrastructure/read_models/publications/facets.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
+# L'appariement d'une ligne de relevé avec le type qu'elle alimente se fait par dépaquetage de
+# clés qu'aucune analyse statique ne connaît, le relevé étant une chaîne de caractères. Le module
+# porte ce contrôle à l'exécution, et les tests d'intégration l'exercent sur chaque relevé.
+[[tool.pyrefly.sub-config]]
+matches = "infrastructure/db/rows.py"
+[tool.pyrefly.sub-config.errors]
+bad-unpacking = false
+
 # `Scope`, le type que Starlette donne au contexte d'une requête ASGI, est un alias de
 # `MutableMapping[str, Any]`. Pyrefly compte l'alias importé comme un `Any` écrit ; le nommer
 # autrement reviendrait à renoncer au type de l'interface qu'on implémente.

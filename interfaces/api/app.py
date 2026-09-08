@@ -99,16 +99,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # développement local, ou derrière un reverse proxy qui le retire en amont.
 # Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
 # surface d'API, admin comprise. Activées en développement, absentes en production.
-_docs_urls = (
-    {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
-    if settings.expose_api_docs
-    else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-)
+_expose_docs = settings.expose_api_docs
 app = FastAPI(
     title="Bibliométrie UCA",
     lifespan=lifespan,
     root_path=os.environ.get("ROOT_PATH", ""),
-    **_docs_urls,
+    docs_url="/docs" if _expose_docs else None,
+    redoc_url="/redoc" if _expose_docs else None,
+    openapi_url="/openapi.json" if _expose_docs else None,
 )
 
 
