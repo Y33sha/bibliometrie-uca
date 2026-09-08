@@ -21,7 +21,7 @@ from infrastructure.db.rows import rows_as
 from infrastructure.db.scalars import scalar_int
 
 
-class _SourcePublicationViewRow(NamedTuple):
+class _SourcePublicationRow(NamedTuple):
     """Projection SQL `get_source_publications` : colonnes de `source_publications` consommées par l'agrégation canonique (`refresh_from_sources` côté domain)."""
 
     id: int
@@ -45,7 +45,7 @@ class _SourcePublicationViewRow(NamedTuple):
     meta: dict[str, JsonValue] | None
 
 
-def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
+def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublication:
     """Mapping d'une row SQL `source_publications` ⨝ `journals` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
     return SourcePublication(
         id=row.id,
@@ -233,7 +233,7 @@ class PgPublicationRepository(PublicationRepository):
             """),
             {"id": pub_id},
         )
-        return [_view_from_row(vue) for vue in rows_as(_SourcePublicationViewRow, result)]
+        return [_source_publication_from_row(vue) for vue in rows_as(_SourcePublicationRow, result)]
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
         result = self._conn.execute(

@@ -19,7 +19,7 @@ from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
-    SourcePublicationRow,
+    SourcePublicationUpsert,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -142,7 +142,7 @@ def insert_source_document(
 
     return queries.upsert_source_publication(
         conn,
-        SourcePublicationRow(
+        SourcePublicationUpsert(
             source="theses",
             source_id=theses_id,
             staging_id=staging_id,

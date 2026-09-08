@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
+from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
 
 _Q = PgSourcePublicationQueries()
@@ -18,7 +18,7 @@ def _create_staging(conn: Connection, source_id: str = "t-stg") -> int:
     ).scalar_one()
 
 
-def _row(staging_id: int, **overrides) -> SourcePublicationRow:
+def _row(staging_id: int, **overrides) -> SourcePublicationUpsert:
     defaults = {
         "source": "theses",
         "source_id": "2023ABC001",
@@ -27,7 +27,7 @@ def _row(staging_id: int, **overrides) -> SourcePublicationRow:
         "pub_year": 2023,
         "doc_type": "thesis",
     }
-    return SourcePublicationRow(**{**defaults, **overrides})
+    return SourcePublicationUpsert(**{**defaults, **overrides})
 
 
 class TestUpsertSourcePublication:

@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
+from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from domain.publications.metadata import normalized_title
 from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
 
@@ -20,7 +20,7 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
     sp_id = _Q.upsert_source_publication(
         conn,
-        SourcePublicationRow(
+        SourcePublicationUpsert(
             source="openalex",
             source_id="W_title_norm",
             staging_id=staging_id,

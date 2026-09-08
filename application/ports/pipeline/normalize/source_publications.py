@@ -13,8 +13,8 @@ from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class SourcePublicationRow:
-    """Un enregistrement `source_publications` tel qu'une source le fournit.
+class SourcePublicationUpsert:
+    """Un enregistrement `source_publications` tel qu'une source le fournit, prêt à être écrit.
 
     Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas de compte de citations, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
@@ -64,6 +64,6 @@ class SourcePublicationRow:
 class SourcePublicationQueries(Protocol):
     """Écriture des `source_publications`, commune aux normaliseurs de toutes les sources."""
 
-    def upsert_source_publication(self, conn: Connection, row: SourcePublicationRow) -> int:
+    def upsert_source_publication(self, conn: Connection, row: SourcePublicationUpsert) -> int:
         """UPSERT de l'enregistrement sur la clé `(source, source_id)`. Retourne l'id de la ligne."""
         ...
