@@ -19,7 +19,7 @@ Phase `normalize` : transforme les données brutes (`staging`) en tables structu
 
 Chaque normaliseur reporte dans `source_authorships` ce que sa source fournit pour chaque signature : identifiants de l'auteur (ORCID, IdRef…) et affiliations.
 
-En fin de phase, les `source_publications` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées, emportant leurs `source_authorships` par cascade. La publication vidée de ses dernières sources est supprimée par la phase [`publications`](07-publications.md). La ligne de `staging` reste, avec sa marque.
+En fin de phase, les `source_publications` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_authorships` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
 Conservés en base, les payloads bruts la font grossir hors de proportion avec les données normalisées qu'on en tire. En fin de phase, le `raw_data` du staging est donc vidé, puis un `VACUUM` récupère l'espace.
 

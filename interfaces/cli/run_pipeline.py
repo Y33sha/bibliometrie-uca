@@ -23,7 +23,7 @@ Phases (dans l'ordre d'execution):
                         cible (auto-borné par le backoff doi_lookups)
     fetch_stale       Refetch par identifiant natif des rows à last_seen_at ancien
                         (> STALE_REFRESH_AFTER_DAYS) : trouvé -> bump last_seen_at + refresh ;
-                        absence confirmée -> disappeared_at, dont normalize tire la suppression.
+                        absence confirmée -> disappeared_at.
     fetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
                         normalize ne les consomme.
     normalize           Normalisation staging -> tables sources (source_publications,
@@ -300,8 +300,7 @@ def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
     sur des années qu'il ne moissonne plus en bulk. `theses` fait exception, comme
     à l'extraction : elle ramène tout l'historique (aucune borne), sauf `--year`.
 
-    L'absence se marque ici (`disappeared_at`) ; `normalize` en tire la suppression
-    des `source_publications`. Placée après `fetch_missing` (qui a fini de peupler
+    L'absence se marque ici (`disappeared_at`). Placée après `fetch_missing` (qui a fini de peupler
     `staging` et `last_seen_at`) et avant `normalize` (qui consomme le `raw_data`
     rafraîchi).
 

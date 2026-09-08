@@ -6,7 +6,6 @@
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
 * [ ] cross_import: max 10k par source par run? (pour lisser dans le temps)
 * [ ] refresh_stale: pas de logs d'avancement (seulement début et fin) => gênant quand beaucoup de lignes stale
-* [ ] documents marqués `disappeared_at`: supprimer en cascade, ou flagger "disparu" pour le sortir des lectures
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
@@ -52,6 +51,7 @@
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
 * [ ] Publications: facette sujets?
 * [ ] Facettes: tester l'option "caché par défaut" / + harmoniser singulier/pluriel
+* [ ] Facettes: bouton Supprimer les filtres
 * [ ] mots-clés libres: ajouter séparateurs + harmoniser style avec "sujets"
 
 # Cas particuliers, bizarreries à élucider
