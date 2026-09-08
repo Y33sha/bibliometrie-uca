@@ -5,10 +5,15 @@ Chaque adaptateur construit ses lignes par appariement de noms. Le relevé étan
 Un relevé nomme ses colonnes qu'il rende des lignes ou aucune : les relevés qui rendent une liste se contrôlent donc sur une base sans données. Ceux qui rendent une ligne unique demandent que la ligne existe.
 """
 
+import ast
+from pathlib import Path
+
 import pytest
 from sqlalchemy import text
 
+from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publication_repository import PgPublicationRepository
@@ -36,6 +41,16 @@ class TestRelevesRendantUneListe:
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
         repo = PgPublicationRepository(sa_sync_conn_owner)
         assert repo.get_source_publications(1) == []
+
+    def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
+        """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""
+        builder = _PublicationFacetsBuilder(sa_sync_conn_owner, PublicationFilters(), [])
+        options, total = builder._facet_labs()
+        assert builder._facet_years() == []
+        assert builder._facet_doc_types() == []
+        assert options == [] and total == 0
+        # La facette d'accès énumère son vocabulaire, que des publications le portent ou non.
+        assert {option.value for option in builder._facet_access()}
 
 
 class TestRelevesRendantUneLigne:
@@ -86,6 +101,64 @@ class TestRelevesRendantUneLigne:
         structure = PgStructureRepository(sa_sync_conn_owner).find_by_id(structure_id)
         assert structure is not None
         assert structure.name_forms
+
+
+TYPES_EXERCES = {
+    "FacetOption",
+    "JournalCorrectionRow",
+    "JournalDoiPrefixRow",
+    "UnaryCorrectionRow",
+    "_JournalRow",
+    "_PerimeterRow",
+    "_PublisherRow",
+    "_SourcePublicationRow",
+    "_StructureNameFormRow",
+    "_StructureRow",
+}
+"""Types que les tests ci-dessus construisent depuis un relevé réel.
+
+Le test qui suit confronte cette liste aux appariements que porte le code : un adaptateur ajouté sans son test fait échouer l'intégration, et un type dont le dernier appariement disparaît sort de la liste.
+"""
+
+_APPARIEMENTS = frozenset({"row_as", "rows_as"})
+
+_COUCHES = ("application", "infrastructure")
+
+
+def _types_apparies() -> set[str]:
+    """Types que le code construit par appariement de noms, relevés sur l'arbre syntaxique."""
+    racine = Path(__file__).resolve().parents[3]
+    trouves: set[str] = set()
+    for couche in _COUCHES:
+        for chemin in (racine / couche).rglob("*.py"):
+            if "__pycache__" in chemin.parts:
+                continue
+            arbre = ast.parse(chemin.read_text(encoding="utf-8"))
+            for noeud in ast.walk(arbre):
+                if (
+                    isinstance(noeud, ast.Call)
+                    and isinstance(noeud.func, ast.Name)
+                    and noeud.func.id in _APPARIEMENTS
+                    and noeud.args
+                    and isinstance(noeud.args[0], ast.Name)
+                ):
+                    trouves.add(noeud.args[0].id)
+    return trouves
+
+
+def test_le_parcours_trouve_les_appariements():
+    """Filet du filet : un parcours qui n'en trouverait aucun rendrait l'assertion vide, donc verte."""
+    assert len(_types_apparies()) >= 10
+
+
+def test_chaque_type_apparie_est_exerce_par_un_test():
+    trouves = _types_apparies()
+    assert trouves == TYPES_EXERCES, (
+        "Types appariés sans test qui les exerce : "
+        f"{sorted(trouves - TYPES_EXERCES)}. "
+        "Types de la liste qu'aucun appariement ne construit plus : "
+        f"{sorted(TYPES_EXERCES - trouves)}."
+    )
 
 
 @pytest.mark.parametrize(
