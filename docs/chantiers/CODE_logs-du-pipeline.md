@@ -26,12 +26,14 @@ Le bilan d'une phase reste dans le journal. La barre montre l'avancement ; le bi
 
 La bibliothèque d'affichage est une dépendance de développement, importée sous `try`. Son absence conduit au repli des runs sans terminal. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
 
+L'affichage passe par `tqdm`, qui pèse 356 Ko sans dépendance transitive. `rich` embarque trois dépendances transitives pour 7,1 Mo, dont `pygments` seul pour 5,1 Mo, au service de la coloration syntaxique et du rendu Markdown.
+
 ## Phasage
 
 ### 1. Socle d'affichage
 
-- [ ] Choisir l'outil. La phase `extract` lance cinq à six sources dans un `ThreadPoolExecutor` (`infrastructure/parallel.py`), soit autant de barres simultanées. `rich` porte plusieurs tâches dans un objet unique redessiné sous verrou ; `tqdm` demande de fixer la position de chaque barre et de poser un verrou entre threads ; une barre maison suppose de piloter le curseur du terminal.
-- [ ] Router les messages de journal par l'objet d'affichage tant qu'une barre est ouverte : une écriture directe sur la sortie casse le rendu.
+- [ ] Fixer la position de chaque barre et poser `tqdm.set_lock()`. La phase `extract` lance cinq à six sources dans un `ThreadPoolExecutor` (`infrastructure/parallel.py`), soit autant de barres simultanées.
+- [ ] Router les messages de journal par `tqdm.write()` tant qu'une barre est ouverte : une écriture directe sur la sortie casse le rendu.
 - [ ] Écrire l'objet de progression : ouverture avec un total, avancement, fermeture. Sans terminal, il n'écrit rien.
 - [ ] Poser le repli des runs non interactifs : une ligne de journal par tranche d'avancement.
 - [ ] Tester les deux modes, terminal et sortie capturée, dont le cas de plusieurs barres concurrentes.
