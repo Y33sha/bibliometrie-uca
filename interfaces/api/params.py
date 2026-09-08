@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Annotated
 
 from fastapi import Query
+from pydantic import AfterValidator
 
 # Nombre de sujets que rendent les nuages de mots (éditeur, revue, laboratoire, personne).
 TOP_SUBJECTS_LIMIT = 30
@@ -19,7 +20,28 @@ MAX_SEARCH_LENGTH = 500
 Le terme part dans un motif `ILIKE '%…%'`, dont le coût croît avec sa longueur : sans borne, une requête fait balayer la table sur un motif arbitrairement long, et le plafond de fréquence est la seule digue. La valeur laisse passer ce qu'une personne cherche réellement, jusqu'à une adresse d'affiliation entière recopiée dans la recherche d'adresses, et arrête le reste.
 """
 
-SearchTerm = Annotated[str, Query(max_length=MAX_SEARCH_LENGTH)]
+
+def reject_control_characters(value: str) -> str:
+    """Refuse une valeur portant un caractère de contrôle, l'octet NUL en tête.
+
+    PostgreSQL n'accepte pas l'octet NUL dans un champ texte, et le driver refuse la valeur à l'adaptation des paramètres : sans ce contrôle, une recherche qui en porte un traverse la route et casse au moment de la requête, hors de portée du contrat d'API. Les autres caractères de contrôle sont refusés avec lui — aucun ne désigne un texte cherché.
+
+    La tabulation, le retour chariot et le saut de ligne restent admis : un terme recopié depuis un document en porte.
+    """
+    intrus = sorted({c for c in value if (c < " " or c == "\x7f") and c not in "\t\r\n"})
+    if intrus:
+        codes = ", ".join(f"U+{ord(c):04X}" for c in intrus)
+        raise ValueError(f"Caractères de contrôle interdits : {codes}.")
+    return value
+
+
+TextParam = Annotated[str, AfterValidator(reject_control_characters)]
+"""Valeur textuelle libre reçue d'un appelant, refusée si elle porte un caractère de contrôle.
+
+Sert les paramètres qui reçoivent du texte sans vocabulaire fermé ni format imposé. Le refus emprunte le code de la validation native, la valeur étant écartée par le contrat de la route.
+"""
+
+SearchTerm = Annotated[TextParam, Query(max_length=MAX_SEARCH_LENGTH)]
 """Terme de recherche textuelle, borné en longueur. Sa valeur par défaut appartient à la route, la chaîne vide valant absence de recherche."""
 
 # Taille de page retenue par les listes qui n'en reçoivent pas.
