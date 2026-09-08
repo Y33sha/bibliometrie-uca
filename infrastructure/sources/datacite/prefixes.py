@@ -17,7 +17,7 @@ from infrastructure.sources.http_retry import http_request_with_retry
 logger = logging.getLogger(__name__)
 
 
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 
 
 def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, str] | None:
@@ -55,13 +55,13 @@ def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | No
     """
     if not isinstance(data, dict):
         return None
-    relationships = (data.get("data") or {}).get("relationships") or {}
-    client_refs = (relationships.get("clients") or {}).get("data") or []
-    provider_refs = (relationships.get("providers") or {}).get("data") or []
+    relationships = at_path(data, "data", "relationships")
+    client_refs = as_sequence(at_path(relationships, "clients").get("data"))
+    provider_refs = as_sequence(at_path(relationships, "providers").get("data"))
     if not client_refs or not provider_refs:
         return None
-    client_symbol = client_refs[0].get("id") if isinstance(client_refs[0], dict) else None
-    provider_id = provider_refs[0].get("id") if isinstance(provider_refs[0], dict) else None
+    client_symbol = as_str(as_mapping(client_refs[0]).get("id"))
+    provider_id = as_str(as_mapping(provider_refs[0]).get("id"))
     if not client_symbol or not provider_id:
         return None
     included_index: dict[tuple[str | None, str | None], Mapping[str, JsonValue]] = {}
