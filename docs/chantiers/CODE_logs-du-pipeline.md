@@ -24,6 +24,8 @@ La barre paraît seulement en terminal interactif, sous condition de `sys.stdout
 
 Le bilan d'une phase reste dans le journal. La barre montre l'avancement ; le bilan dit ce que la phase a produit.
 
+La bibliothèque d'affichage est une dépendance de développement, importée sous `try`. Son absence conduit au repli des runs sans terminal. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
+
 ## Phasage
 
 ### 1. Socle d'affichage
@@ -57,4 +59,3 @@ Le bilan d'une phase reste dans le journal. La barre montre l'avancement ; le bi
 - Le mode texte et le mode JSON portent-ils le même contenu ?
 - Les bilans de phase passent par des tables d'observabilité (`metrics.details["table"]`). Leur rendu entre-t-il dans ce chantier ?
 - Un niveau de détail réglable est-il utile, ou le partage entre terminal et journal suffit-il ?
-- `rich` et `tqdm` sont des dépendances de production, le pipeline tournant en conteneur. Le projet compte ses dépendances : laquelle accepter, ou faut-il écrire la barre ?
