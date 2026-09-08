@@ -33,6 +33,7 @@ from application.pipeline.persons.loading import (
     load_linked_authorships_by_pub,
 )
 from application.pipeline.persons.metrics import CascadeResult
+from application.pipeline.progression import progression
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -265,26 +266,27 @@ def run_cascade(
 
     logger.info("▶ match : rattachement aux personnes existantes ou déjà résolues")
     unresolved: list[EnrichedAuthorship] = []
-    for i, a in enumerate(c.authorships):
-        if i and i % 5000 == 0:
-            logger.info("  %d/%d signatures (match)", i, total)
-        decision = c.decide_full(a)
-        if decision.action == "match":
-            c.apply_match(a, decision.person_id, decision.reason)
-        else:
-            unresolved.append(a)  # création différée ou aucun signal : reprise en passe create
+    with progression(total, "signatures (match)", logger) as avancement:
+        for a in c.authorships:
+            avancement.avance()
+            decision = c.decide_full(a)
+            if decision.action == "match":
+                c.apply_match(a, decision.person_id, decision.reason)
+            else:
+                # Création différée ou aucun signal : reprise en passe create.
+                unresolved.append(a)
 
     logger.info(
         "▶ create : création des personnes inconnues (%d signatures restantes)", len(unresolved)
     )
-    for i, a in enumerate(unresolved):
-        if i and i % 5000 == 0:
-            logger.info("  %d/%d signatures (create)", i, len(unresolved))
-        decision = c.decide_cross_and_name(a)
-        if decision.action == "match":
-            c.apply_match(a, decision.person_id, decision.reason)
-        elif decision.action == "create":
-            c.apply_create(a)
-        else:
-            c.skipped_counts[decision.reason] += 1
+    with progression(len(unresolved), "signatures (create)", logger) as avancement:
+        for a in unresolved:
+            avancement.avance()
+            decision = c.decide_cross_and_name(a)
+            if decision.action == "match":
+                c.apply_match(a, decision.person_id, decision.reason)
+            elif decision.action == "create":
+                c.apply_create(a)
+            else:
+                c.skipped_counts[decision.reason] += 1
     return c.result()

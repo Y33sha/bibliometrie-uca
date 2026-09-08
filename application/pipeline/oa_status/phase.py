@@ -15,6 +15,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.oa_status import OaStatusQueries
 from domain.publications.metadata import decide_oa_status
 
@@ -134,19 +135,12 @@ async def run(
                     await asyncio.to_thread(queries.mark_unpaywall_checked, conn, pub_id)
 
         # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
-        for start in range(0, total, BATCH_SIZE):
-            chunk = pubs[start : start + BATCH_SIZE]
-            await asyncio.gather(*(process_one(*pub) for pub in chunk))
-            await asyncio.to_thread(conn.commit)
-            done = min(start + BATCH_SIZE, total)
-            logger.info(
-                "  %s/%s — %s mis à jour, %s inchangés, %s non trouvés",
-                done,
-                total,
-                progress["updated"],
-                progress["skipped"],
-                progress["not_found"],
-            )
+        with progression(total, "statuts OA", logger) as avancement:
+            for start in range(0, total, BATCH_SIZE):
+                chunk = pubs[start : start + BATCH_SIZE]
+                await asyncio.gather(*(process_one(*pub) for pub in chunk))
+                await asyncio.to_thread(conn.commit)
+                avancement.avance(len(chunk))
 
     logger.info(
         "Terminé : %s mis à jour, %s inchangés, %s non trouvés sur Unpaywall",

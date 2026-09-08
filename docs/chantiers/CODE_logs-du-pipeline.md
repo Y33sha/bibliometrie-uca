@@ -52,10 +52,10 @@ Barre unique :
 - [ ] `extract/fetch_stale.py` — une ligne par lot
 - [ ] `normalize/base.py` — une ligne par lot, pour chaque source à son tour
 - [x] `affiliations/resolve_addresses.py` — une ligne par lot
-- [ ] `persons/cascade.py` — deux boucles, toutes les 5000 signatures
+- [x] `persons/cascade.py` — deux boucles, toutes les 5000 signatures
 - [ ] `publications/reconcile_components.py` — toutes les 5000 publications
 - [x] `subjects/ingestion.py` — toutes les 2000 publications sources
-- [ ] `oa_status/phase.py` — tous les 50 DOI
+- [x] `oa_status/phase.py` — tous les 50 DOI
 
 Puis :
 
