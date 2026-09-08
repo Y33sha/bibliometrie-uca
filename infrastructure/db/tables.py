@@ -31,6 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
+from domain.config import CAP_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
@@ -113,6 +114,20 @@ config = Table(
     Column("value", Jsonb, nullable=False),
     Column("description", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    # `value` est jsonb : la forme attendue dépend de la clé, que le domaine énumère.
+    CheckConstraint(
+        f"key NOT IN ({', '.join(repr(key) for key in sorted(CAP_KEYS))}) "
+        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 0 "
+        "AND (value)::numeric = trunc((value)::numeric))",
+        name="config_cap_is_non_negative_integer",
+    ),
+    CheckConstraint(
+        f"key NOT IN ({', '.join(repr(key) for key in sorted(YEAR_KEYS))}) "
+        f"OR (jsonb_typeof(value) = 'number' "
+        f"AND (value)::numeric BETWEEN {MIN_YEAR} AND {MAX_YEAR} "
+        "AND (value)::numeric = trunc((value)::numeric))",
+        name="config_year_is_in_range",
+    ),
 )
 
 
