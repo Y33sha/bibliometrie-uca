@@ -129,6 +129,11 @@
     return `Depuis ${value}`;
   }
 
+  /** Plafond d'interrogations : zéro retire la borne. */
+  function capLabel(value: number): string {
+    return value > 0 ? `${value.toLocaleString("fr-FR")} par run` : "Illimité";
+  }
+
   function configByKey(key: string): ConfigItem | undefined {
     return configs.find((c) => c.key === key);
   }
@@ -225,6 +230,29 @@
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
           <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+</div>
+
+<!-- ═══ PLAFONDS ═══ -->
+<h3 class="section-title">Plafonds d'interrogation des API</h3>
+<p class="help-text">Bornent le nombre de requêtes unitaires par run, pour étaler la charge sur plusieurs passages et rester sous les quotas des API. Zéro retire la borne.</p>
+<div class="config-grid">
+  {#each [
+    { key: "unpaywall_max_per_run", label: "Unpaywall — statuts vérifiés" },
+    { key: "fetch_missing_max_per_source", label: "Cross-import — DOI par source" },
+  ] as cap (cap.key)}
+    {@const item = configByKey(cap.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{cap.label}</span>
+        {#if editingKey === cap.key}
+          {@render inlineEdit(cap.key)}
+        {:else}
+          <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(cap.key)}>Modifier</button>
         {/if}
       </div>
     {/if}
