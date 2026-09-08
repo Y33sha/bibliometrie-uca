@@ -129,6 +129,23 @@
     return `Depuis ${value}`;
   }
 
+  /** Plafonds d'interrogation des API, dont le champ vidé retire la borne. */
+  const CAPS = [
+    { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
+    { key: "unpaywall_max_per_run", label: "Unpaywall" },
+  ];
+  const CAP_KEYS = new Set(CAPS.map((cap) => cap.key));
+
+  const MIN_YEAR = 1970;
+  const MAX_YEAR = 2100;
+
+  /** Bornes du champ pour une clé numérique, `null` pour les autres. */
+  function numericBounds(key: string): { min: number; max: number } | null {
+    if (CAP_KEYS.has(key)) return { min: 0, max: 10_000_000 };
+    if (key === "pipeline_start_year_full") return { min: MIN_YEAR, max: MAX_YEAR };
+    return null;
+  }
+
   /** Plafond d'interrogations : zéro retire la borne. */
   function capLabel(value: number): string {
     return value > 0 ? `${value.toLocaleString("fr-FR")} par run` : "Illimité";
@@ -185,10 +202,14 @@
     saving = true;
     try {
       let parsed;
-      try {
-        parsed = JSON.parse(editValue);
-      } catch {
-        parsed = editValue;
+      if (CAP_KEYS.has(key) && editValue.trim() === "") {
+        parsed = 0;
+      } else {
+        try {
+          parsed = JSON.parse(editValue);
+        } catch {
+          parsed = editValue;
+        }
       }
       await configApi.setValue(key, parsed);
       editingKey = null;
@@ -209,7 +230,9 @@
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
+  {@const bornes = numericBounds(key)}
   <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }}
+    type={bornes ? "number" : "text"} min={bornes?.min} max={bornes?.max} step={bornes ? 1 : undefined}
     onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
     <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
@@ -234,16 +257,7 @@
       </div>
     {/if}
   {/each}
-</div>
-
-<!-- ═══ PLAFONDS ═══ -->
-<h3 class="section-title">Plafonds d'interrogation des API</h3>
-<p class="help-text">Bornent le nombre de requêtes unitaires par run, pour étaler la charge sur plusieurs passages et rester sous les quotas des API. Zéro retire la borne.</p>
-<div class="config-grid">
-  {#each [
-    { key: "unpaywall_max_per_run", label: "Unpaywall — statuts vérifiés" },
-    { key: "fetch_missing_max_per_source", label: "Cross-import — DOI par source" },
-  ] as cap (cap.key)}
+  {#each CAPS as cap (cap.key)}
     {@const item = configByKey(cap.key)}
     {#if item}
       <div class="config-row">

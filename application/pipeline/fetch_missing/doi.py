@@ -62,9 +62,9 @@ async def run_async(
     dois = cross_import_dois_reader(conn, adapter.source_key)
     slog.info("%d DOI manquants", len(dois))
 
-    if limit:
+    if limit and len(dois) > limit:
+        slog.info("plafond de %d DOI, %d reportés aux prochains runs", limit, len(dois) - limit)
         dois = dois[:limit]
-        slog.info("limité à %d DOI", len(dois))
 
     total = len(dois)
     if total == 0:
