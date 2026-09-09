@@ -7,8 +7,15 @@ import os
 import socket
 
 import pytest
+from sqlalchemy import create_engine, text
 
-from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
+from infrastructure.pipeline_lock import (
+    PIPELINE_LOCK_KEY,
+    PipelineAlreadyRunningError,
+    _detenteur,
+    pipeline_lock,
+)
+from tests.integration.conftest import _sa_url
 
 
 def test_une_seconde_execution_est_refusee(sa_engine_pipeline) -> None:  # noqa: ARG001 — installe l'engine
@@ -46,3 +53,22 @@ def test_une_execution_interrompue_rend_le_verrou(sa_engine_pipeline) -> None:  
 
     with pipeline_lock():
         pass
+
+
+def test_une_autre_base_du_cluster_ne_passe_pas_pour_le_detenteur(sa_engine_pipeline) -> None:
+    """`pg_locks` couvre tout le cluster : le détenteur se cherche dans la base courante seule."""
+    ailleurs = create_engine(_sa_url().set(database="postgres"))
+    try:
+        with ailleurs.connect() as conn:
+            conn.execute(
+                text("SELECT set_config('application_name', :nom, false)"),
+                {"nom": "exécution sur une autre base"},
+            )
+            conn.execute(text("SELECT pg_advisory_lock(:cle)"), {"cle": PIPELINE_LOCK_KEY})
+            try:
+                with sa_engine_pipeline.connect() as local:
+                    assert _detenteur(local) == "une autre exécution"
+            finally:
+                conn.execute(text("SELECT pg_advisory_unlock(:cle)"), {"cle": PIPELINE_LOCK_KEY})
+    finally:
+        ailleurs.dispose()

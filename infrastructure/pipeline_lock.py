@@ -25,6 +25,8 @@ log = logging.getLogger(__name__)
 # partageant, et aucun autre usage d'`advisory lock` du projet ne l'emploie.
 PIPELINE_LOCK_KEY = 8_014_552_301_774_233_001
 
+# `pg_locks` couvre tout le cluster, alors qu'un verrou consultatif vaut pour une seule base : le
+# filtre sur `database` écarte les sessions d'une autre base qui détiennent la même clé.
 _HOLDER_SQL = text("""
     SELECT activite.application_name AS identite,
            to_char(activite.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS depuis
@@ -32,6 +34,7 @@ _HOLDER_SQL = text("""
     JOIN pg_stat_activity AS activite USING (pid)
     WHERE verrou.locktype = 'advisory'
       AND verrou.granted
+      AND verrou.database = (SELECT oid FROM pg_database WHERE datname = current_database())
       AND (verrou.classid::bigint << 32) | (verrou.objid::bigint & 4294967295) = :cle
     LIMIT 1
 """)
