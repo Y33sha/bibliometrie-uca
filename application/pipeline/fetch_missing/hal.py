@@ -165,7 +165,7 @@ async def fetch_missing_hal_by_nnt(
     if stats_only:
         return metrics
     if not nnt_refs:
-        log.info("%saucune thèse soutenue sans document HAL", DERNIERE_BRANCHE)
+        log.info("%sRien à faire", DERNIERE_BRANCHE)
         return metrics
 
     if dry_run:

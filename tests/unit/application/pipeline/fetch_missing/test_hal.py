@@ -196,6 +196,15 @@ class TestParNnt:
         assert metrics.new == 1
         assert metrics.extras["not_found"] == 1
 
+    async def test_sans_these_a_chercher_la_sous_etape_se_conclut(self, caplog):
+        adapter = _FakeHalAdapter()
+
+        with caplog.at_level(logging.INFO):
+            metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
+
+        assert metrics.seen == 0
+        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
+
     async def test_stats_only_s_arrete_au_denombrement(self):
         adapter = _FakeHalAdapter(refs_nnt=[NntRef(nnt="2024UCA0001", theses_id="t1")])
 
