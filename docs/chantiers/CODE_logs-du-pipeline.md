@@ -28,11 +28,11 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 
 ### 1. Socle d'affichage
 
-- [ ] Fixer la position de chaque barre et poser `tqdm.set_lock()`. La phase `extract` lance cinq à six sources dans un `ThreadPoolExecutor` (`infrastructure/parallel.py`), soit autant de barres simultanées.
-- [ ] Router les messages de journal par `tqdm.write()` tant qu'une barre est ouverte : une écriture directe sur la sortie casse le rendu.
-- [ ] Écrire l'objet de progression : ouverture avec un total, avancement, fermeture. Sans terminal, il n'écrit rien.
-- [ ] Poser le repli des runs non interactifs : une ligne de journal par tranche d'avancement.
-- [ ] Tester les deux modes, terminal et sortie capturée, dont le cas de plusieurs barres concurrentes.
+- [x] Écrire l'objet de progression : ouverture avec un total, avancement, fermeture. Sans terminal, il n'écrit rien.
+- [x] Poser le repli des runs non interactifs : une ligne de journal par tranche d'avancement.
+- [x] Router les messages de journal par `tqdm.write()` tant qu'une barre est ouverte : une écriture directe sur la sortie casse le rendu. `infrastructure/observability/log.py` expose l'écrivain, que le composition root branche.
+- [x] Positions et verrou des barres concurrentes : `tqdm` attribue une position libre à chaque instance et sérialise les écritures par son verrou.
+- [x] Tester les deux modes, terminal et sortie capturée, dont le cas de plusieurs barres concurrentes.
 
 ### 2. Remplacement des lignes répétées
 

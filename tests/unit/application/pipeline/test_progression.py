@@ -1,5 +1,6 @@
 """Avancement d'une boucle : barre en terminal, jalons au journal sinon."""
 
+import io
 import logging
 
 import pytest
@@ -94,3 +95,35 @@ def test_une_exception_referme_la_barre(avec_terminal):
     ):
         raise RuntimeError("interruption")
     assert p._barre is None
+
+
+class TestBarresConcurrentes:
+    """`tqdm` empile les barres simultanées, chacune sur sa ligne."""
+
+    def test_chaque_barre_prend_une_position_distincte(self, avec_terminal):
+        with (
+            module.progression(10, "hal", None) as premiere,
+            module.progression(10, "openalex", None) as seconde,
+        ):
+            assert premiere._barre.pos != seconde._barre.pos
+
+    def test_une_position_liberee_se_reprend(self, avec_terminal):
+        with module.progression(10, "hal", None) as premiere:
+            prise = premiere._barre.pos
+        with module.progression(10, "openalex", None) as seconde:
+            assert seconde._barre.pos == prise
+
+
+class TestEcritureHorsBarre:
+    """Une ligne écrite pendant qu'une barre tourne passe au-dessus d'elle."""
+
+    def test_la_ligne_part_sur_le_flux_donne(self):
+        flux = io.StringIO()
+        module.ecrire_hors_barre("erreur sur hal-05614798", flux)
+        assert "erreur sur hal-05614798" in flux.getvalue()
+
+    def test_sans_la_bibliotheque_la_ligne_part_quand_meme(self, monkeypatch):
+        monkeypatch.setattr(module, "tqdm", None)
+        flux = io.StringIO()
+        module.ecrire_hors_barre("erreur sur hal-05614798", flux)
+        assert "erreur sur hal-05614798" in flux.getvalue()

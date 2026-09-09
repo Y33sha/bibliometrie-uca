@@ -77,6 +77,7 @@ from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.phase_order import EXTRA_PHASES, PHASE_ORDER
+from application.pipeline.progression import ecrire_hors_barre
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 from domain.sources.registry import ALL_SOURCES_SET
@@ -86,6 +87,7 @@ from infrastructure.observability.log import (
     RUN_END_MARKER,
     RUN_MARKER,
     reset_log_phase,
+    set_console_writer,
     set_log_phase,
     setup_logger,
 )
@@ -97,6 +99,10 @@ from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 # sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
 # réutilisent ce logger parent (subjects, cooccurrences, enrich) sont persistés.
 log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
+
+# Les barres de progression occupent le bas du terminal : une ligne écrite directement s'y
+# insère au milieu. L'écrivain la pose au-dessus, et les barres se redessinent ensuite.
+set_console_writer(ecrire_hors_barre)
 
 
 # ---------------------------------------------------------------------------

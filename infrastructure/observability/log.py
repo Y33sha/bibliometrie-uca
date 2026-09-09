@@ -11,10 +11,44 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TextIO
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
+
+EcrivainConsole = Callable[[str, TextIO], None]
+"""Écrit une ligne de console sur le flux donné, en préservant ce qui s'y affiche déjà."""
+
+_ecrivain_console: EcrivainConsole | None = None
+
+
+def set_console_writer(ecrire: EcrivainConsole | None) -> None:
+    """Détourne l'écriture des lignes de console vers `ecrire`.
+
+    Sert au pipeline, dont les barres de progression occupent le bas du terminal : une écriture directe s'y insère au milieu. Posé par le composition root, l'écrivain vaut pour tous les loggers configurés par ce module.
+    """
+    global _ecrivain_console
+    _ecrivain_console = ecrire
+
+
+class _FluxConsole(io.TextIOBase):
+    """Flux de console dont l'écriture passe par l'écrivain courant."""
+
+    def __init__(self, flux: TextIO) -> None:
+        self._flux = flux
+
+    def write(self, texte: str) -> int:
+        ligne = texte.rstrip("\n")
+        if _ecrivain_console is not None and ligne:
+            _ecrivain_console(ligne, self._flux)
+            return len(texte)
+        return self._flux.write(texte)
+
+    def flush(self) -> None:
+        self._flux.flush()
+
 
 # Marqueurs délimitant runs et phases dans le flux de log, émis par `run_pipeline` : ils situent une ligne dans son run et sa phase pour qui lit le flux.
 RUN_MARKER = "Run pipeline #"
@@ -149,7 +183,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     # On enveloppe stdout.buffer sans se l'approprier (line_buffering pour flush immédiat)
     utf8_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
     utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
-    console = logging.StreamHandler(stream=utf8_stream)
+    console = logging.StreamHandler(stream=_FluxConsole(utf8_stream))
     console.setFormatter(fmt)
     console.addFilter(_PhaseNameFilter())
     logger.addHandler(console)

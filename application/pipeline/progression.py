@@ -15,6 +15,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from types import TracebackType
+from typing import TextIO
 
 try:
     from tqdm import tqdm
@@ -29,6 +30,14 @@ FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}
 
 type Journal = logging.Logger | logging.LoggerAdapter[logging.Logger]
 """Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
+
+
+def ecrire_hors_barre(ligne: str, flux: TextIO) -> None:
+    """Écrit `ligne` au-dessus des barres en cours, qui se redessinent ensuite."""
+    if tqdm is not None:
+        tqdm.write(ligne, file=flux)
+    else:
+        print(ligne, file=flux)
 
 
 def _terminal_interactif() -> bool:
