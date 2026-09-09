@@ -9,11 +9,13 @@ Corrige le DOI de certaines source_publications afin de provoquer leur fusion en
 """
 
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
@@ -98,13 +100,15 @@ def run(
     conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI des chapitres portant le DOI de l'ouvrage."""
+    logger.info("%sCorrections de DOI par confrontation de documents", ETAPE)
+    t0 = time.perf_counter()
     rows = queries.fetch_doi_cluster_candidates(conn)
-    logger.info("metadata_correction (cluster) : %d source_publications examinées", len(rows))
+    logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
     updates = compute_updates(rows)
-    logger.info("  %d corrections de DOI à appliquer", len(updates))
+    logger.info("%s%s de DOI à appliquer", BRANCHE, accord(len(updates), "correction"))
     case_counts = tally_doi_corrections(updates)
 
-    total = persist_in_batches(conn, updates, queries.persist_doi_corrections)
-    logger.info("✓ %d DOI corrigés (cluster)", total)
+    persist_in_batches(conn, updates, queries.persist_doi_corrections)
+    logger.info("%sTerminé en %.1fs", DERNIERE_BRANCHE, time.perf_counter() - t0)
     return ClusterCorrectionStats(len(rows), len(updates), case_counts)

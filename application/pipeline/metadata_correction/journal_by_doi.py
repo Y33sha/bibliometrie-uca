@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     JournalCorrectionRow,
@@ -62,18 +63,19 @@ def run(
     conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> JournalByDoiStats:
     """Passe journal_by_doi : rattache le journal des orphelines à DOI dont le préfixe désigne un unique journal, et ré-évalue les rattachements existants (auto-cicatrisation)."""
+    logger.info("%sRevues non renseignées, identifiables par le DOI du document", ETAPE)
     journal_prefixes = queries.fetch_journal_doi_prefixes(conn)
     rows = queries.fetch_journal_by_doi_candidates(conn)
-    logger.info(
-        "metadata_correction (journal_by_doi) : %d journaux à préfixe, %d source_publications examinées",
-        len(journal_prefixes),
-        len(rows),
-    )
 
     updates = compute_updates(rows, journal_prefixes)
     attached = sum(1 for u in updates if u.journal_id is not None)
-    logger.info("  %d rattachements à appliquer (%d journaux posés)", len(updates), attached)
 
     persist_in_batches(conn, updates, queries.persist_journal_corrections)
-    logger.info("✓ %d source_publications rattachées (journal_by_doi)", len(updates))
+    logger.info(
+        "%s%s %s (vers %s)",
+        DERNIERE_BRANCHE,
+        accord(len(updates), "rattachement"),
+        forme(len(updates), "effectué"),
+        accord(attached, "revue"),
+    )
     return JournalByDoiStats(len(rows), attached)
