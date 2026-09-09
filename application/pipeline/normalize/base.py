@@ -19,6 +19,7 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
+from application.pipeline.libelles import accord
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.progression import progression
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
@@ -43,7 +44,6 @@ class SourceNormalizer(ABC):
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
     - `process_work(conn, row) -> bool | None` : abstrait, logique métier
     - `preload_caches(conn)` : pré-chargement optionnel
-    - `summary_stats(conn) -> list[str]` : lignes de log additionnelles
     - `cleanup()` : libération des caches après commit final
     """
 
@@ -67,10 +67,6 @@ class SourceNormalizer(ABC):
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel (ex: struct_cache pour HAL)."""
-
-    def summary_stats(self, conn: Connection) -> list[str]:
-        """Lignes additionnelles à logger en fin de run."""
-        return []
 
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libération des caches in-memory."""
@@ -101,12 +97,8 @@ class SourceNormalizer(ABC):
 
         try:
             total = self._count_pending(self.conn)
-            slog.info(f"=== Normalisation : {total} works à traiter ===")
             if total == 0:
-                slog.info("rien à traiter")
                 return NormalizeStats(0, 0, 0)
-
-            slog.info(f"Traitement de {total} works (batch size: {self.DEFAULT_BATCH_SIZE})")
 
             self.preload_caches(self.conn)
 
@@ -138,13 +130,8 @@ class SourceNormalizer(ABC):
             self.conn.commit()
             self.cleanup()
 
-            slog.info("\n=== Normalisation terminée ===")
-            slog.info(f"Traités avec succès : {processed}")
-            if skipped:
-                slog.info(f"Ignorés : {skipped}")
-            slog.info(f"Erreurs : {errors}")
-            for line in self.summary_stats(self.conn):
-                slog.info(line)
+            if errors:
+                slog.warning("%s", accord(errors, "erreur"))
 
             return NormalizeStats(processed, skipped, errors)
 

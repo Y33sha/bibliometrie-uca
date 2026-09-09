@@ -2,6 +2,7 @@
 
 import io
 import logging
+import time
 
 import pytest
 
@@ -127,3 +128,40 @@ class TestEcritureHorsBarre:
         flux = io.StringIO()
         module.ecrire_hors_barre("erreur sur hal-05614798", flux)
         assert "erreur sur hal-05614798" in flux.getvalue()
+
+
+class TestAttente:
+    """Un travail dont l'avancement ne se mesure pas : maintenance des tables, VACUUM."""
+
+    def test_le_terminal_recoit_le_libelle_sur_une_ligne_reecrite(self, avec_terminal, monkeypatch):
+        flux = io.StringIO()
+        monkeypatch.setattr(module, "_flux_barres", flux)
+        with module.attente("maintenance des tables", None):
+            pass
+        ecrit = flux.getvalue()
+        assert ecrit.startswith("\rmaintenance des tables")
+        assert ecrit.endswith("\n")
+
+    def test_les_points_courent_pendant_le_travail(self, avec_terminal, monkeypatch):
+        flux = io.StringIO()
+        monkeypatch.setattr(module, "_flux_barres", flux)
+        monkeypatch.setattr(module, "RAFRAICHISSEMENT_ATTENTE_S", 0.01)
+        with module.attente("maintenance des tables", None):
+            time.sleep(0.08)
+        assert "maintenance des tables..." in flux.getvalue()
+
+    def test_une_sortie_capturee_recoit_une_ligne_de_journal(self, sans_terminal, caplog):
+        with caplog.at_level(logging.INFO), module.attente("maintenance des tables", _log()):
+            pass
+        assert "maintenance des tables…" in caplog.text
+
+    def test_une_exception_arrete_les_points(self, avec_terminal, monkeypatch):
+        flux = io.StringIO()
+        monkeypatch.setattr(module, "_flux_barres", flux)
+        with pytest.raises(RuntimeError), module.attente("maintenance des tables", None):
+            raise RuntimeError("VACUUM en échec")
+        assert flux.getvalue().endswith("\n")
+
+
+def _log() -> logging.Logger:
+    return logging.getLogger(__name__)

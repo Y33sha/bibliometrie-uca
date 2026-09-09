@@ -32,6 +32,9 @@ FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}
 RAFRAICHISSEMENT_S = 0.1
 """Délai entre deux redessins de la barre à l'arrêt, pendant qu'une source répond."""
 
+RAFRAICHISSEMENT_ATTENTE_S = 0.4
+"""Délai entre deux points d'une attente : assez lent pour se suivre à l'œil."""
+
 type Journal = logging.Logger | logging.LoggerAdapter[logging.Logger]
 """Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
 
@@ -184,3 +187,60 @@ def progression(
         yield p
     finally:
         p.ferme()
+
+
+ETAPES_ATTENTE = ("   ", ".  ", ".. ", "...")
+"""Points qui se suivent, pour montrer qu'un travail sans avancement mesurable se poursuit."""
+
+
+class Attente:
+    """Travail en cours dont l'avancement ne se mesure pas.
+
+    En terminal, des points courent après le libellé tant que le travail dure, sur une ligne réécrite en place. Ailleurs, une ligne de journal annonce le travail.
+
+    L'écriture va droit au flux : `tqdm` mesure un avancement, et il n'y en a pas ici. Aucune barre ne tourne pendant ce temps, la maintenance venant après les boucles de la phase.
+    """
+
+    def __init__(self, libelle: str, logger: Journal | None) -> None:
+        self._libelle = libelle
+        self._fini = threading.Event()
+        self._flux = _flux_barres if _terminal_interactif() else None
+        if self._flux is None:
+            if logger is not None:
+                logger.info("%s…", libelle)
+            return
+        self._ecrire(ETAPES_ATTENTE[0])
+        threading.Thread(target=self._battre, daemon=True).start()
+
+    def _ecrire(self, points: str) -> None:
+        """Réécrit la ligne en place, le retour chariot ramenant le curseur à son début."""
+        flux = self._flux
+        if flux is not None:
+            flux.write(f"\r{self._libelle}{points}")
+            flux.flush()
+
+    def _battre(self) -> None:
+        """Fait courir les points tant que le travail dure."""
+        etape = 0
+        while not self._fini.wait(RAFRAICHISSEMENT_ATTENTE_S):
+            etape = (etape + 1) % len(ETAPES_ATTENTE)
+            self._ecrire(ETAPES_ATTENTE[etape])
+
+    def ferme(self) -> None:
+        """Arrête les points en laissant le libellé sur sa ligne."""
+        self._fini.set()
+        if self._flux is not None:
+            self._ecrire("   ")
+            self._flux.write("\n")
+            self._flux.flush()
+            self._flux = None
+
+
+@contextmanager
+def attente(libelle: str, logger: Journal | None) -> Iterator[None]:
+    """Signale pendant tout le bloc qu'un travail se poursuit, sans en mesurer l'avancement."""
+    a = Attente(libelle, logger)
+    try:
+        yield
+    finally:
+        a.ferme()

@@ -22,6 +22,24 @@ class Source(StrEnum):
     DATACITE = "datacite"
 
 
+# Nom sous lequel une source se donne à lire, dans le journal comme à l'écran. L'interface porte
+# les mêmes dans `interfaces/frontend/src/lib/sources.ts`, que TypeScript lit sans passer par ici.
+SOURCE_LABELS: dict[str, str] = {
+    Source.HAL: "HAL",
+    Source.OPENALEX: "OpenAlex",
+    Source.WOS: "WoS",
+    Source.SCANR: "ScanR",
+    Source.THESES: "theses.fr",
+    Source.CROSSREF: "Crossref",
+    Source.DATACITE: "DataCite",
+}
+
+
+def source_label(source: str) -> str:
+    """Nom lisible d'une source. Une clé inconnue se rend telle quelle."""
+    return SOURCE_LABELS.get(source, source)
+
+
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
 ALL_SOURCES: tuple[Source, ...] = tuple(Source)
 

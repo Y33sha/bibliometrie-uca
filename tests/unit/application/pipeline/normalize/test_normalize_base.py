@@ -99,6 +99,7 @@ class _Norm(SourceNormalizer):
 
 class TestRunNoWork:
     def test_nothing_to_do(self, caplog):
+        """Une source sans document en attente se tait : la barre des autres reste lisible."""
         staging = _FakeStaging()
         staging.count_returns = 0
         norm = _Norm(staging)
@@ -106,7 +107,7 @@ class TestRunNoWork:
             norm.run()
         # Pas de preload sur total=0 (sortie avant).
         assert norm.preload_called is False
-        assert "rien à traiter" in caplog.text
+        assert caplog.text == ""
 
 
 # ── Happy path ────────────────────────────────────────────────────
@@ -124,16 +125,14 @@ class TestRunHappyPath:
         assert norm.cleanup_called is True
 
     def test_mixes_success_skip_error(self, caplog):
-        """`True` → processed, `None` → skipped, `False` → errors. Le log final reporte les 3 totaux."""
+        """`True` → processed, `None` → skipped, `False` → errors. Seules les erreurs se lisent."""
         staging = _FakeStaging()
         staging.count_returns = 3
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
             stats = norm.run()
-        assert "Traités avec succès : 1" in caplog.text
-        assert "Ignorés : 1" in caplog.text
-        assert "Erreurs : 1" in caplog.text
+        assert "1 erreur" in caplog.text
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
 
     def test_le_commit_tombe_a_chaque_lot(self):
@@ -145,28 +144,16 @@ class TestRunHappyPath:
         norm.run()
         assert norm.conn.commit.call_count == 3
 
-    def test_le_bilan_porte_les_ignores(self, caplog):
+    def test_un_run_sans_erreur_se_tait(self, caplog):
+        """La barre porte l'avancement ; le compte des ignorés remonte par les métriques."""
         staging = _FakeStaging()
         staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
-            norm.run()
-        assert "Ignorés : 1" in caplog.text
-
-    def test_summary_stats_lines_logged(self, caplog):
-        class _NormWithSummary(_Norm):
-            def summary_stats(self, conn):
-                return ["  table_a : 100", "  table_b : 250"]
-
-        staging = _FakeStaging()
-        staging.count_returns = 1
-        staging.pending_rows = [_row("x")]
-        norm = _NormWithSummary(staging, results=[True])
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        assert "table_a : 100" in caplog.text
-        assert "table_b : 250" in caplog.text
+            stats = norm.run()
+        assert caplog.text == ""
+        assert stats.skipped == 1
 
 
 # ── Exception dans un work ────────────────────────────────────────
@@ -184,7 +171,7 @@ class TestRunWorkException:
         assert "Erreur sur a" in caplog.text
         # Le 2e row est quand même traité après le rollback du 1er.
         assert "b" in [r.source_id for r in norm.processed_rows]
-        assert "Erreurs : 1" in caplog.text
+        assert "1 erreur" in caplog.text
 
 
 # ── KeyboardInterrupt ─────────────────────────────────────────────
