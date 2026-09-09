@@ -1050,7 +1050,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("▶ fetch_missing_hal (par hal-id)")
+    log.info("Recherche dans HAL des documents avec hal-id trouvés ailleurs.")
     t0 = time.time()
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
@@ -1058,11 +1058,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
         metrics = asyncio.run(fetch_missing_hal_by_id(conn, adapter, log))
     finally:
         conn.close()
-    log.info(
-        "✓ fetch_missing_hal (par hal-id) terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
+    log.info("Terminé en %.1fs : %s", time.time() - t0, metrics.resume or metrics.as_summary())
     return metrics
 
 
@@ -1072,7 +1068,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("▶ fetch_missing_hal (par NNT)")
+    log.info("Recherche dans HAL des thèses avec NNT trouvées ailleurs.")
     t0 = time.time()
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
@@ -1080,11 +1076,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
         metrics = asyncio.run(fetch_missing_hal_by_nnt(conn, adapter, log))
     finally:
         conn.close()
-    log.info(
-        "✓ fetch_missing_hal (par NNT) terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
+    log.info("Terminé en %.1fs : %s", time.time() - t0, metrics.resume or metrics.as_summary())
     return metrics
 
 
@@ -1134,8 +1126,6 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
 
     adapter = _make_fetch_missing_doi_adapter(target)
 
-    log.info("▶ fetch_missing_doi --target %s", target)
-    t0 = time.time()
     conn = get_sync_engine().connect()
     # Circuit-breaker par source : la ContextVar est posée ici (composition root) ;
     # le helper HTTP infra la lit, run_async ne consulte que `breaker.tripped`.
@@ -1158,12 +1148,6 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     finally:
         reset_current_breaker(token)
         conn.close()
-    log.info(
-        "✓ fetch_missing_doi (%s) terminé en %.1fs — %s",
-        target,
-        time.time() - t0,
-        metrics.as_summary(),
-    )
     _signal_if_tripped(metrics, breaker)
     return metrics
 

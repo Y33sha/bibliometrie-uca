@@ -18,6 +18,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
+from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import (
@@ -25,12 +26,17 @@ from application.ports.pipeline.fetch_missing.hal import (
     HalIdRef,
     NntRef,
 )
+from domain.types import JsonValue
 
 __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
 
-from domain.types import JsonValue
-
 _COMMIT_EVERY = 50
+
+
+def _retrouves(trouves: int, attendus: int, nom: str, *, feminin: bool = False) -> str:
+    """Rend « 3/5 documents retrouvés dans HAL »."""
+    participe = "retrouvée" if feminin else "retrouvé"
+    return f"{trouves}/{attendus} {forme(attendus, nom)} {forme(attendus, participe)} dans HAL"
 
 
 def _dedup_halid_refs(refs: list[HalIdRef]) -> list[HalIdRef]:
@@ -103,14 +109,18 @@ async def fetch_missing_hal_by_id(
     adapter.configure(conn)
 
     refs_oa = adapter.find_halid_refs_from_openalex(conn)
-    log.info("%d halIds OpenAlex absents de staging_hal", len(refs_oa))
     refs_scanr = adapter.find_halid_refs_from_scanr(conn)
-    log.info("%d halIds ScanR absents de staging_hal", len(refs_scanr))
 
     missing = _dedup_halid_refs(refs_oa + refs_scanr)
-    log.info("%d halIds manquants au total (après déduplication)", len(missing))
+    attendus = len(missing)
+    log.info(
+        "%s %s trouvés seulement dans OpenAlex ou ScanR",
+        accord(attendus, "document avec hal-id", "documents avec hal-id"),
+        forme(attendus, "trouvé", "trouvés"),
+    )
 
-    metrics = PhaseMetrics(seen=len(missing))
+    metrics = PhaseMetrics(seen=attendus)
+    metrics.resume = _retrouves(0, attendus, "document")
     if stats_only or not missing:
         return metrics
 
@@ -139,7 +149,7 @@ async def fetch_missing_hal_by_id(
         insert_one=_insert,
     )
     metrics.add(new=fetched, not_found=not_found)
-    log.info("hal-id : %d récupérés, %d introuvables", fetched, not_found)
+    metrics.resume = _retrouves(fetched, attendus, "document")
     return metrics
 
 
@@ -158,9 +168,11 @@ async def fetch_missing_hal_by_nnt(
     adapter.configure(conn)
 
     nnt_refs = adapter.find_nnt_refs_from_theses(conn)
-    log.info("%d NNT (thèses soutenues) sans HAL", len(nnt_refs))
+    attendues = len(nnt_refs)
+    log.info("%s sans document HAL", accord(attendues, "thèse soutenue", "thèses soutenues"))
 
-    metrics = PhaseMetrics(seen=len(nnt_refs))
+    metrics = PhaseMetrics(seen=attendues)
+    metrics.resume = _retrouves(0, attendues, "thèse", feminin=True)
     if stats_only or not nnt_refs:
         return metrics
 
@@ -189,5 +201,5 @@ async def fetch_missing_hal_by_nnt(
         insert_one=_insert,
     )
     metrics.add(new=fetched, not_found=not_found)
-    log.info("NNT : %d récupérés, %d absents de HAL", fetched, not_found)
+    metrics.resume = _retrouves(fetched, attendues, "thèse", feminin=True)
     return metrics

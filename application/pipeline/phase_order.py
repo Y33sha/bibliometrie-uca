@@ -28,7 +28,7 @@ PHASE_ORDER: tuple[str, ...] = (
 PHASE_LIBELLES: dict[str, str] = {
     "extract": "Moissonnage des sources",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
-    "fetch_missing": "Rattrapage des documents absents d'une source",
+    "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
     "fetch_stale": "Rafraîchissement des documents les plus anciens",
     "fetch_truncated": "Récupération des listes d'auteurs tronquées",
     "normalize": "Mise en forme commune des documents moissonnés",

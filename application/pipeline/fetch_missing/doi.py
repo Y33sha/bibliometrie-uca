@@ -19,6 +19,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
+from application.pipeline.libelles import accord, forme
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
@@ -62,7 +63,11 @@ async def run_async(
     slog = scoped_logger(log, adapter.source_key)
 
     dois = cross_import_dois_reader(conn, adapter.source_key)
-    slog.info("%d DOI manquants", len(dois))
+    slog.info(
+        "%s %s dans les autres sources",
+        accord(len(dois), "DOI", "DOI"),
+        forme(len(dois), "trouvé", "trouvés"),
+    )
 
     if limit and len(dois) > limit:
         slog.info("plafond de %d DOI, %d reportés aux prochains runs", limit, len(dois) - limit)
@@ -137,15 +142,12 @@ async def run_async(
             total,
         )
 
-    duplicates = progress["fetched"] - progress["inserted"]
     slog.info(
-        "terminé : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging),"
-        " %d not-found (backoff)",
-        total,
-        progress["fetched"],
+        "%s/%s %s %s",
         progress["inserted"],
-        duplicates,
-        progress["not_found"],
+        total,
+        forme(total, "document"),
+        forme(total, "récupéré"),
     )
     return PhaseMetrics(
         seen=total,
