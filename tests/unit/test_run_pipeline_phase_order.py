@@ -1,13 +1,12 @@
-"""Régression : `addresses.pub_count` se recalcule en phase `publications`.
-
-`recompute_pub_count` compte les publications rattachées à chaque adresse ; celles-ci ne sont créées qu'en phase `publications`, après réconciliation. Le recalcul tourne dans cet orchestrateur, hors de portée de `normalize`.
-"""
+"""Ordre des phases : ce que chacune exige d'une autre avant de tourner."""
 
 import logging
 from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from application.pipeline.publications import phase as publications_phase
+from application.pipeline.authorships import phase as authorships_phase
+from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli import run_pipeline
 
 
@@ -16,18 +15,28 @@ def _fake_tx():
     yield MagicMock()
 
 
-def test_recompute_addresses_runs_in_publications_phase():
-    reconciliation = MagicMock()
-    reconciliation.count_publications.return_value = 0
+def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
+    """Adresses, revues et éditeurs se comptent des mêmes publications et signatures.
+
+    La phase `authorships` les stabilise : leurs décomptes s'y recalculent ensemble.
+    """
     address_pub_count = MagicMock()
-    # La réconciliation est hors sujet ici : on la neutralise pour isoler le recompute.
-    with patch.object(publications_phase, "reconcile_run", return_value=None):
-        publications_phase.run(
+    address_pub_count.recompute_pub_count.return_value = 0
+    build_queries = MagicMock()
+    purge_queries = MagicMock()
+    purge_queries.purge_orphan_publications.return_value = 0
+    pub_counts = MagicMock()
+    pub_counts.refresh_pub_counts.return_value = SimpleNamespace(journals=0, publishers=0)
+    with patch.object(
+        authorships_phase, "build", return_value=PhaseMetrics(details={"summary": {}})
+    ):
+        authorships_phase.run(
             _fake_tx,
-            reconciliation,
+            build_queries,
+            purge_queries,
+            pub_counts,
             address_pub_count,
             logging.getLogger("test"),
-            publication_repo_factory=lambda conn: MagicMock(),
         )
     address_pub_count.recompute_pub_count.assert_called_once()
 

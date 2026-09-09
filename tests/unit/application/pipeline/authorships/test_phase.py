@@ -34,9 +34,19 @@ class _FakePubCountsQueries:
         return PubCountChanges(journals=3, publishers=2)
 
 
+class _FakeAddressPubCountQueries:
+    def __init__(self) -> None:
+        self.appels = 0
+
+    def recompute_pub_count(self, conn) -> int:
+        self.appels += 1
+        return 7
+
+
 def _run(open_tx, lots, *, rebuild_authorships=False, build_metrics=None):
     purge = _FakePurgeQueries(lots)
     pub_counts = _FakePubCountsQueries()
+    adresses = _FakeAddressPubCountQueries()
     vus: dict[str, object] = {}
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
@@ -52,6 +62,7 @@ def _run(open_tx, lots, *, rebuild_authorships=False, build_metrics=None):
             object(),
             purge,
             pub_counts,
+            adresses,
             _LOG,
             rebuild_authorships=rebuild_authorships,
         )
@@ -100,4 +111,5 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(open_tx):
 def test_chaque_sous_etape_dans_sa_transaction(open_tx):
     _run(open_tx, [10])
 
-    assert open_tx.transactions == 3  # build, purge, refresh des compteurs
+    # build, purge, décompte des adresses, décompte des revues et éditeurs
+    assert open_tx.transactions == 4

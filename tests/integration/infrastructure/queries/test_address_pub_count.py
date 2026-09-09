@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.publications.address_pub_count import PgAddressPubCountQueries
+from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
 
 _Q = PgAddressPubCountQueries()
 from tests.integration.helpers.authorships import upsert_identity

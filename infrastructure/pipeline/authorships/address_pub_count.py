@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.publications.address_pub_count import AddressPubCountQueries
+from application.ports.pipeline.authorships.address_pub_count import AddressPubCountQueries
 
 
 class PgAddressPubCountQueries(AddressPubCountQueries):

@@ -4,20 +4,16 @@
 
 `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
 
-En fin de phase, `addresses.pub_count` (nombre de publications par adresse) est recalculé, une fois les publications créées et fusionnées.
-
-Les trois étapes — redirty optionnel, réconciliation, recompute du cache `pub_count` — sont indépendantes et idempotentes ; chacune tourne dans sa propre transaction.
+Les deux étapes — redirty optionnel, réconciliation — sont indépendantes et idempotentes ; chacune tourne dans sa propre transaction.
 """
 
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publications.reconcile_components import run as reconcile_run
-from application.ports.pipeline.publications.address_pub_count import AddressPubCountQueries
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
 )
@@ -28,17 +24,16 @@ from application.ports.repositories.publication_repository import PublicationRep
 def run(
     open_tx: OpenTransaction,
     reconciliation_queries: PublicationsReconciliationQueries,
-    address_pub_count_queries: AddressPubCountQueries,
     logger: logging.Logger,
     *,
     publication_repo_factory: Callable[[Connection], PublicationRepository],
     rebuild_publications: bool = False,
 ) -> PhaseMetrics:
-    """Redirty optionnel → réconciliation → recompute `addresses.pub_count`."""
+    """Redirty optionnel, puis réconciliation."""
     if rebuild_publications:
         _redirty_all(open_tx, reconciliation_queries, logger)
     metrics = _reconcile(open_tx, reconciliation_queries, logger, publication_repo_factory)
-    _recompute_address_pub_count(open_tx, address_pub_count_queries, logger)
+    metrics.resume = ""
     return metrics
 
 
@@ -80,16 +75,3 @@ def _reconcile(
         "pub_total": pub_total,
     }
     return metrics
-
-
-def _recompute_address_pub_count(
-    open_tx: OpenTransaction,
-    address_pub_count_queries: AddressPubCountQueries,
-    logger: logging.Logger,
-) -> None:
-    t0 = time.perf_counter()
-    with open_tx() as conn:
-        n = address_pub_count_queries.recompute_pub_count(conn)
-    logger.info(
-        "✓ addresses.pub_count : %d rows mises à jour en %.1fs", n, time.perf_counter() - t0
-    )
