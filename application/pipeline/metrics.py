@@ -63,7 +63,7 @@ class PhaseMetrics:
     details: dict[str, object] = field(default_factory=dict)
     signals: list[Signal] = field(default_factory=list)
     resume: str | None = field(default=None, compare=False)
-    """Bilan de fin de phase, dans les mots de la phase. `as_summary()` prend le relais à défaut.
+    """Bilan de fin de phase, dans les mots de la phase. `as_summary()` prend le relais à défaut, et une chaîne vide close la phase sans un mot — ses barres ayant déjà tout dit.
 
     Hors comparaison : deux relevés portant les mêmes compteurs sont égaux, quels que soient les mots qui les présentent.
     """

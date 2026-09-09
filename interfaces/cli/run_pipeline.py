@@ -1523,7 +1523,9 @@ def _run_one_phase(
         duration = time.time() - t0_phase
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
         if isinstance(result, PhaseMetrics):
-            log.info("Terminé en %.1fs : %s", duration, result.resume or result.as_summary())
+            # Une phase pose `resume = ""` pour se clore sans un mot, ses barres ayant tout dit.
+            if (bilan := result.resume if result.resume is not None else result.as_summary()) != "":
+                log.info("Terminé en %.1fs : %s", duration, bilan)
         recorder.record(
             phase=name,
             started_at=phase_started_at,
