@@ -164,6 +164,16 @@ def _make_formatter() -> logging.Formatter:
     return JsonFormatter()
 
 
+def _make_console_formatter() -> logging.Formatter:
+    """Retourne le formatter des lignes de console.
+
+    Devant un terminal, le format texte omet l'horodatage. Une sortie redirigée ou capturée le garde.
+    """
+    if os.environ.get("LOG_FORMAT", "json").lower() == "text" and sys.stdout.isatty():
+        return logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
+    return _make_formatter()
+
+
 def _rebase_log_dir(log_dir: str) -> Path:
     """Rebase `log_dir` vers `PROJECT_ROOT/logs/<relpath>/`.
 
@@ -198,15 +208,13 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     if logger.handlers:
         return logger
 
-    fmt = _make_formatter()
-
     console = logging.StreamHandler(stream=_FluxConsole(console_stream()))
-    console.setFormatter(fmt)
+    console.setFormatter(_make_console_formatter())
     console.addFilter(_PhaseNameFilter())
     logger.addHandler(console)
 
     if os.environ.get("LOG_TO_FILE", "").lower() == "true":
-        _attach_file_handler(logger, name, log_dir, fmt)
+        _attach_file_handler(logger, name, log_dir, _make_formatter())
 
     return logger
 
@@ -252,6 +260,6 @@ def configure_root_logging(level: int = logging.INFO) -> None:
     if os.environ.get("PYTEST_VERSION") or os.environ.get("PYTEST_CURRENT_TEST"):
         return
     handler = logging.StreamHandler(stream=sys.stdout)
-    handler.setFormatter(_make_formatter())
+    handler.setFormatter(_make_console_formatter())
     handler.addFilter(_PhaseNameFilter())
     root.addHandler(handler)
