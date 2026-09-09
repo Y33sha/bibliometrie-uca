@@ -12,6 +12,7 @@
 * [ ] suggested countries: jamais remis à null
 * [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
+* [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
 
 # Code
 * [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
