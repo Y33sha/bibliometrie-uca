@@ -46,7 +46,7 @@ def extract_ppn(
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
     total = as_int(data.get("totalHits")) or 0
-    logger.info("%s thèses", total)
+    logger.info("%s thèses à parcourir", total)
 
     if dry_run or total == 0:
         return total, 0, 0, 0
@@ -100,11 +100,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
             )
         return config
 
-    def setup_logging(self, args: argparse.Namespace, config: ThesesExtractConfig) -> None:
-        self.logger.info("Établissements PPN : %s", config.ppns)
-        if args.year is not None:
-            self.logger.info("Filtre année (NNT préfixe) : %s", args.year)
-
     def extract_all(self, args: argparse.Namespace, config: ThesesExtractConfig) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
@@ -121,12 +116,26 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
             if not args.dry_run:
-                slog.info(
-                    "terminé : %s nouveaux, %s mis à jour, %s inchangés",
-                    inserted,
-                    updated,
-                    unchanged,
-                )
+                retenues = inserted + updated + unchanged
+                if args.year is None:
+                    slog.info(
+                        "%s thèses trouvées : %s nouvelles, %s mises à jour, %s inchangées",
+                        total,
+                        inserted,
+                        updated,
+                        unchanged,
+                    )
+                else:
+                    # `total` porte toutes les thèses de l'établissement ; le filtre par année
+                    # n'en retient qu'une partie, et le bilan porte sur celles-là.
+                    slog.info(
+                        "%s thèses soutenues en %s : %s nouvelles, %s mises à jour, %s inchangées",
+                        retenues,
+                        args.year,
+                        inserted,
+                        updated,
+                        unchanged,
+                    )
         return stats
 
 

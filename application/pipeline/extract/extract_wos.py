@@ -39,15 +39,13 @@ def extract_year(
     """Extrait toutes les publications d'une année.
 
     Retourne `(new, updated, unchanged)`."""
-    logger.info("requête : %s", adapter.build_query(year, affiliations))
-
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
         logger.error("requête impossible")
         return 0, 0, 0
 
     total_count = adapter.get_records_found(data)
-    logger.info("%s records trouvés", total_count)
+    logger.info("%s documents à récupérer", total_count)
 
     if dry_run or total_count == 0:
         return 0, 0, 0
@@ -101,11 +99,11 @@ def extract_year(
                 break
 
     logger.info(
-        "terminé : %s nouveaux, %s mis à jour, %s inchangés sur %s trouvés",
+        "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
+        total_count,
         total_new,
         total_updated,
         total_unchanged,
-        total_count,
     )
     return total_new, total_updated, total_unchanged
 
@@ -126,7 +124,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: WosExtractConfig) -> None:
-        self.logger.info("Affiliations : %s", config.affiliations)
         try:
             remaining = self._adapter.check_quota()
         except Exception as e:
@@ -138,7 +135,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
     def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
-        self.logger.info("Années : %s", years)
 
         stats = PhaseMetrics()
         for i, year in enumerate(years):

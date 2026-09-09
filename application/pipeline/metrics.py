@@ -97,19 +97,19 @@ class PhaseMetrics:
         }
 
     def as_summary(self) -> str:
-        """Une-ligne lisible pour les logs ('10 new, 5 updated' / '...')."""
+        """Une-ligne lisible pour les logs ('10 nouveaux, 5 mis à jour')."""
         parts: list[str] = []
         if self.new:
-            parts.append(f"{self.new} new")
+            parts.append(f"{self.new} nouveaux")
         if self.updated:
-            parts.append(f"{self.updated} updated")
+            parts.append(f"{self.updated} mis à jour")
         if self.unchanged:
-            parts.append(f"{self.unchanged} unchanged")
+            parts.append(f"{self.unchanged} inchangés")
         if self.errors:
-            parts.append(f"{self.errors} errors")
+            parts.append(f"{self.errors} erreurs")
         for k, v in self.extras.items():
             if v:
                 parts.append(f"{v} {k}")
         if self.total and not parts:
-            parts.append(f"{self.total} total")
-        return ", ".join(parts) if parts else "no-op"
+            parts.append(f"{self.total} au total")
+        return ", ".join(parts) if parts else "rien à faire"
