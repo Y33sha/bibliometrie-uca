@@ -129,6 +129,18 @@ class TestEcritureHorsBarre:
         module.ecrire_hors_barre("erreur sur hal-05614798", flux)
         assert "erreur sur hal-05614798" in flux.getvalue()
 
+    def test_le_terminal_recoit_de_quoi_effacer_la_fin_de_ligne(self, avec_terminal):
+        """La ligne emporte de quoi effacer la fin de la barre dont elle prend la place."""
+        flux = io.StringIO()
+        module.ecrire_hors_barre("[HAL · 2018] 13 nouveaux", flux)
+        assert module.EFFACE_FIN_DE_LIGNE in flux.getvalue()
+
+    def test_une_sortie_capturee_reste_sans_sequence_d_effacement(self, sans_terminal):
+        """Un fichier de journal porterait la séquence telle quelle."""
+        flux = io.StringIO()
+        module.ecrire_hors_barre("[HAL · 2018] 13 nouveaux", flux)
+        assert module.EFFACE_FIN_DE_LIGNE not in flux.getvalue()
+
 
 class TestAttente:
     """Un travail dont l'avancement ne se mesure pas : maintenance des tables, VACUUM."""
