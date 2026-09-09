@@ -7,7 +7,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import ETAPE
+from application.pipeline.libelles import etape
 from application.pipeline.persons.resolve_identifier_transfers import (
     detect_identifier_conflicts,
     resolve_identifier_transfers,
@@ -27,7 +27,7 @@ def arbitrate_identifier_conflicts(
 
     Retourne `{transferred}`. Le commit est laissé au caller.
     """
-    logger.info("%sConflits d'attribution d'identifiants", ETAPE)
+    etape(logger, "Conflits d'attribution d'identifiants")
     conflicts = detect_identifier_conflicts(conn, queries)
     transferred = resolve_identifier_transfers(
         conn, conflicts, queries=queries, repo=person_repo, logger=logger

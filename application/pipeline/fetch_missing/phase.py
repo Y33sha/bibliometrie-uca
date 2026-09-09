@@ -8,7 +8,7 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-from application.pipeline.libelles import ETAPE
+from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.parallel import RunParallel
@@ -70,8 +70,7 @@ def run(
     )
 
     if configured:
-        logger.info("")
-        logger.info("%sRecherche par DOI des documents manquants dans chaque source", ETAPE)
+        etape(logger, "Recherche par DOI des documents manquants dans chaque source")
         outcomes = run_parallel(
             {
                 target: partial(timed_metrics, partial(fetch_doi_one, target))

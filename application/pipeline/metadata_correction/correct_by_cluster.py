@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
@@ -100,7 +100,7 @@ def run(
     conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI des chapitres portant le DOI de l'ouvrage."""
-    logger.info("%sCorrections de DOI par confrontation de documents", ETAPE)
+    etape(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = queries.fetch_doi_cluster_candidates(conn)
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))

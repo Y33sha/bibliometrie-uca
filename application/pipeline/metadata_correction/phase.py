@@ -31,9 +31,7 @@ def run(
 ) -> PhaseMetrics:
     """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
     journal_by_doi = _step(open_tx, lambda conn: run_journal_by_doi(conn, queries, logger))
-    logger.info("")
     unary = _step(open_tx, lambda conn: run_unary(conn, queries, logger))
-    logger.info("")
     cluster = _step(open_tx, lambda conn: run_cluster(conn, queries, logger))
 
     metrics = PhaseMetrics()

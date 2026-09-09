@@ -20,7 +20,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE
+from application.pipeline.libelles import DERNIERE_BRANCHE, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
@@ -66,8 +66,7 @@ def run(
         )
         cross_source_detached = persons_queries.detach_authorships(conn, stale)
 
-        logger.info("")
-        logger.info("%sMise à jour des formes de nom associées aux personnes", ETAPE)
+        etape(logger, "Mise à jour des formes de nom associées aux personnes")
         t0 = time.perf_counter()
         with attente(f"{DERNIERE_BRANCHE}mise à jour en cours", logger) as ligne:
             populate(conn, name_forms_queries, logger)

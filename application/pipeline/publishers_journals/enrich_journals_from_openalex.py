@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
@@ -59,9 +59,9 @@ def run_enrich_journals_from_openalex(
     total = len(journals)
     if total == 0:
         return PhaseMetrics()
-    logger.info(
-        "%s%s : identification du type des revues sur OpenAlex",
-        ETAPE,
+    etape(
+        logger,
+        "%s : identification du type des revues sur OpenAlex",
         accord(total, "revue sans type", "revues sans type"),
     )
 

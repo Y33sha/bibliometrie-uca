@@ -76,7 +76,7 @@ if TYPE_CHECKING:
         AsyncFetchMissingDoiAdapter,
     )
 
-from application.pipeline.libelles import ETAPE, accord
+from application.pipeline.libelles import accord, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
@@ -85,6 +85,7 @@ from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE
 from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
+from domain.dates import date_to_french
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import (
@@ -542,7 +543,6 @@ def _run_resolve_publishers() -> PhaseMetrics:
     from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
     from infrastructure.sources.polite_pool import build_user_agent
 
-    t0 = time.time()
     conn = get_sync_engine().connect()
     breaker = SourceCircuitBreaker("crossref/datacite prefixes")
     token = set_current_breaker(breaker)
@@ -570,7 +570,6 @@ def _run_resolve_publishers() -> PhaseMetrics:
     finally:
         reset_current_breaker(token)
         conn.close()
-    log.info("✓ resolve_publishers terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
     _signal_if_tripped(metrics, breaker)
     return metrics
 
@@ -914,15 +913,15 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
         if last is not None and last > threshold:
             prochain = last + datetime.timedelta(days=_DOAJ_STALE_DAYS)
-            log.info(
-                "%sRéférentiel DOAJ importé le %s : prochain import le %s",
-                ETAPE,
-                last.strftime("%d-%m-%Y"),
-                prochain.strftime("%d-%m-%Y"),
+            etape(
+                log,
+                "Référentiel DOAJ importé le %s : prochain import le %s",
+                date_to_french(last.date()),
+                date_to_french(prochain.date()),
             )
             return PhaseMetrics(extras={"skipped": 1})
 
-        log.info("%sImport du référentiel DOAJ", ETAPE)
+        etape(log, "Import du référentiel DOAJ")
 
         # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
         user_agent = build_user_agent(get_polite_pool_email_optional() or "")
@@ -1046,7 +1045,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("%sRecherche dans HAL des documents avec hal-id trouvés ailleurs", ETAPE)
+    etape(log, "Recherche dans HAL des documents avec hal-id trouvés ailleurs")
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
@@ -1062,8 +1061,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("")
-    log.info("%sRecherche dans HAL des thèses avec NNT trouvées ailleurs", ETAPE)
+    etape(log, "Recherche dans HAL des thèses avec NNT trouvées ailleurs")
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
@@ -1565,6 +1563,7 @@ def _run_one_phase(
         if isinstance(result, PhaseMetrics):
             # Une phase pose `resume = ""` pour se clore sans un mot, ses barres ayant tout dit.
             if (bilan := result.resume if result.resume is not None else result.as_summary()) != "":
+                log.info("")
                 log.info("Terminé en %.1fs : %s", duration, bilan)
         recorder.record(
             phase=name,

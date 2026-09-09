@@ -49,7 +49,6 @@ def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> Non
         logger.info(
             "     | %s | %s |", f"{compte}".rjust(largeur_nombre), libelle.ljust(largeur_libelle)
         )
-    logger.info("")
 
 
 def build_metrics(
