@@ -119,7 +119,7 @@ class _FakeCountryQueries:
         self._tranches = list(tranches)
         self._pool = list(pool)
         self._counts = counts or SuggestEligibleCounts(
-            eligible=sum(len(t) for t in tranches), has_suggestion=0, empty_attempted=0
+            eligible=sum(len(t) for t in tranches), empty_attempted=0
         )
         self.ecritures: list[tuple[list, str]] = []
         self.pool_charge = 0
@@ -144,9 +144,7 @@ class _FakeCountryQueries:
 
 class TestRun:
     def test_rien_a_traiter(self):
-        queries = _FakeCountryQueries(
-            counts=SuggestEligibleCounts(eligible=0, has_suggestion=12, empty_attempted=3)
-        )
+        queries = _FakeCountryQueries(counts=SuggestEligibleCounts(eligible=0, empty_attempted=3))
 
         metrics = run(_FakeConnection(), queries, _LOG)
 
@@ -183,7 +181,7 @@ class TestRun:
         queries = _FakeCountryQueries(
             tranches=[[(1, "lab foo")]],
             pool=[("lab foo univ", ["FR"])],
-            counts=SuggestEligibleCounts(eligible=1, has_suggestion=0, empty_attempted=5),
+            counts=SuggestEligibleCounts(eligible=1, empty_attempted=5),
         )
 
         metrics = run(_FakeConnection(), queries, _LOG, retry_empty=True)

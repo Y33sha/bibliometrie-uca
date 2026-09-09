@@ -32,10 +32,9 @@ class AddressCountryFilter:
 
 
 class SuggestEligibleCounts(NamedTuple):
-    """Compteurs des adresses sans pays, pour le log de la passe de suggestion."""
+    """Compteurs des adresses sans pays qui bornent la passe de suggestion."""
 
     eligible: int  # aucune suggestion tentée
-    has_suggestion: int
     empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
 
 

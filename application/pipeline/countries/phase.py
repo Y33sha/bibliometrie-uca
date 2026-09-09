@@ -1,20 +1,16 @@
 """Orchestrateur de la phase `countries` : détection du pays des adresses et recalcul en cascade.
 
-Quatre sous-étapes, chacune dans sa propre transaction, encadrées d'un bilan initial et final :
+Quatre sous-étapes, chacune dans sa propre transaction :
 
 1. **detect_by_country_name** — pays déduit du dernier segment de l'adresse (nom de pays).
 2. **detect_by_place_name** — pays déduit d'un nom de lieu (institution, ville).
 3. **suggest_address_countries** — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
 4. **refresh_publication_countries** — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
 
-Le bilan (initial/final) trace l'entonnoir : du manque initial en pays aux pays rattachés par le run, puis au reste (dont une part porte une suggestion).
+L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
 
 import logging
-import time
-from collections.abc import Callable
-
-from sqlalchemy import Connection
 
 from application.pipeline.countries import (
     detect_by_country_name,
@@ -27,37 +23,10 @@ from application.ports.pipeline.countries import AddressCountryStatus, CountryQu
 from application.ports.pipeline.transaction import OpenTransaction
 
 
-def _bilan(
-    open_tx: OpenTransaction, queries: CountryQueries, logger: logging.Logger, label: str
-) -> AddressCountryStatus:
-    """Bilan global de l'état pays des adresses, logué en début et fin de phase."""
+def _etat_des_adresses(open_tx: OpenTransaction, queries: CountryQueries) -> AddressCountryStatus:
+    """Relève combien d'adresses portent un pays, une suggestion, ou rien."""
     with open_tx() as conn:
-        s = queries.count_address_country_status(conn)
-    logger.info(
-        "%s — adresses (pub_count > 0) : %d total | %d avec pays | %d avec suggestion | %d sans rien",
-        label,
-        s.total,
-        s.with_country,
-        s.with_suggestion,
-        s.none,
-    )
-    return s
-
-
-def _timed_metrics_step(
-    open_tx: OpenTransaction,
-    label: str,
-    step: Callable[[Connection], PhaseMetrics],
-    logger: logging.Logger,
-    *,
-    start_suffix: str = "",
-) -> PhaseMetrics:
-    """Exécute une sous-étape (rendant des `PhaseMetrics`) dans sa transaction, chronométrée."""
-    t0 = time.perf_counter()
-    with open_tx() as conn:
-        metrics = step(conn)
-    logger.info("✓ %s terminé en %.1fs — %s", label, time.perf_counter() - t0, metrics.as_summary())
-    return metrics
+        return queries.count_address_country_status(conn)
 
 
 def run(
@@ -67,40 +36,20 @@ def run(
     *,
     retry_empty: bool,
 ) -> PhaseMetrics:
-    """Enchaîne les quatre sous-étapes, borne l'entonnoir par les bilans et assemble les métriques."""
+    """Enchaîne les quatre sous-étapes, borne l'entonnoir par les deux relevés et assemble les métriques."""
     metrics = PhaseMetrics()
-    initial = _bilan(open_tx, queries, logger, "Bilan initial")
+    initial = _etat_des_adresses(open_tx, queries)
 
-    metrics.merge(
-        _timed_metrics_step(
-            open_tx,
-            "detect_by_country_name",
-            lambda conn: detect_by_country_name.run(conn, queries, logger),
-            logger,
-        )
-    )
-    metrics.merge(
-        _timed_metrics_step(
-            open_tx,
-            "detect_by_place_name",
-            lambda conn: detect_by_place_name.run(conn, queries, logger),
-            logger,
-        )
-    )
-    metrics.merge(
-        _timed_metrics_step(
-            open_tx,
-            "suggest_address_countries",
-            lambda conn: suggest_countries.run(conn, queries, logger, retry_empty=retry_empty),
-            logger,
-            start_suffix=" (retry-vides)" if retry_empty else "",
-        )
-    )
-
+    with open_tx() as conn:
+        metrics.merge(detect_by_country_name.run(conn, queries, logger))
+    with open_tx() as conn:
+        metrics.merge(detect_by_place_name.run(conn, queries, logger))
+    with open_tx() as conn:
+        metrics.merge(suggest_countries.run(conn, queries, logger, retry_empty=retry_empty))
     with open_tx() as conn:
         refresh_publication_countries.refresh(conn, queries, logger)
 
-    final = _bilan(open_tx, queries, logger, "Bilan final")
+    final = _etat_des_adresses(open_tx, queries)
     total = final.total
     without_initial = total - initial.with_country
     metrics.details["summary"] = {
@@ -111,4 +60,6 @@ def run(
         "remaining": total - final.with_country,
         "with_suggestion": final.with_suggestion,
     }
+    # Chaque sous-étape porte ce qu'elle a résolu : une ligne de clôture les répéterait.
+    metrics.resume = ""
     return metrics

@@ -9,6 +9,7 @@ import logging
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.countries import CountryQueries
 
@@ -32,12 +33,12 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
 
     `seen` = adresses sans pays, `new` = adresses matchées et écrites, `extras["unmatched"]` = sans correspondance.
     """
+    etape(logger, "Recherche de noms de pays dans les adresses")
     country_forms = queries.load_country_forms(conn)
     max_tokens = max((form.count(" ") + 1 for form in country_forms), default=1)
-    logger.info("%d formes de noms de pays chargées", len(country_forms))
 
     rows = queries.fetch_addresses_missing_country_normalized(conn)
-    logger.info("%d adresses sans pays", len(rows))
+    logger.info("%s%s sans pays", BRANCHE, accord(len(rows), "adresse"))
 
     matched: list[tuple[int, list[str]]] = []
     unmatched = 0
@@ -48,6 +49,8 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
         else:
             unmatched += 1
 
-    logger.info("Matchés : %d, non matchés : %d", len(matched), unmatched)
+    logger.info(
+        "%s%s %s", DERNIERE_BRANCHE, accord(len(matched), "adresse"), forme(len(matched), "résolue")
+    )
     queries.write_countries(conn, matched, target_column="countries")
     return PhaseMetrics(seen=len(rows), new=len(matched), extras={"unmatched": unmatched})

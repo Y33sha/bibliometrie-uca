@@ -10,14 +10,15 @@ L'orchestrateur `run` alimente `addresses.suggested_countries` (confirmation man
 """
 
 import logging
-import time
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 
 import ahocorasick
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import attente
 from application.ports.pipeline.countries import CountryQueries
 
 BATCH_SIZE = 50000
@@ -79,57 +80,35 @@ def run(
 
     `retry_empty` (mode `full`) : traite les nouvelles **+ les vides** (échecs précédents `= []`), pour réessayer au cas où le pool aurait grossi, sans recalculer les suggestions positives (qui changent rarement et coûtent cher). Sinon (incrémental) : seulement les nouvelles (`suggested_countries IS NULL`). `seen` = adresses traitées, `new` = adresses avec suggestion.
     """
+    etape(logger, "Détermination du pays par similitude d'adresses")
     counts = queries.count_suggest_eligible(conn)
     total = counts.eligible + (counts.empty_attempted if retry_empty else 0)
-    mode = "retry-vides" if retry_empty else "incrémental"
-    logger.info(
-        "%d adresses à traiter (mode %s, batch_size=%d) — %d déjà avec suggestion, "
-        "%d déjà tentées sans match",
-        total,
-        mode,
-        batch_size,
-        counts.has_suggestion,
-        counts.empty_attempted,
-    )
     if total == 0:
-        logger.info("Rien à faire.")
+        logger.info("%sRien à faire", DERNIERE_BRANCHE)
         return PhaseMetrics()
-
-    logger.info("Chargement du pool (adresses avec pays)...")
-    pool = queries.load_country_pool(conn)
-    logger.info("  %d adresses dans le pool", len(pool))
 
     processed = 0
     found = 0
     after_id = 0
-    t0 = time.time()
-    while True:
-        targets = queries.fetch_suggest_targets_chunk(
-            conn, after_id=after_id, limit=batch_size, retry_empty=retry_empty
-        )
-        if not targets:
-            break
-        after_id = targets[-1][0]  # tranche triée par id
+    # Le pool des adresses avec pays et le balayage par lots durent : la ligne dit le travail en
+    # cours, puis cède la place au nombre d'adresses résolues.
+    with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
+        pool = queries.load_country_pool(conn)
+        while True:
+            targets = queries.fetch_suggest_targets_chunk(
+                conn, after_id=after_id, limit=batch_size, retry_empty=retry_empty
+            )
+            if not targets:
+                break
+            after_id = targets[-1][0]  # tranche triée par id
 
-        suggestions = CountrySuggester(targets).suggest(pool)
-        rows = [(addr_id, suggestions.get(addr_id, [])) for addr_id, _ in targets]
-        queries.write_countries(conn, rows, target_column="suggested_countries")
-        conn.commit()
+            suggestions = CountrySuggester(targets).suggest(pool)
+            rows = [(addr_id, suggestions.get(addr_id, [])) for addr_id, _ in targets]
+            queries.write_countries(conn, rows, target_column="suggested_countries")
+            conn.commit()
 
-        processed += len(targets)
-        found += sum(1 for _, sug in rows if sug)
-        elapsed = time.time() - t0
-        rate = processed / elapsed if elapsed > 0 else 0
-        remaining = (total - processed) / rate if rate > 0 else 0
-        logger.info(
-            "  %d/%d traités (%d avec suggestion, %.0fs, ~%.0fs restantes)",
-            processed,
-            total,
-            found,
-            elapsed,
-            remaining,
-        )
+            processed += len(targets)
+            found += sum(1 for _, sug in rows if sug)
 
-    elapsed = time.time() - t0
-    logger.info("Terminé : %d traitées, %d avec suggestion, en %.0fs", processed, found, elapsed)
+        ligne.conclut(f"{DERNIERE_BRANCHE}{accord(found, 'adresse')} {forme(found, 'résolue')}")
     return PhaseMetrics(seen=processed, new=found)

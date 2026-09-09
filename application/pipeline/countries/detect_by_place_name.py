@@ -10,6 +10,7 @@ import logging
 from sqlalchemy import Connection
 
 from application.pipeline.countries.place_name_detector import PlaceNameDetector
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.countries import CountryQueries
 
@@ -20,14 +21,15 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
     `seen` = adresses examinées, `new` = adresses résolues (pays unique),
     `extras["conflicts"]` = adresses à pays multiples ignorées.
     """
+    etape(logger, "Détermination du pays par noms de villes ou d'institutions")
     forms = queries.load_place_forms(conn)
-    logger.info("%d noms de lieux chargés", len(forms))
     if not forms:
+        logger.info("%saucun nom de lieu au référentiel", DERNIERE_BRANCHE)
         return PhaseMetrics()
     detector = PlaceNameDetector(forms)
 
     rows = queries.fetch_addresses_missing_country_normalized(conn)
-    logger.info("%d adresses sans pays à examiner", len(rows))
+    logger.info("%s%s sans pays", BRANCHE, accord(len(rows), "adresse"))
 
     matched: list[tuple[int, list[str]]] = []
     conflicts = 0
@@ -38,6 +40,8 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
         elif len(isos) > 1:
             conflicts += 1
 
-    logger.info("Résolues : %d, conflits (pays multiples, ignorés) : %d", len(matched), conflicts)
+    logger.info(
+        "%s%s %s", DERNIERE_BRANCHE, accord(len(matched), "adresse"), forme(len(matched), "résolue")
+    )
     queries.write_countries(conn, matched, target_column="countries")
     return PhaseMetrics(seen=len(rows), new=len(matched), extras={"conflicts": conflicts})
