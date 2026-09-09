@@ -134,7 +134,7 @@ class TestSetupLoggerFileLocation:
                 h.close()
                 logger.removeHandler(h)
 
-    def test_unwritable_directory_falls_back_to_stdout(self, tmp_path, monkeypatch, caplog):
+    def test_unwritable_directory_falls_back_to_stdout(self, tmp_path, monkeypatch, capsys):
         """Racine en lecture seule : le logger démarre quand même, sur la seule sortie standard."""
         import importlib.util
 
@@ -151,12 +151,13 @@ class TestSetupLoggerFileLocation:
             fresh.Path, "mkdir", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only"))
         )
 
-        with caplog.at_level(logging.WARNING):
-            logger = fresh.setup_logger("pytest_readonly_logger", str(tmp_path / "logs"))
+        logger = fresh.setup_logger("pytest_readonly_logger", str(tmp_path / "logs"))
         try:
             assert not [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
             assert logger.handlers  # la console reste
-            assert "sortie standard" in caplog.text
+            # Le logger porte ses propres handlers sans propager : l'avertissement se lit sur la
+            # sortie où il part, pas sur celle du root.
+            assert "sortie standard" in capsys.readouterr().out
         finally:
             for h in list(logger.handlers):
                 h.close()
@@ -314,6 +315,45 @@ class TestConfigureRootLogging:
         finally:
             for h in list(root.handlers):
                 root.removeHandler(h)
+
+    def test_le_root_ecrit_par_l_ecrivain_de_console(self, monkeypatch):
+        """Un module appelant `logging.getLogger(__name__)` atteint l'écrivain de console, qui pose sa ligne au-dessus des barres de progression."""
+        monkeypatch.delenv("PYTEST_VERSION", raising=False)
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+        from infrastructure.observability.log import _FluxConsole, configure_root_logging
+
+        root = logging.getLogger()
+        try:
+            configure_root_logging(logging.WARNING)
+            (handler,) = root.handlers
+            assert isinstance(handler.stream, _FluxConsole)
+        finally:
+            for h in list(root.handlers):
+                root.removeHandler(h)
+
+    def test_un_logger_nomme_ne_propage_pas_au_root(self, tmp_path):
+        """Un logger configuré porte ses propres handlers et garde ses records, qu'un seul jeu de handlers traite.
+
+        L'instance chargée ici porte le vrai `setup_logger` ; `conftest.py` en donne un logger null à la session de tests.
+        """
+        import importlib.util
+
+        import infrastructure.observability.log as log_module
+
+        spec = importlib.util.spec_from_file_location(
+            "infrastructure_log_propagation", log_module.__file__
+        )
+        fresh = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fresh)
+
+        logger = fresh.setup_logger("pytest_sans_propagation", str(tmp_path / "logs"))
+        try:
+            assert logger.propagate is False
+        finally:
+            for h in list(logger.handlers):
+                h.close()
+                logger.removeHandler(h)
 
     def test_skips_handler_under_pytest(self, monkeypatch):
         """Sous pytest, aucun StreamHandler n'est attaché : pytest a son
