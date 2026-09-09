@@ -205,6 +205,43 @@ class TestMakeFormatter:
         assert "hello" in line and "INFO" in line and not line.startswith("{")
 
 
+class TestMakeConsoleFormatter:
+    """L'horodatage des lignes de console : présent quand la sortie se relit plus tard."""
+
+    @staticmethod
+    def _ligne(monkeypatch, *, log_format: str, terminal: bool) -> str:
+        import logging as _logging
+        import sys as _sys
+
+        from infrastructure.observability.log import _make_console_formatter
+
+        monkeypatch.setenv("LOG_FORMAT", log_format)
+        monkeypatch.setattr(_sys.stdout, "isatty", lambda: terminal, raising=False)
+        record = _logging.LogRecord(
+            name="normalize",
+            level=_logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=None,
+            exc_info=None,
+        )
+        return _make_console_formatter().format(record)
+
+    def test_le_terminal_recoit_le_texte_sans_horodatage(self, monkeypatch):
+        ligne = self._ligne(monkeypatch, log_format="text", terminal=True)
+        assert ligne == "[INFO] normalize: hello"
+
+    def test_une_sortie_capturee_garde_l_horodatage(self, monkeypatch):
+        ligne = self._ligne(monkeypatch, log_format="text", terminal=False)
+        assert ligne.endswith("[INFO] normalize: hello")
+        assert ligne != "[INFO] normalize: hello"
+
+    def test_le_format_json_garde_son_horodatage_devant_un_terminal(self, monkeypatch):
+        ligne = self._ligne(monkeypatch, log_format="json", terminal=True)
+        assert '"timestamp"' in ligne
+
+
 class TestJsonFormatter:
     def test_merges_extras(self):
         import json
