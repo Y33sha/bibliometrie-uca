@@ -50,7 +50,10 @@ Phases (dans l'ordre d'execution):
 
 import argparse
 import asyncio
+import contextlib
 import datetime
+import faulthandler
+import io
 import logging
 import signal
 import sys
@@ -1611,6 +1614,12 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
 
 
 def main() -> None:
+    # Une faute de segmentation vient d'une extension C — pilote de base, client HTTP, automate
+    # de matching — et tue le processus sans passer par Python. `faulthandler` écrit alors la
+    # pile de chaque thread sur la sortie d'erreur, seule trace exploitable de l'incident. Il lui
+    # faut un vrai descripteur de fichier, que la sortie capturée d'un test ne donne pas.
+    with contextlib.suppress(ValueError, io.UnsupportedOperation):
+        faulthandler.enable()
     _install_sigterm_handler()
     args = _build_arg_parser().parse_args()
 
