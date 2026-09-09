@@ -30,4 +30,6 @@ def run(
 
     with open_tx() as conn:
         run_cooccurrences(conn, queries, logger)
+    # Chaque sous-étape porte son résultat : une ligne de clôture le répéterait.
+    metrics.resume = ""
     return metrics

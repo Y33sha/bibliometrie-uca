@@ -14,10 +14,10 @@ Aucune colonne d'état dédiée : la référence « dernière ingestion » est l
 """
 
 import logging
-import time
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.subjects._common import SubjectCache
@@ -38,17 +38,16 @@ def run(
 
     `rebuild` repasse toutes les publications, indépendamment du signal incrémental : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
     """
-    t_run = time.perf_counter()
     subjects_before = queries.count_all_subjects(conn)
+    etape(logger, "Liens publications-sujets")
 
     if rebuild:
         pub_ids = queries.select_all_publication_ids(conn)
-        logger.info("subjects : rebuild complet — %d publications à ré-ingérer", len(pub_ids))
     else:
         pub_ids = queries.select_publications_to_reingest(conn)
     if not pub_ids:
-        n_purged = queries.purge_orphan_subjects(conn)
-        logger.info("subjects : rien à ré-ingérer ; %d sujets orphelins purgés", n_purged)
+        queries.purge_orphan_subjects(conn)
+        logger.info("%sRien à faire", DERNIERE_BRANCHE)
         subjects_after = queries.count_all_subjects(conn)
         metrics = PhaseMetrics()
         metrics.details["summary"] = {
@@ -58,18 +57,21 @@ def run(
         }
         return metrics
 
-    n_cleared = queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
+    queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
     rows = queries.select_source_publications_for_pubs(conn, publication_ids=pub_ids)
     logger.info(
-        "subjects : %d publications à ré-ingérer (%d source_publications, clear: %d liens)",
-        len(pub_ids),
-        len(rows),
-        n_cleared,
+        "%s%s à traiter (%s), soit %s",
+        BRANCHE,
+        accord(len(pub_ids), "publication"),
+        "reconstruction complète"
+        if rebuild
+        else f"{forme(len(pub_ids), 'nouvelle')} ou {forme(len(pub_ids), 'modifiée')}",
+        accord(len(rows), "document source"),
     )
 
     cache = SubjectCache(queries)
     n_links = 0
-    with progression(len(rows), "sujets", logger) as avancement:
+    with progression(len(rows), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
         for r in rows:
             avancement.avance()
             extractor_lang = SUBJECT_EXTRACTORS.get(r.source)
@@ -85,13 +87,7 @@ def run(
             ]
             n_links += cache.link_bulk(conn, source=r.source, rows=links)
 
-    n_purged = queries.purge_orphan_subjects(conn)
-    logger.info(
-        "subjects : %d liens créés, %d sujets orphelins purgés, %.1fs",
-        n_links,
-        n_purged,
-        time.perf_counter() - t_run,
-    )
+    queries.purge_orphan_subjects(conn)
     subjects_after = queries.count_all_subjects(conn)
 
     metrics = PhaseMetrics()
