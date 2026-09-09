@@ -55,6 +55,31 @@ class RelationType(StrEnum):
     IS_RELATED_TO = "is_related_to"
 
 
+RELATION_PAIR_LABELS: dict[RelationType, str] = {
+    RelationType.IS_PREPRINT_OF: "préprint – article",
+    RelationType.HAS_PREPRINT: "préprint – article",
+    RelationType.IS_CORRECTION_OF: "article – erratum",
+    RelationType.HAS_CORRECTION: "article – erratum",
+    RelationType.IS_RETRACTION_OF: "article – rétractation",
+    RelationType.HAS_RETRACTION: "article – rétractation",
+    RelationType.IS_CONCERN_ABOUT: "article – avis de préoccupation",
+    RelationType.HAS_CONCERN: "article – avis de préoccupation",
+    RelationType.IS_SUPPLEMENT_TO: "article – données supplémentaires",
+    RelationType.HAS_SUPPLEMENT: "article – données supplémentaires",
+    RelationType.IS_PART_OF: "partie – ensemble",
+    RelationType.HAS_PART: "partie – ensemble",
+    RelationType.IS_TRANSLATION_OF: "traduction – original",
+    RelationType.HAS_TRANSLATION: "traduction – original",
+    RelationType.DESCRIBES: "data paper – jeu de données",
+    RelationType.IS_DESCRIBED_BY: "data paper – jeu de données",
+    RelationType.IS_RELATED_TO: "apparentées, type à qualifier",
+}
+"""Nom du lien qu'un type et son inverse désignent en commun : le même lien, vu de chaque bout.
+
+Dit les relations dans les mots d'un lecteur, là où l'enum nomme leur direction. Le frontend formule les mêmes types depuis la publication qui les porte (« Préprint de », « Corrigé par ») : deux phrasés pour deux points de vue.
+"""
+
+
 # Mapping DataCite `relationType` → type canonique. Les types absents (citations,
 # même-œuvre, vague — cf. docstring) sont hors scope et renvoient `None`.
 _DATACITE_MAP: dict[str, RelationType] = {

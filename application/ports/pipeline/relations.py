@@ -49,6 +49,16 @@ class TitleMatch(NamedTuple):
     parent_doi: str | None
 
 
+class RelationsRebuild(NamedTuple):
+    """Ce qu'une reconstruction de `publication_relations` laisse : les arêtes écrites, celles qu'elle ajoute (par type, décroissant) et le nombre de celles qui disparaissent.
+
+    Une arête ajoutée est présente après la reconstruction et absente avant ; une arête disparue, l'inverse. Les deux se comptent contre l'état de la table au début de la phase, pas contre le nombre d'arêtes soumises : la table est reconstruite entière à chaque run, et l'essentiel de ce qu'elle reçoit s'y trouvait déjà."""
+
+    written: int
+    added_by_type: list[tuple[str, int]]
+    removed: int
+
+
 class PublicationRelationsQueries(Protocol):
     """Opérations SQL de la phase `relations`."""
 
@@ -76,8 +86,8 @@ class PublicationRelationsQueries(Protocol):
         Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée portent le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
         ...
 
-    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne le nombre inséré."""
+    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
+        """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
         ...
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:

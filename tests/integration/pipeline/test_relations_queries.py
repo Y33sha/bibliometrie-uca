@@ -10,6 +10,7 @@ import json
 
 from sqlalchemy import text
 
+from application.ports.pipeline.relations import RelationEdge
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
 
@@ -231,3 +232,65 @@ class TestCountByRelationType:
         assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)
         json.dumps(result)  # ne doit pas lever
         assert dict(result) == {"is_preprint_of": 2, "has_part": 1}
+
+
+class TestRebuildRelations:
+    """Reconstruction complète et écart avec l'état précédent.
+
+    La table est purgée puis réécrite à chaque run : le nombre d'arêtes écrites ne dit pas ce qui a
+    changé. `rebuild_relations` compare les arêtes d'avant à celles d'après pour rendre les
+    ajoutées, par type, et le nombre de disparues.
+    """
+
+    def _edge(self, from_id, relation_type, target_doi):
+        return RelationEdge(from_id, relation_type, target_doi, "crossref")
+
+    def test_une_reconstruction_a_l_identique_ne_change_rien(self, sa_sync_conn):
+        publication = _pub(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a"
+        )
+        edges = [self._edge(publication, "is_preprint_of", "10.9/x")]
+
+        _Q.rebuild_relations(sa_sync_conn, edges)
+        seconde = _Q.rebuild_relations(sa_sync_conn, edges)
+
+        assert seconde.written == 1
+        assert seconde.added_by_type == []
+        assert seconde.removed == 0
+
+    def test_les_aretes_ajoutees_se_comptent_par_type(self, sa_sync_conn):
+        publication = _pub(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/b"
+        )
+        _Q.rebuild_relations(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
+
+        rebuild = _Q.rebuild_relations(
+            sa_sync_conn,
+            [
+                self._edge(publication, "is_preprint_of", "10.9/x"),
+                self._edge(publication, "is_preprint_of", "10.9/y"),
+                self._edge(publication, "has_part", "10.9/z"),
+            ],
+        )
+
+        assert dict(rebuild.added_by_type) == {"is_preprint_of": 1, "has_part": 1}
+        assert rebuild.removed == 0
+
+    def test_les_aretes_disparues_se_comptent(self, sa_sync_conn):
+        publication = _pub(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/c"
+        )
+        _Q.rebuild_relations(
+            sa_sync_conn,
+            [
+                self._edge(publication, "is_preprint_of", "10.9/x"),
+                self._edge(publication, "has_part", "10.9/z"),
+            ],
+        )
+
+        rebuild = _Q.rebuild_relations(
+            sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")]
+        )
+
+        assert rebuild.added_by_type == []
+        assert rebuild.removed == 1

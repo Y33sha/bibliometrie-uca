@@ -14,13 +14,14 @@ Reconstruction complète à chaque run (table dérivée) : la table est purgée 
 """
 
 import logging
-import time
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
     PublicationRelationsQueries,
     RelationEdge,
+    RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
 )
@@ -28,6 +29,7 @@ from application.ports.pipeline.transaction import OpenTransaction
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
+    RELATION_PAIR_LABELS,
     RelationType,
     extract_crossref_relations,
     extract_datacite_relations,
@@ -96,7 +98,6 @@ def run(
     open_tx: OpenTransaction, queries: PublicationRelationsQueries, logger: logging.Logger
 ) -> PhaseMetrics:
     """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
-    t0 = time.perf_counter()
     with open_tx() as conn:
         sources = queries.fetch_declared_relation_sources(conn)
         declared_edges = _build_declared_edges(sources)
@@ -112,25 +113,58 @@ def run(
         ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
 
         # L'ordre déclarées → clés partagées → titre fixe la priorité de dédup (`ON CONFLICT`).
-        written = queries.rebuild_relations(conn, declared_edges + shared_edges + title_edges)
+        rebuild = queries.rebuild_relations(conn, declared_edges + shared_edges + title_edges)
         by_type = queries.count_by_relation_type(conn)
 
-    logger.info(
-        "✓ relations : %d écrites — déclarées %d arêtes / %d source_publications ; "
-        "clés partagées %d arêtes / %d paires ; par titre %d arêtes (%d erratums, %d preprints) "
-        "— en %.1fs",
-        written,
-        len(declared_edges),
-        len(sources),
-        len(shared_edges),
-        len(pairs),
-        len(title_edges),
-        len(erratum_matches),
-        len(preprint_matches),
-        time.perf_counter() - t0,
-    )
+    _log_changes(rebuild, logger)
+
     metrics = PhaseMetrics()
+    metrics.add(new=sum(count for _, count in rebuild.added_by_type))
     metrics.details["table"] = {
         "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
     }
+    # La sous-étape porte le détail des nouvelles relations : une ligne de clôture le répéterait.
+    metrics.resume = ""
     return metrics
+
+
+def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
+    """Écrit ce que la reconstruction a changé : les relations ajoutées par nature du lien, puis celles qui ont disparu.
+
+    La table étant reconstruite entière à chaque run, le nombre d'arêtes écrites ne dit rien : presque toutes s'y trouvaient déjà. Seul l'écart avec l'état précédent porte une information.
+    """
+    ajoutees = _count_by_pair_label(rebuild.added_by_type)
+    total = sum(ajoutees.values())
+    if total:
+        etape(
+            logger,
+            "%s entre publications",
+            accord(total, "nouvelle relation", "nouvelles relations"),
+        )
+        logger.info("")
+        largeur = max(len(str(count)) for count in ajoutees.values())
+        for libelle, count in ajoutees.items():
+            logger.info("     %s %s", str(count).rjust(largeur), libelle)
+    else:
+        etape(logger, "Relations entre publications")
+
+    if rebuild.removed:
+        if total:
+            logger.info("")
+        logger.info(
+            "%s%s %s",
+            DERNIERE_BRANCHE,
+            accord(rebuild.removed, "relation"),
+            forme(rebuild.removed, "retirée"),
+        )
+    elif not total:
+        logger.info("%saucun changement", DERNIERE_BRANCHE)
+
+
+def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]:
+    """Regroupe les compteurs par nature du lien : un type et son inverse désignent le même."""
+    par_libelle: dict[str, int] = {}
+    for relation_type, count in added_by_type:
+        libelle = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
+        par_libelle[libelle] = par_libelle.get(libelle, 0) + count
+    return dict(sorted(par_libelle.items(), key=lambda item: item[1], reverse=True))
