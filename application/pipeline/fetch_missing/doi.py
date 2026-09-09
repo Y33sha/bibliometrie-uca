@@ -19,7 +19,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import BRANCHE
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
@@ -29,7 +29,6 @@ from application.ports.pipeline.fetch_missing.doi import (
     CrossImportDoisReader,
     is_not_found_marker,
 )
-from domain.sources.registry import source_label
 from domain.types import JsonValue
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
@@ -96,8 +95,9 @@ async def run_async(
             await asyncio.sleep(request_delay)
         return records
 
-    libelle = f"{BRANCHE}{source_label(adapter.source_key)}"
-    with progression(total, libelle, slog, compte_retenus=True) as avancement:
+    with progression(
+        total, branche_de_source(adapter.source_key), slog, compte_retenus=True
+    ) as avancement:
 
         def _write(
             conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]

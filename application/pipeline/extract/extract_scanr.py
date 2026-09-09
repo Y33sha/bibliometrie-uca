@@ -15,6 +15,7 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
@@ -39,7 +40,7 @@ def extract_year(
     seen = 0
     total = 0
 
-    avancement = Progression(None, "scanr", logger)
+    avancement = Progression(None, branche_de_source("scanr"), logger)
     while True:
         first_page = search_after is None
         query = adapter.build_query(year, affiliation_ids, search_after, track_total=first_page)

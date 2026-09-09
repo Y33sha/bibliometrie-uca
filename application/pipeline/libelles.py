@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from application.pipeline.logging_scope import ScopedOrPlainLogger
+from domain.sources.registry import SOURCE_LABELS, source_label
 
 ETAPE = "▶ "
 """Ouvre une sous-étape d'une phase."""
@@ -15,6 +16,15 @@ DERNIERE_BRANCHE = "  └─ "
 
 SUITE_DE_BRANCHE = "  │  "
 """Rattache une ligne à la branche ouverte au-dessus, le trait vertical se prolongeant."""
+
+
+_LARGEUR_SOURCE = max(len(libelle) for libelle in SOURCE_LABELS.values())
+"""Colonne des noms de source, à la largeur du plus long."""
+
+
+def branche_de_source(source: str) -> str:
+    """Libellé de la barre d'avancement d'une source : sa branche, son nom, et le remplissage qui aligne les barres d'une même phase les unes sous les autres."""
+    return f"{BRANCHE}{source_label(source):<{_LARGEUR_SOURCE}}"
 
 
 def etape(logger: ScopedOrPlainLogger, titre: str, *args: object) -> None:
@@ -48,6 +58,7 @@ __all__ = [
     "ETAPE",
     "SUITE_DE_BRANCHE",
     "accord",
+    "branche_de_source",
     "etape",
     "forme",
 ]

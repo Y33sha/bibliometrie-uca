@@ -16,6 +16,7 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
@@ -55,7 +56,7 @@ def extract_year(
     page_num = 0
     consecutive_failures = 0
 
-    with progression(total_count, "wos", logger) as avancement:
+    with progression(total_count, branche_de_source("wos"), logger) as avancement:
         while first_record <= total_count:
             if first_record > 1:
                 data = adapter.fetch_page(year, first_record, affiliations)
