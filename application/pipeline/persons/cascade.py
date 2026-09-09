@@ -15,7 +15,9 @@ Deux populations de candidats traversent la même cascade :
 
 Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` (2ᵉ passe) reprend les signatures restées non liées après `match` et les re-juge contre l'état ferme complet, **cross-source et forme de nom seulement** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
+`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
+
+Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
 Garde de rejet : les personnes rejetées pour la publication (`rejected_authorships`) sont éliminées des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
 """
@@ -34,7 +36,7 @@ from application.pipeline.persons.loading import (
     load_linked_authorships_by_pub,
 )
 from application.pipeline.persons.metrics import CascadeResult, log_matching_breakdown
-from application.pipeline.progression import progression
+from application.pipeline.progression import attente, progression
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -262,11 +264,14 @@ def run_cascade(
 
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
-    c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
-    total = len(c.authorships)
     logger.info("")
     logger.info("%sIdentification des personnes", ETAPE)
-    logger.info("%s%s %s", BRANCHE, accord(total, "signature"), forme(total, "non identifiée"))
+    # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
+    # muette jusqu'à ce qu'il rende la main.
+    with attente(f"{BRANCHE}chargement des signatures", logger) as ligne:
+        c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
+        total = len(c.authorships)
+        ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} {forme(total, 'non identifiée')}")
 
     unresolved: list[EnrichedAuthorship] = []
     with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
