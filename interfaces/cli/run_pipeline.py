@@ -136,7 +136,7 @@ class Extracteur(Protocol):
 
     def run(
         self,
-        args: argparse.Namespace | None = None,
+        args: argparse.Namespace,
         *,
         breaker: CircuitBreaker | None = None,
     ) -> PhaseMetrics: ...
@@ -181,7 +181,7 @@ def _open_tx() -> "AbstractContextManager[Connection]":
 
 
 def phase_extract(options: RunOptions) -> PhaseMetrics:
-    """Phase 1 : Extraction des sources vers staging.
+    """Extraction des sources vers staging.
 
     La policy du mode (sources, stratégie d'années) vit dans `application/pipeline/modes.py`.
     Le refetch des works OpenAlex tronqués est une phase distincte (`fetch_truncated`), placée
@@ -471,8 +471,9 @@ def _vacuum_staging(full: bool = False) -> None:
 
 
 def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
-    """Enrichissement du référentiel `journals`, positionné entre `affiliations`
-    et `metadata_correction`. Trois sous-étapes, toutes incrémentales :
+    """Enrichissement du référentiel `journals`.
+
+    Trois sous-étapes, toutes incrémentales :
 
     1. `resolve_publishers` : préfixe DOI → éditeur Crossref / repository DataCite
        via `/prefixes`. Ne traite que les rows en attente de publisher ; la
@@ -717,7 +718,7 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_countries(options: RunOptions) -> PhaseMetrics:
-    """Detection des pays des adresses et recalcul sur les publications.
+    """Détection des pays des adresses et recalcul sur les publications.
 
     Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
     """
@@ -1325,20 +1326,44 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
 
+def _catalogue_des_phases() -> str:
+    """Phases dans l'ordre d'exécution, chacune résumée par la première ligne de sa docstring."""
+    largeur = max(len(name) for name, _ in PHASES)
+    lignes = ["Phases, dans l'ordre :"]
+    for i, (name, fn) in enumerate(PHASES, 1):
+        doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
+        lignes.append(f"  {i:2d}. {name:{largeur}s}  {doc}")
+    return "\n".join(lignes)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
-    """Parseur des arguments de la CLI pipeline."""
-    parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique")
-    parser.add_argument(
-        "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
+    """Parseur des arguments de la CLI pipeline.
+
+    L'aide porte le catalogue des phases : `--from` et `--only` les nomment.
+    """
+    parser = argparse.ArgumentParser(
+        description="Orchestrateur pipeline bibliométrique",
+        epilog=_catalogue_des_phases(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--only", metavar="PHASE", help="Exécuter uniquement cette phase")
-    parser.add_argument("--list", action="store_true", help="Lister les phases disponibles")
+    parser.add_argument(
+        "--from",
+        dest="from_phase",
+        metavar="PHASE",
+        choices=PHASE_NAMES,
+        help="Reprendre depuis cette phase",
+    )
+    parser.add_argument(
+        "--only",
+        metavar="PHASE",
+        choices=PHASE_NAMES,
+        help="Exécuter uniquement cette phase",
+    )
     parser.add_argument(
         "--no-extras",
         action="store_true",
         help="Omettre les enrichissements terminaux (relations, subjects, countries, oa_status)",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Afficher les étapes sans exécuter")
     parser.add_argument(
         "--mode", choices=list(MODE_NAMES), default="full", help="Mode d'exécution (défaut: full)"
     )
@@ -1390,45 +1415,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_phase_list() -> None:
-    """Affiche les phases disponibles (`--list`)."""
-    print("Phases disponibles :")
-    for i, (name, fn) in enumerate(PHASES, 1):
-        doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
-        print(f"  {i}. {name:15s} — {doc}")
-
-
 def _select_phases_to_run(
     args: argparse.Namespace,
 ) -> list[tuple[str, Phase]]:
     """Phases à exécuter selon `--only` / `--from` (sinon toutes), moins les enrichissements si `--no-extras`.
 
     `--only` nomme une phase explicitement : elle est rendue même si c'est un enrichissement.
-    Sort en erreur sur phase inconnue.
     """
     if args.only:
-        if args.only not in PHASE_NAMES:
-            print(f"Phase inconnue : {args.only}. Phases : {', '.join(PHASE_NAMES)}")
-            sys.exit(1)
         return [(n, fn) for n, fn in PHASES if n == args.only]
     if args.from_phase:
-        if args.from_phase not in PHASE_NAMES:
-            print(f"Phase inconnue : {args.from_phase}. Phases : {', '.join(PHASE_NAMES)}")
-            sys.exit(1)
         retenues = PHASES[PHASE_NAMES.index(args.from_phase) :]
     else:
         retenues = list(PHASES)
     if args.no_extras:
         retenues = [(n, fn) for n, fn in retenues if n not in EXTRA_PHASES]
     return retenues
-
-
-def _print_dry_run(phases_to_run: list[tuple[str, Phase]]) -> None:
-    """Affiche les phases qui seraient exécutées (`--dry-run`), sans rien lancer."""
-    for name, fn in phases_to_run:
-        doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
-        print(f"  [{name}] {doc}")
-    print("\n(dry-run : rien n'a été exécuté)")
 
 
 LARGEUR_TITRE_PHASE = 48
@@ -1625,17 +1627,9 @@ def main() -> None:
     _install_sigterm_handler()
     args = _build_arg_parser().parse_args()
 
-    if args.list:
-        _print_phase_list()
-        return
-
     phases_to_run = _select_phases_to_run(args)
     for ligne in _titre_du_run(args, phases_to_run):
         log.info("%s", ligne)
-
-    if args.dry_run:
-        _print_dry_run(phases_to_run)
-        return
 
     # Une seule exécution à la fois sur la base : deux en parallèle s'interbloquent.
     try:

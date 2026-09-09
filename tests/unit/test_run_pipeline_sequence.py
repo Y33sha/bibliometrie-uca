@@ -32,8 +32,6 @@ def _args(**surcharges) -> argparse.Namespace:
         "rebuild_authorships": False,
         "rebuild_subjects": False,
         "raw_store": False,
-        "dry_run": False,
-        "list": False,
     }
     return argparse.Namespace(**{**base, **surcharges})
 
@@ -83,13 +81,14 @@ class TestSelectPhasesToRun:
         assert noms[0] == "persons"
         assert noms == run_pipeline.PHASE_NAMES[run_pipeline.PHASE_NAMES.index("persons") :]
 
-    @pytest.mark.parametrize("option", ["only", "from_phase"])
+    @pytest.mark.parametrize("option", ["--only", "--from"])
     def test_phase_inconnue_arrete_le_run(self, option, capsys):
+        """Le parseur borne les deux options aux phases connues, et les nomme en refusant."""
         with pytest.raises(SystemExit) as sortie:
-            run_pipeline._select_phases_to_run(_args(**{option: "inexistante"}))
+            run_pipeline._build_arg_parser().parse_args([option, "inexistante"])
 
-        assert sortie.value.code == 1
-        assert "Phase inconnue" in capsys.readouterr().out
+        assert sortie.value.code == 2
+        assert "persons" in capsys.readouterr().err
 
 
 class TestRunOnePhase:
@@ -262,17 +261,12 @@ class TestMain:
 
         assert executees == ["persons"]
 
-    def test_liste_des_phases_sans_rien_lancer(self, lancer, capsys):
-        executees = lancer("--list")
+    def test_l_aide_porte_le_catalogue_des_phases(self):
+        """`--help` remplace toute option de listage : il nomme les phases et les résume."""
+        catalogue = run_pipeline._catalogue_des_phases()
 
-        assert executees == []
-        assert "persons" in capsys.readouterr().out
-
-    def test_simulation_sans_rien_lancer(self, lancer, capsys):
-        executees = lancer("--dry-run")
-
-        assert executees == []
-        assert "rien n'a été exécuté" in capsys.readouterr().out
+        for nom in run_pipeline.PHASE_NAMES:
+            assert nom in catalogue
 
     def test_pipeline_deja_en_cours(self, monkeypatch, capsys):
         """Deux pipelines simultanés se bloqueraient en base : le second refuse de démarrer."""
