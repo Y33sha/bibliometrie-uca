@@ -18,7 +18,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord
+from application.pipeline.libelles import DERNIERE_BRANCHE
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import (
@@ -108,11 +108,6 @@ async def fetch_missing_hal_by_id(
 
     missing = _dedup_halid_refs(refs_oa + refs_scanr)
     attendus = len(missing)
-    log.info(
-        "%s%s connus d'OpenAlex ou de ScanR seulement",
-        BRANCHE,
-        accord(attendus, "document avec hal-id", "documents avec hal-id"),
-    )
 
     metrics = PhaseMetrics(seen=attendus)
     if stats_only or not missing:

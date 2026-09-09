@@ -85,4 +85,7 @@ def run(
         metrics.details["table"] = {
             "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
         }
+    # Les compteurs des trois sous-étapes ne couvrent pas le même ensemble : les rapprocher en une
+    # ligne induirait en erreur. Chaque barre porte son résultat, et la table d'observabilité le détail.
+    metrics.resume = ""
     return metrics
