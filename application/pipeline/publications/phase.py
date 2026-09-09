@@ -47,7 +47,6 @@ def _redirty_all(
     reconciliation_queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
 ) -> None:
-    logger.info("▶ rebuild publications : re-dirty de tout le stock")
     with open_tx() as conn:
         n = reconciliation_queries.mark_keys_dirty(conn)
     logger.info("✓ %d source_publications marquées keys_dirty (rebuild complet)", n)
@@ -59,8 +58,6 @@ def _reconcile(
     logger: logging.Logger,
     publication_repo_factory: Callable[[Connection], PublicationRepository],
 ) -> PhaseMetrics:
-    logger.info("▶ reconcile_components")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         stats = reconcile_run(
             conn,
@@ -69,7 +66,6 @@ def _reconcile(
             publication_repo=publication_repo_factory(conn),
         )
         pub_total = reconciliation_queries.count_publications(conn)
-    logger.info("✓ reconcile_components terminé en %.1fs", time.perf_counter() - t0)
 
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
@@ -91,7 +87,6 @@ def _recompute_address_pub_count(
     address_pub_count_queries: AddressPubCountQueries,
     logger: logging.Logger,
 ) -> None:
-    logger.info("▶ recompute addresses.pub_count")
     t0 = time.perf_counter()
     with open_tx() as conn:
         n = address_pub_count_queries.recompute_pub_count(conn)

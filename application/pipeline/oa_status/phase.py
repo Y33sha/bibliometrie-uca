@@ -42,7 +42,6 @@ async def run(
 
     `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
     """
-    logger.info("▶ enrich_oa_status")
     t0 = time.perf_counter()
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(

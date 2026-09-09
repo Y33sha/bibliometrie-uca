@@ -15,7 +15,6 @@ Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de 
 """
 
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -43,8 +42,6 @@ def run(
     authorship_repo_factory: Callable[[Connection], AuthorshipRepository],
 ) -> PhaseMetrics:
     """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques."""
-    logger.info("▶ persons")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         person_repo = person_repo_factory(conn)
         authorship_repo = authorship_repo_factory(conn)
@@ -81,5 +78,4 @@ def run(
             deleted_persons=purge_counts["deleted_persons"],
         )
         log_matching_breakdown(logger, cascade_result)
-    logger.info("✓ persons terminé en %.1fs", time.perf_counter() - t0)
     return metrics

@@ -8,7 +8,6 @@ Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
 """
 
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -24,13 +23,9 @@ from application.ports.pipeline.transaction import OpenTransaction
 def _step[T](
     open_tx: OpenTransaction, label: str, step: Callable[[Connection], T], logger: logging.Logger
 ) -> T:
-    """Exécute une sous-étape dans sa propre transaction, encadrée d'un chronométrage `▶`/`✓`."""
-    logger.info("▶ metadata_correction (%s)", label)
-    t0 = time.perf_counter()
+    """Exécute une sous-étape dans sa propre transaction."""
     with open_tx() as conn:
-        result = step(conn)
-    logger.info("✓ metadata_correction (%s) terminé en %.1fs", label, time.perf_counter() - t0)
-    return result
+        return step(conn)
 
 
 def run(

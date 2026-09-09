@@ -35,11 +35,8 @@ def run(
     rebuild_authorships: bool = False,
 ) -> PhaseMetrics:
     """Enchaîne build → purge → refresh pub_count et retourne les métriques du build."""
-    logger.info("▶ build_authorships")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         metrics = build(conn, build_queries, logger, rebuild_full=rebuild_authorships)
-    logger.info("✓ build_authorships terminé en %.1fs", time.perf_counter() - t0)
 
     n_purged = _purge_orphan_publications(open_tx, purge_queries, logger)
     summary = metrics.details["summary"]
@@ -53,7 +50,6 @@ def _purge_orphan_publications(
     open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
 ) -> int:
     """Purge par lots (commit par chunk). Retourne le nombre de publications supprimées."""
-    logger.info("▶ purge publications orphelines (zéro authorship)")
     t0 = time.perf_counter()
     n = 0
     with open_tx() as conn:
@@ -74,7 +70,6 @@ def _purge_orphan_publications(
 def _refresh_pub_counts(
     open_tx: OpenTransaction, pub_counts_queries: PubCountsQueries, logger: logging.Logger
 ) -> None:
-    logger.info("▶ refresh pub_count (journals + publishers)")
     t0 = time.perf_counter()
     with open_tx() as conn:
         changes = pub_counts_queries.refresh_pub_counts(conn)

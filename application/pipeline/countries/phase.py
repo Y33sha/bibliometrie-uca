@@ -53,7 +53,6 @@ def _timed_metrics_step(
     start_suffix: str = "",
 ) -> PhaseMetrics:
     """Exécute une sous-étape (rendant des `PhaseMetrics`) dans sa transaction, chronométrée."""
-    logger.info("▶ %s%s", label, start_suffix)
     t0 = time.perf_counter()
     with open_tx() as conn:
         metrics = step(conn)
@@ -98,11 +97,8 @@ def run(
         )
     )
 
-    logger.info("▶ refresh_publication_countries")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         refresh_publication_countries.refresh(conn, queries, logger)
-    logger.info("✓ refresh_publication_countries terminé en %.1fs", time.perf_counter() - t0)
 
     final = _bilan(open_tx, queries, logger, "Bilan final")
     total = final.total

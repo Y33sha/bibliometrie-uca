@@ -9,7 +9,6 @@ Aucun filtre périmètre : la phase `authorships` a purgé en amont les publicat
 """
 
 import logging
-import time
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects.cooccurrences import run as run_cooccurrences
@@ -26,15 +25,9 @@ def run(
     rebuild: bool = False,
 ) -> PhaseMetrics:
     """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. `rebuild` force la ré-ingestion de toutes les publications."""
-    logger.info("▶ subjects")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         metrics = run_ingest(conn, queries, logger, rebuild=rebuild)
-    logger.info("✓ subjects terminé en %.1fs", time.perf_counter() - t0)
 
-    logger.info("▶ cooccurrences")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         run_cooccurrences(conn, queries, logger)
-    logger.info("✓ cooccurrences terminé en %.1fs", time.perf_counter() - t0)
     return metrics
