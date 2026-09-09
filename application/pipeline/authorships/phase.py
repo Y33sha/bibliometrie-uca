@@ -4,16 +4,15 @@ Trois sous-étapes :
 
 1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé.
 2. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
-3. **refresh des `pub_count`** — recalcule les compteurs `journals` + `publishers` qui dérivent de `in_perimeter`.
+3. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
 
 Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
 """
 
 import logging
-import time
 
 from application.pipeline.authorships.build_authorships import build
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.authorships.address_pub_count import AddressPubCountQueries
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
@@ -53,7 +52,6 @@ def _purge_orphan_publications(
     open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
 ) -> int:
     """Purge par lots (commit par chunk). Retourne le nombre de publications supprimées."""
-    t0 = time.perf_counter()
     n = 0
     with open_tx() as conn:
         while True:
@@ -62,11 +60,10 @@ def _purge_orphan_publications(
                 break
             conn.commit()
             n += deleted
-    logger.info(
-        "✓ purge : %d publication(s) supprimée(s) en %.1fs",
-        n,
-        time.perf_counter() - t0,
-    )
+    if n:
+        logger.info("")
+        logger.info("%sPublications sans auteur", ETAPE)
+        logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))
     return n
 
 
