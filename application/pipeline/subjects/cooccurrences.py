@@ -7,10 +7,11 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 """
 
 import logging
-import time
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from application.pipeline.progression import attente
 from application.ports.pipeline.subjects import SubjectsIngestionQueries
 
 
@@ -19,16 +20,18 @@ def run(
     queries: SubjectsIngestionQueries,
     logger: logging.Logger,
 ) -> dict[str, int]:
-    """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats."""
-    t0 = time.perf_counter()
+    """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats.
 
-    n_updated = queries.recompute_usage_counts(conn)
-    logger.info("cooccurrences : usage_count rafraîchi sur %d sujets", n_updated)
+    Les deux recalculs balaient tous les liens publication-sujet : chaque ligne dit le travail en cours, puis cède la place à son résultat.
+    """
+    etape(logger, "Mise à jour des décomptes")
+    with attente(f"{BRANCHE}publications par sujet", logger) as ligne:
+        n_updated = queries.recompute_usage_counts(conn)
+        # « mis à jour » ne varie pas au pluriel.
+        ligne.conclut(f"{BRANCHE}publications par sujet : {accord(n_updated, 'sujet')} mis à jour")
 
-    t_uc = time.perf_counter()
-    n_pairs = queries.refresh_cooccurrences(conn)
-    t_co = time.perf_counter()
-    logger.info("cooccurrences : %d paires dans la matview en %.1fs", n_pairs, t_co - t_uc)
+    with attente(f"{DERNIERE_BRANCHE}co-occurrences entre sujets", logger) as ligne:
+        n_pairs = queries.refresh_cooccurrences(conn)
+        ligne.conclut(f"{DERNIERE_BRANCHE}co-occurrences entre sujets : décomptes rafraîchis")
 
-    logger.info("cooccurrences : terminé en %.1fs", time.perf_counter() - t0)
     return {"usage_counts_updated": n_updated, "cooccurrence_pairs": n_pairs}
