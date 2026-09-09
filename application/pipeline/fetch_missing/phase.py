@@ -70,7 +70,7 @@ def run(
 
     if configured:
         logger.info(
-            "▶ cross-imports par DOI en parallèle (%d) : %s", len(configured), ", ".join(configured)
+            "▶ extractions par DOI en parallèle (%d) : %s", len(configured), ", ".join(configured)
         )
         outcomes = run_parallel(
             {
