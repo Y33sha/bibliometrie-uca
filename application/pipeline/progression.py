@@ -13,13 +13,14 @@ import logging
 import sys
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from types import TracebackType
 from typing import Protocol
 
 try:
     from tqdm import tqdm
+    from tqdm.utils import disp_len
 
     # `tqdm` se verrouille par défaut sur un `multiprocessing.RLock`, soit un sémaphore du
     # système, qu'un processus interrompu laisse derrière lui. Le pipeline répartit son travail
@@ -38,9 +39,49 @@ FORMAT_BARRE_RETENUS = "{desc} {percentage:3.0f}% |{bar}| {retenus}/{total_fmt} 
 """Barre dont le compteur porte les éléments retenus, quand le remplissage suit les parcourus."""
 
 
+class FluxTexte(Protocol):
+    """Ce qu'une barre et une ligne de journal écrivent en commun."""
+
+    def write(self, texte: str, /) -> int: ...
+
+    def flush(self) -> None: ...
+
+
+EFFACE_FIN_DE_LIGNE = "\x1b[K"
+"""Séquence effaçant du curseur à la fin de la ligne."""
+
+EFFACE_BAS_DE_L_ECRAN = "\x1b[J"
+"""Séquence effaçant du curseur au bas de l'écran."""
+
+
 if tqdm is not None:
 
-    class _BarreRetenus(tqdm):  # type: ignore[misc]
+    class _Barre(tqdm):  # type: ignore[misc]
+        """Barre dont le redessin résiste au redimensionnement du terminal.
+
+        Un terminal rétréci reçoit une barre plus longue que sa largeur. Il la replie sur autant de lignes qu'il faut, et le redessin suivant les efface toutes.
+        """
+
+        def status_printer(self, flux: FluxTexte) -> Callable[[str], None]:
+            """Réécrit la ligne en place : retour chariot, barre, effacement de ce qui suit.
+
+            L'effacement passe par une séquence, qui occupe une colonne quelle que soit la largeur. Des espaces jusqu'à la longueur du redessin précédent déborderaient d'un terminal rétréci entre-temps, et le redessin d'après s'installerait sur ce débordement, laissant la barre précédente affichée au-dessus.
+
+            Le curseur revient en début de ligne. Un terminal qui replie une ligne garde le curseur à la place qu'il occupe dans le texte : laissé en fin de barre, il passerait sur la dernière ligne du repli, hors de portée du redessin suivant.
+            """
+            longueur_precedente = 0
+
+            def redessine(ligne: str) -> None:
+                nonlocal longueur_precedente
+                repliee = longueur_precedente > (self.ncols or 0)
+                efface = EFFACE_BAS_DE_L_ECRAN if repliee else EFFACE_FIN_DE_LIGNE
+                flux.write(f"\r{ligne}{efface}\r")
+                flux.flush()
+                longueur_precedente = disp_len(ligne)
+
+            return redessine
+
+    class _BarreRetenus(_Barre):
         """Barre offrant `{retenus}` à son format, à côté des champs que `tqdm` fournit."""
 
         retenus = 0
@@ -49,6 +90,7 @@ if tqdm is not None:
         def format_dict(self) -> dict[str, object]:
             return {**super().format_dict, "retenus": self.retenus}
 else:
+    _Barre = None  # type: ignore[assignment,misc]
     _BarreRetenus = None  # type: ignore[assignment,misc]
 
 RAFRAICHISSEMENT_S = 0.1
@@ -61,14 +103,6 @@ type Journal = logging.Logger | logging.LoggerAdapter[logging.Logger]
 """Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
 
 
-class FluxTexte(Protocol):
-    """Ce qu'une barre et une ligne de journal écrivent en commun."""
-
-    def write(self, texte: str, /) -> int: ...
-
-    def flush(self) -> None: ...
-
-
 _flux_barres: FluxTexte | None = None
 
 
@@ -79,10 +113,6 @@ def set_flux_barres(flux: FluxTexte | None) -> None:
     """
     global _flux_barres
     _flux_barres = flux
-
-
-EFFACE_FIN_DE_LIGNE = "\x1b[K"
-"""Séquence effaçant du curseur à la fin de la ligne."""
 
 
 def ecrire_hors_barre(ligne: str, flux: FluxTexte) -> None:
@@ -128,7 +158,7 @@ class Progression:
         self._debut = time.perf_counter()
         self._fini = threading.Event()
         self._dernier_jalon = self._debut
-        classe = _BarreRetenus if compte_retenus else tqdm
+        classe = _BarreRetenus if compte_retenus else _Barre
         self._barre = (
             classe(
                 total=total,
@@ -239,7 +269,7 @@ def progression(
         p.ferme()
 
 
-ETAPES_ATTENTE = ("   ", ".  ", ".. ", "...")
+ETAPES_ATTENTE = ("", ".", "..", "...")
 """Points qui se suivent, pour montrer qu'un travail sans avancement mesurable se poursuit."""
 
 
@@ -265,10 +295,13 @@ class Attente:
         threading.Thread(target=self._battre, daemon=True).start()
 
     def _ecrire(self, points: str) -> None:
-        """Réécrit la ligne en place, le retour chariot ramenant le curseur à son début."""
+        """Réécrit la ligne en place, le retour chariot ramenant le curseur à son début.
+
+        La ligne emporte de quoi effacer ce qui la suit : plus courte que celle dont elle prend la place, elle en laisserait la fin derrière elle.
+        """
         flux = self._flux
         if flux is not None:
-            flux.write(f"\r{self._libelle}{points}")
+            flux.write(f"\r{self._libelle}{points}{EFFACE_FIN_DE_LIGNE}")
             flux.flush()
 
     def _battre(self) -> None:
@@ -287,7 +320,7 @@ class Attente:
         self._fini.set()
         if self._flux is not None:
             self._libelle = self._conclusion or self._libelle
-            self._ecrire("   ")
+            self._ecrire("")
             self._flux.write("\n")
             self._flux.flush()
             self._flux = None

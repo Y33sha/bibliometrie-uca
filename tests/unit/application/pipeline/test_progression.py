@@ -115,6 +115,60 @@ class TestBarresConcurrentes:
             assert seconde._barre.pos == prise
 
 
+class TestRedessinDeLaBarre:
+    """La ligne réécrite en place emporte de quoi effacer le redessin précédent."""
+
+    @staticmethod
+    def _barre(flux: io.StringIO, largeur: int) -> "module._Barre":
+        barre = module._Barre(
+            total=100, desc="hal", bar_format=module.FORMAT_BARRE, file=flux, dynamic_ncols=True
+        )
+        barre.dynamic_ncols = lambda _: (largeur, 20)
+        return barre
+
+    @staticmethod
+    def _redessine(barre: "module._Barre", flux: io.StringIO) -> str:
+        """Vide le flux, redessine la barre, rend ce que le redessin a écrit."""
+        flux.seek(0)
+        flux.truncate(0)
+        barre.refresh()
+        return flux.getvalue()
+
+    def test_le_redessin_tient_dans_la_largeur_du_terminal(self):
+        """Des espaces jusqu'à la longueur du redessin précédent déborderaient d'un terminal rétréci."""
+        flux = io.StringIO()
+        with self._barre(flux, 80) as barre:
+            self._redessine(barre, flux)
+            barre.dynamic_ncols = lambda _: (40, 20)
+            ecrit = self._redessine(barre, flux)
+        assert module.disp_len(ecrit.strip("\r")) <= 40
+
+    def test_le_curseur_revient_en_debut_de_ligne(self):
+        """Un terminal replie la barre trop longue en gardant le curseur à sa place dans le texte : ramené au début, il reste sur la première ligne du repli, que le redessin suivant remplace."""
+        flux = io.StringIO()
+        with self._barre(flux, 80) as barre:
+            ecrit = self._redessine(barre, flux)
+        assert ecrit.startswith("\r")
+        assert ecrit.endswith("\r")
+
+    def test_une_largeur_stable_efface_la_fin_de_la_ligne(self):
+        flux = io.StringIO()
+        with self._barre(flux, 80) as barre:
+            self._redessine(barre, flux)
+            ecrit = self._redessine(barre, flux)
+        assert module.EFFACE_FIN_DE_LIGNE in ecrit
+        assert module.EFFACE_BAS_DE_L_ECRAN not in ecrit
+
+    def test_un_terminal_retreci_efface_jusqu_au_bas_de_l_ecran(self):
+        """La barre trop longue s'y replie sur plusieurs lignes, toutes à effacer."""
+        flux = io.StringIO()
+        with self._barre(flux, 80) as barre:
+            self._redessine(barre, flux)
+            barre.dynamic_ncols = lambda _: (40, 20)
+            ecrit = self._redessine(barre, flux)
+        assert module.EFFACE_BAS_DE_L_ECRAN in ecrit
+
+
 class TestEcritureHorsBarre:
     """Une ligne écrite pendant qu'une barre tourne passe au-dessus d'elle."""
 
@@ -197,6 +251,14 @@ class TestAttente:
         with module.attente("maintenance des tables", None):
             time.sleep(0.08)
         assert "maintenance des tables..." in flux.getvalue()
+
+    def test_la_conclusion_efface_la_fin_du_libelle(self, avec_terminal, monkeypatch):
+        """Plus courte que le libellé dont elle prend la place, elle en laisserait la fin derrière elle."""
+        flux = io.StringIO()
+        monkeypatch.setattr(module, "_flux_barres", flux)
+        with module.attente("mise à jour en cours", None) as ligne:
+            ligne.conclut("Terminé en 12.3s")
+        assert flux.getvalue().endswith(f"Terminé en 12.3s{module.EFFACE_FIN_DE_LIGNE}\n")
 
     def test_une_sortie_capturee_recoit_une_ligne_de_journal(self, sans_terminal, caplog):
         with caplog.at_level(logging.INFO), module.attente("maintenance des tables", _log()):
