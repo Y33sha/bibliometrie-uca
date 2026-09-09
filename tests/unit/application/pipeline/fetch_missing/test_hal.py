@@ -11,6 +11,7 @@ from application.pipeline.fetch_missing.hal import (
     fetch_missing_hal_by_id,
     fetch_missing_hal_by_nnt,
 )
+from application.pipeline.libelles import DERNIERE_BRANCHE
 from application.ports.pipeline.fetch_missing.hal import (
     HalIdRef,
     NntInsertResult,
@@ -109,6 +110,16 @@ class TestParHalId:
 
         assert metrics.seen == 2
         assert sorted(adapter.telecharges) == ["hal-1", "hal-2"]
+
+    async def test_sans_reference_manquante_la_sous_etape_se_conclut(self, caplog):
+        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
+        adapter = _FakeHalAdapter()
+
+        with caplog.at_level(logging.INFO):
+            metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+
+        assert metrics.seen == 0
+        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
 
     async def test_stats_only_s_arrete_au_denombrement(self):
         adapter = _FakeHalAdapter(refs_oa=[_halid("hal-1")], docs={"hal-1": {}})

@@ -110,7 +110,10 @@ async def fetch_missing_hal_by_id(
     attendus = len(missing)
 
     metrics = PhaseMetrics(seen=attendus)
-    if stats_only or not missing:
+    if stats_only:
+        return metrics
+    if not missing:
+        log.info("%sRien à faire", DERNIERE_BRANCHE)
         return metrics
 
     if dry_run:
@@ -159,7 +162,9 @@ async def fetch_missing_hal_by_nnt(
     attendues = len(nnt_refs)
 
     metrics = PhaseMetrics(seen=attendues)
-    if stats_only or not nnt_refs:
+    if stats_only:
+        return metrics
+    if not nnt_refs:
         log.info("%saucune thèse soutenue sans document HAL", DERNIERE_BRANCHE)
         return metrics
 
