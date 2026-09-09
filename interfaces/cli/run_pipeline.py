@@ -537,7 +537,6 @@ def _run_resolve_publishers() -> PhaseMetrics:
     from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
     from infrastructure.sources.polite_pool import build_user_agent
 
-    log.info("▶ resolve_publishers")
     t0 = time.time()
     conn = get_sync_engine().connect()
     breaker = SourceCircuitBreaker("crossref/datacite prefixes")
@@ -860,8 +859,6 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     )
     from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
 
-    log.info("▶ enrich_journals_from_openalex")
-    t0 = time.time()
     conn = get_sync_engine().connect()
     # Seuil 3 : trois batches consécutifs à bout de budget (429) suffisent à conclure
     # que le quota OpenAlex quotidien est épuisé et à reporter le reste au prochain run.
@@ -889,7 +886,6 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     finally:
         reset_current_breaker(token)
         conn.close()
-    log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
     _signal_if_tripped(metrics, breaker)
     return metrics
 
@@ -908,8 +904,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
     from infrastructure.sources.polite_pool import build_user_agent
 
-    log.info("▶ enrich_journals_from_doaj")
-    t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         journal_repo = PgJournalGatewayQueries(conn)
@@ -943,7 +937,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
             Path(dump_path).unlink(missing_ok=True)
     finally:
         conn.close()
-    log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
     return PhaseMetrics(extras={"matched": stats.matched})
 
 

@@ -8,7 +8,6 @@ Trois sous-étapes, chacune dans sa propre transaction :
 """
 
 import logging
-import time
 
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
@@ -27,28 +26,19 @@ def run(
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
-    logger.info("▶ refresh perimeter_structures")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         perimeter_queries.refresh_perimeter_structures(conn)
-    logger.info("✓ perimeter_structures en %.1fs", time.perf_counter() - t0)
 
-    logger.info("▶ resolve_addresses")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         # Périmètre lu une fois après le refresh, réutilisé par les deux sous-étapes suivantes.
         perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
         stats = run_resolution(conn, address_queries, perimeter_ids, logger)
-    logger.info("✓ resolve_addresses terminé en %.1fs", time.perf_counter() - t0)
 
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed)
     metrics.details["summary"] = {"adresses": stats.processed, "in_perimeter": stats.in_perimeter}
 
-    logger.info("▶ populate_affiliations")
-    t0 = time.perf_counter()
     with open_tx() as conn:
         run_populate(conn, affiliations_queries, logger, perimeter_ids)
-    logger.info("✓ populate_affiliations terminé en %.1fs", time.perf_counter() - t0)
 
     return metrics

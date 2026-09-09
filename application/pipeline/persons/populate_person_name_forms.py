@@ -22,7 +22,6 @@ BATCH_SIZE = 5000
 
 
 def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.Logger) -> None:
-    logger.info("▶ régénération des formes de nom")
     queries.create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []
     n_persons_rows = 0

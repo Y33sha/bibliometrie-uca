@@ -259,12 +259,10 @@ def run_cascade(
 
     Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante. Passe `create` (`decide_cross_and_name`) sur ces seules restantes : cross-source de rattrapage contre l'état ferme complet, puis création des inconnues — une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe.
     """
-    logger.info("▶ chargement des index de la cascade...")
     c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
     total = len(c.authorships)
     logger.info("  %d signatures à traiter", total)
 
-    logger.info("▶ match : rattachement aux personnes existantes ou déjà résolues")
     unresolved: list[EnrichedAuthorship] = []
     with progression(total, "signatures (match)", logger) as avancement:
         for a in c.authorships:

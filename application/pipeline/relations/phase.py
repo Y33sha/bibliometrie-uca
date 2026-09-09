@@ -96,7 +96,6 @@ def run(
     open_tx: OpenTransaction, queries: PublicationRelationsQueries, logger: logging.Logger
 ) -> PhaseMetrics:
     """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
-    logger.info("▶ relations")
     t0 = time.perf_counter()
     with open_tx() as conn:
         sources = queries.fetch_declared_relation_sources(conn)
