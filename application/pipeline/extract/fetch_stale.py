@@ -120,7 +120,6 @@ async def refresh(
 
     metrics = PhaseMetrics(seen=total)
     if total == 0:
-        slog.info("rien à faire")
         return metrics
 
     slog.info("%s à chercher", accord(total, "document"))
