@@ -219,6 +219,9 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
+    # Le logger porte ses propres handlers : propager en plus émettrait chaque record une
+    # seconde fois par ceux du root.
+    logger.propagate = False
 
     # Éviter les doublons si le logger est configuré plusieurs fois
     if logger.handlers:
@@ -260,9 +263,9 @@ def _attach_file_handler(
 
 
 def configure_root_logging(level: int = logging.INFO) -> None:
-    """Configure le root logger (utilisé par les modules qui font simplement `logging.getLogger(__name__)` sans passer par setup_logger, notamment les routers FastAPI).
+    """Configure le root logger, que rejoignent les records des modules appelant `logging.getLogger(__name__)`.
 
-    Appelé au démarrage de backend/app.py.
+    Sans ce handler, `logging` se rabat sur son handler de dernier recours : la ligne part sur la sortie d'erreur, sans format, hors de portée de l'écrivain de console. Elle s'inscrit alors au milieu de ce que le terminal affiche déjà.
     """
     root = logging.getLogger()
     root.setLevel(level)
@@ -275,7 +278,7 @@ def configure_root_logging(level: int = logging.INFO) -> None:
     # plus duplique les records et pollue la sortie des tests.
     if os.environ.get("PYTEST_VERSION") or os.environ.get("PYTEST_CURRENT_TEST"):
         return
-    handler = logging.StreamHandler(stream=sys.stdout)
+    handler = logging.StreamHandler(stream=_FluxConsole(console_stream()))
     handler.setFormatter(_make_console_formatter())
     handler.addFilter(_PhaseNameFilter())
     root.addHandler(handler)

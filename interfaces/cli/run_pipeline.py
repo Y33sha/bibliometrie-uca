@@ -86,6 +86,7 @@ from infrastructure.observability.log import (
     PHASE_MARKER,
     RUN_END_MARKER,
     RUN_MARKER,
+    configure_root_logging,
     console_stream,
     reset_log_phase,
     set_console_writer,
@@ -106,6 +107,10 @@ log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 # passent par le même flux, sans quoi aucune n'efface l'autre.
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())
+
+# Les modules qui appellent `logging.getLogger(__name__)` émettent vers le root logger. Le seuil
+# reste l'avertissement : les bibliothèques tierces y déversent leurs lignes d'information.
+configure_root_logging(logging.WARNING)
 
 
 # ---------------------------------------------------------------------------
