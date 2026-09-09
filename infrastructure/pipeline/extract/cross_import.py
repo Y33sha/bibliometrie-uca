@@ -1,7 +1,9 @@
-"""Pool de DOI à cross-importer et journal des DOI écartés (`doi_lookups`).
+"""Pool de DOI à cross-importer et journal des DOI introuvables (`doi_lookups`).
 
-`get_cross_import_dois` bâtit la liste des DOI présents ailleurs mais absents de la cible. Deux issues d'une recherche reportent les suivantes : `record_doi_not_found` quand la source ne connaît pas le DOI, `record_doi_already_present` quand elle rend un document déjà présent. Le commit est à la charge de l'appelant.
+`get_cross_import_dois` bâtit la liste des DOI présents ailleurs mais absents de la cible ; `record_doi_not_found` mémorise les misses pour les exclure du pool en backoff, `forget_doi_lookups` les rend au pool dès que la source livre le document. Le commit est à la charge de l'appelant.
 """
+
+from collections.abc import Sequence
 
 from sqlalchemy import Connection, text
 
@@ -56,21 +58,19 @@ def record_doi_not_found(
     )
 
 
-def record_doi_already_present(conn: Connection, source: str, doi: str | None) -> None:
-    """Reporte les prochaines recherches d'un DOI dont la source rend un document déjà présent.
+_FORGET_DOI_LOOKUP_SQL = text(
+    "DELETE FROM doi_lookups WHERE source = CAST(:source AS source_type) AND doi = ANY(:dois)"
+)
 
-    La source retrouve un même document par n'importe lequel de ses identifiants : un DOI qu'elle n'expose pas dans le document reçu échappe au filtre du pool, et reviendrait à chaque exécution. Le report l'écarte pour `DOI_LOOKUP_RETRY_DAYS` jours, comme un DOI introuvable. Ne commit pas.
+
+def forget_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]) -> None:
+    """Retire de `doi_lookups` les DOI d'un document que la source rend.
+
+    `doi_lookups` recense les DOI qu'une source ne connaît pas. Un document reçu porte ses identifiants, donc la source les connaît : ce que la table en retenait cesse de valoir, qu'il entre en base ou qu'il y soit déjà. Ne commit pas.
     """
-    if doi:
-        conn.execute(
-            _RECORD_DOI_NOT_FOUND_SQL,
-            {
-                "source": source,
-                "doi": clean_doi(doi),
-                "days": DOI_LOOKUP_RETRY_DAYS,
-                "permanent": False,
-            },
-        )
+    propres = [propre for d in dois if (propre := clean_doi(d))]
+    if propres:
+        conn.execute(_FORGET_DOI_LOOKUP_SQL, {"source": source, "dois": propres})
 
 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:

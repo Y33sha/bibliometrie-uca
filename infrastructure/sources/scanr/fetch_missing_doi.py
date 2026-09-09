@@ -21,7 +21,7 @@ from application.ports.pipeline.fetch_missing.doi import (
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.cross_import import (
-    record_doi_already_present,
+    forget_doi_lookups,
     record_doi_not_found,
 )
 from infrastructure.pipeline.extract.staging import upsert_staging
@@ -106,9 +106,6 @@ class ScanrFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        if not inserted:
-            # Le document porte plusieurs DOI et ScanR le rend pour chacun d'eux ; `staging.doi`
-            # n'en garde qu'un, donc les autres reviendraient au pool.
-            for doi in dois:
-                record_doi_already_present(conn, "scanr", doi)
+        # ScanR rend un même document pour chacun de ses DOI : aucun n'est introuvable.
+        forget_doi_lookups(conn, "scanr", dois)
         return inserted

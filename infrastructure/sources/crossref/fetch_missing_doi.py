@@ -22,7 +22,7 @@ from application.ports.pipeline.fetch_missing.doi import (
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.cross_import import (
-    record_doi_already_present,
+    forget_doi_lookups,
     record_doi_not_found,
 )
 from infrastructure.pipeline.extract.staging import upsert_staging
@@ -97,6 +97,5 @@ class CrossrefFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        if not inserted:
-            record_doi_already_present(conn, "crossref", doi)
+        forget_doi_lookups(conn, "crossref", [doi])
         return inserted

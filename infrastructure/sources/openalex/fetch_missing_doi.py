@@ -18,7 +18,7 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.cross_import import (
-    record_doi_already_present,
+    forget_doi_lookups,
     record_doi_not_found,
 )
 from infrastructure.pipeline.extract.staging import upsert_staging
@@ -91,6 +91,5 @@ class OpenalexFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        if not inserted:
-            record_doi_already_present(conn, "openalex", doi)
+        forget_doi_lookups(conn, "openalex", [doi])
         return inserted
