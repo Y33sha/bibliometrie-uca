@@ -11,6 +11,7 @@ import logging
 
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
+from application.pipeline.libelles import ETAPE
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
@@ -29,6 +30,7 @@ def run(
     with open_tx() as conn:
         perimeter_queries.refresh_perimeter_structures(conn)
 
+    logger.info("%sIdentification des structures dans les adresses institutionnelles", ETAPE)
     with open_tx() as conn:
         # Périmètre lu une fois après le refresh, réutilisé par les deux sous-étapes suivantes.
         perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
@@ -38,7 +40,10 @@ def run(
     metrics.add(total=stats.processed)
     metrics.details["summary"] = {"adresses": stats.processed, "in_perimeter": stats.in_perimeter}
 
+    logger.info("")
+    logger.info("%sRattachement des structures aux auteurs des documents", ETAPE)
     with open_tx() as conn:
         run_populate(conn, affiliations_queries, logger, perimeter_ids)
 
+    metrics.resume = ""
     return metrics
