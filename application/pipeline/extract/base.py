@@ -97,7 +97,7 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
 
     def run(
         self,
-        args: argparse.Namespace | None = None,
+        args: argparse.Namespace,
         *,
         breaker: CircuitBreaker | None = None,
     ) -> PhaseMetrics:
@@ -107,8 +107,6 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
 
         `breaker` : circuit-breaker de la source (posé via la ContextVar par le composition root) ; les boucles `extract_all` le consultent pour stopper une source à bout de budget.
         """
-        if args is None:
-            args = argparse.Namespace(dry_run=False)
         self._breaker = breaker
         config = self.load_config(self.conn)
         self.setup_logging(args, config)

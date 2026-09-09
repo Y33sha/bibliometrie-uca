@@ -33,8 +33,6 @@ def extract_year(
     year: int,
     affiliations: list[str],
     logger: ExtractLogger,
-    *,
-    dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Extrait toutes les publications d'une année.
 
@@ -47,7 +45,7 @@ def extract_year(
     total_count = adapter.get_records_found(data)
     logger.info("%s documents à récupérer", total_count)
 
-    if dry_run or total_count == 0:
+    if total_count == 0:
         return 0, 0, 0
 
     total_new = 0
@@ -148,7 +146,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
                     year,
                     config.affiliations,
                     slog,
-                    dry_run=args.dry_run,
                 )
                 stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:

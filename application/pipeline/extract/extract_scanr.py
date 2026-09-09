@@ -28,8 +28,6 @@ def extract_year(
     year: int,
     affiliation_ids: list[str],
     logger: ExtractLogger,
-    *,
-    dry_run: bool = False,
 ) -> tuple[int, int, int, int]:
     """Extrait toutes les publications d'une année.
 
@@ -50,8 +48,6 @@ def extract_year(
         if first_page:
             total = as_int(at_path(data, "hits", "total").get("value")) or 0
             logger.info("%s documents à récupérer", total)
-            if dry_run:
-                return total, 0, 0, 0
             avancement.fixer_total(total)
 
         hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
@@ -113,7 +109,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
                 year,
                 config.affiliation_ids,
                 slog,
-                dry_run=args.dry_run,
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
             slog.info(

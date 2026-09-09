@@ -134,25 +134,6 @@ class TestRouting:
         assert adapter.upsert_work.call_count == 1
 
 
-class TestDryRun:
-    def test_dry_run_reads_numfound_without_upsert(self):
-        pages = [_page([_doc("hal-1")], next_cursor="c1", num_found=4242)]
-        adapter = _adapter(pages)
-
-        metrics = extract_union(
-            adapter,
-            _config({"C": "Coll"}),
-            MagicMock(),
-            _LOGGER,
-            years=[2025],
-            dry_run=True,
-        )
-
-        assert metrics.total == 4242
-        assert adapter.fetch_page_cursor.call_count == 1
-        adapter.upsert_work.assert_not_called()
-
-
 class TestBreaker:
     def test_breaker_interrupts_pagination(self):
         """Le circuit-breaker tripé stoppe la boucle avant le premier fetch."""

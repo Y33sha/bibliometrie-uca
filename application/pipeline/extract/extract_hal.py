@@ -33,27 +33,17 @@ def extract_union(
     *,
     years: list[int] | None = None,
     since: str | None = None,
-    dry_run: bool = False,
     breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> PhaseMetrics:
     """Extrait l'union des collections configurées pour un périmètre temporel.
 
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis paginate en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois. `logger` est le logger scopé construit par `extract_all` : `[hal · <année>]` par année, `[hal]` sur une passe unique. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
-
-    En `dry_run`, une seule page est tirée pour lire `numFound` (volume du périmètre) sans rien écrire.
     """
     codes = list(config.all_collections.keys())
     query = adapter.build_query(years=years, since=since)
     fq = adapter.build_collections_fq(codes)
 
     metrics = PhaseMetrics()
-
-    if dry_run:
-        data = adapter.fetch_page_cursor(query, fq, "*")
-        total = as_int(at_path(data, "response").get("numFound")) or 0
-        metrics.add(total=total)
-        logger.info("%s documents à récupérer (simulation)", total)
-        return metrics
 
     page_size = adapter.per_page()
     cursor = "*"
@@ -132,7 +122,6 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
                 self.conn,
                 scoped_logger(self.logger, self.SOURCE),
                 since=args.since,
-                dry_run=args.dry_run,
                 breaker_tripped=self._breaker_tripped,
             )
 
@@ -150,18 +139,16 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
                 self.conn,
                 slog,
                 years=[year],
-                dry_run=args.dry_run,
                 breaker_tripped=self._breaker_tripped,
             )
             metrics.merge(year_metrics)
-            if not args.dry_run:
-                slog.info(
-                    "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
-                    year_metrics.total,
-                    year_metrics.new,
-                    year_metrics.updated,
-                    year_metrics.unchanged,
-                )
+            slog.info(
+                "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
+                year_metrics.total,
+                year_metrics.new,
+                year_metrics.updated,
+                year_metrics.unchanged,
+            )
         return metrics
 
 

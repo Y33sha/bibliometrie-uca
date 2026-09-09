@@ -93,8 +93,6 @@ async def fetch_missing_hal_by_id(
     conn: Connection,
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
-    *,
-    stats_only: bool = False,
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
 
@@ -109,8 +107,6 @@ async def fetch_missing_hal_by_id(
     attendus = len(missing)
 
     metrics = PhaseMetrics(seen=attendus)
-    if stats_only:
-        return metrics
     if not missing:
         log.info("%sRien à faire", DERNIERE_BRANCHE)
         return metrics
@@ -139,8 +135,6 @@ async def fetch_missing_hal_by_nnt(
     conn: Connection,
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
-    *,
-    stats_only: bool = False,
 ) -> PhaseMetrics:
     """Fetch des documents HAL de thèses soutenues repérées par NNT (theses.fr).
 
@@ -152,8 +146,6 @@ async def fetch_missing_hal_by_nnt(
     attendues = len(nnt_refs)
 
     metrics = PhaseMetrics(seen=attendues)
-    if stats_only:
-        return metrics
     if not nnt_refs:
         log.info("%sRien à faire", DERNIERE_BRANCHE)
         return metrics

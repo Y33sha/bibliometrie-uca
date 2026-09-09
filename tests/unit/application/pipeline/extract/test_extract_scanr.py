@@ -67,12 +67,6 @@ def test_document_sans_identifiant_ignore():
     assert extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER)[1] == 1
 
 
-def test_dry_run_s_arrete_apres_le_decompte():
-    adapter = _adapter([_page([_hit("a")], total=7)])
-    assert extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER, dry_run=True) == (7, 0, 0, 0)
-    assert adapter.fetch_page.call_count == 1
-
-
 def test_le_curseur_suit_la_cle_de_tri_du_dernier_document():
     adapter = _adapter([_page([_hit("a"), _hit("b")], total=2), _page([])])
     extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER)
@@ -98,7 +92,7 @@ def _extracteur(adapter: MagicMock, config: ScanrExtractConfig, annees: list[int
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"dry_run": False, "year": None, "start_year": None}
+    valeurs: dict = {"year": None, "start_year": None}
     valeurs.update(surcharges)
     return argparse.Namespace(**valeurs)
 

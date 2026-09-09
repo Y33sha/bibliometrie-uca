@@ -63,7 +63,7 @@ def conn():
 class TestRun:
     def test_happy_path_calls_pipeline_in_order(self, conn, logger):
         ext = _FakeExtractor(conn, logger)
-        args = argparse.Namespace(dry_run=False)
+        args = argparse.Namespace(year=None, start_year=None)
 
         metrics = ext.run(args)
 
@@ -75,11 +75,3 @@ class TestRun:
         assert call["args"] is args
         assert call["config"] == {"affiliations": ["UCA"]}
         assert metrics.new == 42
-
-    def test_no_args_defaults_to_non_dry_run(self, conn, logger):
-        """`run()` sans argument fabrique un Namespace(dry_run=False)."""
-        ext = _FakeExtractor(conn, logger)
-
-        ext.run()
-
-        assert ext.extract_all_calls[0]["args"].dry_run is False

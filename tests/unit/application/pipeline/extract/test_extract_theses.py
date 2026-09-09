@@ -67,12 +67,6 @@ def test_these_sans_identifiant_ignoree():
     assert extract_ppn(adapter, MagicMock(), "PPN1", _LOGGER)[1] == 1
 
 
-def test_dry_run_ne_pagine_pas():
-    adapter = _adapter([[_these("2020AAA1")]], total=1)
-    assert extract_ppn(adapter, MagicMock(), "PPN1", _LOGGER, dry_run=True) == (1, 0, 0, 0)
-    assert adapter.fetch_page.call_count == 1
-
-
 def test_aucun_resultat():
     adapter = _adapter([], total=0)
     assert extract_ppn(adapter, MagicMock(), "PPN1", _LOGGER) == (0, 0, 0, 0)
@@ -97,9 +91,7 @@ def test_run_parcourt_chaque_etablissement():
         {"totalHits": 1},
         {"theses": [_these("2020B")]},
     ]
-    metrics = _extracteur(adapter, ["PPN1", "PPN2"]).run(
-        argparse.Namespace(dry_run=False, year=None)
-    )
+    metrics = _extracteur(adapter, ["PPN1", "PPN2"]).run(argparse.Namespace(year=None))
     assert metrics.new == 2
 
 
@@ -110,7 +102,7 @@ def test_run_sans_ppn_configure_refuse():
 
     adapter = _adapter([], total=0)
     with pytest.raises(ExtractionConfigError, match="aucun PPN"):
-        _extracteur(adapter, []).run(argparse.Namespace(dry_run=False, year=None))
+        _extracteur(adapter, []).run(argparse.Namespace(year=None))
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout():
@@ -119,7 +111,7 @@ def test_run_s_arrete_quand_la_source_est_a_bout():
     breaker = MagicMock()
     breaker.tripped = True
     metrics = _extracteur(adapter, ["PPN1", "PPN2"]).run(
-        argparse.Namespace(dry_run=False, year=None), breaker=breaker
+        argparse.Namespace(year=None), breaker=breaker
     )
     assert metrics.total == 0
     assert adapter.fetch_page.call_count == 0

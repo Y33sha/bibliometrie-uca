@@ -38,7 +38,7 @@ def _adapter(collections: dict[str, str], annees: list[int]) -> MagicMock:
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"dry_run": False, "year": None, "start_year": None, "since": None}
+    valeurs: dict = {"year": None, "start_year": None, "since": None}
     valeurs.update(surcharges)
     return argparse.Namespace(**valeurs)
 
@@ -61,12 +61,6 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date():
     HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(since="2026-01-01"))
     assert adapter.fetch_page_cursor.call_count == 1
     assert adapter.build_query.call_args.kwargs.get("since") == "2026-01-01"
-
-
-def test_dry_run_ne_journalise_pas_de_bilan_d_annee():
-    adapter = _adapter({"C": "Coll"}, [2024])
-    metrics = HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(dry_run=True))
-    assert metrics.total == 0
 
 
 def test_sans_collection_refuse():
