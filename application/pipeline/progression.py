@@ -32,15 +32,16 @@ except ImportError:  # `tqdm` est une dépendance de développement.
 JALON_INTERVALLE_S = 30.0
 """Délai entre deux jalons de journal, quand aucune barre ne s'affiche."""
 
-LARGEUR_BARRE = 40
-"""Longueur du remplissage, en caractères. Fixe : les barres d'une même phase se comparent d'un coup d'œil, et une barre ne s'étire pas à la largeur de la fenêtre."""
+LARGEUR_LIGNE = 80
+"""Largeur maximale d'une barre, en colonnes. Une fenêtre plus étroite l'emporte : une ligne plus longue que la fenêtre s'y replierait, décalant les barres voisines."""
 
-FORMAT_BARRE = (
-    f"{{desc}} {{percentage:3.0f}}% |{{bar:{LARGEUR_BARRE}}}| {{n_fmt}}/{{total_fmt}}  {{elapsed}}"
-)
+LARGEUR_COMPTEUR = 13
+"""Colonne du compteur, à la largeur de `435758/435758`. Fixe, comme le nom de la source à gauche : ce qui reste pour le remplissage l'est aussi, et les barres d'une même phase ont la même longueur."""
+
+FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {compteur} {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
 
-FORMAT_BARRE_RETENUS = f"{{desc}} {{percentage:3.0f}}% |{{bar:{LARGEUR_BARRE}}}| {{retenus}}/{{total_fmt}}  {{elapsed}}"
+FORMAT_BARRE_RETENUS = FORMAT_BARRE
 """Barre dont le compteur porte les éléments retenus, quand le remplissage suit les parcourus."""
 
 
@@ -59,6 +60,11 @@ EFFACE_BAS_DE_L_ECRAN = "\x1b[J"
 """Séquence effaçant du curseur au bas de l'écran."""
 
 
+def _colonne_compteur(fait: object, total: object) -> str:
+    """Rend `fait/total` à la largeur de la colonne, le total inconnu s'écrivant `?`."""
+    return f"{fait}/{total if total is not None else '?'}".ljust(LARGEUR_COMPTEUR)
+
+
 if tqdm is not None:
 
     class _Barre(tqdm):  # type: ignore[misc]
@@ -66,6 +72,25 @@ if tqdm is not None:
 
         Un terminal rétréci reçoit une barre plus longue que sa largeur. Il la replie sur autant de lignes qu'il faut, et le redessin suivant les efface toutes.
         """
+
+        @property
+        def format_dict(self) -> dict[str, object]:
+            """Champs du format, avec le compteur complété et la largeur bornée.
+
+            `{compteur}` occupe une colonne fixe, de sorte que le remplissage qui la précède en occupe une aussi : deux sources aux volumes différents tracent des barres de même longueur.
+            """
+            champs: dict[str, object] = super().format_dict
+            largeur = champs.get("ncols")
+            if isinstance(largeur, int):
+                # `self.ncols` sert aussi au redessin, qui compare la longueur écrite à la largeur.
+                self.ncols = min(largeur, LARGEUR_LIGNE)
+                champs["ncols"] = self.ncols
+            champs["compteur"] = self._compteur(champs)
+            return champs
+
+        def _compteur(self, champs: dict[str, object]) -> str:
+            """Éléments parcourus sur le total, complétés à la largeur de la colonne."""
+            return _colonne_compteur(champs["n"], champs["total"])
 
         def status_printer(self, flux: FluxTexte) -> Callable[[str], None]:
             """Réécrit la ligne en place : retour chariot, barre, effacement de ce qui suit.
@@ -87,13 +112,12 @@ if tqdm is not None:
             return redessine
 
     class _BarreRetenus(_Barre):
-        """Barre offrant `{retenus}` à son format, à côté des champs que `tqdm` fournit."""
+        """Barre dont le compteur porte les éléments retenus, quand le remplissage suit les parcourus."""
 
         retenus = 0
 
-        @property
-        def format_dict(self) -> dict[str, object]:
-            return {**super().format_dict, "retenus": self.retenus}
+        def _compteur(self, champs: dict[str, object]) -> str:
+            return _colonne_compteur(self.retenus, champs["total"])
 else:
     _Barre = None  # type: ignore[assignment,misc]
     _BarreRetenus = None  # type: ignore[assignment,misc]
