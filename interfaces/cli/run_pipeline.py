@@ -833,16 +833,13 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
 def _run_normalize(source: str, build: ConstructeurNormalizer) -> dict[str, object]:
     from infrastructure.db.engine import get_sync_engine
 
-    log.info("▶ normalize_%s", source)
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         stats = build(conn).run()
     finally:
         conn.close()
-    duration = time.time() - t0
-    log.info("✓ normalize_%s terminé en %.1fs", source, duration)
-    return _normalize_row(source, stats, duration)
+    return _normalize_row(source, stats, time.time() - t0)
 
 
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
