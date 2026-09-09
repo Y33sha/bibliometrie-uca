@@ -1427,30 +1427,62 @@ def _print_dry_run(phases_to_run: list[tuple[str, Phase]]) -> None:
 
 
 LARGEUR_TITRE_PHASE = 48
-"""Largeur du texte dans le cadre d'une phase, la même pour toutes."""
+"""Largeur du texte dans le cadre d'un titre, la même pour tous."""
 
 
-def _titre_de_phase(name: str) -> list[str]:
-    """Lignes ouvrant une phase : son nom, et ce qu'elle produit.
+def _encadre(lignes: list[str]) -> list[str]:
+    """Détache `lignes` du flux, chacune repliée à la largeur du cadre.
 
-    Devant un terminal, un cadre de largeur constante les détache du flux, un libellé long tenant sur deux lignes. Une sortie capturée reçoit des filets, que la largeur de la fenêtre laisse indifférents.
+    Devant un terminal, un cadre de largeur constante. Une sortie capturée reçoit des filets, que la largeur de la fenêtre laisse indifférents.
     """
-    # `phase_order` donne un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
-    libelle = PHASE_LIBELLES.get(name)
-
     if not sys.stdout.isatty():
-        lignes = [f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])]
         return ["─" * 40, *lignes, "─" * 40]
 
-    lignes = textwrap.wrap(f"{PHASE_MARKER}{name}", LARGEUR_TITRE_PHASE)
-    if libelle:
-        lignes += textwrap.wrap(libelle, LARGEUR_TITRE_PHASE)
+    repliees = [repli for ligne in lignes for repli in textwrap.wrap(ligne, LARGEUR_TITRE_PHASE)]
     largeur = LARGEUR_TITRE_PHASE + 4
     return [
         f"╔{'═' * largeur}╗",
-        *[f"║  {ligne.ljust(largeur - 2)}║" for ligne in lignes],
+        *[f"║  {ligne.ljust(largeur - 2)}║" for ligne in repliees],
         f"╚{'═' * largeur}╝",
     ]
+
+
+def _titre_de_phase(name: str) -> list[str]:
+    """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
+    # `phase_order` donne un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
+    libelle = PHASE_LIBELLES.get(name)
+    return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
+
+
+def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, Phase]]) -> list[str]:
+    """Lignes ouvrant une exécution : son mode, puis ce qui écarte le lancement du courant."""
+    # Le retrait détache le titre des réglages qui le suivent.
+    lignes = ["    PIPELINE BIBLIOMÉTRIQUE", f"Mode : {args.mode}"]
+
+    demandees = {s.strip() for s in args.sources.split(",") if s.strip()}
+    retenues = demandees if args.include_wos else demandees - {"wos"}
+    lignes.append(f"Sources : {', '.join(sorted(retenues))}")
+
+    if args.year:
+        lignes.append(f"Année : {args.year}")
+    elif args.start_year:
+        lignes.append(f"Depuis : {args.start_year}")
+
+    if args.only or args.from_phase:
+        lignes.append(f"Phases : {' → '.join(n for n, _ in phases)}")
+    elif args.no_extras:
+        lignes.append("Phases : sans les enrichissements terminaux")
+
+    for drapeau, texte in (
+        (args.rebuild_publications, "Publications reconstruites"),
+        (args.rebuild_authorships, "Signatures reconstruites"),
+        (args.rebuild_subjects, "Sujets reconstruits"),
+        (args.raw_store, "Réponses des sources archivées"),
+    ):
+        if drapeau:
+            lignes.append(texte)
+
+    return _encadre(lignes)
 
 
 def _run_one_phase(
@@ -1546,7 +1578,6 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
     sources = {s.strip() for s in args.sources.split(",") if s.strip()}
     # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
     effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
-    log.info("Sources : %s", ", ".join(effective_sources))
 
     # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
     recorder = start_run(mode=args.mode, sources=effective_sources)
@@ -1588,10 +1619,8 @@ def main() -> None:
         return
 
     phases_to_run = _select_phases_to_run(args)
-    log.info("=" * 60)
-    log.info("PIPELINE BIBLIOMÉTRIQUE — mode %s", args.mode)
-    log.info("Phases : %s", " → ".join(n for n, _ in phases_to_run))
-    log.info("=" * 60)
+    for ligne in _titre_du_run(args, phases_to_run):
+        log.info("%s", ligne)
 
     if args.dry_run:
         _print_dry_run(phases_to_run)

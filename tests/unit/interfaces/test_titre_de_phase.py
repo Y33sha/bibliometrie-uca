@@ -1,13 +1,14 @@
-"""Lignes ouvrant une phase du pipeline."""
+"""Lignes ouvrant une exécution du pipeline, et chacune de ses phases."""
 
 from __future__ import annotations
 
+import argparse
 import sys
 
 import pytest
 
 from application.pipeline.phase_order import PHASE_LIBELLES, PHASE_ORDER
-from interfaces.cli.run_pipeline import LARGEUR_TITRE_PHASE, _titre_de_phase
+from interfaces.cli.run_pipeline import LARGEUR_TITRE_PHASE, _titre_de_phase, _titre_du_run
 
 
 @pytest.fixture
@@ -54,3 +55,55 @@ def test_une_phase_sans_libelle_garde_son_cadre(terminal) -> None:
     lignes = _titre_de_phase("une")
     assert len(lignes) == 3
     assert "une" in lignes[1]
+
+
+def _args(**modifications) -> argparse.Namespace:
+    defauts = {
+        "mode": "full",
+        "sources": "hal,openalex,scanr,theses,crossref,datacite,wos",
+        "include_wos": False,
+        "year": None,
+        "start_year": None,
+        "only": None,
+        "from_phase": None,
+        "no_extras": False,
+        "rebuild_publications": False,
+        "rebuild_authorships": False,
+        "rebuild_subjects": False,
+        "raw_store": False,
+    }
+    return argparse.Namespace(**{**defauts, **modifications})
+
+
+class TestTitreDuRun:
+    def test_le_mode_suit_le_titre(self, terminal) -> None:
+        lignes = _titre_du_run(_args(), [])
+        assert "PIPELINE BIBLIOMÉTRIQUE" in lignes[1]
+        assert "Mode : full" in lignes[2]
+
+    def test_le_titre_est_en_retrait(self, terminal) -> None:
+        titre = _titre_du_run(_args(), [])[1]
+        assert titre.startswith("║      PIPELINE")
+
+    def test_wos_reste_dehors_sans_son_option(self, terminal) -> None:
+        texte = " ".join(_titre_du_run(_args(), []))
+        assert "wos" not in texte
+        assert "hal" in texte
+
+    def test_l_option_fait_entrer_wos(self, terminal) -> None:
+        texte = " ".join(_titre_du_run(_args(include_wos=True), []))
+        assert "wos" in texte
+
+    def test_une_annee_demandee_paraît(self, terminal) -> None:
+        assert "Année : 2018" in " ".join(_titre_du_run(_args(year=2018), []))
+
+    def test_les_phases_paraissent_quand_le_lancement_les_restreint(self, terminal) -> None:
+        texte = " ".join(_titre_du_run(_args(only="persons"), [("persons", None)]))
+        assert "Phases : persons" in texte
+
+    def test_un_lancement_courant_ne_liste_pas_les_phases(self, terminal) -> None:
+        assert "Phases" not in " ".join(_titre_du_run(_args(), [("extract", None)]))
+
+    def test_les_reconstructions_demandees_paraissent(self, terminal) -> None:
+        texte = " ".join(_titre_du_run(_args(rebuild_authorships=True), []))
+        assert "Signatures reconstruites" in texte
