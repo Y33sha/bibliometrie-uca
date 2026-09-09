@@ -2,7 +2,6 @@
 
 import logging
 from contextlib import contextmanager
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from application.pipeline.authorships import phase as authorships_phase
@@ -26,7 +25,8 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
     purge_queries = MagicMock()
     purge_queries.purge_orphan_publications.return_value = 0
     pub_counts = MagicMock()
-    pub_counts.refresh_pub_counts.return_value = SimpleNamespace(journals=0, publishers=0)
+    pub_counts.refresh_journal_pub_counts.return_value = 0
+    pub_counts.refresh_publisher_pub_counts.return_value = 0
     with patch.object(
         authorships_phase, "build", return_value=PhaseMetrics(details={"summary": {}})
     ):
@@ -39,6 +39,8 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
             logging.getLogger("test"),
         )
     address_pub_count.recompute_pub_count.assert_called_once()
+    pub_counts.refresh_journal_pub_counts.assert_called_once()
+    pub_counts.refresh_publisher_pub_counts.assert_called_once()
 
 
 def test_resolve_ra_runs_after_extract_before_fetch_missing():
