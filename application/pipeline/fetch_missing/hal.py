@@ -94,7 +94,6 @@ async def fetch_missing_hal_by_id(
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
     *,
-    dry_run: bool = False,
     stats_only: bool = False,
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
@@ -114,14 +113,6 @@ async def fetch_missing_hal_by_id(
         return metrics
     if not missing:
         log.info("%sRien à faire", DERNIERE_BRANCHE)
-        return metrics
-
-    if dry_run:
-        log.info("[DRY RUN] %d documents HAL à télécharger (par halId) :", len(missing))
-        for ref in missing[:10]:
-            log.info("  [%s] %s → %s", ref.source, ref.foreign_id, ref.hal_id)
-        if len(missing) > 10:
-            log.info("  ... et %d autres", len(missing) - 10)
         return metrics
 
     def _insert(
@@ -149,7 +140,6 @@ async def fetch_missing_hal_by_nnt(
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
     *,
-    dry_run: bool = False,
     stats_only: bool = False,
 ) -> PhaseMetrics:
     """Fetch des documents HAL de thèses soutenues repérées par NNT (theses.fr).
@@ -166,14 +156,6 @@ async def fetch_missing_hal_by_nnt(
         return metrics
     if not nnt_refs:
         log.info("%sRien à faire", DERNIERE_BRANCHE)
-        return metrics
-
-    if dry_run:
-        log.info("[DRY RUN] %d documents HAL à chercher (par NNT) :", len(nnt_refs))
-        for ref in nnt_refs[:10]:
-            log.info("  [nnt] %s → NNT=%s", ref.theses_id, ref.nnt)
-        if len(nnt_refs) > 10:
-            log.info("  ... et %d autres", len(nnt_refs) - 10)
         return metrics
 
     def _insert(

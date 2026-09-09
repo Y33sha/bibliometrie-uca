@@ -1,6 +1,6 @@
 """Orchestrateurs du fetch des entrées HAL manquantes : par hal-id, et par NNT.
 
-Deux pistes, même forme : repérer les références absentes, puis les télécharger par un pool de workers et les insérer. Les propriétés qui les distinguent tiennent aux comptages — un hal-id introuvable côté HAL, un NNT trouvé mais dont le document est déjà en staging — et aux deux modes qui s'arrêtent avant le téléchargement, `stats_only` et `dry_run`.
+Deux pistes, même forme : repérer les références absentes, puis les télécharger par un pool de workers et les insérer. Les propriétés qui les distinguent tiennent aux comptages — un hal-id introuvable côté HAL, un NNT trouvé mais dont le document est déjà en staging — et au dénombrement seul (`stats_only`), qui s'arrête avant le téléchargement.
 
 Le pool réel est exercé : seule la source HTTP est doublée. La déduplication des références, elle, décide de ce qui est téléchargé — un hal-id vu par OpenAlex et par ScanR ne l'est qu'une fois.
 """
@@ -111,40 +111,12 @@ class TestParHalId:
         assert metrics.seen == 2
         assert sorted(adapter.telecharges) == ["hal-1", "hal-2"]
 
-    async def test_sans_reference_manquante_la_sous_etape_se_conclut(self, caplog):
-        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
-        adapter = _FakeHalAdapter()
-
-        with caplog.at_level(logging.INFO):
-            metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
-
-        assert metrics.seen == 0
-        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
-
     async def test_stats_only_s_arrete_au_denombrement(self):
         adapter = _FakeHalAdapter(refs_oa=[_halid("hal-1")], docs={"hal-1": {}})
 
         metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG, stats_only=True)
 
         assert metrics.seen == 1
-        assert adapter.telecharges == []
-
-    async def test_dry_run_ne_telecharge_rien(self):
-        # Plus de dix références : la liste affichée est tronquée, le décompte du reste aussi.
-        adapter = _FakeHalAdapter(refs_oa=[_halid(f"hal-{i}") for i in range(12)])
-
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG, dry_run=True)
-
-        assert metrics.seen == 12
-        assert adapter.telecharges == []
-
-    async def test_dry_run_liste_courte(self):
-        # Dix références ou moins : la liste tient entière, sans mention d'un reste.
-        adapter = _FakeHalAdapter(refs_oa=[_halid(f"hal-{i}") for i in range(3)])
-
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG, dry_run=True)
-
-        assert metrics.seen == 3
         assert adapter.telecharges == []
 
     async def test_jalon_de_progression_et_pause_entre_fetchs(self):
@@ -158,13 +130,16 @@ class TestParHalId:
         assert metrics.new == 60
         assert conn.commits == 2  # un au 50e document, un en sortie de pool
 
-    async def test_rien_a_faire(self):
+    async def test_rien_a_faire(self, caplog):
+        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
         adapter = _FakeHalAdapter()
 
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+        with caplog.at_level(logging.INFO):
+            metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
 
         assert metrics.seen == 0
         assert adapter.telecharges == []
+        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
 
 
 class TestParNnt:
@@ -196,15 +171,6 @@ class TestParNnt:
         assert metrics.new == 1
         assert metrics.extras["not_found"] == 1
 
-    async def test_sans_these_a_chercher_la_sous_etape_se_conclut(self, caplog):
-        adapter = _FakeHalAdapter()
-
-        with caplog.at_level(logging.INFO):
-            metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
-
-        assert metrics.seen == 0
-        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
-
     async def test_stats_only_s_arrete_au_denombrement(self):
         adapter = _FakeHalAdapter(refs_nnt=[NntRef(nnt="2024UCA0001", theses_id="t1")])
 
@@ -213,29 +179,13 @@ class TestParNnt:
         assert metrics.seen == 1
         assert adapter.telecharges == []
 
-    async def test_dry_run_ne_telecharge_rien(self):
-        adapter = _FakeHalAdapter(
-            refs_nnt=[NntRef(nnt=f"2024UCA{i:04d}", theses_id=f"t{i}") for i in range(12)]
-        )
-
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG, dry_run=True)
-
-        assert metrics.seen == 12
-        assert adapter.telecharges == []
-
-    async def test_dry_run_liste_courte(self):
-        adapter = _FakeHalAdapter(
-            refs_nnt=[NntRef(nnt=f"2024UCA{i:04d}", theses_id=f"t{i}") for i in range(3)]
-        )
-
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG, dry_run=True)
-
-        assert metrics.seen == 3
-        assert adapter.telecharges == []
-
-    async def test_rien_a_faire(self):
+    async def test_rien_a_faire(self, caplog):
+        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
         adapter = _FakeHalAdapter()
 
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
+        with caplog.at_level(logging.INFO):
+            metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
 
         assert metrics.seen == 0
+        assert adapter.telecharges == []
+        assert f"{DERNIERE_BRANCHE}Rien à faire" in caplog.text
