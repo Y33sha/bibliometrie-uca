@@ -339,13 +339,11 @@ class TestProcessWork:
             "batch_queries": MagicMock(),
         }
 
-    def test_skip_when_no_title(self, caplog):
+    def test_skip_when_no_title(self):
         sq = FakeStagingQueries()
         row = staging_row(staging_id=7, source_id="2024CLFAC001", raw={})
-        with caplog.at_level(logging.WARNING):
-            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
-        assert "sans titre" in caplog.text
         # Marquée traitée pour ne pas retenter indéfiniment une thèse sans titre.
         assert sq.marked_done == [7]
 

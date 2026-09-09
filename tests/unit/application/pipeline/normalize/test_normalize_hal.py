@@ -575,26 +575,22 @@ class TestProcessWork:
         assert result is True
         assert sq.marked_done == [1]
 
-    def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps, caplog):
+    def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps):
         sq = FakeStagingQueries()
         row = staging_row(staging_id=1, raw={"title_s": []})  # pas de titre / pas d'année
-        with caplog.at_level(logging.WARNING):
-            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
-        assert "manquant" in caplog.text
         # Marqué traité : un doc sans titre ni année n'a aucune chance d'aboutir.
         assert sq.marked_done == [1]
 
-    def test_missing_author_field_marks_done(self, stub_orchestration_deps, caplog):
+    def test_missing_author_field_marks_done(self, stub_orchestration_deps):
         sq = FakeStagingQueries()
         # Métadonnées minimales OK mais champ auteurs absent → doc inexploitable.
         row = staging_row(
             staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
         )
-        with caplog.at_level(logging.ERROR):
-            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
-        assert "inexploitable" in caplog.text
         assert sq.marked_done == [2]
 
     def test_no_publisher_name_no_upsert(self, monkeypatch):

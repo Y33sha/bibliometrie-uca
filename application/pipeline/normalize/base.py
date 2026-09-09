@@ -19,7 +19,7 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.libelles import BRANCHE, accord
+from application.pipeline.libelles import BRANCHE, SUITE_DE_BRANCHE, accord
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.progression import progression
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
@@ -92,6 +92,21 @@ class SourceNormalizer(ABC):
         with savepoint(conn, on_rollback_failure=self.conn.rollback):
             return self.process_work(conn, row)
 
+    def _recapitule_incomplets(self, identifiants: list[str]) -> None:
+        """Récapitule sous la barre de la source les documents qu'elle a laissés de côté.
+
+        Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source, et la liste des sources reste d'un seul tenant. Le logger nu porte ces lignes, celui de la source les préfixerait de son nom et romprait l'alignement.
+        """
+        if not identifiants:
+            return
+        self.logger.info(
+            "%s%s aux métadonnées incomplètes",
+            SUITE_DE_BRANCHE,
+            accord(len(identifiants), "document"),
+        )
+        for identifiant in identifiants:
+            self.logger.info("%s%s", SUITE_DE_BRANCHE, identifiant)
+
     def run(self) -> NormalizeStats:
         """Entry point : pilote la boucle de normalisation."""
         self.conn.rollback()
@@ -109,6 +124,9 @@ class SourceNormalizer(ABC):
             processed = 0
             skipped = 0
             errors = 0
+            # Documents que `process_work` laisse de côté faute de métadonnées exploitables :
+            # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
+            incomplets: list[str] = []
 
             libelle = f"{BRANCHE}{source_label(self.SOURCE):<{_LARGEUR_LIBELLE}}"
             with progression(total, libelle, slog) as avancement:
@@ -127,6 +145,7 @@ class SourceNormalizer(ABC):
                         skipped += 1
                     else:
                         errors += 1
+                        incomplets.append(row.source_id)
 
                     done = processed + skipped
                     if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
@@ -135,9 +154,7 @@ class SourceNormalizer(ABC):
             self.conn.commit()
             self.cleanup()
 
-            if errors:
-                slog.warning("%s", accord(errors, "erreur"))
-
+            self._recapitule_incomplets(incomplets)
             return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:

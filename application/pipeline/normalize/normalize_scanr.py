@@ -335,7 +335,6 @@ def process_work(
     title = get_title(doc)
     pub_year = as_int(doc.get("year"))
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning("Impossible d'insérer %s — titre ou année manquant", scanr_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 
