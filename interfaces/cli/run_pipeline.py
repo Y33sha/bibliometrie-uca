@@ -73,7 +73,7 @@ if TYPE_CHECKING:
         AsyncFetchMissingDoiAdapter,
     )
 
-from application.pipeline.libelles import accord
+from application.pipeline.libelles import ETAPE, accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
@@ -1040,15 +1040,14 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("Recherche dans HAL des documents avec hal-id trouvés ailleurs.")
-    t0 = time.time()
+    log.info("%sRecherche dans HAL des documents avec hal-id trouvés ailleurs", ETAPE)
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
         metrics = asyncio.run(fetch_missing_hal_by_id(conn, adapter, log))
     finally:
         conn.close()
-    log.info("Terminé en %.1fs : %s", time.time() - t0, metrics.resume or metrics.as_summary())
+    log.info("")
     return metrics
 
 
@@ -1058,15 +1057,14 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("Recherche dans HAL des thèses avec NNT trouvées ailleurs.")
-    t0 = time.time()
+    log.info("%sRecherche dans HAL des thèses avec NNT trouvées ailleurs", ETAPE)
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
         metrics = asyncio.run(fetch_missing_hal_by_nnt(conn, adapter, log))
     finally:
         conn.close()
-    log.info("Terminé en %.1fs : %s", time.time() - t0, metrics.resume or metrics.as_summary())
+    log.info("")
     return metrics
 
 

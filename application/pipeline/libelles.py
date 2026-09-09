@@ -1,6 +1,15 @@
-"""Formatage des quantités dans les messages de journal."""
+"""Formatage des messages de journal : quantités accordées, sous-étapes d'une phase."""
 
 from __future__ import annotations
+
+ETAPE = "▶ "
+"""Ouvre une sous-étape d'une phase."""
+
+BRANCHE = "  ├─ "
+"""Rattache une ligne à la sous-étape ouverte au-dessus."""
+
+DERNIERE_BRANCHE = "  └─ "
+"""Ferme la sous-étape : rattache sa dernière ligne."""
 
 
 def forme(n: int, singulier: str, pluriel: str | None = None) -> str:
@@ -18,4 +27,4 @@ def accord(n: int, singulier: str, pluriel: str | None = None) -> str:
     return f"{n} {forme(n, singulier, pluriel)}"
 
 
-__all__ = ["accord", "forme"]
+__all__ = ["BRANCHE", "DERNIERE_BRANCHE", "ETAPE", "accord", "forme"]
