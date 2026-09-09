@@ -3,12 +3,12 @@
 `journals.pub_count` = nombre de publications in-perimeter de la revue.
 `publishers.pub_count` = somme des `pub_count` de ses revues.
 
-Le bulk `refresh_pub_counts` tourne dans le pipeline après que `in_perimeter` est posé (phase `authorships`). Les variantes scopées servent aux fusions admin (on ne recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
+Les deux recalculs en masse tournent dans le pipeline après que `in_perimeter` est posé (phase `authorships`), les éditeurs après les revues dont ils somment le compteur. Les variantes scopées servent aux fusions admin (on ne recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
 """
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.authorships.pub_counts import PubCountChanges, PubCountsQueries
+from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
 
 
 def refresh_journal_pub_count(conn: Connection, journal_id: int) -> None:
@@ -41,8 +41,8 @@ def refresh_publisher_pub_count(conn: Connection, publisher_id: int) -> None:
 class PgPubCountsQueries(PubCountsQueries):
     """Adapter PostgreSQL pour le port `PubCountsQueries`."""
 
-    def refresh_pub_counts(self, conn: Connection) -> PubCountChanges:
-        n_journals = conn.execute(
+    def refresh_journal_pub_counts(self, conn: Connection) -> int:
+        return conn.execute(
             text("""
                 WITH counts AS (
                     SELECT journal_id, COUNT(*) AS n
@@ -58,7 +58,9 @@ class PgPubCountsQueries(PubCountsQueries):
                 WHERE j2.id = j.id AND j.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
             """)
         ).rowcount
-        n_publishers = conn.execute(
+
+    def refresh_publisher_pub_counts(self, conn: Connection) -> int:
+        return conn.execute(
             text("""
                 WITH counts AS (
                     SELECT publisher_id, SUM(pub_count) AS n
@@ -73,4 +75,3 @@ class PgPubCountsQueries(PubCountsQueries):
                 WHERE p2.id = p.id AND p.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
             """)
         ).rowcount
-        return PubCountChanges(journals=n_journals, publishers=n_publishers)

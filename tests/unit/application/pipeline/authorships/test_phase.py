@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from application.pipeline.authorships import phase
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.authorships.pub_counts import PubCountChanges
 
 _LOG = logging.getLogger("test")
 
@@ -29,9 +28,13 @@ class _FakePubCountsQueries:
     def __init__(self) -> None:
         self.appels = 0
 
-    def refresh_pub_counts(self, conn) -> PubCountChanges:
+    def refresh_journal_pub_counts(self, conn) -> int:
         self.appels += 1
-        return PubCountChanges(journals=3, publishers=2)
+        return 3
+
+    def refresh_publisher_pub_counts(self, conn) -> int:
+        self.appels += 1
+        return 2
 
 
 class _FakeAddressPubCountQueries:
@@ -75,7 +78,7 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx):
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
     assert open_tx.conn.commits == 3  # un commit par lot supprimé, aucun pour le lot vide
-    assert pub_counts.appels == 1
+    assert pub_counts.appels == 2  # revues puis éditeurs
 
 
 def test_rien_a_purger(open_tx):
@@ -111,5 +114,5 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(open_tx):
 def test_chaque_sous_etape_dans_sa_transaction(open_tx):
     _run(open_tx, [10])
 
-    # build, purge, décompte des adresses, décompte des revues et éditeurs
-    assert open_tx.transactions == 4
+    # build, purge, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 5
