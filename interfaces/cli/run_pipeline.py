@@ -1,51 +1,9 @@
 #!/usr/bin/env python
-"""
-Orchestrateur du pipeline bibliométrique.
+"""Orchestrateur du pipeline bibliométrique : câblage des phases et séquence d'exécution.
 
-Usage:
-    run_pipeline                    # Pipeline complet
-    run_pipeline --from normalize   # Reprendre depuis la normalisation
-    run_pipeline --only extract     # Exécuter une seule phase
-    run_pipeline --list             # Lister les phases
-    run_pipeline --no-extras        # Sans les enrichissements terminaux
-    run_pipeline --dry-run          # Afficher sans exécuter
-    run_pipeline --mode daily       # Import quotidien (HAL depuis dernier run)
-    run_pipeline --mode full        # Repasse complète (toutes sources sauf WoS)
-    run_pipeline --start-year 2024  # Repasse sur [2024 … année courante]
-    run_pipeline --include-wos      # Inclure WoS (opt-in, crédit API limité)
-    run_pipeline --sources hal,openalex  # Extraction HAL + OA seulement
-    run_pipeline --only extract --sources scanr --year 2023  # ScanR 2023 seul
+Chaque phase est une fonction `phase_<nom>` qui construit ses adaptateurs, ouvre ses connexions et délègue la séquence à `application/pipeline/<phase>/`. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_FUNCTIONS` associe chaque nom à sa fonction.
 
-Phases (dans l'ordre d'execution):
-    extract             Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
-    fetch_missing       Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
-                        (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
-                        cible (auto-borné par le backoff doi_lookups)
-    fetch_stale       Refetch par identifiant natif des rows à last_seen_at ancien
-                        (> STALE_REFRESH_AFTER_DAYS) : trouvé -> bump last_seen_at + refresh ;
-                        absence confirmée -> disappeared_at.
-    fetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
-                        normalize ne les consomme.
-    normalize           Normalisation staging -> tables sources (source_publications,
-                        source_authorships) avec publication_id=NULL (le rattachement aux
-                        publications est fait plus tard par la phase publications). Crée les
-                        adresses et liens source_authorship_addresses. Vide le raw_data du
-                        staging apres traitement + VACUUM.
-    affiliations        Résolution adresses → structures, puis propagation in_perimeter
-                        sur source_authorships
-    publishers_journals Enrichissement du référentiel journals (préfixes DOI, APC, DOAJ,
-                        journal_type). L'enrichissement éditeurs est hors pipeline (maintenance).
-    metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
-                        et par grappe de DOI : concept DataCite, ouvrage/chapitre)
-    publications        Création/rattachement des publications + fusions/scissions, en une passe
-    relations           Population des relations sémantiques entre publications (depuis les sources)
-    persons             Creation/mapping personnes + formes de noms
-    authorships         Reconstruction authorships canoniques (table de verite) + propagation
-                        in_perimeter, puis purge des publications orphelines
-    countries           Detection pays des adresses + recalcul pays des publications
-    subjects            Sujets/mots-clés : ingestion source_publications → subjects +
-                        publication_subjects, puis recalcul usage_count + matview cooccurrences
-    oa_status           Statut open access par publication via Unpaywall
+`run_pipeline --help` donne les options et la liste des phases.
 """
 
 import argparse
@@ -130,9 +88,9 @@ type ConstructeurNormalizer = Callable[[Connection], SourceNormalizer]
 
 
 class Extracteur(Protocol):
-    """Ce que l'orchestrateur consomme d'un extracteur : son exécution, rien d'autre.
+    """Point d'entrée commun des extracteurs, seul que l'orchestrateur appelle.
 
-    Les extracteurs diffèrent par leur configuration et par l'adapter qu'ils pilotent, deux types propres à chaque source. Le composition root, lui, n'en appelle que le point d'entrée commun : le décrire ici évite de faire circuler ces deux types jusqu'à un endroit qui ne s'en sert pas.
+    Chaque source a son type de configuration et son type d'adapter ; ce protocole les laisse aux extracteurs.
     """
 
     def run(
@@ -155,9 +113,9 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 class RunOptions:
     """Options d'un run, telles que la ligne de commande les pose, remises à chaque phase.
 
-    Toutes les phases reçoivent les mêmes options et n'en lisent que ce qui les concerne : l'orchestrateur les appelle uniformément, sans savoir laquelle en consomme quoi.
+    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent.
 
-    `sources` vaut `None` quand le run n'en restreint aucune ; les phases qui ont besoin d'une liste explicite y substituent alors l'ensemble des sources connues.
+    `sources` vaut `None` quand le run n'en restreint aucune ; les phases qui attendent une liste explicite y substituent l'ensemble des sources connues.
     """
 
     mode: str = "full"
@@ -172,9 +130,7 @@ class RunOptions:
 
 
 def _open_tx() -> "AbstractContextManager[Connection]":
-    """Fabrique de transaction gérée (port `OpenTransaction`) injectée aux orchestrateurs de
-    phase : commit-sur-succès / rollback / close, tolérant les commits par lots. Concentrée au
-    composition-root pour que `application/` reste sans dépendance à l'engine."""
+    """Fabrique de transaction gérée (port `OpenTransaction`) : commit sur succès, rollback sur erreur, fermeture, et tolérance aux commits par lots."""
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.transaction import managed_transaction
 
@@ -184,12 +140,7 @@ def _open_tx() -> "AbstractContextManager[Connection]":
 def phase_extract(options: RunOptions) -> PhaseMetrics:
     """Extraction des sources vers staging.
 
-    La policy du mode (sources, stratégie d'années) vit dans `application/pipeline/modes.py`.
-    Le refetch des works OpenAlex tronqués est une phase distincte (`fetch_truncated`), placée
-    après `fetch_stale` et avant `normalize`.
-
-    Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le
-    câblage : registre des adapters, primitif de parallélisme, lecture de la dernière extraction.
+    `application/pipeline/modes.py` porte la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le câblage : registre des adaptateurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from application.pipeline.extract.phase import run
     from infrastructure.observability.phase_executions import get_last_extract_date
@@ -214,14 +165,11 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
-    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant fetch_missing.
+    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant `fetch_missing`.
 
-    Permet à `fetch_missing` de router les fetches par RA (Crossref vs DataCite) dès le
-    run courant, au lieu de tenter chaque DOI contre les deux APIs (ensembles disjoints).
-    Le volet publisher (phase `publishers_journals`) complète ensuite les rows via les
-    API `/prefixes`.
+    La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite : `fetch_missing` adresse ensuite chaque DOI à la bonne. La phase `publishers_journals` reprend les préfixes restants via les API `/prefixes`.
 
-    Séquence et métriques dans `run` ; ici, le câblage (connexion, breaker, user-agent).
+    Séquence et métriques dans `application/pipeline/resolve_ra/phase.py` ; ici, le câblage : connexion, circuit-breaker, user-agent.
     """
     from application.pipeline.resolve_ra.phase import run
     from infrastructure.db.engine import get_sync_engine
@@ -265,23 +213,9 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
 def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
-    Deux mécanismes complémentaires, exécutés dans cet ordre :
+    Le cross-import HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. Le cross-import par DOI cherche ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
-    1. **Cross-import HAL** (`fetch_missing_hal`), en deux pistes distinctes :
-       par hal-id (repéré dans OpenAlex/ScanR, tourne systématiquement) et par
-       NNT (thèses soutenues sans HAL, mode `full` uniquement — volume trop large
-       en incrémental). Pour chaque référence absente du staging HAL, on télécharge
-       le document via l'API HAL. Auto-bornée : les hal-ids/NNT introuvables sont
-       marqués `not_found_at` dans staging et ne sont jamais re-interrogés.
-
-    2. **Cross-import par DOI** (`fetch_missing_doi`).
-       Pour chaque source cible, on cherche les DOI vus dans les autres
-       sources mais absents de la sienne, et on tente de les fetcher.
-       WoS est opt-in (`--include-wos`) : source en fin de vie, crédit API
-       limité, exclue par défaut. Auto-bornée : les DOI absents d'une source non
-       native reçoivent un backoff dans `doi_lookups` (re-tenté après
-       `DOI_LOOKUP_RETRY_DAYS`), ceux absents de Crossref (source native) un stub
-       `staging` définitif.
+    Les deux se bornent d'eux-mêmes : un identifiant introuvable est marqué `not_found_at` dans le staging, un DOI absent d'une source reçoit un délai avant nouvelle tentative dans `doi_lookups`.
 
     Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
     """
@@ -304,25 +238,9 @@ def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
 def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
-    Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
-    charge (chaque passe ne ramasse que ce qui vient de franchir le délai).
+    Chaque row est réinterrogée par son identifiant natif (`staging.source_id`), avec ou sans DOI : trouvée, son `last_seen_at` et son `raw_data` sont rafraîchis ; absente de sa source, elle reçoit un `disappeared_at` ; sur échec réseau, elle attend le run suivant. Le seuil `STALE_REFRESH_AFTER_DAYS` étale la charge, chaque passe ne ramassant que les rows qui viennent de franchir le délai.
 
-    Pour chaque source, refetch des rows stale **par leur identifiant natif**
-    (`staging.source_id`, jamais NULL) : trouvé → bump `last_seen_at` + refresh
-    `raw_data` ; absence confirmée par la source → `disappeared_at` ; échec
-    transitoire → no-op. Toute row est ainsi re-vérifiée directement, avec ou
-    sans DOI. WoS est opt-in (`--include-wos`) : exclu par défaut, comme
-    `extract` et `fetch_missing`.
-
-    Le refresh est **couplé à la fenêtre d'années du run** (`start_year`/`year`,
-    via `source_publications.pub_year`) : un run sur une période glissante ne
-    refetche que le stale de ses propres années, sans requêtes unitaires inutiles
-    sur des années qu'il ne moissonne plus en bulk. `theses` fait exception, comme
-    à l'extraction : elle ramène tout l'historique (aucune borne), sauf `--year`.
-
-    L'absence se marque ici (`disappeared_at`). Placée après `fetch_missing` (qui a fini de peupler
-    `staging` et `last_seen_at`) et avant `normalize` (qui consomme le `raw_data`
-    rafraîchi).
+    La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 
     Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::run_phase`.
     """
@@ -341,16 +259,14 @@ def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
 
 
 def _credentials_missing(source: str) -> str | None:
-    """Motif d'absence des identifiants d'une source (None si configurée), depuis le détecteur
-    central. Injecté aux orchestrateurs des phases qui interrogent une API tierce."""
+    """Motif d'absence des identifiants d'une source, ou `None` si elle est configurée. Injecté aux phases qui interrogent une API tierce."""
     from infrastructure.sources.config import source_credentials_missing
 
     return source_credentials_missing(source)
 
 
 def _get_years_for_window(start_year: int | None) -> list[int] | None:
-    """Années de la fenêtre du run `[start_year … courante]` (défaut config). Injecté aux
-    orchestrateurs qui bornent leurs requêtes par année."""
+    """Années de la fenêtre du run, de `start_year` à l'année courante. Injecté aux phases qui bornent leurs requêtes par année."""
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_years
 
@@ -361,13 +277,7 @@ def _get_years_for_window(start_year: int | None) -> list[int] | None:
 def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
     """Re-télécharge les works OpenAlex tronqués à 100 auteurs.
 
-    L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. Cette phase
-    repère les lignes staging openalex `processed=FALSE` à 100 auteurs et les
-    re-télécharge intégralement (pagination des auteurs).
-
-    Placée après `fetch_stale` (pour capter aussi les works tronqués ramenés
-    par `fetch_missing` et `fetch_stale`) et avant `normalize` (qui passe les
-    lignes à `processed=TRUE`, après quoi elles sont invisibles à la détection).
+    L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. La phase repère les lignes staging openalex à 100 auteurs restées `processed=FALSE`, et les re-télécharge en paginant leurs auteurs. Sa position, après `fetch_stale` et avant `normalize`, lui donne à voir les works tronqués que les phases de rattrapage viennent de ramener.
 
     Séquence et métriques dans `application/pipeline/extract/fetch_truncated.py`.
     """
@@ -390,14 +300,9 @@ def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_normalize(options: RunOptions) -> PhaseMetrics:
-    """Normalisation staging -> tables sources.
+    """Normalisation du staging vers les tables sources.
 
-    Écrit les `source_publications` avec `publication_id = NULL` (aucun
-    rattachement ici : l'assignation aux publications canoniques est faite plus
-    tard par la phase `publications`). Stocke les metadonnees (abstract, keywords,
-    topics, biblio, etc.) sur source_publications. Vide le raw_data du staging
-    apres traitement. Pour HAL : enrichit les structures et extrait ORCID/IdRef
-    depuis le TEI.
+    Écrit les `source_publications` avec leurs métadonnées — résumé, mots-clés, sujets, références — et leurs signatures, en laissant `publication_id` à NULL : la phase `publications` assigne le document à sa publication. Le `raw_data` du staging est vidé après traitement. Pour HAL, les structures sont enrichies et les ORCID et IdRef extraits du TEI.
 
     Séquence, nettoyage et VACUUM dans `application/pipeline/normalize/phase.py`.
     """
@@ -452,15 +357,9 @@ def _run_cleanup_orphan_identities() -> None:
 
 
 def _vacuum_staging(full: bool = False) -> None:
-    """VACUUM sur staging. FULL en mode full/monthly, simple sinon.
+    """VACUUM du staging, complet en mode `full` et simple sinon.
 
-    `staging.raw_data` est un JSONB potentiellement gros (payload brut
-    HAL/OpenAlex/WoS) vidé après normalisation : `VACUUM` simple marque
-    l'espace réutilisable mais ne le rend pas à l'OS — la table TOAST
-    reste gonflée. `VACUUM FULL` réécrit la table et libère l'espace.
-    Lock exclusif sur staging pendant la durée — sans conséquence dans
-    le créneau d'exécution du mode `full` (mensuel nocturne, aucun
-    autre accès concurrent au staging).
+    La normalisation vide `staging.raw_data`, un JSONB volumineux. Le VACUUM simple marque l'espace réutilisable, le VACUUM complet réécrit la table et le rend au système. Ce dernier prend un verrou exclusif sur le staging, le temps de son exécution.
     """
     from sqlalchemy import text
 
@@ -474,29 +373,11 @@ def _vacuum_staging(full: bool = False) -> None:
 def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     """Enrichissement du référentiel `journals`.
 
-    Trois sous-étapes, toutes incrémentales :
+    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de trente jours.
 
-    1. `resolve_publishers` : préfixe DOI → éditeur Crossref / repository DataCite
-       via `/prefixes`. Ne traite que les rows en attente de publisher ; la
-       Registration Agency est posée en amont par la phase `resolve_ra`.
-    2. `enrich_journals_from_openalex` : OpenAlex Sources → APC + journal_type.
-       Ne traite que les revues à `journal_type='unknown'` (converge à zéro,
-       OpenAlex typant ses sources).
-    3. `enrich_journals_from_doaj` : dump CSV DOAJ (téléchargé au plus tous les
-       ~30 jours) → `doaj_payload` + `is_in_doaj`. DOAJ fait
-       autorité et est seul à poser `is_in_doaj` (reset global puis re-pose des
-       TRUE). Ne se déclenche que si le dernier `doaj_imported_at` est null ou
-       plus vieux que la fenêtre de stale.
+    La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 
-    L'enrichissement des **éditeurs** (pays, ROR, type) est purement cosmétique :
-    hors pipeline, lancé à la demande via
-    `interfaces/cli/maintenance/enrich_publishers.py`.
-
-    Placée **après normalize** : (a) `fetch_missing` (en amont) peut introduire de
-    nouveaux DOIs via `fetch_missing_hal`, (b) `normalize` crée les
-    `publishers`/`journals` qu'on veut enrichir.
-
-    Séquence, gardes de config et métriques dans `application/pipeline/publishers_journals/phase.py`.
+    Séquence, gardes de configuration et métriques dans `application/pipeline/publishers_journals/phase.py`.
     """
     from application.pipeline.publishers_journals.phase import run
 
@@ -510,9 +391,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
 
 
 def _signal_if_tripped(metrics: PhaseMetrics, breaker: SourceCircuitBreaker) -> None:
-    """Quand un circuit-breaker source a coupé (série de 429/5xx), marque la phase en
-    avertissement : son point passe ambre et le motif s'affiche au drill-down. Les items
-    non traités sont repris au run suivant (phases de rattrapage idempotentes)."""
+    """Marque la phase en avertissement quand le circuit-breaker d'une source a coupé, après une série de 429 ou de 5xx. Les phases de rattrapage étant idempotentes, le run suivant reprend les documents non traités."""
     if breaker.tripped:
         metrics.signals.append(
             {
@@ -575,7 +454,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
 
 
 def phase_affiliations(options: RunOptions) -> PhaseMetrics:
-    """Résolution des affiliations UCA sur les source_authorships.
+    """Rattachement des signatures aux structures du périmètre, par leurs adresses.
 
     Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
     """
@@ -596,7 +475,7 @@ def phase_affiliations(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:
-    """Persistance des corrections de métadonnées sur les source_publications.
+    """Correction des métadonnées des documents sources.
 
     Séquence, transactions et métriques dans `application/pipeline/metadata_correction/phase.py`.
     """
@@ -609,23 +488,11 @@ def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:
 def phase_publications(options: RunOptions) -> PhaseMetrics:
     """Assignation des `source_publications` aux publications, en une seule passe.
 
-    `reconcile_components` clusterise le voisinage des SP dirty par composante
-    connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse
-    `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩
-    DOI)`, dans le respect du cannot-link DOI. Assignation (match/create/skip d'un
-    orphelin) et réconciliation (merge/split de publications matérialisées) sont
-    des facettes du même primitif — un seul `connected_components`, aucun drift.
+    Les documents sources modifiés et leur voisinage sont regroupés par composante connexe de leurs clés de confirmation — DOI, NNT, hal_id, PMID, et pour les thèses le couple titre-année. Chaque document rejoint la publication qui ancre sa partition. Rattacher un document, fusionner deux publications ou en scinder une sont trois lectures du même regroupement.
 
-    Les passes ad-hoc `merge_pubs_by_*` ont été retirées du pipeline : la
-    réconciliation les subsume. La dédup thèse passe par le token de confirmation,
-    plus de passe métadonnées dédiée.
+    La phase suit `metadata_correction`, qui a substitué le DOI de concept aux DOI de version DataCite : le regroupement porte alors sur le concept.
 
-    Prerequis : `metadata_correction` (en amont) a substitué en colonne le DOI concept
-    des versions DataCite, de sorte que le matching regroupe sur le concept.
-
-    `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci
-    dégénère alors en cluster-then-materialize global (à lancer après une évolution des
-    règles de clés, pour matérialiser les fusions/scissions qu'elles impliquent).
+    `--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
 
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
@@ -647,11 +514,7 @@ def phase_publications(options: RunOptions) -> PhaseMetrics:
 def phase_relations(options: RunOptions) -> PhaseMetrics:
     """Population des relations sémantiques entre publications distinctes.
 
-    Tourne après `publications` : les `source_publications` sont rattachées et les DOI
-    cibles résolus en `publication_id`. Reconstruit `publication_relations` depuis les
-    relations déclarées par les sources (DataCite `meta.related_identifiers`, Crossref
-    `meta.relation`). Les relations même-œuvre (versions, variantes, pièces) relèvent de
-    la déduplication (`metadata_correction`), pas d'ici.
+    La phase suit `publications`, qui a rattaché les documents sources et permet de résoudre les DOI cibles en `publication_id`. Elle reconstruit `publication_relations` depuis les relations que les sources déclarent — `meta.related_identifiers` chez DataCite, `meta.relation` chez Crossref — complétées par les clés partagées et le rapprochement par titre. Les liens entre formes d'une même œuvre relèvent du dédoublonnage, en phase `metadata_correction`.
     """
     from application.pipeline.relations.phase import run
     from infrastructure.pipeline.relations import PgPublicationRelationsQueries
@@ -660,14 +523,9 @@ def phase_relations(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_persons(options: RunOptions) -> PhaseMetrics:
-    """Rattachement et création des personnes, phase ordre-indépendante.
+    """Rattachement des signatures aux personnes, et création des personnes inconnues.
 
-    L'orchestrateur enchaîne, sur une seule transaction : `enforce` (réapplique les épinglages
-    admin), `reset` (réinitialise les attributions dérivées — arbitrage des conflits d'identifiant,
-    recompute cross-source), `match` (rattache sans créer), `create` (crée les signatures restées
-    non liées, cross-source rejoué d'abord), `populate` (régénère les formes de nom canoniques),
-    `purge` (re-orpheline les formes devenues ambiguës et supprime les personnes vidées). Exclut les
-    publications hors-scope (cf domain/publications/scope).
+    Une seule transaction enchaîne : la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues, la création des personnes pour les signatures restantes, la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées. Les publications hors scope sont écartées (`domain/publications/scope`).
 
     Séquence, transaction et métriques dans `application/pipeline/persons/phase.py`.
     """
@@ -687,13 +545,13 @@ def phase_persons(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_authorships(options: RunOptions) -> PhaseMetrics:
-    """Construction de la table de vérité `authorships`.
+    """Construction du référentiel `authorships`.
 
-    Consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé ; les structures dérivent de la matview `authorship_structures`.
+    Les signatures des sources se consolident en une entrée par couple publication-personne, portant l'appartenance au périmètre ; les structures dérivent de la matview `authorship_structures`.
 
-    Phase source-agnostique : `--sources` n'est pas propagé. Une source_authorship peut être touchée par d'autres voies que sa propre normalisation (re-population d'affiliations, refresh_from_sources, etc.) — toutes les sources doivent être reconsolidées à chaque run.
+    La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une signature se trouve modifiée par d'autres voies que sa propre normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
 
-    Le build est incrémental et convergent dans tous les modes (add + prune + recompute des attributs en une passe) : aucune purge routinière. La purge complète de la table est disponible en récupération via `run_pipeline --rebuild-authorships`.
+    Une passe unique ajoute les liens attestés, retire les obsolètes et recalcule les attributs, de sorte que la table converge sans être vidée. `run_pipeline --rebuild-authorships` la purge et la reconstruit depuis zéro, en récupération.
 
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
@@ -733,29 +591,13 @@ def phase_countries(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_subjects(options: RunOptions) -> PhaseMetrics:
-    """Sujets / mots-clés : ingestion + recalcul des co-occurrences.
+    """Sujets et mots-clés : ingestion, puis recalcul des décomptes.
 
-    Deux étapes enchaînées, indissociables :
+    L'ingestion reprend les publications dont le contenu a changé depuis leur dernier passage, lit les sujets de leurs documents sources, et purge les sujets restés sans lien. Le recalcul qui suit compte les publications de chaque sujet et rafraîchit la matview des paires de sujets présents sur une même publication.
 
-    1. **Ingestion** (`subjects` + `publication_subjects`) — incrémentale et
-       publication-centrée : ne ré-ingère que les publications dont le contenu
-       canonique a changé depuis leur dernière ingestion (`publications.updated_at`
-       > `max(publication_subjects.created_at)`), à partir des `topics` de leurs
-       `source_publications`. Purge en fin les sujets devenus orphelins (plus aucun
-       lien). Cf. `application/pipeline/subjects/ingestion.py`.
+    La phase `authorships` ayant supprimé les publications sans auteur, `publication_subjects` ne porte que le périmètre, dont les deux décomptes héritent.
 
-    2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
-       — recalcule l'usage de chaque sujet et rafraîchit la matview des
-       paires de sujets co-présents sur une même publication.
-
-    Aucun filtre périmètre ici : la phase `authorships` a purgé en amont les
-    publications orphelines (zéro authorship), donc `publication_subjects` ne
-    porte plus que du périmètre et `usage_count` / `subject_cooccurrences` en
-    héritent. Ne pas re-filtrer (cf. `purge_orphan_publications`).
-
-    Idempotente. `--rebuild-subjects` force une ré-ingestion complète (toutes les
-    publications, pas seulement les modifiées), pour propager une évolution des
-    règles d'ingestion sur tout le stock.
+    `--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
 
     Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
     """
@@ -777,10 +619,7 @@ def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dic
 
 
 def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
-    """Constructeur du normalizer par source, dans l'ordre de priorité (source la plus
-    autoritative en premier — cf. SOURCE_PRIORITY) : les suivantes n'écrasent pas les
-    métadonnées déjà posées. Les six sources bibliographiques partagent le câblage
-    `_biblio` ; `theses` a le sien (sans repos journal/publisher)."""
+    """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
     from application.pipeline.normalize.normalize_hal import HalNormalizer
@@ -950,12 +789,9 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 
 
 def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
-    """Exécute un extracteur avec un circuit-breaker de source (seuil 5).
+    """Exécute un extracteur sous circuit-breaker, qui coupe la source après cinq échecs.
 
-    Pose le breaker dans la ContextVar (lu par le helper HTTP sync) et le passe à
-    `run` (consulté par les boucles `extract_all` pour stopper une source à bout de
-    budget). Seuil 5 : extracteurs séquentiels, pas de batch concurrent comme le
-    cross-import (qui est à 10).
+    Le circuit-breaker est posé dans la ContextVar que lit le client HTTP synchrone, et passé à `run`, dont les boucles le consultent pour arrêter une source à bout de budget. Le seuil est plus bas qu'au cross-import, les extracteurs travaillant sans lots concurrents.
     """
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
@@ -974,10 +810,9 @@ def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace)
 
 
 def _extractors() -> dict[str, ConstructeurExtracteur]:
-    """Constructeur de l'extracteur par source : `(conn, source_log)` → extracteur câblé.
+    """Constructeur de l'extracteur de chaque source : `(conn, source_log)` → extracteur câblé.
 
-    `wos` et `scanr` ouvrent une connexion d'amorçage pour lire leur clé / identifiants
-    avant l'extraction ; les autres n'ont besoin que de l'URL de base (lue en config).
+    `wos` et `scanr` ouvrent une connexion d'amorçage pour lire leurs identifiants avant l'extraction ; les autres lisent leur URL de base en configuration.
 
     Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
     from infrastructure.sources.api_params import API_BASE_URLS
@@ -1027,8 +862,7 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 def _run_extract(
     source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
 ) -> PhaseMetrics:
-    """Squelette commun d'une extraction : connexion, circuit-breaker (`_run_extractor`),
-    fermeture. Le câblage propre à la source vit dans `make_extractor`."""
+    """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous circuit-breaker, fermeture. `make_extractor` porte le câblage propre à la source."""
     from infrastructure.db.engine import get_sync_engine
 
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
@@ -1205,12 +1039,9 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
 
 def phase_oa_status(options: RunOptions) -> PhaseMetrics:
-    """Enrichissement `publications.oa_status` via Unpaywall (per-publication).
+    """Enrichissement de `publications.oa_status`, une publication à la fois, via Unpaywall.
 
-    Incrémentale et auto-bornée (staleness + cap `MAX_PER_RUN`) : le backlog des
-    jamais-vérifiées s'écoule run après run. Tourne dans tous les modes.
-
-    Unpaywall exige l'email polite pool : sans lui, la phase est sautée proprement.
+    Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée.
 
     Séquence et métriques dans `application/pipeline/oa_status/phase.py` ; ici, le câblage.
     """
@@ -1311,14 +1142,9 @@ def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: FrameType | None) -
 
 
 def _install_sigterm_handler() -> None:
-    """Convertit SIGTERM en KeyboardInterrupt pour réutiliser le handler
-    existant (log d'interruption, rapport partiel, commande de reprise).
+    """Convertit SIGTERM en KeyboardInterrupt, traité comme une interruption clavier : ligne de journal, rapport partiel, commande de reprise.
 
-    Utile quand un orchestrateur (systemd, docker stop, kubectl delete)
-    arrête le pipeline poliment. Sans ça, le process est tué silencieusement
-    sans trace du point d'interruption — l'idempotence permettrait quand
-    même la reprise, mais sans rapport sur le run coupé.
-    No-op effectif sur Windows où SIGTERM n'est pas délivré par os.kill.
+    Un arrêt demandé par systemd, `docker stop` ou `kubectl delete` laisse ainsi la trace du point où le pipeline s'est arrêté. Sur Windows, où `os.kill` ne délivre pas SIGTERM, la fonction reste sans effet.
     """
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
@@ -1435,9 +1261,9 @@ LARGEUR_TITRE_PHASE = 48
 
 
 def _encadre(lignes: list[str]) -> list[str]:
-    """Détache `lignes` du flux, chacune repliée à la largeur du cadre.
+    """Encadre `lignes`, chacune repliée à la largeur du cadre.
 
-    Devant un terminal, un cadre de largeur constante. Une sortie capturée reçoit des filets, que la largeur de la fenêtre laisse indifférents.
+    Un terminal reçoit un cadre de largeur constante, une sortie capturée deux filets horizontaux.
     """
     if not sys.stdout.isatty():
         return ["─" * 40, *lignes, "─" * 40]
@@ -1497,10 +1323,9 @@ def _run_one_phase(
     sources: set[str],
     recorder: PhaseExecutionRecorder,
 ) -> tuple[str, float]:
-    """Exécute une phase : appel, capture d'observabilité. Rend `(nom, durée)`.
+    """Exécute une phase et enregistre son observabilité. Rend son nom et sa durée.
 
-    Une interruption utilisateur, une `RuntimeError` ou une erreur de base est enregistrée puis
-    termine le process (reprise possible via `--from <phase>`)."""
+    Une interruption clavier, une `RuntimeError` ou une erreur de base est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
     from sqlalchemy.exc import SQLAlchemyError
 
     # Injecte le nom de phase dans tous les records émis pendant `fn` (logger `normalize:` plutôt
