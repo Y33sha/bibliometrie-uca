@@ -12,7 +12,6 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
@@ -340,23 +339,16 @@ def process_work(
         staging_queries.mark_done(conn, staging_id)
         return False
 
-    t = StepTimer()
     publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
     journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-    t.mark("publisher+journal")
 
     pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
     source_publication_id = insert_scanr_document(
         conn, queries, doc, staging_id, scanr_id, pub_meta
     )
-    t.mark("scanr_doc")
-
     process_authorships(conn, authorship_queries, doc, source_publication_id)
-    t.mark("authors")
-
     staging_queries.mark_done(conn, staging_id)
-    t.log_if_slow(scanr_id, logger)
 
     return True
 
