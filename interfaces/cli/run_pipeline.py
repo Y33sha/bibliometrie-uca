@@ -61,29 +61,18 @@ from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 
-# `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
-# sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
-# réutilisent ce logger parent (subjects, cooccurrences, enrich) sont persistés.
+# `setup_logger` attache un FileHandler sur `logs/pipeline.log` quand `LOG_TO_FILE=true`.
 log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 
-# Les barres de progression occupent le bas du terminal : une ligne écrite directement s'y
-# insère au milieu. L'écrivain la pose au-dessus, et les barres se redessinent ensuite. Les deux
-# passent par le même flux, sans quoi aucune n'efface l'autre.
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())
 
-# Les modules qui appellent `logging.getLogger(__name__)` émettent vers le root logger. Le seuil
-# reste l'avertissement : les bibliothèques tierces y déversent leurs lignes d'information.
+# Seuil du root logger, où émettent les modules qui appellent `logging.getLogger(__name__)` :
+# les bibliothèques tierces y écrivent trop d'information pour la laisser passer.
 configure_root_logging(logging.WARNING)
 
 
-# ---------------------------------------------------------------------------
-# Définition des phases
-# ---------------------------------------------------------------------------
-
-
-# Un normalizer se construit sur la connexion de sa phase : les adapters qu'il reçoit en
-# dépendent, et la phase en ouvre une par source.
+# Un normaliseur se construit sur la connexion de sa phase, dont ses adaptateurs dépendent.
 type ConstructeurNormalizer = Callable[[Connection], SourceNormalizer]
 
 
@@ -101,8 +90,7 @@ class Extracteur(Protocol):
     ) -> PhaseMetrics: ...
 
 
-# Une phase reçoit les options du run et rend ses métriques : signature uniforme, que
-# l'orchestrateur appelle sans savoir ce que chacune consomme.
+# Une phase reçoit les options du run et rend ses métriques.
 type Phase = Callable[[RunOptions], PhaseMetrics]
 
 # Un extracteur se construit sur la connexion de sa phase et le journal scopé à sa source.
@@ -184,13 +172,12 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
     from infrastructure.sources.polite_pool import build_user_agent
 
     conn = get_sync_engine().connect()
-    # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
-    # `run` consulte `breaker.tripped` pour s'arrêter proprement.
+    # Circuit-breaker de doi.org/ra : le client HTTP lit la ContextVar, `run` consulte
+    # `breaker.tripped` pour s'arrêter.
     breaker = SourceCircuitBreaker("doi.org/ra")
     token = set_current_breaker(breaker)
     try:
-        # doi.org/ra est une API publique (aucun credential) : l'email polite pool
-        # est facultatif, on ne saute pas la résolution s'il manque.
+        # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
         user_agent = build_user_agent(get_polite_pool_email_optional() or "")
         metrics = run(
             log,
@@ -288,8 +275,8 @@ def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
     from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
     sources = options.sources if options.sources is not None else set(ALL_SOURCES_SET)
-    # Toujours actif (incrémental : ne repère que les lignes openalex processed=FALSE
-    # à 100 auteurs) ; ne dépend que de la présence d'openalex dans les sources.
+    # La phase repère les seules lignes openalex à 100 auteurs restées à traiter : elle tourne
+    # dans tous les modes, dès qu'openalex fait partie des sources.
     if "openalex" not in sources:
         return PhaseMetrics()
     conn = get_sync_engine().connect()
@@ -308,8 +295,6 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
     """
     from application.pipeline.normalize.phase import run
 
-    # Ordre d'exécution : source la plus autoritative en premier (cf. SOURCE_PRIORITY).
-    # Les suivantes n'écrasent pas les métadonnées déjà posées lors de `refresh_from_sources`.
     registry = _normalize_builders(archive=options.raw_store)
 
     def normalize_one(source: str) -> dict[str, object]:
@@ -637,7 +622,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     from infrastructure.raw_store import NullRawStore, get_raw_store
     from infrastructure.repositories import publication_repository
 
-    # Sans archivage, les payloads sont oubliés au lieu d'être écrits sur disque.
     raw_store = get_raw_store() if archive else NullRawStore()
 
     def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
@@ -701,8 +685,8 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
 
     conn = get_sync_engine().connect()
-    # Seuil 3 : trois batches consécutifs à bout de budget (429) suffisent à conclure
-    # que le quota OpenAlex quotidien est épuisé et à reporter le reste au prochain run.
+    # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
+    # le run suivant.
     breaker = SourceCircuitBreaker("openalex sources", threshold=3)
     token = set_current_breaker(breaker)
     try:
@@ -731,7 +715,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     return metrics
 
 
-# DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les N jours.
+# Délai minimal entre deux imports du dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`.
 _DOAJ_STALE_DAYS = 30
 
 
@@ -762,12 +746,11 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 
         etape(log, "Import du référentiel DOAJ")
 
-        # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
+        # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
         user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-        # Le dump transite par un fichier temporaire : le module CSV y lit les
-        # enregistrements que des sauts de ligne pourraient traverser, ce qu'une lecture
-        # du flux ligne à ligne ne saurait pas reconstituer. Le répertoire temporaire est
-        # le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`).
+        # Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement
+        # peut porter des sauts de ligne dans ses champs. Le répertoire temporaire est le seul
+        # emplacement en écriture du conteneur (`tmpfs` sur `/tmp`).
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
             dump_path = tmp.name
         try:
@@ -783,9 +766,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     finally:
         conn.close()
     return PhaseMetrics(extras={"matched": stats.matched})
-
-
-# ── Extracteurs sources (Volet 0 — sweep subprocess → imports) ──
 
 
 def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
@@ -922,8 +902,8 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
     from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
     from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
 
-    # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe
-    # concrète à un Protocol via `type[Protocol]`.
+    # Cast : mypy ne reconnaît pas qu'une classe concrète se conforme à un Protocol quand elle
+    # est passée comme `type[Protocol]`.
     adapter_classes: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
         "dict[str, type[AsyncFetchMissingDoiAdapter]]",
         {
@@ -952,8 +932,8 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     adapter = _make_fetch_missing_doi_adapter(target)
 
     conn = get_sync_engine().connect()
-    # Circuit-breaker par source : la ContextVar est posée ici (composition root) ;
-    # le helper HTTP infra la lit, run_async ne consulte que `breaker.tripped`.
+    # Circuit-breaker de la source : le client HTTP lit la ContextVar, l'orchestrateur consulte
+    # `breaker.tripped`.
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
     try:
@@ -987,8 +967,7 @@ def _make_fetch_stale_adapter(source: str) -> "FetchStaleAdapter":
     from infrastructure.sources.theses.fetch_stale import ThesesFetchStaleAdapter
     from infrastructure.sources.wos.fetch_stale import WosFetchStaleAdapter
 
-    # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe concrète
-    # à un Protocol via `type[Protocol]` (cf. `_make_fetch_missing_doi_adapter`).
+    # Cast : cf. `_make_fetch_missing_doi_adapter`.
     adapter_classes: dict[str, type[FetchStaleAdapter]] = cast(
         "dict[str, type[FetchStaleAdapter]]",
         {
@@ -1020,10 +999,8 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     adapter = _make_fetch_stale_adapter(target)
 
     conn = get_sync_engine().connect()
-    # Circuit-breaker par source (cf. `_run_fetch_missing_doi`) : coupe le refetch
-    # d'une source à bout de budget (429 répétés) au lieu de la marteler. La
-    # ContextVar est posée ici, le helper HTTP infra la lit, l'orchestrateur ne
-    # consulte que `breaker.tripped`.
+    # Circuit-breaker de la source, comme au cross-import : une série de 429 coupe son
+    # rafraîchissement jusqu'au run suivant.
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
     try:
@@ -1094,9 +1071,8 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     return metrics
 
 
-# Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient de
-# `PHASE_ORDER`, source de vérité unique ; ce registre ne fournit que les fonctions,
-# validées comme couvrant exactement cet ordre.
+# Implémentation de chaque phase. `PHASE_ORDER` fixe l'ordre d'exécution ; un contrôle au
+# démarrage vérifie que le registre couvre exactement les phases qu'il nomme.
 _PHASE_FUNCTIONS: dict[str, Phase] = {
     "extract": phase_extract,
     "resolve_ra": phase_resolve_ra,
@@ -1125,16 +1101,6 @@ if set(_PHASE_FUNCTIONS) != set(PHASE_ORDER):
 PHASES: list[tuple[str, Phase]] = [(name, _PHASE_FUNCTIONS[name]) for name in PHASE_ORDER]
 
 PHASE_NAMES = list(PHASE_ORDER)
-
-
-# ---------------------------------------------------------------------------
-# Helpers d'exécution
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 
 def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: FrameType | None) -> None:
@@ -1279,7 +1245,7 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 def _titre_de_phase(name: str) -> list[str]:
     """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
-    # `phase_order` donne un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
+    # `PHASE_LIBELLES` couvre les phases du pipeline ; les tests en nomment d'autres.
     libelle = PHASE_LIBELLES.get(name)
     return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
 
@@ -1411,7 +1377,7 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
     # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
     effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
 
-    # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
+    # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
     recorder = start_run(mode=args.mode, sources=effective_sources)
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
@@ -1444,9 +1410,9 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
 
 def main() -> None:
     # Une faute de segmentation vient d'une extension C — pilote de base, client HTTP, automate
-    # de matching — et tue le processus sans passer par Python. `faulthandler` écrit alors la
-    # pile de chaque thread sur la sortie d'erreur, seule trace exploitable de l'incident. Il lui
-    # faut un vrai descripteur de fichier, que la sortie capturée d'un test ne donne pas.
+    # de matching — et tue le processus sans passer par Python. `faulthandler` écrit alors la pile
+    # de chaque thread sur la sortie d'erreur. Il lui faut un vrai descripteur de fichier, que la
+    # sortie capturée d'un test ne donne pas.
     with contextlib.suppress(ValueError, io.UnsupportedOperation):
         faulthandler.enable()
     _install_sigterm_handler()
