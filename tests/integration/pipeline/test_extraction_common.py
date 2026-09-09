@@ -6,8 +6,8 @@ from sqlalchemy import text
 from domain.publications.identifiers import clean_doi
 from infrastructure.pipeline.change_detection import change_detection_hash, compute_hash
 from infrastructure.pipeline.extract.cross_import import (
+    forget_doi_lookups,
     get_cross_import_dois,
-    record_doi_already_present,
     record_doi_not_found,
 )
 from infrastructure.pipeline.extract.stale import get_stale_rows, set_disappeared_by_source_id
@@ -338,30 +338,32 @@ class TestGetCrossImportDois:
         assert result == ["10.1234/b"]
 
 
-class TestRecordDoiAlreadyPresent:
-    def test_reporte_les_prochaines_recherches(self, sa_sync_conn):
-        record_doi_already_present(sa_sync_conn, "scanr", "10.1234/deja-la")
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT next_retry > now() AS reporte FROM doi_lookups "
-                "WHERE source = 'scanr' AND doi = '10.1234/deja-la'"
-            )
-        ).one()
-        assert row.reporte is True
-
-    def test_normalise_le_doi_avant_de_l_ecrire(self, sa_sync_conn):
-        """La clé d'exclusion se compare à des DOI déjà normalisés."""
-        record_doi_already_present(sa_sync_conn, "scanr", "HTTPS://DOI.ORG/10.1234/Casse")
-        stocke = sa_sync_conn.execute(
-            text("SELECT doi FROM doi_lookups WHERE source = 'scanr'")
-        ).scalar_one()
-        assert stocke == "10.1234/casse"
-
-    def test_un_doi_absent_ne_donne_pas_de_ligne(self, sa_sync_conn):
-        """Un document reçu sans DOI n'a rien à écarter du pool."""
-        record_doi_already_present(sa_sync_conn, "scanr", None)
+class TestForgetDoiLookups:
+    def test_un_doi_livre_par_la_source_quitte_la_table(self, sa_sync_conn):
+        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/x")
+        forget_doi_lookups(sa_sync_conn, "scanr", ["10.1234/x"])
         n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
         assert n == 0
+
+    def test_les_autres_sources_gardent_la_leur(self, sa_sync_conn):
+        """Une source qui livre le document ne dit rien de ce que les autres connaissent."""
+        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
+        forget_doi_lookups(sa_sync_conn, "scanr", ["10.1234/x"])
+        restant = sa_sync_conn.execute(text("SELECT source FROM doi_lookups")).scalar_one()
+        assert restant == "hal"
+
+    def test_normalise_les_doi_avant_de_les_chercher(self, sa_sync_conn):
+        """La table porte des DOI normalisés ; le document reçu les expose sous n'importe quelle forme."""
+        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/casse")
+        forget_doi_lookups(sa_sync_conn, "scanr", ["HTTPS://DOI.ORG/10.1234/Casse"])
+        n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
+        assert n == 0
+
+    def test_un_document_sans_doi_laisse_la_table_intacte(self, sa_sync_conn):
+        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/x")
+        forget_doi_lookups(sa_sync_conn, "scanr", [None])
+        n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
+        assert n == 1
 
 
 class TestRecordDoiNotFound:
