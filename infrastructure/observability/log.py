@@ -49,6 +49,27 @@ class _FluxConsole(io.TextIOBase):
     def flush(self) -> None:
         self._flux.flush()
 
+    def isatty(self) -> bool:
+        return self._flux.isatty()
+
+
+_console: TextIO | None = None
+
+
+def console_stream() -> TextIO:
+    """Flux de console, partagé par les loggers et par ce qui s'affiche à côté d'eux.
+
+    Un flux unique permet aux barres de progression et aux lignes de journal de s'effacer mutuellement : deux enveloppes du même descripteur s'ignoreraient.
+
+    L'enveloppe UTF-8 écarte les `UnicodeEncodeError` d'une console cp1252. `line_buffering` vide le tampon à chaque ligne. La fermeture est neutralisée : le tampon de la sortie standard appartient au processus.
+    """
+    global _console
+    if _console is None:
+        flux = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
+        flux.close = lambda: None  # type: ignore[method-assign]
+        _console = flux
+    return _console
+
 
 # Marqueurs délimitant runs et phases dans le flux de log, émis par `run_pipeline` : ils situent une ligne dans son run et sa phase pour qui lit le flux.
 RUN_MARKER = "Run pipeline #"
@@ -179,11 +200,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
 
     fmt = _make_formatter()
 
-    # Force UTF-8 sur la console pour éviter les UnicodeEncodeError Windows (cp1252)
-    # On enveloppe stdout.buffer sans se l'approprier (line_buffering pour flush immédiat)
-    utf8_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
-    utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
-    console = logging.StreamHandler(stream=_FluxConsole(utf8_stream))
+    console = logging.StreamHandler(stream=_FluxConsole(console_stream()))
     console.setFormatter(fmt)
     console.addFilter(_PhaseNameFilter())
     logger.addHandler(console)

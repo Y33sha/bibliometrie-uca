@@ -16,6 +16,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
@@ -40,6 +41,7 @@ def extract_year(
     seen = 0
     total = 0
 
+    avancement = Progression(None, "scanr", logger)
     while True:
         first_page = search_after is None
         query = adapter.build_query(year, affiliation_ids, search_after, track_total=first_page)
@@ -50,12 +52,14 @@ def extract_year(
             logger.info("%s publications", total)
             if dry_run:
                 return total, 0, 0, 0
+            avancement.fixer_total(total)
 
         hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
         if not hits:
             break
 
         for hit in hits:
+            avancement.avance()
             doc = as_mapping(hit.get("_source"))
             scanr_id = adapter.extract_id(doc)
             if not scanr_id:
@@ -74,15 +78,8 @@ def extract_year(
 
         if seen % 500 == 0:
             conn.commit()
-            logger.info(
-                "%s/%s traités (%s nouveaux, %s mis à jour, %s inchangés)",
-                seen,
-                total,
-                inserted,
-                updated,
-                unchanged,
-            )
 
+    avancement.ferme()
     conn.commit()
     return total, inserted, updated, unchanged
 

@@ -38,13 +38,13 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 
 Barres simultanées, une par source, sous `ThreadPoolExecutor` :
 
-- [ ] `extract/extract_hal.py` — une ligne par page
-- [ ] `extract/extract_openalex.py` — une ligne par page
-- [ ] `extract/extract_wos.py` — une ligne par page
-- [ ] `extract/extract_scanr.py` — toutes les 500 notices
-- [ ] `extract/extract_theses.py` — toutes les 1000 notices
-- [ ] `fetch_missing/doi.py` — tous les 100 DOI
-- [ ] `fetch_missing/hal.py` — une ligne par lot
+- [x] `extract/extract_hal.py` — une ligne par page
+- [x] `extract/extract_openalex.py` — une ligne par page
+- [x] `extract/extract_wos.py` — une ligne par page
+- [x] `extract/extract_scanr.py` — toutes les 500 notices
+- [x] `extract/extract_theses.py` — toutes les 1000 notices
+- [x] `fetch_missing/doi.py` — tous les 100 DOI
+- [x] `fetch_missing/hal.py` — une ligne par lot
 
 Barre unique :
 

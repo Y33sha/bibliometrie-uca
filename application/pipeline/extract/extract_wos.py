@@ -17,6 +17,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
@@ -58,55 +59,46 @@ def extract_year(
     page_num = 0
     consecutive_failures = 0
 
-    while first_record <= total_count:
-        if first_record > 1:
-            data = adapter.fetch_page(year, first_record, affiliations)
+    with progression(total_count, "wos", logger) as avancement:
+        while first_record <= total_count:
+            if first_record > 1:
+                data = adapter.fetch_page(year, first_record, affiliations)
 
-        records = adapter.get_records(data)
-        if not records:
-            consecutive_failures += 1
-            if consecutive_failures >= 3:
-                logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
+            records = adapter.get_records(data)
+            if not records:
+                consecutive_failures += 1
+                if consecutive_failures >= 3:
+                    logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
+                    break
+                logger.warning(
+                    "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
+                )
+                time.sleep(5)
+                continue
+
+            consecutive_failures = 0
+            page_num += 1
+
+            counts = adapter.insert_batch(conn, records)
+            conn.commit()
+            total_new += counts.new
+            total_updated += counts.updated
+            total_unchanged += counts.unchanged
+            avancement.avance(len(records))
+
+            first_record += len(records)
+
+            # Pause longue toutes les N pages pour laisser l'API souffler
+            if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
+                logger.info("pause de %ss (toutes les %s pages)…", _BREATHER_SECS, _BREATHER_EVERY)
+                time.sleep(_BREATHER_SECS)
+
+            if first_record > _WOS_FIRST_RECORD_LIMIT:
+                logger.warning(
+                    "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
+                    _WOS_FIRST_RECORD_LIMIT,
+                )
                 break
-            logger.warning(
-                "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
-            )
-            time.sleep(5)
-            continue
-
-        consecutive_failures = 0
-        page_num += 1
-
-        counts = adapter.insert_batch(conn, records)
-        conn.commit()
-        total_new += counts.new
-        total_updated += counts.updated
-        total_unchanged += counts.unchanged
-
-        logger.info(
-            "page %s : %s records, %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
-            page_num,
-            len(records),
-            counts.new,
-            counts.updated,
-            counts.unchanged,
-            min(first_record + len(records) - 1, total_count),
-            total_count,
-        )
-
-        first_record += len(records)
-
-        # Pause longue toutes les N pages pour laisser l'API souffler
-        if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
-            logger.info("pause de %ss (toutes les %s pages)…", _BREATHER_SECS, _BREATHER_EVERY)
-            time.sleep(_BREATHER_SECS)
-
-        if first_record > _WOS_FIRST_RECORD_LIMIT:
-            logger.warning(
-                "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
-                _WOS_FIRST_RECORD_LIMIT,
-            )
-            break
 
     logger.info(
         "terminé : %s nouveaux, %s mis à jour, %s inchangés sur %s trouvés",

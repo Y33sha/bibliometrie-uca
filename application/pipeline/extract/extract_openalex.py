@@ -16,6 +16,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
@@ -51,40 +52,32 @@ def extract_year(
     if dry_run:
         return 0, 0, 0
 
-    while True:
-        page_num += 1
+    with progression(total_count, "openalex", logger) as avancement:
+        while True:
+            page_num += 1
 
-        if page_num == 1:
-            data = first_page
-        else:
-            data = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
+            if page_num == 1:
+                data = first_page
+            else:
+                data = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
 
-        results = [as_mapping(r) for r in as_sequence(data.get("results"))]
-        if not results:
-            break
+            results = [as_mapping(r) for r in as_sequence(data.get("results"))]
+            if not results:
+                break
 
-        counts = adapter.insert_batch(conn, results)
-        conn.commit()
-        total_new += counts.new
-        total_updated += counts.updated
-        total_unchanged += counts.unchanged
+            counts = adapter.insert_batch(conn, results)
+            conn.commit()
+            total_new += counts.new
+            total_updated += counts.updated
+            total_unchanged += counts.unchanged
 
-        total_fetched += len(results)
-        logger.info(
-            "page %s : %s works — %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
-            page_num,
-            len(results),
-            counts.new,
-            counts.updated,
-            counts.unchanged,
-            total_fetched,
-            total_count,
-        )
+            total_fetched += len(results)
+            avancement.avance(len(results))
 
-        next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
-        if not next_cursor:
-            break
-        cursor = next_cursor
+            next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
+            if not next_cursor:
+                break
+            cursor = next_cursor
 
     logger.info(
         "terminé : %s nouveaux, %s mis à jour, %s inchangés (sur %s récupérés, %s au total)",

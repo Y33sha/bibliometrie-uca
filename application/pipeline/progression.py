@@ -11,11 +11,12 @@ Usage :
 
 import logging
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from types import TracebackType
-from typing import TextIO
+from typing import Protocol
 
 try:
     from tqdm import tqdm
@@ -28,11 +29,34 @@ JALON_INTERVALLE_S = 30.0
 FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
 
+RAFRAICHISSEMENT_S = 0.1
+"""Délai entre deux redessins de la barre à l'arrêt, pendant qu'une source répond."""
+
 type Journal = logging.Logger | logging.LoggerAdapter[logging.Logger]
 """Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
 
 
-def ecrire_hors_barre(ligne: str, flux: TextIO) -> None:
+class FluxTexte(Protocol):
+    """Ce qu'une barre et une ligne de journal écrivent en commun."""
+
+    def write(self, texte: str, /) -> int: ...
+
+    def flush(self) -> None: ...
+
+
+_flux_barres: FluxTexte | None = None
+
+
+def set_flux_barres(flux: FluxTexte | None) -> None:
+    """Flux sur lequel les barres s'affichent, celui-là même qui porte les lignes de journal.
+
+    Un flux commun permet à chacune d'effacer l'autre : sur deux flux distincts, les barres et les lignes se recouvrent.
+    """
+    global _flux_barres
+    _flux_barres = flux
+
+
+def ecrire_hors_barre(ligne: str, flux: FluxTexte) -> None:
     """Écrit `ligne` au-dessus des barres en cours, qui se redessinent ensuite."""
     if tqdm is not None:
         tqdm.write(ligne, file=flux)
@@ -53,7 +77,7 @@ class Progression:
 
     def __init__(
         self,
-        total: int,
+        total: int | None,
         libelle: str,
         logger: Journal | None,
         *,
@@ -65,12 +89,40 @@ class Progression:
         self._intervalle_s = intervalle_s
         self._fait = 0
         self._debut = time.perf_counter()
+        self._fini = threading.Event()
         self._dernier_jalon = self._debut
         self._barre = (
-            tqdm(total=total, desc=libelle, bar_format=FORMAT_BARRE, leave=True)
+            tqdm(
+                total=total,
+                desc=libelle,
+                bar_format=FORMAT_BARRE,
+                leave=True,
+                file=_flux_barres,
+                dynamic_ncols=True,
+            )
             if tqdm is not None and _terminal_interactif()
             else None
         )
+        if self._barre is not None:
+            threading.Thread(target=self._battre, daemon=True).start()
+
+    def _battre(self) -> None:
+        """Redessine la barre tant qu'elle vit : le temps écoulé avance même à l'arrêt.
+
+        Une barre `tqdm` se redessine seulement quand elle avance. Une source qui répond lentement la figerait, sans distinguer l'attente de l'arrêt.
+        """
+        while not self._fini.wait(RAFRAICHISSEMENT_S):
+            barre = self._barre
+            if barre is None:
+                return
+            barre.refresh()
+
+    def fixer_total(self, total: int) -> None:
+        """Fixe le total qu'une première réponse révèle."""
+        self._total = total
+        if self._barre is not None:
+            self._barre.total = total
+            self._barre.refresh()
 
     def avance(self, n: int = 1) -> None:
         """Compte `n` unités traitées de plus."""
@@ -89,16 +141,19 @@ class Progression:
             return
         ecoule = maintenant - self._debut
         debit = self._fait / ecoule if ecoule > 0 else 0.0
-        if self._total > 0:
-            part = f" ({self._fait * 100 // self._total} %)"
-        else:
-            part = ""
+        part = f" ({self._fait * 100 // self._total} %)" if self._total else ""
         self._logger.info(
-            "%s : %d/%d%s — %.0f/s", self._libelle, self._fait, self._total, part, debit
+            "%s : %d/%s%s — %.0f/s",
+            self._libelle,
+            self._fait,
+            self._total if self._total is not None else "?",
+            part,
+            debit,
         )
 
     def ferme(self) -> None:
         """Retire la barre."""
+        self._fini.set()
         if self._barre is not None:
             self._barre.close()
             self._barre = None
@@ -117,7 +172,7 @@ class Progression:
 
 @contextmanager
 def progression(
-    total: int,
+    total: int | None,
     libelle: str,
     logger: Journal | None,
     *,

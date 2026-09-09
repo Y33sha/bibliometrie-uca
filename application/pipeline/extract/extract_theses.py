@@ -18,6 +18,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
@@ -55,41 +56,33 @@ def extract_ppn(
     unchanged = 0
     debut = 0
 
-    while debut < total:
-        data = adapter.fetch_page(query, debut=debut, nombre=adapter.per_page())
-        theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]
+    with progression(total, "theses", logger) as avancement:
+        while debut < total:
+            data = adapter.fetch_page(query, debut=debut, nombre=adapter.per_page())
+            theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]
 
-        if not theses:
-            break
+            if not theses:
+                break
 
-        for these in theses:
-            theses_id = adapter.extract_id(these)
-            if not theses_id:
-                continue
+            for these in theses:
+                theses_id = adapter.extract_id(these)
+                if not theses_id:
+                    continue
 
-            if year is not None and not theses_id.startswith(str(year)):
-                continue
+                if year is not None and not theses_id.startswith(str(year)):
+                    continue
 
-            outcome = adapter.upsert_these(conn, these)
-            if outcome is UpsertOutcome.NEW:
-                inserted += 1
-            elif outcome is UpsertOutcome.UPDATED:
-                updated += 1
-            else:
-                unchanged += 1
+                outcome = adapter.upsert_these(conn, these)
+                if outcome is UpsertOutcome.NEW:
+                    inserted += 1
+                elif outcome is UpsertOutcome.UPDATED:
+                    updated += 1
+                else:
+                    unchanged += 1
 
-        conn.commit()
-        debut += len(theses)
-
-        if debut % 1000 == 0 or debut >= total:
-            logger.info(
-                "%s/%s traités (%s nouveaux, %s mis à jour, %s inchangés)",
-                debut,
-                total,
-                inserted,
-                updated,
-                unchanged,
-            )
+            conn.commit()
+            debut += len(theses)
+            avancement.avance(len(theses))
 
     return total, inserted, updated, unchanged
 

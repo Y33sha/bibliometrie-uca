@@ -19,6 +19,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import (
     HalFetchMissingAdapter,
     HalIdRef,
@@ -48,6 +49,7 @@ async def _fetch_refs_async[Ref](
     conn: Connection,
     log: logging.Logger,
     *,
+    libelle: str,
     max_concurrent: int,
     delay_s: float,
     fetch_one: Callable[[httpx2.AsyncClient, Ref], Awaitable[Mapping[str, JsonValue] | None]],
@@ -66,22 +68,23 @@ async def _fetch_refs_async[Ref](
             await asyncio.sleep(delay_s)
         return doc
 
-    def _write(conn: Connection, ref: Ref, doc: Mapping[str, JsonValue] | None) -> None:
-        fetched, not_found = insert_one(conn, ref, doc)
-        counts["fetched"] += fetched
-        counts["not_found"] += not_found
-        counts["done"] += 1
-        if counts["done"] % _COMMIT_EVERY == 0:
-            log.info("  %s/%s — %s récupérés", counts["done"], total, counts["fetched"])
+    with progression(total, libelle, log) as avancement:
 
-    await run_fetch_pool(
-        refs,
-        conn,
-        max_concurrent=max_concurrent,
-        commit_every=_COMMIT_EVERY,
-        fetch=_fetch,
-        write=_write,
-    )
+        def _write(conn: Connection, ref: Ref, doc: Mapping[str, JsonValue] | None) -> None:
+            fetched, not_found = insert_one(conn, ref, doc)
+            counts["fetched"] += fetched
+            counts["not_found"] += not_found
+            counts["done"] += 1
+            avancement.avance()
+
+        await run_fetch_pool(
+            refs,
+            conn,
+            max_concurrent=max_concurrent,
+            commit_every=_COMMIT_EVERY,
+            fetch=_fetch,
+            write=_write,
+        )
     return counts["fetched"], counts["not_found"]
 
 
@@ -129,6 +132,7 @@ async def fetch_missing_hal_by_id(
         missing,
         conn,
         log,
+        libelle="hal (par identifiant)",
         max_concurrent=adapter.max_concurrent,
         delay_s=adapter.delay_s,
         fetch_one=lambda client, ref: adapter.fetch_by_halid(client, ref.hal_id),
@@ -178,6 +182,7 @@ async def fetch_missing_hal_by_nnt(
         nnt_refs,
         conn,
         log,
+        libelle="hal (par NNT)",
         max_concurrent=adapter.max_concurrent,
         delay_s=adapter.delay_s,
         fetch_one=lambda client, ref: adapter.fetch_by_nnt(client, ref.nnt),
