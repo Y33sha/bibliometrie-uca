@@ -977,41 +977,47 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
     """Constructeur de l'extracteur par source : `(conn, source_log)` → extracteur câblé.
 
     `wos` et `scanr` ouvrent une connexion d'amorçage pour lire leur clé / identifiants
-    avant l'extraction ; les autres n'ont besoin que de l'URL de base (lue en config)."""
-    from application.pipeline.extract.extract_hal import HalExtractor
-    from application.pipeline.extract.extract_openalex import OpenalexExtractor
-    from application.pipeline.extract.extract_scanr import ScanrExtractor
-    from application.pipeline.extract.extract_theses import ThesesExtractor
-    from application.pipeline.extract.extract_wos import WosExtractor
+    avant l'extraction ; les autres n'ont besoin que de l'URL de base (lue en config).
+
+    Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
     from infrastructure.sources.api_params import API_BASE_URLS
-    from infrastructure.sources.config import get_scanr_credentials, get_wos_api_key
-    from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
-    from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
-    from infrastructure.sources.scanr.extract_scanr import (
-        PgScanrExtractAdapter,
-    )
-    from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
-    from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_hal import HalExtractor
+        from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
+
         adapter = PgHalExtractAdapter(base_url=API_BASE_URLS["hal"])
         return HalExtractor(conn, source_log, adapter)
 
     def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_openalex import OpenalexExtractor
+        from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
+
         adapter = PgOpenalexExtractAdapter(base_url=API_BASE_URLS["openalex"])
         return OpenalexExtractor(conn, source_log, adapter)
 
     def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_wos import WosExtractor
+        from infrastructure.sources.config import get_wos_api_key
+        from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
+
         adapter = PgWosExtractAdapter(base_url=API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, adapter)
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_scanr import ScanrExtractor
+        from infrastructure.sources.config import get_scanr_credentials
+        from infrastructure.sources.scanr.extract_scanr import PgScanrExtractAdapter
+
         adapter = PgScanrExtractAdapter(
             base_url=API_BASE_URLS["scanr"], credentials=get_scanr_credentials()
         )
         return ScanrExtractor(conn, source_log, adapter)
 
     def theses(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_theses import ThesesExtractor
+        from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
+
         adapter = PgThesesExtractAdapter(base_url=API_BASE_URLS["theses"])
         return ThesesExtractor(conn, source_log, adapter)
 
