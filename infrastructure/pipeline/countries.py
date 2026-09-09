@@ -181,7 +181,6 @@ class PgCountryQueries(CountryQueries):
             text("""
                 SELECT
                     COUNT(*) FILTER (WHERE suggested_countries IS NULL) AS eligible,
-                    COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
                     COUNT(*) FILTER (
                         WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
                     ) AS empty_attempted
@@ -189,7 +188,7 @@ class PgCountryQueries(CountryQueries):
                 WHERE countries IS NULL
             """)
         ).one()
-        return SuggestEligibleCounts(row.eligible, row.has_suggestion, row.empty_attempted)
+        return SuggestEligibleCounts(row.eligible, row.empty_attempted)
 
     def fetch_suggest_targets_chunk(
         self, conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
