@@ -101,7 +101,7 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         *,
         breaker: CircuitBreaker | None = None,
     ) -> PhaseMetrics:
-        """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`, puis loggue le résumé.
+        """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`.
 
         Invoqué par `run_pipeline`. Les exceptions (`ExtractionConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
 
@@ -112,6 +112,4 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         self._breaker = breaker
         config = self.load_config(self.conn)
         self.setup_logging(args, config)
-        metrics = self.extract_all(args, config)
-        self.logger.info("=== Terminé : %s ===", metrics.as_summary())
-        return metrics
+        return self.extract_all(args, config)

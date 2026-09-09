@@ -1032,19 +1032,16 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 def _run_extract(
     source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
 ) -> PhaseMetrics:
-    """Squelette commun d'une extraction : bilan, connexion, circuit-breaker
-    (`_run_extractor`), fermeture. Le câblage propre à la source vit dans `make_extractor`."""
+    """Squelette commun d'une extraction : connexion, circuit-breaker (`_run_extractor`),
+    fermeture. Le câblage propre à la source vit dans `make_extractor`."""
     from infrastructure.db.engine import get_sync_engine
 
-    t0 = time.time()
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     conn = get_sync_engine().connect()
     try:
-        metrics = _run_extractor(source, make_extractor(conn, source_log), args)
+        return _run_extractor(source, make_extractor(conn, source_log), args)
     finally:
         conn.close()
-    log.info("✓ extract_%s terminé en %.1fs — %s", source, time.time() - t0, metrics.as_summary())
-    return metrics
 
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:

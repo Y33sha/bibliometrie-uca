@@ -83,27 +83,3 @@ class TestRun:
         ext.run()
 
         assert ext.extract_all_calls[0]["args"].dry_run is False
-
-
-class _MinimalExtractor(SourceExtractor):
-    """Extracteur minimal (`load_config`/`extract_all` déterministes)."""
-
-    SOURCE = "minimal"
-
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        return {}
-
-    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
-        return PhaseMetrics(new=3)
-
-
-class TestRunLogsSummary:
-    def test_run_logs_terminé_message(self, conn, caplog):
-        """`run()` loggue le résumé `=== Terminé : … ===` en fin d'extraction."""
-        logger = logging.getLogger("test_run_summary")
-        ext = _MinimalExtractor(conn, logger, MagicMock())
-
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            ext.run(argparse.Namespace(dry_run=False))
-
-        assert any("Terminé" in r.getMessage() for r in caplog.records)
