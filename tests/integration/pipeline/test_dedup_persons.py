@@ -164,6 +164,36 @@ def _run_cascade(conn):
 # ── Scénarios ────────────────────────────────────────────────────
 
 
+class TestPasseDeCreation:
+    """Ce que la seconde passe reprend : les signatures du périmètre restées sans personne."""
+
+    def test_une_signature_hors_perimetre_ne_cree_pas_de_personne(self, sa_sync_conn):
+        """Un nom inconnu hors périmètre reste sans personne, sans en introduire une."""
+        pub = _insert_publication(sa_sync_conn)
+        sp = _insert_source_document(sa_sync_conn, "openalex", "W1", pub)
+        signature = _insert_authorship(
+            sa_sync_conn, "openalex", sp, "Inconnue Hors Perimetre", in_perimeter=False
+        )
+
+        avant = sa_sync_conn.execute(text("SELECT count(*) FROM persons")).scalar_one()
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, signature) is None
+        assert sa_sync_conn.execute(text("SELECT count(*) FROM persons")).scalar_one() == avant
+
+    def test_une_signature_du_perimetre_cree_sa_personne(self, sa_sync_conn):
+        """Le pendant : dans le périmètre, un nom inconnu introduit sa personne."""
+        pub = _insert_publication(sa_sync_conn)
+        sp = _insert_source_document(sa_sync_conn, "openalex", "W2", pub)
+        signature = _insert_authorship(
+            sa_sync_conn, "openalex", sp, "Inconnue Du Perimetre", in_perimeter=True
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, signature) is not None
+
+
 class TestCascadeRun:
     def test_cross_source_links_and_imports_identifiers(self, sa_sync_conn):
         """Cross-source : authorship OA non-rattachée + HAL rattachée même position

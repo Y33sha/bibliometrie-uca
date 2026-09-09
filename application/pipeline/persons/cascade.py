@@ -258,7 +258,9 @@ def run_cascade(
 ) -> CascadeResult:
     """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
 
-    Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante. Passe `create` (`decide_cross_and_name`) sur ces seules restantes : cross-source de rattrapage contre l'état ferme complet, puis création des inconnues — une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe.
+    Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante.
+
+    Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
     c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
     total = len(c.authorships)
@@ -280,16 +282,22 @@ def run_cascade(
 
     log_matching_breakdown(logger, c.result())
 
+    # Seules les signatures du périmètre encore sans personne peuvent en créer une. Les autres —
+    # hors périmètre, ou déjà liées en cross-source — n'attendent de cette passe qu'un
+    # rattachement à une personne qu'elle vient de créer ; la passe suivante du run d'après les
+    # rejuge contre l'état ferme complet.
+    a_creer = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
+
     logger.info("%sCréation de nouvelles personnes", ETAPE)
     logger.info(
         "%s%s %s",
         BRANCHE,
-        accord(len(unresolved), "signature"),
-        forme(len(unresolved), "non identifiée"),
+        accord(len(a_creer), "signature"),
+        forme(len(a_creer), "non identifiée"),
     )
     creees_avant = c.created
-    with progression(len(unresolved), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
-        for a in unresolved:
+    with progression(len(a_creer), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
+        for a in a_creer:
             avancement.avance()
             decision = c.decide_cross_and_name(a)
             if decision.action == "match":
