@@ -7,23 +7,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from application.pipeline.libelles import forme
 from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
 
-LIBELLES_EXTRAS: dict[str, str] = {
-    "already_complete": "déjà complets",
-    "conflicts": "conflits",
-    "disappeared": "disparus",
-    "fetched": "récupérés",
-    "matched": "rapprochés",
-    "no_publisher": "sans éditeur",
-    "not_found": "introuvables",
-    "publisher_created": "éditeurs créés",
-    "publisher_matched": "éditeurs rapprochés",
-    "resolved": "résolus",
-    "unmatched": "non rapprochés",
-    "unresolved": "non résolus",
+LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
+    "already_complete": "déjà complet",
+    "conflicts": "conflit",
+    "disappeared": "disparu",
+    "fetched": "récupéré",
+    "matched": "rapproché",
+    "no_publisher": ("sans éditeur", "sans éditeur"),
+    "not_found": "introuvable",
+    "publisher_created": ("éditeur créé", "éditeurs créés"),
+    "publisher_matched": ("éditeur rapproché", "éditeurs rapprochés"),
+    "resolved": "résolu",
+    "skipped": "sauté",
+    "stale": ("à rafraîchir", "à rafraîchir"),
+    "unmatched": "non rapproché",
+    "unresolved": "non résolu",
 }
-"""Compteurs sur-mesure, dans les mots du journal. La clé sert de repli."""
+"""Compteurs sur-mesure, au singulier. Un couple porte les formes que le `s` final ne donne pas."""
 
 
 @dataclass
@@ -123,16 +126,18 @@ class PhaseMetrics:
         # d'administration et les runs déjà enregistrés lisent : la traduction reste à l'affichage.
         parts: list[str] = []
         if self.new:
-            parts.append(f"{self.new} nouveaux")
+            parts.append(f"{self.new} {forme(self.new, 'nouveau', 'nouveaux')}")
         if self.updated:
             parts.append(f"{self.updated} mis à jour")
         if self.unchanged:
-            parts.append(f"{self.unchanged} inchangés")
+            parts.append(f"{self.unchanged} {forme(self.unchanged, 'inchangé')}")
         if self.errors:
-            parts.append(f"{self.errors} erreurs")
+            parts.append(f"{self.errors} {forme(self.errors, 'erreur')}")
         for k, v in self.extras.items():
             if v:
-                parts.append(f"{v} {LIBELLES_EXTRAS.get(k, k)}")
+                libelle = LIBELLES_EXTRAS.get(k, (k, k))
+                singulier, pluriel = libelle if isinstance(libelle, tuple) else (libelle, None)
+                parts.append(f"{v} {forme(v, singulier, pluriel)}")
         if self.total and not parts:
             parts.append(f"{self.total} au total")
         return ", ".join(parts) if parts else "rien à faire"
