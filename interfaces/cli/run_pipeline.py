@@ -914,12 +914,16 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         last = journal_repo.doaj_last_import_at()
         threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
         if last is not None and last > threshold:
+            prochain = last + datetime.timedelta(days=_DOAJ_STALE_DAYS)
             log.info(
-                "✓ enrich_journals_from_doaj : dump importé il y a < %d jours (%s), skip",
-                _DOAJ_STALE_DAYS,
-                last.date(),
+                "%sRéférentiel DOAJ importé le %s : prochain import le %s",
+                ETAPE,
+                last.strftime("%d-%m-%Y"),
+                prochain.strftime("%d-%m-%Y"),
             )
             return PhaseMetrics(extras={"skipped": 1})
+
+        log.info("%sImport du référentiel DOAJ", ETAPE)
 
         # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
         user_agent = build_user_agent(get_polite_pool_email_optional() or "")

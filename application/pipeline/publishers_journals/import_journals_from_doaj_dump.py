@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.normalize import sanitize_optional_text
 
@@ -73,12 +74,9 @@ def run_import_doaj_dump(
         for issn_value in (issn, eissn, issnl):
             if issn_value:
                 issn_to_journal_id.setdefault(issn_value, indexed_journal_id)
-    logger.info("%d ISSN indexés (journals.issn/eissn/issnl)", len(issn_to_journal_id))
-
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
     if not dry_run:
-        n_reset = journal_repo.reset_is_in_doaj()
-        logger.info("Reset is_in_doaj = FALSE sur %d journaux", n_reset)
+        journal_repo.reset_is_in_doaj()
 
     stats = DoajImportStats()
     now = datetime.now(UTC)
@@ -108,10 +106,8 @@ def run_import_doaj_dump(
     if commit and not dry_run:
         conn.commit()
     logger.info(
-        "Import DOAJ : %d rows, %d sans ISSN, %d orphelines, %d journaux matchés",
-        stats.total_rows,
-        stats.no_issn_rows,
-        stats.orphan_rows,
-        stats.matched,
+        "%sTerminé : %s mises à jour",
+        DERNIERE_BRANCHE,
+        accord(stats.matched, "revue", "revues"),
     )
     return stats

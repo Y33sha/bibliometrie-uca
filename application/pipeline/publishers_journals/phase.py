@@ -74,4 +74,6 @@ def run(
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
     metrics.details["summary"] = {"doaj_matched": doaj.extras.get("matched", 0)}
+    # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
+    metrics.resume = ""
     return metrics

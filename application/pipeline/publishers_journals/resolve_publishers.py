@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import (
@@ -42,9 +43,16 @@ def run_resolve_publishers(
     """
     metrics = PhaseMetrics()
     rows = repo.get_prefixes_pending_publisher()
-    log.info("resolve_publishers — %d préfixes en attente de publisher", len(rows))
+    if not rows:
+        return metrics
+    log.info(
+        "%s%s : identification des éditeurs",
+        ETAPE,
+        accord(len(rows), "nouveau préfixe DOI", "nouveaux préfixes DOI"),
+    )
 
-    for row in rows:
+    for indice, row in enumerate(rows):
+        branche = DERNIERE_BRANCHE if indice == len(rows) - 1 else BRANCHE
         if breaker is not None and breaker.tripped:
             log.warning("resolve_publishers : circuit-breaker tripé, arrêt")
             break
@@ -68,14 +76,15 @@ def run_resolve_publishers(
             repo.update_publisher_id(row.prefix, publisher_id)
             metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
             log.info(
-                "  %s → publisher_id=%d (%s)",
+                "%s%s → “%s”%s",
+                branche,
                 row.prefix,
-                publisher_id,
-                "créé" if created else "matché",
+                name_raw,
+                " (nouveau)" if created else "",
             )
         else:
             metrics.add(no_publisher=1)
-            log.info("  %s → pas de publisher (RA %s, /prefixes muet)", row.prefix, row.ra)
+            log.info("%s%s → éditeur inconnu de %s", branche, row.prefix, row.ra)
 
         # Tentative effectuée (succès ou échec) → ne plus reprendre cette row.
         repo.mark_publisher_checked(row.prefix)

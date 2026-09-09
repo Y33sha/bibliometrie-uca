@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
@@ -56,10 +57,13 @@ def run_enrich_journals_from_openalex(
 ) -> PhaseMetrics:
     journals = journal_repo.find_journals_of_unknown_type()
     total = len(journals)
-    logger.info("%d revues à typer (openalex_id, journal_type inconnu).", total)
     if total == 0:
-        logger.info("Rien à faire.")
         return PhaseMetrics()
+    logger.info(
+        "%s%s : identification du type des revues sur OpenAlex",
+        ETAPE,
+        accord(total, "revue sans type", "revues sans type"),
+    )
 
     updated = 0
     with_apc = 0
@@ -103,20 +107,13 @@ def run_enrich_journals_from_openalex(
 
         if processed % COMMIT_EVERY < BATCH_SIZE:
             conn.commit()
-        logger.info(
-            "  %d/%d — %d avec APC, %d types écrits",
-            min(i + BATCH_SIZE, total),
-            total,
-            with_apc,
-            type_written,
-        )
 
     conn.commit()
     logger.info(
-        "Terminé : %d/%d revues mises à jour, %d avec APC, %d journal_type écrits.",
+        "%sTerminé : %d/%d %s mises à jour",
+        DERNIERE_BRANCHE,
         updated,
         total,
-        with_apc,
-        type_written,
+        forme(total, "revue"),
     )
     return PhaseMetrics(seen=total, updated=updated)
