@@ -20,7 +20,10 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.pipeline.extract.cross_import import record_doi_not_found
+from infrastructure.pipeline.extract.cross_import import (
+    record_doi_already_present,
+    record_doi_not_found,
+)
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
@@ -88,19 +91,24 @@ class ScanrFetchMissingDoiAdapter:
         if not scanr_id:
             return False
 
-        doi = None
-        for entree in as_sequence(record.get("externalIds")):
-            ext = as_mapping(entree)
-            if as_str(ext.get("type")) == "doi":
-                doi = clean_doi(as_str(ext.get("id")))
-                break
+        dois = [
+            propre
+            for entree in as_sequence(record.get("externalIds"))
+            if as_str((ext := as_mapping(entree)).get("type")) == "doi"
+            and (propre := clean_doi(as_str(ext.get("id"))))
+        ]
 
         inserted, _ = upsert_staging(
             conn,
             source="scanr",
             source_id=scanr_id,
-            doi=doi,
+            doi=dois[0] if dois else None,
             raw_data=record,
             entry_mode="cross_import_doi",
         )
+        if not inserted:
+            # Le document porte plusieurs DOI et ScanR le rend pour chacun d'eux ; `staging.doi`
+            # n'en garde qu'un, donc les autres reviendraient au pool.
+            for doi in dois:
+                record_doi_already_present(conn, "scanr", doi)
         return inserted
