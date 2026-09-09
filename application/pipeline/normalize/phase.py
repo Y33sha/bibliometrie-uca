@@ -11,10 +11,11 @@ Les runners par source, la suppression, le nettoyage et le VACUUM (maintenance p
 """
 
 import logging
+import time
 from collections.abc import Callable
 from typing import cast
 
-from application.pipeline.libelles import accord
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
 from application.pipeline.progression import attente
@@ -37,13 +38,17 @@ def run(
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Normalise les sources retenues (dans l'ordre de priorité), retire les documents disparus, nettoie puis VACUUM le staging."""
+    etape(logger, "Normalisation")
     rows = [normalize_one(source) for source in ordered_sources if source in sources]
 
     disparues = prune_disappeared()
 
-    with attente("maintenance des tables", logger):
+    etape(logger, "Maintenance des tables")
+    t0 = time.perf_counter()
+    with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
         cleanup_orphan_identities()
         vacuum_staging(MODES[mode].vacuum_full)
+        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
     metrics = PhaseMetrics()
     normalises = sum(cast("int", row["processed"]) for row in rows)
