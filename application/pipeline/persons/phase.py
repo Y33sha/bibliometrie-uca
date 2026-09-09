@@ -15,16 +15,19 @@ Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de 
 """
 
 import logging
+import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
-from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
+from application.pipeline.persons.metrics import build_metrics
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
+from application.pipeline.progression import attente
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries
 from application.ports.pipeline.transaction import OpenTransaction
@@ -62,13 +65,14 @@ def run(
             cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
         )
         cross_source_detached = persons_queries.detach_authorships(conn, stale)
-        if cross_source_detached:
-            logger.info(
-                "  %d signature(s) cross-source sans appui détachée(s)", cross_source_detached
-            )
 
-        populate(conn, name_forms_queries, logger)
-        purge_counts = purge(conn, persons_queries, logger)
+        logger.info("")
+        logger.info("%sMise à jour des formes de nom associées aux personnes", ETAPE)
+        t0 = time.perf_counter()
+        with attente(f"{DERNIERE_BRANCHE}mise à jour en cours", logger) as ligne:
+            populate(conn, name_forms_queries, logger)
+            purge_counts = purge(conn, persons_queries, logger)
+            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
         metrics = build_metrics(
             cascade_result,
@@ -77,5 +81,5 @@ def run(
             reorphaned=purge_counts["reorphaned"],
             deleted_persons=purge_counts["deleted_persons"],
         )
-        log_matching_breakdown(logger, cascade_result)
+        metrics.resume = ""
     return metrics

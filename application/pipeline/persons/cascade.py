@@ -25,6 +25,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.persons.loading import (
     EnrichedAuthorship,
     get_all_unlinked_authorships,
@@ -32,7 +33,7 @@ from application.pipeline.persons.loading import (
     get_out_of_perimeter_candidates,
     load_linked_authorships_by_pub,
 )
-from application.pipeline.persons.metrics import CascadeResult
+from application.pipeline.persons.metrics import CascadeResult, log_matching_breakdown
 from application.pipeline.progression import progression
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -261,23 +262,33 @@ def run_cascade(
     """
     c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
     total = len(c.authorships)
-    logger.info("  %d signatures à traiter", total)
+    logger.info("")
+    logger.info("%sIdentification des personnes", ETAPE)
+    logger.info("%s%s %s", BRANCHE, accord(total, "signature"), forme(total, "non identifiée"))
 
     unresolved: list[EnrichedAuthorship] = []
-    with progression(total, "signatures (match)", logger) as avancement:
+    with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
         for a in c.authorships:
             avancement.avance()
             decision = c.decide_full(a)
             if decision.action == "match":
                 c.apply_match(a, decision.person_id, decision.reason)
+                avancement.retient()
             else:
                 # Création différée ou aucun signal : reprise en passe create.
                 unresolved.append(a)
 
+    log_matching_breakdown(logger, c.result())
+
+    logger.info("%sCréation de nouvelles personnes", ETAPE)
     logger.info(
-        "▶ create : création des personnes inconnues (%d signatures restantes)", len(unresolved)
+        "%s%s %s",
+        BRANCHE,
+        accord(len(unresolved), "signature"),
+        forme(len(unresolved), "non identifiée"),
     )
-    with progression(len(unresolved), "signatures (create)", logger) as avancement:
+    creees_avant = c.created
+    with progression(len(unresolved), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
         for a in unresolved:
             avancement.avance()
             decision = c.decide_cross_and_name(a)
@@ -285,6 +296,13 @@ def run_cascade(
                 c.apply_match(a, decision.person_id, decision.reason)
             elif decision.action == "create":
                 c.apply_create(a)
+                avancement.retient()
             else:
                 c.skipped_counts[decision.reason] += 1
+    logger.info(
+        "%s%s %s",
+        DERNIERE_BRANCHE,
+        accord(c.created - creees_avant, "personne"),
+        forme(c.created - creees_avant, "créée"),
+    )
     return c.result()

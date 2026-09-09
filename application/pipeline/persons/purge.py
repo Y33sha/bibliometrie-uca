@@ -20,9 +20,6 @@ def purge(
     Retourne les compteurs `{reorphaned, deleted_persons}`. Le commit est laissé au caller.
     """
     reorphaned = queries.reorphan_ambiguous_nominal(conn)
-    logger.info("  → %d signatures détachées", reorphaned)
-
     deleted_persons = queries.delete_empty_persons(conn)
-    logger.info("  → %d personnes supprimées", deleted_persons)
 
     return {"reorphaned": reorphaned, "deleted_persons": deleted_persons}

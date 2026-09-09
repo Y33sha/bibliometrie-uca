@@ -12,6 +12,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
@@ -111,20 +112,24 @@ def resolve_identifier_transfers(
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
         logger.info(
-            "Transfert %s=%s : personne %d → %d (consensus %r), %d signature(s) détachée(s)",
+            "%sTransfert %s=%s : personne %d → %d (consensus %r), %s %s",
+            BRANCHE,
             id_type,
             id_value,
             owner_id,
             target,
             cons,
-            detached,
+            accord(detached, "signature"),
+            forme(detached, "détachée"),
         )
         transferred += 1
 
     logger.info(
-        "Transferts par consensus : %d conflits (%d pending) → %d identifiants transférés",
-        len(conflicts),
+        "%s%s (%d en attente) → %s %s",
+        DERNIERE_BRANCHE,
+        accord(len(conflicts), "conflit"),
         len(pending),
-        transferred,
+        accord(transferred, "identifiant"),
+        forme(transferred, "transféré"),
     )
     return {"conflicts": len(conflicts), "pending": len(pending), "transferred": transferred}
