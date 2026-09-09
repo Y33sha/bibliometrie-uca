@@ -34,7 +34,6 @@ def extract_ppn(
     logger: ExtractLogger,
     *,
     year: int | None = None,
-    dry_run: bool = False,
 ) -> tuple[int, int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
 
@@ -48,7 +47,7 @@ def extract_ppn(
     total = as_int(data.get("totalHits")) or 0
     logger.info("%s thèses à parcourir", total)
 
-    if dry_run or total == 0:
+    if total == 0:
         return total, 0, 0, 0
 
     inserted = 0
@@ -112,30 +111,28 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
                 ppn,
                 slog,
                 year=args.year,
-                dry_run=args.dry_run,
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
-            if not args.dry_run:
-                retenues = inserted + updated + unchanged
-                if args.year is None:
-                    slog.info(
-                        "%s thèses trouvées : %s nouvelles, %s mises à jour, %s inchangées",
-                        total,
-                        inserted,
-                        updated,
-                        unchanged,
-                    )
-                else:
-                    # `total` porte toutes les thèses de l'établissement ; le filtre par année
-                    # n'en retient qu'une partie, et le bilan porte sur celles-là.
-                    slog.info(
-                        "%s thèses soutenues en %s : %s nouvelles, %s mises à jour, %s inchangées",
-                        retenues,
-                        args.year,
-                        inserted,
-                        updated,
-                        unchanged,
-                    )
+            retenues = inserted + updated + unchanged
+            if args.year is None:
+                slog.info(
+                    "%s thèses trouvées : %s nouvelles, %s mises à jour, %s inchangées",
+                    total,
+                    inserted,
+                    updated,
+                    unchanged,
+                )
+            else:
+                # `total` porte toutes les thèses de l'établissement ; le filtre par année
+                # n'en retient qu'une partie, et le bilan porte sur celles-là.
+                slog.info(
+                    "%s thèses soutenues en %s : %s nouvelles, %s mises à jour, %s inchangées",
+                    retenues,
+                    args.year,
+                    inserted,
+                    updated,
+                    unchanged,
+                )
         return stats
 
 

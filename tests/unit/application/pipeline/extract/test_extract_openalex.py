@@ -59,12 +59,6 @@ def test_page_sans_resultat_interrompt():
     assert adapter.insert_batch.call_count == 0
 
 
-def test_dry_run_s_arrete_apres_le_decompte():
-    adapter = _adapter([_page(3, next_cursor="c2", count=3)])
-    assert extract_year(adapter, MagicMock(), ["I1"], _LOGGER, dry_run=True) == (0, 0, 0)
-    assert adapter.fetch_page.call_count == 1
-
-
 def _config(**surcharges) -> OpenalexExtractConfig:
     valeurs: dict = {
         "base_url": "https://example/",
@@ -82,7 +76,7 @@ def _extracteur(adapter: MagicMock, config: OpenalexExtractConfig, annees: list[
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"dry_run": False, "year": None, "start_year": None, "since": None}
+    valeurs: dict = {"year": None, "start_year": None, "since": None}
     valeurs.update(surcharges)
     return argparse.Namespace(**valeurs)
 

@@ -1,6 +1,6 @@
 """Orchestrateurs du fetch des entrées HAL manquantes : par hal-id, et par NNT.
 
-Deux pistes, même forme : repérer les références absentes, puis les télécharger par un pool de workers et les insérer. Les propriétés qui les distinguent tiennent aux comptages — un hal-id introuvable côté HAL, un NNT trouvé mais dont le document est déjà en staging — et au dénombrement seul (`stats_only`), qui s'arrête avant le téléchargement.
+Deux pistes, même forme : repérer les références absentes, puis les télécharger par un pool de workers et les insérer. Les propriétés qui les distinguent tiennent aux comptages : un hal-id introuvable côté HAL, un NNT trouvé mais dont le document est déjà en staging.
 
 Le pool réel est exercé : seule la source HTTP est doublée. La déduplication des références, elle, décide de ce qui est téléchargé — un hal-id vu par OpenAlex et par ScanR ne l'est qu'une fois.
 """
@@ -111,14 +111,6 @@ class TestParHalId:
         assert metrics.seen == 2
         assert sorted(adapter.telecharges) == ["hal-1", "hal-2"]
 
-    async def test_stats_only_s_arrete_au_denombrement(self):
-        adapter = _FakeHalAdapter(refs_oa=[_halid("hal-1")], docs={"hal-1": {}})
-
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG, stats_only=True)
-
-        assert metrics.seen == 1
-        assert adapter.telecharges == []
-
     async def test_jalon_de_progression_et_pause_entre_fetchs(self):
         # Au-delà du pas de commit, le pool commite en cours de route et jalonne le journal.
         refs = [_halid(f"hal-{i}") for i in range(60)]
@@ -170,14 +162,6 @@ class TestParNnt:
 
         assert metrics.new == 1
         assert metrics.extras["not_found"] == 1
-
-    async def test_stats_only_s_arrete_au_denombrement(self):
-        adapter = _FakeHalAdapter(refs_nnt=[NntRef(nnt="2024UCA0001", theses_id="t1")])
-
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG, stats_only=True)
-
-        assert metrics.seen == 1
-        assert adapter.telecharges == []
 
     async def test_rien_a_faire(self, caplog):
         """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""

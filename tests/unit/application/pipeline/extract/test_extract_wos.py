@@ -75,12 +75,6 @@ def test_aucun_record_trouve():
     assert adapter.insert_batch.call_count == 0
 
 
-def test_dry_run_s_arrete_apres_le_decompte():
-    adapter = _adapter([_records(5)], total=5)
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, dry_run=True) == (0, 0, 0)
-    assert adapter.insert_batch.call_count == 0
-
-
 def test_trois_pages_vides_consecutives_arretent_l_annee():
     adapter = _adapter([[], [], []], total=10)
     adapter.fetch_page.side_effect = [{"page": i} for i in range(6)]
@@ -120,7 +114,7 @@ def _extracteur(adapter: MagicMock, config: WosExtractConfig, annees: list[int])
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"dry_run": False, "year": None, "start_year": None}
+    valeurs: dict = {"year": None, "start_year": None}
     valeurs.update(surcharges)
     return argparse.Namespace(**valeurs)
 

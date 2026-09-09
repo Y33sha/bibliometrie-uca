@@ -32,7 +32,6 @@ def extract_year(
     *,
     year: int | None = None,
     since: str | None = None,
-    dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Extrait des publications OpenAlex par année ou par date de modification.
 
@@ -48,9 +47,6 @@ def extract_year(
     first_page = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
     total_count = as_int(at_path(first_page, "meta").get("count")) or 0
     logger.info("%s documents à récupérer", total_count)
-
-    if dry_run:
-        return 0, 0, 0
 
     with progression(total_count, "openalex", logger) as avancement:
         while True:
@@ -124,7 +120,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexExtractAd
                 config.institution_ids,
                 scoped_logger(self.logger, self.SOURCE, f"depuis {args.since}"),
                 since=args.since,
-                dry_run=args.dry_run,
             )
             stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         else:
@@ -137,7 +132,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexExtractAd
                     config.institution_ids,
                     scoped_logger(self.logger, self.SOURCE, str(year)),
                     year=year,
-                    dry_run=args.dry_run,
                 )
                 stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         return stats
