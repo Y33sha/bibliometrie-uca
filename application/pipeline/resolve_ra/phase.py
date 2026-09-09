@@ -8,9 +8,9 @@ Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et 
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Callable
 
+from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
@@ -32,11 +32,9 @@ def run(
     `total` = préfixes traités ; `new` = rows insérées ; `extras` = `resolved` / `unresolved`.
     S'arrête si le `breaker` a tripé (doi.org à bout de budget).
     """
-    log.info("▶ resolve_ra")
-    t0 = time.perf_counter()
     metrics = PhaseMetrics()
     prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
-    log.info("%d préfixes à résoudre", len(prefixes))
+    log.info("%s à résoudre", accord(len(prefixes), "préfixe DOI", "préfixes DOI"))
 
     new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:
@@ -66,7 +64,9 @@ def run(
             for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
         ]
     }
-    log.info("✓ resolve_ra terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary())
+    resolus = metrics.extras.get("resolved", 0)
+    total = metrics.total
+    metrics.resume = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
     return metrics
 
 

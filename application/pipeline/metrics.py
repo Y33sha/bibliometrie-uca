@@ -43,6 +43,8 @@ class PhaseMetrics:
     extras: dict[str, int] = field(default_factory=dict)
     details: dict[str, object] = field(default_factory=dict)
     signals: list[Signal] = field(default_factory=list)
+    resume: str | None = None
+    """Bilan de fin de phase, dans les mots de la phase. `as_summary()` prend le relais à défaut."""
 
     @property
     def total(self) -> int:

@@ -76,7 +76,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
-from application.pipeline.phase_order import EXTRA_PHASES, PHASE_ORDER
+from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
@@ -1482,6 +1482,9 @@ def _run_one_phase(
     try:
         log.info("─" * 40)
         log.info("%s%s", PHASE_MARKER, name)
+        # `phase_order` garantit un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
+        if libelle := PHASE_LIBELLES.get(name):
+            log.info("%s", libelle)
         log.info("─" * 40)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
@@ -1533,7 +1536,7 @@ def _run_one_phase(
         duration = time.time() - t0_phase
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
         if isinstance(result, PhaseMetrics):
-            log.info("Total phase %s : %s", name, result.as_summary())
+            log.info("Terminé en %.1fs : %s", duration, result.resume or result.as_summary())
         recorder.record(
             phase=name,
             started_at=phase_started_at,

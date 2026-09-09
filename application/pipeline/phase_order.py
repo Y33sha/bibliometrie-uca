@@ -25,6 +25,27 @@ PHASE_ORDER: tuple[str, ...] = (
 )
 
 
+PHASE_LIBELLES: dict[str, str] = {
+    "extract": "Moissonnage des sources",
+    "resolve_ra": "Résolution des agences d'enregistrement des DOI",
+    "fetch_missing": "Rattrapage des documents absents d'une source",
+    "fetch_stale": "Rafraîchissement des documents les plus anciens",
+    "fetch_truncated": "Récupération des listes d'auteurs tronquées",
+    "normalize": "Mise en forme commune des documents moissonnés",
+    "affiliations": "Rattachement des adresses aux structures",
+    "publishers_journals": "Enrichissement des revues et des éditeurs",
+    "metadata_correction": "Correction des métadonnées",
+    "publications": "Regroupement des documents en publications",
+    "persons": "Regroupement des signatures en personnes",
+    "authorships": "Construction du lien entre publications et personnes",
+    "relations": "Relations entre publications",
+    "subjects": "Sujets et mots-clés",
+    "countries": "Détection des pays",
+    "oa_status": "Statut d'accès ouvert",
+}
+"""Ce que chaque phase produit, en une ligne lisible sans connaître le schéma."""
+
+
 EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
 """Enrichissements terminaux, hors résolution d'entités : `--no-extras` les omet.
 
@@ -36,3 +57,6 @@ if len(set(PHASE_ORDER)) != len(PHASE_ORDER):
 
 if not EXTRA_PHASES <= set(PHASE_ORDER):
     raise ValueError("EXTRA_PHASES nomme une phase absente de PHASE_ORDER")
+
+if set(PHASE_LIBELLES) != set(PHASE_ORDER):
+    raise ValueError("PHASE_LIBELLES et PHASE_ORDER ne nomment pas les mêmes phases")
