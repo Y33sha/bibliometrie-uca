@@ -39,8 +39,12 @@ class TestCorroborationCounts:
         assert summary["corroboration_rejected"] == 22555
         assert summary["corroboration_rejected_distinct"] == 798
 
-    def test_pass_summary_names_the_distinct_identifiers(self, caplog):
+    def test_le_journal_nomme_les_methodes_d_identification(self, caplog):
+        """Le tableau dit ce qui a identifié les personnes, dans les mots du domaine."""
         logger = logging.getLogger("test_cascade_metrics")
         with caplog.at_level(logging.INFO, logger=logger.name):
             log_matching_breakdown(logger, _result(rejected=22555, distinct=798))
-        assert "22555 (798 identifiants distincts)" in caplog.text
+        assert "par ORCID" in caplog.text
+        assert "par nom sans homonymie" in caplog.text
+        # Les identifiants techniques de la cascade restent hors du journal.
+        assert "single_name" not in caplog.text

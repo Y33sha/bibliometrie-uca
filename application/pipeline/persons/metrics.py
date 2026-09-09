@@ -6,10 +6,17 @@
 import logging
 from typing import NamedTuple
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord
 from application.pipeline.metrics import PhaseMetrics
 
-# Méthodes de rattachement, par fiabilité décroissante de la cascade.
-_MATCHING_METHODS = ("orcid", "hal_person_id", "idref", "cross_source", "single_name")
+# Méthodes de rattachement, par fiabilité décroissante de la cascade, et ce qu'elles disent.
+_MATCHING_METHODS: dict[str, str] = {
+    "orcid": "par ORCID",
+    "hal_person_id": "par compte HAL",
+    "idref": "par IdRef",
+    "cross_source": "par comparaison entre sources",
+    "single_name": "par nom sans homonymie",
+}
 
 
 class CascadeResult(NamedTuple):
@@ -29,19 +36,20 @@ class CascadeResult(NamedTuple):
 
 
 def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
-    """Loggue le nombre de rattachements par méthode, le nombre de créations et les refus de corroboration."""
+    """Écrit ce qui a identifié les personnes, méthode par méthode, en tableau aligné."""
     matched = result.matched_counts
-    breakdown = ", ".join(f"{method}={matched.get(method, 0)}" for method in _MATCHING_METHODS)
-    logger.info("Rattachements par méthode : %s | créées : %d", breakdown, result.created)
-    # Une même signature revient sur chaque publication d'une collaboration : le nombre
-    # d'identifiants distincts dit l'ampleur du désaccord, là où les occurrences n'en disent
-    # que la fréquence. Le détail de chaque cas se relit en base, par le nom normalisé de la
-    # signature et l'identifiant qu'elle porte.
-    logger.info(
-        "Refus de corroboration : %d (%d identifiants distincts)",
-        result.corroboration_rejected,
-        result.corroboration_rejected_distinct,
-    )
+    total = sum(matched.get(methode, 0) for methode in _MATCHING_METHODS)
+    logger.info("%s%s, dont", DERNIERE_BRANCHE, accord(total, "identification"))
+
+    largeur_nombre = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
+    largeur_libelle = max(len(libelle) for libelle in _MATCHING_METHODS.values())
+    logger.info("")
+    for methode, libelle in _MATCHING_METHODS.items():
+        compte = matched.get(methode, 0)
+        logger.info(
+            "     | %s | %s |", f"{compte}".rjust(largeur_nombre), libelle.ljust(largeur_libelle)
+        )
+    logger.info("")
 
 
 def build_metrics(

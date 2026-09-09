@@ -38,15 +38,6 @@ def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.
                 batch = []
     if batch:
         queries.insert_raw_forms_batch(conn, batch)
-    logger.info("  %d formes calculées depuis les personnes", n_persons_rows)
 
-    logger.info("  synchronisation avec les formes issues des signatures...")
-    counts = queries.sync_from_raw_forms(conn)
+    queries.sync_from_raw_forms(conn)
     queries.drop_temp_raw_forms_table(conn)
-
-    logger.info(
-        "  → %d ajoutées, %d mises à jour, %d supprimées",
-        counts.inserted,
-        counts.updated,
-        counts.deleted,
-    )
