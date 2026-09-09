@@ -5,13 +5,19 @@
 
 from sqlalchemy import Connection, text
 
+from domain.config import STALE_REFRESH_AFTER_DAYS
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 
-STALE_REFRESH_AFTER_DAYS = 90
-"""Âge (jours) de `staging.last_seen_at` au-delà duquel une row est refetchée.
+__all__ = [
+    "STALE_REFRESH_AFTER_DAYS",
+    "get_stale_rows",
+    "set_disappeared_by_source_id",
+]
 
-La phase « refresh stale » (fin de cross-import, à chaque run) refetche par id natif les rows dont `last_seen_at < now() - STALE_REFRESH_AFTER_DAYS` : trouvé → `last_seen_at` mis à jour + refresh `raw_data` ; 404 → `disappeared_at`. Tournant à chaque run, le seuil étale la charge (chaque passe ne ramasse que ce qui vient de franchir le délai) sans `LIMIT`.
-"""
+# La phase refetche par identifiant natif les rows dont `last_seen_at` a franchi le seuil : trouvé
+# → `last_seen_at` mis à jour et `raw_data` rafraîchi ; absence confirmée → `disappeared_at`.
+# Tournant à chaque exécution, le seuil étale la charge sans `LIMIT` : chaque passe ne ramasse que
+# ce qui vient de franchir le délai.
 
 # Filtre année (`{year_clause}`) : `pub_year` vient de `source_publications` (LEFT JOIN ; NULL si absent, conservé).
 _STALE_ROWS_SQL_TEMPLATE = """

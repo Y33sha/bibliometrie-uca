@@ -32,6 +32,9 @@ YEAR_KEYS: frozenset[str] = frozenset({"pipeline_start_year_full"})
 MIN_YEAR = 1970
 MAX_YEAR = 2100
 
+STALE_REFRESH_AFTER_DAYS = 90
+"""Âge, en jours, au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
+
 
 def _as_int(value: JsonValue) -> int | None:
     """Entier porté par `value`, ou `None`. Un booléen est écarté, Python le tenant pour un entier."""
