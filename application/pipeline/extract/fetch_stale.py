@@ -23,6 +23,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
+from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
@@ -116,11 +117,13 @@ async def refresh(
 
     stale = adapter.find_stale(conn, years)
     total = len(stale)
-    slog.info("%d rows stale", total)
 
     metrics = PhaseMetrics(seen=total)
     if total == 0:
+        slog.info("rien à faire")
         return metrics
+
+    slog.info("%s à chercher", accord(total, "document"))
 
     request_delay = getattr(adapter, "request_delay_s", 0.0)
     processed = 0
@@ -169,12 +172,12 @@ async def refresh(
             processed,
             total,
         )
-    slog.info(
-        "terminé : %d interrogées, %d rafraîchies, %d inchangées, %d disparues, %d erreurs",
-        total,
-        metrics.updated,
-        metrics.unchanged,
-        metrics.extras.get("disappeared", 0),
-        metrics.errors,
-    )
+    disparus = metrics.extras.get("disappeared", 0)
+    retrouves = metrics.updated + metrics.unchanged
+    bilan = f"{retrouves}/{total} {forme(total, 'document')} {forme(retrouves, 'retrouvé')}"
+    if disparus:
+        bilan += f", {disparus} {forme(disparus, 'disparu')}"
+    if metrics.errors:
+        bilan += f", {metrics.errors} {forme(metrics.errors, 'erreur')}"
+    slog.info("%s", bilan)
     return metrics

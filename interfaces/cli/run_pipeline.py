@@ -1194,8 +1194,6 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
     adapter = _make_fetch_stale_adapter(target)
 
-    log.info("▶ fetch_stale --target %s", target)
-    t0 = time.time()
     conn = get_sync_engine().connect()
     # Circuit-breaker par source (cf. `_run_fetch_missing_doi`) : coupe le refetch
     # d'une source à bout de budget (429 répétés) au lieu de la marteler. La
@@ -1211,12 +1209,6 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     finally:
         reset_current_breaker(token)
         conn.close()
-    log.info(
-        "✓ fetch_stale (%s) terminé en %.1fs — %s",
-        target,
-        time.time() - t0,
-        metrics.as_summary(),
-    )
     _signal_if_tripped(metrics, breaker)
     return metrics
 

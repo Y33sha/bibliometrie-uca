@@ -5,6 +5,8 @@ Source de vérité unique de l'ordre d'exécution, consommée par l'orchestrateu
 
 from __future__ import annotations
 
+from domain.config import STALE_REFRESH_AFTER_DAYS
+
 PHASE_ORDER: tuple[str, ...] = (
     "extract",
     "resolve_ra",
@@ -29,7 +31,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "extract": "Moissonnage des sources",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
     "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
-    "fetch_stale": "Rafraîchissement des documents les plus anciens",
+    "fetch_stale": f"Recherche des documents non revus depuis {STALE_REFRESH_AFTER_DAYS} jours",
     "fetch_truncated": "Récupération des listes d'auteurs tronquées",
     "normalize": "Mise en forme commune des documents moissonnés",
     "affiliations": "Rattachement des adresses aux structures",
