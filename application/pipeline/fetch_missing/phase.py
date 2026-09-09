@@ -70,6 +70,7 @@ def run(
     )
 
     if configured:
+        logger.info("")
         logger.info("%sRecherche par DOI des documents manquants dans chaque source", ETAPE)
         outcomes = run_parallel(
             {

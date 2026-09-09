@@ -1053,7 +1053,6 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
         metrics = asyncio.run(fetch_missing_hal_by_id(conn, adapter, log))
     finally:
         conn.close()
-    log.info("")
     return metrics
 
 
@@ -1063,6 +1062,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
+    log.info("")
     log.info("%sRecherche dans HAL des thèses avec NNT trouvées ailleurs", ETAPE)
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
@@ -1070,7 +1070,6 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
         metrics = asyncio.run(fetch_missing_hal_by_nnt(conn, adapter, log))
     finally:
         conn.close()
-    log.info("")
     return metrics
 
 
@@ -1510,6 +1509,8 @@ def _run_one_phase(
     # que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
+        # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.
+        log.info("")
         for ligne in _titre_de_phase(name):
             log.info("%s", ligne)
         phase_started_at = datetime.datetime.now(datetime.UTC)
