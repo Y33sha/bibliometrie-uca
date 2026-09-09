@@ -70,7 +70,9 @@ async def run_async(
     )
 
     if limit and len(dois) > limit:
-        slog.info("plafond de %d DOI, %d reportés aux prochains runs", limit, len(dois) - limit)
+        slog.info(
+            "plafond de %d DOI par exécution, %d reportés aux suivantes", limit, len(dois) - limit
+        )
         dois = dois[:limit]
 
     total = len(dois)
@@ -142,12 +144,19 @@ async def run_async(
             total,
         )
 
+    trouves = progress["fetched"]
+    nouveaux = progress["inserted"]
+    doublons = trouves - nouveaux
+    detail = [f"{nouveaux} {forme(nouveaux, 'nouveau', 'nouveaux')}"]
+    if doublons:
+        detail.append(f"{doublons} en doublon avec des documents existants")
     slog.info(
-        "%s/%s %s %s",
-        progress["inserted"],
+        "%s %s, %s %s (dont %s)",
         total,
-        forme(total, "document"),
-        forme(total, "récupéré"),
+        forme(total, "DOI interrogé"),
+        trouves,
+        forme(trouves, "document trouvé", "documents trouvés"),
+        ", ".join(detail),
     )
     return PhaseMetrics(
         seen=total,

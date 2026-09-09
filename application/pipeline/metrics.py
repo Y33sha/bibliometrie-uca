@@ -9,6 +9,22 @@ from dataclasses import dataclass, field
 
 from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
 
+LIBELLES_EXTRAS: dict[str, str] = {
+    "already_complete": "déjà complets",
+    "conflicts": "conflits",
+    "disappeared": "disparus",
+    "fetched": "récupérés",
+    "matched": "rapprochés",
+    "no_publisher": "sans éditeur",
+    "not_found": "introuvables",
+    "publisher_created": "éditeurs créés",
+    "publisher_matched": "éditeurs rapprochés",
+    "resolved": "résolus",
+    "unmatched": "non rapprochés",
+    "unresolved": "non résolus",
+}
+"""Compteurs sur-mesure, dans les mots du journal. La clé sert de repli."""
+
 
 @dataclass
 class PhaseMetrics:
@@ -103,6 +119,8 @@ class PhaseMetrics:
 
     def as_summary(self) -> str:
         """Une-ligne lisible pour les logs ('10 nouveaux, 5 mis à jour')."""
+        # Les clés d'`extras` nomment les compteurs pour l'observabilité, que l'interface
+        # d'administration et les runs déjà enregistrés lisent : la traduction reste à l'affichage.
         parts: list[str] = []
         if self.new:
             parts.append(f"{self.new} nouveaux")
@@ -114,7 +132,7 @@ class PhaseMetrics:
             parts.append(f"{self.errors} erreurs")
         for k, v in self.extras.items():
             if v:
-                parts.append(f"{v} {k}")
+                parts.append(f"{v} {LIBELLES_EXTRAS.get(k, k)}")
         if self.total and not parts:
             parts.append(f"{self.total} au total")
         return ", ".join(parts) if parts else "rien à faire"
