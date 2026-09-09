@@ -630,9 +630,6 @@ def phase_publications(options: RunOptions) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
     from application.pipeline.publications.phase import run
-    from infrastructure.pipeline.publications.address_pub_count import (
-        PgAddressPubCountQueries,
-    )
     from infrastructure.pipeline.publications.reconciliation import (
         PgPublicationsReconciliationQueries,
     )
@@ -641,7 +638,6 @@ def phase_publications(options: RunOptions) -> PhaseMetrics:
     return run(
         _open_tx,
         PgPublicationsReconciliationQueries(),
-        PgAddressPubCountQueries(),
         log,
         publication_repo_factory=publication_repository,
         rebuild_publications=options.rebuild_publications,
@@ -702,6 +698,7 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
     from application.pipeline.authorships.phase import run
+    from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
     from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
     from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
     from infrastructure.pipeline.authorships.purge_orphan_publications import (
@@ -713,6 +710,7 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
         PgAuthorshipsBuildQueries(),
         PgPurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
+        PgAddressPubCountQueries(),
         log,
         rebuild_authorships=options.rebuild_authorships,
     )

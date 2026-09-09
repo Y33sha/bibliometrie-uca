@@ -395,8 +395,8 @@ def add_identifiers_from_authorships(
             except CannotAttributeConflict as exc:
                 # Valeur déjà prise par une autre personne : on n'écrase pas. Le conflit est
                 # tranché par le balayage frontal de la phase (arbitrage par consensus) au run
-                # suivant — inutile de le collecter ici.
-                logger.warning("%s", exc)
+                # suivant — inutile de le collecter ici, et de le porter au journal.
+                logger.debug("%s", exc)
             except ValidationError:
                 logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
