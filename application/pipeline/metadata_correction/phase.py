@@ -20,9 +20,7 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.pipeline.transaction import OpenTransaction
 
 
-def _step[T](
-    open_tx: OpenTransaction, label: str, step: Callable[[Connection], T], logger: logging.Logger
-) -> T:
+def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:
     """Exécute une sous-étape dans sa propre transaction."""
     with open_tx() as conn:
         return step(conn)
@@ -32,11 +30,11 @@ def run(
     open_tx: OpenTransaction, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> PhaseMetrics:
     """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
-    journal_by_doi = _step(
-        open_tx, "journal_by_doi", lambda conn: run_journal_by_doi(conn, queries, logger), logger
-    )
-    unary = _step(open_tx, "unaire", lambda conn: run_unary(conn, queries, logger), logger)
-    cluster = _step(open_tx, "cluster", lambda conn: run_cluster(conn, queries, logger), logger)
+    journal_by_doi = _step(open_tx, lambda conn: run_journal_by_doi(conn, queries, logger))
+    logger.info("")
+    unary = _step(open_tx, lambda conn: run_unary(conn, queries, logger))
+    logger.info("")
+    cluster = _step(open_tx, lambda conn: run_cluster(conn, queries, logger))
 
     metrics = PhaseMetrics()
     metrics.add(
@@ -55,4 +53,6 @@ def run(
     counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
     counts.sort(key=lambda kc: kc[1], reverse=True)
     metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
+    # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
+    metrics.resume = ""
     return metrics

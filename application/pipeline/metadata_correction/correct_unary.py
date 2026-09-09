@@ -10,10 +10,12 @@ Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (
 """
 
 import logging
+import time
 from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
@@ -130,13 +132,15 @@ def run(
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
     """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_publications`."""
+    logger.info("%sCorrections de métadonnées par document", ETAPE)
+    t0 = time.perf_counter()
     rows = queries.fetch_for_unary_correction(conn)
-    logger.info("metadata_correction (unaire) : %d source_publications examinées", len(rows))
+    logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
     updates = [u for row in rows if (u := compute_update(row)) is not None]
-    logger.info("  %d corrections à appliquer", len(updates))
+    logger.info("%s%s à appliquer", BRANCHE, accord(len(updates), "correction"))
     corrected, rule_counts = tally_corrections(updates)
 
-    total = persist_in_batches(conn, updates, queries.persist_corrections)
-    logger.info("✓ %d source_publications corrigées", total)
+    persist_in_batches(conn, updates, queries.persist_corrections)
+    logger.info("%sTerminé en %.1fs", DERNIERE_BRANCHE, time.perf_counter() - t0)
     return UnaryCorrectionStats(len(rows), corrected, rule_counts)
