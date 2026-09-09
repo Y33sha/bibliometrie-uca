@@ -158,6 +158,26 @@ class TestGetCrossImportDois:
         with pytest.raises(ValueError, match="Source inconnue"):
             get_cross_import_dois(None, "unknown")
 
+    def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
+        """Interroger la cible sur ce DOI rendrait un document déjà présent."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
+        _add_inperim_sp(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
+
+        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+
+    def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
+        """La cible rend le même document pour son DOI principal comme pour ses DOI secondaires."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/preprint")
+        _add_inperim_sp(
+            sa_sync_conn,
+            "hal",
+            "hal-1",
+            doi="10.1234/version-editeur",
+            external_ids='{"related_dois": ["10.1234/preprint"]}',
+        )
+
+        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+
     def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
         pub_id = sa_sync_conn.execute(
