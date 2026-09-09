@@ -15,6 +15,7 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.extract.openalex import (
@@ -48,7 +49,7 @@ def extract_year(
     total_count = as_int(at_path(first_page, "meta").get("count")) or 0
     logger.info("%s documents à récupérer", total_count)
 
-    with progression(total_count, "openalex", logger) as avancement:
+    with progression(total_count, branche_de_source("openalex"), logger) as avancement:
         while True:
             page_num += 1
 

@@ -18,6 +18,7 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
@@ -49,7 +50,7 @@ def extract_union(
     cursor = "*"
     num_found = 0
     total_pages: int | None = None
-    avancement = Progression(None, "hal", logger)
+    avancement = Progression(None, branche_de_source("hal"), logger)
     while True:
         if breaker_tripped():
             logger.warning(

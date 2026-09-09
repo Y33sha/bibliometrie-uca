@@ -32,10 +32,15 @@ except ImportError:  # `tqdm` est une dépendance de développement.
 JALON_INTERVALLE_S = 30.0
 """Délai entre deux jalons de journal, quand aucune barre ne s'affiche."""
 
-FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}"
+LARGEUR_BARRE = 40
+"""Longueur du remplissage, en caractères. Fixe : les barres d'une même phase se comparent d'un coup d'œil, et une barre ne s'étire pas à la largeur de la fenêtre."""
+
+FORMAT_BARRE = (
+    f"{{desc}} {{percentage:3.0f}}% |{{bar:{LARGEUR_BARRE}}}| {{n_fmt}}/{{total_fmt}}  {{elapsed}}"
+)
 """Barre réduite à l'avancement et au temps écoulé."""
 
-FORMAT_BARRE_RETENUS = "{desc} {percentage:3.0f}% |{bar}| {retenus}/{total_fmt}  {elapsed}"
+FORMAT_BARRE_RETENUS = f"{{desc}} {{percentage:3.0f}}% |{{bar:{LARGEUR_BARRE}}}| {{retenus}}/{{total_fmt}}  {{elapsed}}"
 """Barre dont le compteur porte les éléments retenus, quand le remplissage suit les parcourus."""
 
 
@@ -164,7 +169,9 @@ class Progression:
                 total=total,
                 desc=libelle,
                 bar_format=FORMAT_BARRE_RETENUS if compte_retenus else FORMAT_BARRE,
-                leave=True,
+                # `ferme` écrit elle-même la dernière image de la barre : `tqdm` la laisserait en
+                # tête du bloc des barres concurrentes, sur la ligne d'une autre.
+                leave=False,
                 file=_flux_barres,
                 dynamic_ncols=True,
             )
@@ -229,11 +236,19 @@ class Progression:
         )
 
     def ferme(self) -> None:
-        """Retire la barre."""
+        """Retire la barre en laissant sa dernière image au-dessus de celles qui tournent encore.
+
+        La ligne passe par le chemin des lignes de journal, qui efface les barres, écrit, puis les redessine. `tqdm` la poserait, lui, en tête du bloc des barres, sur la ligne d'une autre, et ferait glisser tout le reste d'un cran.
+        """
         self._fini.set()
-        if self._barre is not None:
-            self._barre.close()
-            self._barre = None
+        barre = self._barre
+        if barre is None:
+            return
+        self._barre = None
+        with tqdm.get_lock():
+            derniere_image = str(barre)
+            barre.close()
+            ecrire_hors_barre(derniere_image, _flux_barres or sys.stderr)
 
     def __enter__(self) -> "Progression":
         return self

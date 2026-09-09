@@ -19,14 +19,14 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.libelles import BRANCHE, SUITE_DE_BRANCHE, accord
+from application.pipeline.libelles import (
+    SUITE_DE_BRANCHE,
+    accord,
+    branche_de_source,
+)
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.progression import progression
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from domain.sources.registry import SOURCE_LABELS, source_label
-
-_LARGEUR_LIBELLE = max(len(libelle) for libelle in SOURCE_LABELS.values())
-"""Colonne des noms de source : les barres des sources successives partent au même endroit."""
 
 
 class NormalizeStats(NamedTuple):
@@ -128,8 +128,7 @@ class SourceNormalizer(ABC):
             # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
             incomplets: list[str] = []
 
-            libelle = f"{BRANCHE}{source_label(self.SOURCE):<{_LARGEUR_LIBELLE}}"
-            with progression(total, libelle, slog) as avancement:
+            with progression(total, branche_de_source(self.SOURCE), slog) as avancement:
                 for row in self._iter_rows(self.conn):
                     avancement.avance()
                     try:

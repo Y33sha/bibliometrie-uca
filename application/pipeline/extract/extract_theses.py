@@ -17,6 +17,7 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.extract._common import UpsertOutcome
@@ -55,7 +56,7 @@ def extract_ppn(
     unchanged = 0
     debut = 0
 
-    with progression(total, "theses", logger) as avancement:
+    with progression(total, branche_de_source("theses"), logger) as avancement:
         while debut < total:
             data = adapter.fetch_page(query, debut=debut, nombre=adapter.per_page())
             theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]

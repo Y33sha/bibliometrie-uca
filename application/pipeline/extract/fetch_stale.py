@@ -23,7 +23,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
-from application.pipeline.libelles import accord, forme
+from application.pipeline.libelles import accord, branche_de_source, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
@@ -139,7 +139,7 @@ async def refresh(
             await asyncio.sleep(request_delay)
         return outcome
 
-    with progression(total, adapter.source_key, slog) as avancement:
+    with progression(total, branche_de_source(adapter.source_key), slog) as avancement:
 
         def _write(conn: Connection, row: StaleRow, outcome: FetchOutcome) -> None:
             nonlocal processed
