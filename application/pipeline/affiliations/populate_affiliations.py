@@ -8,6 +8,8 @@ import time
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE
+from application.pipeline.progression import attente
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 
 
@@ -23,14 +25,8 @@ def run_populate(
     2. Sync de `in_perimeter` (BOOL) depuis cette matview.
     """
     t0 = time.perf_counter()
-    logger.info("Périmètre restreint : %s structures", len(perimeter_ids))
-
-    logger.info("Refresh matview source_authorship_structures...")
-    queries.refresh_source_authorship_structures(conn)
-
-    added, removed = queries.sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
-    logger.info("in_perimeter : +%s / -%s", added, removed)
-
-    elapsed = time.perf_counter() - t0
-    logger.info("\nTerminé en %.1fs", elapsed)
+    with attente(f"{DERNIERE_BRANCHE}rattachement en cours", logger) as ligne:
+        queries.refresh_source_authorship_structures(conn)
+        queries.sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
+        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
     # Commit laissé au caller (CLI commit, tests d'intégration restent dans leur transaction rollbackée).

@@ -4,12 +4,12 @@ Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address
 """
 
 import logging
-import time
 from typing import NamedTuple
 
 import ahocorasick
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, forme
 from application.pipeline.progression import progression
 from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
@@ -122,12 +122,7 @@ def run_resolution(
     logger: logging.Logger,
 ) -> ResolutionStats:
     """Recalcul complet idempotent des affiliations (commit par lot, d'où le `conn`)."""
-    logger.info("Chargement des structures et formes...")
-    forms = queries.load_name_forms(conn)
-    logger.info("  %s formes chargées", len(forms))
-    matcher = AddressMatcher(forms)
-    logger.info("  %s structures dans le périmètre", len(perimeter_ids))
-
+    matcher = AddressMatcher(queries.load_name_forms(conn))
     return process_addresses(conn, queries, matcher, perimeter_ids, logger)
 
 
@@ -145,14 +140,13 @@ def process_addresses(
     Chaque tranche est lue et matchée en mémoire, puis mise à jour des liens adresse→structure en base pour qu'ils correspondent au matching, en trois requêtes ensemblistes : on retire les liens automatiques qui ne sont plus détectés ; un lien confirmé par l'admin est conservé mais perd sa marque « automatique » ; les liens trouvés cette fois sont insérés ou mis à jour. Seul ce qui change est écrit ; mémoire et allers-retours SQL bornés par `chunk_size`.
     """
 
-    t_start = time.perf_counter()
     processed = 0
     in_perimeter_count = 0
     affil_count = 0
     removed_count = 0
     after_id = 0
 
-    with progression(queries.count_addresses(conn), "adresses", logger) as avancement:
+    with progression(queries.count_addresses(conn), BRANCHE.rstrip(), logger) as avancement:
         while True:
             rows = queries.fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
             if not rows:
@@ -180,16 +174,13 @@ def process_addresses(
             processed += len(rows)
             avancement.avance(len(rows))
 
-    elapsed = time.perf_counter() - t_start
     if processed > 0:
-        logger.info("\n=== Terminé en %.1fs ===", elapsed)
-        logger.info("  Adresses traitées    : %s", processed)
         logger.info(
-            "  in_perimeter         : %s (%.1f%%)",
+            "%sstructures du périmètre identifiées dans %s %s (%.1f%%)",
+            DERNIERE_BRANCHE,
             in_perimeter_count,
+            forme(in_perimeter_count, "adresse"),
             100 * in_perimeter_count / processed,
         )
-        logger.info("  Affiliations créées  : %s", affil_count)
-        logger.info("  Obsolètes supprimés  : %s", removed_count)
 
     return ResolutionStats(processed, in_perimeter_count, affil_count)

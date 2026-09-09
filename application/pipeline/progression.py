@@ -248,6 +248,8 @@ class Attente:
 
     def __init__(self, libelle: str, logger: Journal | None) -> None:
         self._libelle = libelle
+        self._logger = logger
+        self._conclusion = ""
         self._fini = threading.Event()
         self._flux = _flux_barres if _terminal_interactif() else None
         if self._flux is None:
@@ -271,21 +273,31 @@ class Attente:
             etape = (etape + 1) % len(ETAPES_ATTENTE)
             self._ecrire(ETAPES_ATTENTE[etape])
 
+    def conclut(self, texte: str) -> None:
+        """Donne à la ligne le texte qu'elle gardera une fois le travail fini."""
+        self._conclusion = texte
+
     def ferme(self) -> None:
-        """Arrête les points en laissant le libellé sur sa ligne."""
+        """Arrête les points en laissant sur la ligne le libellé, ou la conclusion posée."""
         self._fini.set()
         if self._flux is not None:
+            self._libelle = self._conclusion or self._libelle
             self._ecrire("   ")
             self._flux.write("\n")
             self._flux.flush()
             self._flux = None
+        elif self._conclusion and self._logger is not None:
+            self._logger.info("%s", self._conclusion)
 
 
 @contextmanager
-def attente(libelle: str, logger: Journal | None) -> Iterator[None]:
-    """Signale pendant tout le bloc qu'un travail se poursuit, sans en mesurer l'avancement."""
+def attente(libelle: str, logger: Journal | None) -> Iterator[Attente]:
+    """Signale pendant tout le bloc qu'un travail se poursuit, sans en mesurer l'avancement.
+
+    `conclut()` donne à la ligne le texte qu'elle gardera une fois le bloc terminé.
+    """
     a = Attente(libelle, logger)
     try:
-        yield
+        yield a
     finally:
         a.ferme()
