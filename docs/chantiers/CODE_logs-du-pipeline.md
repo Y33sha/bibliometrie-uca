@@ -19,7 +19,7 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 ## Décisions
 
 - **Sans terminal, le code écrit des lignes de journal espacées**, sous condition de `sys.stdout.isatty()`. Une barre écrite sans terminal encombrerait la sortie capturée de retours chariot.
-- **L'affichage passe par `tqdm`** : 1 paquet, 356 Ko, contre 4 paquets et 7,1 Mo pour `rich`. Les barres concurrentes demandent en contrepartie de fixer leur position et de poser un verrou entre threads.
+- **L'affichage passe par `tqdm`** : 1 paquet, 356 Ko, contre 4 paquets et 7,1 Mo pour `rich`.
 - **`tqdm` est une dépendance de développement**, importée sous `try` : son absence conduit au même repli que l'absence de terminal, et l'image de production n'embarque rien. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
 - **Les jalons d'avancement partent au journal en mode non interactif.** Un run long en conteneur se suit alors dans les logs.
 - **Les jalons suivent un intervalle de temps**, 30 secondes, et portent le débit. Un pas exprimé en éléments traités espace ses lignes quand le traitement ralentit, au moment où l'avancement intéresse le plus.
