@@ -8,6 +8,11 @@ def today() -> date:
     return datetime.now(UTC).date()
 
 
+def date_to_french(d: date) -> str:
+    """Convertit une date en `"JJ/MM/AAAA"`, sa forme lisible en français."""
+    return d.strftime("%d/%m/%Y")
+
+
 def french_date_to_iso(s: str | None) -> str | None:
     """Convertit `"JJ/MM/AAAA"` en `"YYYY-MM-DD"`.
 

@@ -38,7 +38,7 @@ def extract_union(
 ) -> PhaseMetrics:
     """Extrait l'union des collections configurées pour un périmètre temporel.
 
-    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis paginate en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois. `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all`. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis paginate en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois. `logger` est le logger scopé construit par `extract_all` : `[hal · <année>]` par année, `[hal]` sur une passe unique. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
     En `dry_run`, une seule page est tirée pour lire `numFound` (volume du périmètre) sans rien écrire.
     """
@@ -120,24 +120,17 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
             )
         return config
 
-    def setup_logging(self, args: argparse.Namespace, config: HalExtractConfig) -> None:
-        if args.since:
-            self.logger.info("Mode incrémental : documents soumis depuis %s", args.since)
-
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Extraction de l'union des collections, périmètre temporel par périmètre.
 
-        En mode `--since`, un seul périmètre (les dépôts depuis la date). Sinon une
-        passe `cursorMark` par année : progression visible année par année et reprise
-        ciblée via `--year` sans tout recommencer (chaque année est un sous-ensemble
-        disjoint — un document n'a qu'une `producedDateY_i`).
+        En mode incrémental, un seul périmètre : les dépôts depuis la date. Sinon une passe `cursorMark` par année : progression visible année par année et reprise ciblée via `--year` sans tout recommencer (chaque année est un sous-ensemble disjoint — un document n'a qu'une `producedDateY_i`).
         """
         if args.since:
             return extract_union(
                 self._adapter,
                 config,
                 self.conn,
-                scoped_logger(self.logger, self.SOURCE, f"depuis {args.since}"),
+                scoped_logger(self.logger, self.SOURCE),
                 since=args.since,
                 dry_run=args.dry_run,
                 breaker_tripped=self._breaker_tripped,
