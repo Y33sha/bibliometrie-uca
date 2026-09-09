@@ -29,6 +29,23 @@ JALON_INTERVALLE_S = 30.0
 FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
 
+FORMAT_BARRE_RETENUS = "{desc} {percentage:3.0f}% |{bar}| {retenus}/{total_fmt}  {elapsed}"
+"""Barre dont le compteur porte les éléments retenus, quand le remplissage suit les parcourus."""
+
+
+if tqdm is not None:
+
+    class _BarreRetenus(tqdm):  # type: ignore[misc]
+        """Barre offrant `{retenus}` à son format, à côté des champs que `tqdm` fournit."""
+
+        retenus = 0
+
+        @property
+        def format_dict(self) -> dict[str, object]:
+            return {**super().format_dict, "retenus": self.retenus}
+else:
+    _BarreRetenus = None  # type: ignore[assignment,misc]
+
 RAFRAICHISSEMENT_S = 0.1
 """Délai entre deux redessins de la barre à l'arrêt, pendant qu'une source répond."""
 
@@ -94,20 +111,24 @@ class Progression:
         logger: Journal | None,
         *,
         intervalle_s: float = JALON_INTERVALLE_S,
+        compte_retenus: bool = False,
     ) -> None:
         self._total = total
         self._libelle = libelle
         self._logger = logger
         self._intervalle_s = intervalle_s
         self._fait = 0
+        self._retenus = 0
+        self._compte_retenus = compte_retenus
         self._debut = time.perf_counter()
         self._fini = threading.Event()
         self._dernier_jalon = self._debut
+        classe = _BarreRetenus if compte_retenus else tqdm
         self._barre = (
-            tqdm(
+            classe(
                 total=total,
                 desc=libelle,
-                bar_format=FORMAT_BARRE,
+                bar_format=FORMAT_BARRE_RETENUS if compte_retenus else FORMAT_BARRE,
                 leave=True,
                 file=_flux_barres,
                 dynamic_ncols=True,
@@ -117,6 +138,12 @@ class Progression:
         )
         if self._barre is not None:
             threading.Thread(target=self._battre, daemon=True).start()
+
+    def retient(self, n: int = 1) -> None:
+        """Compte `n` éléments retenus de plus — trouvés, récupérés, corrigés selon la phase."""
+        self._retenus += n
+        if self._barre is not None and self._compte_retenus:
+            self._barre.retenus = self._retenus
 
     def _battre(self) -> None:
         """Redessine la barre tant qu'elle vit : le temps écoulé avance même à l'arrêt.
@@ -192,9 +219,15 @@ def progression(
     logger: Journal | None,
     *,
     intervalle_s: float = JALON_INTERVALLE_S,
+    compte_retenus: bool = False,
 ) -> Iterator[Progression]:
-    """Ouvre une progression et la referme à la sortie du bloc."""
-    p = Progression(total, libelle, logger, intervalle_s=intervalle_s)
+    """Ouvre une progression et la referme à la sortie du bloc.
+
+    `compte_retenus` fait porter au compteur les éléments retenus, posés par `retient()`, quand la barre elle-même suit les éléments parcourus.
+    """
+    p = Progression(
+        total, libelle, logger, intervalle_s=intervalle_s, compte_retenus=compte_retenus
+    )
     try:
         yield p
     finally:

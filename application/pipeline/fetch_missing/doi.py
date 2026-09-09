@@ -19,7 +19,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import accord, forme
+from application.pipeline.libelles import BRANCHE
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
@@ -29,6 +29,7 @@ from application.ports.pipeline.fetch_missing.doi import (
     CrossImportDoisReader,
     is_not_found_marker,
 )
+from domain.sources.registry import source_label
 from domain.types import JsonValue
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
@@ -63,11 +64,6 @@ async def run_async(
     slog = scoped_logger(log, adapter.source_key)
 
     dois = cross_import_dois_reader(conn, adapter.source_key)
-    slog.info(
-        "%s %s dans les autres sources",
-        accord(len(dois), "DOI", "DOI"),
-        forme(len(dois), "trouvé", "trouvés"),
-    )
 
     if limit and len(dois) > limit:
         slog.info(
@@ -100,7 +96,8 @@ async def run_async(
             await asyncio.sleep(request_delay)
         return records
 
-    with progression(total, adapter.source_key, slog) as avancement:
+    libelle = f"{BRANCHE}{source_label(adapter.source_key)}"
+    with progression(total, libelle, slog, compte_retenus=True) as avancement:
 
         def _write(
             conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]
@@ -112,8 +109,8 @@ async def run_async(
 
             # Un lot = une transaction (le pool commite après ce write). Sur erreur,
             # rollback (désempoisonne la connexion), le lot repartira au prochain run.
+            batch_inserted = 0
             try:
-                batch_inserted = 0
                 for record in records:
                     if adapter.insert(conn, record):
                         batch_inserted += 1
@@ -126,6 +123,7 @@ async def run_async(
 
             progress["processed"] += len(batch)
             avancement.avance(len(batch))
+            avancement.retient(batch_inserted)
 
         await run_fetch_pool(
             items,
@@ -144,20 +142,6 @@ async def run_async(
             total,
         )
 
-    trouves = progress["fetched"]
-    nouveaux = progress["inserted"]
-    doublons = trouves - nouveaux
-    detail = [f"{nouveaux} {forme(nouveaux, 'nouveau', 'nouveaux')}"]
-    if doublons:
-        detail.append(f"{doublons} en doublon avec des documents existants")
-    slog.info(
-        "%s %s, %s %s (dont %s)",
-        total,
-        forme(total, "DOI interrogé"),
-        trouves,
-        forme(trouves, "document trouvé", "documents trouvés"),
-        ", ".join(detail),
-    )
     return PhaseMetrics(
         seen=total,
         new=progress["inserted"],

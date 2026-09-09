@@ -142,6 +142,42 @@ class TestEcritureHorsBarre:
         assert module.EFFACE_FIN_DE_LIGNE not in flux.getvalue()
 
 
+class TestCompteurDeRetenus:
+    """Le compteur porte les éléments retenus ; le remplissage suit les éléments parcourus."""
+
+    def test_le_compteur_part_de_zero(self, avec_terminal):
+        with module.progression(25, "HAL", None, compte_retenus=True) as p:
+            assert p._barre.retenus == 0
+
+    def test_le_compteur_suit_les_retenus_et_la_barre_les_parcourus(self, avec_terminal):
+        with module.progression(25, "HAL", None, compte_retenus=True) as p:
+            for i in range(25):
+                p.avance()
+                if i < 14:
+                    p.retient()
+            assert p._barre.retenus == 14
+            assert p._barre.n == 25
+
+    def test_le_format_montre_les_retenus_sur_le_total(self, avec_terminal):
+        with module.progression(25, "HAL", None, compte_retenus=True) as p:
+            p.avance(25)
+            p.retient(14)
+            rendu = p._barre.format_meter(**p._barre.format_dict)
+        assert "14/25" in rendu
+
+    def test_sans_compteur_la_barre_montre_les_parcourus(self, avec_terminal):
+        with module.progression(25, "HAL", None) as p:
+            p.avance(25)
+            rendu = p._barre.format_meter(**p._barre.format_dict)
+        assert "25/25" in rendu
+
+    def test_le_compteur_tient_sans_barre(self, sans_terminal):
+        """Une sortie capturée compte les retenus sans rien afficher."""
+        with module.progression(25, "HAL", None, compte_retenus=True) as p:
+            p.retient(3)
+            assert p._retenus == 3
+
+
 class TestAttente:
     """Un travail dont l'avancement ne se mesure pas : maintenance des tables, VACUUM."""
 
