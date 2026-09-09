@@ -19,6 +19,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
@@ -57,9 +58,9 @@ def extract_union(
     page_size = adapter.per_page()
     logger.info("interrogation HAL…")
     cursor = "*"
-    page = 0
     num_found = 0
     total_pages: int | None = None
+    avancement = Progression(None, "hal", logger)
     while True:
         if breaker_tripped():
             logger.warning(
@@ -75,6 +76,7 @@ def extract_union(
             num_found = as_int(resp.get("numFound")) or 0
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
             logger.info("%s documents → ~%s pages de %s", num_found, total_pages, page_size)
+            avancement.fixer_total(num_found)
 
         for doc in docs:
             hal_id = adapter.extract_id(doc)
@@ -90,22 +92,7 @@ def extract_union(
                 metrics.add(unchanged=1, total=1)
         conn.commit()
 
-        # Un log par page pour un signe de vie régulier (pages lourdes : ~rows docs
-        # TEI + autant d'upserts unitaires). La page de confirmation vide finale
-        # n'est pas loguée.
-        if docs:
-            page += 1
-            logger.info(
-                "page %s/%s : %s docs — %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
-                page,
-                total_pages,
-                len(docs),
-                metrics.new,
-                metrics.updated,
-                metrics.unchanged,
-                metrics.total,
-                num_found,
-            )
+        avancement.avance(len(docs))
 
         # Fin de pagination cursorMark : Solr renvoie le même marqueur que celui
         # envoyé une fois l'union épuisée. Le test `not docs` borne aussi la boucle
@@ -115,6 +102,7 @@ def extract_union(
             break
         cursor = next_cursor
 
+    avancement.ferme()
     return metrics
 
 

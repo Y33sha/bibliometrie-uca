@@ -21,12 +21,14 @@ from sqlalchemy import Connection
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_missing.doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
     is_not_found_marker,
 )
+from domain.types import JsonValue
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
 
@@ -91,50 +93,42 @@ async def run_async(
             await asyncio.sleep(request_delay)
         return records
 
-    def _write(
-        conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]
-    ) -> None:
-        batch_idx, batch = item
-        real = [r for r in records if not is_not_found_marker(r)]
-        progress["fetched"] += len(real)
-        progress["not_found"] += len(records) - len(real)
+    with progression(total, adapter.source_key, slog) as avancement:
 
-        # Un lot = une transaction (le pool commite après ce write). Sur erreur,
-        # rollback (désempoisonne la connexion), le lot repartira au prochain run.
-        try:
-            batch_inserted = 0
-            for record in records:
-                if adapter.insert(conn, record):
-                    batch_inserted += 1
-            progress["inserted"] += batch_inserted
-        except Exception as e:
-            conn.rollback()
-            slog.warning(
-                "lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e
-            )
+        def _write(
+            conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]
+        ) -> None:
+            batch_idx, batch = item
+            real = [r for r in records if not is_not_found_marker(r)]
+            progress["fetched"] += len(real)
+            progress["not_found"] += len(records) - len(real)
 
-        progress["processed"] += len(batch)
-        if progress["processed"] % 100 == 0 or progress["processed"] >= total:
-            duplicates = progress["fetched"] - progress["inserted"]
-            slog.info(
-                "%d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
-                progress["processed"],
-                total,
-                progress["fetched"],
-                progress["inserted"],
-                duplicates,
-                progress["not_found"],
-            )
+            # Un lot = une transaction (le pool commite après ce write). Sur erreur,
+            # rollback (désempoisonne la connexion), le lot repartira au prochain run.
+            try:
+                batch_inserted = 0
+                for record in records:
+                    if adapter.insert(conn, record):
+                        batch_inserted += 1
+                progress["inserted"] += batch_inserted
+            except Exception as e:
+                conn.rollback()
+                slog.warning(
+                    "lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e
+                )
 
-    await run_fetch_pool(
-        items,
-        conn,
-        max_concurrent=adapter.max_concurrent,
-        commit_every=1,
-        fetch=_fetch,
-        write=_write,
-        should_continue=lambda: breaker is None or not breaker.tripped,
-    )
+            progress["processed"] += len(batch)
+            avancement.avance(len(batch))
+
+        await run_fetch_pool(
+            items,
+            conn,
+            max_concurrent=adapter.max_concurrent,
+            commit_every=1,
+            fetch=_fetch,
+            write=_write,
+            should_continue=lambda: breaker is None or not breaker.tripped,
+        )
 
     if breaker is not None and breaker.tripped:
         slog.warning(
@@ -158,6 +152,3 @@ async def run_async(
         new=progress["inserted"],
         extras={"fetched": progress["fetched"], "not_found": progress["not_found"]},
     )
-
-
-from domain.types import JsonValue
