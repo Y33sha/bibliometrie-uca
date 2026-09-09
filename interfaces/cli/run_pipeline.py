@@ -55,6 +55,7 @@ import logging
 import signal
 import sys
 import tempfile
+import textwrap
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1427,6 +1428,33 @@ def _print_dry_run(phases_to_run: list[tuple[str, Phase]]) -> None:
     print("\n(dry-run : rien n'a été exécuté)")
 
 
+LARGEUR_TITRE_PHASE = 48
+"""Largeur du texte dans le cadre d'une phase, la même pour toutes."""
+
+
+def _titre_de_phase(name: str) -> list[str]:
+    """Lignes ouvrant une phase : son nom, et ce qu'elle produit.
+
+    Devant un terminal, un cadre de largeur constante les détache du flux, un libellé long tenant sur deux lignes. Une sortie capturée reçoit des filets, que la largeur de la fenêtre laisse indifférents.
+    """
+    # `phase_order` donne un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
+    libelle = PHASE_LIBELLES.get(name)
+
+    if not sys.stdout.isatty():
+        lignes = [f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])]
+        return ["─" * 40, *lignes, "─" * 40]
+
+    lignes = textwrap.wrap(f"{PHASE_MARKER}{name}", LARGEUR_TITRE_PHASE)
+    if libelle:
+        lignes += textwrap.wrap(libelle, LARGEUR_TITRE_PHASE)
+    largeur = LARGEUR_TITRE_PHASE + 4
+    return [
+        f"╔{'═' * largeur}╗",
+        *[f"║  {ligne.ljust(largeur - 2)}║" for ligne in lignes],
+        f"╚{'═' * largeur}╝",
+    ]
+
+
 def _run_one_phase(
     name: str,
     fn: Phase,
@@ -1445,12 +1473,8 @@ def _run_one_phase(
     # que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
-        log.info("─" * 40)
-        log.info("%s%s", PHASE_MARKER, name)
-        # `phase_order` garantit un libellé à chaque phase du pipeline ; les tests en nomment d'autres.
-        if libelle := PHASE_LIBELLES.get(name):
-            log.info("%s", libelle)
-        log.info("─" * 40)
+        for ligne in _titre_de_phase(name):
+            log.info("%s", ligne)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
         try:
