@@ -164,13 +164,29 @@ def _make_formatter() -> logging.Formatter:
     return JsonFormatter()
 
 
+class _FormatConsole(logging.Formatter):
+    """Message seul, précédé du niveau à partir de l'avertissement.
+
+    Le titre ouvrant chaque phase situe les lignes qui suivent, et le niveau de l'information vaut pour la quasi-totalité d'entre elles.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("%(message)s")
+
+    def format(self, record: logging.LogRecord) -> str:
+        ligne = super().format(record)
+        if record.levelno > logging.INFO:
+            return f"[{record.levelname}] {ligne}"
+        return ligne
+
+
 def _make_console_formatter() -> logging.Formatter:
     """Retourne le formatter des lignes de console.
 
-    Devant un terminal, le format texte omet l'horodatage. Une sortie redirigée ou capturée le garde.
+    Devant un terminal, le format texte se réduit au message. Une sortie redirigée ou capturée porte l'horodatage, le niveau et la phase.
     """
     if os.environ.get("LOG_FORMAT", "json").lower() == "text" and sys.stdout.isatty():
-        return logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
+        return _FormatConsole()
     return _make_formatter()
 
 
