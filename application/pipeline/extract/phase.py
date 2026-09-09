@@ -30,7 +30,7 @@ from application.pipeline.signals import (
 )
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.parallel import RunParallel
-from domain.dates import today
+from domain.dates import date_to_french, today
 
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
 GetLastExtractDate = Callable[[str], date | None]
@@ -110,14 +110,20 @@ def _run_since_last(
     metrics: PhaseMetrics,
     logger: logging.Logger,
 ) -> dict[str, dict[str, float]]:
-    """Mode quotidien : HAL depuis la dernière extraction HAL réussie (fallback -30 j)."""
+    """Mode quotidien : HAL depuis la dernière extraction HAL réussie, ou les 30 derniers jours."""
     last = get_last_extract_date("hal")
     if last is not None:
-        since = last.isoformat()
-        logger.info("Mode quotidien : HAL depuis %s (dernière extraction HAL)", since)
+        depuis = last
+        origine = "dernière extraction HAL"
     else:
-        since = (today() - timedelta(days=30)).isoformat()
-        logger.info("Mode quotidien : HAL depuis %s (fallback, aucune extraction HAL)", since)
+        depuis = today() - timedelta(days=30)
+        origine = "aucune extraction HAL, repli sur 30 jours"
+    since = depuis.isoformat()
+    logger.info(
+        "Mode incrémental : documents déposés sur HAL depuis le %s (%s)",
+        date_to_french(depuis),
+        origine,
+    )
 
     if "hal" not in effective:
         return {}

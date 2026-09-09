@@ -1,4 +1,14 @@
-from domain.dates import french_date_to_iso
+from datetime import date
+
+from domain.dates import date_to_french, french_date_to_iso
+
+
+class TestDateToFrench:
+    def test_standard(self):
+        assert date_to_french(date(2023, 3, 15)) == "15/03/2023"
+
+    def test_jour_et_mois_sur_deux_chiffres(self):
+        assert date_to_french(date(2026, 1, 5)) == "05/01/2026"
 
 
 class TestFrenchDateToIso:
