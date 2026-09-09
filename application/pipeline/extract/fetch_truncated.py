@@ -10,13 +10,13 @@ Implémentation async : pool de `adapter.max_concurrent` workers (`run_fetch_poo
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.extract.fetch_truncated import (
@@ -37,22 +37,16 @@ async def refetch(
 
     `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
-    log.info("▶ fetch_truncated")
-    t0 = time.perf_counter()
     adapter.configure(conn)
 
     truncated = adapter.find_truncated(conn)
     total = len(truncated)
-    log.info("%s works marqués tronqués (à vérifier/compléter)", total)
 
     metrics = PhaseMetrics(seen=total)
     if not truncated:
-        log.info(
-            "✓ fetch_truncated terminé en %.1fs — %s",
-            time.perf_counter() - t0,
-            metrics.as_summary(),
-        )
         return metrics
+
+    log.info("%s", accord(total, "document tronqué", "documents tronqués"))
 
     async def _fetch(
         client: httpx2.AsyncClient, ref: TruncatedWork
@@ -85,9 +79,6 @@ async def refetch(
             write=_write,
         )
 
-    log.info(
-        "✓ fetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
-    )
     return metrics
 
 
