@@ -187,7 +187,11 @@ class TestExecutePhases:
         import infrastructure.observability.phase_executions as observabilite
         import infrastructure.pipeline.perimeter as perimetre
 
-        monkeypatch.setattr(observabilite, "start_run", lambda **kw: recorder)
+        def _start_run(**kw):
+            recorder.demarrage = kw
+            return recorder
+
+        monkeypatch.setattr(observabilite, "start_run", _start_run)
         monkeypatch.setattr(perimetre, "refresh_perimeter_structures", lambda conn: None)
 
         from contextlib import contextmanager
@@ -215,18 +219,16 @@ class TestExecutePhases:
         assert [r["phase"] for r in run_prepare.records] == ["une", "deux"]
         assert run_prepare.closed
 
-    def test_wos_ecarte_des_sources_annoncees(self, run_prepare, caplog):
+    def test_wos_ecartee_des_sources_consignees(self, run_prepare):
         """WoS n'est interrogée que sur demande : son crédit d'appels est limité."""
-        with caplog.at_level(logging.INFO):
-            run_pipeline._execute_phases(_args(sources="hal,wos"), [])
+        run_pipeline._execute_phases(_args(sources="hal,wos"), [])
 
-        assert "Sources : hal" in caplog.text
+        assert run_prepare.demarrage["sources"] == ["hal"]
 
-    def test_wos_annoncee_quand_elle_est_demandee(self, run_prepare, caplog):
-        with caplog.at_level(logging.INFO):
-            run_pipeline._execute_phases(_args(sources="hal,wos", include_wos=True), [])
+    def test_wos_consignee_quand_elle_est_demandee(self, run_prepare):
+        run_pipeline._execute_phases(_args(sources="hal,wos", include_wos=True), [])
 
-        assert "Sources : hal, wos" in caplog.text
+        assert run_prepare.demarrage["sources"] == ["hal", "wos"]
 
 
 class TestMain:
