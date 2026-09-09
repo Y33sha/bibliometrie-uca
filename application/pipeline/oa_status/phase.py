@@ -8,12 +8,12 @@ Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` s
 
 import asyncio
 import logging
-import time
 from collections.abc import Awaitable, Callable
 
 import httpx2
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.oa_status import OaStatusQueries
@@ -42,7 +42,6 @@ async def run(
 
     `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
     """
-    t0 = time.perf_counter()
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
         conn, limit=max_per_run, staleness_days=STALENESS_DAYS
@@ -50,13 +49,6 @@ async def run(
     total = len(pubs)
     stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
     before_dist = queries.count_publications_by_oa_status(conn)
-    logger.info(
-        "%s publications à (re)vérifier sur Unpaywall (max %s, staleness %sj) — %s stale au total",
-        total,
-        max_per_run if max_per_run is not None else "illimité",
-        STALENESS_DAYS,
-        stale_total,
-    )
 
     progress = {"updated": 0, "skipped": 0, "not_found": 0}
 
@@ -92,15 +84,32 @@ async def run(
                 for s in statuses
             ]
         }
-        logger.info(
-            "✓ enrich_oa_status terminé en %.1fs — %s",
-            time.perf_counter() - t0,
-            metrics.as_summary(),
-        )
+        # Chaque ligne de la sous-étape porte son décompte : une ligne de clôture les répéterait.
+        metrics.resume = ""
         return metrics
 
+    etape(logger, "Vérification du statut open access sur Unpaywall")
     if not total:
+        logger.info("%sRien à faire", DERNIERE_BRANCHE)
         return _result()
+
+    logger.info(
+        "%s%s %s ou %s depuis plus de %s",
+        BRANCHE,
+        accord(stale_total, "publication"),
+        forme(stale_total, "jamais vérifiée"),
+        forme(stale_total, "vérifiée"),
+        accord(STALENESS_DAYS, "jour"),
+    )
+    if max_per_run and max_per_run < stale_total:
+        reportees = stale_total - total
+        logger.info(
+            "%splafond de %s par run ⇒ %s %s au prochain",
+            BRANCHE,
+            max_per_run,
+            reportees,
+            forme(reportees, "reportée"),
+        )
 
     sem = asyncio.Semaphore(max_concurrent)
     # La `Connection` SA sync n'est pas thread-safe ; les writes concurrents d'un paquet passent par `to_thread` sous ce lock (le commit, lui, se fait à la frontière de paquet, hors concurrence).
@@ -134,7 +143,7 @@ async def run(
                     await asyncio.to_thread(queries.mark_unpaywall_checked, conn, pub_id)
 
         # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
-        with progression(total, "statuts OA", logger) as avancement:
+        with progression(total, BRANCHE.rstrip(), logger) as avancement:
             for start in range(0, total, BATCH_SIZE):
                 chunk = pubs[start : start + BATCH_SIZE]
                 await asyncio.gather(*(process_one(*pub) for pub in chunk))
@@ -142,10 +151,14 @@ async def run(
                 avancement.avance(len(chunk))
 
     logger.info(
-        "Terminé : %s mis à jour, %s inchangés, %s non trouvés sur Unpaywall",
+        "%s%s %s, %s %s, %s non %s",
+        DERNIERE_BRANCHE,
         progress["updated"],
+        forme(progress["updated"], "mise à jour", "mises à jour"),
         progress["skipped"],
+        forme(progress["skipped"], "inchangée"),
         progress["not_found"],
+        forme(progress["not_found"], "trouvée"),
     )
 
     return _result()
