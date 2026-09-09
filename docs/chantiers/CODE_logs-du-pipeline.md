@@ -6,15 +6,11 @@ Le pipeline écrit 351 lignes de journal réparties sur ses phases. Elles serven
 
 La sortie part sur la console, et sur un fichier quand `LOG_TO_FILE` l'active. Le format est JSON par défaut, texte quand `LOG_FORMAT=text` (`infrastructure/observability/log.py`). En production, le pipeline tourne en conteneur détaché, sans terminal.
 
-Quatre défauts se cumulent.
-
 Le vocabulaire suppose le schéma connu. Les messages nomment les tables par leur identifiant technique — `authorships`, `source_publications`, `staging`, `halIds`. Une personne qui découvre l'application ne sait pas ce que chaque phase produit.
 
 Les conventions divergent. Certaines sous-étapes portent un numéro, d'autres non. Un même objet se nomme de plusieurs façons selon le module.
 
 Le volume vient de lignes répétées. Une phase qui traite par lots écrit une ligne par lot.
-
-Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit une ligne par document dépassant un demi-seconde, avec le détail par étape.
 
 ## Décisions
 
@@ -59,7 +55,7 @@ Barre unique :
 
 Puis :
 
-- [ ] Retirer le détail par document lent de `application/pipeline/timings.py`. La durée totale et le nombre de documents traités restent au bilan.
+- [x] Retirer le détail par document lent. La durée par source et le nombre de documents traités restent au bilan de la phase.
 
 ### 3. Vocabulaire
 

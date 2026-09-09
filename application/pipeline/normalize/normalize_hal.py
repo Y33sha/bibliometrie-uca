@@ -17,7 +17,6 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
@@ -531,7 +530,6 @@ def process_work(
     hal_id = staging_row.source_id
     doc = staging_row.raw_data
 
-    t = StepTimer()
     title = get_title(doc)
     pub_year = as_int(doc.get("producedDateY_i"))
     if not has_minimal_publication_metadata(title, pub_year):
@@ -554,8 +552,6 @@ def process_work(
         upsert_publisher(publisher_name, publisher_repo=publisher_repo) if publisher_name else None
     )
     journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-    t.mark("publisher+journal")
-
     pub_meta = extract_pub_metadata(doc, journal_id)
 
     source_publication_id = insert_hal_document(
@@ -566,13 +562,8 @@ def process_work(
         hal_id,
         pub_meta,
     )
-    t.mark("hal_doc")
-
     process_authorships(conn, authorship_queries, doc, source_publication_id)
-    t.mark("authors")
-
     staging_queries.mark_done(conn, staging_id)
-    t.log_if_slow(hal_id, logger)
 
     return True
 

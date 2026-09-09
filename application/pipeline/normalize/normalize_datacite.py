@@ -21,7 +21,6 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
-from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
@@ -255,10 +254,8 @@ def process_work(
         return False
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
-    t = StepTimer()
     publisher_id = upsert_publisher(attributes, publisher_repo=publisher_repo)
     journal_id = upsert_journal(attributes, publisher_id, journal_repo=journal_repo)
-    t.mark("publisher+journal")
 
     container_title, _ = get_container(attributes)
     related_dois = extract_related_dois(attributes, doi)
@@ -288,13 +285,8 @@ def process_work(
             meta=extract_datacite_meta(attributes),
         ),
     )
-    t.mark("datacite_doc")
-
     process_authorships(conn, authorship_queries, attributes, source_publication_id)
-    t.mark("authors")
-
     staging_queries.mark_done(conn, staging_id)
-    t.log_if_slow(doi, logger)
     return True
 
 

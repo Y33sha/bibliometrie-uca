@@ -15,7 +15,6 @@ from sqlalchemy import Connection
 from application.pipeline.normalize._authorships_batch import AddressRecord, write_addresses
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -239,19 +238,13 @@ def process_work(
         staging_queries.mark_done(conn, staging_id)
         return False
 
-    t = StepTimer()
     pub_meta = extract_pub_metadata(these)
 
     source_publication_id = insert_source_document(
         conn, queries, these, staging_id, theses_id, pub_meta
     )
-    t.mark("theses_doc")
-
     process_authorships(conn, these, source_publication_id, batch_queries=batch_queries)
-    t.mark("authorships")
-
     staging_queries.mark_done(conn, staging_id)
-    t.log_if_slow(theses_id, logger)
 
     return True
 
