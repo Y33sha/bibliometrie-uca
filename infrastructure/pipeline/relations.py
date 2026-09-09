@@ -9,6 +9,7 @@ from application.ports.pipeline.relations import (
     DeclaredRelationSource,
     PublicationRelationsQueries,
     RelationEdge,
+    RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
 )
@@ -16,6 +17,7 @@ from domain.publications.doc_types import DocType
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
 from domain.sources.registry import Source
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.scalars import scalar_int
 
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
@@ -153,10 +155,56 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
         rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
         return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
-    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+    # Colonnes qui identifient une arête, celles de la contrainte d'unicité : deux arêtes qui s'y
+    # accordent sont le même lien. Le diff avant/après les compare.
+    _IDENTITE = "from_publication_id, relation_type, target_publication_id, target_doi"
+
+    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
+        # La table temporaire vit le temps de l'appel : créée avant la purge, elle sert le diff puis
+        # disparaît. Un échec en cours de route annule sa création avec le reste de la transaction.
+        conn.execute(
+            text(
+                f"CREATE TEMP TABLE relations_avant AS "
+                f"SELECT {self._IDENTITE} FROM publication_relations"
+            )
+        )
         conn.execute(text("DELETE FROM publication_relations"))
-        if not edges:
-            return 0
+        written = 0 if not edges else self._insert_edges(conn, edges)
+        rebuild = RelationsRebuild(written, self._count_added(conn), self._count_removed(conn))
+        conn.execute(text("DROP TABLE relations_avant"))
+        return rebuild
+
+    def _count_added(self, conn: Connection) -> list[tuple[str, int]]:
+        """Arêtes présentes après la reconstruction et absentes avant, par type."""
+        rows = conn.execute(
+            text(f"""
+                SELECT relation_type::text AS rel_type, count(*) AS cnt
+                FROM (
+                    SELECT {self._IDENTITE} FROM publication_relations
+                    EXCEPT
+                    SELECT {self._IDENTITE} FROM relations_avant
+                ) ajoutees
+                GROUP BY relation_type
+                ORDER BY cnt DESC
+            """)
+        ).all()
+        return [(r.rel_type, r.cnt) for r in rows]
+
+    def _count_removed(self, conn: Connection) -> int:
+        """Arêtes présentes avant la reconstruction et absentes après."""
+        return scalar_int(
+            conn.execute(
+                text(f"""
+                    SELECT count(*) FROM (
+                        SELECT {self._IDENTITE} FROM relations_avant
+                        EXCEPT
+                        SELECT {self._IDENTITE} FROM publication_relations
+                    ) disparues
+                """)
+            )
+        )
+
+    def _insert_edges(self, conn: Connection, edges: list[RelationEdge]) -> int:
         payload = [
             {
                 "f": e.from_publication_id,
