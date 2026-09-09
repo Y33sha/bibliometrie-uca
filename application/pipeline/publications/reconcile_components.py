@@ -20,7 +20,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.progression import attente, progression
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
@@ -99,9 +99,9 @@ def reconcile(
     if not dirty_ids:
         return None
     if logger:
-        logger.info(
-            "%s%s %s (nouveaux ou mis à jour)",
-            ETAPE,
+        etape(
+            logger,
+            "%s %s (nouveaux ou mis à jour)",
             accord(len(dirty_ids), "document"),
             forme(len(dirty_ids), "examiné"),
         )
@@ -158,8 +158,7 @@ def reconcile(
     # 3. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)
     if logger:
-        logger.info("")
-        logger.info("%sRecalcul des métadonnées consolidées", ETAPE)
+        etape(logger, "Recalcul des métadonnées consolidées")
     with progression(len(survivor_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
         for pub_id in survivor_ids:
             avancement.avance()

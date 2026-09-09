@@ -12,7 +12,7 @@ import time
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import attente
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
@@ -33,7 +33,7 @@ def build(
     if rebuild_full:
         queries.purge_authorships(conn)
 
-    logger.info("%sLiens publication-personne", ETAPE)
+    etape(logger, "Liens publication-personne")
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.
     inserted = queries.insert_missing_authorships(conn)
@@ -52,8 +52,7 @@ def build(
         forme(pruned, "supprimé"),
     )
 
-    logger.info("")
-    logger.info("%sSynchronisation des tables", ETAPE)
+    etape(logger, "Synchronisation des tables")
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}synchronisation en cours", logger) as ligne:
         # Stats fraîches avant l'UPDATE de l'étape 3 (sinon Nested Loop sur rows=1).

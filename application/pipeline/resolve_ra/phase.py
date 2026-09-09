@@ -35,6 +35,8 @@ def run(
     metrics = PhaseMetrics()
     prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
     log.info("%s à résoudre", accord(len(prefixes), "préfixe DOI", "préfixes DOI"))
+    if prefixes:
+        log.info("")
 
     new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:

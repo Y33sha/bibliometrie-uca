@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
@@ -132,7 +132,7 @@ def run(
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
     """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_publications`."""
-    logger.info("%sCorrections de métadonnées par document", ETAPE)
+    etape(logger, "Corrections de métadonnées par document")
     t0 = time.perf_counter()
     rows = queries.fetch_for_unary_correction(conn)
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))

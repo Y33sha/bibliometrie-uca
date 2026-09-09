@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from application.pipeline.logging_scope import ScopedOrPlainLogger
+
 ETAPE = "▶ "
 """Ouvre une sous-étape d'une phase."""
 
@@ -10,6 +12,16 @@ BRANCHE = "  ├─ "
 
 DERNIERE_BRANCHE = "  └─ "
 """Ferme la sous-étape : rattache sa dernière ligne."""
+
+
+def etape(logger: ScopedOrPlainLogger, titre: str, *args: object) -> None:
+    """Ouvre une sous-étape : une ligne vide la détache de ce qui précède, puis son titre.
+
+    `args` complète les champs de `titre`, comme pour tout message de journal.
+    """
+    ligne = f"{ETAPE}{titre}"
+    logger.info("")
+    logger.info(ligne, *args)
 
 
 def forme(n: int, singulier: str, pluriel: str | None = None) -> str:
@@ -27,4 +39,4 @@ def accord(n: int, singulier: str, pluriel: str | None = None) -> str:
     return f"{n} {forme(n, singulier, pluriel)}"
 
 
-__all__ = ["BRANCHE", "DERNIERE_BRANCHE", "ETAPE", "accord", "forme"]
+__all__ = ["BRANCHE", "DERNIERE_BRANCHE", "ETAPE", "accord", "etape", "forme"]

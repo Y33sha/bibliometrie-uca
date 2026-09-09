@@ -12,7 +12,7 @@ Le build est incrémental et convergent (add + prune + recompute en une passe) ;
 import logging
 
 from application.pipeline.authorships.build_authorships import build
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import attente
 from application.ports.pipeline.authorships.address_pub_count import AddressPubCountQueries
@@ -64,8 +64,7 @@ def _purge_orphan_publications(
             conn.commit()
             n += deleted
     if n:
-        logger.info("")
-        logger.info("%sPublications sans auteur", ETAPE)
+        etape(logger, "Publications sans auteur")
         logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))
     return n
 
@@ -82,8 +81,7 @@ def _refresh_pub_counts(
 
     Chaque décompte dure : sa ligne annonce le travail en cours, puis cède la place à son résultat.
     """
-    logger.info("")
-    logger.info("%sRecalcul des décomptes de publications", ETAPE)
+    etape(logger, "Recalcul des décomptes de publications")
 
     with attente(f"{BRANCHE}par adresse", logger) as ligne:
         with open_tx() as conn:

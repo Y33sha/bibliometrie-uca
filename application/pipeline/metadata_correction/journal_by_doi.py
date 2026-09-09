@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     JournalCorrectionRow,
@@ -63,7 +63,7 @@ def run(
     conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> JournalByDoiStats:
     """Passe journal_by_doi : rattache le journal des orphelines à DOI dont le préfixe désigne un unique journal, et ré-évalue les rattachements existants (auto-cicatrisation)."""
-    logger.info("%sRevues non renseignées, identifiables par le DOI du document", ETAPE)
+    etape(logger, "Revues non renseignées, identifiables par le DOI du document")
     journal_prefixes = queries.fetch_journal_doi_prefixes(conn)
     rows = queries.fetch_journal_by_doi_candidates(conn)
 

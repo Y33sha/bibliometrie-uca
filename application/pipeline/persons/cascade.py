@@ -27,7 +27,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.persons.loading import (
     EnrichedAuthorship,
     get_all_unlinked_authorships,
@@ -264,8 +264,7 @@ def run_cascade(
 
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
-    logger.info("")
-    logger.info("%sIdentification des personnes", ETAPE)
+    etape(logger, "Identification des personnes")
     # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
     # muette jusqu'à ce qu'il rende la main.
     with attente(f"{BRANCHE}chargement des signatures", logger) as ligne:
@@ -293,7 +292,7 @@ def run_cascade(
     # rejuge contre l'état ferme complet.
     a_creer = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
 
-    logger.info("%sCréation de nouvelles personnes", ETAPE)
+    etape(logger, "Création de nouvelles personnes")
     logger.info(
         "%s%s %s",
         BRANCHE,

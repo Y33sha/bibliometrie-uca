@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import (
@@ -45,9 +45,9 @@ def run_resolve_publishers(
     rows = repo.get_prefixes_pending_publisher()
     if not rows:
         return metrics
-    log.info(
-        "%s%s : identification des éditeurs",
-        ETAPE,
+    etape(
+        log,
+        "%s : identification des éditeurs",
         accord(len(rows), "nouveau préfixe DOI", "nouveaux préfixes DOI"),
     )
 
