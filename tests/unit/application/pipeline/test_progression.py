@@ -159,6 +159,25 @@ class TestRedessinDeLaBarre:
         assert module.EFFACE_FIN_DE_LIGNE in ecrit
         assert module.EFFACE_BAS_DE_L_ECRAN not in ecrit
 
+    def test_la_barre_tient_dans_la_fenetre(self):
+        """Une ligne plus longue que la fenêtre s'y replierait, décalant les barres voisines."""
+        flux = io.StringIO()
+        with self._barre(flux, 70) as barre:
+            assert module.disp_len(str(barre)) <= 70
+
+    def test_la_barre_ne_s_etire_pas_indefiniment(self):
+        flux = io.StringIO()
+        with self._barre(flux, 300) as barre:
+            assert module.disp_len(str(barre)) == module.LARGEUR_LIGNE
+
+    def test_deux_volumes_differents_donnent_la_meme_longueur(self):
+        """Le compteur occupe une colonne fixe : ce qui reste au remplissage l'est aussi."""
+        flux = io.StringIO()
+        with self._barre(flux, 80) as petite, self._barre(flux, 80) as grande:
+            petite.total = 19
+            grande.total = 435758
+            assert module.disp_len(str(petite)) == module.disp_len(str(grande))
+
     def test_un_terminal_retreci_efface_jusqu_au_bas_de_l_ecran(self):
         """La barre trop longue s'y replie sur plusieurs lignes, toutes à effacer."""
         flux = io.StringIO()
