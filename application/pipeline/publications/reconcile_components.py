@@ -14,12 +14,14 @@ L'orchestrateur dépend du port `PublicationsReconciliationQueries` ; il est app
 """
 
 import logging
+import time
 from typing import NamedTuple
 
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.progression import progression
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, ETAPE, accord, forme
+from application.pipeline.progression import attente, progression
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
@@ -92,17 +94,16 @@ def reconcile(
 
     Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici.
     """
-    spread = queries.mark_publication_siblings_dirty(conn)
+    queries.mark_publication_siblings_dirty(conn)
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
         return None
-    if logger and spread:
-        logger.info("Réconciliation : %d source_publications co-rattachées marquées dirty", spread)
-
     if logger:
         logger.info(
-            "Réconciliation : %d source_publications dirty, chargement de l'univers…",
-            len(dirty_ids),
+            "%s%s %s (nouveaux ou mis à jour)",
+            ETAPE,
+            accord(len(dirty_ids), "document"),
+            forme(len(dirty_ids), "examiné"),
         )
     rows = queries.fetch_reconciliation_universe(conn)
     rows_by_sp = {row.id: row for row in rows}
@@ -111,42 +112,55 @@ def reconcile(
         (_member(row) for row in rows), existing_pub_by_doi=existing_pub_by_doi
     )
     if logger:
+        # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
+        a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)
         logger.info(
-            "  univers de %d SP → %d publications cibles, %d doublons à fusionner ; application…",
-            len(rows),
-            len(plan.groups),
-            len(plan.dissolved),
+            "%srésolus en %s (%d déjà existantes, %d nouvelles ; %s à fusionner)",
+            BRANCHE,
+            accord(len(plan.groups), "publication"),
+            len(plan.groups) - a_creer,
+            a_creer,
+            accord(len(plan.dissolved), "doublon"),
         )
 
     survivors: set[int] = set()
     created = 0
     splits = 0
 
-    # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante).
-    for group in plan.groups:
-        target = group.target_publication_id
-        if target is None:
-            from_existing = any(
-                rows_by_sp[sp].publication_id is not None for sp in group.source_publication_ids
-            )
-            target = _create_new_publication(group, rows_by_sp, publication_repo)
-            created += 1
-            if from_existing:
-                splits += 1
-        queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
-        survivors.add(target)
+    t0 = time.perf_counter()
+    with attente(f"{DERNIERE_BRANCHE}application", logger) as ligne:
+        # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante).
+        for group in plan.groups:
+            target = group.target_publication_id
+            if target is None:
+                from_existing = any(
+                    rows_by_sp[sp].publication_id is not None for sp in group.source_publication_ids
+                )
+                target = _create_new_publication(group, rows_by_sp, publication_repo)
+                created += 1
+                if from_existing:
+                    splits += 1
+            queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
+            survivors.add(target)
 
-    # 2. Dissolutions d'abord : sauver les dépendants curatés vers le successeur, puis `refresh_from_sources` supprime la pub vidée (cas orphelin). Avant les survivants, pour libérer le DOI qu'un survivant reprend : sinon son `save` heurterait la contrainte unique tant que la pub dissoute porte encore ce DOI.
-    for dissolved in plan.dissolved:
-        queries.repoint_dependents(
-            conn, dissolved.publication_id, dissolved.successor_publication_id
-        )
-        with savepoint(conn):
-            refresh_from_sources(dissolved.publication_id, repo=publication_repo)
+        # 2. Dissolutions : les dépendants corrigés à la main passent au successeur, puis
+        # `refresh_from_sources` supprime la publication vidée. Avant les survivants, pour libérer
+        # le DOI qu'un survivant reprend — la contrainte unique le refuserait autrement.
+        for dissolved in plan.dissolved:
+            queries.repoint_dependents(
+                conn, dissolved.publication_id, dissolved.successor_publication_id
+            )
+            with savepoint(conn):
+                refresh_from_sources(dissolved.publication_id, repo=publication_repo)
+
+        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
     # 3. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)
-    with progression(len(survivor_ids), "métadonnées", logger) as avancement:
+    if logger:
+        logger.info("")
+        logger.info("%sRecalcul des métadonnées consolidées", ETAPE)
+    with progression(len(survivor_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
         for pub_id in survivor_ids:
             avancement.avance()
             with savepoint(conn):
@@ -174,18 +188,8 @@ def run(
     try:
         stats = reconcile(conn, queries, publication_repo=publication_repo, logger=logger)
         if stats is None:
-            logger.info("Réconciliation : aucune source_publication dirty")
             return None
         conn.commit()
-        logger.info("✓ %d source_publications traitées", stats.processed)
-        logger.info(
-            "  → rattachées à %d publications (%d nouvelles dont %d par scission, %d déjà existantes)",
-            stats.publications,
-            stats.created,
-            stats.splits,
-            stats.existing,
-        )
-        logger.info("  → %d doublons fusionnés", stats.merges)
         return stats
     except Exception:
         conn.rollback()
