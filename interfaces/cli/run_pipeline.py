@@ -1032,11 +1032,10 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 def _run_extract(
     source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
 ) -> PhaseMetrics:
-    """Squelette commun d'une extraction : logs `▶`/`✓`, connexion, circuit-breaker
+    """Squelette commun d'une extraction : bilan, connexion, circuit-breaker
     (`_run_extractor`), fermeture. Le câblage propre à la source vit dans `make_extractor`."""
     from infrastructure.db.engine import get_sync_engine
 
-    log.info("▶ extract_%s", source)
     t0 = time.time()
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     conn = get_sync_engine().connect()
@@ -1573,7 +1572,6 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
     with get_sync_engine().connect() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)
         perimeter_conn.commit()
-    log.info("perimeter_structures matérialisées")
 
     t0_total = time.time()
     phase_results = [

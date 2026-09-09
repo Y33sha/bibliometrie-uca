@@ -52,11 +52,10 @@ def extract_union(
         data = adapter.fetch_page_cursor(query, fq, "*")
         total = as_int(at_path(data, "response").get("numFound")) or 0
         metrics.add(total=total)
-        logger.info("%s docs (dry-run)", total)
+        logger.info("%s documents à récupérer (simulation)", total)
         return metrics
 
     page_size = adapter.per_page()
-    logger.info("interrogation HAL…")
     cursor = "*"
     num_found = 0
     total_pages: int | None = None
@@ -75,7 +74,9 @@ def extract_union(
         if total_pages is None:
             num_found = as_int(resp.get("numFound")) or 0
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
-            logger.info("%s documents → ~%s pages de %s", num_found, total_pages, page_size)
+            logger.info(
+                "%s documents à récupérer, ~%s pages de %s", num_found, total_pages, page_size
+            )
             avancement.fixer_total(num_found)
 
         for doc in docs:
@@ -122,10 +123,6 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
     def setup_logging(self, args: argparse.Namespace, config: HalExtractConfig) -> None:
         if args.since:
             self.logger.info("Mode incrémental : documents soumis depuis %s", args.since)
-        else:
-            years = [args.year] if args.year else None  # recalculé dans extract_all
-            self.logger.info("Année(s) : %s", years or "toutes (config)")
-        self.logger.info("Collections : %s structures du périmètre", config.n_collections)
 
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Extraction de l'union des collections, périmètre temporel par périmètre.
@@ -166,7 +163,8 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
             metrics.merge(year_metrics)
             if not args.dry_run:
                 slog.info(
-                    "terminé : %s nouveaux, %s mis à jour, %s inchangés",
+                    "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
+                    year_metrics.total,
                     year_metrics.new,
                     year_metrics.updated,
                     year_metrics.unchanged,

@@ -49,7 +49,7 @@ def extract_year(
 
         if first_page:
             total = as_int(at_path(data, "hits", "total").get("value")) or 0
-            logger.info("%s publications", total)
+            logger.info("%s documents à récupérer", total)
             if dry_run:
                 return total, 0, 0, 0
             avancement.fixer_total(total)
@@ -99,13 +99,9 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
             raise ExtractionConfigError(config.credentials_missing)
         return config
 
-    def setup_logging(self, args: argparse.Namespace, config: ScanrExtractConfig) -> None:
-        self.logger.info("Structures : %s", len(config.affiliation_ids))
-
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
-        self.logger.info("Années : %s", years)
         stats = PhaseMetrics()
         for year in years:
             if self._stop_on_tripped("années restantes sautées"):
@@ -121,7 +117,11 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
             slog.info(
-                "terminé : %s nouveaux, %s mis à jour, %s inchangés", inserted, updated, unchanged
+                "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
+                total,
+                inserted,
+                updated,
+                unchanged,
             )
         return stats
 
