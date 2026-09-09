@@ -13,6 +13,9 @@ BRANCHE = "  ├─ "
 DERNIERE_BRANCHE = "  └─ "
 """Ferme la sous-étape : rattache sa dernière ligne."""
 
+SUITE_DE_BRANCHE = "  │  "
+"""Rattache une ligne à la branche ouverte au-dessus, le trait vertical se prolongeant."""
+
 
 def etape(logger: ScopedOrPlainLogger, titre: str, *args: object) -> None:
     """Ouvre une sous-étape : une ligne vide la détache de ce qui précède, puis son titre.
@@ -39,4 +42,12 @@ def accord(n: int, singulier: str, pluriel: str | None = None) -> str:
     return f"{n} {forme(n, singulier, pluriel)}"
 
 
-__all__ = ["BRANCHE", "DERNIERE_BRANCHE", "ETAPE", "accord", "etape", "forme"]
+__all__ = [
+    "BRANCHE",
+    "DERNIERE_BRANCHE",
+    "ETAPE",
+    "SUITE_DE_BRANCHE",
+    "accord",
+    "etape",
+    "forme",
+]

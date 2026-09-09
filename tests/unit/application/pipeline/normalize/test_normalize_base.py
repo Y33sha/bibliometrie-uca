@@ -125,15 +125,25 @@ class TestRunHappyPath:
         assert norm.cleanup_called is True
 
     def test_mixes_success_skip_error(self, caplog):
-        """`True` → processed, `None` → skipped, `False` → errors. Seules les erreurs se lisent."""
+        """`True` → processed, `None` → skipped, `False` → errors, récapitulé par son identifiant."""
         staging = _FakeStaging()
         staging.count_returns = 3
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
             stats = norm.run()
-        assert "1 erreur" in caplog.text
+        assert "1 document aux métadonnées incomplètes" in caplog.text
+        assert "err" in caplog.text
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
+
+    def test_sans_document_incomplet_aucun_recapitulatif(self, caplog):
+        staging = _FakeStaging()
+        staging.count_returns = 2
+        staging.pending_rows = [_row("ok"), _row("skip")]
+        norm = _Norm(staging, results=[True, None])
+        with caplog.at_level(logging.INFO):
+            norm.run()
+        assert "métadonnées incomplètes" not in caplog.text
 
     def test_le_commit_tombe_a_chaque_lot(self):
         """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
@@ -171,7 +181,8 @@ class TestRunWorkException:
         assert "Erreur sur a" in caplog.text
         # Le 2e row est quand même traité après le rollback du 1er.
         assert "b" in [r.source_id for r in norm.processed_rows]
-        assert "1 erreur" in caplog.text
+        # Une exception n'est pas un document incomplet : elle sort sur-le-champ, avec son motif.
+        assert "métadonnées incomplètes" not in caplog.text
 
 
 # ── KeyboardInterrupt ─────────────────────────────────────────────
