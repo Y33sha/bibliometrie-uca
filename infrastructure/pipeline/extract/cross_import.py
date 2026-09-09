@@ -61,6 +61,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
 
     Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne cross-importer que des DOI de publications in-périmètre coupe la propagation de cross-imports hors-périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
 
+    Exclut les DOI que la cible porte déjà, en `source_publications.doi` comme en `external_ids.related_dois` : une source rend un même document pour l'un ou l'autre de ses identifiants, si bien qu'un DOI secondaire ramènerait un document déjà présent.
+
     Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
     Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent sur la cible dont `next_retry` n'est pas encore atteint). Le pool est auto-borné et convergent : 1er pass tente tout, les misses reçoivent un `next_retry`, les passes suivantes ne retentent que les DOI dont le délai est écoulé.
@@ -78,9 +80,20 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     join_clause = (
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + `NOT IN (staging du target)`.
+    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + `NOT IN (staging du target)` + `NOT IN (DOI que la cible porte déjà)`.
     prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
     query = f"""
+        WITH deja_connus AS (
+            SELECT sp.doi
+            FROM source_publications sp
+            WHERE sp.source = CAST(:target AS source_type) AND sp.doi IS NOT NULL
+            UNION
+            SELECT d.value
+            FROM source_publications sp
+            CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> 'related_dois') d(value)
+            WHERE sp.source = CAST(:target AS source_type)
+              AND jsonb_typeof(sp.external_ids -> 'related_dois') = 'array'
+        )
         SELECT DISTINCT c.doi
         FROM candidate_dois c
         {join_clause}
@@ -88,6 +101,7 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
           AND c.doi NOT IN (
                   SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
               ){prefix_filter}
+          AND c.doi NOT IN (SELECT doi FROM deja_connus)
           AND NOT EXISTS (
               SELECT 1 FROM doi_lookups l
               WHERE l.source = :target AND l.doi = c.doi
