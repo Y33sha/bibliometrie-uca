@@ -59,12 +59,21 @@ def set_flux_barres(flux: FluxTexte | None) -> None:
     _flux_barres = flux
 
 
+EFFACE_FIN_DE_LIGNE = "\x1b[K"
+"""Séquence effaçant du curseur à la fin de la ligne."""
+
+
 def ecrire_hors_barre(ligne: str, flux: FluxTexte) -> None:
-    """Écrit `ligne` au-dessus des barres en cours, qui se redessinent ensuite."""
-    if tqdm is not None:
-        tqdm.write(ligne, file=flux)
-    else:
+    """Écrit `ligne` au-dessus des barres en cours, qui se redessinent ensuite.
+
+    La ligne emporte de quoi effacer ce qui la suit : plus courte que la barre dont elle prend la place, elle en laisserait la fin derrière elle.
+    """
+    if tqdm is None:
         print(ligne, file=flux)
+        return
+    if _terminal_interactif():
+        ligne = f"{ligne}{EFFACE_FIN_DE_LIGNE}"
+    tqdm.write(ligne, file=flux)
 
 
 def _terminal_interactif() -> bool:
@@ -113,12 +122,15 @@ class Progression:
         """Redessine la barre tant qu'elle vit : le temps écoulé avance même à l'arrêt.
 
         Une barre `tqdm` se redessine seulement quand elle avance. Une source qui répond lentement la figerait, sans distinguer l'attente de l'arrêt.
+
+        Le redessin prend le verrou dont `tqdm.write` se sert : une ligne de journal efface les barres, s'écrit, puis les redessine, et un redessin qui s'y glisserait laisserait la fin de la barre derrière la ligne.
         """
         while not self._fini.wait(RAFRAICHISSEMENT_S):
             barre = self._barre
             if barre is None:
                 return
-            barre.refresh()
+            with tqdm.get_lock():
+                barre.refresh()
 
     def fixer_total(self, total: int) -> None:
         """Fixe le total qu'une première réponse révèle."""
