@@ -40,7 +40,7 @@ class TestCorroborationCounts:
         assert summary["corroboration_rejected_distinct"] == 798
 
     def test_le_journal_nomme_les_methodes_d_identification(self, caplog):
-        """Le tableau dit ce qui a identifié les personnes, dans les mots du domaine."""
+        """La ventilation dit ce qui a identifié les personnes, dans les mots du domaine."""
         logger = logging.getLogger("test_cascade_metrics")
         with caplog.at_level(logging.INFO, logger=logger.name):
             log_matching_breakdown(logger, _result(rejected=22555, distinct=798))
