@@ -11,12 +11,13 @@ Les runners par source, la suppression, le nettoyage et le VACUUM (maintenance p
 """
 
 import logging
-import time
 from collections.abc import Callable
 from typing import cast
 
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
+from application.pipeline.progression import attente
 
 NormalizeOne = Callable[[str], dict[str, object]]
 """Normalise une source (connexion + normaliseur câblé) et rend sa ligne d'observabilité."""
@@ -40,17 +41,14 @@ def run(
 
     disparues = prune_disappeared()
 
-    cleanup_orphan_identities()
-
-    vacuum_full = MODES[mode].vacuum_full
-    label = "VACUUM FULL" if vacuum_full else "VACUUM"
-    logger.info("▶ %s staging…", label)
-    t0 = time.perf_counter()
-    vacuum_staging(vacuum_full)
-    logger.info("✓ %s staging terminé en %.1fs", label, time.perf_counter() - t0)
+    with attente("maintenance des tables", logger):
+        cleanup_orphan_identities()
+        vacuum_staging(MODES[mode].vacuum_full)
 
     metrics = PhaseMetrics()
-    metrics.add(total=sum(cast("int", row["processed"]) for row in rows))
+    normalises = sum(cast("int", row["processed"]) for row in rows)
+    metrics.add(total=normalises)
+    metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
     metrics.details["table"] = {"rows": rows}
     metrics.details["disappeared_pruned"] = disparues
     return metrics

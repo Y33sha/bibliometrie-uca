@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 from collections.abc import MutableMapping
 
+from domain.sources.registry import source_label
+
 
 class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
     """Logger préfixant chaque ligne d'un `[source · scope]` (ou `[source]`)."""
@@ -25,8 +27,12 @@ class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
 
 
 def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None) -> _ScopedLogger:
-    """Adaptateur préfixant les logs d'un `[source · scope]`, ou `[source]` sans scope."""
-    prefix = f"[{source} · {scope}]" if scope else f"[{source}]"
+    """Adaptateur préfixant les logs d'un `[source · scope]`, ou `[source]` sans scope.
+
+    La source paraît sous le nom qu'on lui connaît — `theses.fr` plutôt que `theses`.
+    """
+    nom = source_label(source)
+    prefix = f"[{nom} · {scope}]" if scope else f"[{nom}]"
     return _ScopedLogger(logger, prefix)
 
 

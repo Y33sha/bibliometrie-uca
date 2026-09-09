@@ -72,6 +72,7 @@ if TYPE_CHECKING:
         AsyncFetchMissingDoiAdapter,
     )
 
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
@@ -420,15 +421,16 @@ def _run_prune_disappeared() -> int:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
 
-    log.info("▶ retrait des documents que leur source ne rend plus")
-    t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         n = delete_disappeared_source_publications(conn)
         conn.commit()
     finally:
         conn.close()
-    log.info("✓ %d publications sources retirées en %.1fs", n, time.time() - t0)
+    if n:
+        log.info(
+            "%s (disparus de leur source)", accord(n, "document supprimé", "documents supprimés")
+        )
     return n
 
 
@@ -436,15 +438,12 @@ def _run_cleanup_orphan_identities() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.normalize.authorships import delete_orphan_identities
 
-    log.info("▶ nettoyage des identités orphelines")
-    t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        n = delete_orphan_identities(conn)
+        delete_orphan_identities(conn)
         conn.commit()
     finally:
         conn.close()
-    log.info("✓ %d identités orphelines supprimées en %.1fs", n, time.time() - t0)
 
 
 def _vacuum_staging(full: bool = False) -> None:

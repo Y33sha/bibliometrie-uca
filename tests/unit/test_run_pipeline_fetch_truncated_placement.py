@@ -27,8 +27,10 @@ def test_refetch_not_called_in_extract():
 
 
 def test_refetch_not_called_in_normalize():
+    # La ligne d'observabilité d'une source, dont la phase somme les documents normalisés.
+    ligne = {"key": "openalex", "processed": 0, "skipped": 0, "errors": 0, "duration_s": 0.0}
     with (
-        patch.object(run_pipeline, "_run_normalize"),
+        patch.object(run_pipeline, "_run_normalize", return_value=ligne),
         patch.object(run_pipeline, "_vacuum_staging"),
         patch.object(run_pipeline, "_run_prune_disappeared"),
         patch.object(run_pipeline, "_run_cleanup_orphan_identities"),
