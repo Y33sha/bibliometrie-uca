@@ -56,8 +56,22 @@ class TestPublisher:
     def test_absent(self):
         assert get_publisher_name({}) is None
 
+    def test_object_without_textual_name(self):
+        assert get_publisher_name({"publisher": {"name": None}}) is None
+
 
 class TestContainer:
+    def test_not_an_object(self):
+        assert get_container({"container": "Journal of Things"}) == (None, None)
+
+    def test_issn_without_title(self):
+        attrs = {"container": {"identifier": "1234-5678", "identifierType": "ISSN"}}
+        assert get_container(attrs) == (None, "1234-5678")
+
+    def test_issn_type_without_identifier(self):
+        attrs = {"container": {"title": "X", "identifier": None, "identifierType": "ISSN"}}
+        assert get_container(attrs) == ("X", None)
+
     def test_title_and_issn(self):
         attrs = {
             "container": {
@@ -88,6 +102,10 @@ class TestAbstract:
 
     def test_fallback_first(self):
         attrs = {"descriptions": [{"description": "Texte", "descriptionType": "Other"}]}
+        assert get_abstract(attrs) == "Texte"
+
+    def test_skips_a_non_textual_description(self):
+        attrs = {"descriptions": [{"description": None}, {"description": "Texte"}]}
         assert get_abstract(attrs) == "Texte"
 
 
@@ -122,6 +140,14 @@ class TestDocTypeToken:
     def test_text_without_resourcetype(self):
         attrs = {"types": {"resourceTypeGeneral": "Text", "resourceType": ""}}
         assert extract_datacite_doc_type_token(attrs) == "Text"
+
+    def test_other_falls_back_to_resourcetype(self):
+        attrs = {"types": {"resourceTypeGeneral": "Other", "resourceType": "Poster"}}
+        assert extract_datacite_doc_type_token(attrs) == "Poster"
+
+    def test_resourcetype_without_general(self):
+        attrs = {"types": {"resourceType": "Journal Article"}}
+        assert extract_datacite_doc_type_token(attrs) == "Journal Article"
 
 
 class TestDocTypeMapping:
@@ -184,6 +210,48 @@ class TestRelatedDois:
         types = {r["relation_type"] for r in related}
         assert types == {"IsVersionOf", "Cites", "IsSupplementTo"}
         assert all(r["doi"].startswith("10.") for r in related)
+
+    def test_a_relation_needs_a_doi_and_a_relation_type(self):
+        attrs = {
+            "relatedIdentifiers": [
+                {
+                    "relatedIdentifier": "",
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsPartOf",
+                },
+                {"relatedIdentifier": "10.1234/sans-type", "relatedIdentifierType": "DOI"},
+                {
+                    "relatedIdentifier": "10.1234/partie",
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsPartOf",
+                },
+            ]
+        }
+        assert extract_datacite_meta(attrs) == {
+            "related_identifiers": [{"doi": "10.1234/partie", "relation_type": "IsPartOf"}]
+        }
+
+    def test_related_dois_after_the_own_doi_are_kept_once(self):
+        attrs = {
+            "relatedIdentifiers": [
+                {
+                    "relatedIdentifier": "10.5555/self",
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsVersionOf",
+                },
+                {
+                    "relatedIdentifier": "10.5281/zenodo.999",
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsVersionOf",
+                },
+                {
+                    "relatedIdentifier": "10.5281/zenodo.999",
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsSupplementTo",
+                },
+            ]
+        }
+        assert extract_related_dois(attrs, "10.5555/self") == ["10.5281/zenodo.999"]
 
 
 class TestLanguage:
