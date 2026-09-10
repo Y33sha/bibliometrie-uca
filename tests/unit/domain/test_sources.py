@@ -1,11 +1,24 @@
 """Tests des constantes et helpers de `domain/sources.py` — registre
 des sources et ordres de priorité."""
 
+import pytest
+
+from domain.errors import ValidationError
 from domain.sources.registry import (
     ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
+    require_known_source,
 )
+
+
+class TestRequireKnownSource:
+    def test_known_source_passes(self):
+        require_known_source("hal")
+
+    def test_unknown_source_is_named(self):
+        with pytest.raises(ValidationError, match="Source inconnue : 'inconnue'"):
+            require_known_source("inconnue")
 
 
 class TestSourcePriority:
