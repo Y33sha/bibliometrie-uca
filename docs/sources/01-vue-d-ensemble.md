@@ -73,8 +73,6 @@ Les sources donnent le même titre dans 89,7 % des cas. Ici, l'éditeur a mis le
 
 **Langue.** Trois sources sur cinq la renseignent, dans deux formats.
 
-**DOI.** Les sources s'accordent toujours sur le DOI quand elles le portent. Dans 48,6 % des cas, au moins une source l'omet.
-
 #### Revue
 
 | Source | Valeur |
@@ -135,43 +133,6 @@ Part des mentions d'auteur portant au moins un identifiant : Web of Science 100 
 | ScanR | aucune |
 
 Crossref, OpenAlex et Web of Science portent l'adresse imprimée dans l'article, entière ou abrégée. Les trois donnent les mêmes cinq structures : l'université, l'école d'ingénieurs, le CNRS, l'école des mines et le laboratoire. HAL porte les structures rattachées au compte de l'auteur : deux d'entre elles, le centre de recherche sur le développement international et l'institut de recherche pour le développement, sont sans rapport avec cet article. ScanR donne les auteurs sans adresse pour cette publication.
-
-### Gestion des affiliations
-
-*A compléter*
-
-- **OpenAlex** et **WoS**: [affiliations](../glossaire.md#affiliation) résolues de manière algorithmique à partir des [adresses](../glossaire.md#adresse) liées aux publications. Beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore les affiliations résolues par les sources et **on reconstruit l'affiliation à partir des adresses brutes**. ([Phase `affiliations`](../pipeline/04-affiliations.md) du pipeline.)
-
-- **HAL**: affiliation basée sur celle renseignée dans le compte HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), éventuellement corrigée manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes présentes dans les publications. On récupère donc les affiliations telles qu'elles sont renseignées dans HAL : les noms de structures sont traités fictivement comme des adresses par l'algo de résolution d'affiliation. Les erreurs d'affiliation dans HAL sont détectées *a posteriori* (pages [hal-problems](../guide-utilisateur/01-pages-publiques.md#problèmes-hal)).
-
-<!--TODO: Compléter avec les autres sources-->
-
-### Entités auteurs
-
-Deux cas de figure:
-
-- Dans **OpenAlex** et **WoS**, chaque auteur de chaque publication est identifié par une clé interne dans le référentiel personnes de la base. Ces entités auteurs sont algorithmiques et peu fiables (même personne fréquemment divisée en entités multiples, ou personnes distinctes confondues). L'ORCID rattaché à *l'entité auteur* (`author.orcid` côté OpenAlex, `PreferredORCID` côté WoS) ne prouve pas sa présence dans la publication : le rattachement peut provenir d'un *matching* algorithmique. Signal peu fiable.
-    - **Nuance OpenAlex** : en plus de l'ORCID d'entité, OpenAlex expose parfois un `raw_orcid` au **niveau de l'authorship**, issu des métadonnées brutes de la source. On retient `raw_orcid`, on ignore `author.orcid`.
-- Les autres sources (**HAL**, **ScanR**, **theses.fr**, **Crossref**, **DataCite**) sont plus conservatrices: pas de tentative d'identification systématique des auteurs. Une même publication peut avoir des auteurs avec ou sans identifiants.
-    - **Crossref**: l'identifiant est toujours ORCID.
-    - **DataCite**: l'identifiant est toujours ORCID, porté par les `nameIdentifiers` du *creator*.
-    - **HAL**: l'identifiant est un `personId` interne à HAL, qui identifie un compte HAL. Y sont parfois joints d'autres identifiants (`idHAL`, `IdRef`, `ORCID`) quand l'auteur les a ajoutés à son profil HAL.
-    - **ScanR**, **theses.fr**: lorsque présent, l'identifiant est toujours [IdRef](../glossaire.md#idref) (référentiel personnes de l'ESR).
-
-| Source | Identifiant auteur | Entité stable ? | Identifiants récupérés si présents |
-|---|---|---|---|
-| HAL avec compte | `hal_person_id` | ✅ | `hal_person_id`, `idhal`, `orcid`, `idref` |
-| HAL sans compte | `formId` | ❌ identifie la chaîne de caractères | (aucun) |
-| ScanR avec idref | `idref` | ✅ | `idref`, `orcid` |
-| ScanR sans idref | rien | ❌ | (aucun) |
-| theses.fr avec PPN | `ppn` (= `idref`) | ✅ | `idref` |
-| theses.fr sans PPN | rien | ❌ | (aucun) |
-| OpenAlex | `openalex_id` | ⚠️ entité algorithmique non fiable | `raw_orcid` (fiable, article-level, retenu) ; `author.orcid` (peu fiable, ignoré) |
-| WoS | `daisng_id` | ⚠️ entité algorithmique non fiable | `researcher_id` (l'ORCID de WoS n'est pas moissonné) |
-| CrossRef | rien | ❌ | `orcid` (fiable, article-level) |
-| DataCite | rien | ❌ | `orcid` (fiable, article-level) |
-
-Les informations d'identification récupérées depuis les sources (forme de nom, identifiants éventuels) sont stockées dans la table `author_identifying_keys`. La résolution / création des personnes se fait dans la [phase `persons`](../pipeline/08-persons.md) du pipeline à partir de ces éléments.
 
 ## Sources complémentaires
 
