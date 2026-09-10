@@ -6,6 +6,25 @@ Un `staging` portant `disappeared_at` perd ses `source_publications`, et celles-
 from sqlalchemy import text
 
 from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
+from infrastructure.repositories import publication_repository
+
+
+def _publication(conn) -> int:
+    return publication_repository(conn).create(
+        title="T",
+        title_normalized="t",
+        doc_type="article",
+        pub_year=2024,
+        doi=None,
+        oa_status="unknown",
+    )
+
+
+def _a_reconcilier(conn, source_publication_id: int) -> bool:
+    return conn.execute(
+        text("SELECT keys_dirty FROM source_publications WHERE id = :id"),
+        {"id": source_publication_id},
+    ).scalar_one()
 
 
 def _staging(conn, source_id: str, *, disparu: bool) -> int:
@@ -20,14 +39,17 @@ def _staging(conn, source_id: str, *, disparu: bool) -> int:
     ).scalar_one()
 
 
-def _source_publication(conn, staging_id: int, source_id: str) -> int:
+def _source_publication(
+    conn, staging_id: int, source_id: str, *, publication_id: int | None = None
+) -> int:
     return conn.execute(
         text("""
-            INSERT INTO source_publications (source, source_id, staging_id, title)
-            VALUES ('hal', :sid, :stg, 'Titre')
+            INSERT INTO source_publications
+                (source, source_id, staging_id, title, publication_id, keys_dirty)
+            VALUES ('hal', :sid, :stg, 'Titre', :pid, FALSE)
             RETURNING id
         """),
-        {"sid": source_id, "stg": staging_id},
+        {"sid": source_id, "stg": staging_id, "pid": publication_id},
     ).scalar_one()
 
 
@@ -72,6 +94,31 @@ def test_les_signatures_suivent_par_cascade(sa_sync_conn_owner):
         {"id": sp_id},
     ).scalar_one()
     assert restantes == 0
+
+
+def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
+    """La publication perd une source : ses autres sources la font réconcilier et rafraîchir."""
+    conn = sa_sync_conn_owner
+    publication = _publication(conn)
+    _source_publication(
+        conn, _staging(conn, "hal-disparu", disparu=True), "hal-disparu", publication_id=publication
+    )
+    soeur = _source_publication(
+        conn, _staging(conn, "hal-soeur", disparu=False), "hal-soeur", publication_id=publication
+    )
+    etrangere = _source_publication(
+        conn,
+        _staging(conn, "hal-autre", disparu=False),
+        "hal-autre",
+        publication_id=_publication(conn),
+    )
+    orpheline = _source_publication(conn, _staging(conn, "hal-seule", disparu=False), "hal-seule")
+
+    delete_disappeared_source_publications(conn)
+
+    assert _a_reconcilier(conn, soeur) is True
+    assert _a_reconcilier(conn, etrangere) is False
+    assert _a_reconcilier(conn, orpheline) is False
 
 
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):

@@ -195,10 +195,22 @@ class PgStagingQueries(StagingQueries):
 def delete_disappeared_source_publications(conn: Connection) -> int:
     """Supprime les `source_publications` dont le staging porte `disappeared_at`.
 
-    Les `source_authorships` suivent par cascade, et la publication vidée de ses dernières sources est supprimée par la phase `publications`. La ligne de `staging` reste, avec sa marque.
+    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. La ligne de `staging` reste, avec sa marque.
 
     Balayage ensembliste, idempotent. Rend le nombre de `source_publications` supprimées.
     """
+    conn.execute(
+        text("""
+            UPDATE source_publications soeur
+            SET keys_dirty = true
+            FROM source_publications sp
+            JOIN staging s ON s.id = sp.staging_id
+            WHERE s.disappeared_at IS NOT NULL
+              AND soeur.publication_id = sp.publication_id
+              AND soeur.id <> sp.id
+              AND NOT soeur.keys_dirty
+        """)
+    )
     return conn.execute(
         text("""
             DELETE FROM source_publications sp
