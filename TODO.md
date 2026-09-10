@@ -13,6 +13,7 @@
 * [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
+* [ ] rendre les délais de staleness configurables (fetch_stale, fetch_missing après première tentative infructueuse, oa_statut unpaywall)
 
 # Code
 * [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
@@ -22,6 +23,7 @@
 * [ ] distinguer conference_paper et conférence (critère: présence d'un journal_id?)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
+* [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -61,6 +63,7 @@
 * [ ] 165425: fusion d'un article et d'un dataset
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
 * [ ] "Total phase persons : 3 new, 51333 updated" comment est-ce possible, avec 14k personnes en base?
+* [ ] 172655 titre mal formé (notation mathématique mal développée)
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
@@ -74,4 +77,4 @@
 ## Détails techniques
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL?
-* passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps
+* passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — "suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps"

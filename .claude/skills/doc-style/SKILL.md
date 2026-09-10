@@ -13,7 +13,6 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 2. `vale <chemin>` sur les fichiers visés. Si Vale est absent, le dire et continuer sur les seuls contrôles manuels ci-dessous.
 3. Traiter chaque alerte.
 4. Passer le contrôle "paragraphe amovible".
-5. Montrer le diff. Ne rien committer.
 
 ## Règle de réparation
 
