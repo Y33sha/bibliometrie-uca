@@ -57,7 +57,7 @@ Les phases 1 et 2 partent ensemble : sans la seconde, les publications se scinde
 
 ### 4. Fusions résiduelles
 
-- [ ] Publications 57821, 152027, 170655 et 204355 : la notice arXiv reste rattachée à l'article, sans substitution de DOI. Leurs deux DOI distincts devraient les séparer, mais aucune de leurs notices n'est à retraiter (`keys_dirty` faux).
+- [x] Publications 57821, 152027, 170655 et 204355 : la notice arXiv partageait la publication de l'article, sans substitution de DOI. Marquées `keys_dirty` puis retraitées, les notices arXiv forment les publications 217991 à 217994.
 
 ## Questions ouvertes
 
