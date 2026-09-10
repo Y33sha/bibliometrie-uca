@@ -113,6 +113,9 @@ class TestBestOAStatus:
         # un statut absent de OA_RANK est ignoré (rank=0), on garde l'autre
         assert best_oa_status(["mystery", "green"]) == "green"
 
+    def test_unknown_status_value_alone_gives_none(self):
+        assert best_oa_status(["mystery"]) is None
+
     def test_unknown_kept_only_if_nothing_better(self):
         # le statut "unknown" a un rank > 0 : il gagne face à rien
         assert best_oa_status(["unknown"]) == "unknown"
@@ -154,6 +157,9 @@ class TestCleanPublicationTitle:
     def test_decodes_double_encoded_hex_entities(self):
         """Entités hexadécimales double-encodées (ex: &amp;#xE9; → é)."""
         assert clean_publication_title("Gagn&amp;#xE9; et al.") == "Gagné et al."
+
+    def test_keeps_a_numeric_entity_outside_unicode(self):
+        assert clean_publication_title("a &#99999999999; b") == "a &#99999999999; b"
 
     def test_decodes_single_encoded_html_markup(self):
         """Cas le plus fréquent du stock : markup simple-échappé `&lt;sub&gt;`."""
