@@ -3,6 +3,7 @@
 from domain.publications.relations import (
     RelationType,
     extract_crossref_relations,
+    extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
     inverse_relation,
@@ -88,6 +89,34 @@ class TestExtractDatacite:
     def test_empty(self):
         assert extract_datacite_relations({}) == []
         assert extract_datacite_relations(None) == []
+
+
+class TestExtractDataciteDistinctWorks:
+    """Relations de même œuvre qui franchissent un registrant : deux œuvres à relier."""
+
+    @staticmethod
+    def _meta(relation_type, doi):
+        return {"related_identifiers": [{"relation_type": relation_type, "doi": doi}]}
+
+    def test_preprint_arxiv_vers_l_article_publie(self):
+        meta = self._meta("IsVersionOf", "10.1007/jhep07(2023)066")
+        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000") == [
+            "10.1007/jhep07(2023)066"
+        ]
+
+    def test_copie_de_depot_vers_l_article_publie(self):
+        meta = self._meta("IsVariantFormOf", "10.1103/physrevd.105.012010")
+        assert extract_datacite_distinct_works(meta, "10.18154/rwth-2022-02923") == [
+            "10.1103/physrevd.105.012010"
+        ]
+
+    def test_version_du_meme_registrant_ecartee(self):
+        meta = self._meta("IsVersionOf", "10.5281/zenodo.1")
+        assert extract_datacite_distinct_works(meta, "10.5281/zenodo.10") == []
+
+    def test_autres_relations_ignorees(self):
+        meta = self._meta("IsSupplementTo", "10.1103/x")
+        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.1") == []
 
 
 class TestExtractCrossref:

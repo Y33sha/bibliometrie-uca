@@ -7,6 +7,7 @@ from sqlalchemy import Connection, bindparam, text
 
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
+    DoiPublication,
     PublicationRelationsQueries,
     RelationEdge,
     RelationsRebuild,
@@ -116,18 +117,37 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.relations.PublicationRelationsQueries`."""
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
+        # Le DOI d'origine, et non le DOI corrigé : c'est lui que la notice déclare, et c'est son
+        # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
             text(f"""
-                SELECT sp.publication_id, sp.source::text AS source, sp.meta
+                SELECT sp.publication_id, sp.source::text AS source, sp.meta,
+                       lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS doi,
+                       p.doc_type::text AS doc_type
                 FROM source_publications sp
-                WHERE sp.publication_id IS NOT NULL
-                  AND (
-                        (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
-                     OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
-                  )
+                JOIN publications p ON p.id = sp.publication_id
+                WHERE (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
+                   OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
             """)
         ).all()
-        return [DeclaredRelationSource(r.publication_id, r.source, r.meta) for r in rows]
+        return [
+            DeclaredRelationSource(r.publication_id, r.source, r.meta, r.doi, r.doc_type)
+            for r in rows
+        ]
+
+    def fetch_publications_by_doi(
+        self, conn: Connection, dois: list[str]
+    ) -> dict[str, DoiPublication]:
+        if not dois:
+            return {}
+        rows = conn.execute(
+            text(
+                "SELECT lower(doi) AS doi, id, doc_type::text AS doc_type "
+                "FROM publications WHERE lower(doi) = ANY(:dois)"
+            ),
+            {"dois": dois},
+        ).all()
+        return {r.doi: DoiPublication(r.id, r.doc_type) for r in rows}
 
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
         rows = conn.execute(_SHARED_KEY_PAIRS_SQL).all()

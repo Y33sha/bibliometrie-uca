@@ -418,6 +418,12 @@ def clean_doi_prefix(prefix: str | None) -> str | None:
     return match.group(1) if match else None
 
 
+def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
+    """Vrai si deux DOI portent le même préfixe, c'est-à-dire relèvent du même registrant."""
+    prefixe = clean_doi_prefix(doi_a)
+    return prefixe is not None and prefixe == clean_doi_prefix(doi_b)
+
+
 def normalize_nnt(nnt: str | None) -> str | None:
     """Normalise un NNT : uppercase, strip whitespace. Retourne None si l'entrée est vide ou ne contient pas de caractères alphanumériques."""
     return _normalize_nnt(nnt)

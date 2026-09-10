@@ -16,7 +16,7 @@ from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import clean_doi_prefix
+from domain.publications.identifiers import meme_registrant
 
 
 class DoiClusterCase(StrEnum):
@@ -111,7 +111,7 @@ def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
         return False
     if member.same_work_case not in _PREFIXE_EGAL_EXIGE:
         return True
-    return clean_doi_prefix(member.canonical_doi) == clean_doi_prefix(shared_doi)
+    return meme_registrant(member.canonical_doi, shared_doi)
 
 
 def resolve_cluster_doi_corrections(

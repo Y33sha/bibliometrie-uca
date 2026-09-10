@@ -8,7 +8,7 @@ Trois signaux peuplent la table :
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts) qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
-Les relations même-œuvre (versions, formes variantes, pièces de package) sont absentes des trois signaux : elles sont traitées en déduplication à la phase `metadata_correction`, en amont.
+Les relations de même œuvre à préfixe égal (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Entre deux registrants, `IsVersionOf` et `IsVariantFormOf` relient deux œuvres : le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
 
 Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
 """
@@ -19,6 +19,7 @@ from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
+    DoiPublication,
     PublicationRelationsQueries,
     RelationEdge,
     RelationsRebuild,
@@ -32,6 +33,7 @@ from domain.publications.relations import (
     RELATION_PAIR_LABELS,
     RelationType,
     extract_crossref_relations,
+    extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
 )
@@ -50,6 +52,54 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
             RelationEdge(sp.publication_id, rel_type.value, target_doi, sp.source)
             for rel_type, target_doi in relations
         )
+    return edges
+
+
+def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
+    """DOI que les notices DataCite déclarent comme autre forme de leur œuvre, chez un autre registrant."""
+    return sorted(
+        {
+            doi
+            for sp in sources
+            if sp.source == "datacite"
+            for doi in extract_datacite_distinct_works(sp.meta, sp.doi)
+        }
+    )
+
+
+def _build_distinct_work_edges(
+    sources: list[DeclaredRelationSource], publications_by_doi: dict[str, DoiPublication]
+) -> list[RelationEdge]:
+    """Relie une notice DataCite à la forme d'un autre registrant qu'elle déclare de la même œuvre.
+
+    Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`. Une cible absente du corpus, de type inconnu, reçoit `is_related_to`.
+    """
+    edges: list[RelationEdge] = []
+    for sp in sources:
+        if sp.source != "datacite":
+            continue
+        for target_doi in extract_datacite_distinct_works(sp.meta, sp.doi):
+            target = publications_by_doi.get(target_doi)
+            inferred = infer_shared_key_relation(sp.doc_type, target.doc_type if target else None)
+            if inferred is None:
+                continue
+            relation, subject = inferred
+            if subject == "b":
+                # Une cible typée est au corpus : c'est elle qui porte la relation dirigée.
+                assert target is not None
+                edges.append(
+                    RelationEdge(
+                        target.id,
+                        relation.value,
+                        sp.doi,
+                        "datacite",
+                        target_publication_id=sp.publication_id,
+                    )
+                )
+            else:
+                edges.append(
+                    RelationEdge(sp.publication_id, relation.value, target_doi, "datacite")
+                )
     return edges
 
 
@@ -101,6 +151,10 @@ def run(
     with open_tx() as conn:
         sources = queries.fetch_declared_relation_sources(conn)
         declared_edges = _build_declared_edges(sources)
+        publications_by_doi = queries.fetch_publications_by_doi(
+            conn, _distinct_work_targets(sources)
+        )
+        declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
         pairs = queries.fetch_shared_key_pairs(conn)
         declared_pairs = queries.fetch_declared_related_pairs(conn)

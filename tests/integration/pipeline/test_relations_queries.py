@@ -10,7 +10,7 @@ import json
 
 from sqlalchemy import text
 
-from application.ports.pipeline.relations import RelationEdge
+from application.ports.pipeline.relations import DoiPublication, RelationEdge
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
 
@@ -201,6 +201,58 @@ class TestRelationTargetDeletionCascades:
             {"c": child},
         ).scalar_one()
         assert remaining == 0
+
+
+def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible):
+    """Notice DataCite dont l'étape de correction a substitué le DOI."""
+    conn.execute(
+        text("""
+            INSERT INTO source_publications
+                (source, source_id, title, doi, publication_id, meta, raw_metadata)
+            VALUES ('datacite', :sid, 'T', :doi, :pub, CAST(:meta AS jsonb), CAST(:raw AS jsonb))
+        """),
+        {
+            "sid": doi_d_origine,
+            "doi": doi,
+            "pub": publication_id,
+            "meta": json.dumps(
+                {"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]}
+            ),
+            "raw": json.dumps(
+                {"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}}
+            ),
+        },
+    )
+
+
+class TestRelationsDeMemeOeuvre:
+    def test_la_notice_expose_son_doi_d_origine_et_le_type_de_sa_publication(self, sa_sync_conn):
+        """Le préfixe se juge sur le DOI que la notice déclare, pas sur le DOI substitué."""
+        pub = _pub(
+            sa_sync_conn, doc_type="preprint", title_normalized="preprint", doi="10.48550/arxiv.1"
+        )
+        _notice_datacite(
+            sa_sync_conn,
+            pub,
+            doi="10.1007/article",
+            doi_d_origine="10.48550/arxiv.1",
+            cible="10.1007/article",
+        )
+        sources = [
+            s for s in _Q.fetch_declared_relation_sources(sa_sync_conn) if s.publication_id == pub
+        ]
+        assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
+
+    def test_publications_retrouvees_par_doi_quelle_que_soit_la_casse(self, sa_sync_conn):
+        pub = _pub(
+            sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/JHEP.A1"
+        )
+        assert _Q.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
+            "10.1007/jhep.a1": DoiPublication(pub, "article")
+        }
+
+    def test_aucun_doi_aucune_requete(self, sa_sync_conn):
+        assert _Q.fetch_publications_by_doi(sa_sync_conn, []) == {}
 
 
 class TestCountByRelationType:
