@@ -1255,10 +1255,6 @@ def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, Phase]]) -> 
     # Le retrait détache le titre des réglages qui le suivent.
     lignes = ["    PIPELINE BIBLIOMÉTRIQUE", f"Mode : {args.mode}"]
 
-    demandees = {s.strip() for s in args.sources.split(",") if s.strip()}
-    retenues = demandees if args.include_wos else demandees - {"wos"}
-    lignes.append(f"Sources : {', '.join(sorted(retenues))}")
-
     if args.year:
         lignes.append(f"Année : {args.year}")
     elif args.start_year:
