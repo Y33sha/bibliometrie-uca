@@ -66,9 +66,9 @@ def run(
         )
         cross_source_detached = persons_queries.detach_authorships(conn, stale)
 
-        etape(logger, "Mise à jour des formes de nom associées aux personnes")
+        etape(logger, "Rafraîchissement des formes de nom associées aux personnes")
         t0 = time.perf_counter()
-        with attente(f"{DERNIERE_BRANCHE}mise à jour en cours", logger) as ligne:
+        with attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", logger) as ligne:
             populate(conn, name_forms_queries, logger)
             purge_counts = purge(conn, persons_queries, logger)
             ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")

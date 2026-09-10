@@ -39,7 +39,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
     "persons": "Résolution de l'identité des personnes",
-    "authorships": "Consolidation des liens entre publications, personnes et structures",
+    "authorships": "Rafraîchissement des liens entre publications, personnes et structures",
     "relations": "Relations entre publications apparentées",
     "subjects": "Sujets des publications",
     "countries": "Pays associés aux signatures",
