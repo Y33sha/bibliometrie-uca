@@ -184,13 +184,14 @@ class _Cascade:
             rejected_person_ids=rejected_for_pub,
         )
 
-    def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
+    def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> bool:
+        """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
         assert pid is not None  # garanti par decide_person_match action=match
         if a.current_person_id is not None:
             # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
             self.resolved_cross_source_ids.add(a.authorship_id)
             if reason == "cross_source" and pid == a.current_person_id:
-                return  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
+                return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
         link_authorship(
             pid,
             a.source,
@@ -209,6 +210,7 @@ class _Cascade:
             self._linked_index[(a.publication_id, a.author_position)].append(
                 (pid, a.last_norm, a.first_norm, a.source)
             )
+        return True
 
     def apply_create(self, a: EnrichedAuthorship) -> None:
         if a.current_person_id is not None:
@@ -270,7 +272,7 @@ def run_cascade(
     with attente(f"{BRANCHE}chargement des signatures", logger) as ligne:
         c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
         total = len(c.authorships)
-        ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} {forme(total, 'non identifiée')}")
+        ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} à examiner")
 
     unresolved: list[EnrichedAuthorship] = []
     with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
@@ -278,8 +280,9 @@ def run_cascade(
             avancement.avance()
             decision = c.decide_full(a)
             if decision.action == "match":
-                c.apply_match(a, decision.person_id, decision.reason)
-                avancement.retient()
+                # La barre compte les rattachements réels, pas les confirmations à l'identique.
+                if c.apply_match(a, decision.person_id, decision.reason):
+                    avancement.retient()
             else:
                 # Création différée ou aucun signal : reprise en passe create.
                 unresolved.append(a)
