@@ -100,23 +100,28 @@ class TestExtractDataciteDistinctWorks:
 
     def test_preprint_arxiv_vers_l_article_publie(self):
         meta = self._meta("IsVersionOf", "10.1007/jhep07(2023)066")
-        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000") == [
+        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000", "preprint") == [
             "10.1007/jhep07(2023)066"
         ]
 
-    def test_copie_de_depot_vers_l_article_publie(self):
-        meta = self._meta("IsVariantFormOf", "10.1103/physrevd.105.012010")
-        assert extract_datacite_distinct_works(meta, "10.18154/rwth-2022-02923") == [
-            "10.1103/physrevd.105.012010"
+    def test_copie_de_preprint_vers_l_article_publie(self):
+        meta = self._meta("IsVariantFormOf", "10.1140/epjc/s10052-017-5315-6")
+        assert extract_datacite_distinct_works(meta, "10.3204/pubdb-2017-13318", "preprint") == [
+            "10.1140/epjc/s10052-017-5315-6"
         ]
+
+    def test_copie_de_l_article_ecartee(self):
+        """La copie de repository de l'article publié rejoint l'article : aucune relation."""
+        meta = self._meta("IsVariantFormOf", "10.1103/physrevd.105.012010")
+        assert extract_datacite_distinct_works(meta, "10.18154/rwth-2022-02923", "article") == []
 
     def test_version_du_meme_registrant_ecartee(self):
         meta = self._meta("IsVersionOf", "10.5281/zenodo.1")
-        assert extract_datacite_distinct_works(meta, "10.5281/zenodo.10") == []
+        assert extract_datacite_distinct_works(meta, "10.5281/zenodo.10", "dataset") == []
 
     def test_autres_relations_ignorees(self):
         meta = self._meta("IsSupplementTo", "10.1103/x")
-        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.1") == []
+        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.1", "preprint") == []
 
 
 class TestExtractCrossref:

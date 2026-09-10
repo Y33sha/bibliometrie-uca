@@ -13,7 +13,7 @@ from domain.types import JsonValue
 class DeclaredRelationSource(NamedTuple):
     """Une `source_publication` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
 
-    Son DOI d'origine et le `doc_type` de sa publication servent aux relations de même œuvre déclarées entre deux registrants.
+    Son DOI d'origine et son `notice_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
 
     publication_id: int
@@ -21,6 +21,7 @@ class DeclaredRelationSource(NamedTuple):
     meta: dict[str, JsonValue]
     doi: str | None = None
     doc_type: str | None = None
+    notice_doc_type: str | None = None
 
 
 class DoiPublication(NamedTuple):

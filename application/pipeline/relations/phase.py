@@ -8,7 +8,7 @@ Trois signaux peuplent la table :
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts) qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
-Les relations de même œuvre à préfixe égal (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Entre deux registrants, `IsVersionOf` et `IsVariantFormOf` relient deux œuvres : le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
+Les relations de même œuvre (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Quand `IsVersionOf` ou `IsVariantFormOf` relient deux œuvres (cf. `meme_oeuvre_declaree`), le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
 
 Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
 """
@@ -62,7 +62,7 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
             doi
             for sp in sources
             if sp.source == "datacite"
-            for doi in extract_datacite_distinct_works(sp.meta, sp.doi)
+            for doi in extract_datacite_distinct_works(sp.meta, sp.doi, sp.notice_doc_type)
         }
     )
 
@@ -78,7 +78,7 @@ def _build_distinct_work_edges(
     for sp in sources:
         if sp.source != "datacite":
             continue
-        for target_doi in extract_datacite_distinct_works(sp.meta, sp.doi):
+        for target_doi in extract_datacite_distinct_works(sp.meta, sp.doi, sp.notice_doc_type):
             target = publications_by_doi.get(target_doi)
             inferred = infer_shared_key_relation(sp.doc_type, target.doc_type if target else None)
             if inferred is None:

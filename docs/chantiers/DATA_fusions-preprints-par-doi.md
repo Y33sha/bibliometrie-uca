@@ -28,23 +28,23 @@ La revue ArXiv.org porte le type `preprint_server` et le préfixe `10.48550`. La
 
 ## Décisions
 
-- **La substitution exige un préfixe égal**, pour `IsVersionOf` comme pour `IsVariantFormOf`. Un traitement propre à `IsVariantFormOf` est écarté : ses 8 cas à préfixe égal relèvent de la version → concept.
+- **Une version exige un préfixe égal** (`IsVersionOf`). Une copie de repository rejoint la forme publiée quel que soit le préfixe (`IsVariantFormOf`), sauf une notice `preprint`. La correction de DOI et la phase `relations` lisent cette règle dans `meme_oeuvre_declaree`.
 - **À préfixe différent, la relation va à la phase `relations`**, au lieu de substituer le DOI. Un preprint qui a sa propre publication est relié à l'article.
 - **Une notice sans publication le reste.** Une notice DataCite absente des sources du périmètre ne crée pas de publication : son auteur UCA figure par son seul nom, sans structure ni identifiant. L'article publié couvre le document, et sa notice OpenAlex porte souvent l'identifiant arXiv.
 - **Aucune reprise en base.** L'étape de correction repart du DOI d'origine à chaque run et le restitue quand elle ne décide rien. La revue déduite du préfixe se réévalue de la même façon.
-- **L'ordre des sous-étapes reste inchangé.** Réservée au préfixe égal, la substitution laisse intact le préfixe dont se déduit la revue.
+- **L'ordre des sous-étapes reste inchangé.** L'étape qui déduit la revue du DOI renseigne seulement les revues absentes, et une copie de repository porte en général celle de l'article.
 
 ## Phasage
 
 ### 1. Substitution réservée au préfixe égal
 
 - [x] `resolve_cluster_doi_corrections` : substitution seulement quand le DOI d'origine et le DOI cible ont le même préfixe.
-- [x] Tests : `IsVersionOf` à préfixe égal substitué, `IsVersionOf` à préfixe différent laissé, idem pour `IsVariantFormOf`, DOI d'origine restitué à une notice déjà substituée.
+- [x] Tests : `IsVersionOf` à préfixe égal substitué, `IsVersionOf` à préfixe différent laissé, DOI d'origine restitué à une notice déjà substituée.
 
 ### 2. Relations de même œuvre à préfixe différent
 
 - [x] `relations.py` : `IsVersionOf` et `IsVariantFormOf` produisent une relation quand les deux DOI diffèrent de préfixe.
-- [x] Tests : notice arXiv face à l'article publié donne `is_preprint_of` ; copie de dépôt face à l'article donne `is_related_to`.
+- [x] Tests : notice arXiv face à l'article publié donne `is_preprint_of`.
 
 Les phases 1 et 2 partent ensemble : sans la seconde, les publications se scindent sans relation entre elles.
 
@@ -59,6 +59,15 @@ Les phases 1 et 2 partent ensemble : sans la seconde, les publications se scinde
 
 - [x] Publications 57821, 152027, 170655 et 204355 : la notice arXiv partageait la publication de l'article, sans substitution de DOI. Marquées `keys_dirty` puis retraitées, les notices arXiv forment les publications 217991 à 217994.
 
+### 5. Copies de repository fusionnées avec l'article
+
+L'audit des 735 publications de copies CERN, RWTH et GSI montre des notices de repository de l'article publié : même titre aux formules près, année à un an près, rattachement à la revue par l'ISSN. Les copies typées `preprint` sont des working papers.
+
+- [x] `meme_oeuvre_declaree` : une copie `IsVariantFormOf` converge sur la forme publiée quel que soit le préfixe, sauf une notice `preprint`.
+- [x] Tests : copie de l'article convergente, copie de preprint distincte et reliée par `is_preprint_of`.
+- [ ] Run et contrôle : les publications de copies rejoignent leur article.
+
 ## Questions ouvertes
 
-- **Copies de dépôt.** Les copies CERN, RWTH et GSI sont typées `article` et reçoivent `is_related_to` face à l'article publié. Un audit dira si elles méritent un autre traitement.
+- **Déclaration erronée.** `10.3204/pubdb-2019-03026`, copie d'un article sur les squarks bottom, déclare `IsVariantFormOf` vers un article sur W±Z. La fusion la rattache à tort : cas à défaire dans l'outil admin de dédoublonnage.
+- **Revue « II ».** 51 copies typées `preprint` sont rattachées à une revue intitulée « II ». Origine non recherchée.
