@@ -71,3 +71,29 @@ class TestMapDocType:
 
     def test_none_vers_other(self):
         assert map_doc_type(None) == "other"
+
+    def test_la_nomenclature_de_la_source_prime_sur_la_recherche_globale(self):
+        """HAL range « proceedings » en communication, Crossref en actes."""
+        assert map_doc_type("proceedings", source="crossref") == "proceedings"
+
+    def test_une_valeur_absente_de_la_source_se_cherche_ailleurs(self):
+        assert map_doc_type("dissertation") == "thesis"
+
+
+class TestMapDocTypeComposite:
+    """Types composites WoS : le premier type significatif l'emporte."""
+
+    def test_le_premier_type_l_emporte(self):
+        assert map_doc_type("Article; Proceedings Paper", source="wos") == "article"
+
+    def test_un_type_sans_signification_laisse_passer_le_suivant(self):
+        assert map_doc_type("Note; Review", source="wos") == "review"
+
+    def test_chaque_partie_se_lit_dans_la_nomenclature_de_la_source(self):
+        assert map_doc_type("Proceedings; Other", source="crossref") == "proceedings"
+
+    def test_des_types_tous_sans_signification_donnent_other(self):
+        assert map_doc_type("Note; Reprint", source="wos") == "other"
+
+    def test_un_composite_sans_partie_donne_other(self):
+        assert map_doc_type(";") == "other"
