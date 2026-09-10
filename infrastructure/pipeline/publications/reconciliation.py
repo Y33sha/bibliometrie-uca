@@ -200,6 +200,16 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         ).bindparams(bindparam("ids"))
         return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
 
+    def delete_publications_without_sources(self, conn: Connection) -> int:
+        return conn.execute(
+            text("""
+                DELETE FROM publications p
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM source_publications sp WHERE sp.publication_id = p.id
+                )
+            """)
+        ).rowcount
+
     def count_publications(self, conn: Connection) -> int:
         # Toutes les publications sont in-périmètre par construction : la réconciliation gate leur création sur le périmètre.
         return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())

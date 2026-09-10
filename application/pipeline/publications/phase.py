@@ -4,7 +4,9 @@
 
 `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
 
-Les deux étapes — redirty optionnel, réconciliation — sont indépendantes et idempotentes ; chacune tourne dans sa propre transaction.
+La réconciliation est suivie de la suppression des publications restées sans source : celles que la réconciliation a vidées, et celles dont la phase `normalize` a retiré les derniers documents disparus.
+
+Les trois étapes — redirty optionnel, réconciliation, suppression — sont idempotentes ; chacune tourne dans sa propre transaction.
 """
 
 import logging
@@ -12,6 +14,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publications.reconcile_components import run as reconcile_run
 from application.ports.pipeline.publications.reconciliation import (
@@ -29,12 +32,32 @@ def run(
     publication_repo_factory: Callable[[Connection], PublicationRepository],
     rebuild_publications: bool = False,
 ) -> PhaseMetrics:
-    """Redirty optionnel, puis réconciliation."""
+    """Redirty optionnel, réconciliation, puis suppression des publications restées sans source."""
     if rebuild_publications:
         _redirty_all(open_tx, reconciliation_queries, logger)
     metrics = _reconcile(open_tx, reconciliation_queries, logger, publication_repo_factory)
+    _delete_publications_without_sources(open_tx, reconciliation_queries, logger)
+    with open_tx() as conn:
+        pub_total = reconciliation_queries.count_publications(conn)
+    summary = metrics.details["summary"]
+    if isinstance(summary, dict):
+        summary["pub_total"] = pub_total
     metrics.resume = ""
     return metrics
+
+
+def _delete_publications_without_sources(
+    open_tx: OpenTransaction,
+    reconciliation_queries: PublicationsReconciliationQueries,
+    logger: logging.Logger,
+) -> int:
+    """Supprime les publications restées sans source. Retourne leur nombre."""
+    with open_tx() as conn:
+        n = reconciliation_queries.delete_publications_without_sources(conn)
+    if n:
+        etape(logger, "Publications sans source")
+        logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))
+    return n
 
 
 def _redirty_all(
@@ -60,11 +83,10 @@ def _reconcile(
             logger,
             publication_repo=publication_repo_factory(conn),
         )
-        pub_total = reconciliation_queries.count_publications(conn)
 
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
-    # Chiffres du run (SP dirty examinées → publications d'arrivée, mouvements) + le total global des publications (`pub_total`) en « nouveau total ». Le frontend les compose en lignes de texte ; les volumes avant/après auto sont masqués.
+    # Chiffres du run ; `run` y ajoute `pub_total`, compté après la suppression des publications sans source.
     metrics.details["summary"] = {
         "processed": stats.processed if stats else 0,
         "publications": stats.publications if stats else 0,
@@ -72,6 +94,5 @@ def _reconcile(
         "created": stats.created if stats else 0,
         "splits": stats.splits if stats else 0,
         "merges": stats.merges if stats else 0,
-        "pub_total": pub_total,
     }
     return metrics
