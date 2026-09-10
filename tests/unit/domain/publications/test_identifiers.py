@@ -15,6 +15,7 @@ from domain.publications.identifiers import (
     HALId,
     clean_doi_prefix,
     extract_doi_from_url,
+    is_hal_host,
     normalize_arxiv_id,
     normalize_pmcid,
     normalize_pmid,
@@ -57,6 +58,10 @@ class TestDOIConstruction:
                 "10.1007/jhep07(2020)108",
                 "10.1007/jhep07(2020)108",
             ),  # parenthèses appariées conservées
+            ("10.1234/abc(2020)", "10.1234/abc(2020)"),  # parenthèse finale appariée conservée
+            ("10.1234/a)b", "10.1234/a)b"),  # parenthèse non appariée hors de la fin conservée
+            ("10.1234/a(b", "10.1234/a(b"),
+            ("10.1234/abc(", "10.1234/abc"),  # seule la parenthèse finale est retirée
             # Lowercase : CrossRef traite le DOI en case-insensitive ; lowercase
             # évite les faux doublons cross-sources.
             ("10.1038/Nature", "10.1038/nature"),
@@ -187,6 +192,7 @@ class TestHALIdConstruction:
             "1234",  # aucun préfixe
             "gsi-2021",  # moins de 8 chiffres : fragment de DOI, pas un docid HAL
             "https://doi.org/10.3204/pubdb-2020-00553",  # hôte non-HAL
+            "https://doi.org/10.1234/zenodo-12345678",  # hôte non-HAL, fragment au format d'un docid
             # Identifiants OAI-PMH de dépôts institutionnels : l'autorité n'est pas HAL, le regex
             # de docid attraperait sinon un fragment d'UUID (b454-3339841149, f-2861829395).
             "pmh:oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee",
@@ -196,6 +202,26 @@ class TestHALIdConstruction:
     def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
             HALId(raw)
+
+
+class TestIsHalHost:
+    @pytest.mark.parametrize(
+        "host",
+        [
+            "hal.science",
+            "hal.inrae.fr",
+            "tel.archives-ouvertes.fr",
+            "dumas.ccsd.cnrs.fr",
+            "hal-univ-exemple.fr",  # portail white-label au label `hal-…`
+            "HAL.Science",
+        ],
+    )
+    def test_hal_portal(self, host):
+        assert is_hal_host(host)
+
+    @pytest.mark.parametrize("host", ["doi.org", "halle.de", "exemple.fr"])
+    def test_other_host(self, host):
+        assert not is_hal_host(host)
 
 
 class TestHALIdTryParse:
