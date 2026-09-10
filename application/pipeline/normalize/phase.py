@@ -7,6 +7,8 @@ Enchaîne, dans l'ordre de priorité des sources (la plus fiable en premier, pou
 3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
 4. le `VACUUM` du staging (`raw_data` vidé après normalisation) — `VACUUM FULL` en mode full, simple sinon.
 
+Sans document traité ni retiré, la phase s'arrête après l'étape 2.
+
 Les runners par source, la suppression, le nettoyage et le VACUUM (maintenance physique) sont injectés par le composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
 """
 
@@ -43,6 +45,14 @@ def run(
 
     disparues = prune_disappeared()
 
+    if not disparues and not any(_a_traite(row) for row in rows):
+        logger.info("%sRien à faire", DERNIERE_BRANCHE)
+        metrics = PhaseMetrics()
+        metrics.resume = ""
+        metrics.details["table"] = {"rows": rows}
+        metrics.details["disappeared_pruned"] = 0
+        return metrics
+
     etape(logger, "Maintenance des tables")
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
@@ -57,3 +67,8 @@ def run(
     metrics.details["table"] = {"rows": rows}
     metrics.details["disappeared_pruned"] = disparues
     return metrics
+
+
+def _a_traite(row: dict[str, object]) -> bool:
+    """Vrai si la source a traité au moins un document : normalisé, écarté ou en erreur."""
+    return any(cast("int", row.get(cle, 0)) for cle in ("processed", "skipped", "errors"))
