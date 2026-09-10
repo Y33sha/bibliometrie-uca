@@ -43,7 +43,9 @@ Crossref et DataCite ne portent l'affiliation qu'en chaîne libre, sans identifi
 
 ### Une même publication vue par chaque source
 
-Ce que chaque source dit d'une même publication, entité par entité. L'exemple est un article de conférence de 2025, signé par deux auteurs dont un seul relève du périmètre. Il est présent dans cinq sources sur sept. Titre : *Mixed data k-Anonymization by Consistent Maximal Association and Microaggregation*. DOI : [10.1145/3746252.3761293](https://doi.org/10.1145/3746252.3761293). Les proportions citées portent sur les 58 608 publications du périmètre présentes dans au moins deux sources.
+Exemple d'une publication vue à travers différentes sources.
+
+ Titre : *Mixed data k-Anonymization by Consistent Maximal Association and Microaggregation*. DOI : [10.1145/3746252.3761293](https://doi.org/10.1145/3746252.3761293). Les proportions citées portent sur les 58 608 publications du périmètre présentes dans au moins deux sources.
 
 #### Publication
 
@@ -61,13 +63,13 @@ Les sources donnent le même titre dans 89,7 % des cas. Ici, l'éditeur a mis le
 |---|---|---|---|---|---|
 | Crossref | 2025 | `conference_paper` | absente | présent | absent |
 | HAL | 2025 | `conference_paper` | `en` | présent | absent |
-| OpenAlex | 2025 | `other` | `en` | présent | 1 083 caractères |
+| OpenAlex | 2025 | `conference_paper` | `en` | présent | 1 083 caractères |
 | ScanR | 2025 | `conference_paper` | absente | présent | absent |
 | Web of Science | 2025 | `conference_paper` | `English` | présent | 1 084 caractères |
 
 **Année.** Les sources s'accordent dans 88,6 % des cas. Quand elles divergent, l'écart est d'une seule année quatre fois sur cinq. Les deux dates en cause sont la mise en ligne et la parution.
 
-**Type de document.** Le champ le plus divergent : 60,7 % d'accord. Chaque source a sa nomenclature — `proceedings-article` pour Crossref, `COMM` pour HAL, `conference-paper` pour OpenAlex, `proceedings` pour ScanR, `Proceedings Paper` pour Web of Science. Le pipeline les ramène à un vocabulaire commun. La valeur d'OpenAlex manque à la table de correspondance et devient `other`.
+**Type de document.** Le champ le plus divergent : 60,7 % d'accord. Chaque source a sa nomenclature — `proceedings-article` pour Crossref, `COMM` pour HAL, `conference-paper` pour OpenAlex, `proceedings` pour ScanR, `Proceedings Paper` pour Web of Science. La phase `metadata_correction` les ramène toutes à un vocabulaire commun, ici `conference_paper`.
 
 **Langue.** Trois sources sur cinq la renseignent, dans deux formats.
 
