@@ -110,8 +110,8 @@ def test_version_d_un_autre_prefixe_reste_distincte():
     assert _resoudre(group, "10.48550/arxiv.2210.12000") == []
 
 
-def test_variante_d_un_autre_prefixe_reste_distincte():
-    """Une copie déposée à RWTH déclare `IsVariantFormOf` vers l'article publié."""
+def test_copie_de_l_article_d_un_autre_prefixe_converge():
+    """Une copie déposée à RWTH déclare `IsVariantFormOf` vers l'article publié : une seule œuvre."""
     group = [
         _m(
             1,
@@ -120,7 +120,38 @@ def test_variante_d_un_autre_prefixe_reste_distincte():
             same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
         ),
     ]
-    assert _resoudre(group, "10.18154/rwth-2022-02923") == []
+    assert _resoudre(group, "10.18154/rwth-2022-02923") == [
+        DoiClusterDecision(
+            1, "10.1103/physrevd.105.012010", DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY
+        )
+    ]
+
+
+def test_copie_de_preprint_d_un_autre_prefixe_reste_distincte():
+    """Un working paper déposé au DESY déclare `IsVariantFormOf` vers l'article publié : deux œuvres."""
+    group = [
+        _m(
+            1,
+            "preprint",
+            canonical_doi="10.1140/epjc/s10052-017-5315-6",
+            same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+        ),
+    ]
+    assert _resoudre(group, "10.3204/pubdb-2017-13318") == []
+
+
+def test_copie_de_preprint_du_meme_prefixe_converge():
+    group = [
+        _m(
+            1,
+            "preprint",
+            canonical_doi="10.5281/zenodo.1",
+            same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+        ),
+    ]
+    assert _resoudre(group, "10.5281/zenodo.2") == [
+        DoiClusterDecision(1, "10.5281/zenodo.1", DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY)
+    ]
 
 
 def test_variante_du_meme_prefixe_converge():
@@ -255,8 +286,20 @@ def test_version_doi_substituted_to_concept():
     )
 
 
-def test_variante_d_un_autre_prefixe_garde_son_doi():
-    # Copie déposée à RWTH → article publié chez un éditeur : deux œuvres, le DOI reste.
+def test_copie_de_preprint_d_un_autre_prefixe_garde_son_doi():
+    # Working paper déposé à RWTH → article publié chez un éditeur : deux œuvres, le DOI reste.
+    row = _row(
+        1,
+        "preprint",
+        "10.18154/rwth-1",
+        raw_doi="10.18154/rwth-1",
+        canonical_doi="10.1103/published",
+        same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+    )
+    assert compute_updates([row]) == []
+
+
+def test_copie_de_l_article_prend_le_doi_publie():
     row = _row(
         1,
         "article",
@@ -265,7 +308,13 @@ def test_variante_d_un_autre_prefixe_garde_son_doi():
         canonical_doi="10.1103/published",
         same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
     )
-    assert compute_updates([row]) == []
+    assert compute_updates([row]) == [
+        DoiCorrectionUpdate(
+            1,
+            "10.1103/published",
+            {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
+        )
+    ]
 
 
 def test_preprint_deja_substitue_retrouve_son_doi():

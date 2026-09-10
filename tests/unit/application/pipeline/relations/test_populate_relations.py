@@ -67,6 +67,7 @@ def _notice(doc_type, relation_type, cible, doi):
         meta={"related_identifiers": [{"relation_type": relation_type, "doi": cible}]},
         doi=doi,
         doc_type=doc_type,
+        notice_doc_type=doc_type,
     )
 
 
@@ -81,8 +82,8 @@ class TestBuildDistinctWorkEdges:
         ]
 
     def test_la_cible_preprint_porte_la_relation(self):
-        """Une copie de dépôt déclare une variante vers le preprint : le preprint est sujet."""
-        notice = _notice("article", "IsVariantFormOf", "10.48550/arxiv.2", "10.18154/rwth-1")
+        """Un article déclare une version vers le preprint d'un autre registrant : le preprint est sujet."""
+        notice = _notice("article", "IsVersionOf", "10.48550/arxiv.2", "10.1103/article")
         edges = _build_distinct_work_edges(
             [notice], {"10.48550/arxiv.2": DoiPublication(3, "preprint")}
         )
@@ -90,15 +91,23 @@ class TestBuildDistinctWorkEdges:
             (e.from_publication_id, e.relation_type, e.target_publication_id) for e in edges
         ] == [(3, "is_preprint_of", 1)]
 
-    def test_deux_articles_restent_a_qualifier(self):
+    def test_copie_de_preprint_face_a_l_article(self):
+        notice = _notice("preprint", "IsVariantFormOf", "10.1140/article", "10.3204/pubdb-1")
+        edges = _build_distinct_work_edges(
+            [notice], {"10.1140/article": DoiPublication(4, "article")}
+        )
+        assert [(e.from_publication_id, e.relation_type) for e in edges] == [(1, "is_preprint_of")]
+
+    def test_copie_de_l_article_ne_donne_aucune_relation(self):
+        """La copie de repository de l'article publié rejoint l'article à la déduplication."""
         notice = _notice("article", "IsVariantFormOf", "10.1103/article", "10.18154/rwth-1")
         edges = _build_distinct_work_edges(
             [notice], {"10.1103/article": DoiPublication(4, "article")}
         )
-        assert [e.relation_type for e in edges] == ["is_related_to"]
+        assert edges == []
 
     def test_une_cible_hors_corpus_reste_a_qualifier(self):
-        notice = _notice("article", "IsVariantFormOf", "10.48550/arxiv.2", "10.18154/rwth-1")
+        notice = _notice("article", "IsVersionOf", "10.48550/arxiv.2", "10.18154/rwth-1")
         edges = _build_distinct_work_edges([notice], {})
         assert [(e.from_publication_id, e.relation_type, e.target_doi) for e in edges] == [
             (1, "is_related_to", "10.48550/arxiv.2")

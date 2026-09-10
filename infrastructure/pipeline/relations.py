@@ -123,7 +123,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
             text(f"""
                 SELECT sp.publication_id, sp.source::text AS source, sp.meta,
                        lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS doi,
-                       p.doc_type::text AS doc_type
+                       p.doc_type::text AS doc_type, sp.doc_type AS notice_doc_type
                 FROM source_publications sp
                 JOIN publications p ON p.id = sp.publication_id
                 WHERE (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
@@ -131,7 +131,9 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
             """)
         ).all()
         return [
-            DeclaredRelationSource(r.publication_id, r.source, r.meta, r.doi, r.doc_type)
+            DeclaredRelationSource(
+                r.publication_id, r.source, r.meta, r.doi, r.doc_type, r.notice_doc_type
+            )
             for r in rows
         ]
 

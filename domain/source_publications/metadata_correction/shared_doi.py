@@ -2,7 +2,7 @@
 
 Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_publications` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
 
-- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Version et variante exigent un préfixe égal : entre deux registrants, la relation relie deux œuvres, comme un preprint arXiv et l'article publié, que la phase `relations` traite.
+- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
 - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres.
 
 La décision est **agnostique de la source** : le caller applicatif regroupe par DOI (brut reconstruit) et persiste la cible de chaque membre. La famille de cas est extensible.
@@ -58,10 +58,17 @@ DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
 # Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
 
-# Cas qui ne réunissent deux DOI en une seule œuvre qu'à préfixe égal (cf. `_meme_oeuvre`).
-_PREFIXE_EGAL_EXIGE: frozenset[DoiClusterCase] = frozenset(
-    {DoiClusterCase.DATACITE_VERSION_TO_CONCEPT, DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY}
-)
+
+def meme_oeuvre_declaree(
+    case: DoiClusterCase, doc_type: str | None, own_doi: str | None, target_doi: str | None
+) -> bool:
+    """Vrai si la relation déclarée par une notice réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
+
+    Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf une notice `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
+    """
+    if case is DoiClusterCase.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
+        return True
+    return case is DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
 
 
 class DoiClusterMember(NamedTuple):
@@ -103,15 +110,12 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
 
 
 def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
-    """Vrai si la relation déclarée par `member` désigne la même œuvre que le DOI partagé.
-
-    Une version ou une variante ne rejoint son œuvre qu'à préfixe égal : d'un registrant à l'autre, la relation relie deux œuvres, comme un preprint arXiv et l'article publié. Une pièce de dataset rejoint son parent quel que soit le préfixe.
-    """
+    """Vrai si la relation déclarée par `member` désigne la même œuvre que le DOI partagé (cf. `meme_oeuvre_declaree`)."""
     if member.same_work_case is None or member.canonical_doi is None:
         return False
-    if member.same_work_case not in _PREFIXE_EGAL_EXIGE:
-        return True
-    return meme_registrant(member.canonical_doi, shared_doi)
+    return meme_oeuvre_declaree(
+        member.same_work_case, member.doc_type, shared_doi, member.canonical_doi
+    )
 
 
 def resolve_cluster_doi_corrections(

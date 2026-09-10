@@ -203,17 +203,19 @@ class TestRelationTargetDeletionCascades:
         assert remaining == 0
 
 
-def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible):
+def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
     """Notice DataCite dont l'étape de correction a substitué le DOI."""
     conn.execute(
         text("""
             INSERT INTO source_publications
-                (source, source_id, title, doi, publication_id, meta, raw_metadata)
-            VALUES ('datacite', :sid, 'T', :doi, :pub, CAST(:meta AS jsonb), CAST(:raw AS jsonb))
+                (source, source_id, title, doi, doc_type, publication_id, meta, raw_metadata)
+            VALUES ('datacite', :sid, 'T', :doi, :dt, :pub, CAST(:meta AS jsonb),
+                    CAST(:raw AS jsonb))
         """),
         {
             "sid": doi_d_origine,
             "doi": doi,
+            "dt": doc_type,
             "pub": publication_id,
             "meta": json.dumps(
                 {"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]}
@@ -242,6 +244,24 @@ class TestRelationsDeMemeOeuvre:
             s for s in _Q.fetch_declared_relation_sources(sa_sync_conn) if s.publication_id == pub
         ]
         assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
+
+    def test_la_notice_expose_aussi_son_propre_type(self, sa_sync_conn):
+        """La règle de même œuvre lit le type de la notice, la relation celui de sa publication."""
+        pub = _pub(
+            sa_sync_conn, doc_type="article", title_normalized="article", doi="10.3204/pubdb-1"
+        )
+        _notice_datacite(
+            sa_sync_conn,
+            pub,
+            doi="10.3204/pubdb-1",
+            doi_d_origine="10.3204/pubdb-1",
+            cible="10.1140/article",
+            doc_type="preprint",
+        )
+        sources = [
+            s for s in _Q.fetch_declared_relation_sources(sa_sync_conn) if s.publication_id == pub
+        ]
+        assert [(s.doc_type, s.notice_doc_type) for s in sources] == [("article", "preprint")]
 
     def test_publications_retrouvees_par_doi_quelle_que_soit_la_casse(self, sa_sync_conn):
         pub = _pub(
