@@ -114,12 +114,14 @@ def reconcile(
     if logger:
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
         a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)
+        existantes = len(plan.groups) - a_creer
         logger.info(
-            "%srésolus en %s (%d déjà existantes, %d nouvelles ; %s à fusionner)",
+            "%srésolus en %s (%d déjà %s, %s ; %s à fusionner)",
             BRANCHE,
             accord(len(plan.groups), "publication"),
-            len(plan.groups) - a_creer,
-            a_creer,
+            existantes,
+            forme(existantes, "existante"),
+            accord(a_creer, "nouvelle"),
             accord(len(plan.dissolved), "doublon"),
         )
 
