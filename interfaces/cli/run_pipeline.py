@@ -1276,9 +1276,15 @@ def _banniere(reglages: list[str]) -> list[str]:
     if not sys.stdout.isatty():
         return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *reglages, "─" * 40]
 
-    corps = ["", *(f"  {ligne}" for ligne in TITRE_PIPELINE), "", *(f"  {r}" for r in reglages), ""]
+    reglages = [f"  {reglage}" for reglage in reglages]
+    largeur_dessin = max(map(len, TITRE_PIPELINE))
+    largeur = max(
+        LARGEUR_TITRE_PHASE + 4, largeur_dessin + 4, *(len(reglage) + 2 for reglage in reglages)
+    )
+    # Un même retrait pour toutes les lignes du dessin : centrées une à une, elles se décaleraient.
+    retrait = " " * ((largeur - largeur_dessin) // 2)
+    corps = ["", *(retrait + ligne for ligne in TITRE_PIPELINE), "", *reglages, ""]
     onglet = "┤ PIPELINE ├"
-    largeur = max(LARGEUR_TITRE_PHASE + 4, *(len(ligne) + 2 for ligne in corps))
     return [
         f"┌───{onglet}{'─' * (largeur - 3 - len(onglet))}┐",
         *(f"│{ligne.ljust(largeur)}│▒" for ligne in corps),
@@ -1455,8 +1461,10 @@ def main() -> None:
     args = _build_arg_parser().parse_args()
 
     phases_to_run = _select_phases_to_run(args)
+    log.info("")
     for ligne in _titre_du_run(args, phases_to_run):
         log.info("%s", ligne)
+    log.info("")
 
     # Une seule exécution à la fois sur la base : deux en parallèle s'interbloquent.
     try:
