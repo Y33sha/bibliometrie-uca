@@ -66,6 +66,22 @@ class TestMapDocType:
     def test_hal_proceedings_vers_conference_paper(self):
         assert map_doc_type("proceedings", source="hal") == "conference_paper"
 
+    def test_openalex_conference_paper_vers_conference_paper(self):
+        assert map_doc_type("conference-paper", source="openalex") == "conference_paper"
+
+    def test_openalex_conference_abstract_vers_conference_paper(self):
+        assert map_doc_type("conference-abstract", source="openalex") == "conference_paper"
+
+    def test_openalex_book_review_vers_book_review(self):
+        assert map_doc_type("book-review", source="openalex") == "book_review"
+
+    def test_openalex_data_paper_vers_data_paper(self):
+        assert map_doc_type("data-paper", source="openalex") == "data_paper"
+
+    def test_openalex_software_paper_vers_data_paper(self):
+        """Un article décrivant un logiciel reste un article de données."""
+        assert map_doc_type("software-paper", source="openalex") == "data_paper"
+
     def test_inconnu_vers_other(self):
         assert map_doc_type("foo_bar_baz") == "other"
 
