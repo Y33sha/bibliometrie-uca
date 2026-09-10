@@ -63,6 +63,17 @@ class TestConnectedComponents:
         assert connected_components(members) == expected
         assert connected_components(list(reversed(members))) == expected
 
+    def test_root_discovered_late_is_reached_through_a_chain(self):
+        """3 rejoint 2, puis 2 rejoint 1 : 3 atteint la racine 1 en deux sauts."""
+        result = connected_components(
+            [
+                (2, _tok(("doi", "x"))),
+                (3, _tok(("doi", "x"))),
+                (1, _tok(("nnt", "y"), ("doi", "x"))),
+            ]
+        )
+        assert result == [[1, 2, 3]]
+
     def test_multivalued_hal_ids_bridge_two_records(self):
         """Une SP portant deux HAL ids ponte deux SP qui n'en partagent qu'un chacune."""
         result = connected_components(
