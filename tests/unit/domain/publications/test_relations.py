@@ -90,6 +90,15 @@ class TestExtractDatacite:
         assert extract_datacite_relations({}) == []
         assert extract_datacite_relations(None) == []
 
+    def test_an_entry_that_is_not_an_object_leaves_the_next_one(self):
+        meta = {
+            "related_identifiers": [
+                "pas un objet",
+                {"doi": "10.1/sup", "relation_type": "IsSupplementTo"},
+            ]
+        }
+        assert extract_datacite_relations(meta) == [(RelationType.IS_SUPPLEMENT_TO, "10.1/sup")]
+
 
 class TestExtractDataciteDistinctWorks:
     """Relations de même œuvre qui franchissent un registrant : deux œuvres à relier."""
@@ -123,6 +132,18 @@ class TestExtractDataciteDistinctWorks:
         meta = self._meta("IsSupplementTo", "10.1103/x")
         assert extract_datacite_distinct_works(meta, "10.48550/arxiv.1", "preprint") == []
 
+    def test_les_entrees_ecartees_laissent_passer_la_suivante(self):
+        meta = {
+            "related_identifiers": [
+                "pas un objet",
+                {"relation_type": "IsSupplementTo", "doi": "10.1103/x"},
+                {"relation_type": "IsVersionOf", "doi": "10.1007/jhep07(2023)066"},
+            ]
+        }
+        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000", "preprint") == [
+            "10.1007/jhep07(2023)066"
+        ]
+
 
 class TestExtractCrossref:
     def test_keeps_doi_targets_in_scope(self):
@@ -146,6 +167,18 @@ class TestExtractCrossref:
     def test_no_relation(self):
         assert extract_crossref_relations({}) == []
         assert extract_crossref_relations({"relation": None}) == []
+
+    def test_an_ignored_target_leaves_the_next_one(self):
+        meta = {
+            "relation": {
+                "is-part-of": [
+                    "pas un objet",
+                    {"id": "abc", "id-type": "issn"},
+                    {"id": "10.1/ds", "id-type": "doi"},
+                ]
+            }
+        }
+        assert extract_crossref_relations(meta) == [(RelationType.DESCRIBES, "10.1/ds")]
 
 
 class TestInferSharedKeyRelation:
