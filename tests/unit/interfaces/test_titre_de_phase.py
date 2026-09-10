@@ -85,14 +85,9 @@ class TestTitreDuRun:
         titre = _titre_du_run(_args(), [])[1]
         assert titre.startswith("║      PIPELINE")
 
-    def test_wos_reste_dehors_sans_son_option(self, terminal) -> None:
-        texte = " ".join(_titre_du_run(_args(), []))
-        assert "wos" not in texte
-        assert "hal" in texte
-
-    def test_l_option_fait_entrer_wos(self, terminal) -> None:
-        texte = " ".join(_titre_du_run(_args(include_wos=True), []))
-        assert "wos" in texte
+    def test_le_titre_ne_liste_pas_les_sources(self, terminal) -> None:
+        """Chaque phase interroge ses propres sources : une liste commune induirait en erreur."""
+        assert "Sources" not in " ".join(_titre_du_run(_args(), []))
 
     def test_une_annee_demandee_paraît(self, terminal) -> None:
         assert "Année : 2018" in " ".join(_titre_du_run(_args(year=2018), []))
