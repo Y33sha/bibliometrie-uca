@@ -234,6 +234,131 @@ class TestExternalDoiCarrier:
         assert plan.dissolved == (DissolvedPublication(50, 90),)
 
 
+class TestSingleDoiComponent:
+    def test_sp_without_doi_joins_the_partition(self):
+        """Composante à un seul DOI : la SP sans DOI fait partie de la partition, sa pub est absorbée."""
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+                _m(2, 20, tokens=[("hal_id", "h")]),
+            ]
+        )
+        assert _groups(plan) == {10: (1, 2)}
+        assert plan.dissolved == (DissolvedPublication(20, 10),)
+
+
+class TestCompetingClaims:
+    """Deux partitions revendiquent la même publication : une seule la garde."""
+
+    def test_doi_carrier_beats_a_weak_claim_with_a_smaller_sp(self):
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.2/y",
+                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
+                ),
+                _m(
+                    5,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+            ]
+        )
+        assert _groups(plan) == {10: (5,), None: (1,)}
+
+    def test_between_weak_claims_the_smallest_sp_wins(self):
+        plan = plan_reconciliation(
+            [
+                _m(5, 10, doi="10.1/x", tokens=[("hal_id", "h"), ("doi", "10.1/x")]),
+                _m(2, 10, doi="10.2/y", tokens=[("hal_id", "h"), ("doi", "10.2/y")]),
+            ]
+        )
+        assert _groups(plan) == {10: (2,), None: (5,)}
+
+    def test_external_carrier_beats_a_weak_claim_with_a_smaller_sp(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, 90, pub_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
+                _m(5, 50, doi="10.1/x", tokens=[("hal_id", "b")]),
+            ],
+            existing_pub_by_doi={"10.1/x": 90},
+        )
+        assert _groups(plan) == {90: (5,), None: (1,)}
+
+    def test_external_carrier_of_orphans_beats_a_weak_claim_with_a_smaller_sp(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, 90, pub_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
+                _m(5, None, doi="10.1/x", tokens=[("hal_id", "b")]),
+            ],
+            existing_pub_by_doi={"10.1/x": 90},
+        )
+        assert _groups(plan) == {90: (5,), None: (1,)}
+
+
+class TestDissolution:
+    def test_pub_retaining_a_residual_sp_is_kept(self):
+        """La pub 30 perd la SP 1 mais garde la SP résiduelle 3 : elle n'est pas dissoute."""
+        plan = plan_reconciliation(
+            [
+                _m(1, 30, doi="10.1/x", tokens=[("hal_id", "h"), ("doi", "10.1/x")]),
+                _m(
+                    4,
+                    40,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+                _m(
+                    2,
+                    20,
+                    pub_doi="10.2/y",
+                    doi="10.2/y",
+                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
+                ),
+                _m(3, 30, tokens=[("hal_id", "h")]),
+            ]
+        )
+        assert _groups(plan) == {40: (1, 4), 20: (2,)}
+        assert plan.dissolved == ()
+
+    def test_successor_follows_the_smallest_sp_of_the_dissolved_pub(self):
+        """La pub 50 éclate entre les pubs 70 et 30 : son successeur est celui de sa SP 3."""
+        plan = plan_reconciliation(
+            [
+                _m(7, 50, doi="10.1/x", tokens=[("hal_id", "h"), ("doi", "10.1/x")]),
+                _m(3, 50, doi="10.2/y", tokens=[("hal_id", "h"), ("doi", "10.2/y")]),
+                _m(
+                    8,
+                    70,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+                _m(
+                    4,
+                    30,
+                    pub_doi="10.2/y",
+                    doi="10.2/y",
+                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
+                ),
+            ]
+        )
+        assert _groups(plan) == {70: (7, 8), 30: (3, 4)}
+        assert plan.dissolved == (DissolvedPublication(50, 30),)
+
+
 class TestWorkGroupShape:
     def test_group_sp_ids_sorted(self):
         plan = plan_reconciliation(
