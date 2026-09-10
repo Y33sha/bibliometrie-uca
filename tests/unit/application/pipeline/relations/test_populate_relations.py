@@ -97,12 +97,9 @@ class TestBuildDistinctWorkEdges:
         )
         assert [e.relation_type for e in edges] == ["is_related_to"]
 
-    def test_une_cible_hors_corpus_reste_a_qualifier(self):
-        notice = _notice("article", "IsVariantFormOf", "10.48550/arxiv.2", "10.18154/rwth-1")
-        edges = _build_distinct_work_edges([notice], {})
-        assert [(e.from_publication_id, e.relation_type, e.target_doi) for e in edges] == [
-            (1, "is_related_to", "10.48550/arxiv.2")
-        ]
+    def test_une_cible_hors_corpus_ne_donne_aucune_relation(self):
+        notice = _notice("preprint", "IsVersionOf", "10.1007/article", "10.48550/arxiv.1")
+        assert _build_distinct_work_edges([notice], {}) == []
 
     def test_meme_registrant_sans_relation(self):
         notice = _notice("dataset", "IsVersionOf", "10.5281/zenodo.1", "10.5281/zenodo.10")
