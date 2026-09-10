@@ -66,7 +66,7 @@ def run(
         "reconstruction complète"
         if rebuild
         else f"{forme(len(pub_ids), 'nouvelle')} ou {forme(len(pub_ids), 'modifiée')}",
-        accord(len(rows), "document source"),
+        accord(len(rows), "document source", "documents sources"),
     )
 
     cache = SubjectCache(queries)

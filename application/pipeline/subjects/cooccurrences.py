@@ -24,7 +24,7 @@ def run(
 
     Les deux recalculs balaient tous les liens publication-sujet : chaque ligne dit le travail en cours, puis cède la place à son résultat.
     """
-    etape(logger, "Mise à jour des décomptes")
+    etape(logger, "Rafraîchissement des décomptes")
     with attente(f"{BRANCHE}publications par sujet", logger) as ligne:
         n_updated = queries.recompute_usage_counts(conn)
         # « mis à jour » ne varie pas au pluriel.
