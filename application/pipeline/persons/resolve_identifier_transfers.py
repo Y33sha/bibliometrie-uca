@@ -124,11 +124,11 @@ def resolve_identifier_transfers(
         )
         transferred += 1
 
+    # Un conflit dont l'attribution est confirmée par l'admin est tranché : seuls les autres comptent.
     logger.info(
-        "%s%s (%d en attente) → %s %s",
+        "%s%s → %s %s",
         DERNIERE_BRANCHE,
-        accord(len(conflicts), "conflit"),
-        len(pending),
+        accord(len(pending), "conflit"),
         accord(transferred, "identifiant"),
         forme(transferred, "transféré"),
     )
