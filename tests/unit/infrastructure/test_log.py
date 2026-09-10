@@ -401,3 +401,38 @@ class TestGabaritDuMessage:
         rendu = self._rendu("Rien à faire.", ())
         assert rendu["message"] == "Rien à faire."
         assert "template" not in rendu
+
+
+class TestFluxDeConsole:
+    """Le flux de console écrit sur la sortie standard en place au moment de l'écriture."""
+
+    def test_une_sortie_standard_fermee_laisse_passer_l_ecriture(self, monkeypatch):
+        """Deux sessions pytest d'un même processus ont chacune leur sortie capturée : la première est fermée quand la seconde écrit."""
+        import io
+        import sys
+
+        from infrastructure.observability.log import console_stream
+
+        flux = console_stream()
+        premiere = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        monkeypatch.setattr(sys, "stdout", premiere)
+        flux.write("session 1\n")
+        premiere.close()
+        seconde = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        monkeypatch.setattr(sys, "stdout", seconde)
+        flux.write("session 2 — é\n")
+        assert seconde.buffer.getvalue() == "session 2 — é\n".encode()
+
+    def test_le_flux_est_unique(self):
+        """`tqdm` reconnaît les barres à effacer à l'identité de leur flux."""
+        from infrastructure.observability.log import console_stream
+
+        assert console_stream() is console_stream()
+
+    def test_le_terminal_est_celui_de_la_sortie_standard(self, monkeypatch):
+        import sys
+
+        from infrastructure.observability.log import console_stream
+
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+        assert console_stream().isatty()

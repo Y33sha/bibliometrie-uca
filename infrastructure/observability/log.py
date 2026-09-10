@@ -14,7 +14,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, cast
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
@@ -53,22 +53,49 @@ class _FluxConsole(io.TextIOBase):
         return self._flux.isatty()
 
 
-_console: TextIO | None = None
+class _SortieStandard(io.TextIOBase):
+    """Sortie standard courante, écrite en UTF-8 et vidée à chaque ligne.
+
+    Chaque écriture s'adresse au `sys.stdout` en place à cet instant. Les loggers et les barres qui détiennent ce flux écrivent donc sur la sortie standard courante, capture de pytest comprise.
+
+    L'UTF-8 écarte les `UnicodeEncodeError` d'une console cp1252. La fermeture est neutralisée : la sortie standard appartient au processus.
+    """
+
+    @property
+    def encoding(self) -> str:
+        return "utf-8"
+
+    def write(self, texte: str) -> int:
+        tampon = getattr(sys.stdout, "buffer", None)
+        if tampon is None:
+            return sys.stdout.write(texte)
+        tampon.write(texte.encode("utf-8"))
+        if "\n" in texte:
+            tampon.flush()
+        return len(texte)
+
+    def flush(self) -> None:
+        getattr(sys.stdout, "buffer", sys.stdout).flush()
+
+    def fileno(self) -> int:
+        return sys.stdout.fileno()
+
+    def isatty(self) -> bool:
+        return sys.stdout.isatty()
+
+    def close(self) -> None:
+        pass
+
+
+_console = _SortieStandard()
 
 
 def console_stream() -> TextIO:
     """Flux de console, partagé par les loggers et par ce qui s'affiche à côté d'eux.
 
-    Un flux unique permet aux barres de progression et aux lignes de journal de s'effacer mutuellement : deux enveloppes du même descripteur s'ignoreraient.
-
-    L'enveloppe UTF-8 écarte les `UnicodeEncodeError` d'une console cp1252. `line_buffering` vide le tampon à chaque ligne. La fermeture est neutralisée : le tampon de la sortie standard appartient au processus.
+    Un flux unique permet aux barres de progression et aux lignes de journal de s'effacer mutuellement : `tqdm` reconnaît les barres à effacer à l'identité de leur flux.
     """
-    global _console
-    if _console is None:
-        flux = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
-        flux.close = lambda: None  # type: ignore[method-assign]
-        _console = flux
-    return _console
+    return cast("TextIO", _console)
 
 
 # Marqueurs délimitant runs et phases dans le flux de log, émis par `run_pipeline` : ils situent une ligne dans son run et sa phase pour qui lit le flux.
