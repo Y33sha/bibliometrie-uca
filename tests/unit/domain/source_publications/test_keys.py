@@ -5,7 +5,11 @@ Garde le contrat de la projection partagée : extraction et normalisation des cl
 
 from __future__ import annotations
 
-from domain.source_publications.keys import ConfirmationKeys, project_confirmation_keys
+from domain.source_publications.keys import (
+    DISCRIMINANT_TITLE_MIN_LENGTH,
+    ConfirmationKeys,
+    project_confirmation_keys,
+)
 
 
 def _keys(doi=None, external_ids=None, doc_type=None, title_normalized=None, pub_year=None):
@@ -94,6 +98,13 @@ class TestMetadataBlock:
         """Titre ≤ seuil → pas de token (garde de longueur, écarte les titres génériques)."""
         keys = _keys(doc_type="conference_paper", title_normalized="court titre", pub_year=2020)
         assert keys.metadata_block is None
+
+    def test_title_at_the_threshold_no_token(self):
+        seuil = "a" * DISCRIMINANT_TITLE_MIN_LENGTH
+        assert (
+            _keys(doc_type="article", title_normalized=seuil, pub_year=2020).metadata_block is None
+        )
+        assert _keys(doc_type="article", title_normalized=seuil + "b", pub_year=2020).metadata_block
 
     def test_no_doc_type_no_token(self):
         keys = _keys(doc_type=None, title_normalized=self.LONG, pub_year=2020)
