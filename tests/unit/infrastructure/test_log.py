@@ -1,6 +1,7 @@
 """Tests de la consolidation des logs (infrastructure/log.py)."""
 
 import logging
+import uuid
 
 from infrastructure.observability.log import (
     _PROJECT_ROOT,
@@ -98,6 +99,14 @@ class TestRebaseLogDir:
         assert result == _PROJECT_ROOT / "logs"
 
 
+def _nom_de_logger_inedit(prefixe: str) -> str:
+    """Nom qu'aucun logger du processus ne porte encore.
+
+    Le registre de `logging` vit autant que le processus, et pytest attache sa capture aux loggers existants qui ne propagent pas. Un logger de nom inédit arrive donc sans handler dans `setup_logger`, même d'une session pytest à l'autre.
+    """
+    return f"{prefixe}_{uuid.uuid4().hex}"
+
+
 class TestSetupLoggerFileLocation:
     """Valide que setup_logger (version d'origine) écrit sous logs/<relpath>/.
 
@@ -121,12 +130,13 @@ class TestSetupLoggerFileLocation:
         # l'emplacement du fichier quand il est activé.
         monkeypatch.setenv("LOG_TO_FILE", "true")
 
-        logger = fresh.setup_logger("pytest_fake_logger", str(tmp_path / "foo" / "bar" / "logs"))
+        nom = _nom_de_logger_inedit("pytest_fake_logger")
+        logger = fresh.setup_logger(nom, str(tmp_path / "foo" / "bar" / "logs"))
         try:
             logger.info("marker")
             for h in logger.handlers:
                 h.flush()
-            expected = tmp_path / "logs" / "foo" / "bar" / "pytest_fake_logger.log"
+            expected = tmp_path / "logs" / "foo" / "bar" / f"{nom}.log"
             assert expected.exists()
             assert "marker" in expected.read_text(encoding="utf-8")
         finally:
@@ -151,7 +161,9 @@ class TestSetupLoggerFileLocation:
             fresh.Path, "mkdir", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only"))
         )
 
-        logger = fresh.setup_logger("pytest_readonly_logger", str(tmp_path / "logs"))
+        logger = fresh.setup_logger(
+            _nom_de_logger_inedit("pytest_readonly_logger"), str(tmp_path / "logs")
+        )
         try:
             assert not [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
             assert logger.handlers  # la console reste
