@@ -101,6 +101,9 @@ class TestIsDocTypeExpected:
     def test_null_doc_type_is_expected(self):
         assert is_doc_type_expected("journal", None)
 
+    def test_journal_type_absent_from_the_mapping_is_expected(self):
+        assert is_doc_type_expected("type_inconnu", "thesis")
+
 
 class TestMappingCoverage:
     """Garde-fou : les keys des mappings correspondent à des journal_type /
