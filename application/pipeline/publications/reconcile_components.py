@@ -97,6 +97,9 @@ def reconcile(
     queries.mark_publication_siblings_dirty(conn)
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
+        if logger:
+            etape(logger, "Aucun document nouveau ou mis à jour")
+            logger.info("%sRien à faire", DERNIERE_BRANCHE)
         return None
     if logger:
         etape(

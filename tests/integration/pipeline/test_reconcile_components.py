@@ -172,6 +172,24 @@ class TestEndToEnd:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
+    def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(
+        self, sa_sync_conn, monkeypatch, caplog
+    ):
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+
+        with caplog.at_level(logging.INFO, logger=logger.name):
+            run(
+                conn,
+                PgPublicationsReconciliationQueries(),
+                logger,
+                publication_repo=publication_repository(conn),
+            )
+
+        assert "Aucun document nouveau ou mis à jour" in caplog.text
+        assert "Rien à faire" in caplog.text
+        assert "Recalcul" not in caplog.text
+
     def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, monkeypatch, caplog):
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
