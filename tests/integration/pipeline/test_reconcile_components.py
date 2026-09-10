@@ -172,6 +172,24 @@ class TestEndToEnd:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
+    def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, monkeypatch, caplog):
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        _seed_sp(conn, source_id="a", publication_id=pub_a, doi="10.1/x")
+        _seed_sp(conn, source_id="b", publication_id=pub_b, doi="10.1/x")
+
+        with caplog.at_level(logging.INFO, logger=logger.name):
+            run(
+                conn,
+                PgPublicationsReconciliationQueries(),
+                logger,
+                publication_repo=publication_repository(conn),
+            )
+
+        assert "résolus en 1 publication (1 déjà existante, 0 nouvelle ; 1 doublon" in caplog.text
+
     def test_pub_with_two_dois_splits(self, sa_sync_conn, monkeypatch):
         """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
         Y part sur un nouveau pub."""
