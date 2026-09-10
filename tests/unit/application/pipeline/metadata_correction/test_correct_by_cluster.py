@@ -254,6 +254,34 @@ def test_chapters_subtitle_truncation_is_same():
     assert _resoudre(g) == []
 
 
+def test_chapters_number_glued_to_a_word_is_same():
+    g = [
+        _m(1, "book_chapter", "covid19 et societe"),
+        _m(2, "book_chapter", "covid et societe"),
+    ]
+    assert _resoudre(g) == []
+
+
+def test_chapters_marker_inside_the_title_is_same():
+    g = [
+        _m(1, "book_chapter", "introduction partie generale"),
+        _m(2, "book_chapter", "introduction generale"),
+    ]
+    assert _resoudre(g) == []
+
+
+def test_chapter_without_title_is_not_compared():
+    assert _resoudre([_m(1, "book_chapter", None), _m(2, "book_chapter", "introduction")]) == []
+
+
+def test_same_work_case_without_canonical_doi_does_not_converge():
+    group = [
+        _m(1, "book", same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
+        _m(2, "book_chapter"),
+    ]
+    assert _resoudre(group) == [DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
+
+
 def test_chapters_typo_is_false_positive_left_to_admin():
     g = [
         _m(1, "book_chapter", "les effets thermomecaniques"),

@@ -1,13 +1,17 @@
 """Tests de `effective_metadata` (correction des métadonnées canoniques)."""
 
+import pytest
+
 from domain.source_publications.metadata_correction.journal_by_doi import resolve_journal_by_doi
 from domain.source_publications.metadata_correction.rules import (
     _SOURCE_ONLY_PREDICATES,
     MetadataCorrectionRule,
     MetadataForCorrection,
     _AppliesTo,
+    _check_predicate,
     effective_doc_type_for_publication,
     effective_metadata,
+    strip_dissertation_keys,
 )
 
 
@@ -51,6 +55,29 @@ def _view(**overrides: object) -> MetadataForCorrection:
     }
     defaults.update(overrides)
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
+
+
+class TestPredicates:
+    def test_title_prefix_needs_a_title(self):
+        """Sans titre, aucune règle de préfixe de titre ne s'applique."""
+        assert effective_metadata(_view(doc_type="article", title="")).doc_type is None
+
+    def test_unknown_predicate_is_named(self):
+        with pytest.raises(ValueError, match="Prédicat inconnu : 'inconnu'"):
+            _check_predicate(_view(), "inconnu", True)
+
+
+class TestStripDissertationKeys:
+    def test_only_dissertation_hal_ids_leave_no_hal_id(self):
+        external_ids = {"nnt": "2021CLFAC030", "hal_id": ["tel-01234567", "dumas-07654321"]}
+        assert strip_dissertation_keys(external_ids) == {}
+
+    def test_article_hal_ids_are_kept(self):
+        external_ids = {"hal_id": ["tel-01234567", "hal-04123456"], "doi": "10.1/x"}
+        assert strip_dissertation_keys(external_ids) == {
+            "hal_id": ["hal-04123456"],
+            "doi": "10.1/x",
+        }
 
 
 class TestThesesFrRule:
@@ -118,6 +145,11 @@ class TestThesisWithJournalRule:
 
     def test_thesis_registry_doi_is_not_corrected(self):
         view = _view(doc_type="thesis", journal_id=42, doi=self.ABES_DOI)
+        assert effective_metadata(view).doc_type is None
+
+    def test_registry_prefix_is_read_before_the_first_slash(self):
+        """Un DOI de registre dont le suffixe contient lui-même une barre oblique reste un DOI de registre."""
+        view = _view(doc_type="thesis", journal_id=42, doi="10.70675/abc/123")
         assert effective_metadata(view).doc_type is None
 
     def test_no_doi_is_not_corrected(self):
