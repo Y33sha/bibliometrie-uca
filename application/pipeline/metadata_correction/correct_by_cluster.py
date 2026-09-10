@@ -57,7 +57,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
         groups[row.raw_doi].append(row)
 
     updates: list[DoiCorrectionUpdate] = []
-    for members in groups.values():
+    for raw_doi, members in groups.items():
         decision_by_id = {
             d.id: d
             for d in resolve_cluster_doi_corrections(
@@ -66,7 +66,8 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
                         m.id, m.doc_type, m.title_normalized, m.canonical_doi, m.same_work_case
                     )
                     for m in members
-                ]
+                ],
+                shared_doi=raw_doi,
             )
         }
         for m in members:

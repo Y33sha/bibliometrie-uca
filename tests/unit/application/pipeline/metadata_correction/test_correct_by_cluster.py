@@ -50,6 +50,11 @@ def _m(member_id, doc_type, title="t", canonical_doi=None, same_work_case=None) 
     return DoiClusterMember(member_id, doc_type, title, canonical_doi, same_work_case)
 
 
+def _resoudre(group, shared_doi="10.1/x"):
+    """Décision pour un groupe dont le DOI partagé importe peu au cas testé."""
+    return resolve_cluster_doi_corrections(group, shared_doi=shared_doi)
+
+
 # ── domaine pur : convergence même-œuvre ─────────────────────────────────
 
 
@@ -64,7 +69,7 @@ def test_same_work_all_converge_on_canonical():
         ),
         _m(2, "dataset"),
     ]
-    assert resolve_cluster_doi_corrections(group) == [
+    assert _resoudre(group, "10.5281/zenodo.10") == [
         DoiClusterDecision(1, "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
         DoiClusterDecision(2, "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
     ]
@@ -74,7 +79,7 @@ def test_same_work_carries_its_case():
     # Le cas porté par le membre est restitué (variante, pièce de package…).
     for case in (DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY, DoiClusterCase.DATACITE_PACKAGE_PIECE):
         group = [_m(1, "dataset", canonical_doi="10.9/canon", same_work_case=case)]
-        assert resolve_cluster_doi_corrections(group) == [DoiClusterDecision(1, "10.9/canon", case)]
+        assert _resoudre(group, "10.9/forme") == [DoiClusterDecision(1, "10.9/canon", case)]
 
 
 def test_same_work_takes_precedence_over_book_chapter():
@@ -87,8 +92,81 @@ def test_same_work_takes_precedence_over_book_chapter():
         ),
         _m(2, "book_chapter"),
     ]
-    cases = {d.case for d in resolve_cluster_doi_corrections(group)}
+    cases = {d.case for d in _resoudre(group, "10.5281/zenodo.10")}
     assert cases == {DoiClusterCase.DATACITE_VERSION_TO_CONCEPT}
+
+
+def test_version_d_un_autre_prefixe_reste_distincte():
+    """Un preprint arXiv déclare `IsVersionOf` vers l'article publié : deux œuvres, pas une."""
+    group = [
+        _m(
+            1,
+            "article",
+            canonical_doi="10.1007/jhep07(2023)066",
+            same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+        ),
+        _m(2, "preprint"),
+    ]
+    assert _resoudre(group, "10.48550/arxiv.2210.12000") == []
+
+
+def test_variante_d_un_autre_prefixe_reste_distincte():
+    """Une copie déposée à RWTH déclare `IsVariantFormOf` vers l'article publié."""
+    group = [
+        _m(
+            1,
+            "article",
+            canonical_doi="10.1103/physrevd.105.012010",
+            same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+        ),
+    ]
+    assert _resoudre(group, "10.18154/rwth-2022-02923") == []
+
+
+def test_variante_du_meme_prefixe_converge():
+    """Une version de logiciel Zenodo déclarée `IsVariantFormOf` rejoint son concept."""
+    group = [
+        _m(
+            1,
+            "software",
+            canonical_doi="10.5281/zenodo.13354942",
+            same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+        ),
+    ]
+    assert _resoudre(group, "10.5281/zenodo.17224613") == [
+        DoiClusterDecision(1, "10.5281/zenodo.13354942", DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY)
+    ]
+
+
+def test_piece_de_dataset_converge_quel_que_soit_le_prefixe():
+    """Une pièce rejoint son dataset parent, dont le DOI prend souvent une autre forme."""
+    group = [
+        _m(
+            1,
+            "dataset",
+            canonical_doi="10.1594/pangaea.1",
+            same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
+        ),
+    ]
+    assert _resoudre(group, "10.15454/fichier") == [
+        DoiClusterDecision(1, "10.1594/pangaea.1", DoiClusterCase.DATACITE_PACKAGE_PIECE)
+    ]
+
+
+def test_version_d_un_autre_prefixe_laisse_les_regles_ouvrage_s_appliquer():
+    """Sans convergence, un groupe ouvrage + chapitre reste traité comme tel."""
+    group = [
+        _m(
+            1,
+            "book",
+            canonical_doi="10.1007/autre",
+            same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+        ),
+        _m(2, "book_chapter"),
+    ]
+    assert _resoudre(group, "10.4000/livre") == [
+        DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
+    ]
 
 
 # ── domaine pur : ouvrage/chapitre (divergence) ──────────────────────────
@@ -96,20 +174,16 @@ def test_same_work_takes_precedence_over_book_chapter():
 
 def test_book_and_chapter_chapter_loses_doi():
     group = [_m(1, "book"), _m(2, "book_chapter")]
-    assert resolve_cluster_doi_corrections(group) == [
-        DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
-    ]
+    assert _resoudre(group) == [DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
 
 
 def test_only_book_no_correction():
-    assert resolve_cluster_doi_corrections([_m(1, "book")]) == []
+    assert _resoudre([_m(1, "book")]) == []
 
 
 def test_article_sharing_book_doi_is_ignored():
     group = [_m(1, "book"), _m(2, "book_chapter"), _m(3, "article")]
-    assert resolve_cluster_doi_corrections(group) == [
-        DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
-    ]
+    assert _resoudre(group) == [DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
 
 
 # ── domaine pur : chapitre/chapitre (nettoyage + containment + strict) ────
@@ -120,7 +194,7 @@ def test_chapters_distinct_titles_all_lose_doi():
         _m(1, "book_chapter", "geographie de l environnement"),
         _m(2, "book_chapter", "le monde a la une"),
     ]
-    decisions = resolve_cluster_doi_corrections(group)
+    decisions = _resoudre(group)
     assert {d.case for d in decisions} == {DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS}
     assert {d.id for d in decisions} == {1, 2}
     assert all(d.target_doi is None for d in decisions)
@@ -128,9 +202,7 @@ def test_chapters_distinct_titles_all_lose_doi():
 
 def test_chapters_same_title_no_correction():
     assert (
-        resolve_cluster_doi_corrections(
-            [_m(1, "book_chapter", "introduction"), _m(2, "book_chapter", "introduction")]
-        )
+        _resoudre([_m(1, "book_chapter", "introduction"), _m(2, "book_chapter", "introduction")])
         == []
     )
 
@@ -140,7 +212,7 @@ def test_chapters_chapter_number_prefix_is_same():
         _m(1, "book_chapter", "chapitre 14 les limnosystemes"),
         _m(2, "book_chapter", "les limnosystemes"),
     ]
-    assert resolve_cluster_doi_corrections(g) == []
+    assert _resoudre(g) == []
 
 
 def test_chapters_subtitle_truncation_is_same():
@@ -148,7 +220,7 @@ def test_chapters_subtitle_truncation_is_same():
         _m(1, "book_chapter", "contested concepts"),
         _m(2, "book_chapter", "contested concepts plutarch on common notions"),
     ]
-    assert resolve_cluster_doi_corrections(g) == []
+    assert _resoudre(g) == []
 
 
 def test_chapters_typo_is_false_positive_left_to_admin():
@@ -156,7 +228,7 @@ def test_chapters_typo_is_false_positive_left_to_admin():
         _m(1, "book_chapter", "les effets thermomecaniques"),
         _m(2, "book_chapter", "les effets thermomecanqiues"),
     ]
-    assert resolve_cluster_doi_corrections(g) != []  # déterministe, pas de fuzzy
+    assert _resoudre(g) != []  # déterministe, pas de fuzzy
 
 
 # ── compute_updates (orchestration mécanique) ────────────────────────────
@@ -183,8 +255,8 @@ def test_version_doi_substituted_to_concept():
     )
 
 
-def test_variant_substituted_to_primary():
-    # Copie repository → version publiée, provenance DATACITE_VARIANT_TO_PRIMARY.
+def test_variante_d_un_autre_prefixe_garde_son_doi():
+    # Copie déposée à RWTH → article publié chez un éditeur : deux œuvres, le DOI reste.
     row = _row(
         1,
         "article",
@@ -193,13 +265,26 @@ def test_variant_substituted_to_primary():
         canonical_doi="10.1103/published",
         same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
     )
-    assert compute_updates([row]) == [
-        DoiCorrectionUpdate(
-            1,
-            "10.1103/published",
-            {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
-        )
-    ]
+    assert compute_updates([row]) == []
+
+
+def test_preprint_deja_substitue_retrouve_son_doi():
+    # Un preprint arXiv substitué par l'article publié récupère son DOI d'origine.
+    row = _row(
+        1,
+        "article",
+        "10.1007/jhep07(2023)066",
+        raw_metadata={
+            "doi": {
+                "raw": "10.48550/arxiv.2210.12000",
+                "corrected_by": "DATACITE_VERSION_TO_CONCEPT",
+            }
+        },
+        raw_doi="10.48550/arxiv.2210.12000",
+        canonical_doi="10.1007/jhep07(2023)066",
+        same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+    )
+    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {})]
 
 
 def test_package_piece_substituted_to_parent():
