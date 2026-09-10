@@ -392,13 +392,17 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         ).rowcount
 
     def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
-        """Une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_authorships`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion."""
+        """Une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_authorships`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion.
+
+        Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la signature (`rejected_authorships`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette signature.
+        """
         return conn.execute(
             text(f"""
                 UPDATE source_authorships sa
                 SET person_id = NULL, resolution_mode = NULL
-                FROM author_identifying_keys aik
+                FROM author_identifying_keys aik, source_publications sp
                 WHERE sa.identity_id = aik.id
+                  AND sp.id = sa.source_publication_id
                   AND sa.resolution_mode = '{ResolutionMode.NAME.value}'
                   AND NOT EXISTS (
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
@@ -410,6 +414,17 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                       GROUP BY name_form
                       HAVING count(DISTINCT person_id) >= 2
                   )
+                  AND (
+                      SELECT count(DISTINCT pnf.person_id)
+                      FROM person_name_forms pnf
+                      WHERE pnf.name_form = aik.author_name_normalized
+                        AND pnf.status <> '{AttributionStatus.REJECTED.value}'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM rejected_authorships r
+                            WHERE r.publication_id = sp.publication_id
+                              AND r.person_id = pnf.person_id
+                        )
+                  ) >= 2
             """)
         ).rowcount
 

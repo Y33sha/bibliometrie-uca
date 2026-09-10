@@ -92,6 +92,40 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     assert _row(conn, by_identifier).person_id == a  # résolu par identifiant
 
 
+def _publication_of(conn, sa_id):
+    return conn.execute(
+        text(
+            "SELECT sp.publication_id FROM source_authorships sa "
+            "JOIN source_publications sp ON sp.id = sa.source_publication_id WHERE sa.id = :i"
+        ),
+        {"i": sa_id},
+    ).scalar_one()
+
+
+def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
+    """Comme la cascade, la purge écarte la personne rejetée pour la publication de la signature.
+
+    Régression : la purge comptait toutes les personnes de la forme, et remettait à NULL à chaque run une signature que la cascade rattachait de nouveau.
+    """
+    conn = sa_sync_conn
+    rejetee = _person(conn, "Tixier", "Laurent")
+    retenue = _person(conn, "Tixier", "Lucie")
+    _name_form(conn, "l tixier", rejetee)
+    _name_form(conn, "l tixier", retenue)
+
+    avec_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
+    conn.execute(
+        text("INSERT INTO rejected_authorships (publication_id, person_id) VALUES (:pub, :p)"),
+        {"pub": _publication_of(conn, avec_rejet), "p": rejetee},
+    )
+    sans_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
+
+    assert _Q.reorphan_ambiguous_nominal(conn) == 1
+
+    assert _row(conn, avec_rejet).person_id == retenue  # un seul candidat pour sa publication
+    assert _row(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
+
+
 def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     conn = sa_sync_conn
     p = _person(conn, "Zhang", "Wei")
