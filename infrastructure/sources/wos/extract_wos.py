@@ -107,6 +107,16 @@ class PgWosExtractAdapter(WosExtractAdapter):
         }
         return self._get(params, label=f"({year}, rec {first_record})")
 
+    def count(self, year: int, affiliations: list[str]) -> int:
+        """Nombre de records d'une année, lu sur une recherche qui n'en renvoie aucun (`count=0`)."""
+        params: dict[str, str | int | float | bool | None] = {
+            "databaseId": "WOS",
+            "usrQuery": parsing.build_query(year, affiliations),
+            "count": 0,
+            "firstRecord": 1,
+        }
+        return self.get_records_found(self._get(params, label=f"({year}, comptage)"))
+
     def check_quota(self) -> str | None:
         """Probe l'API pour récupérer le header `X-REC-AmtPerYear-Remaining`."""
         resp = httpx2.get(

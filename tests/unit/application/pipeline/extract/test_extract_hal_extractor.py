@@ -1,6 +1,6 @@
 """Tests unitaires du pilotage de l'extraction HAL par `HalExtractor`.
 
-La pagination `cursorMark` d'`extract_union` est éprouvée à part. Ce module porte sur ce qui l'entoure : découpage du travail en périmètres temporels, mode incrémental par date de dépôt, refus d'une configuration sans collection, arrêt sur circuit-breaker.
+La pagination `cursorMark` d'`extract_union` est éprouvée à part. Ce module porte sur ce qui l'entoure : découpage du travail en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental par date de dépôt, refus d'une configuration sans collection, arrêt sur circuit-breaker.
 
 Pas de réseau ni de base : un faux `HalExtractAdapter` sert une page vide, et la connexion est un mock.
 """
@@ -31,8 +31,9 @@ def _adapter(collections: dict[str, str], annees: list[int]) -> MagicMock:
         n_collections=len(collections),
     )
     a.get_years.return_value = annees
-    a.build_query.return_value = "q"
+    a.build_query.side_effect = lambda years=None, since=None: f"q{years or since}"
     a.build_collections_fq.return_value = "collCode_s:(…)"
+    a.count.return_value = 0
     a.fetch_page_cursor.return_value = _PAGE_VIDE
     return a
 
@@ -46,8 +47,15 @@ def _args(**surcharges) -> argparse.Namespace:
 def test_une_passe_par_annee_de_la_configuration():
     adapter = _adapter({"C": "Coll"}, [2023, 2024])
     HalExtractor(MagicMock(), _LOGGER, adapter).run(_args())
-    annees_demandees = [appel.kwargs.get("years") for appel in adapter.build_query.call_args_list]
-    assert annees_demandees == [[2023], [2024]]
+    requetes = [appel.args[0] for appel in adapter.fetch_page_cursor.call_args_list]
+    assert requetes == ["q[2023]", "q[2024]"]
+
+
+def test_chaque_annee_est_comptee_avant_l_extraction():
+    adapter = _adapter({"C": "Coll"}, [2023, 2024])
+    HalExtractor(MagicMock(), _LOGGER, adapter).run(_args())
+    comptees = [appel.args for appel in adapter.count.call_args_list]
+    assert comptees == [("q[2023]", "collCode_s:(…)"), ("q[2024]", "collCode_s:(…)")]
 
 
 def test_une_annee_demandee_ignore_la_configuration():
@@ -61,6 +69,7 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date():
     HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(since="2026-01-01"))
     assert adapter.fetch_page_cursor.call_count == 1
     assert adapter.build_query.call_args.kwargs.get("since") == "2026-01-01"
+    assert adapter.count.call_args.args[0] == "q2026-01-01"
 
 
 def test_sans_collection_refuse():

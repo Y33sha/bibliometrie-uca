@@ -232,6 +232,14 @@ class Progression:
             self._barre.total = total
             self._barre.refresh()
 
+    def renomme(self, libelle: str) -> None:
+        """Change le libellé de la barre et des jalons, pour suivre le périmètre en cours."""
+        self._libelle = libelle
+        barre = self._barre
+        if barre is not None:
+            with tqdm.get_lock():
+                barre.set_description_str(libelle)
+
     def avance(self, n: int = 1) -> None:
         """Compte `n` unités traitées de plus."""
         self._fait += n

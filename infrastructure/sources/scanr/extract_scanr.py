@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.scanr import (
     ScanrExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.config import (
@@ -98,7 +98,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
         Tout est en **contexte `filter`** : un `term` sur l'année et un `terms` sur les affiliations (« au moins une de la liste » — équivalent strict du `minimum_should_match: 1` d'un `should`). Le contexte `filter` ne calcule aucun `_score` et est cacheable côté cluster ; mesuré ~9× plus rapide que l'équivalent `must`/`should` scoré (≈1 s vs ≈9,5 s par page de 200 sur le cluster ScanR), pour un résultat identique : le tri se fait sur `id.keyword` ASC, le score ne sert pas. Ce tri permet la pagination `search_after`.
 
-        `track_total` ne demande le comptage exact du set (`track_total_hits`) que sur la première page : Elasticsearch recompte sinon l'intégralité des résultats à *chaque* page, alors que le total n'est consommé qu'une fois (log + dénominateur de progression). Les pages suivantes le coupent (`False`), ce qui évite un full-count par page sur des sets de ~15k docs.
+        `track_total` demande le comptage exact du set (`track_total_hits`), que seul `count` consomme. Les pages le coupent (`False`) : Elasticsearch recompterait sinon l'intégralité des résultats à chaque page.
         """
         query: dict[str, JsonValue] = {
             "size": SCANR_PER_PAGE,
@@ -130,6 +130,11 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
         """Exécute une requête Elasticsearch (avec retry/backoff)."""
         return self._search(query)
+
+    def count(self, year: int, affiliation_ids: list[str]) -> int:
+        """Nombre de documents d'une année, lu sur un comptage exact sans document (`size=0`)."""
+        query = {**self.build_query(year, affiliation_ids, track_total=True), "size": 0}
+        return as_int(at_path(self.fetch_page(query), "hits", "total").get("value")) or 0
 
     # ── SQL ────────────────────────────────────────────────────
 

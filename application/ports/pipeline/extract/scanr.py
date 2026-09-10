@@ -58,6 +58,10 @@ class ScanrExtractAdapter(Protocol):
 
     def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]: ...
 
+    def count(self, year: int, affiliation_ids: list[str]) -> int:
+        """Nombre de documents d'une année, sans en récupérer aucun."""
+        ...
+
     # ── SQL ────────────────────────────────────────────────────
 
     def upsert_doc(self, conn: Connection, doc: Mapping[str, JsonValue]) -> UpsertOutcome:

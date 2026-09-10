@@ -16,10 +16,15 @@ import pytest
 from application.pipeline.extract import extract_wos
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_wos import WosExtractor, extract_year
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractConfig
 
 _LOGGER = logging.getLogger("test")
+
+
+def _avancement() -> Progression:
+    return Progression(None, "WoS", None)
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +38,7 @@ def _adapter(pages: list[list[dict]], *, total: int, comptes=None) -> MagicMock:
     a = MagicMock()
     a.build_query.return_value = "TS=(…)"
     a.get_records_found.return_value = total
+    a.count.return_value = total
     a.check_quota.return_value = "1000"
     a.fetch_page.side_effect = [{"page": i} for i in range(len(pages) + 1)]
     a.get_records.side_effect = pages
@@ -49,7 +55,7 @@ def _records(n: int) -> list[dict]:
 
 def test_pagination_sur_le_premier_record():
     adapter = _adapter([_records(2), _records(1)], total=3)
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (3, 0, 0)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (3, 0, 0)
     # Deuxième page demandée à partir du record 3.
     assert adapter.fetch_page.call_args_list[1].args[1] == 3
 
@@ -60,31 +66,31 @@ def test_ventilation_cumulee_sur_les_pages():
         BatchInsertCounts(new=0, updated=2, unchanged=1),
     ]
     adapter = _adapter([_records(1), _records(1)], total=2, comptes=comptes)
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (1, 2, 1)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (1, 2, 1)
 
 
 def test_requete_impossible():
     adapter = _adapter([], total=0)
     adapter.fetch_page.side_effect = [None]
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (0, 0, 0)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (0, 0, 0)
 
 
 def test_aucun_record_trouve():
     adapter = _adapter([], total=0)
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (0, 0, 0)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (0, 0, 0)
     assert adapter.insert_batch.call_count == 0
 
 
 def test_trois_pages_vides_consecutives_arretent_l_annee():
     adapter = _adapter([[], [], []], total=10)
     adapter.fetch_page.side_effect = [{"page": i} for i in range(6)]
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (0, 0, 0)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (0, 0, 0)
 
 
 def test_une_page_vide_isolee_est_retentee():
     adapter = _adapter([[], _records(2)], total=2)
     adapter.fetch_page.side_effect = [{"page": i} for i in range(4)]
-    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER) == (2, 0, 0)
+    assert extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement()) == (2, 0, 0)
 
 
 def test_plafond_de_l_api_interrompt():
@@ -92,7 +98,7 @@ def test_plafond_de_l_api_interrompt():
     adapter = _adapter([_records(1)], total=200_000)
     adapter.get_records.side_effect = [[{"UID": f"WOS:{i}"} for i in range(100_001)]]
     adapter.insert_batch.side_effect = [BatchInsertCounts(new=100_001, updated=0, unchanged=0)]
-    new, _, _ = extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER)
+    new, _, _ = extract_year(adapter, MagicMock(), 2024, ["UCA"], _LOGGER, _avancement())
     assert new == 100_001
     assert adapter.fetch_page.call_count == 1
 
@@ -131,6 +137,14 @@ def test_run_isole_l_echec_d_une_annee():
     adapter = _adapter([_records(1)], total=1)
     adapter.fetch_page.side_effect = [RuntimeError("API en panne"), {"page": 0}, {"page": 1}]
     metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args())
+    assert metrics.new == 1
+
+
+def test_run_survit_a_un_comptage_impossible():
+    """Un comptage qui lève compte l'année pour zéro : son extraction s'exécute quand même."""
+    adapter = _adapter([_records(1)], total=1)
+    adapter.count.side_effect = RuntimeError("API en panne")
+    metrics = _extracteur(adapter, _config(), [2024]).run(_args())
     assert metrics.new == 1
 
 

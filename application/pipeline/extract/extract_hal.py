@@ -18,12 +18,11 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
-from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
+from domain.types import as_mapping, as_sequence, as_str, at_path
 
 
 def extract_union(
@@ -31,6 +30,7 @@ def extract_union(
     config: HalExtractConfig,
     conn: Connection,
     logger: ExtractLogger,
+    avancement: Progression,
     *,
     years: list[int] | None = None,
     since: str | None = None,
@@ -38,19 +38,14 @@ def extract_union(
 ) -> PhaseMetrics:
     """Extrait l'union des collections configurées pour un périmètre temporel.
 
-    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis paginate en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois. `logger` est le logger scopé construit par `extract_all` : `[hal · <année>]` par année, `[hal]` sur une passe unique. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis pagine en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois et fait avancer `avancement`. `logger`, scopé par `extract_all`, porte les avertissements. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
     """
     codes = list(config.all_collections.keys())
     query = adapter.build_query(years=years, since=since)
     fq = adapter.build_collections_fq(codes)
 
     metrics = PhaseMetrics()
-
-    page_size = adapter.per_page()
     cursor = "*"
-    num_found = 0
-    total_pages: int | None = None
-    avancement = Progression(None, branche_de_source("hal"), logger)
     while True:
         if breaker_tripped():
             logger.warning(
@@ -58,17 +53,7 @@ def extract_union(
             )
             break
         data = adapter.fetch_page_cursor(query, fq, cursor)
-        resp = at_path(data, "response")
-        docs = [as_mapping(d) for d in as_sequence(resp.get("docs"))]
-
-        # `numFound` n'est connu qu'à la première réponse cursorMark : on logue alors le volume du périmètre et le nombre de pages attendu.
-        if total_pages is None:
-            num_found = as_int(resp.get("numFound")) or 0
-            total_pages = (num_found + page_size - 1) // page_size if num_found else 0
-            logger.info(
-                "%s documents à récupérer, ~%s pages de %s", num_found, total_pages, page_size
-            )
-            avancement.fixer_total(num_found)
+        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
 
         for doc in docs:
             hal_id = adapter.extract_id(doc)
@@ -94,7 +79,6 @@ def extract_union(
             break
         cursor = next_cursor
 
-    avancement.ferme()
     return metrics
 
 
@@ -114,43 +98,45 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Extraction de l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les dépôts depuis la date. Sinon une passe `cursorMark` par année : progression visible année par année et reprise ciblée via `--year` sans tout recommencer (chaque année est un sous-ensemble disjoint — un document n'a qu'une `producedDateY_i`).
+        En mode incrémental, un seul périmètre : les dépôts depuis la date. Sinon une passe `cursorMark` par année, qui permet une reprise ciblée via `--year` (chaque année est un sous-ensemble disjoint — un document n'a qu'une `producedDateY_i`).
         """
+        fq = self._adapter.build_collections_fq(list(config.all_collections.keys()))
+
         if args.since:
+            query = self._adapter.build_query(years=None, since=args.since)
+            return self._extrait_d_un_tenant(
+                self._adapter.count(query, fq),
+                lambda avancement: extract_union(
+                    self._adapter,
+                    config,
+                    self.conn,
+                    scoped_logger(self.logger, self.SOURCE),
+                    avancement,
+                    since=args.since,
+                    breaker_tripped=self._breaker_tripped,
+                ),
+            )
+
+        def compte(annee: int) -> int:
+            return self._adapter.count(self._adapter.build_query(years=[annee]), fq)
+
+        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
             return extract_union(
                 self._adapter,
                 config,
                 self.conn,
-                scoped_logger(self.logger, self.SOURCE),
-                since=args.since,
+                scoped_logger(self.logger, self.SOURCE, str(annee)),
+                avancement,
+                years=[annee],
                 breaker_tripped=self._breaker_tripped,
             )
 
-        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
-        years = [args.year] if args.year else config_years
-
-        metrics = PhaseMetrics()
-        for year in years:
-            if self._stop_on_tripped("années restantes sautées"):
-                break
-            slog = scoped_logger(self.logger, self.SOURCE, str(year))
-            year_metrics = extract_union(
-                self._adapter,
-                config,
-                self.conn,
-                slog,
-                years=[year],
-                breaker_tripped=self._breaker_tripped,
-            )
-            metrics.merge(year_metrics)
-            slog.info(
-                "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
-                year_metrics.total,
-                year_metrics.new,
-                year_metrics.updated,
-                year_metrics.unchanged,
-            )
-        return metrics
+        years = (
+            [args.year]
+            if args.year
+            else self._adapter.get_years(self.conn, start_year=args.start_year)
+        )
+        return self._extrait_par_annee(years, compte, extrait)
 
 
 __all__ = [

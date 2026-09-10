@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from application.pipeline.extract.base import ExtractionConfigError
+from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
 from application.pipeline.signals import (
@@ -161,9 +162,7 @@ def _run_parallel_sources(
     if not args_by_source:
         return {}
 
-    logger.info(
-        "▶ extracteurs en parallèle (%d) : %s", len(args_by_source), ", ".join(args_by_source)
-    )
+    etape(logger, "Extraction des sources")
     outcomes = run_parallel(
         {
             source: _extraction_thunk(extract_one, source, args)

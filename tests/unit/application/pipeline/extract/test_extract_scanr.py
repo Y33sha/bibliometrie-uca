@@ -13,10 +13,15 @@ import pytest
 
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_scanr import ScanrExtractor, extract_year
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractConfig
 
 _LOGGER = logging.getLogger("test")
+
+
+def _avancement() -> Progression:
+    return Progression(None, "ScanR", None)
 
 
 def _hit(identifiant: str, route: UpsertOutcome = UpsertOutcome.NEW) -> dict:
@@ -24,25 +29,27 @@ def _hit(identifiant: str, route: UpsertOutcome = UpsertOutcome.NEW) -> dict:
     return {"_source": {"id": identifiant, "_route": route}, "sort": [identifiant]}
 
 
-def _page(hits: list[dict], total: int | None = None) -> dict:
-    corps: dict = {"hits": {"hits": hits}}
-    if total is not None:
-        corps["hits"]["total"] = {"value": total}
-    return corps
+def _page(hits: list[dict]) -> dict:
+    return {"hits": {"hits": hits}}
 
 
 def _adapter(pages: list[dict]) -> MagicMock:
     a = MagicMock()
     a.build_query.return_value = {"q": "…"}
+    a.count.return_value = sum(len(p["hits"]["hits"]) for p in pages)
     a.extract_id.side_effect = lambda doc: doc.get("id", "")
     a.upsert_doc.side_effect = lambda conn, doc: doc["_route"]
     a.fetch_page.side_effect = pages
     return a
 
 
+def _extraire(adapter: MagicMock) -> tuple[int, int, int, int]:
+    return extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER, _avancement())
+
+
 def test_pagination_jusqu_a_la_page_vide():
-    adapter = _adapter([_page([_hit("a"), _hit("b")], total=3), _page([_hit("c")]), _page([])])
-    assert extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER) == (3, 3, 0, 0)
+    adapter = _adapter([_page([_hit("a"), _hit("b")]), _page([_hit("c")]), _page([])])
+    assert _extraire(adapter) == (3, 3, 0, 0)
 
 
 def test_routage_par_sort_de_l_upsert():
@@ -53,23 +60,22 @@ def test_routage_par_sort_de_l_upsert():
                     _hit("a", UpsertOutcome.NEW),
                     _hit("b", UpsertOutcome.UPDATED),
                     _hit("c", UpsertOutcome.UNCHANGED),
-                ],
-                total=3,
+                ]
             ),
             _page([]),
         ]
     )
-    assert extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER) == (3, 1, 1, 1)
+    assert _extraire(adapter) == (3, 1, 1, 1)
 
 
 def test_document_sans_identifiant_ignore():
-    adapter = _adapter([_page([_hit(""), _hit("b")], total=2), _page([])])
-    assert extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER)[1] == 1
+    adapter = _adapter([_page([_hit(""), _hit("b")]), _page([])])
+    assert _extraire(adapter)[:2] == (1, 1)
 
 
 def test_le_curseur_suit_la_cle_de_tri_du_dernier_document():
-    adapter = _adapter([_page([_hit("a"), _hit("b")], total=2), _page([])])
-    extract_year(adapter, MagicMock(), 2024, ["S1"], _LOGGER)
+    adapter = _adapter([_page([_hit("a"), _hit("b")]), _page([])])
+    _extraire(adapter)
     # Premier appel sans curseur, second reprenant la clé de tri du dernier document servi.
     assert adapter.build_query.call_args_list[0].args[2] is None
     assert adapter.build_query.call_args_list[1].args[2] == ["b"]
@@ -98,15 +104,14 @@ def _args(**surcharges) -> argparse.Namespace:
 
 
 def test_run_parcourt_les_annees_de_la_configuration():
-    adapter = _adapter(
-        [_page([_hit("a")], total=1), _page([]), _page([_hit("b")], total=1), _page([])]
-    )
+    adapter = _adapter([_page([_hit("a")]), _page([]), _page([_hit("b")]), _page([])])
     metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args())
     assert metrics.new == 2
+    assert [appel.args[0] for appel in adapter.count.call_args_list] == [2023, 2024]
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration():
-    adapter = _adapter([_page([_hit("a")], total=1), _page([])])
+    adapter = _adapter([_page([_hit("a")]), _page([])])
     metrics = _extracteur(adapter, _config(), [2020, 2021, 2022]).run(_args(year=2024))
     assert metrics.total == 1
     assert adapter.build_query.call_args_list[0].args[0] == 2024

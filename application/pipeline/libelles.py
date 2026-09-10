@@ -22,9 +22,19 @@ _LARGEUR_SOURCE = max(len(libelle) for libelle in SOURCE_LABELS.values())
 """Colonne des noms de source, à la largeur du plus long."""
 
 
-def branche_de_source(source: str) -> str:
-    """Libellé de la barre d'avancement d'une source : sa branche, son nom, et le remplissage qui aligne les barres d'une même phase les unes sous les autres."""
-    return f"{BRANCHE}{source_label(source):<{_LARGEUR_SOURCE}}"
+_LARGEUR_PORTEE = len("2023-2026")
+"""Colonne du périmètre d'une source, à la largeur d'une plage d'années."""
+
+
+def branche_de_source(source: str, portee: str | None = None) -> str:
+    """Libellé de la barre d'avancement d'une source : sa branche, son nom, et le remplissage qui aligne les barres d'une même phase les unes sous les autres.
+
+    `portee` ajoute une colonne pour le périmètre en cours, une année par exemple. Une portée vide garde la colonne, pour aligner une source sans périmètre sur les autres.
+    """
+    libelle = f"{BRANCHE}{source_label(source):<{_LARGEUR_SOURCE}}"
+    if portee is None:
+        return libelle
+    return f"{libelle} {portee:<{_LARGEUR_PORTEE}}"
 
 
 def etape(logger: ScopedOrPlainLogger, titre: str, *args: object) -> None:

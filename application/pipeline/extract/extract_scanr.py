@@ -15,12 +15,11 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
+from domain.types import JsonValue, as_mapping, as_sequence, at_path
 
 
 def extract_year(
@@ -29,27 +28,20 @@ def extract_year(
     year: int,
     affiliation_ids: list[str],
     logger: ExtractLogger,
+    avancement: Progression,
 ) -> tuple[int, int, int, int]:
     """Extrait toutes les publications d'une année.
 
-    Retourne (total, nouveaux, mis à jour, inchangés)."""
+    Retourne (trouvés, nouveaux, mis à jour, inchangés)."""
     search_after: list[JsonValue] | None = None
     inserted = 0
     updated = 0
     unchanged = 0
     seen = 0
-    total = 0
 
-    avancement = Progression(None, branche_de_source("scanr"), logger)
     while True:
-        first_page = search_after is None
-        query = adapter.build_query(year, affiliation_ids, search_after, track_total=first_page)
+        query = adapter.build_query(year, affiliation_ids, search_after)
         data = adapter.fetch_page(query)
-
-        if first_page:
-            total = as_int(at_path(data, "hits", "total").get("value")) or 0
-            logger.info("%s documents à récupérer", total)
-            avancement.fixer_total(total)
 
         hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
         if not hits:
@@ -76,9 +68,8 @@ def extract_year(
         if seen % 500 == 0:
             conn.commit()
 
-    avancement.ferme()
     conn.commit()
-    return total, inserted, updated, unchanged
+    return seen, inserted, updated, unchanged
 
 
 class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
@@ -97,29 +88,29 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
         return config
 
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
-        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
-        years = [args.year] if args.year else config_years
-        stats = PhaseMetrics()
-        for year in years:
-            if self._stop_on_tripped("années restantes sautées"):
-                break
-            slog = scoped_logger(self.logger, self.SOURCE, str(year))
+        ids = config.affiliation_ids
+
+        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
             total, inserted, updated, unchanged = extract_year(
                 self._adapter,
                 self.conn,
-                year,
-                config.affiliation_ids,
-                slog,
+                annee,
+                ids,
+                scoped_logger(self.logger, self.SOURCE, str(annee)),
+                avancement,
             )
-            stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
-            slog.info(
-                "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
-                total,
-                inserted,
-                updated,
-                unchanged,
-            )
-        return stats
+            metrics = PhaseMetrics()
+            metrics.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
+            return metrics
+
+        years = (
+            [args.year]
+            if args.year
+            else self._adapter.get_years(self.conn, start_year=args.start_year)
+        )
+        return self._extrait_par_annee(
+            years, lambda annee: self._adapter.count(annee, ids), extrait
+        )
 
 
 __all__ = [

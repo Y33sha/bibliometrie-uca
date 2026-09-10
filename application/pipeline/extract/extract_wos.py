@@ -16,9 +16,8 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
@@ -34,6 +33,7 @@ def extract_year(
     year: int,
     affiliations: list[str],
     logger: ExtractLogger,
+    avancement: Progression,
 ) -> tuple[int, int, int]:
     """Extrait toutes les publications d'une année.
 
@@ -44,8 +44,6 @@ def extract_year(
         return 0, 0, 0
 
     total_count = adapter.get_records_found(data)
-    logger.info("%s documents à récupérer", total_count)
-
     if total_count == 0:
         return 0, 0, 0
 
@@ -56,54 +54,45 @@ def extract_year(
     page_num = 0
     consecutive_failures = 0
 
-    with progression(total_count, branche_de_source("wos"), logger) as avancement:
-        while first_record <= total_count:
-            if first_record > 1:
-                data = adapter.fetch_page(year, first_record, affiliations)
+    while first_record <= total_count:
+        if first_record > 1:
+            data = adapter.fetch_page(year, first_record, affiliations)
 
-            records = adapter.get_records(data)
-            if not records:
-                consecutive_failures += 1
-                if consecutive_failures >= 3:
-                    logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
-                    break
-                logger.warning(
-                    "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
-                )
-                time.sleep(5)
-                continue
-
-            consecutive_failures = 0
-            page_num += 1
-
-            counts = adapter.insert_batch(conn, records)
-            conn.commit()
-            total_new += counts.new
-            total_updated += counts.updated
-            total_unchanged += counts.unchanged
-            avancement.avance(len(records))
-
-            first_record += len(records)
-
-            # Pause longue toutes les N pages pour laisser l'API souffler
-            if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
-                logger.info("pause de %ss (toutes les %s pages)…", _BREATHER_SECS, _BREATHER_EVERY)
-                time.sleep(_BREATHER_SECS)
-
-            if first_record > _WOS_FIRST_RECORD_LIMIT:
-                logger.warning(
-                    "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
-                    _WOS_FIRST_RECORD_LIMIT,
-                )
+        records = adapter.get_records(data)
+        if not records:
+            consecutive_failures += 1
+            if consecutive_failures >= 3:
+                logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
                 break
+            logger.warning(
+                "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
+            )
+            time.sleep(5)
+            continue
 
-    logger.info(
-        "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
-        total_count,
-        total_new,
-        total_updated,
-        total_unchanged,
-    )
+        consecutive_failures = 0
+        page_num += 1
+
+        counts = adapter.insert_batch(conn, records)
+        conn.commit()
+        total_new += counts.new
+        total_updated += counts.updated
+        total_unchanged += counts.unchanged
+        avancement.avance(len(records))
+
+        first_record += len(records)
+
+        # Pause longue toutes les N pages pour laisser l'API souffler
+        if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
+            time.sleep(_BREATHER_SECS)
+
+        if first_record > _WOS_FIRST_RECORD_LIMIT:
+            logger.warning(
+                "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
+                _WOS_FIRST_RECORD_LIMIT,
+            )
+            break
+
     return total_new, total_updated, total_unchanged
 
 
@@ -132,30 +121,36 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
             self.logger.info("Quota annuel restant : %s records", remaining)
 
     def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
-        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
-        years = [args.year] if args.year else config_years
+        affiliations = config.affiliations
+        years = (
+            [args.year]
+            if args.year
+            else self._adapter.get_years(self.conn, start_year=args.start_year)
+        )
 
-        stats = PhaseMetrics()
-        for i, year in enumerate(years):
-            if self._stop_on_tripped("années restantes sautées"):
-                break
-            slog = scoped_logger(self.logger, self.SOURCE, str(year))
+        def compte(annee: int) -> int:
+            try:
+                return self._adapter.count(annee, affiliations)
+            except Exception:
+                # L'extraction de l'année rencontre la même erreur et la signale.
+                return 0
+
+        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
+            slog = scoped_logger(self.logger, self.SOURCE, str(annee))
             try:
                 new, updated, unchanged = extract_year(
-                    self._adapter,
-                    self.conn,
-                    year,
-                    config.affiliations,
-                    slog,
+                    self._adapter, self.conn, annee, affiliations, slog, avancement
                 )
-                stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:
                 slog.error("erreur : %s — passage à la suivante", e)
-            # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
-            if i < len(years) - 1 and not self._breaker_tripped():
-                self.logger.info("Pause de 30s avant l'année suivante...")
-                time.sleep(30)
-        return stats
+                return PhaseMetrics()
+            finally:
+                # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
+                if annee != years[-1] and not self._breaker_tripped():
+                    time.sleep(30)
+            return PhaseMetrics(new=new, updated=updated, unchanged=unchanged)
+
+        return self._extrait_par_annee(years, compte, extrait)
 
 
 __all__ = [

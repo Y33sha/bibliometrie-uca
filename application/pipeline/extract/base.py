@@ -10,12 +10,15 @@ from __future__ import annotations
 import argparse
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import ClassVar
 
 from sqlalchemy import Connection
 
+from application.pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
 from application.pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import Progression, progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 
 __all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
@@ -23,6 +26,26 @@ __all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_
 
 # Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `application.pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
 ExtractLogger = ScopedOrPlainLogger
+
+
+type Formes = tuple[str, str]
+"""Singulier et pluriel d'un mot du bilan."""
+
+_FORMES_DU_BILAN: dict[bool, tuple[Formes, Formes, Formes, Formes]] = {
+    False: (
+        ("trouvé", "trouvés"),
+        ("nouveau", "nouveaux"),
+        ("mis à jour", "mis à jour"),
+        ("inchangé", "inchangés"),
+    ),
+    True: (
+        ("trouvée", "trouvées"),
+        ("nouvelle", "nouvelles"),
+        ("mise à jour", "mises à jour"),
+        ("inchangée", "inchangées"),
+    ),
+}
+"""Mots du bilan d'une source, au masculin puis au féminin."""
 
 
 class ExtractionConfigError(Exception):
@@ -52,6 +75,10 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
     """
 
     SOURCE: ClassVar[str] = ""
+    DOCUMENT: ClassVar[str] = "document"
+    """Nom des éléments que rapporte la source, au singulier."""
+    FEMININ: ClassVar[bool] = False
+    """Genre de `DOCUMENT`, auquel s'accordent les mots du bilan."""
 
     def __init__(
         self,
@@ -77,6 +104,75 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
             )
             return True
         return False
+
+    # ── Barre et bilan de la source ─────────────────────────────
+
+    def _libelle(self, portee: str | None = None) -> str:
+        """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
+        return branche_de_source(self.SOURCE, portee)
+
+    def _extrait_par_annee(
+        self,
+        annees: list[int],
+        compte: Callable[[int], int],
+        extrait: Callable[[int, Progression], PhaseMetrics],
+    ) -> PhaseMetrics:
+        """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
+
+        `compte` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
+        """
+        metrics = PhaseMetrics()
+        if not annees:
+            return metrics
+        total = sum(compte(annee) for annee in annees)
+        with progression(total, self._libelle(str(annees[0])), self.logger) as avancement:
+            for i, annee in enumerate(annees):
+                restantes = annees[i:]
+                sautees = (
+                    f"{forme(len(restantes), 'année')} {', '.join(map(str, restantes))} "
+                    f"{forme(len(restantes), 'sautée')}"
+                )
+                if self._stop_on_tripped(sautees):
+                    break
+                avancement.renomme(self._libelle(str(annee)))
+                metrics.merge(extrait(annee, avancement))
+            else:
+                plage = f"{annees[0]}-{annees[-1]}" if len(annees) > 1 else str(annees[0])
+                avancement.renomme(self._libelle(plage))
+        self._ecrit_bilan(metrics)
+        return metrics
+
+    def _extrait_d_un_tenant(
+        self, total: int, extrait: Callable[[Progression], PhaseMetrics]
+    ) -> PhaseMetrics:
+        """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
+        with progression(total, self._libelle(), self.logger) as avancement:
+            metrics = extrait(avancement)
+        self._ecrit_bilan(metrics)
+        return metrics
+
+    def _ecrit_bilan(
+        self,
+        metrics: PhaseMetrics,
+        *,
+        trouves: int | None = None,
+        participe: Formes | None = None,
+    ) -> None:
+        """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
+
+        `trouves` et `participe` donnent le nombre et le mot du bilan quand un filtre retient une partie des documents parcourus.
+        """
+        trouve, nouveau, mis_a_jour, inchange = _FORMES_DU_BILAN[self.FEMININ]
+        n = metrics.total if trouves is None else trouves
+        self.logger.info(
+            "%s%s %s : %s, %s, %s",
+            SUITE_DE_BRANCHE,
+            accord(n, self.DOCUMENT),
+            forme(n, *(participe or trouve)),
+            accord(metrics.new, *nouveau),
+            accord(metrics.updated, *mis_a_jour),
+            accord(metrics.unchanged, *inchange),
+        )
 
     # ── Hooks métier ────────────────────────────────────────────
 
