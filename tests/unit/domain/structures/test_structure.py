@@ -44,6 +44,55 @@ class TestStructureConstruction:
         assert s.name_forms == (nf,)
 
 
+class TestStructureCreate:
+    def test_parses_type_and_identifiers(self):
+        s = Structure.create(
+            code="UMR-1234",
+            name="Lab",
+            structure_type="labo",
+            ror_id="https://ror.org/02feahw73",
+            hal_collection=" limos ",
+        )
+        assert s.structure_type is StructureType.LABO
+        assert s.ror_id == RorId("02feahw73")
+        assert s.hal_collection == HalCollection("LIMOS")
+
+    @pytest.mark.parametrize("vide", ["", "   "])
+    def test_blank_identifiers_are_absent(self, vide):
+        s = Structure.create(
+            code="X", name="Lab", structure_type="labo", ror_id=vide, hal_collection=vide
+        )
+        assert s.ror_id is None
+        assert s.hal_collection is None
+
+    def test_unknown_type_is_named(self):
+        with pytest.raises(ValidationError, match="Type de structure invalide : 'inconnu'"):
+            Structure.create(code="X", name="Lab", structure_type="inconnu")
+
+    def test_invalid_ror_is_named(self):
+        with pytest.raises(ValidationError, match="ror_id invalide : '12feahw73'"):
+            Structure.create(code="X", name="Lab", structure_type="labo", ror_id="12feahw73")
+
+    def test_invalid_hal_collection_is_named(self):
+        with pytest.raises(ValidationError, match="hal_collection invalide : 'LAB X'"):
+            Structure.create(code="X", name="Lab", structure_type="labo", hal_collection="LAB X")
+
+
+class TestStructureApply:
+    def test_validates_and_lists_the_applied_fields(self):
+        s = Structure(id=1, code="X", name="Lab", structure_type=StructureType.LABO)
+        applied = s.apply(structure_type="equipe", ror_id="02FEAHW73", hal_collection="limos")
+        assert applied == ["structure_type", "ror_id", "hal_collection"]
+        assert s.structure_type is StructureType.EQUIPE
+        assert s.ror_id == RorId("02feahw73")
+        assert s.hal_collection == HalCollection("LIMOS")
+
+    def test_invalid_type_is_refused(self):
+        s = Structure(id=1, code="X", name="Lab", structure_type=StructureType.LABO)
+        with pytest.raises(ValidationError, match="Type de structure invalide"):
+            s.apply(structure_type="inconnu")
+
+
 class TestRorId:
     @pytest.mark.parametrize(
         ("raw", "expected"),
