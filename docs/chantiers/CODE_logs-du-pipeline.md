@@ -74,3 +74,4 @@ Puis :
 - Le mode texte et le mode JSON portent-ils le même contenu ?
 - Les bilans de phase passent par des tables d'observabilité (`metrics.details["table"]`). Leur rendu entre-t-il dans ce chantier ?
 - Un niveau de détail réglable est-il utile, ou le partage entre terminal et journal suffit-il ?
+- Une barre qui compte les éléments retenus affiche deux mesures : le pourcentage des éléments parcourus, qui atteint 100 %, et un compteur de retenus souvent très en deçà. Faut-il un autre affichage ? La question vaut pour toutes les phases.
