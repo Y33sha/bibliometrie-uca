@@ -89,6 +89,9 @@ class TestParseRawAuthorName:
     def test_comma_format(self):
         assert parse_raw_author_name("Dupont, Jean") == ("Dupont", "Jean")
 
+    def test_only_the_first_comma_separates_last_from_first_name(self):
+        assert parse_raw_author_name("Martin, Jean-Luc, Jr.") == ("Martin", "Jean-Luc, Jr.")
+
     def test_space_format(self):
         # "Jean Dupont" → last=Dupont, first=Jean
         assert parse_raw_author_name("Jean Dupont") == ("Dupont", "Jean")
