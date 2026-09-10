@@ -396,28 +396,37 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
         Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la signature (`rejected_authorships`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette signature.
         """
+        # Les candidates (nominales, non épinglées, à forme ambiguë) sont matérialisées d'abord : le
+        # décompte par signature et la jointure vers la publication ne portent que sur elles.
         return conn.execute(
             text(f"""
+                WITH candidates AS MATERIALIZED (
+                    SELECT sa.id, sa.source_publication_id,
+                           aik.author_name_normalized AS name_form
+                    FROM source_authorships sa
+                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                    WHERE sa.resolution_mode = '{ResolutionMode.NAME.value}'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM confirmed_authorships ca
+                          WHERE ca.source_authorship_id = sa.id
+                      )
+                      AND aik.author_name_normalized IN (
+                          SELECT name_form
+                          FROM person_name_forms
+                          WHERE status <> '{AttributionStatus.REJECTED.value}'
+                          GROUP BY name_form
+                          HAVING count(DISTINCT person_id) >= 2
+                      )
+                )
                 UPDATE source_authorships sa
                 SET person_id = NULL, resolution_mode = NULL
-                FROM author_identifying_keys aik, source_publications sp
-                WHERE sa.identity_id = aik.id
-                  AND sp.id = sa.source_publication_id
-                  AND sa.resolution_mode = '{ResolutionMode.NAME.value}'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
-                  )
-                  AND aik.author_name_normalized IN (
-                      SELECT name_form
-                      FROM person_name_forms
-                      WHERE status <> '{AttributionStatus.REJECTED.value}'
-                      GROUP BY name_form
-                      HAVING count(DISTINCT person_id) >= 2
-                  )
+                FROM candidates c
+                JOIN source_publications sp ON sp.id = c.source_publication_id
+                WHERE sa.id = c.id
                   AND (
                       SELECT count(DISTINCT pnf.person_id)
                       FROM person_name_forms pnf
-                      WHERE pnf.name_form = aik.author_name_normalized
+                      WHERE pnf.name_form = c.name_form
                         AND pnf.status <> '{AttributionStatus.REJECTED.value}'
                         AND NOT EXISTS (
                             SELECT 1 FROM rejected_authorships r
