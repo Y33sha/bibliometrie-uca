@@ -31,6 +31,21 @@ class TestFormMatchesPerson:
             "helene chanal", "chanal", "herve", confirmed_forms=["herve chanal"]
         )
 
+    def test_family_name_alone_matches(self):
+        assert form_matches_person("martin", "martin", "jean")
+
+    def test_first_name_of_another_person_does_not_match(self):
+        """Le prénom commun ne suffit pas : le patronyme de la forme doit aussi correspondre."""
+        assert not form_matches_person("pierre durand", "martin", "pierre")
+
+    def test_confirmed_form_longer_than_the_form(self):
+        assert form_matches_person("dupont", "martin", "jean", confirmed_forms=["marie dupont"])
+
+    def test_form_longer_than_the_confirmed_form(self):
+        assert form_matches_person(
+            "marie jeanne dupont", "martin", "paul", confirmed_forms=["marie dupont"]
+        )
+
 
 class TestDecideCrossSourceMatch:
     def test_no_candidates_returns_none(self):
@@ -78,6 +93,40 @@ class TestDecideCrossSourceMatch:
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
+            )
+            is None
+        )
+
+    def test_same_source_candidate_does_not_hide_the_next_one(self):
+        candidates = [(17, "dupont", "jean", "openalex"), (42, "dupont", "jean", "hal")]
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=candidates,
+            )
+            == 42
+        )
+
+    def test_same_first_name_other_last_name_skipped(self):
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=[(42, "martin", "jean", "hal")],
+            )
+            is None
+        )
+
+    def test_same_last_name_other_first_name_skipped(self):
+        assert (
+            decide_cross_source_match(
+                authorship_source="openalex",
+                last_norm="dupont",
+                first_norm="jean",
+                candidates=[(42, "dupont", "pierre", "hal")],
             )
             is None
         )
