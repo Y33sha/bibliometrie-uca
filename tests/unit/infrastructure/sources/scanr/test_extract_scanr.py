@@ -48,8 +48,8 @@ class TestBuildQuery:
         assert "search_after" not in q
 
     def test_track_total_only_when_requested(self, adapter):
-        # Le comptage exact du set est coûteux côté Elasticsearch : on ne le
-        # demande que sur la première page (`track_total=True`), pas par défaut.
+        # Le comptage exact du set est coûteux côté Elasticsearch : seul le
+        # comptage le demande (`track_total=True`), les pages s'en passent.
         assert adapter.build_query(year=2024, affiliation_ids=["A1"])["track_total_hits"] is False
         assert (
             adapter.build_query(year=2024, affiliation_ids=["A1"], track_total=True)[

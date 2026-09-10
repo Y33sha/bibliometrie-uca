@@ -1,6 +1,6 @@
 """Adapter theses.fr pour la phase extract : HTTP (recherche paginée par `debut`/`nombre`) + écritures staging + config.
 
-Implémente le port `application.ports.pipeline.extract.theses.ThesesExtractAdapter`. L'orchestration de la phase (boucle par PPN × statut, filtre année post-fetch) vit côté `application.pipeline.extract.extract_theses`.
+Implémente le port `application.ports.pipeline.extract.theses.ThesesExtractAdapter`. L'orchestration de la phase (pagination, filtre année post-fetch) vit côté `application.pipeline.extract.extract_theses`.
 """
 
 from __future__ import annotations
@@ -65,9 +65,9 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     # ── Parsing & requête (pur, sans I/O) ──────────────────────
 
-    def build_query(self, ppn: str) -> str:
-        """Construit la chaîne de recherche theses.fr (filtre par PPN d'établissement)."""
-        return f"etabSoutenancePpn:({ppn})"
+    def build_query(self, ppns: list[str]) -> str:
+        """Construit la chaîne de recherche theses.fr, qui filtre sur l'un des PPN d'établissement."""
+        return f"etabSoutenancePpn:({' OR '.join(ppns)})"
 
     def per_page(self) -> int:
         """Taille de page theses.fr (max accepté par l'API ; cf. `api_params`)."""

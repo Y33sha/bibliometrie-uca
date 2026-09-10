@@ -15,9 +15,8 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
+from application.pipeline.progression import Progression
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
@@ -30,6 +29,7 @@ def extract_year(
     conn: Connection,
     institution_ids: list[str],
     logger: ExtractLogger,
+    avancement: Progression,
     *,
     year: int | None = None,
     since: str | None = None,
@@ -39,51 +39,36 @@ def extract_year(
     Retourne (nouveaux, mis_a_jour, inchangés) — ventilation calculée par l'adapter via `xmax` (insert) + comparaison de hash (changed).
     """
     cursor = "*"
+    total_count: int | None = None
     total_fetched = 0
     total_new = 0
     total_updated = 0
     total_unchanged = 0
-    page_num = 0
 
-    first_page = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
-    total_count = as_int(at_path(first_page, "meta").get("count")) or 0
-    logger.info("%s documents à récupérer", total_count)
+    while True:
+        data = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
+        if total_count is None:
+            total_count = as_int(at_path(data, "meta").get("count")) or 0
 
-    with progression(total_count, branche_de_source("openalex"), logger) as avancement:
-        while True:
-            page_num += 1
+        results = [as_mapping(r) for r in as_sequence(data.get("results"))]
+        if not results:
+            break
 
-            if page_num == 1:
-                data = first_page
-            else:
-                data = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
+        counts = adapter.insert_batch(conn, results)
+        conn.commit()
+        total_new += counts.new
+        total_updated += counts.updated
+        total_unchanged += counts.unchanged
 
-            results = [as_mapping(r) for r in as_sequence(data.get("results"))]
-            if not results:
-                break
+        total_fetched += len(results)
+        avancement.avance(len(results))
 
-            counts = adapter.insert_batch(conn, results)
-            conn.commit()
-            total_new += counts.new
-            total_updated += counts.updated
-            total_unchanged += counts.unchanged
+        next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
+        if not next_cursor:
+            break
+        cursor = next_cursor
 
-            total_fetched += len(results)
-            avancement.avance(len(results))
-
-            next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
-            if not next_cursor:
-                break
-            cursor = next_cursor
-
-    logger.info(
-        "%s documents trouvés : %s nouveaux, %s mis à jour, %s inchangés",
-        total_count,
-        total_new,
-        total_updated,
-        total_unchanged,
-    )
-    if total_fetched < total_count:
+    if total_count and total_fetched < total_count:
         logger.warning(
             "%s documents non récupérés sur %s", total_count - total_fetched, total_count
         )
@@ -110,32 +95,39 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexExtractAd
             self.logger.info("Mode incrémental : documents modifiés depuis %s", args.since)
 
     def extract_all(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> PhaseMetrics:
-        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
-        years = [args.year] if args.year else config_years
+        ids = config.institution_ids
 
-        stats = PhaseMetrics()
-        if args.since:
-            year_new, year_updated, year_unchanged = extract_year(
+        def extrait(
+            avancement: Progression, *, year: int | None = None, since: str | None = None
+        ) -> PhaseMetrics:
+            portee = f"depuis {since}" if since else str(year)
+            new, updated, unchanged = extract_year(
                 self._adapter,
                 self.conn,
-                config.institution_ids,
-                scoped_logger(self.logger, self.SOURCE, f"depuis {args.since}"),
-                since=args.since,
+                ids,
+                scoped_logger(self.logger, self.SOURCE, portee),
+                avancement,
+                year=year,
+                since=since,
             )
-            stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
-        else:
-            for year in years:
-                if self._stop_on_tripped("années restantes sautées"):
-                    break
-                year_new, year_updated, year_unchanged = extract_year(
-                    self._adapter,
-                    self.conn,
-                    config.institution_ids,
-                    scoped_logger(self.logger, self.SOURCE, str(year)),
-                    year=year,
-                )
-                stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
-        return stats
+            return PhaseMetrics(new=new, updated=updated, unchanged=unchanged)
+
+        if args.since:
+            return self._extrait_d_un_tenant(
+                self._adapter.count(ids, since=args.since),
+                lambda avancement: extrait(avancement, since=args.since),
+            )
+
+        years = (
+            [args.year]
+            if args.year
+            else self._adapter.get_years(self.conn, start_year=args.start_year)
+        )
+        return self._extrait_par_annee(
+            years,
+            lambda annee: self._adapter.count(ids, year=annee),
+            lambda annee, avancement: extrait(avancement, year=annee),
+        )
 
 
 __all__ = [

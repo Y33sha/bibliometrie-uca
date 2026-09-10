@@ -47,6 +47,12 @@ class OpenalexExtractAdapter(Protocol):
 
     # ── HTTP (l'adapter connaît la base_url et l'auth via sa construction) ──
 
+    def count(
+        self, institution_ids: list[str], *, year: int | None = None, since: str | None = None
+    ) -> int:
+        """Nombre de works d'une année ou d'une période, sans en récupérer le contenu."""
+        ...
+
     def fetch_page(
         self,
         institution_ids: list[str],

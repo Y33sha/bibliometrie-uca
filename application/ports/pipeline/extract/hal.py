@@ -56,6 +56,10 @@ class HalExtractAdapter(Protocol):
 
     # ── HTTP (l'adapter connaît la base_url via sa construction) ──
 
+    def count(self, query: str, fq: str) -> int:
+        """Nombre de documents d'une requête, sans en récupérer aucun."""
+        ...
+
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
         """Une page Solr en pagination `cursorMark` (`cursor_mark="*"` au premier appel, puis le `nextCursorMark` de la réponse précédente)."""
         ...

@@ -2,7 +2,7 @@
 
 import pytest
 
-from application.pipeline.libelles import accord, forme
+from application.pipeline.libelles import accord, branche_de_source, forme
 
 
 @pytest.mark.parametrize(
@@ -16,6 +16,19 @@ def test_le_singulier_couvre_zero_et_un(n: int, attendu: str) -> None:
 def test_un_groupe_nominal_porte_son_pluriel() -> None:
     """Le `s` final se pose sur le nom, que le groupe ne place pas toujours en dernier."""
     assert accord(5, "préfixe DOI", "préfixes DOI") == "5 préfixes DOI"
+
+
+def test_une_annee_et_une_plage_gardent_la_meme_largeur() -> None:
+    """La barre d'une source change d'année en cours de route sans décaler le reste de la ligne."""
+    assert len(branche_de_source("hal", "2024")) == len(branche_de_source("hal", "2023-2026"))
+
+
+def test_une_portee_vide_aligne_la_source_sur_les_autres() -> None:
+    assert len(branche_de_source("theses", "")) == len(branche_de_source("hal", "2024"))
+
+
+def test_sans_portee_le_libelle_s_arrete_au_nom() -> None:
+    assert branche_de_source("hal").rstrip().endswith("HAL")
 
 
 def test_la_forme_seule_sert_les_phrases_construites() -> None:

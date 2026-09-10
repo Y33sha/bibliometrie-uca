@@ -55,6 +55,10 @@ class WosExtractAdapter(Protocol):
         self, year: int, first_record: int, affiliations: list[str]
     ) -> Mapping[str, JsonValue]: ...
 
+    def count(self, year: int, affiliations: list[str]) -> int:
+        """Nombre de records d'une année, sans en récupérer aucun."""
+        ...
+
     def check_quota(self) -> str | None:
         """Retourne le quota annuel restant (header WoS), ou `None` si indisponible.
 

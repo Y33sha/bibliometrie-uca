@@ -15,7 +15,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
-from domain.types import JsonValue, as_mapping
+from domain.types import JsonValue, as_int, as_mapping, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.config import (
@@ -116,6 +116,18 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         params = build_params(institution_ids, year=year, cursor=cursor, since=since)
         label = f"OpenAlex {since or year}"
         return self._get(params, label)
+
+    def count(
+        self, institution_ids: list[str], *, year: int | None = None, since: str | None = None
+    ) -> int:
+        """Nombre de works d'une année ou d'une période, lu sur une page d'un seul work réduit à son identifiant."""
+        params = {
+            **build_params(institution_ids, year=year, since=since),
+            "per_page": 1,
+            "select": "id",
+        }
+        data = self._get(params, f"OpenAlex comptage {since or year}")
+        return as_int(at_path(data, "meta").get("count")) or 0
 
     # ── SQL ────────────────────────────────────────────────────
 

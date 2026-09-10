@@ -14,7 +14,7 @@ from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
 from domain.sources.hal import hal_text_field
-from domain.types import JsonValue, as_mapping
+from domain.types import JsonValue, as_int, as_mapping, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
 from infrastructure.sources.config import (
@@ -117,6 +117,16 @@ class PgHalExtractAdapter(HalExtractAdapter):
         return f"collCode_s:({terms})"
 
     # ── HTTP ───────────────────────────────────────────────────
+
+    def count(self, query: str, fq: str) -> int:
+        """Nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
+        params: dict[str, str | int | float | bool | None] = {
+            "q": query,
+            "fq": fq,
+            "rows": 0,
+            "wt": "json",
+        }
+        return as_int(at_path(self._get(params, "HAL comptage"), "response").get("numFound")) or 0
 
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
         """Une page Solr en pagination `cursorMark` (full payload `HAL_FIELDS`).

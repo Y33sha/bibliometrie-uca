@@ -43,6 +43,15 @@ class TestSansTerminal:
         assert "hal : 25/100 (25 %)" in caplog.text
         assert "/s" in caplog.text
 
+    def test_les_jalons_prennent_le_libelle_du_perimetre_en_cours(self, sans_terminal, caplog):
+        with (
+            caplog.at_level(logging.INFO),
+            module.progression(100, "hal 2023", logging.getLogger(__name__), intervalle_s=0) as p,
+        ):
+            p.renomme("hal 2024")
+            p.avance(25)
+        assert "hal 2024 : 25/100" in caplog.text
+
     def test_un_total_nul_n_affiche_pas_de_part(self, sans_terminal, caplog):
         with (
             caplog.at_level(logging.INFO),
@@ -66,6 +75,11 @@ class TestAvecTerminal:
         ):
             p.avance(5)
         assert caplog.records == []
+
+    def test_la_barre_prend_le_libelle_du_perimetre_en_cours(self, avec_terminal):
+        with module.progression(10, "hal 2023", None) as p:
+            p.renomme("hal 2024")
+            assert p._barre.desc == "hal 2024"
 
     def test_la_barre_est_refermee_a_la_sortie(self, avec_terminal):
         with module.progression(10, "hal", logging.getLogger(__name__)) as p:

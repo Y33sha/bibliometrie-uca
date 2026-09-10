@@ -19,7 +19,13 @@ def adapter() -> PgThesesExtractAdapter:
 
 class TestBuildQuery:
     def test_ppn(self, adapter):
-        assert adapter.build_query(ppn="196200032") == "etabSoutenancePpn:(196200032)"
+        assert adapter.build_query(["196200032"]) == "etabSoutenancePpn:(196200032)"
+
+    def test_plusieurs_ppn_en_une_requete(self, adapter):
+        assert (
+            adapter.build_query(["196200032", "252404955"])
+            == "etabSoutenancePpn:(196200032 OR 252404955)"
+        )
 
 
 class TestExtractId:
