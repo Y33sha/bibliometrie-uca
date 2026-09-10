@@ -65,6 +65,7 @@ L'audit des 735 publications de copies CERN, RWTH et GSI montre des notices de r
 
 - [x] `meme_oeuvre_declaree` : une copie `IsVariantFormOf` converge sur la forme publiée quel que soit le préfixe, sauf une notice `preprint`.
 - [x] Tests : copie de l'article convergente, copie de preprint distincte et reliée par `is_preprint_of`.
+- [x] La règle lit le type de la notice DataCite qui mentionne la cible, et ignore celui des autres notices au même DOI. Une notice qui mentionne plusieurs cibles converge sur la version plutôt que sur la variante.
 - [ ] Run et contrôle : les publications de copies rejoignent leur article.
 
 ## Questions ouvertes

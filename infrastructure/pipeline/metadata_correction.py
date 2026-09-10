@@ -165,10 +165,16 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                     FROM sp_eff
                     WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
                 ),
+                -- La cible reste attachée à la notice DataCite dont les `related_identifiers`
+                -- la mentionnent : la règle de même œuvre lit le type de cette notice, et les
+                -- autres notices au même DOI suivent la décision du groupe. Quand une notice
+                -- mentionne plusieurs cibles, la version (concept) prime sur la variante.
                 same_work AS (
-                    SELECT DISTINCT ON (secondary_doi) secondary_doi, canonical_doi, same_work_case
+                    SELECT DISTINCT ON (declarant_id)
+                           declarant_id, secondary_doi, canonical_doi, same_work_case
                     FROM (
                         SELECT
+                            sp.id AS declarant_id,
                             sp.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
@@ -185,6 +191,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                         -- le parent absent (les pièces attendent son moissonnage). La forme du DOI
                         -- n'intervient pas : les pièces portent souvent un DOI frère, pas suffixé.
                         SELECT
+                            sp.id AS declarant_id,
                             sp.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
@@ -197,7 +204,9 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                           AND lower(rel->>'doi') <> sp.eff_doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
                     ) s
-                    ORDER BY secondary_doi
+                    ORDER BY declarant_id,
+                             same_work_case = '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}' DESC,
+                             canonical_doi
                 ),
                 candidate_dois AS (
                     SELECT secondary_doi AS d FROM same_work
@@ -212,7 +221,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                        sw.canonical_doi, sw.same_work_case
                 FROM sp_eff sp
                 JOIN candidate_dois c ON c.d = sp.eff_doi
-                LEFT JOIN same_work sw ON sw.secondary_doi = sp.eff_doi
+                LEFT JOIN same_work sw ON sw.declarant_id = sp.id
             """)
         ).all()
         return [

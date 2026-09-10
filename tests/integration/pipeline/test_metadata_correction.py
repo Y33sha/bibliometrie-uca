@@ -1,5 +1,7 @@
 """Intégration : la phase metadata_correction persiste l'effective + le brut réversible."""
 
+import json
+
 from sqlalchemy import text
 
 from application.pipeline.metadata_correction import journal_by_doi
@@ -401,6 +403,96 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
         title_normalized="les limnosystemes",
     )
     assert _apply_cluster(conn) == 0
+
+
+# ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
+
+
+def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=None):
+    """Notice DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
+    meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
+    return conn.execute(
+        text(
+            "INSERT INTO source_publications "
+            "(source, source_id, title, title_normalized, doc_type, doi, meta, raw_metadata) "
+            "VALUES ('datacite', :sid, 'T', 't', :dt, :doi, CAST(:meta AS jsonb), "
+            "CAST(:raw AS jsonb)) RETURNING id"
+        ),
+        {
+            "sid": source_id,
+            "dt": doc_type,
+            "doi": doi,
+            "meta": json.dumps(meta),
+            "raw": json.dumps(raw_metadata or {}),
+        },
+    ).scalar_one()
+
+
+def test_la_regle_lit_le_type_de_la_notice_qui_mentionne_la_cible(sa_sync_conn):
+    """Une notice OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
+
+    Régression : la cible était attachée à toutes les notices du DOI, et le type de la notice OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
+    """
+    conn = sa_sync_conn
+    wp = _seed_datacite(
+        conn,
+        source_id="wp",
+        doi="10.18154/rwth-1",
+        doc_type="preprint",
+        relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
+    )
+    oa = _seed_typed_sp(conn, source_id="oa", doc_type="article", doi="10.18154/rwth-1")
+    assert _apply_cluster(conn) == 0
+    assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
+
+
+def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
+    conn = sa_sync_conn
+    stash = {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
+    wp = _seed_datacite(
+        conn,
+        source_id="wp",
+        doi="10.48550/arxiv.1",
+        doc_type="preprint",
+        relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
+        raw_metadata=stash,
+    )
+    oa = _seed_typed_sp(conn, source_id="oa", doc_type="article", doi="10.48550/arxiv.1")
+    conn.execute(
+        text("UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
+        {"raw": json.dumps(stash), "id": oa},
+    )
+    assert _apply_cluster(conn) == 2
+    assert _apply_cluster(conn) == 0
+    assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
+
+
+def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
+    conn = sa_sync_conn
+    copie = _seed_datacite(
+        conn,
+        source_id="copie",
+        doi="10.3204/pubdb-1",
+        doc_type="article",
+        relations=[("IsVariantFormOf", "10.1007/article")],
+    )
+    oa = _seed_typed_sp(conn, source_id="oa", doc_type="article", doi="10.3204/pubdb-1")
+    assert _apply_cluster(conn) == 2
+    assert (_doi(conn, copie), _doi(conn, oa)) == ("10.1007/article", "10.1007/article")
+
+
+def test_la_version_prime_sur_la_variante(sa_sync_conn):
+    """Une notice qui mentionne un concept et une variante converge sur le concept."""
+    conn = sa_sync_conn
+    version = _seed_datacite(
+        conn,
+        source_id="v",
+        doi="10.5281/zenodo.20",
+        doc_type="software",
+        relations=[("IsVariantFormOf", "10.5281/zenodo.1"), ("IsVersionOf", "10.5281/zenodo.9")],
+    )
+    assert _apply_cluster(conn) == 1
+    assert _doi(conn, version) == "10.5281/zenodo.9"
 
 
 # ── Sous-étape cluster : pièce d'un dataset → dataset parent (IsPartOf) ──
