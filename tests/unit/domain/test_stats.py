@@ -19,24 +19,24 @@ def test_validate_allows_zero_groups():
 
 
 def test_validate_rejects_unknown_measure():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="Mesure inconnue : 'bogus'"):
         validate_pivot("bogus", ["year"])
 
 
 def test_validate_rejects_unknown_dimension():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="Dimension inconnue : 'bogus'"):
         validate_pivot("pub_count", ["bogus"])
 
 
 def test_validate_rejects_repeated_group():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="Groupement répété : 'year'"):
         validate_pivot("pub_count", ["year", "year"])
 
 
 def test_validate_rejects_non_groupable_dimension():
     # `apc` est filtrable mais pas un axe de ventilation.
     assert DIMENSIONS["apc"].groupable is False
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="Dimension non groupable : 'apc'"):
         validate_pivot("pub_count", ["apc"])
 
 
