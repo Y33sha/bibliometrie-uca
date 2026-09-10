@@ -88,6 +88,11 @@ class TestExtractCrossrefPubYearMalformed:
             extract_crossref_pub_year({"published": _date_field(1200)}, max_year=_NEXT_YEAR) is None
         )
 
+    def test_1500_accepted(self):
+        assert (
+            extract_crossref_pub_year({"published": _date_field(1500)}, max_year=_NEXT_YEAR) == 1500
+        )
+
 
 class TestParseCrossrefIssns:
     def test_separates_print_and_electronic(self):
@@ -120,6 +125,18 @@ class TestParseCrossrefIssns:
             ]
         }
         assert parse_crossref_issns(msg) == ("1111-2222", None)
+
+    def test_a_second_electronic_issn_is_not_taken_for_print(self):
+        msg = {
+            "issn-type": [
+                {"type": "electronic", "value": "8765-4321"},
+                {"type": "electronic", "value": "1111-2222"},
+            ]
+        }
+        assert parse_crossref_issns(msg) == (None, "8765-4321")
+
+    def test_non_textual_plain_issn_ignored(self):
+        assert parse_crossref_issns({"ISSN": [None]}) == (None, None)
 
 
 class TestStripJatsTags:
@@ -177,6 +194,9 @@ class TestExtractCrossrefMeta:
     def test_drops_zero_references_count(self):
         meta = extract_crossref_meta({"references-count": 0})
         assert meta is None
+
+    def test_keeps_a_single_reference(self):
+        assert extract_crossref_meta({"references-count": 1}) == {"references_count": 1}
 
     def test_falls_back_to_indexed_date_time(self):
         meta = extract_crossref_meta({"indexed": {"date-time": "2024-01-01T00:00:00Z"}})
