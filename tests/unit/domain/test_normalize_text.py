@@ -86,6 +86,11 @@ class TestSanitizeRawText:
             ("Paris‎‏", "Paris"),
             # Contrôle C0 supprimé
             ("a\x00b", "ab"),
+            # Caractère d'usage privé et substitut isolé supprimés
+            ("a\ue000b", "ab"),
+            ("a\ud800b", "ab"),
+            # Un caractère invisible entre deux espaces : un seul espace reste
+            ("a \u200b b", "a b"),
             # Balisage déposé par la source autour de l'adresse : retiré, texte conservé.
             ("<p>Institut Pascal, Clermont-Ferrand</p>", "Institut Pascal, Clermont-Ferrand"),
             ("Universit&eacute; Clermont Auvergne", "Université Clermont Auvergne"),
