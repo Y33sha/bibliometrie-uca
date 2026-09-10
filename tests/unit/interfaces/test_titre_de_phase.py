@@ -75,30 +75,28 @@ def _args(**modifications) -> argparse.Namespace:
     return argparse.Namespace(**{**defauts, **modifications})
 
 
-class TestTitreDuRun:
-    def test_le_mode_suit_le_titre(self, terminal) -> None:
-        lignes = _titre_du_run(_args(), [])
-        assert "PIPELINE BIBLIOMÉTRIQUE" in lignes[1]
-        assert "Mode : full" in lignes[2]
+def _texte(lignes: list[str]) -> str:
+    return " ".join(lignes)
 
-    def test_le_titre_est_en_retrait(self, terminal) -> None:
-        titre = _titre_du_run(_args(), [])[1]
-        assert titre.startswith("║      PIPELINE")
+
+class TestTitreDuRun:
+    def test_le_mode_parait(self, terminal) -> None:
+        assert "mode ····· full" in _texte(_titre_du_run(_args(), []))
 
     def test_le_titre_ne_liste_pas_les_sources(self, terminal) -> None:
         """Chaque phase interroge ses propres sources : une liste commune induirait en erreur."""
-        assert "Sources" not in " ".join(_titre_du_run(_args(), []))
+        assert "sources" not in _texte(_titre_du_run(_args(), [])).lower()
 
-    def test_une_annee_demandee_paraît(self, terminal) -> None:
-        assert "Année : 2018" in " ".join(_titre_du_run(_args(year=2018), []))
+    def test_une_annee_demandee_parait(self, terminal) -> None:
+        assert "année ···· 2018" in _texte(_titre_du_run(_args(year=2018), []))
 
     def test_les_phases_paraissent_quand_le_lancement_les_restreint(self, terminal) -> None:
-        texte = " ".join(_titre_du_run(_args(only="persons"), [("persons", None)]))
-        assert "Phases : persons" in texte
+        texte = _texte(_titre_du_run(_args(only="persons"), [("persons", None)]))
+        assert "phases ··· persons" in texte
 
     def test_un_lancement_courant_ne_liste_pas_les_phases(self, terminal) -> None:
-        assert "Phases" not in " ".join(_titre_du_run(_args(), [("extract", None)]))
+        assert "phases" not in _texte(_titre_du_run(_args(), [("extract", None)]))
 
     def test_les_reconstructions_demandees_paraissent(self, terminal) -> None:
-        texte = " ".join(_titre_du_run(_args(rebuild_authorships=True), []))
-        assert "Signatures reconstruites" in texte
+        texte = _texte(_titre_du_run(_args(rebuild_authorships=True), []))
+        assert "options ·· signatures reconstruites" in texte
