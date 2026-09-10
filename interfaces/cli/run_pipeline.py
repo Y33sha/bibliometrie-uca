@@ -1250,31 +1250,71 @@ def _titre_de_phase(name: str) -> list[str]:
     return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
 
 
+TITRE_PIPELINE = (
+    "┏┓ ╻┏┓ ╻  ╻┏━┓┏┳┓┏━╸╺┳╸┏━┓╻┏━╸",
+    "┣┻┓┃┣┻┓┃  ┃┃ ┃┃┃┃┣╸  ┃ ┣┳┛┃┣╸",
+    "┗━┛╹┗━┛┗━╸╹┗━┛╹ ╹┗━╸ ╹ ╹┗╸╹┗━╸",
+)
+"""« BIBLIOMETRIE » en caractères de filets, en tête de la bannière d'une exécution."""
+
+_LARGEUR_CLE_REGLAGE = 9
+"""Largeur d'une clé de réglage et de ses points de conduite, dans la bannière."""
+
+
+def _reglage(cle: str, valeur: str) -> list[str]:
+    """Lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
+    tete = f"{cle} {'·' * (_LARGEUR_CLE_REGLAGE - len(cle))} "
+    repliee = textwrap.wrap(valeur, LARGEUR_TITRE_PHASE - len(tete)) or [""]
+    return [tete + repliee[0], *(" " * len(tete) + suite for suite in repliee[1:])]
+
+
+def _banniere(reglages: list[str]) -> list[str]:
+    """Encadre le titre et les réglages d'une exécution, avec une ombre.
+
+    Un terminal reçoit le cadre, au moins aussi large que celui d'une phase ; une sortie capturée reçoit deux filets et le titre en texte.
+    """
+    if not sys.stdout.isatty():
+        return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *reglages, "─" * 40]
+
+    corps = ["", *(f"  {ligne}" for ligne in TITRE_PIPELINE), "", *(f"  {r}" for r in reglages), ""]
+    onglet = "┤ PIPELINE ├"
+    largeur = max(LARGEUR_TITRE_PHASE + 4, *(len(ligne) + 2 for ligne in corps))
+    return [
+        f"┌───{onglet}{'─' * (largeur - 3 - len(onglet))}┐",
+        *(f"│{ligne.ljust(largeur)}│▒" for ligne in corps),
+        f"└{'─' * largeur}┘▒",
+        f" {'▒' * (largeur + 2)}",
+    ]
+
+
 def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, Phase]]) -> list[str]:
     """Lignes ouvrant une exécution : son mode, puis ce qui écarte le lancement du courant."""
-    # Le retrait détache le titre des réglages qui le suivent.
-    lignes = ["    PIPELINE BIBLIOMÉTRIQUE", f"Mode : {args.mode}"]
+    reglages = _reglage("mode", args.mode)
 
     if args.year:
-        lignes.append(f"Année : {args.year}")
+        reglages += _reglage("année", str(args.year))
     elif args.start_year:
-        lignes.append(f"Depuis : {args.start_year}")
+        reglages += _reglage("depuis", str(args.start_year))
 
     if args.only or args.from_phase:
-        lignes.append(f"Phases : {' → '.join(n for n, _ in phases)}")
+        reglages += _reglage("phases", ", ".join(n for n, _ in phases))
     elif args.no_extras:
-        lignes.append("Phases : sans les enrichissements terminaux")
+        reglages += _reglage("phases", "sans les enrichissements terminaux")
 
-    for drapeau, texte in (
-        (args.rebuild_publications, "Publications reconstruites"),
-        (args.rebuild_authorships, "Signatures reconstruites"),
-        (args.rebuild_subjects, "Sujets reconstruits"),
-        (args.raw_store, "Réponses des sources archivées"),
-    ):
-        if drapeau:
-            lignes.append(texte)
+    options = [
+        texte
+        for drapeau, texte in (
+            (args.rebuild_publications, "publications reconstruites"),
+            (args.rebuild_authorships, "signatures reconstruites"),
+            (args.rebuild_subjects, "sujets reconstruits"),
+            (args.raw_store, "réponses des sources archivées"),
+        )
+        if drapeau
+    ]
+    if options:
+        reglages += _reglage("options", ", ".join(options))
 
-    return _encadre(lignes)
+    return _banniere(reglages)
 
 
 def _run_one_phase(
