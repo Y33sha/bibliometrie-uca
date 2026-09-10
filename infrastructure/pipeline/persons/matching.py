@@ -153,7 +153,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
     def fetch_out_of_perimeter_candidates(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         """Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même signature peut être candidate par plusieurs chemins (identifiant fort partagé, ou ancrage cross-source sur une position déjà liée). La cascade côté orchestrateur arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces candidats hors-périmètre).
 
-        Seules les signatures ancrées sur une personne existante (jointure identifiant) ou une position liée (cross-source) sont ramenées, jamais le pool mondial non-UCA. L'ensemble *rendu* décroît à chaque run (une fois rattachée, une signature sort de l'espace orphelin) ; le *coût* du fetch, lui, reste celui d'un scan de cet espace (cf. docstrings des branches) — acceptable (~minutes) en attendant la refonte ER set-based.
+        Seules les signatures ancrées sur une personne existante (identifiant partagé) ou sur une position déjà rattachée (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source porte l'essentiel de son coût.
         """
         rows = conn.execute(
             text(_OOP_CANDIDATES_SQL), {"orcid_sources": list(ORCID_MATCH_SOURCES)}
