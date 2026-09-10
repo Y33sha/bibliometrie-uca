@@ -77,6 +77,24 @@ class TestExtractExternalIdsFromUrls:
             "pmid": "12345678",
         }
 
+    def test_scalar_ids_keep_the_first_match(self):
+        urls = [
+            "https://www.theses.fr/2021CLFAC030",
+            "https://pubmed.ncbi.nlm.nih.gov/12345678",
+            "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654",
+            "http://arxiv.org/abs/1210.6893",
+            "https://www.theses.fr/2022CLFAC099",
+            "https://pubmed.ncbi.nlm.nih.gov/87654321",
+            "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC111111",
+            "http://arxiv.org/abs/2301.00001",
+        ]
+        assert extract_external_ids_from_urls(urls) == {
+            "nnt": "2021CLFAC030",
+            "pmid": "12345678",
+            "pmcid": "PMC987654",
+            "arxiv_id": "1210.6893",
+        }
+
     def test_no_match_returns_empty(self):
         urls = ["https://example.com/foo", "https://random.org/bar"]
         assert extract_external_ids_from_urls(urls) == {}
@@ -136,8 +154,10 @@ class TestParsePrimaryLocation:
         assert loc is not None
         assert loc.location_id == "pmh:2023UCFAC123"
         assert loc.landing_page_url == "https://theses.fr/2023UCFAC123"
+        assert loc.source_id == "https://openalex.org/S4306400194"
         assert loc.source_type == "repository"
         assert loc.source_display_name == "theses.fr"
+        assert loc.source_homepage_url == "https://theses.fr"
 
     def test_missing_primary(self):
         assert parse_primary_location({}) is None
