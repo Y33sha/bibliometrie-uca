@@ -8,7 +8,7 @@ Trois signaux peuplent la table :
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts) qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
-Les relations de même œuvre à préfixe égal (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Entre deux registrants, `IsVersionOf` et `IsVariantFormOf` relient deux œuvres : quand les deux ont leur publication au corpus, le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
+Les relations de même œuvre à préfixe égal (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Entre deux registrants, `IsVersionOf` et `IsVariantFormOf` relient deux œuvres : le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
 
 Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
 """
@@ -70,9 +70,9 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
 def _build_distinct_work_edges(
     sources: list[DeclaredRelationSource], publications_by_doi: dict[str, DoiPublication]
 ) -> list[RelationEdge]:
-    """Relie une notice DataCite à la forme d'un autre registrant qu'elle déclare de la même œuvre, quand cette forme a sa publication au corpus.
+    """Relie une notice DataCite à la forme d'un autre registrant qu'elle déclare de la même œuvre.
 
-    Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`.
+    Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`. Une cible absente du corpus a un type inconnu : face à elle, un preprint donne `is_preprint_of`, les autres notices `is_related_to`.
     """
     edges: list[RelationEdge] = []
     for sp in sources:
@@ -80,13 +80,13 @@ def _build_distinct_work_edges(
             continue
         for target_doi in extract_datacite_distinct_works(sp.meta, sp.doi):
             target = publications_by_doi.get(target_doi)
-            if target is None:
-                continue
-            inferred = infer_shared_key_relation(sp.doc_type, target.doc_type)
+            inferred = infer_shared_key_relation(sp.doc_type, target.doc_type if target else None)
             if inferred is None:
                 continue
             relation, subject = inferred
             if subject == "b":
+                # Une cible typée est au corpus : c'est elle qui porte la relation dirigée.
+                assert target is not None
                 edges.append(
                     RelationEdge(
                         target.id,

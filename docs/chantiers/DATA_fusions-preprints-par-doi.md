@@ -29,7 +29,7 @@ La revue ArXiv.org porte le type `preprint_server` et le préfixe `10.48550`. La
 ## Décisions
 
 - **La substitution exige un préfixe égal**, pour `IsVersionOf` comme pour `IsVariantFormOf`. Un traitement propre à `IsVariantFormOf` est écarté : ses 8 cas à préfixe égal relèvent de la version → concept.
-- **À préfixe différent, la relation va à la phase `relations`**, au lieu de substituer le DOI. La relation exige que les deux formes aient leur publication au corpus.
+- **À préfixe différent, la relation va à la phase `relations`**, au lieu de substituer le DOI. Un preprint qui a sa propre publication est relié à l'article.
 - **Une notice sans publication le reste.** Une notice DataCite absente des sources du périmètre ne crée pas de publication : son auteur UCA figure par son seul nom, sans structure ni identifiant. L'article publié couvre le document, et sa notice OpenAlex porte souvent l'identifiant arXiv.
 - **Aucune reprise en base.** L'étape de correction repart du DOI d'origine à chaque run et le restitue quand elle ne décide rien. La revue déduite du préfixe se réévalue de la même façon.
 - **L'ordre des sous-étapes reste inchangé.** Réservée au préfixe égal, la substitution laisse intact le préfixe dont se déduit la revue.
@@ -55,9 +55,8 @@ Les phases 1 et 2 partent ensemble : sans la seconde, les publications se scinde
 - [x] Notices DataCite arXiv typées `article` : aucune. Les 3 572 notices sont typées `preprint` et rattachées à ArXiv.org.
 - [x] Publications 2, 7 et 37 : chacune contient les seules notices de l'article. Les copies RWTH forment des publications distinctes, reliées par `is_related_to`.
 
-### 4. Suites du contrôle
+### 4. Fusions résiduelles
 
-- [x] Relation de même œuvre créée seulement quand la forme déclarée a sa publication au corpus.
 - [ ] Publications 57821, 152027, 170655 et 204355 : la notice arXiv reste rattachée à l'article, sans substitution de DOI. Leurs deux DOI distincts devraient les séparer, mais aucune de leurs notices n'est à retraiter (`keys_dirty` faux).
 
 ## Questions ouvertes
