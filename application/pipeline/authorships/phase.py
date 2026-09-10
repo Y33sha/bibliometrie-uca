@@ -46,7 +46,8 @@ def run(
     if isinstance(summary, dict):
         summary["publications_purged"] = n_purged
     _refresh_pub_counts(open_tx, pub_counts_queries, address_pub_count_queries, logger)
-    # Chaque sous-étape porte déjà son décompte : une ligne de clôture les répéterait.
+    # Les sous-étapes affichées portent déjà leur décompte : une ligne de clôture les répéterait.
+    # La purge reste muette, son décompte va aux métriques.
     metrics.resume = ""
     return metrics
 
@@ -63,9 +64,6 @@ def _purge_orphan_publications(
                 break
             conn.commit()
             n += deleted
-    if n:
-        etape(logger, "Publications sans auteur")
-        logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))
     return n
 
 
