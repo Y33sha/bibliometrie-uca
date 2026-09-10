@@ -136,7 +136,7 @@
     --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
     --gold: #ffd700;
     --diamond: #a2a8f8;
-    --hybrid: #ab5010;
+    --hybrid: #c39be3;
     --bronze: #cd7f32;
     --green: #4c9030;
     --open: #4caf50; /* vert « accès ouvert » (indicateur générique), plus clair que la voie green */
