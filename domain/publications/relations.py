@@ -9,7 +9,7 @@ Ce module fige un jeu de **types canoniques** (directionnels) et le mapping de c
 
 Hors scope (renvoient `None`), avec leur raison :
 
-- **Même œuvre** (versions, formes identiques) : `IsVersionOf` / `HasVersion` / `IsIdenticalTo` / `IsNewVersionOf` / `IsVariantFormOf` / `IsOriginalFormOf` côté DataCite ; `is-version-of` / `has-version` / `new_version` / `is-identical-to` / `is-same-as` côté Crossref. → déduplication (phase `metadata_correction`), pas une relation.
+- **Même œuvre** (versions, formes identiques) : `IsVersionOf` / `HasVersion` / `IsIdenticalTo` / `IsNewVersionOf` / `IsVariantFormOf` / `IsOriginalFormOf` côté DataCite ; `is-version-of` / `has-version` / `new_version` / `is-identical-to` / `is-same-as` côté Crossref. → déduplication (phase `metadata_correction`), pas une relation. Entre deux registrants, `IsVersionOf` et `IsVariantFormOf` relient deux œuvres : `extract_datacite_distinct_works` les isole, et leur couple de `doc_type` les type.
 - **Citations** : `References` / `Cites` / `IsCitedBy` / `IsReferencedBy` ; `references` / `is-referenced-by` / `is-cited-by`. → graphe bibliographique.
 - **Peer-review / discussion** : `has-review` / `is-review-of` / `is-comment-on` / `has-comment` (Crossref), `IsReviewedBy` (DataCite). → évaluation ou commentaire (le porteur de `is-comment-on` est un `peer_review`), pas une œuvre apparentée.
 - **Vague / dérivation** : `IsDerivedFrom`, `IsSourceOf`, `Requires`, `Continues`, `IsPublishedIn` ; `has-manifestation`, `is-related-material`, `has-related-material`, `is-basis-for`.
@@ -21,7 +21,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import clean_doi, meme_registrant
+from domain.source_publications.metadata_correction.shared_doi import DATACITE_DIRECT_CONVERGENCE
 from domain.types import JsonValue, as_str
 
 
@@ -174,6 +175,28 @@ def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[
         target = clean_doi(as_str(item.get("doi")))
         if canonical and target:
             out.append((canonical, target))
+    return out
+
+
+def extract_datacite_distinct_works(
+    meta: dict[str, JsonValue] | None, own_doi: str | None
+) -> list[str]:
+    """DOI qu'un payload DataCite déclare comme autre forme de son œuvre, chez un autre registrant.
+
+    `IsVersionOf` et `IsVariantFormOf` réunissent deux DOI d'un même registrant en une seule œuvre. D'un registrant à l'autre, ils relient deux œuvres, comme un preprint arXiv et l'article publié.
+    """
+    related = (meta or {}).get("related_identifiers")
+    if not isinstance(related, list):
+        return []
+    out: list[str] = []
+    for item in related:
+        if not isinstance(item, dict):
+            continue
+        if as_str(item.get("relation_type")) not in DATACITE_DIRECT_CONVERGENCE:
+            continue
+        target = clean_doi(as_str(item.get("doi")))
+        if target and not meme_registrant(own_doi, target):
+            out.append(target)
     return out
 
 

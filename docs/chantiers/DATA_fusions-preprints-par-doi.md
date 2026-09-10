@@ -37,13 +37,13 @@ La revue ArXiv.org porte le type `preprint_server` et le préfixe `10.48550`. La
 
 ### 1. Substitution réservée au préfixe égal
 
-- [ ] `resolve_cluster_doi_corrections` : substitution seulement quand le DOI d'origine et le DOI cible ont le même préfixe.
-- [ ] Tests : `IsVersionOf` à préfixe égal substitué, `IsVersionOf` à préfixe différent laissé, idem pour `IsVariantFormOf`, DOI d'origine restitué à une notice déjà substituée.
+- [x] `resolve_cluster_doi_corrections` : substitution seulement quand le DOI d'origine et le DOI cible ont le même préfixe.
+- [x] Tests : `IsVersionOf` à préfixe égal substitué, `IsVersionOf` à préfixe différent laissé, idem pour `IsVariantFormOf`, DOI d'origine restitué à une notice déjà substituée.
 
 ### 2. Relations de même œuvre à préfixe différent
 
-- [ ] `relations.py` : `IsVersionOf` et `IsVariantFormOf` produisent une relation quand les deux DOI diffèrent de préfixe.
-- [ ] Tests : notice arXiv face à l'article publié donne `is_preprint_of` ; copie de dépôt face à l'article donne `is_related_to`.
+- [x] `relations.py` : `IsVersionOf` et `IsVariantFormOf` produisent une relation quand les deux DOI diffèrent de préfixe.
+- [x] Tests : notice arXiv face à l'article publié donne `is_preprint_of` ; copie de dépôt face à l'article donne `is_related_to`.
 
 Les phases 1 et 2 partent ensemble : sans la seconde, les publications se scindent sans relation entre elles.
 

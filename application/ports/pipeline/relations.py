@@ -11,11 +11,23 @@ from domain.types import JsonValue
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Une `source_publication` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`)."""
+    """Une `source_publication` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
+
+    Son DOI d'origine et le `doc_type` de sa publication servent aux relations de même œuvre déclarées entre deux registrants.
+    """
 
     publication_id: int
     source: str
     meta: dict[str, JsonValue]
+    doi: str | None = None
+    doc_type: str | None = None
+
+
+class DoiPublication(NamedTuple):
+    """Une publication du corpus, désignée par un DOI qu'une relation déclarée prend pour cible."""
+
+    id: int
+    doc_type: str | None
 
 
 class RelationEdge(NamedTuple):
@@ -64,6 +76,12 @@ class PublicationRelationsQueries(Protocol):
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
         """Les `source_publications` rattachées dont le `meta` déclare des relations."""
+        ...
+
+    def fetch_publications_by_doi(
+        self, conn: Connection, dois: list[str]
+    ) -> dict[str, DoiPublication]:
+        """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules."""
         ...
 
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
