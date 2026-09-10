@@ -37,6 +37,7 @@ class TestORCID:
         [
             "",  # vide
             "0000-0001-2345",  # trop court
+            "00000001234567890",  # 17 chiffres sans tirets
             "0000-000A-2345-6789",  # corps non numérique
             "garbage",  # forme invalide
         ],
@@ -173,7 +174,7 @@ class TestNormalizedIdentifierValue:
         assert normalized_identifier_value(id_type, raw) == expected
 
     def test_unknown_type_raises(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="Type d'identifiant inconnu : 'researcher_id'"):
             normalized_identifier_value("researcher_id", "ABC-1234")
 
     def test_malformed_value_raises(self):
@@ -254,3 +255,14 @@ class TestMarkSharedIdentifiersDubious:
         seule position nue (l'autre étant déjà `_dubious`) n'est pas requalifiée."""
         ids = [{"orcid_dubious": "X"}, {"orcid": "X"}]
         assert mark_shared_identifiers_dubious(ids) is ids
+
+    def test_shared_dubious_keys_leave_bare_keys_alone(self):
+        """Une valeur partagée seulement sous des clés `_dubious` ne requalifie pas les clés nues."""
+        ids = [{"orcid_dubious": "X", "idref": "r1"}, {"orcid_dubious": "X", "idref": "r2"}]
+        assert mark_shared_identifiers_dubious(ids) is ids
+
+    def test_already_dubious_key_is_not_suffixed_twice(self):
+        out = mark_shared_identifiers_dubious(
+            [{"orcid_dubious": "X", "idref": "r"}, {"idref": "r"}]
+        )
+        assert out == [{"orcid_dubious": "X", "idref_dubious": "r"}, {"idref_dubious": "r"}]
