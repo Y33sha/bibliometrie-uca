@@ -81,5 +81,42 @@ class TestAggregateThesisPersons:
         these = {"auteurs": [{"nom": "", "prenom": "Jean"}, {"prenom": "Sansnom"}]}
         assert aggregate_thesis_persons(these) == []
 
+    def test_a_person_without_nom_leaves_the_next_one(self):
+        these = {"auteurs": [{"prenom": "Sansnom"}, {"nom": "Dupont", "prenom": "Jean"}]}
+        assert [a.raw_author_name for a in aggregate_thesis_persons(these)] == ["Jean Dupont"]
+
+    def test_dedup_by_ppn_despite_name_variants(self):
+        these = {
+            "rapporteurs": [{"nom": "Durand", "prenom": "Élise", "ppn": "999"}],
+            "president": {"nom": "Durand-Martin", "prenom": "E.", "ppn": "999"},
+        }
+        assert len(aggregate_thesis_persons(these)) == 1
+
+    def test_homonyms_with_distinct_ppn_stay_distinct(self):
+        these = {
+            "rapporteurs": [{"nom": "Martin", "prenom": "Paul", "ppn": "111"}],
+            "president": {"nom": "Martin", "prenom": "Paul", "ppn": "222"},
+        }
+        assert len(aggregate_thesis_persons(these)) == 2
+
+    def test_without_ppn_distinct_first_names_stay_distinct(self):
+        these = {
+            "rapporteurs": [{"nom": "Martin", "prenom": "Paul"}],
+            "president": {"nom": "Martin", "prenom": "Anne"},
+        }
+        assert len(aggregate_thesis_persons(these)) == 2
+
+    def test_author_without_prenom(self):
+        these = {"auteurs": [{"nom": "Dupont"}]}
+        assert aggregate_thesis_persons(these)[0].raw_author_name == "Dupont"
+
+    def test_raw_person_is_passed_through(self):
+        person = {"nom": "Dupont", "prenom": "Jean", "ppn": "111111111"}
+        assert aggregate_thesis_persons({"auteurs": [person]})[0].person == person
+
+    def test_three_authors_get_consecutive_positions(self):
+        these = {"auteurs": [{"nom": "A"}, {"nom": "B"}, {"nom": "C"}]}
+        assert [a.author_position for a in aggregate_thesis_persons(these)] == [0, 1, 2]
+
     def test_empty_input(self):
         assert aggregate_thesis_persons({}) == []
