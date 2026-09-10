@@ -448,6 +448,8 @@ exclude = [
     # module `alembic` à l'import, mypy ne les détecte pas. Cohérent
     # avec l'exclusion `tests/` : code framework, pas du métier.
     "^alembic/",
+    # Copie de travail de mutmut : double les paquets du projet.
+    "^mutants/",
 ]
 
 # Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
