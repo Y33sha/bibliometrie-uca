@@ -76,6 +76,10 @@ class PublicationsReconciliationQueries(Protocol):
         """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""
         ...
 
+    def delete_publications_without_sources(self, conn: Connection) -> int:
+        """Supprime les publications auxquelles plus aucune `source_publication` n'est rattachée. Retourne le nombre de publications supprimées."""
+        ...
+
     def count_publications(self, conn: Connection) -> int:
         """Total des publications (toutes in-périmètre : la réconciliation gate leur création sur le périmètre)."""
         ...

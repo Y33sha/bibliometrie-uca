@@ -591,6 +591,18 @@ def _distinct_dois(conn, pub_id) -> set[str]:
     )
 
 
+class TestDeletePublicationsWithoutSources:
+    def test_only_publications_without_source_are_deleted(self, sa_sync_conn):
+        conn = sa_sync_conn
+        vide = _seed_pub(conn)
+        garnie = _seed_pub(conn, doi="10.1/garnie")
+        _seed_sp(conn, source_id="garnie", publication_id=garnie, keys_dirty=False)
+
+        assert _Q.delete_publications_without_sources(conn) == 1
+        assert not _pub_exists(conn, vide)
+        assert _pub_exists(conn, garnie)
+
+
 class TestStaleMembership:
     """Régression : une source_publication rattachée par une clé de confirmation qui disparaît
     ensuite doit être détachée, pas laissée sur une publication que plus rien ne lui associe.
