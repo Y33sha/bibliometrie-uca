@@ -135,7 +135,7 @@
     --border: #e5e5e0;
     --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
     --gold: #ffd700;
-    --diamond: #a2a8f8;
+    --diamond: #d0d4fb;
     --hybrid: #c39be3;
     --bronze: #cd7f32;
     --green: #4c9030;
