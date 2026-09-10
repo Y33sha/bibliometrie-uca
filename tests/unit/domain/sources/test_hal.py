@@ -1,6 +1,11 @@
 from datetime import date
 
-from domain.sources.hal import derive_hal_oa_status
+from domain.sources.hal import derive_hal_oa_status, hal_text_field
+
+
+class TestHalTextField:
+    def test_non_textual_first_value_is_rendered_as_text(self):
+        assert hal_text_field([123, "suite"]) == "123"
 
 
 class TestDeriveHalOaStatus:
