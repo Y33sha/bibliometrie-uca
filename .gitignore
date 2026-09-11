@@ -45,3 +45,6 @@ data/
 
 # mutmut
 mutants/
+
+# Instances par université
+instances/
