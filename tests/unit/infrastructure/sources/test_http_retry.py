@@ -206,13 +206,61 @@ class TestAsync:
 
 
 class TestRedirections:
-    """Le helper ne suit pas les redirections : l'hôte joint est celui que la requête désigne.
+    """Le helper ne suit une redirection que vers le même hôte, pour une requête GET, et une seule fois : l'hôte joint reste celui que la requête désigne.
 
-    Les points d'entrée des sources répondent directement. Un statut 3xx signale donc une réponse inattendue, non une étape à franchir — et les en-têtes d'authentification propres à un fournisseur, que le client HTTP ne retire pas comme il retire `Authorization`, ne quittent pas leur destinataire.
+    Les en-têtes d'authentification propres à un fournisseur, que le client HTTP ne retire pas comme il retire `Authorization`, ne quittent donc pas leur destinataire.
     """
 
     @pytest.mark.asyncio
-    async def test_une_redirection_est_une_erreur(self, http_mock):
+    async def test_une_redirection_vers_le_meme_hote_est_suivie(self, http_mock):
+        http_mock.get("https://api.example/alias").mock(
+            return_value=httpx2.Response(301, headers={"location": "/principal"})
+        )
+        principal = http_mock.get("https://api.example/principal").mock(
+            return_value=httpx2.Response(200, json={"ok": True})
+        )
+        async with httpx2.AsyncClient() as client:
+            data = await http_request_with_retry_async(
+                client, "GET", "https://api.example/alias", initial_backoff=0.01, label="test"
+            )
+        assert data == {"ok": True}
+        assert principal.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_un_second_saut_est_une_erreur(self, http_mock):
+        http_mock.get("https://api.example/a").mock(
+            return_value=httpx2.Response(301, headers={"location": "/b"})
+        )
+        http_mock.get("https://api.example/b").mock(
+            return_value=httpx2.Response(301, headers={"location": "/c"})
+        )
+        fin = http_mock.get("https://api.example/c").mock(
+            return_value=httpx2.Response(200, json={"ok": True})
+        )
+        async with httpx2.AsyncClient() as client:
+            with pytest.raises(httpx2.HTTPStatusError):
+                await http_request_with_retry_async(
+                    client, "GET", "https://api.example/a", initial_backoff=0.01, label="test"
+                )
+        assert fin.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_une_requete_post_redirigee_est_une_erreur(self, http_mock):
+        http_mock.post("https://api.example/search").mock(
+            return_value=httpx2.Response(307, headers={"location": "/autre"})
+        )
+        autre = http_mock.post("https://api.example/autre").mock(
+            return_value=httpx2.Response(200, json={"ok": True})
+        )
+        async with httpx2.AsyncClient() as client:
+            with pytest.raises(httpx2.HTTPStatusError):
+                await http_request_with_retry_async(
+                    client, "POST", "https://api.example/search", initial_backoff=0.01, label="test"
+                )
+        assert autre.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_une_redirection_vers_un_autre_hote_est_une_erreur(self, http_mock):
         http_mock.get("https://api.example/foo").mock(
             return_value=httpx2.Response(302, headers={"location": "https://ailleurs.example/foo"})
         )

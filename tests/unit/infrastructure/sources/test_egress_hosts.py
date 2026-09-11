@@ -1,6 +1,6 @@
 """Hôtes que le trafic sortant peut joindre.
 
-La liste d'hôtes déclarée est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé traite une redirection comme une erreur (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
+La liste d'hôtes déclarée est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé ne suit une redirection que vers le même hôte (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
 
 La confrontation porte sur `infrastructure/sources/`, couche d'où partent les requêtes. Les URL des autres couches désignent des pages à afficher — une fiche HAL, un profil ORCID — ou un espace de noms XML, et ne sont jamais appelées.
 """

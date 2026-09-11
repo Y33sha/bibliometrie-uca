@@ -20,6 +20,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
 )
+from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
 from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
@@ -255,6 +256,42 @@ class TestHalFetchAsync:
         assert len(docs) == 1
         assert is_not_found_marker(docs[0])
         assert docs[0]["_doi"] == "10.1/missing"
+
+
+# ── adapter Crossref : fetch_async via http_mock ─────────────────
+
+
+class TestCrossrefFetchAsync:
+    @staticmethod
+    def _adapter() -> CrossrefFetchMissingDoiAdapter:
+        adapter = CrossrefFetchMissingDoiAdapter()
+        adapter.base_url = "https://api.crossref.org"
+        adapter.headers = {}
+        return adapter
+
+    @pytest.mark.asyncio
+    async def test_un_doi_principal_rend_son_document(self, http_mock):
+        http_mock.get("https://api.crossref.org/works/10.1/a").mock(
+            return_value=httpx2.Response(200, json={"message": {"DOI": "10.1/A"}})
+        )
+        async with httpx2.AsyncClient() as client:
+            records = list(await self._adapter().fetch_async(client, ["10.1/a"]))
+        assert records == [{"DOI": "10.1/A"}]
+
+    @pytest.mark.asyncio
+    async def test_un_doi_alias_rend_le_document_principal_et_un_marqueur(self, http_mock):
+        """Crossref redirige un alias vers son DOI principal : le document principal entre, l'alias est inscrit comme introuvable."""
+        http_mock.get("https://api.crossref.org/works/10.1/alias").mock(
+            return_value=httpx2.Response(301, headers={"location": "/works/10.1/principal"})
+        )
+        http_mock.get("https://api.crossref.org/works/10.1/principal").mock(
+            return_value=httpx2.Response(200, json={"message": {"DOI": "10.1/PRINCIPAL"}})
+        )
+        async with httpx2.AsyncClient() as client:
+            records = list(await self._adapter().fetch_async(client, ["10.1/alias"]))
+        assert records[0] == {"DOI": "10.1/PRINCIPAL"}
+        assert is_not_found_marker(records[1])
+        assert records[1]["_doi"] == "10.1/alias"
 
 
 # ── adapter ScanR : fetch_async via http_mock ────────────────────
