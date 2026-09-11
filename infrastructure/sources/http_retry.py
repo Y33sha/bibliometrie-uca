@@ -8,7 +8,7 @@ Politique de retry :
   - erreur réseau : retry ; l'épuisement compte un échec.
   - corps vide (si `retry_on_empty_body`) ou JSON invalide : retry.
 
-Les redirections ne sont pas suivies : les points d'entrée des sources répondent directement, et un statut 3xx est traité comme une erreur. L'hôte joint est donc celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
+Une redirection n'est suivie que vers le même hôte, pour une requête GET, et une seule fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection — autre hôte, autre méthode, second saut — est traitée comme une erreur. L'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
 
 Circuit-breaker : un `SourceCircuitBreaker` posé en ContextVar par la composition root court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès.
 """
@@ -39,6 +39,17 @@ def _backoff_delay(initial_backoff: float, attempt: int) -> float:
 def _is_retryable_status(status: int) -> bool:
     """429 (rate-limit) et 5xx (panne source) sont retentés ; les autres codes ≥ 400 échouent immédiatement."""
     return status == 429 or 500 <= status < 600
+
+
+def _same_host_redirect(resp: httpx2.Response) -> httpx2.URL | None:
+    """Destination d'une redirection à suivre, ou `None` : seule une requête GET redirigée vers le même hôte, sous le même schéma et le même port, est suivie."""
+    if not resp.is_redirect or resp.request.method != "GET":
+        return None
+    origin = resp.request.url
+    target = origin.join(resp.headers["location"])
+    if (target.scheme, target.host, target.port) != (origin.scheme, origin.host, origin.port):
+        return None
+    return target
 
 
 def _prepared_label(label: str) -> tuple[SourceCircuitBreaker | None, str]:
@@ -99,6 +110,8 @@ def http_request_with_retry(
                 auth=auth,
                 timeout=timeout,
             )
+            if (target := _same_host_redirect(resp)) is not None:
+                resp = httpx2.request("GET", target, headers=headers, auth=auth, timeout=timeout)
         except httpx2.RequestError as e:
             last_error = e
             if is_last:
@@ -182,6 +195,10 @@ async def http_request_with_retry_async(
                 auth=auth,
                 timeout=timeout,
             )
+            if (target := _same_host_redirect(resp)) is not None:
+                resp = await client.request(
+                    "GET", target, headers=headers, auth=auth, timeout=timeout
+                )
         except httpx2.RequestError as e:
             last_error = e
             if is_last:

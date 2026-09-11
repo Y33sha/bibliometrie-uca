@@ -4,7 +4,7 @@ CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre sour
 
 Polite pool obtenu via le header `User-Agent` qui inclut un mailto. Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative.
+Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative. Un DOI alias est redirigé par Crossref vers son DOI principal : le document principal est inséré, et l'alias inscrit de la même façon.
 """
 
 from __future__ import annotations
@@ -77,6 +77,9 @@ class CrossrefFetchMissingDoiAdapter:
         message = data.get("message")
         if not isinstance(message, dict):
             return []
+        if clean_doi(as_str(message.get("DOI"))) != doi:
+            # DOI alias, que Crossref redirige vers son DOI principal : le document reçu porte ce dernier. L'alias n'est pas une œuvre de Crossref, source native du DOI : son marqueur l'inscrit définitivement dans failed_lookups.
+            return [message, not_found_marker(doi)]
         return [message]
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
