@@ -138,8 +138,10 @@
     --diamond: #d0d4fb;
     --hybrid: #b366f2;
     --bronze: #cd7f32;
-    --green: #4c9030;
-    --open: #4caf50; /* vert « accès ouvert » (indicateur générique), plus clair que la voie green */
+    --bronze-text: #9a5a1e; /* bronze assombri, lisible en texte sur fond clair */
+    --green: #5ec62c;
+    --green-text: #3f7a28; /* voie green assombrie, lisible en texte sur fond clair */
+    --open: #4caf50; /* vert « accès ouvert » (indicateur générique) */
     --embargoed: #b08900;
     --closed: #555;
     --unknown: #bbb;
