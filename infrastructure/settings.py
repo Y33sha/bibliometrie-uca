@@ -1,6 +1,6 @@
 """Configuration du projet bibliometrie-uca.
 
-Settings typés chargés depuis les variables d'environnement ou un fichier `.env` à la racine du projet (gitignored). En prod, les variables sont injectées par l'orchestrateur (pm2, systemd, docker).
+Settings typés chargés depuis les variables d'environnement, le fichier `.env` à la racine du projet (gitignored) et le fichier de l'instance désignée par `BIBLIO_INSTANCE` (cf. `infrastructure/__init__.py`). En prod, les variables sont injectées par l'orchestrateur (pm2, systemd, docker).
 
 Usage :
     from infrastructure.settings import settings
@@ -16,14 +16,14 @@ from typing import Annotated
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from infrastructure import PROJECT_ROOT
+from infrastructure import ENV_FILES
 
 
 class Settings(BaseSettings):
-    """Configuration de l'app — lit .env et les variables d'environnement."""
+    """Configuration de l'app — lit les fichiers d'environnement et les variables d'environnement."""
 
     model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env",
+        env_file=ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",  # ignore les env vars non déclarées (POSTGRES_*, FORWARDED_ALLOW_IPS, etc.)
         case_sensitive=False,

@@ -27,7 +27,10 @@ Obstacles :
 - **Une base par établissement** sur le serveur PostgreSQL existant : `bibliometrie_lorraine`, `bibliometrie_nantes`…
 - **Seed commun et seed d'établissement.** Le seed commun contient les référentiels partagés par tous les établissements. Le seed d'établissement contient les structures, leurs tutelles, les périmètres, les formes de noms et la configuration propre à l'établissement. Le seed d'établissement UCA reste versionné et sert d'exemple.
 - **Les fichiers des autres établissements sont stockés dans `instances/`**, à la racine, hors versionnement. `instances/<nom>/` contient la configuration de l'instance (`instance.env`) et son seed d'établissement (`seed.sql`).
-- **Configuration par surcharge.** `BIBLIO_INSTANCE=<nom>` désigne l'instance. Son `instance.env` se charge après le `.env` racine et contient seulement les valeurs propres à l'instance : `DB_NAME`, les ports, `API_TARGET`. Le backend (`Settings`, `infrastructure/__init__.py`) et le frontend (`svelte.config.js`, `vite.config.ts`) appliquent la même règle. Sans `BIBLIO_INSTANCE`, seul le `.env` racine s'applique.
+- **Configuration par surcharge.** La variable d'environnement `BIBLIO_INSTANCE=<nom>` désigne l'instance. `instances/<nom>/instance.env` contient seulement les valeurs propres à l'instance : `DB_NAME`, les ports, `API_TARGET`. Le backend (`infrastructure/__init__.py`) et le frontend (`project-env.js`) appliquent la même règle :
+  - sans `BIBLIO_INSTANCE`, seul le `.env` racine s'applique ;
+  - avec `BIBLIO_INSTANCE`, les valeurs de l'instance priment sur l'environnement du processus et sur le `.env` racine. Un terminal VSCode injecte le `.env` racine dans l'environnement, d'où la priorité sur l'environnement du processus ;
+  - si le fichier de l'instance manque, le démarrage échoue en nommant le chemin attendu.
 - **Un nom d'hôte par instance** : `<nom>.localhost`. Les navigateurs le résolvent vers la boucle locale, et chaque instance a son propre cookie de session.
 - **Le pipeline des autres établissements tourne sans `--raw-store`, avec `LOG_TO_FILE=false`.**
 - **Le nom de l'établissement est le nom du périmètre `perimeter_persons`** (`perimeters.name`). Le seed d'établissement le fournit, et la lecture publique de la configuration le sert au frontend.
@@ -43,8 +46,8 @@ Obstacles :
 ### Phase 2 — Configuration par instance
 
 - [x] Ajouter `instances/` au `.gitignore`.
-- [ ] Charger `instances/<nom>/instance.env` après `.env` quand `BIBLIO_INSTANCE` est posé, côté backend et côté frontend.
-- [ ] Test : une valeur de l'instance prime sur celle du `.env` racine.
+- [x] Charger `instances/<nom>/instance.env` après `.env` quand `BIBLIO_INSTANCE` est posé, côté backend et côté frontend.
+- [x] Test : une valeur de l'instance prime sur celle du `.env` racine.
 
 ### Phase 3 — Création et lancement
 
