@@ -4,7 +4,7 @@ CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre sour
 
 Polite pool obtenu via le header `User-Agent` qui inclut un mailto. Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). Le miss est mémorisé dans `doi_lookups` avec `next_retry = NULL` (jamais retenté), ce qui l'exclut définitivement du pool de cross-import.
+Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative.
 """
 
 from __future__ import annotations
@@ -22,9 +22,9 @@ from application.ports.pipeline.fetch_missing.doi import (
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    record_doi_not_found,
+from infrastructure.pipeline.fetch_missing.failed_lookups import (
+    forget_failed_doi_lookups,
+    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
@@ -68,7 +68,7 @@ class CrossrefFetchMissingDoiAdapter:
             )
         except httpx2.HTTPStatusError as e:
             if e.response.status_code == 404:
-                # 404 = DOI confirmé absent de Crossref (source native du DOI, miss définitif). insert() le mémorise dans doi_lookups (permanent).
+                # 404 = DOI confirmé absent de Crossref. insert() l'inscrit dans failed_lookups.
                 return [not_found_marker(doi)]
             return []
         except httpx2.RequestError:
@@ -81,8 +81,7 @@ class CrossrefFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            # Source native du DOI : un 404 est définitif → doi_lookups permanent, jamais retenté.
-            record_doi_not_found(conn, "crossref", as_str(record["_doi"]) or "", permanent=True)
+            record_failed_lookup(conn, "crossref", "doi", as_str(record["_doi"]) or "")
             return False
 
         # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour rester cohérent avec les autres sources et la colonne `doi`.
@@ -97,5 +96,5 @@ class CrossrefFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        forget_doi_lookups(conn, "crossref", [doi])
+        forget_failed_doi_lookups(conn, "crossref", [doi])
         return inserted

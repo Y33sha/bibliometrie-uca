@@ -1,6 +1,6 @@
 """Adapter HAL pour `application.pipeline.fetch_missing.hal`.
 
-Implémente les lookups SQL (hal-ids d'OpenAlex et de ScanR, NNT de theses.fr), les fetchs HTTP async (par halId et par NNT) et les inserts staging.
+Délègue la sélection des identifiants à `infrastructure.pipeline.fetch_missing.hal`. Implémente les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
 L'orchestration (boucles async, commits intermédiaires) vit côté `application.pipeline.fetch_missing.hal`.
 """
@@ -17,7 +17,9 @@ from application.ports.pipeline.fetch_missing.hal import (
     NntInsertResult,
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.pipeline.extract.staging import upsert_not_found_stub, upsert_staging
+from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_lookup
+from infrastructure.pipeline.fetch_missing.hal import get_missing_hal_ids, get_missing_nnts
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
@@ -26,37 +28,6 @@ from infrastructure.sources.http_retry import http_request_with_retry_async
 # HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.
 HAL_MAX_CONCURRENT = 5
-
-_MISSING_HAL_IDS_SQL = text(
-    """
-    SELECT DISTINCT h.hal_id
-    FROM source_publications sp
-    JOIN publications p ON p.id = sp.publication_id
-    CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> 'hal_id') AS h(hal_id)
-    WHERE sp.source IN ('openalex', 'scanr')
-      AND p.in_perimeter
-      AND jsonb_typeof(sp.external_ids -> 'hal_id') = 'array'
-      AND NOT EXISTS (
-          SELECT 1 FROM staging s WHERE s.source = 'hal' AND s.source_id = h.hal_id
-      )
-    """
-)
-
-_MISSING_NNTS_SQL = text(
-    """
-    SELECT sp.external_ids ->> 'nnt' AS nnt
-    FROM source_publications sp
-    JOIN publications p ON p.id = sp.publication_id
-    WHERE sp.source = 'theses'
-      AND p.in_perimeter
-      AND sp.external_ids ->> 'nnt' IS NOT NULL
-      AND p.doc_type != 'ongoing_thesis'
-      AND NOT EXISTS (
-          SELECT 1 FROM source_publications hal
-          WHERE hal.publication_id = p.id AND hal.source = 'hal'
-      )
-    """
-)
 
 
 def insert_staging_hal(
@@ -91,15 +62,10 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
     # ── Lookups SQL ────────────────────────────────────────────
 
     def find_missing_hal_ids(self, conn: Connection) -> list[str]:
-        """hal-ids que des `source_publications` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
-
-        Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_publications` du run précédent : les documents extraits pendant le run y entrent au run suivant.
-        """
-        return list(conn.execute(_MISSING_HAL_IDS_SQL).scalars())
+        return get_missing_hal_ids(conn)
 
     def find_missing_nnts(self, conn: Connection) -> list[str]:
-        """NNT des `source_publications` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_publications` HAL."""
-        return list(conn.execute(_MISSING_NNTS_SQL).scalars())
+        return get_missing_nnts(conn)
 
     # ── HTTP ───────────────────────────────────────────────────
 
@@ -138,13 +104,14 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         if doc:
             insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
             return True
-        upsert_not_found_stub(conn, source="hal", source_id=hal_id, entry_mode="cross_import_hal")
+        record_failed_lookup(conn, "hal", "hal_id", hal_id)
         return False
 
     def insert_nnt_result(
         self, conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None
     ) -> NntInsertResult:
         if not doc:
+            record_failed_lookup(conn, "hal", "nnt", nnt)
             return NntInsertResult(api_found=False, inserted=False)
         hal_id = as_str(doc.get("halId_s"))
         if not hal_id:

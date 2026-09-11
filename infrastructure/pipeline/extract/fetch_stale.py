@@ -1,4 +1,4 @@
-"""Sélection des rows `staging` périmées et marquage des disparues (phase refresh stale).
+"""Sélection des rows `staging` périmées et marquage des disparues (phase `fetch_stale`).
 
 `get_stale_rows` liste les rows dont `last_seen_at` a franchi le seuil ; `set_disappeared_by_source_id` marque celles dont le refetch a confirmé l'absence. Le commit est à la charge de l'appelant.
 """
@@ -26,7 +26,6 @@ _STALE_ROWS_SQL_TEMPLATE = """
     LEFT JOIN source_publications sp
       ON sp.source = s.source AND sp.source_id = s.source_id
     WHERE s.source = CAST(:source AS source_type)
-      AND s.not_found_at IS NULL
       AND s.disappeared_at IS NULL
       AND s.last_seen_at < now() - make_interval(days => :days)
       {year_clause}
@@ -37,7 +36,7 @@ _SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
     """
     UPDATE staging SET disappeared_at = now()
     WHERE source = CAST(:source AS source_type) AND source_id = :source_id
-      AND disappeared_at IS NULL AND not_found_at IS NULL
+      AND disappeared_at IS NULL
     """
 )
 
@@ -47,7 +46,7 @@ def get_stale_rows(
 ) -> list[tuple[int, str]]:
     """Rows `(id, source_id)` de `source` dont `last_seen_at` dépasse STALE_REFRESH_AFTER_DAYS.
 
-    Alimente la phase refresh : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`) : la sélection ne dépend pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà marquées disparues.
+    Alimente la phase `fetch_stale` : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`) : la sélection ne dépend pas de la présence d'un DOI. Exclut les rows déjà marquées disparues.
 
     `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis `source_publications.pub_year` : un run sur une période glissante ne refetche que le stale de ses propres années, sans requêtes unitaires inutiles sur des années hors de sa fenêtre bulk. `None` = aucune borne (tout le stale de la source).
     """
@@ -65,6 +64,6 @@ def get_stale_rows(
 def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) -> None:
     """Marque `disappeared_at` sur la row `(source, source_id)` confirmée absente.
 
-    Appelé par la phase refresh quand le refetch par id natif renvoie une absence confirmée (réponse valide, zéro record). Ne commit pas — l'appelant s'en charge.
+    Appelé par la phase `fetch_stale` quand le refetch par id natif renvoie une absence confirmée (réponse valide, zéro record). Ne commit pas — l'appelant s'en charge.
     """
     conn.execute(_SET_DISAPPEARED_BY_SOURCE_ID_SQL, {"source": source, "source_id": source_id})

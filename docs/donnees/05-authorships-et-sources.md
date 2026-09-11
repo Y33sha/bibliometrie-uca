@@ -34,15 +34,15 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 - **`source_authorships`** : une signature — un auteur sur un document source. `person_id` et `authorship_id` la relient à la personne et à l'authorship consolidés, `identity_id` à son identité d'auteur. Ses adresses passent par `source_authorship_addresses`, d'où la matview `source_authorship_structures` dérive ses structures.
 - **`author_identifying_keys`** : les attributs d'identité d'une signature — nom normalisé et identifiants. Une ligne par identité distincte, que `source_authorships.identity_id` référence : toutes les signatures de même identité la partagent.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
-- **`staging`** : une ligne par document moissonné. Porte le payload brut de la source, vidé après normalisation, et les marqueurs d'absence — `not_found_at` quand la source n'a pas rendu un document cherché, `disappeared_at` quand elle cesse de le rendre. Son cycle de vie relève du [moissonnage](../pipeline/02-extract.md).
-- **`doi_lookups`** : DOI cherchés en vain dans une source. `next_retry` porte la date de la prochaine tentative, NULL valant « plus jamais ».
+- **`staging`** : une ligne par document moissonné. Porte le payload brut de la source, vidé après normalisation, et `disappeared_at` quand la source cesse de rendre le document. Son cycle de vie relève du [moissonnage](../pipeline/02-extract.md).
+- **`failed_lookups`** : identifiants (DOI, hal-id, NNT) cherchés en vain dans une source. `next_retry` porte la date de la prochaine tentative, NULL valant « plus jamais ».
 
 ## Propriété des tables
 
 | Table | Auteur | Écrit par |
 |---|---|---|
 | `staging` | pipeline | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) |
-| `doi_lookups` | pipeline | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) |
+| `failed_lookups` | pipeline | phase `fetch_missing` (`infrastructure/sources/*/fetch_missing_*.py`) |
 | `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
 | `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |

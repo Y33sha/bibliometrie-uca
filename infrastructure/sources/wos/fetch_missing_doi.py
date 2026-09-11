@@ -22,7 +22,7 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import record_doi_not_found
+from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_lookup
 from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -121,7 +121,7 @@ class WosFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "wos", as_str(record["_doi"]) or "")
+            record_failed_lookup(conn, "wos", "doi", as_str(record["_doi"]) or "")
             return False
 
         inserted, _ = upsert_staging(

@@ -96,7 +96,7 @@ async def fetch_missing_hal_by_id(
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
 
-    `new` = documents insérés ; `extras["not_found"]` = hal-ids introuvables côté HAL (marqués `not_found_at`). `total` = hal-ids manquants à traiter.
+    `new` = documents insérés ; `extras["not_found"]` = hal-ids introuvables côté HAL (inscrits dans `failed_lookups`). `total` = hal-ids manquants à traiter.
     """
     adapter.configure(conn)
 

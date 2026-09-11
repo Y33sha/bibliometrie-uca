@@ -6,11 +6,7 @@ from sqlalchemy import text
 from domain.publications.identifiers import clean_doi
 from infrastructure.pipeline.change_detection import change_detection_hash, compute_hash
 from infrastructure.pipeline.extract.fetch_stale import get_stale_rows, set_disappeared_by_source_id
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    get_missing_dois,
-    record_doi_not_found,
-)
+from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 # ── compute_hash ─────────────────────────────────────────────────
@@ -288,133 +284,66 @@ class TestGetMissingDois:
         assert result == ["10.5281/zenodo.1"]
 
     def test_excludes_dois_in_backoff(self, sa_sync_conn):
-        """Un DOI en backoff `doi_lookups` (next_retry futur) sort du pool."""
+        """Un DOI dont la recherche a échoué et attend sa reprise (next_retry futur) sort du pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-                "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
+                "VALUES ('hal', 'doi', '10.1234/a', now(), now() + interval '30 days')"
             )
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
-        """Backoff expiré (next_retry passé) → le DOI repasse dans le pool."""
+        """Délai échu (next_retry passé) → le DOI repasse dans le pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-                "VALUES ('hal', '10.1234/a', now() - interval '60 days', now() - interval '1 day')"
+                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
+                "VALUES ('hal', 'doi', '10.1234/a', now() - interval '60 days', "
+                "now() - interval '1 day')"
             )
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/a"]
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
-        """Le backoff d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
+        """L'échec d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
         _add_inperim_sp(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-                "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
+                "VALUES ('hal', 'doi', '10.1234/a', now(), now() + interval '30 days')"
             )
         )
         assert get_missing_dois(sa_sync_conn, "hal") == []
         assert get_missing_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
 
     def test_excludes_dois_with_permanent_miss(self, sa_sync_conn):
-        """Un DOI avec un miss définitif (`next_retry NULL`) sort du pool pour toujours."""
+        """Un DOI à l'échec définitif (`next_retry NULL`) sort du pool pour toujours."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-                "VALUES ('hal', '10.1234/a', now(), NULL)"
+                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
+                "VALUES ('hal', 'doi', '10.1234/a', now(), NULL)"
             )
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
 
-class TestForgetDoiLookups:
-    def test_un_doi_livre_par_la_source_quitte_la_table(self, sa_sync_conn):
-        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/x")
-        forget_doi_lookups(sa_sync_conn, "scanr", ["10.1234/x"])
-        n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
-        assert n == 0
-
-    def test_les_autres_sources_gardent_la_leur(self, sa_sync_conn):
-        """Une source qui livre le document ne dit rien de ce que les autres connaissent."""
-        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
-        forget_doi_lookups(sa_sync_conn, "scanr", ["10.1234/x"])
-        restant = sa_sync_conn.execute(text("SELECT source FROM doi_lookups")).scalar_one()
-        assert restant == "hal"
-
-    def test_normalise_les_doi_avant_de_les_chercher(self, sa_sync_conn):
-        """La table porte des DOI normalisés ; le document reçu les expose sous n'importe quelle forme."""
-        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/casse")
-        forget_doi_lookups(sa_sync_conn, "scanr", ["HTTPS://DOI.ORG/10.1234/Casse"])
-        n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
-        assert n == 0
-
-    def test_un_document_sans_doi_laisse_la_table_intacte(self, sa_sync_conn):
-        record_doi_not_found(sa_sync_conn, "scanr", "10.1234/x")
-        forget_doi_lookups(sa_sync_conn, "scanr", [None])
-        n = sa_sync_conn.execute(text("SELECT count(*) FROM doi_lookups")).scalar_one()
-        assert n == 1
-
-
-class TestRecordDoiNotFound:
-    def test_inserts_pending_backoff_row(self, sa_sync_conn):
-        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT next_retry > now() AS pending FROM doi_lookups "
-                "WHERE source = 'hal' AND doi = '10.1234/x'"
-            )
-        ).one()
-        assert row.pending is True
-
-    def test_rearms_on_conflict_without_duplicate(self, sa_sync_conn):
-        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
-        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
-        count = sa_sync_conn.execute(
-            text("SELECT count(*) FROM doi_lookups WHERE source = 'hal' AND doi = '10.1234/x'")
-        ).scalar()
-        assert count == 1
-
-    def test_permanent_sets_null_next_retry(self, sa_sync_conn):
-        """`permanent=True` (source native du DOI) : `next_retry NULL`, jamais retenté."""
-        record_doi_not_found(sa_sync_conn, "crossref", "10.1234/x", permanent=True)
-        next_retry = sa_sync_conn.execute(
-            text(
-                "SELECT next_retry FROM doi_lookups WHERE source = 'crossref' AND doi = '10.1234/x'"
-            )
-        ).scalar_one()
-        assert next_retry is None
-
-
-def _insert_staging(conn, source, sid, doi, *, seen_days_ago, not_found=False, disappeared=False):
+def _insert_staging(conn, source, sid, doi, *, seen_days_ago, disappeared=False):
     conn.execute(
         text(
-            "INSERT INTO staging (source, source_id, doi, raw_data, processed, last_seen_at, "
-            "       not_found_at, disappeared_at) "
-            "VALUES (CAST(:s AS source_type), :sid, :doi, '{}'::jsonb, :proc, "
+            "INSERT INTO staging (source, source_id, doi, raw_data, last_seen_at, disappeared_at) "
+            "VALUES (CAST(:s AS source_type), :sid, :doi, '{}'::jsonb, "
             "       now() - make_interval(days => :d), "
-            "       CASE WHEN :nf THEN now() ELSE NULL END, "
             "       CASE WHEN :dis THEN now() ELSE NULL END)"
         ),
-        {
-            "s": source,
-            "sid": sid,
-            "doi": doi,
-            "d": seen_days_ago,
-            "proc": not_found,
-            "nf": not_found,
-            "dis": disappeared,
-        },
+        {"s": source, "sid": sid, "doi": doi, "d": seen_days_ago, "dis": disappeared},
     )
 
 
@@ -438,12 +367,9 @@ class TestGetStaleRows:
         rows = get_stale_rows(sa_sync_conn, "openalex")
         assert sorted(src_id for _, src_id in rows) == ["W1", "W2"]
 
-    def test_excludes_not_found_and_disappeared(self, sa_sync_conn):
+    def test_excludes_disappeared(self, sa_sync_conn):
         _insert_staging(
-            sa_sync_conn, "openalex", "W1", "10.1/nf", seen_days_ago=100, not_found=True
-        )
-        _insert_staging(
-            sa_sync_conn, "openalex", "W2", "10.1/gone", seen_days_ago=100, disappeared=True
+            sa_sync_conn, "openalex", "W1", "10.1/gone", seen_days_ago=100, disappeared=True
         )
         assert get_stale_rows(sa_sync_conn, "openalex") == []
 
@@ -475,17 +401,6 @@ class TestDisappearedMarking:
         marked = sa_sync_conn.execute(
             text(
                 "SELECT disappeared_at IS NOT NULL FROM staging WHERE source='openalex' AND source_id='W1'"
-            )
-        ).scalar()
-        assert marked is True
-
-    def test_set_disappeared_skips_not_found_stub(self, sa_sync_conn):
-        # Une row déjà marquée not_found (stub cross-import) n'est pas re-marquée.
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100, not_found=True)
-        set_disappeared_by_source_id(sa_sync_conn, "openalex", "W1")
-        marked = sa_sync_conn.execute(
-            text(
-                "SELECT disappeared_at IS NULL FROM staging WHERE source='openalex' AND source_id='W1'"
             )
         ).scalar()
         assert marked is True

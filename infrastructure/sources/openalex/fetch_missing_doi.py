@@ -18,9 +18,9 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    record_doi_not_found,
+from infrastructure.pipeline.fetch_missing.failed_lookups import (
+    forget_failed_doi_lookups,
+    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
@@ -79,7 +79,7 @@ class OpenalexFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "openalex", as_str(record["_doi"]) or "")
+            record_failed_lookup(conn, "openalex", "doi", as_str(record["_doi"]) or "")
             return False
 
         doi = extract_doi(record)
@@ -91,5 +91,5 @@ class OpenalexFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        forget_doi_lookups(conn, "openalex", [doi])
+        forget_failed_doi_lookups(conn, "openalex", [doi])
         return inserted

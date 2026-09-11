@@ -47,7 +47,7 @@ async def run_async(
 
     Les fetchs HTTP tournent concurremment via `run_fetch_pool` (pool de `adapter.max_concurrent` workers), ce qui borne le débit au rate-limit de l'API. Les inserts DB restent sync, sérialisés par le pool sous un lock (la `Connection` SA sync n'est pas thread-safe) ; chaque lot est committé en une transaction (l'adapter source ne commite pas).
 
-    Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la mémorise dans `doi_lookups`.
+    Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui l'inscrit dans `failed_lookups`.
 
     Args:
         conn: `Connection` SA ouverte.

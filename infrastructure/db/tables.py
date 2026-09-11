@@ -843,7 +843,6 @@ staging = Table(
         ),
     ),
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
-    Column("not_found_at", DateTime(timezone=True)),
     Column("disappeared_at", DateTime(timezone=True)),
     # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
     # Posé à l'extraction, consommé puis effacé par `fetch_truncated`.
@@ -852,38 +851,37 @@ staging = Table(
     Column("entry_mode", Text, nullable=False, server_default="bulk"),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
-        "not_found_at IS NULL OR processed",
-        name="staging_not_found_at_implies_processed",
-    ),
-    CheckConstraint(
         "entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, "
         "'cross_import_hal'::text])",
         name="staging_entry_mode_check",
     ),
     comment=(
-        "Documents moissonnés, en transit vers les tables sources. Trois états : à traiter "
+        "Documents moissonnés, en transit vers les tables sources. Deux états : à traiter "
         "(processed FALSE, raw_data porte le payload de la source), normalisée (processed "
-        "TRUE, raw_data vidé), introuvable (processed TRUE, not_found_at horodaté, raw_data "
-        "jamais peuplé). Le dernier est posé par la phase fetch_missing quand HAL ne rend "
-        "pas un document demandé par hal-id ou NNT."
+        "TRUE, raw_data vidé)."
     ),
 )
 
 
-# Cache des tentatives négatives de cross-import par DOI. `next_retry` NULL = miss
-# définitif (crossref, datacite : le DOI est leur identifiant natif, un 404 est sans
-# appel) ; `next_retry` daté = miss transitoire d'une source non native (hal, openalex,
-# wos, scanr), re-tenté après le délai. Tient le pool `get_missing_dois` auto-borné.
-# Distinct de `staging` : ce ne sont pas des documents (pas de payload, pas de cycle de
-# normalisation).
-doi_lookups = Table(
-    "doi_lookups",
+failed_lookups = Table(
+    "failed_lookups",
     metadata,
     Column("source", source_type_enum, nullable=False),
-    Column("doi", Text, nullable=False),
+    Column("id_type", Text, nullable=False),
+    Column("id_value", Text, nullable=False),
     Column("not_found_at", DateTime(timezone=True), nullable=False),
-    Column("next_retry", DateTime(timezone=True), nullable=True),
-    PrimaryKeyConstraint("source", "doi"),
+    Column("next_retry", DateTime(timezone=True)),
+    PrimaryKeyConstraint("source", "id_type", "id_value"),
+    CheckConstraint(
+        "id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])",
+        name="failed_lookups_id_type_check",
+    ),
+    comment=(
+        "Identifiants cherchés en vain dans une source par la phase fetch_missing. "
+        "next_retry porte la date de la prochaine tentative. Il est NULL quand l'identifiant "
+        "est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : "
+        "l'échec est alors définitif."
+    ),
 )
 
 
