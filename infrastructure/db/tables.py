@@ -873,7 +873,7 @@ staging = Table(
 # Cache des tentatives négatives de cross-import par DOI. `next_retry` NULL = miss
 # définitif (crossref, datacite : le DOI est leur identifiant natif, un 404 est sans
 # appel) ; `next_retry` daté = miss transitoire d'une source non native (hal, openalex,
-# wos, scanr), re-tenté après le délai. Tient le pool `get_cross_import_dois` auto-borné.
+# wos, scanr), re-tenté après le délai. Tient le pool `get_missing_dois` auto-borné.
 # Distinct de `staging` : ce ne sont pas des documents (pas de payload, pas de cycle de
 # normalisation).
 doi_lookups = Table(

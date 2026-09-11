@@ -931,7 +931,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     from application.pipeline.fetch_missing.doi import run_async
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.pipeline.extract.cross_import import get_cross_import_dois
+    from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
@@ -952,7 +952,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                 conn,
                 adapter,
                 log,
-                cross_import_dois_reader=get_cross_import_dois,
+                missing_dois_reader=get_missing_dois,
                 limit=get_fetch_missing_max_per_source(conn),
                 breaker=breaker,
             )

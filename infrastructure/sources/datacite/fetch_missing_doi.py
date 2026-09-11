@@ -4,7 +4,7 @@ DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source
 
 Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette au-delà d'une dizaine de clauses `OR` (mesuré : ~0,3 s à 10 DOI, ~2,6 s à 20), on reste à 10 — coût par DOI minimal, et c'est alors le rate-limit qui borne. Les DOI absents de la réponse d'un batch sont les introuvables (cf. ci-dessous).
 
-Le pool de DOI candidats est filtré en amont par `get_cross_import_dois` : seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu) sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
+Le pool de DOI candidats est filtré en amont par `get_missing_dois` : seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu) sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
 
 DataCite est la source native du DOI pour ses préfixes : un miss (DOI absent de la réponse du batch) est définitif (DOI erroné ou non DataCite). Il est mémorisé dans `doi_lookups` avec `next_retry = NULL` (jamais retenté).
 """
@@ -22,11 +22,11 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from infrastructure.pipeline.extract.cross_import import (
+from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.fetch_missing.doi import (
     forget_doi_lookups,
     record_doi_not_found,
 )
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async

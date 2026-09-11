@@ -21,8 +21,8 @@ from application.ports.pipeline.fetch_missing.doi import (
     not_found_marker,
 )
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.fetch_missing.doi import record_doi_not_found
 from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import http_request_with_retry_async

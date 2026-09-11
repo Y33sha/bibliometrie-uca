@@ -2,7 +2,7 @@
 
 API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un lot de 50 DOI en un seul appel. Authentification basic.
 
-ScanR stocke les DOI en casse variable ; le matching est case-insensitive côté `get_cross_import_dois` (cf. `infrastructure.pipeline.extract.cross_import`).
+ScanR stocke les DOI en casse variable : les DOI de ses réponses passent par `clean_doi` avant d'être comparés aux DOI demandés.
 
 Adapter async (`AsyncFetchMissingDoiAdapter`).
 """
@@ -20,11 +20,11 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.pipeline.extract.cross_import import (
+from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.fetch_missing.doi import (
     forget_doi_lookups,
     record_doi_not_found,
 )
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -72,7 +72,7 @@ class ScanrFetchMissingDoiAdapter:
             as_mapping(as_mapping(hit).get("_source"))
             for hit in as_sequence(as_mapping(data.get("hits")).get("hits"))
         ]
-        # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_cross_import_dois`.
+        # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_missing_dois`.
         found = {
             clean_doi(as_str(champs.get("id")))
             for rec in records

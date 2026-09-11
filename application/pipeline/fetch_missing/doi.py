@@ -2,7 +2,7 @@
 
 Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans `staging`.
 
-Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/fetch_missing/fetch_missing_doi.py`).
+Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/fetch_missing/doi.py`).
 
 Implémentation async via `run_fetch_pool` (pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
 
@@ -26,12 +26,12 @@ from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_missing.doi import (
     AsyncFetchMissingDoiAdapter,
-    CrossImportDoisReader,
+    MissingDoisReader,
     is_not_found_marker,
 )
 from domain.types import JsonValue
 
-__all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
+__all__ = ["AsyncFetchMissingDoiAdapter", "MissingDoisReader", "run_async"]
 
 
 async def run_async(
@@ -39,7 +39,7 @@ async def run_async(
     adapter: AsyncFetchMissingDoiAdapter,
     log: logging.Logger,
     *,
-    cross_import_dois_reader: CrossImportDoisReader,
+    missing_dois_reader: MissingDoisReader,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
@@ -53,7 +53,7 @@ async def run_async(
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
-        cross_import_dois_reader: callable `(conn, source) -> list[doi]`.
+        missing_dois_reader: callable `(conn, source) -> list[doi]`.
         limit: nombre max de DOI à traiter.
 
     Returns:
@@ -62,7 +62,7 @@ async def run_async(
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
 
-    dois = cross_import_dois_reader(conn, adapter.source_key)
+    dois = missing_dois_reader(conn, adapter.source_key)
 
     if limit and len(dois) > limit:
         slog.info(

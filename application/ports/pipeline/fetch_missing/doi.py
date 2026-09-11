@@ -18,10 +18,10 @@ from sqlalchemy import Connection
 
 from domain.types import JsonValue
 
-CrossImportDoisReader = Callable[[Connection, str], list[str]]
+MissingDoisReader = Callable[[Connection, str], list[str]]
 """Signature : `(conn, target) -> list[doi]`.
 
-La fonction elle-même (`infrastructure.pipeline.extract.cross_import.get_cross_import_dois`) est injectée dans `run_async` : la couche application ne dépend pas d'`infrastructure` pour lire la liste des DOI manquants.
+La fonction elle-même (`infrastructure.pipeline.fetch_missing.doi.get_missing_dois`) est injectée dans `run_async` : la couche application ne dépend pas d'`infrastructure` pour lire la liste des DOI manquants.
 """
 
 _NOT_FOUND_STATUS = "not_found"
