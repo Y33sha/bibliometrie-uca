@@ -141,7 +141,8 @@
     --bronze-text: #9a5a1e; /* bronze assombri, lisible en texte sur fond clair */
     --green: #5ec62c;
     --green-text: #3f7a28; /* voie green assombrie, lisible en texte sur fond clair */
-    --open: #4caf50; /* vert « accès ouvert » (indicateur générique) */
+    --open: #57b82e; /* vert « accès ouvert » (indicateur générique) */
+    --open-text: #3f7a28; /* « accès ouvert » assombri, lisible en texte sur fond clair */
     --embargoed: #b08900;
     --closed: #555;
     --unknown: #bbb;

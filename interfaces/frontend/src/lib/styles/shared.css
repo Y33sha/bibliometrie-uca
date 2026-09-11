@@ -608,7 +608,7 @@ th.sorted .sort-arrow {
 }
 
 .oa-lock-open .oa-lock-label {
-	color: var(--open);
+	color: var(--open-text);
 }
 
 .oa-lock-closed .oa-lock-label {
