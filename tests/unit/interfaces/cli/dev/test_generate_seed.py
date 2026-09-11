@@ -1,18 +1,16 @@
-"""Garde-régression du chemin de sortie par défaut de `generate_seed`.
+"""Garde-régression des chemins de sortie par défaut de `generate_seed` : ils visent `infrastructure/db/`, et ce dossier doit exister."""
 
-Le défaut doit résoudre le fichier seed canonique, compagnon de
-`infrastructure/db/schema.sql`, et son dossier doit exister : un chemin pointant
-sur un dossier absent lèverait `FileNotFoundError` à l'écriture.
-"""
+import pytest
 
-from pathlib import Path
-
-from interfaces.cli.dev.generate_seed import DEFAULT_SEED_PATH
+from interfaces.cli.dev.generate_seed import COMMON_SEED, INSTITUTION_SEED, SeedSpec
 
 
-def test_default_seed_path_is_canonical():
-    path = Path(DEFAULT_SEED_PATH)
-    assert path.name == "seed.sql"
+@pytest.mark.parametrize(
+    ("seed", "name"), [(COMMON_SEED, "seed.sql"), (INSTITUTION_SEED, "seed_uca.sql")]
+)
+def test_default_seed_path_is_canonical(seed: SeedSpec, name: str):
+    path = seed.default_path
+    assert path.name == name
     assert path.parent.name == "db"
     assert path.parent.parent.name == "infrastructure"
     # Le dossier de sortie doit exister : sinon l'écriture lève FileNotFoundError.

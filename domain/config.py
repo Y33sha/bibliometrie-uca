@@ -29,6 +29,17 @@ CAP_KEYS: frozenset[str] = frozenset(
 YEAR_KEYS: frozenset[str] = frozenset({"pipeline_start_year_full"})
 """Clés portant une année."""
 
+PERIMETER_EXTRACTION_KEY = "perimeter_extraction"
+"""Clé du code du périmètre dont les structures sont interrogées à l'extraction."""
+
+PERIMETER_PERSONS_KEY = "perimeter_persons"
+"""Clé du code du périmètre de création des personnes."""
+
+INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
+    {PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY}
+)
+"""Clés propres à l'établissement : elles désignent des périmètres de l'établissement."""
+
 MIN_YEAR = 1970
 MAX_YEAR = 2100
 

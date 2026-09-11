@@ -8,6 +8,7 @@ import logging
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from domain.config import PERIMETER_EXTRACTION_KEY
 from domain.dates import today
 from domain.types import JsonValue, as_str
 from infrastructure.settings import settings
@@ -93,7 +94,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
     try:
         from infrastructure.read_models.perimeters import get_perimeter_structure_ids
 
-        raw_perim = _get_from_db(conn, "perimeter_extraction")
+        raw_perim = _get_from_db(conn, PERIMETER_EXTRACTION_KEY)
         perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "alliance_uca"
         perimeter_ids = get_perimeter_structure_ids(conn, perim_code)
         if perimeter_ids:
@@ -128,7 +129,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 
     Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
     """
-    perim_code = _get_from_db(conn, "perimeter_extraction")
+    perim_code = _get_from_db(conn, PERIMETER_EXTRACTION_KEY)
     if not (perim_code and isinstance(perim_code, str)):
         return []
     try:
