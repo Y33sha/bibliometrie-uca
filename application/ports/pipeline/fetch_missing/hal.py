@@ -1,17 +1,11 @@
 """Port : adapter HAL pour le fetch des entrées HAL manquantes.
 
-Implémenté par
-`infrastructure.sources.hal.fetch_missing_hal.PgHalFetchMissingAdapter`.
-
-Les orchestrateurs (`application.pipeline.fetch_missing.hal`) consomment
-ce Protocol : `fetch_missing_hal_by_id` pour les références hal-id (OpenAlex,
-ScanR) et `fetch_missing_hal_by_nnt` pour les NNT (theses).
+Implémenté par `infrastructure.sources.hal.fetch_missing_hal.PgHalFetchMissingAdapter`. Les orchestrateurs de `application.pipeline.fetch_missing.hal` le consomment : `fetch_missing_hal_by_id` pour les hal-ids repérés dans d'autres sources, `fetch_missing_hal_by_nnt` pour les NNT de theses.fr.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import NamedTuple, Protocol
 
 import httpx2
@@ -27,24 +21,6 @@ class NntInsertResult(NamedTuple):
     inserted: bool
 
 
-@dataclass(frozen=True, slots=True)
-class HalIdRef:
-    """Référence HAL repérée via une autre source mais absente de staging."""
-
-    source: str  # "openalex" | "scanr"
-    hal_id: str
-    foreign_id: str  # openalex_id / scanr_id — uniquement pour le log
-    landing_url: str | None = None  # OA only
-
-
-@dataclass(frozen=True, slots=True)
-class NntRef:
-    """Thèse soutenue (NNT) sans document HAL associé."""
-
-    nnt: str
-    theses_id: str  # pour le log
-
-
 class HalFetchMissingAdapter(Protocol):
     """Port fetch_missing_hal : config, lookups SQL, HTTP, inserts SQL."""
 
@@ -54,20 +30,13 @@ class HalFetchMissingAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL) depuis la base avant la boucle."""
 
-    # ── Lookups SQL (refs manquantes) ──────────────────────────
+    # ── Lookups SQL (identifiants manquants) ───────────────────
 
-    def find_halid_refs_from_openalex(self, conn: Connection) -> list[HalIdRef]:
-        """halIds référencés par OpenAlex (primary_location ou external_ids->'hal_id')
-        et absents de staging HAL.
-        """
+    def find_missing_hal_ids(self, conn: Connection) -> list[str]:
+        """hal-ids portés par les publications in-périmètre d'OpenAlex et de ScanR, absents du staging HAL."""
 
-    def find_halid_refs_from_scanr(self, conn: Connection) -> list[HalIdRef]:
-        """halIds référencés par ScanR (externalIds[type=hal] ou external_ids->'hal_id')
-        et absents de staging HAL.
-        """
-
-    def find_nnt_refs_from_theses(self, conn: Connection) -> list[NntRef]:
-        """NNT (thèses soutenues) sans document HAL associé."""
+    def find_missing_nnts(self, conn: Connection) -> list[str]:
+        """NNT des thèses soutenues sans document HAL associé."""
 
     # ── HTTP ───────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 """Adapter HAL pour `application.pipeline.fetch_missing.hal`.
 
-Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses), les fetchs HTTP async (par halId et par NNT) et les inserts staging.
+Implémente les lookups SQL (hal-ids d'OpenAlex et de ScanR, NNT de theses.fr), les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
-L'orchestration (combinaison des refs, dedup, boucles async, commits intermédiaires) vit côté `application.pipeline.fetch_missing.hal`.
+L'orchestration (boucles async, commits intermédiaires) vit côté `application.pipeline.fetch_missing.hal`.
 """
 
 from __future__ import annotations
@@ -14,9 +14,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.fetch_missing.hal import (
     HalFetchMissingAdapter,
-    HalIdRef,
     NntInsertResult,
-    NntRef,
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_not_found_stub, upsert_staging
@@ -29,97 +27,36 @@ from infrastructure.sources.http_retry import http_request_with_retry_async
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.
 HAL_MAX_CONCURRENT = 5
 
-
-def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, str | None]]:
-    """halIds référencés par des `source_publications` OpenAlex in-périmètre, absents de staging HAL.
-
-    Source : `source_publications` OpenAlex des publications `in_perimeter` (`external_ids.hal_id`, liste ; toutes locations, pas seulement la primary), normalisés à un run antérieur. Ne cross-importer que des hal-ids portés par des publications confirmées UCA coupe la propagation hors-périmètre ; les documents fraîchement extraits sont rattrapés au run suivant (pipeline convergent).
-
-    Retourne `[{openalex_id, hal_id, landing_url}, ...]`. Le filtre `NOT EXISTS staging_hal` écarte les hal-ids déjà stagés.
+_MISSING_HAL_IDS_SQL = text(
     """
-    rows = conn.execute(
-        text(
-            """
-            SELECT sp.source_id AS openalex_id, h AS hal_id
-            FROM source_publications sp
-            JOIN publications p ON p.id = sp.publication_id
-            CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'hal_id') AS h
-            WHERE sp.source = 'openalex'
-              AND p.in_perimeter
-              AND jsonb_typeof(sp.external_ids->'hal_id') = 'array'
-            """
-        )
-    ).all()
-    results: dict[str, dict[str, str | None]] = {
-        row.hal_id: {"openalex_id": row.openalex_id, "hal_id": row.hal_id, "landing_url": None}
-        for row in rows
-    }
-    if not results:
-        return []
-    already_staged = set(
-        conn.execute(
-            text("SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(:ids)"),
-            {"ids": list(results.keys())},
-        ).scalars()
-    )
-    return [r for hal_id, r in results.items() if hal_id not in already_staged]
-
-
-def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, str | None]]:
-    """halIds référencés par des `source_publications` ScanR in-périmètre, absents de staging HAL.
-
-    Source : `source_publications` ScanR des publications `in_perimeter` (`external_ids.hal_id`, liste), normalisés à un run antérieur. Cf. `find_hal_ids_from_openalex` pour le choix du périmètre et le lag n+1.
-
-    Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`. Fonction libre, référencée par des tests d'intégration ciblés (cf. `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal.py`).
+    SELECT DISTINCT h.hal_id
+    FROM source_publications sp
+    JOIN publications p ON p.id = sp.publication_id
+    CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> 'hal_id') AS h(hal_id)
+    WHERE sp.source IN ('openalex', 'scanr')
+      AND p.in_perimeter
+      AND jsonb_typeof(sp.external_ids -> 'hal_id') = 'array'
+      AND NOT EXISTS (
+          SELECT 1 FROM staging s WHERE s.source = 'hal' AND s.source_id = h.hal_id
+      )
     """
-    rows = conn.execute(
-        text(
-            """
-            SELECT sd.source_id AS scanr_id, h AS hal_id
-            FROM source_publications sd
-            JOIN publications p ON p.id = sd.publication_id
-            CROSS JOIN LATERAL jsonb_array_elements_text(sd.external_ids->'hal_id') AS h
-            WHERE sd.source = 'scanr'
-              AND p.in_perimeter
-              AND jsonb_typeof(sd.external_ids->'hal_id') = 'array'
-              AND NOT EXISTS (
-                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = h
-              )
-            """
-        )
-    ).all()
-    results: dict[str, dict[str, str | None]] = {
-        row.hal_id: {"source": "scanr", "hal_id": row.hal_id, "scanr_id": row.scanr_id}
-        for row in rows
-    }
-    return list(results.values())
+)
 
-
-def find_nnt_without_hal(conn: Connection) -> list[dict[str, str | None]]:
-    """NNT (thèses soutenues) sans document HAL associé.
-
-    Recherche via `source_publications.external_ids->>'nnt'` pour les publications `in_perimeter` qui n'ont pas `'hal'` dans leurs sources et ne sont pas de type `ongoing_thesis`.
-
-    Retourne `[{source: "nnt", nnt, theses_id}, ...]`.
+_MISSING_NNTS_SQL = text(
     """
-    rows = conn.execute(
-        text(
-            """
-            SELECT sd.external_ids->>'nnt' AS nnt, sd.source_id AS theses_id
-            FROM source_publications sd
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE sd.source = 'theses'
-              AND p.in_perimeter
-              AND sd.external_ids->>'nnt' IS NOT NULL
-              AND p.doc_type != 'ongoing_thesis'
-              AND NOT EXISTS (
-                  SELECT 1 FROM source_publications sd2
-                  WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
-              )
-            """
-        )
-    ).all()
-    return [{"source": "nnt", "nnt": row.nnt, "theses_id": row.theses_id} for row in rows]
+    SELECT sp.external_ids ->> 'nnt' AS nnt
+    FROM source_publications sp
+    JOIN publications p ON p.id = sp.publication_id
+    WHERE sp.source = 'theses'
+      AND p.in_perimeter
+      AND sp.external_ids ->> 'nnt' IS NOT NULL
+      AND p.doc_type != 'ongoing_thesis'
+      AND NOT EXISTS (
+          SELECT 1 FROM source_publications hal
+          WHERE hal.publication_id = p.id AND hal.source = 'hal'
+      )
+    """
+)
 
 
 def insert_staging_hal(
@@ -153,28 +90,16 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
 
     # ── Lookups SQL ────────────────────────────────────────────
 
-    def find_halid_refs_from_openalex(self, conn: Connection) -> list[HalIdRef]:
-        return [
-            HalIdRef(
-                source="openalex",
-                hal_id=r["hal_id"] or "",
-                foreign_id=r["openalex_id"] or "",
-                landing_url=r.get("landing_url"),
-            )
-            for r in find_hal_ids_from_openalex(conn)
-        ]
+    def find_missing_hal_ids(self, conn: Connection) -> list[str]:
+        """hal-ids que des `source_publications` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
 
-    def find_halid_refs_from_scanr(self, conn: Connection) -> list[HalIdRef]:
-        return [
-            HalIdRef(source="scanr", hal_id=r["hal_id"] or "", foreign_id=r["scanr_id"] or "")
-            for r in find_hal_ids_from_scanr(conn)
-        ]
+        Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_publications` du run précédent : les documents extraits pendant le run y entrent au run suivant.
+        """
+        return list(conn.execute(_MISSING_HAL_IDS_SQL).scalars())
 
-    def find_nnt_refs_from_theses(self, conn: Connection) -> list[NntRef]:
-        return [
-            NntRef(nnt=r["nnt"] or "", theses_id=r["theses_id"] or "")
-            for r in find_nnt_without_hal(conn)
-        ]
+    def find_missing_nnts(self, conn: Connection) -> list[str]:
+        """NNT des `source_publications` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_publications` HAL."""
+        return list(conn.execute(_MISSING_NNTS_SQL).scalars())
 
     # ── HTTP ───────────────────────────────────────────────────
 
