@@ -22,88 +22,49 @@ import json
 from pathlib import Path
 from typing import TypedDict
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Table, text
 
 from domain.types import JsonValue
+from infrastructure.db import tables
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.jsonb import Jsonb
 
 # Fichier seed canonique, compagnon de infrastructure/db/schema.sql.
 # `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt.
 DEFAULT_SEED_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "seed.sql"
 
-
-class _ColonnesExportees(TypedDict):
-    table: str
-    columns: list[str]
-    order: str
+# Colonnes absentes de l'export : l'horodatage d'insertion reprend sa valeur par défaut au chargement.
+EXCLUDED_COLUMNS = frozenset({"created_at"})
 
 
-class TableSpec(_ColonnesExportees, total=False):
+class _TableExportee(TypedDict):
+    table: Table
+
+
+class TableSpec(_TableExportee, total=False):
     """Table de référence à exporter.
 
-    `table`, `columns` et `order` composent la requête de lecture. `jsonb_columns` désigne les colonnes à sérialiser en JSON, `where` restreint les lignes exportées.
+    Toutes les colonnes de la table sont exportées, sauf celles de `EXCLUDED_COLUMNS`, et les lignes sont triées par clé primaire. `where` restreint les lignes exportées.
     """
 
-    jsonb_columns: list[str]
     where: str
 
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK).
 TABLES: list[TableSpec] = [
-    {
-        "table": "config",
-        "columns": ["key", "value", "description"],
-        "order": "key",
-        "jsonb_columns": ["value"],
-    },
-    {
-        "table": "countries",
-        "columns": ["code", "name"],
-        "order": "code",
-    },
-    {
-        "table": "place_name_forms",
-        "columns": ["id", "iso_code", "form_normalized", "kind"],
-        "order": "id",
-        "where": "kind <> 'institution'",
-    },
-    {
-        "table": "structures",
-        "columns": [
-            "id",
-            "code",
-            "name",
-            "acronym",
-            "structure_type",
-            "ror_id",
-            "rnsr_id",
-            "hal_collection",
-        ],
-        "order": "id",
-    },
-    {
-        "table": "structure_tutelles",
-        "columns": ["id", "parent_id", "child_id"],
-        "order": "id",
-    },
-    {
-        "table": "perimeters",
-        "columns": ["id", "code", "name", "root_structure_ids"],
-        "order": "id",
-    },
-    {
-        "table": "structure_name_forms",
-        "columns": [
-            "id",
-            "structure_id",
-            "form_text",
-            "requires_context_of",
-            "is_word_boundary",
-            "is_excluding",
-        ],
-        "order": "id",
-    },
+    {"table": tables.config},
+    {"table": tables.countries},
+    {"table": tables.place_name_forms, "where": "kind <> 'institution'"},
+    {"table": tables.structures},
+    {"table": tables.structure_tutelles},
+    {"table": tables.perimeters},
+    {"table": tables.structure_name_forms},
 ]
+
+
+def exported_columns(table: Table) -> list[str]:
+    """Colonnes exportées de `table`, dans l'ordre de sa définition."""
+    return [c.name for c in table.columns if c.name not in EXCLUDED_COLUMNS]
 
 
 def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
@@ -143,9 +104,9 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
     lines.append("")
 
     for spec in TABLES:
-        table = spec["table"]
-        columns = spec["columns"]
-        order = spec["order"]
+        table = spec["table"].name
+        columns = exported_columns(spec["table"])
+        order = ", ".join(c.name for c in spec["table"].primary_key.columns)
 
         col_list = ", ".join(columns)
         restriction = spec.get("where")
@@ -160,7 +121,7 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
         lines.append(f"-- {table} ({len(rows)} lignes)")
         lines.append(f"DELETE FROM {table}{filtre};")
 
-        jsonb_cols = set(spec.get("jsonb_columns") or [])
+        jsonb_cols = {c.name for c in spec["table"].columns if isinstance(c.type, type(Jsonb))}
 
         for row in rows:
             row_values = list(row)
@@ -189,8 +150,9 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
     for spec in TABLES:
         restriction = spec.get("where")
         filtre = f" WHERE {restriction}" if restriction else ""
-        count = conn.execute(text(f"SELECT COUNT(*) FROM {spec['table']}{filtre}")).scalar_one()
-        print(f"  {spec['table']}: {count} lignes")
+        table = spec["table"].name
+        count = conn.execute(text(f"SELECT COUNT(*) FROM {table}{filtre}")).scalar_one()
+        print(f"  {table}: {count} lignes")
 
 
 def main() -> None:
