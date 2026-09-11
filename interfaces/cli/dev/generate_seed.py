@@ -12,6 +12,7 @@ Chaque fichier produit est un SQL pur (INSERT) avec recalage des séquences. Il 
 
 import argparse
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
@@ -51,6 +52,15 @@ class SeedSpec:
     description: str
     tables: tuple[TableSpec, ...]
     default_path: Path
+
+
+@dataclass(frozen=True)
+class SeedSection:
+    """Lignes d'une table à écrire dans un seed, valeurs dans l'ordre de `exported_columns`. `where` restreint les lignes supprimées au chargement."""
+
+    table: Table
+    rows: list[tuple[JsonValue, ...]]
+    where: str | None = None
 
 
 _INSTITUTION_KEYS_SQL = ", ".join(f"'{key}'" for key in sorted(INSTITUTION_CONFIG_KEYS))
@@ -119,43 +129,35 @@ def _display_path(path: Path) -> str:
     return str(resolved)
 
 
-def generate_seed(conn: Connection, seed: SeedSpec, output_path: Path) -> None:
-    lines = []
-    lines.append("-- Seed généré automatiquement par interfaces/cli/dev/generate_seed.py")
-    lines.append("-- Ne pas modifier à la main — relancer le script pour régénérer.")
-    lines.append("--")
-    lines.append(f"-- {seed.description}")
-    lines.append("-- Prérequis : schéma appliqué par les migrations (alembic upgrade head)")
-    lines.append(f"-- Usage : psql -d bibliometrie -f {_display_path(output_path)}")
-    lines.append("")
-    lines.append("BEGIN;")
-    lines.append("")
-
-    for spec in seed.tables:
-        table = spec["table"].name
-        columns = exported_columns(spec["table"])
-        order = ", ".join(c.name for c in spec["table"].primary_key.columns)
-
-        col_list = ", ".join(columns)
-        restriction = spec.get("where")
-        filtre = f" WHERE {restriction}" if restriction else ""
-        rows = conn.execute(text(f"SELECT {col_list} FROM {table}{filtre} ORDER BY {order}")).all()
-
-        if not rows:
-            lines.append(f"-- {table} : aucune donnée")
-            lines.append("")
+def render_seed(description: str, output_path: Path, sections: Sequence[SeedSection]) -> str:
+    """Texte SQL d'un seed : une transaction qui vide puis remplit chaque table, et recale les séquences."""
+    lines = [
+        "-- Seed généré automatiquement par interfaces/cli/dev/generate_seed.py",
+        "-- Ne pas modifier à la main — relancer le script pour régénérer.",
+        "--",
+        f"-- {description}",
+        "-- Prérequis : schéma appliqué par les migrations (alembic upgrade head)",
+        f"-- Usage : psql -d bibliometrie -f {_display_path(output_path)}",
+        "",
+        "BEGIN;",
+        "",
+    ]
+    for section in sections:
+        table = section.table.name
+        columns = exported_columns(section.table)
+        if not section.rows:
+            lines += [f"-- {table} : aucune donnée", ""]
             continue
 
-        lines.append(f"-- {table} ({len(rows)} lignes)")
+        col_list = ", ".join(columns)
+        filtre = f" WHERE {section.where}" if section.where else ""
+        jsonb_cols = {c.name for c in section.table.columns if isinstance(c.type, type(Jsonb))}
+        lines.append(f"-- {table} ({len(section.rows)} lignes)")
         lines.append(f"DELETE FROM {table}{filtre};")
-
-        jsonb_cols = {c.name for c in spec["table"].columns if isinstance(c.type, type(Jsonb))}
-
-        for row in rows:
-            row_values = list(row)
+        for row in section.rows:
             values = ", ".join(
-                escape_sql(row_values[i], is_jsonb=(columns[i] in jsonb_cols))
-                for i in range(len(columns))
+                escape_sql(value, is_jsonb=(column in jsonb_cols))
+                for column, value in zip(columns, row, strict=True)
             )
             lines.append(f"INSERT INTO {table} ({col_list}) VALUES ({values});")
 
@@ -165,22 +167,38 @@ def generate_seed(conn: Connection, seed: SeedSpec, output_path: Path) -> None:
                 f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
                 f"(SELECT COALESCE(MAX(id), 0) FROM {table}));"
             )
-
         lines.append("")
 
-    lines.append("COMMIT;")
-    lines.append("")
+    lines += ["COMMIT;", ""]
+    return "\n".join(lines)
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
 
+def write_seed(description: str, output_path: Path, sections: Sequence[SeedSection]) -> None:
+    """Écrit le seed dans `output_path` et affiche le nombre de lignes de chaque table."""
+    output_path.write_text(render_seed(description, output_path, sections), encoding="utf-8")
     print(f"Seed généré : {output_path}")
+    for section in sections:
+        print(f"  {section.table.name}: {len(section.rows)} lignes")
+
+
+def read_sections(conn: Connection, seed: SeedSpec) -> list[SeedSection]:
+    """Lignes de la base courante pour chaque table du seed, triées par clé primaire."""
+    sections = []
     for spec in seed.tables:
-        restriction = spec.get("where")
-        filtre = f" WHERE {restriction}" if restriction else ""
-        table = spec["table"].name
-        count = conn.execute(text(f"SELECT COUNT(*) FROM {table}{filtre}")).scalar_one()
-        print(f"  {table}: {count} lignes")
+        table = spec["table"]
+        where = spec.get("where")
+        filtre = f" WHERE {where}" if where else ""
+        col_list = ", ".join(exported_columns(table))
+        order = ", ".join(c.name for c in table.primary_key.columns)
+        rows = conn.execute(
+            text(f"SELECT {col_list} FROM {table.name}{filtre} ORDER BY {order}")
+        ).all()
+        sections.append(SeedSection(table, [tuple(row) for row in rows], where))
+    return sections
+
+
+def generate_seed(conn: Connection, seed: SeedSpec, output_path: Path) -> None:
+    write_seed(seed.description, output_path, read_sections(conn, seed))
 
 
 def main() -> None:
