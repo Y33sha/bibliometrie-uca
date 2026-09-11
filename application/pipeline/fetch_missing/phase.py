@@ -8,7 +8,7 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-from application.pipeline.libelles import etape
+from application.pipeline.libelles import etape, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.parallel import RunParallel
@@ -80,6 +80,9 @@ def run(
         for target, (channel_metrics, duration) in outcomes.items():
             metrics.merge(channel_metrics)
             by_channel[target] = _summary(channel_metrics, duration)
+        # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
+        if all(m.total == 0 and not m.signals for m, _ in outcomes.values()):
+            rien_a_faire(logger)
 
     if by_channel:
         metrics.details["table"] = {
