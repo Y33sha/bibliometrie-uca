@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from typing import cast
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
 from application.pipeline.progression import attente
@@ -46,7 +46,7 @@ def run(
     disparues = prune_disappeared()
 
     if not disparues and not any(_a_traite(row) for row in rows):
-        logger.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(logger)
         metrics = PhaseMetrics()
         metrics.resume = ""
         metrics.details["table"] = {"rows": rows}

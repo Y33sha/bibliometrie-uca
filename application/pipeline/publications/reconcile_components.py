@@ -20,7 +20,14 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import (
+    BRANCHE,
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
 from application.pipeline.progression import attente, progression
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
@@ -99,7 +106,7 @@ def reconcile(
     if not dirty_ids:
         if logger:
             etape(logger, "Aucun document nouveau ou mis à jour")
-            logger.info("%sRien à faire", DERNIERE_BRANCHE)
+            rien_a_faire(logger)
         return None
     if logger:
         etape(

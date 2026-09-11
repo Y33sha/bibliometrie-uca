@@ -19,7 +19,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import DERNIERE_BRANCHE
+from application.pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import HalFetchMissingAdapter
@@ -104,7 +104,7 @@ async def fetch_missing_hal_by_id(
 
     metrics = PhaseMetrics(seen=len(hal_ids))
     if not hal_ids:
-        log.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(log)
         return metrics
 
     def _insert(
@@ -142,7 +142,7 @@ async def fetch_missing_hal_by_nnt(
 
     metrics = PhaseMetrics(seen=len(nnts))
     if not nnts:
-        log.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(log)
         return metrics
 
     def _insert(conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None) -> tuple[int, int]:

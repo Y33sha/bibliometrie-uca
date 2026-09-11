@@ -17,7 +17,14 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import (
+    BRANCHE,
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.subjects._common import SubjectCache
@@ -47,7 +54,7 @@ def run(
         pub_ids = queries.select_publications_to_reingest(conn)
     if not pub_ids:
         queries.purge_orphan_subjects(conn)
-        logger.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(logger)
         subjects_after = queries.count_all_subjects(conn)
         metrics = PhaseMetrics()
         metrics.details["summary"] = {
