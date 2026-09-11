@@ -6,7 +6,7 @@
 # la pile, points d'entrée que le routage expose sans qu'ils aient été voulus.
 #
 # Portée de ce que le passage établit : la base porte les seules données de référence de
-# `seed.sql` — ni publication, ni personne. Les listes traversées sont vides, et aucune injection
+# `seed.sql` et `seed_uca.sql` — ni publication, ni personne. Les listes traversées sont vides, et aucune injection
 # n'est essayée sur un identifiant réel. Le résultat vaut pour la surface et la configuration,
 # non pour le traitement des données.
 #
@@ -99,7 +99,9 @@ jobs:
       - name: Charger les données de référence
         env:
           PGPASSWORD: postgres
-        run: psql -h 127.0.0.1 -U postgres -d postgres -f infrastructure/db/seed.sql
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres -f infrastructure/db/seed.sql
+          psql -h 127.0.0.1 -U postgres -d postgres -f infrastructure/db/seed_uca.sql
 
       # La description des points d'entrée, produite sans serveur. L'application balayée tourne
       # avec sa configuration de production, qui ne publie pas cette description : la passer par

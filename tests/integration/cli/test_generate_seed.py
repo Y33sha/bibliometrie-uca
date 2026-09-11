@@ -5,7 +5,7 @@ Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comm
 
 from sqlalchemy import text
 
-from interfaces.cli.dev.generate_seed import generate_seed
+from interfaces.cli.dev.generate_seed import COMMON_SEED, INSTITUTION_SEED, generate_seed
 
 
 def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
@@ -16,15 +16,19 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
             "VALUES ('smoke', 'Smoke', '{1,2}')"
         )
     )
-    out = tmp_path / "seed.sql"
+    common = tmp_path / "common.sql"
+    institution = tmp_path / "institution.sql"
 
     # Chaque table déclenche un `SELECT <colonnes> FROM <table>` : une colonne périmée lèverait ici.
-    generate_seed(sa_sync_conn, out)
+    generate_seed(sa_sync_conn, COMMON_SEED, common)
+    generate_seed(sa_sync_conn, INSTITUTION_SEED, institution)
 
-    content = out.read_text(encoding="utf-8")
-    assert content.startswith("-- Seed généré")
-    assert "BEGIN;" in content
-    assert "COMMIT;" in content
+    for out in (common, institution):
+        content = out.read_text(encoding="utf-8")
+        assert content.startswith("-- Seed généré")
+        assert "BEGIN;" in content
+        assert "COMMIT;" in content
+    content = institution.read_text(encoding="utf-8")
     assert "INSERT INTO perimeters (id, code, name, root_structure_ids)" in content
     assert "'{1, 2}'" in content
 
@@ -40,8 +44,34 @@ def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
     )
     out = tmp_path / "seed.sql"
 
-    generate_seed(sa_sync_conn, out)
+    generate_seed(sa_sync_conn, INSTITUTION_SEED, out)
 
     content = out.read_text(encoding="utf-8")
     assert "hal_collection, api_ids) VALUES" in content
     assert """'{"openalex": ["I1"]}'""" in content
+
+
+def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
+    # Les clés de périmètre désignent des périmètres de l'établissement : elles suivent son seed, les autres clés vont au seed commun.
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO config (key, value) "
+            "VALUES ('perimeter_persons', '\"smoke\"'), ('unpaywall_max_per_run', '5') "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+        )
+    )
+    common = tmp_path / "common.sql"
+    institution = tmp_path / "institution.sql"
+
+    generate_seed(sa_sync_conn, COMMON_SEED, common)
+    generate_seed(sa_sync_conn, INSTITUTION_SEED, institution)
+
+    common_sql = common.read_text(encoding="utf-8")
+    institution_sql = institution.read_text(encoding="utf-8")
+    assert "VALUES ('perimeter_persons'" in institution_sql
+    assert "VALUES ('perimeter_persons'" not in common_sql
+    assert "VALUES ('unpaywall_max_per_run'" in common_sql
+    assert "VALUES ('unpaywall_max_per_run'" not in institution_sql
+    # Chaque seed supprime seulement ses propres clés : l'ordre de chargement est indifférent.
+    assert "DELETE FROM config WHERE key NOT IN (" in common_sql
+    assert "DELETE FROM config WHERE key IN (" in institution_sql

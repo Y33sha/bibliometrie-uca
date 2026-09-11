@@ -1,37 +1,31 @@
 # STATUS: recurring (dev)
-"""Génère infrastructure/db/seed.sql à partir des données de référence de la base courante.
+"""Génère le seed commun et le seed d'établissement à partir des données de référence de la base courante.
 
-Tables exportées :
-  - config              (paramètres applicatifs)
-  - countries           (référentiel pays)
-  - place_name_forms    (formes normalisées de noms de pays et de villes)
-  - structures          (structures UCA, labos, partenaires)
-  - structure_tutelles  (tutelles entre structures)
-  - perimeters          (périmètres UCA, UCA élargi)
-  - structure_name_forms (formes de noms pour le matching d'adresses)
+Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements. Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms et les clés de configuration qui désignent les périmètres. Les deux seeds se chargent indépendamment l'un de l'autre.
 
 Usage :
     python -m interfaces.cli.dev.generate_seed
-    python -m interfaces.cli.dev.generate_seed --output infrastructure/db/seed.sql
+    python -m interfaces.cli.dev.generate_seed --common-output CHEMIN --institution-output CHEMIN
 
-Le fichier produit est un SQL pur (INSERT) avec gestion des séquences. Il suppose que le schéma (tables, enums, séquences) est déjà appliqué via infrastructure/db/schema.sql + migrations.
+Chaque fichier produit est un SQL pur (INSERT) avec recalage des séquences. Il suppose le schéma appliqué par les migrations.
 """
 
 import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
 from sqlalchemy import Connection, Table, text
 
+from domain.config import INSTITUTION_CONFIG_KEYS
 from domain.types import JsonValue
+from infrastructure import PROJECT_ROOT
 from infrastructure.db import tables
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 
-# Fichier seed canonique, compagnon de infrastructure/db/schema.sql.
-# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt.
-DEFAULT_SEED_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "seed.sql"
+_DB_DIR = PROJECT_ROOT / "infrastructure" / "db"
 
 # Colonnes absentes de l'export : l'horodatage d'insertion reprend sa valeur par défaut au chargement.
 EXCLUDED_COLUMNS = frozenset({"created_at"})
@@ -44,22 +38,47 @@ class _TableExportee(TypedDict):
 class TableSpec(_TableExportee, total=False):
     """Table de référence à exporter.
 
-    Toutes les colonnes de la table sont exportées, sauf celles de `EXCLUDED_COLUMNS`, et les lignes sont triées par clé primaire. `where` restreint les lignes exportées.
+    Toutes les colonnes de la table sont exportées, sauf celles de `EXCLUDED_COLUMNS`, et les lignes sont triées par clé primaire. `where` restreint les lignes exportées et supprimées au chargement.
     """
 
     where: str
 
 
-# Tables à exporter, dans l'ordre d'insertion (respect des FK).
-TABLES: list[TableSpec] = [
-    {"table": tables.config},
-    {"table": tables.countries},
-    {"table": tables.place_name_forms, "where": "kind <> 'institution'"},
-    {"table": tables.structures},
-    {"table": tables.structure_tutelles},
-    {"table": tables.perimeters},
-    {"table": tables.structure_name_forms},
-]
+@dataclass(frozen=True)
+class SeedSpec:
+    """Seed à produire : description en tête de fichier, tables dans l'ordre d'insertion (respect des FK), fichier par défaut."""
+
+    description: str
+    tables: tuple[TableSpec, ...]
+    default_path: Path
+
+
+_INSTITUTION_KEYS_SQL = ", ".join(f"'{key}'" for key in sorted(INSTITUTION_CONFIG_KEYS))
+
+COMMON_SEED = SeedSpec(
+    description="Seed commun : référentiels partagés par tous les établissements.",
+    tables=(
+        {"table": tables.config, "where": f"key NOT IN ({_INSTITUTION_KEYS_SQL})"},
+        {"table": tables.countries},
+        {"table": tables.place_name_forms, "where": "kind <> 'institution'"},
+    ),
+    default_path=_DB_DIR / "seed.sql",
+)
+
+INSTITUTION_SEED = SeedSpec(
+    description=(
+        "Seed d'établissement : structures, tutelles, périmètres, formes de noms "
+        "et clés de configuration des périmètres."
+    ),
+    tables=(
+        {"table": tables.structures},
+        {"table": tables.structure_tutelles},
+        {"table": tables.perimeters},
+        {"table": tables.structure_name_forms},
+        {"table": tables.config, "where": f"key IN ({_INSTITUTION_KEYS_SQL})"},
+    ),
+    default_path=_DB_DIR / "seed_uca.sql",
+)
 
 
 def exported_columns(table: Table) -> list[str]:
@@ -92,18 +111,27 @@ def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
     return f"'{s}'"
 
 
-def generate_seed(conn: Connection, output_path: str | Path) -> None:
+def _display_path(path: Path) -> str:
+    """Chemin relatif à la racine du dépôt quand le fichier s'y trouve, absolu sinon."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(PROJECT_ROOT):
+        return str(resolved.relative_to(PROJECT_ROOT))
+    return str(resolved)
+
+
+def generate_seed(conn: Connection, seed: SeedSpec, output_path: Path) -> None:
     lines = []
     lines.append("-- Seed généré automatiquement par interfaces/cli/dev/generate_seed.py")
     lines.append("-- Ne pas modifier à la main — relancer le script pour régénérer.")
     lines.append("--")
-    lines.append("-- Prérequis : schéma appliqué (infrastructure/db/schema.sql + migrations)")
-    lines.append("-- Usage : psql -d bibliometrie -f infrastructure/db/seed.sql")
+    lines.append(f"-- {seed.description}")
+    lines.append("-- Prérequis : schéma appliqué par les migrations (alembic upgrade head)")
+    lines.append(f"-- Usage : psql -d bibliometrie -f {_display_path(output_path)}")
     lines.append("")
     lines.append("BEGIN;")
     lines.append("")
 
-    for spec in TABLES:
+    for spec in seed.tables:
         table = spec["table"].name
         columns = exported_columns(spec["table"])
         order = ", ".join(c.name for c in spec["table"].primary_key.columns)
@@ -147,7 +175,7 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
         f.write("\n".join(lines))
 
     print(f"Seed généré : {output_path}")
-    for spec in TABLES:
+    for spec in seed.tables:
         restriction = spec.get("where")
         filtre = f" WHERE {restriction}" if restriction else ""
         table = spec["table"].name
@@ -157,14 +185,16 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Génère infrastructure/db/seed.sql depuis la base courante"
+        description="Génère le seed commun et le seed d'établissement depuis la base courante"
     )
-    parser.add_argument("--output", default=DEFAULT_SEED_PATH)
+    parser.add_argument("--common-output", type=Path, default=COMMON_SEED.default_path)
+    parser.add_argument("--institution-output", type=Path, default=INSTITUTION_SEED.default_path)
     args = parser.parse_args()
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        generate_seed(conn, args.output)
+        generate_seed(conn, COMMON_SEED, args.common_output)
+        generate_seed(conn, INSTITUTION_SEED, args.institution_output)
 
 
 if __name__ == "__main__":

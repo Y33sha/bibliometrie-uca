@@ -12,6 +12,7 @@ from application.ports.read_models.perimeters_queries import (
     PerimetersQueries,
     PerimeterStructureItem,
 )
+from domain.config import PERIMETER_PERSONS_KEY
 
 # ── Fonctions libres ──────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> s
 
 def get_persons_structure_ids(conn: Connection) -> set[int]:
     """Périmètre pour la création des personnes (`in_perimeter`)."""
-    code = _config_perimeter_code(conn, "perimeter_persons", "uca")
+    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
     return get_perimeter_structure_ids(conn, code)
 
 
@@ -61,7 +62,7 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 
     À distinguer de `get_persons_structure_ids(...)` qui retourne la clôture transitive (racines + tous les labos descendants). Utilisé quand un code appelant veut filtrer explicitement les racines du périmètre (ex. exclure l'UCA des tutelles affichées pour un labo).
     """
-    code = _config_perimeter_code(conn, "perimeter_persons", "uca")
+    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
     row = conn.execute(
         text("SELECT root_structure_ids FROM perimeters WHERE code = :code"),
         {"code": code},
