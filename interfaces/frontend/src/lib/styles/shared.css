@@ -527,7 +527,7 @@ th.sorted .sort-arrow {
 
 .source-openalex-label {
 	background: #fef3e0;
-	color: var(--bronze);
+	color: var(--bronze-text);
 }
 
 .source-wos-label {
@@ -649,12 +649,12 @@ th.sorted .sort-arrow {
 
 .oa-green {
 	background: var(--success-light);
-	color: var(--green);
+	color: var(--green-text);
 }
 
 .oa-bronze {
 	background: #fdf0e6;
-	color: var(--bronze);
+	color: var(--bronze-text);
 }
 
 .oa-embargoed {
