@@ -27,3 +27,21 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
     assert "COMMIT;" in content
     assert "INSERT INTO perimeters (id, code, name, root_structure_ids)" in content
     assert "'{1, 2}'" in content
+
+
+def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
+    # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les porter.
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO structures (code, name, structure_type, api_ids) "
+            "VALUES ('smoke', 'Smoke', 'universite', CAST(:api_ids AS jsonb))"
+        ),
+        {"api_ids": '{"openalex": ["I1"]}'},
+    )
+    out = tmp_path / "seed.sql"
+
+    generate_seed(sa_sync_conn, out)
+
+    content = out.read_text(encoding="utf-8")
+    assert "hal_collection, api_ids) VALUES" in content
+    assert """'{"openalex": ["I1"]}'""" in content
