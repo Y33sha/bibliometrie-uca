@@ -4,7 +4,7 @@ Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` (institutions comme auteur) sont ignorés — ce ne sont pas des personnes. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
 - `doc_type` : token brut issu de `types` (cf. `domain.sources.datacite.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
-- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (cross-import + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
+- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
 

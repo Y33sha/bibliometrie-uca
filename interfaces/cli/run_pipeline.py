@@ -210,9 +210,9 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
 def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
-    Le cross-import HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. Le cross-import par DOI cherche ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
+    La recherche dans HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
-    Les deux se bornent d'eux-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
+    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
 
     Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
     """
@@ -781,7 +781,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
     """Exécute un extracteur sous circuit-breaker, qui coupe la source après cinq échecs.
 
-    Le circuit-breaker est posé dans la ContextVar que lit le client HTTP synchrone, et passé à `run`, dont les boucles le consultent pour arrêter une source à bout de budget. Le seuil est plus bas qu'au cross-import, les extracteurs travaillant sans lots concurrents.
+    Le circuit-breaker est posé dans la ContextVar que lit le client HTTP synchrone, et passé à `run`, dont les boucles le consultent pour arrêter une source à bout de budget. Le seuil est plus bas qu'à la phase `fetch_missing`, les extracteurs travaillant sans lots concurrents.
     """
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
@@ -864,7 +864,7 @@ def _run_extract(
 
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
-    """Cross-import HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
+    """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_id
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
@@ -880,7 +880,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
-    """Cross-import HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
+    """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_nnt
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
@@ -898,7 +898,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
 def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter":
     """Construit l'adapter `fetch_missing_doi` d'une source cible.
 
-    Consommé par le cross-import (`_run_fetch_missing_doi`).
+    Consommé par la recherche par DOI (`_run_fetch_missing_doi`).
     """
     from typing import cast
 
@@ -1009,7 +1009,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     adapter = _make_fetch_stale_adapter(target)
 
     conn = get_sync_engine().connect()
-    # Circuit-breaker de la source, comme au cross-import : une série de 429 coupe son
+    # Circuit-breaker de la source, comme à la phase fetch_missing : une série de 429 coupe son
     # rafraîchissement jusqu'au run suivant.
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
@@ -1183,7 +1183,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include-wos",
         action="store_true",
-        help="Inclure WoS dans l'extraction et le cross-import (opt-in : source en fin de vie, "
+        help="Inclure WoS dans l'extraction et la phase fetch_missing (opt-in : source en fin de vie, "
         "crédit API limité ; exclue par défaut).",
     )
     parser.add_argument(

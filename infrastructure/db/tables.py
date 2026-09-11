@@ -847,12 +847,12 @@ staging = Table(
     # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
     # Posé à l'extraction, consommé puis effacé par `fetch_truncated`.
     Column("authors_truncated", Boolean, nullable=False, server_default="false"),
-    # Provenance d'entrée : 'bulk' (extraction) ou 'cross_import_doi' / 'cross_import_hal'.
+    # Provenance d'entrée : 'bulk' (extraction) ou 'fetch_missing_doi' / 'fetch_missing_hal'.
     Column("entry_mode", Text, nullable=False, server_default="bulk"),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
-        "entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, "
-        "'cross_import_hal'::text])",
+        "entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, "
+        "'fetch_missing_hal'::text])",
         name="staging_entry_mode_check",
     ),
     comment=(

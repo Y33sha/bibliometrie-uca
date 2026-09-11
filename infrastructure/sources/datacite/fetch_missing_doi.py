@@ -111,7 +111,7 @@ class DataciteFetchMissingDoiAdapter:
             source_id=doi,
             doi=doi,
             raw_data=record,
-            entry_mode="cross_import_doi",
+            entry_mode="fetch_missing_doi",
         )
         forget_failed_doi_lookups(conn, "datacite", [doi])
         return inserted

@@ -1,11 +1,6 @@
 """Pool de workers pour les phases qui fetchent une source HTTP puis écrivent en base.
 
-Motif partagé par les orchestrateurs async du pipeline (cross-import HAL, cross-import
-DOI, re-fetch des works tronqués) : un client `httpx2` partagé, un pool borné de workers
-qui se répartissent les items via un itérateur commun (aucune barrière — un fetch lent
-n'occupe que son propre worker, les autres continuent), des écritures sérialisées sous un
-lock (la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` s'exécute dans
-un pool de threads), et un commit tous les `commit_every` items plus un commit final.
+Motif partagé par les orchestrateurs async du pipeline (phase `fetch_missing` par hal-id, NNT et DOI, re-fetch des works tronqués) : un client `httpx2` partagé, un pool borné de workers qui se répartissent les items via un itérateur commun (aucune barrière — un fetch lent n'occupe que son propre worker, les autres continuent), des écritures sérialisées sous un lock (la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` s'exécute dans un pool de threads), et un commit tous les `commit_every` items plus un commit final.
 
 `write` ne commite pas : c'est cet helper qui porte le commit, par lot. `should_continue`
 permet un arrêt anticipé (coupe-circuit d'une source indisponible) : dès qu'il rend `False`,

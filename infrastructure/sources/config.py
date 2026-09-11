@@ -65,7 +65,7 @@ def get_unpaywall_max_per_run(conn: Connection) -> int | None:
 
 
 def get_fetch_missing_max_per_source(conn: Connection) -> int | None:
-    """Nombre maximum de DOI interrogés par source cible au cross-import, `None` valant illimité.
+    """Nombre maximum de DOI interrogés par source cible à la phase `fetch_missing`, `None` valant illimité.
 
     Le plafond vaut pour chaque source prise séparément : les quotas sont propres à chaque API.
     """
@@ -172,7 +172,7 @@ def get_scanr_credentials() -> tuple[str, str]:
 def source_credentials_missing(source: str) -> str | None:
     """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
 
-    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extraction, cross-import, refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
+    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extract, fetch_missing, fetch_stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
     """
     if source in ("hal", "theses"):
         return None

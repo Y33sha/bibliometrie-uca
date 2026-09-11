@@ -1,13 +1,8 @@
 """Intégration : back-fill du `doi` sur conflit, via `upsert_staging`.
 
-Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner
-`doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le
-DOI). Sinon le DOI trouvé par le cross-import n'atterrit jamais et le même lot est
-re-cherché à chaque run. Comportement mutualisé dans `upsert_staging` (utilisé par
-l'extraction bulk et tous les cross-imports).
+Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner `doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI). Sinon le DOI trouvé par la phase `fetch_missing` n'atterrit jamais et le même lot est re-cherché à chaque run. Comportement mutualisé dans `upsert_staging`, commun à toutes les voies d'entrée du staging.
 
-Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture est
-préservée).
+Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture est préservée).
 """
 
 from sqlalchemy import text
@@ -39,7 +34,7 @@ def _upsert(conn, source_id, doi):
         source_id=source_id,
         doi=doi,
         raw_data={"halId_s": source_id, "doiId_s": doi},
-        entry_mode="cross_import_doi",
+        entry_mode="fetch_missing_doi",
     )
 
 

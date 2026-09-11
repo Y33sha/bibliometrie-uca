@@ -133,7 +133,7 @@ class TestCleanDoi:
 def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids="{}"):
     """Publication `in_perimeter` + source_publication `source` rattaché.
 
-    Le pool de cross-import ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
+    Le pool de la recherche par DOI ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
     pub_id = conn.execute(
         text(
             "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, TRUE) "
@@ -408,9 +408,9 @@ class TestDisappearedMarking:
 
 class TestGetUnresolvedPrefixes:
     """Régression : resolve tire ses préfixes de la vue `candidate_dois`, le même
-    pool que cross-import — donc aussi les cibles de relations et les arXiv-dérivés,
+    pool que la recherche par DOI — donc aussi les cibles de relations et les arXiv-dérivés,
     pas seulement staging + related_dois. L'ancienne requête ratait ces préfixes,
-    laissant leur RA jamais résolue et cross-import en best-effort sur les deux RA."""
+    laissant leur RA jamais résolue et la recherche par DOI en best-effort sur les deux RA."""
 
     def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
         from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries

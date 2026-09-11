@@ -104,7 +104,7 @@ class ScanrFetchMissingDoiAdapter:
             source_id=scanr_id,
             doi=dois[0] if dois else None,
             raw_data=record,
-            entry_mode="cross_import_doi",
+            entry_mode="fetch_missing_doi",
         )
         # ScanR rend un même document pour chacun de ses DOI : aucun n'est introuvable.
         forget_failed_doi_lookups(conn, "scanr", dois)

@@ -66,7 +66,7 @@ def upsert_staging(
 
     `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même logique que `processed` — (re)posé seulement quand le hash change, sinon préservé (n'écrase pas l'effacement de `fetch_truncated`). Les sources non plafonnées laissent le défaut `False`.
 
-    `entry_mode` enregistre comment la ligne est **entrée** (`bulk` à l'extraction, `cross_import_doi` / `cross_import_hal` au cross-import) ; posé à la création, jamais réécrit (provenance d'origine).
+    `entry_mode` enregistre comment la ligne est **entrée** : `bulk` à l'extraction, `fetch_missing_doi` ou `fetch_missing_hal` à la phase `fetch_missing`. Posé à la création, jamais réécrit.
 
     Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash distinct de celui déjà en base). Le commit est à la charge de l'appelant.
     """
