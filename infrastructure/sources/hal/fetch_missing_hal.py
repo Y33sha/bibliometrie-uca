@@ -106,48 +106,27 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
     async def fetch_by_halid(
         self, client: httpx2.AsyncClient, hal_id: str
     ) -> Mapping[str, JsonValue] | None:
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self._base_url,
-                    params={
-                        "q": f"halId_s:{hal_id}",
-                        "fl": HAL_FIELDS_STR,
-                        "wt": "json",
-                        "rows": "1",
-                    },
-                    timeout=15,
-                    label=f"halId {hal_id}",
-                )
-            )
-        except (httpx2.HTTPStatusError, httpx2.RequestError):
-            return None
-        docs = as_sequence(as_mapping(data.get("response")).get("docs"))
-        return as_mapping(docs[0]) if docs else None
+        return await self._search_one(client, f"halId_s:{hal_id}", label=f"halId {hal_id}")
 
     async def fetch_by_nnt(
         self, client: httpx2.AsyncClient, nnt: str
     ) -> Mapping[str, JsonValue] | None:
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self._base_url,
-                    params={
-                        "q": f"nntId_s:{nnt}",
-                        "fl": HAL_FIELDS_STR,
-                        "wt": "json",
-                        "rows": "1",
-                    },
-                    timeout=15,
-                    label=f"NNT {nnt}",
-                )
+        return await self._search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}")
+
+    async def _search_one(
+        self, client: httpx2.AsyncClient, query: str, *, label: str
+    ) -> Mapping[str, JsonValue] | None:
+        """Premier document de la recherche Solr `query`, ou `None` quand la réponse est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
+        data = as_mapping(
+            await http_request_with_retry_async(
+                client,
+                "GET",
+                self._base_url,
+                params={"q": query, "fl": HAL_FIELDS_STR, "wt": "json", "rows": "1"},
+                timeout=15,
+                label=label,
             )
-        except (httpx2.HTTPStatusError, httpx2.RequestError):
-            return None
+        )
         docs = as_sequence(as_mapping(data.get("response")).get("docs"))
         return as_mapping(docs[0]) if docs else None
 

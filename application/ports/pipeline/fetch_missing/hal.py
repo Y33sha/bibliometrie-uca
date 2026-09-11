@@ -43,12 +43,12 @@ class HalFetchMissingAdapter(Protocol):
     async def fetch_by_halid(
         self, client: httpx2.AsyncClient, hal_id: str
     ) -> Mapping[str, JsonValue] | None:
-        """Fetch un document HAL par halId. Retourne `None` si introuvable."""
+        """Fetch un document HAL par halId. Retourne `None` quand la réponse de HAL est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
 
     async def fetch_by_nnt(
         self, client: httpx2.AsyncClient, nnt: str
     ) -> Mapping[str, JsonValue] | None:
-        """Fetch un document HAL par NNT (thèse). Retourne `None` si introuvable."""
+        """Fetch un document HAL par NNT (thèse). Retourne `None` quand la réponse de HAL est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
 
     # ── SQL (inserts) ──────────────────────────────────────────
 
