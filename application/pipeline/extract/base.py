@@ -21,7 +21,13 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression, progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 
-__all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
+__all__ = [
+    "EmptyExtractionPerimeterError",
+    "ExtractLogger",
+    "ExtractionConfigError",
+    "SourceExtractor",
+    "scoped_logger",
+]
 
 
 # Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `application.pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
@@ -56,6 +62,10 @@ class ExtractionConfigError(Exception):
     disponible. Interrompt l'extraction proprement avec un message
     explicite au lieu d'un 400 API opaque.
     """
+
+
+class EmptyExtractionPerimeterError(RuntimeError):
+    """Le périmètre d'extraction ne contient aucune structure : aucune source n'a d'institution à interroger."""
 
 
 class SourceExtractor[ConfigT, AdapterT](ABC):

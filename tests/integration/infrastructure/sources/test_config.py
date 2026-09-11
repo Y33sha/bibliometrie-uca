@@ -1,6 +1,6 @@
 """Lecture de la configuration du pipeline, depuis la table `config` et le périmètre.
 
-Trois réglages en dépendent : les années à couvrir, les collections HAL à moissonner et les identifiants de structure à interroger par source. Les deux derniers se dérivent du périmètre d'extraction — les structures qui le composent portent la collection et les identifiants — avec repli sur une valeur posée en configuration.
+Trois réglages en dépendent : les années à couvrir, les collections HAL à moissonner et les identifiants de structure à interroger par source. Les deux derniers se dérivent du périmètre d'extraction : les structures qui le composent portent la collection et les identifiants.
 
 Les clés dont la forme est imposée — plafonds d'interrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
 """
@@ -101,29 +101,23 @@ class TestGetHalCollections:
 
         assert get_hal_collections(conn) == {"LABO-A": "cfg_labo_a"}
 
-    def test_repli_sur_la_valeur_configuree(self, sa_sync_conn):
-        """Aucune structure du périmètre ne porte de collection : la configuration prend le relais."""
+    def test_perimetre_designe_mais_inexistant(self, sa_sync_conn):
         conn = sa_sync_conn
-        _set_config(conn, "perimeter_extraction", "cfg_perim_vide")
-        _set_config(conn, "hal_collections", {"UCA": "Université"})
+        _set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
 
-        assert get_hal_collections(conn) == {"UCA": "Université"}
+        assert get_hal_collections(conn) == {}
 
     def test_perimetre_dont_aucune_structure_ne_depose_dans_hal(self, sa_sync_conn):
-        """Le périmètre est peuplé, mais sans collection : la configuration prend le relais."""
         conn = sa_sync_conn
         structure = _structure(conn, "cfg_labo_sans_collection")
         _perimeter(conn, "cfg_perim_sans_collection", [structure])
         _set_config(conn, "perimeter_extraction", "cfg_perim_sans_collection")
-        _set_config(conn, "hal_collections", {"UCA": "Université"})
 
-        assert get_hal_collections(conn) == {"UCA": "Université"}
+        assert get_hal_collections(conn) == {}
 
-    def test_sans_collection_nulle_part(self, sa_sync_conn):
+    def test_sans_perimetre_configure(self, sa_sync_conn):
         conn = sa_sync_conn
-        conn.execute(
-            text("DELETE FROM config WHERE key IN ('perimeter_extraction', 'hal_collections')")
-        )
+        conn.execute(text("DELETE FROM config WHERE key = 'perimeter_extraction'"))
 
         assert get_hal_collections(conn) == {}
 

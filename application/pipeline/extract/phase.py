@@ -2,13 +2,15 @@
 
 Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
+- s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction HAL réussie ;
 - sinon : toutes les sources retenues en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
-Les trois dépendances techniques sont injectées par le composition-root :
+Les dépendances techniques sont injectées par le composition-root :
 
+- `count_extraction_structures()` : le nombre de structures du périmètre d'extraction ;
 - `extract_one(source, args)` : ouvre la connexion, câble l'adapter, exécute l'extraction sous circuit-breaker (les métriques rendues portent déjà l'éventuel signal `source_unavailable`), et lève `ExtractionConfigError` si la source n'est pas configurée ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_extract_date` : la date de la dernière extraction d'une source (branche incrémentale).
@@ -20,7 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from application.pipeline.extract.base import ExtractionConfigError
+from application.pipeline.extract.base import EmptyExtractionPerimeterError, ExtractionConfigError
 from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
@@ -78,12 +80,18 @@ def run(
     year: int | None,
     start_year: int | None,
     include_wos: bool,
+    count_extraction_structures: Callable[[], int],
     extract_one: ExtractOne,
     run_parallel: RunParallel,
     get_last_extract_date: GetLastExtractDate,
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
+    if count_extraction_structures() == 0:
+        raise EmptyExtractionPerimeterError(
+            "Le périmètre d'extraction est vide : la clé `perimeter_extraction` est absente de "
+            "`config`, ou désigne un périmètre sans structure."
+        )
     policy = MODES[mode]
     effective = set(policy.extract_sources) | ({"wos"} if include_wos else set())
     if sources:

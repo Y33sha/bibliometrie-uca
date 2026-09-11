@@ -25,7 +25,10 @@ def test_phase_extract_full_skips_unconfigured_source():
             raise ExtractionConfigError("ni clé ni email")
         return PhaseMetrics(new=7)
 
-    with patch.object(run_pipeline, "_run_extract", side_effect=_extract):
+    with (
+        patch.object(run_pipeline, "_extraction_structure_count", return_value=1),
+        patch.object(run_pipeline, "_run_extract", side_effect=_extract),
+    ):
         metrics = run_pipeline.phase_extract(
             run_pipeline.RunOptions(mode="full", sources={"openalex", "theses"})
         )
@@ -44,6 +47,7 @@ def test_phase_extract_daily_hal_unconfigured():
             "infrastructure.observability.phase_executions.get_last_extract_date",
             return_value=None,
         ),
+        patch.object(run_pipeline, "_extraction_structure_count", return_value=1),
         patch.object(run_pipeline, "_run_extract", side_effect=_extract),
     ):
         metrics = run_pipeline.phase_extract(run_pipeline.RunOptions(mode="daily"))

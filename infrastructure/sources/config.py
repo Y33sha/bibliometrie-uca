@@ -8,9 +8,8 @@ import logging
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.config import PERIMETER_EXTRACTION_KEY
 from domain.dates import today
-from domain.types import JsonValue, as_str
+from domain.types import JsonValue
 from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -87,36 +86,22 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
 
 
 def get_hal_collections(conn: Connection) -> dict[str, str]:
-    """Retourne les collections HAL {code_hal: label}.
+    """Collections HAL {code_hal: label} des structures du périmètre d'extraction qui en portent une."""
+    from infrastructure.read_models.perimeters import get_extraction_structure_ids
 
-    Dérivé des structures du périmètre qui ont un hal_collection renseigné, avec fallback sur la clé `hal_collections` de la table config.
-    """
-    try:
-        from infrastructure.read_models.perimeters import get_perimeter_structure_ids
-
-        raw_perim = _get_from_db(conn, PERIMETER_EXTRACTION_KEY)
-        perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "alliance_uca"
-        perimeter_ids = get_perimeter_structure_ids(conn, perim_code)
-        if perimeter_ids:
-            rows = conn.execute(
-                text(
-                    "SELECT hal_collection, COALESCE(acronym, name) AS label "
-                    "FROM structures "
-                    "WHERE id = ANY(:ids) "
-                    "AND hal_collection IS NOT NULL AND hal_collection != ''"
-                ),
-                {"ids": list(perimeter_ids)},
-            ).all()
-            if rows:
-                return {r.hal_collection: r.label for r in rows}
-    except SQLAlchemyError as e:
-        logger.warning("Impossible de dériver les collections HAL depuis le périmètre : %s", e)
-
-    val = _get_from_db(conn, "hal_collections")
-    if isinstance(val, dict):
-        return {code: libelle for code, valeur in val.items() if (libelle := as_str(valeur))}
-
-    return {}
+    structure_ids = get_extraction_structure_ids(conn)
+    if not structure_ids:
+        return {}
+    rows = conn.execute(
+        text(
+            "SELECT hal_collection, COALESCE(acronym, name) AS label "
+            "FROM structures "
+            "WHERE id = ANY(:ids) "
+            "AND hal_collection IS NOT NULL AND hal_collection != ''"
+        ),
+        {"ids": list(structure_ids)},
+    ).all()
+    return {r.hal_collection: r.label for r in rows}
 
 
 def get_openalex_api_key() -> str | None:
@@ -129,34 +114,24 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 
     Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
     """
-    perim_code = _get_from_db(conn, PERIMETER_EXTRACTION_KEY)
-    if not (perim_code and isinstance(perim_code, str)):
-        return []
-    try:
-        from infrastructure.read_models.perimeters import get_perimeter_structure_ids
+    from infrastructure.read_models.perimeters import get_extraction_structure_ids
 
-        struct_ids = get_perimeter_structure_ids(conn, perim_code)
-        if not struct_ids:
-            return []
-        rows = conn.execute(
-            text(
-                "SELECT api_ids->:src AS ids FROM structures "
-                "WHERE id = ANY(:ids) AND api_ids ? :src"
-            ),
-            {"src": source, "ids": list(struct_ids)},
-        ).all()
-        result: list[str] = []
-        for row in rows:
-            ids = row.ids
-            if isinstance(ids, list):
-                result.extend(ids)
-            elif isinstance(ids, str):
-                # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
-                result.append(ids)
-        return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
-    except SQLAlchemyError as e:
-        logger.warning("Impossible de dériver api_ids depuis le périmètre : %s", e)
+    struct_ids = get_extraction_structure_ids(conn)
+    if not struct_ids:
         return []
+    rows = conn.execute(
+        text("SELECT api_ids->:src AS ids FROM structures WHERE id = ANY(:ids) AND api_ids ? :src"),
+        {"src": source, "ids": list(struct_ids)},
+    ).all()
+    result: list[str] = []
+    for row in rows:
+        ids = row.ids
+        if isinstance(ids, list):
+            result.extend(ids)
+        elif isinstance(ids, str):
+            # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
+            result.append(ids)
+    return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
 
 
 def get_polite_pool_email_optional() -> str | None:
