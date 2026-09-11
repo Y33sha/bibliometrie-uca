@@ -60,7 +60,7 @@ Obstacles :
 - [x] Servir le nom du périmètre `perimeter_persons` au frontend par la lecture publique de la configuration (`GET /api/config/institution`).
 - [x] Référencer ce nom dans les titres et les libellés du frontend et du backend. Le titre de l'API vaut « Bibliométrie ».
 - [x] Remplacer la logique du frontend qui dépend de l'identifiant 169 et du code `uca`. Les lignes APC portent `in_perimeter`, calculé par l'API.
-- [x] Supprimer les valeurs de repli des périmètres (`"uca"`, `"alliance_uca"`, clé `hal_collections`). Une clé de périmètre absente vaut périmètre vide. Le périmètre des personnes se rabat sur celui d'extraction. La phase `extract` échoue si le périmètre d'extraction ne contient aucune structure.
+- [x] Supprimer les valeurs de repli des périmètres (`"uca"`, `"alliance_uca"`, clé `hal_collections`). Une clé de périmètre absente vaut périmètre vide. Le périmètre des personnes se rabat sur celui d'extraction. Les phases `extract` et `affiliations` échouent si le périmètre d'extraction ne contient aucune structure.
 
 ### Phase 5 — Seeds d'autres établissements
 

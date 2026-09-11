@@ -6,7 +6,10 @@
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters import (
+    get_extraction_structure_ids,
+    get_persons_structure_ids_list,
+)
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:
@@ -36,6 +39,9 @@ def refresh_perimeter_structures(conn: Connection) -> None:
 
 class PgPerimeterStructuresQueries(PerimeterStructuresQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.perimeter_structures.PerimeterStructuresQueries`."""
+
+    def count_extraction_structures(self, conn: Connection) -> int:
+        return len(get_extraction_structure_ids(conn))
 
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
         return get_persons_structure_ids_list(conn)
