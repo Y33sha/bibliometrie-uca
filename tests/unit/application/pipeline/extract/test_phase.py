@@ -8,8 +8,10 @@ synchrone déterministe.
 import logging
 from datetime import date
 
+import pytest
+
 from application.pipeline.extract import phase
-from application.pipeline.extract.base import ExtractionConfigError
+from application.pipeline.extract.base import EmptyExtractionPerimeterError, ExtractionConfigError
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 
@@ -36,6 +38,7 @@ def test_parallel_skips_unconfigured_source():
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
         get_last_extract_date=lambda _s: None,
+        count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
 
@@ -60,6 +63,7 @@ def test_since_last_extracts_hal_from_last_date():
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
         get_last_extract_date=lambda _s: date(2026, 1, 1),
+        count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
 
@@ -85,6 +89,7 @@ def test_theses_ignores_year_range_bound():
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
         get_last_extract_date=lambda _s: None,
+        count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
 
@@ -109,6 +114,7 @@ def test_parallel_skips_unavailable_source():
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
         get_last_extract_date=lambda _s: None,
+        count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
 
@@ -132,8 +138,34 @@ def test_since_last_marks_hal_unavailable():
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
         get_last_extract_date=lambda _s: None,
+        count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
     assert "table" not in metrics.details  # aucune source aboutie
+
+
+def test_empty_extraction_perimeter_stops_the_phase():
+    """Un périmètre d'extraction sans structure arrête la phase avant toute extraction."""
+    calls: list[str] = []
+
+    def extract_one(source, _args):
+        calls.append(source)
+        return PhaseMetrics()
+
+    with pytest.raises(EmptyExtractionPerimeterError, match="perimeter_extraction"):
+        phase.run(
+            mode="full",
+            sources=None,
+            year=None,
+            start_year=None,
+            include_wos=False,
+            count_extraction_structures=lambda: 0,
+            extract_one=extract_one,
+            run_parallel=_sync_run_parallel,
+            get_last_extract_date=lambda _s: None,
+            logger=_LOG,
+        )
+
+    assert calls == []

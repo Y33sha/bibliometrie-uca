@@ -53,8 +53,14 @@ def _create_lab(conn, code="LAB", hal_collection=None):
         {"c": code, "col": hal_collection},
     ).one()
     lab_id = row.id
-    # Rattache au périmètre persons (code 'uca' par défaut) : les lectures HAL scopent
+    # Rattache au périmètre persons, désigné en configuration : les lectures HAL scopent
     # au périmètre, pas au type de structure.
+    conn.execute(
+        text(
+            "INSERT INTO config (key, value) VALUES ('perimeter_persons', '\"uca\"') "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+        )
+    )
     perim_id = conn.execute(
         text("""
             INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter')

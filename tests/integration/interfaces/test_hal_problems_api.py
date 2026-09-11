@@ -31,8 +31,12 @@ def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int
             (code, code, hal_collection),
         )
         lab_id = cur.fetchone()["id"]
-        # Rattache au périmètre persons (code 'uca' par défaut) : les lectures HAL
+        # Rattache au périmètre persons, désigné en configuration : les lectures HAL
         # scopent au périmètre, pas au type de structure.
+        cur.execute(
+            "INSERT INTO config (key, value) VALUES ('perimeter_persons', '\"uca\"') "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+        )
         cur.execute(
             "INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter') "
             "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id"
@@ -51,6 +55,7 @@ def _cleanup_after_module():
     yield
     with owner_pool() as cur:
         cur.execute("TRUNCATE TABLE structures RESTART IDENTITY CASCADE")
+        cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
 
 
 class TestDuplicateAccounts:

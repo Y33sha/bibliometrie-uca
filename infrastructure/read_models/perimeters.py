@@ -1,6 +1,6 @@
 """Lecture du périmètre : clôture de structures (matview `perimeter_structures`) et projection de la page admin.
 
-Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes). La clôture récursive des tutelles est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
+Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes, à défaut le périmètre d'extraction). Une clé absente vaut périmètre vide. La clôture récursive des tutelles est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
 
 Les fonctions libres sont partagées par l'extraction, le pipeline et les adapters : tout lecteur du périmètre passe par cette couche de lecture. `PgPerimetersQueries` implémente le port `application.ports.read_models.perimeters_queries`.
 """
@@ -13,7 +13,7 @@ from application.ports.read_models.perimeters_queries import (
     PerimetersQueries,
     PerimeterStructureItem,
 )
-from domain.config import PERIMETER_PERSONS_KEY
+from domain.config import PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY
 
 # ── Fonctions libres ──────────────────────────────────────────────
 
@@ -35,22 +35,35 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
     return {row.structure_id for row in result}
 
 
-def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
-    """Lit un code périmètre depuis la table config, ou rend `default` si la clé est absente."""
-    row = conn.execute(
+def _config_perimeter_code(conn: Connection, config_key: str) -> str | None:
+    """Code de périmètre lu dans `config`, ou `None` si la clé est absente ou vide."""
+    value = conn.execute(
         text("SELECT value FROM config WHERE key = :key"),
         {"key": config_key},
-    ).first()
-    if row:
-        val = row.value
-        return val if isinstance(val, str) else default
-    return default
+    ).scalar_one_or_none()
+    return value if isinstance(value, str) and value else None
+
+
+def extraction_perimeter_code(conn: Connection) -> str | None:
+    """Code du périmètre d'extraction, ou `None` s'il n'est pas configuré."""
+    return _config_perimeter_code(conn, PERIMETER_EXTRACTION_KEY)
+
+
+def persons_perimeter_code(conn: Connection) -> str | None:
+    """Code du périmètre des personnes, à défaut celui du périmètre d'extraction."""
+    return _config_perimeter_code(conn, PERIMETER_PERSONS_KEY) or extraction_perimeter_code(conn)
+
+
+def get_extraction_structure_ids(conn: Connection) -> set[int]:
+    """Structures du périmètre d'extraction, vide s'il n'est pas configuré."""
+    code = extraction_perimeter_code(conn)
+    return get_perimeter_structure_ids(conn, code) if code else set()
 
 
 def get_persons_structure_ids(conn: Connection) -> set[int]:
-    """Périmètre pour la création des personnes (`in_perimeter`)."""
-    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
-    return get_perimeter_structure_ids(conn, code)
+    """Périmètre pour la création des personnes (`in_perimeter`), vide s'il n'est pas configuré."""
+    code = persons_perimeter_code(conn)
+    return get_perimeter_structure_ids(conn, code) if code else set()
 
 
 def get_persons_structure_ids_list(conn: Connection) -> list[int]:
@@ -63,7 +76,9 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 
     À distinguer de `get_persons_structure_ids(...)` qui retourne la clôture transitive (racines + tous les labos descendants). Utilisé quand un code appelant veut filtrer explicitement les racines du périmètre (ex. exclure l'UCA des tutelles affichées pour un labo).
     """
-    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
+    code = persons_perimeter_code(conn)
+    if not code:
+        return []
     row = conn.execute(
         text("SELECT root_structure_ids FROM perimeters WHERE code = :code"),
         {"code": code},
@@ -74,8 +89,10 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 
 
 def get_persons_perimeter_name(conn: Connection) -> str:
-    """Nom du périmètre des personnes, qui désigne l'établissement dans l'interface, ou son code s'il manque."""
-    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
+    """Nom du périmètre des personnes, qui désigne l'établissement dans l'interface, ou son code s'il manque. Vide sans périmètre configuré."""
+    code = persons_perimeter_code(conn)
+    if not code:
+        return ""
     name = conn.execute(
         text("SELECT name FROM perimeters WHERE code = :code"), {"code": code}
     ).scalar_one_or_none()

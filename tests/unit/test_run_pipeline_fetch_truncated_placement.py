@@ -19,6 +19,7 @@ _REFETCH = "application.pipeline.extract.fetch_truncated.refetch"
 
 def test_refetch_not_called_in_extract():
     with (
+        patch.object(run_pipeline, "_extraction_structure_count", return_value=1),
         patch.object(run_pipeline, "_run_extract", return_value=PhaseMetrics()),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):

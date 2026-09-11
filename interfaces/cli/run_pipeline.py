@@ -125,6 +125,15 @@ def _open_tx() -> "AbstractContextManager[Connection]":
     return managed_transaction(get_sync_engine())
 
 
+def _extraction_structure_count() -> int:
+    """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.read_models.perimeters import get_extraction_structure_ids
+
+    with get_sync_engine().connect() as conn:
+        return len(get_extraction_structure_ids(conn))
+
+
 def phase_extract(options: RunOptions) -> PhaseMetrics:
     """Extraction des sources vers staging.
 
@@ -145,6 +154,7 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
         year=options.year,
         start_year=options.start_year,
         include_wos=options.include_wos,
+        count_extraction_structures=_extraction_structure_count,
         extract_one=extract_one,
         run_parallel=run_parallel,
         get_last_extract_date=get_last_extract_date,

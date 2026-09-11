@@ -76,37 +76,13 @@ class _ConnEnPanne:
         raise SQLAlchemyError("base indisponible")
 
 
-class _ConnPartielle:
-    """Connexion qui répond à la lecture de configuration, puis échoue.
-
-    Reproduit une panne survenant après la lecture du périmètre : c'est la requête sur les structures qui tombe.
-    """
-
-    def __init__(self, valeur: str) -> None:
-        self._valeur = valeur
-        self._premiere = True
-
-    def execute(self, *args, **kwargs):
-        if self._premiere:
-            self._premiere = False
-            return _UneLigne(self._valeur)
-        raise SQLAlchemyError("base indisponible")
-
-
-class _UneLigne:
-    def __init__(self, valeur) -> None:
-        self._valeur = valeur
-
-    def one_or_none(self):
-        return type("Row", (), {"value": self._valeur})()
-
-
 class TestPanneDeLecture:
-    def test_collections_hal_retombent_sur_rien(self):
-        assert get_hal_collections(_ConnEnPanne()) == {}
+    """Une panne de lecture du périmètre d'extraction remonte à l'appelant."""
 
-    def test_identifiants_d_api_retombent_sur_rien(self):
-        assert get_extraction_api_ids(_ConnEnPanne(), "openalex") == []
+    def test_collections_hal(self):
+        with pytest.raises(SQLAlchemyError):
+            get_hal_collections(_ConnEnPanne())
 
-    def test_panne_apres_lecture_du_perimetre(self):
-        assert get_extraction_api_ids(_ConnPartielle("un_perimetre"), "openalex") == []
+    def test_identifiants_d_api(self):
+        with pytest.raises(SQLAlchemyError):
+            get_extraction_api_ids(_ConnEnPanne(), "openalex")
