@@ -26,7 +26,7 @@ Obstacles :
 
 - **Une base par établissement** sur le serveur PostgreSQL existant : `bibliometrie_lorraine`, `bibliometrie_nantes`…
 - **Seed commun et seed d'établissement.** Le seed commun contient les référentiels partagés par tous les établissements. Le seed d'établissement contient les structures, leurs tutelles, les périmètres, les formes de noms et la configuration propre à l'établissement. Le seed d'établissement UCA reste versionné et sert d'exemple.
-- **Les fichiers des autres établissements sont stockés dans `data/`**, hors versionnement. `data/instances/<nom>/` contient la configuration de l'instance (`instance.env`) et son seed (`seed.sql`).
+- **Les fichiers des autres établissements sont stockés dans `instances/`**, à la racine, hors versionnement. `instances/<nom>/` contient la configuration de l'instance (`instance.env`) et son seed d'établissement (`seed.sql`).
 - **Configuration par surcharge.** `BIBLIO_INSTANCE=<nom>` désigne l'instance. Son `instance.env` se charge après le `.env` racine et contient seulement les valeurs propres à l'instance : `DB_NAME`, les ports, `API_TARGET`. Le backend (`Settings`, `infrastructure/__init__.py`) et le frontend (`svelte.config.js`, `vite.config.ts`) appliquent la même règle. Sans `BIBLIO_INSTANCE`, seul le `.env` racine s'applique.
 - **Un nom d'hôte par instance** : `<nom>.localhost`. Les navigateurs le résolvent vers la boucle locale, et chaque instance a son propre cookie de session.
 - **Le pipeline des autres établissements tourne sans `--raw-store`, avec `LOG_TO_FILE=false`.**
@@ -36,13 +36,14 @@ Obstacles :
 
 ### Phase 1 — Seed commun et seed d'établissement
 
-- [ ] `generate_seed` produit deux fichiers : le seed commun (`infrastructure/db/seed.sql`) et le seed d'établissement UCA.
-- [ ] Répartir les clés de `config` entre les deux seeds.
-- [ ] Mettre à jour l'initialisation de la base dans `docs/exploitation/01-developpement-local.md` et `02-production.md`.
+- [x] `generate_seed` produit deux fichiers : le seed commun (`infrastructure/db/seed.sql`) et le seed d'établissement UCA.
+- [x] Répartir les clés de `config` entre les deux seeds.
+- [x] Mettre à jour l'initialisation de la base dans `docs/exploitation/01-developpement-local.md` et `02-production.md`.
 
 ### Phase 2 — Configuration par instance
 
-- [ ] Charger `data/instances/<nom>/instance.env` après `.env` quand `BIBLIO_INSTANCE` est posé, côté backend et côté frontend.
+- [ ] Ajouter `instances/` au `.gitignore`.
+- [ ] Charger `instances/<nom>/instance.env` après `.env` quand `BIBLIO_INSTANCE` est posé, côté backend et côté frontend.
 - [ ] Test : une valeur de l'instance prime sur celle du `.env` racine.
 
 ### Phase 3 — Création et lancement
@@ -60,7 +61,7 @@ Obstacles :
 ### Phase 5 — Seeds d'autres établissements
 
 - [ ] Générer le seed d'un établissement à partir de ROR (structures filles), du référentiel des structures HAL et des identifiants d'institution OpenAlex. Les formes de noms de départ viennent des noms et des acronymes.
-- [ ] Seeds Université de Lorraine et Nantes Université dans `data/instances/`.
+- [ ] Seeds Université de Lorraine et Nantes Université dans `instances/`.
 - [ ] Faire tourner le pipeline sur chaque instance et examiner le résultat dans l'interface.
 
 ### Phase 6 — Valeurs de filtre
