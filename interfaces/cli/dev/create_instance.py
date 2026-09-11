@@ -66,6 +66,9 @@ def _run_psql(script: Path) -> None:
             "-v",
             "ON_ERROR_STOP=1",
             "-q",
+            # Les résultats des requêtes (recalage des séquences) encombrent le journal ; les erreurs passent par stderr.
+            "-o",
+            os.devnull,
             "-f",
             str(script),
         ],

@@ -51,7 +51,7 @@ Obstacles :
 
 ### Phase 3 — Création et lancement
 
-- [ ] Script de création d'une instance : création de la base, `alembic upgrade head`, `roles.sql`, seed commun, seed d'établissement.
+- [x] Script de création d'une instance : création de la base, `alembic upgrade head`, `roles.sql`, seed commun, seed d'établissement.
 - [x] `start.sh <nom>` lance l'API et vite sur les ports de l'instance. Sans argument, il lance l'instance UCA sur 8000 et 5173.
 - [x] Documenter le lancement du pipeline et des scripts sur une instance (`BIBLIO_INSTANCE=<nom> run_pipeline …`).
 
