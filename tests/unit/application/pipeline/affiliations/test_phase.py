@@ -6,8 +6,11 @@ La phase rafraîchit le périmètre, résout les adresses, puis pose `in_perimet
 import logging
 from unittest.mock import patch
 
+import pytest
+
 from application.pipeline.affiliations import phase
 from application.pipeline.affiliations.resolve_addresses import ResolutionStats
+from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 
 _LOG = logging.getLogger("test")
 
@@ -15,11 +18,15 @@ PERIMETRE = [10, 20]
 
 
 class _FakePerimeterQueries:
-    def __init__(self) -> None:
+    def __init__(self, extraction_structures: int = 5) -> None:
         self.refreshed = 0
+        self.extraction_structures = extraction_structures
 
     def refresh_perimeter_structures(self, conn) -> None:
         self.refreshed += 1
+
+    def count_extraction_structures(self, conn) -> int:
+        return self.extraction_structures
 
     def get_persons_structure_ids_list(self, conn) -> list[int]:
         return PERIMETRE
@@ -66,3 +73,14 @@ def test_perimetre_lu_une_fois_et_partage(open_tx):
 
     assert vus["resolution"] == set(PERIMETRE)
     assert vus["populate"] is vus["resolution"]
+
+
+def test_perimetre_d_extraction_vide_arrete_la_phase(open_tx):
+    """Sans structure dans le périmètre d'extraction, la phase s'arrête avant de résoudre les adresses."""
+    with (
+        patch.object(phase, "run_resolution") as resolution,
+        pytest.raises(EmptyExtractionPerimeterError),
+    ):
+        phase.run(open_tx, object(), object(), _FakePerimeterQueries(extraction_structures=0), _LOG)
+
+    resolution.assert_not_called()

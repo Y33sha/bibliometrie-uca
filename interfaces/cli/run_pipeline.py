@@ -128,10 +128,10 @@ def _open_tx() -> "AbstractContextManager[Connection]":
 def _extraction_structure_count() -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.read_models.perimeters import get_extraction_structure_ids
+    from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 
     with get_sync_engine().connect() as conn:
-        return len(get_extraction_structure_ids(conn))
+        return PgPerimeterStructuresQueries().count_extraction_structures(conn)
 
 
 def phase_extract(options: RunOptions) -> PhaseMetrics:

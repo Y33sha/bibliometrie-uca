@@ -11,9 +11,10 @@ from datetime import date
 import pytest
 
 from application.pipeline.extract import phase
-from application.pipeline.extract.base import EmptyExtractionPerimeterError, ExtractionConfigError
+from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 
 _LOG = logging.getLogger("test")
 

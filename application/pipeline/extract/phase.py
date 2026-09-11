@@ -22,7 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from application.pipeline.extract.base import EmptyExtractionPerimeterError, ExtractionConfigError
+from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
@@ -33,6 +33,7 @@ from application.pipeline.signals import (
 )
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.parallel import RunParallel
+from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 from domain.dates import date_to_french, today
 
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
@@ -88,10 +89,7 @@ def run(
 ) -> PhaseMetrics:
     """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
     if count_extraction_structures() == 0:
-        raise EmptyExtractionPerimeterError(
-            "Le périmètre d'extraction est vide : la clé `perimeter_extraction` est absente de "
-            "`config`, ou désigne un périmètre sans structure."
-        )
+        raise EmptyExtractionPerimeterError()
     policy = MODES[mode]
     effective = set(policy.extract_sources) | ({"wos"} if include_wos else set())
     if sources:

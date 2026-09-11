@@ -2,7 +2,7 @@
 
 Trois sous-étapes, chacune dans sa propre transaction :
 
-1. **refresh_perimeter_structures** — rafraîchit la table `perimeter_structures`.
+1. **refresh_perimeter_structures** — rafraîchit la table `perimeter_structures`. La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure.
 2. **resolve_addresses** — matche les adresses vers les structures connues (commits par lots).
 3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
 """
@@ -15,7 +15,10 @@ from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import (
+    EmptyExtractionPerimeterError,
+    PerimeterStructuresQueries,
+)
 from application.ports.pipeline.transaction import OpenTransaction
 
 
@@ -29,6 +32,8 @@ def run(
     """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
     with open_tx() as conn:
         perimeter_queries.refresh_perimeter_structures(conn)
+        if perimeter_queries.count_extraction_structures(conn) == 0:
+            raise EmptyExtractionPerimeterError()
 
     etape(logger, "Identification des structures dans les adresses institutionnelles")
     with open_tx() as conn:
