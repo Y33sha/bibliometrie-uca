@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import NamedTuple
 
 import httpx2
 from sqlalchemy import Connection
@@ -29,6 +30,13 @@ __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
 _COMMIT_EVERY = 50
 
 
+class _Fetched(NamedTuple):
+    """Issue d'une requête HAL : `reached` est faux quand la requête a échoué, `doc` vaut `None` quand la réponse est vide."""
+
+    reached: bool
+    doc: Mapping[str, JsonValue] | None
+
+
 async def _fetch_ids_async(
     ids: Sequence[str],
     conn: Connection,
@@ -43,25 +51,32 @@ async def _fetch_ids_async(
     """Fetch concurrent puis insert sérialisé, via `run_fetch_pool`.
 
     `insert_one` retourne `(fetched, not_found)` en incréments (0/1) : la sémantique de comptage propre à chaque piste vit dans la closure appelante. Retourne les totaux `(fetched, not_found)`.
+
+    Une requête en échec (erreur réseau ou HTTP) laisse l'identifiant de côté : ni insertion, ni comptage. Il reste dans la sélection du run suivant.
     """
     counts = {"fetched": 0, "not_found": 0, "done": 0}
     total = len(ids)
 
-    async def _fetch(client: httpx2.AsyncClient, identifier: str) -> Mapping[str, JsonValue] | None:
-        doc = await fetch_one(client, identifier)
+    async def _fetch(client: httpx2.AsyncClient, identifier: str) -> _Fetched:
+        try:
+            fetched = _Fetched(reached=True, doc=await fetch_one(client, identifier))
+        except httpx2.HTTPError as e:
+            log.warning("%s : requête en échec, reprise au prochain run (%s)", identifier, e)
+            fetched = _Fetched(reached=False, doc=None)
         if delay_s:
             await asyncio.sleep(delay_s)
-        return doc
+        return fetched
 
     with progression(total, libelle, log, compte_retenus=True) as avancement:
 
-        def _write(conn: Connection, identifier: str, doc: Mapping[str, JsonValue] | None) -> None:
-            fetched, not_found = insert_one(conn, identifier, doc)
-            counts["fetched"] += fetched
-            counts["not_found"] += not_found
+        def _write(conn: Connection, identifier: str, result: _Fetched) -> None:
+            if result.reached:
+                fetched, not_found = insert_one(conn, identifier, result.doc)
+                counts["fetched"] += fetched
+                counts["not_found"] += not_found
+                avancement.retient(fetched)
             counts["done"] += 1
             avancement.avance()
-            avancement.retient(fetched)
 
         await run_fetch_pool(
             ids,

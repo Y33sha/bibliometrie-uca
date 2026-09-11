@@ -7,6 +7,8 @@ Le pool réel est exercé : seule la source HTTP est doublée.
 
 import logging
 
+import httpx2
+
 from application.pipeline.fetch_missing.hal import (
     fetch_missing_hal_by_id,
     fetch_missing_hal_by_nnt,
@@ -28,16 +30,19 @@ class _FakeConnection:
 class _FakeHalAdapter:
     """Doublure du port : les documents rendus sont posés par `docs`, indexés par identifiant.
 
-    Une clé absente vaut « introuvable côté HAL ». `deja_en_staging` désigne les NNT dont le document existe déjà, que HAL rend pourtant.
+    Une clé absente vaut « introuvable côté HAL ». `en_echec` désigne les identifiants dont la requête échoue. `deja_en_staging` désigne les NNT dont le document existe déjà, que HAL rend pourtant.
     """
 
     max_concurrent = 2
 
-    def __init__(self, *, hal_ids=(), nnts=(), docs=None, deja_en_staging=(), delay_s=0.0):
+    def __init__(
+        self, *, hal_ids=(), nnts=(), docs=None, en_echec=(), deja_en_staging=(), delay_s=0.0
+    ):
         self.delay_s = delay_s
         self.hal_ids = list(hal_ids)
         self.nnts = list(nnts)
         self.docs = docs or {}
+        self.en_echec = set(en_echec)
         self.deja_en_staging = set(deja_en_staging)
         self.configure_appels = 0
         self.telecharges: list[str] = []
@@ -52,13 +57,17 @@ class _FakeHalAdapter:
     def find_missing_nnts(self, conn) -> list[str]:
         return self.nnts
 
+    def _rendu(self, identifiant: str):
+        self.telecharges.append(identifiant)
+        if identifiant in self.en_echec:
+            raise httpx2.ConnectError("connexion refusée")
+        return self.docs.get(identifiant)
+
     async def fetch_by_halid(self, client, hal_id: str):
-        self.telecharges.append(hal_id)
-        return self.docs.get(hal_id)
+        return self._rendu(hal_id)
 
     async def fetch_by_nnt(self, client, nnt: str):
-        self.telecharges.append(nnt)
-        return self.docs.get(nnt)
+        return self._rendu(nnt)
 
     def insert_halid_result(self, conn, hal_id: str, doc) -> bool:
         self.inseres.append(hal_id)
@@ -84,6 +93,18 @@ class TestParHalId:
         assert metrics.new == 1
         assert metrics.extras["not_found"] == 1
         assert adapter.configure_appels == 1
+
+    async def test_une_requete_en_echec_n_est_ni_inseree_ni_comptee(self):
+        # Une erreur réseau ne prouve pas l'absence : l'identifiant attend le run suivant.
+        adapter = _FakeHalAdapter(
+            hal_ids=["hal-1", "hal-2"], docs={"hal-1": {}}, en_echec={"hal-2"}
+        )
+
+        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+
+        assert adapter.inseres == ["hal-1"]
+        assert metrics.new == 1
+        assert metrics.extras["not_found"] == 0
 
     async def test_jalon_de_progression_et_pause_entre_fetchs(self):
         # Au-delà du pas de commit, le pool commite en cours de route et jalonne le journal.
