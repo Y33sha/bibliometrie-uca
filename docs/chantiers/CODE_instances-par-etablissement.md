@@ -42,7 +42,7 @@ Obstacles :
 
 ### Phase 2 — Configuration par instance
 
-- [ ] Ajouter `instances/` au `.gitignore`.
+- [x] Ajouter `instances/` au `.gitignore`.
 - [ ] Charger `instances/<nom>/instance.env` après `.env` quand `BIBLIO_INSTANCE` est posé, côté backend et côté frontend.
 - [ ] Test : une valeur de l'instance prime sur celle du `.env` racine.
 
