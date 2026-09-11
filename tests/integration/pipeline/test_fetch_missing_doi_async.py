@@ -66,7 +66,7 @@ class _FakeAdapter:
 
 
 def _reader(dois: list[str]):
-    """Fabrique un `cross_import_dois_reader` qui retourne une liste fixe."""
+    """Fabrique un `missing_dois_reader` qui retourne une liste fixe."""
 
     def _read(conn, target):  # noqa: ARG001
         return dois
@@ -85,7 +85,7 @@ class TestRunAsyncOrchestrator:
             MagicMock(),
             adapter,
             logging.getLogger("test"),
-            cross_import_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
+            missing_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
         )
         assert result == PhaseMetrics(seen=3, new=3, extras={"fetched": 3, "not_found": 0})
         assert len(adapter.inserted_records) == 3
@@ -102,7 +102,7 @@ class TestRunAsyncOrchestrator:
             MagicMock(),
             adapter,
             logging.getLogger("test"),
-            cross_import_dois_reader=_reader(dois),
+            missing_dois_reader=_reader(dois),
         )
         assert max(in_flight) <= 3
         # Avec 10 DOIs et 3 workers, on doit avoir vu les 3 workers saturés au moins une fois
@@ -115,7 +115,7 @@ class TestRunAsyncOrchestrator:
             MagicMock(),
             adapter,
             logging.getLogger("test"),
-            cross_import_dois_reader=_reader([f"10.1/{i}" for i in range(10)]),
+            missing_dois_reader=_reader([f"10.1/{i}" for i in range(10)]),
             limit=3,
         )
         assert result.total == 3
@@ -127,7 +127,7 @@ class TestRunAsyncOrchestrator:
             MagicMock(),
             adapter,
             logging.getLogger("test"),
-            cross_import_dois_reader=_reader([]),
+            missing_dois_reader=_reader([]),
         )
         assert result == PhaseMetrics()
 
@@ -149,7 +149,7 @@ class TestRunAsyncOrchestrator:
             MagicMock(),
             adapter,
             logging.getLogger("test"),
-            cross_import_dois_reader=_reader(["10.1/ok1", "10.1/bad", "10.1/ok2"]),
+            missing_dois_reader=_reader(["10.1/ok1", "10.1/bad", "10.1/ok2"]),
         )
         assert result.total == 3
         assert result.extras["fetched"] == 2  # seulement les 2 OK

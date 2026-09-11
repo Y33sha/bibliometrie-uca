@@ -1,6 +1,6 @@
 """Pool de DOI à cross-importer et journal des DOI introuvables (`doi_lookups`).
 
-`get_cross_import_dois` bâtit la liste des DOI présents ailleurs mais absents de la cible ; `record_doi_not_found` mémorise les misses pour les exclure du pool en backoff, `forget_doi_lookups` les rend au pool dès que la source livre le document. Le commit est à la charge de l'appelant.
+`get_missing_dois` bâtit la liste des DOI présents ailleurs mais absents de la cible ; `record_doi_not_found` mémorise les misses pour les exclure du pool en backoff, `forget_doi_lookups` les rend au pool dès que la source livre le document. Le commit est à la charge de l'appelant.
 """
 
 from collections.abc import Sequence
@@ -45,7 +45,7 @@ def record_doi_not_found(
 
     Appelé par les adapters `fetch_missing_doi` quand un DOI cherché est absent de la source. `permanent=False` (hal, openalex, wos, scanr) : miss temporaire, `next_retry` repousse la prochaine tentative de `DOI_LOOKUP_RETRY_DAYS` jours — ces sources peuvent indexer le DOI plus tard. `permanent=True` (crossref, datacite, dont le DOI est l'identifiant natif) : `next_retry = NULL`, miss définitif jamais retenté. Ne commit pas — l'appelant s'en charge.
 
-    Le DOI est normalisé par `clean_doi` avant écriture : `doi_lookups.doi` sert de clé d'exclusion comparée à des DOI déjà normalisés (cf. `get_cross_import_dois`) — toute forme non canonique manquerait l'exclusion.
+    Le DOI est normalisé par `clean_doi` avant écriture : `doi_lookups.doi` sert de clé d'exclusion comparée à des DOI déjà normalisés (cf. `get_missing_dois`) — toute forme non canonique manquerait l'exclusion.
     """
     conn.execute(
         _RECORD_DOI_NOT_FOUND_SQL,
@@ -73,7 +73,7 @@ def forget_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]
         conn.execute(_FORGET_DOI_LOOKUP_SQL, {"source": source, "dois": propres})
 
 
-def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
+def get_missing_dois(conn: Connection, target: str) -> list[str]:
     """Retourne les DOI présents dans les autres sources mais absents de la cible.
 
     Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne cross-importer que des DOI de publications in-périmètre coupe la propagation de cross-imports hors-périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).

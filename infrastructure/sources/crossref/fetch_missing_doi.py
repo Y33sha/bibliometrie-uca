@@ -21,11 +21,11 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from infrastructure.pipeline.extract.cross_import import (
+from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.fetch_missing.doi import (
     forget_doi_lookups,
     record_doi_not_found,
 )
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async

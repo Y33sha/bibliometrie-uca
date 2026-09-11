@@ -5,12 +5,12 @@ from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
 from infrastructure.pipeline.change_detection import change_detection_hash, compute_hash
-from infrastructure.pipeline.extract.cross_import import (
+from infrastructure.pipeline.extract.fetch_stale import get_stale_rows, set_disappeared_by_source_id
+from infrastructure.pipeline.fetch_missing.doi import (
     forget_doi_lookups,
-    get_cross_import_dois,
+    get_missing_dois,
     record_doi_not_found,
 )
-from infrastructure.pipeline.extract.stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 # ── compute_hash ─────────────────────────────────────────────────
@@ -154,17 +154,17 @@ def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids="{}"):
     )
 
 
-class TestGetCrossImportDois:
+class TestGetMissingDois:
     def test_rejects_unknown_source(self):
         with pytest.raises(ValueError, match="Source inconnue"):
-            get_cross_import_dois(None, "unknown")
+            get_missing_dois(None, "unknown")
 
     def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
         """Interroger la cible sur ce DOI rendrait un document déjà présent."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
         _add_inperim_sp(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
 
-        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
         """La cible rend le même document pour son DOI principal comme pour ses DOI secondaires."""
@@ -177,7 +177,7 @@ class TestGetCrossImportDois:
             external_ids='{"related_dois": ["10.1234/preprint"]}',
         )
 
-        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
@@ -194,7 +194,7 @@ class TestGetCrossImportDois:
             ),
             {"pub": pub_id},
         )
-        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
         """target='crossref' : DOIs DataCite/mEDRA filtrés via doi_prefixes."""
@@ -209,7 +209,7 @@ class TestGetCrossImportDois:
         _add_inperim_sp(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
         _add_inperim_sp(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
 
-        result = get_cross_import_dois(sa_sync_conn, "crossref")
+        result = get_missing_dois(sa_sync_conn, "crossref")
 
         # DataCite éliminé, Crossref gardé, NULL gardé (best-effort).
         assert "10.5281/zenodo.1" not in result
@@ -225,20 +225,20 @@ class TestGetCrossImportDois:
             doi="10.1234/primary",
             external_ids='{"related_dois": ["10.9999/preprint"]}',
         )
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """Un arxiv_id d'un source_publication in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids='{"arxiv_id": "2605.02321"}')
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" in result
 
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
         """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
         _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids='{"arxiv_id": "2605.02321"}')
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" not in result
 
     def test_includes_relation_targets(self, sa_sync_conn):
@@ -256,7 +256,7 @@ class TestGetCrossImportDois:
                 "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
             )
         )
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.9999/related" in result
 
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
@@ -274,7 +274,7 @@ class TestGetCrossImportDois:
                 "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
             )
         )
-        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
@@ -283,7 +283,7 @@ class TestGetCrossImportDois:
         )
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
 
         assert result == ["10.5281/zenodo.1"]
 
@@ -297,7 +297,7 @@ class TestGetCrossImportDois:
                 "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
             )
         )
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
@@ -309,7 +309,7 @@ class TestGetCrossImportDois:
                 "VALUES ('hal', '10.1234/a', now() - interval '60 days', now() - interval '1 day')"
             )
         )
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/a"]
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
@@ -321,8 +321,8 @@ class TestGetCrossImportDois:
                 "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
             )
         )
-        assert get_cross_import_dois(sa_sync_conn, "hal") == []
-        assert get_cross_import_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
+        assert get_missing_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
 
     def test_excludes_dois_with_permanent_miss(self, sa_sync_conn):
         """Un DOI avec un miss définitif (`next_retry NULL`) sort du pool pour toujours."""
@@ -334,7 +334,7 @@ class TestGetCrossImportDois:
                 "VALUES ('hal', '10.1234/a', now(), NULL)"
             )
         )
-        result = get_cross_import_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
 
