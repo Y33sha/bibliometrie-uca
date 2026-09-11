@@ -3,7 +3,7 @@
 1. WoS est opt-in (`--include-wos`) : exclu par défaut du refresh, comme
    `extract` et `fetch_missing`.
 2. Le refetch d'une source pose un circuit-breaker (coupe sur 429 répétés),
-   au même titre que le cross-import — sinon fetch_stale martèle une source
+   au même titre que fetch_missing — sinon fetch_stale martèle une source
    à bout de budget API.
 """
 
@@ -51,8 +51,8 @@ def test_fetch_stale_includes_wos_when_opted_in():
 
 
 def test_fetch_stale_covers_theses():
-    # theses entre dans le refresh (refetch par id natif), contrairement au
-    # cross-import par DOI qui l'excluait.
+    # theses entre dans le refresh (refetch par id natif), contrairement à la
+    # recherche par DOI de fetch_missing, qui l'exclut.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         run_pipeline.phase_fetch_stale(run_pipeline.RunOptions())

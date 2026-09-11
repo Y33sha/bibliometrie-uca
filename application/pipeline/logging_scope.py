@@ -36,5 +36,5 @@ def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None)
     return _ScopedLogger(logger, prefix)
 
 
-# Les fonctions d'extraction / cross-import / normalisation acceptent indifféremment un logger nu ou un logger scopé — c'est l'orchestrateur qui décide du scope.
+# Les fonctions d'extraction, de la phase fetch_missing et de normalisation acceptent indifféremment un logger nu ou un logger scopé — c'est l'orchestrateur qui décide du scope.
 type ScopedOrPlainLogger = logging.Logger | logging.LoggerAdapter[logging.Logger]

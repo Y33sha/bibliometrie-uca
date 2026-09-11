@@ -185,7 +185,7 @@ def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[s
 # corpus : même œuvre (versions, formes) ou œuvre étroitement liée (parties,
 # suppléments). Les relations de citation (Cites / IsCitedBy / References /
 # IsReferencedBy) en sont EXCLUES : elles désignent un lien bibliographique,
-# pas une œuvre du périmètre — les verser dans le pool cross-import ferait
+# pas une œuvre du périmètre — les ajouter aux DOI cherchés par fetch_missing ferait
 # ingérer toute la bibliographie citée. La nature complète des relations
 # (citations comprises) reste tracée dans `meta.related_identifiers`.
 _CORPUS_RELATION_TYPES = frozenset(
@@ -208,7 +208,7 @@ _CORPUS_RELATION_TYPES = frozenset(
 def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> list[str]:
     """DOI secondaires à rapatrier dans le corpus, hors DOI primaire, dédupliqués.
 
-    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois` (pool cross-import). La liste typée complète vit dans `meta.related_identifiers`.
+    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois`, que la phase `fetch_missing` cherche dans chaque source. La liste typée complète vit dans `meta.related_identifiers`.
     """
     self_doi_clean = clean_doi(self_doi)
     out: list[str] = []

@@ -44,7 +44,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
 
 
 def test_resolve_ra_runs_after_extract_before_fetch_missing():
-    """La RA doit être résolue avant le cross-import par DOI : sinon fetch_missing
+    """La RA doit être résolue avant la recherche par DOI : sinon fetch_missing
     route en best-effort (RA NULL) et tente chaque DOI contre Crossref ET DataCite."""
     names = [n for n, _ in run_pipeline.PHASES]
     assert names.index("extract") < names.index("resolve_ra") < names.index("fetch_missing")

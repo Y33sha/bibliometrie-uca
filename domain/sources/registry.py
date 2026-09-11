@@ -64,7 +64,7 @@ SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
     f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
 )
 
-# Sources interrogeables par DOI pour le cross-import (`fetch_missing_doi`).
+# Sources interrogeables par DOI à la phase `fetch_missing`.
 # Theses absent car son API ne se requête pas par DOI mais par NNT.
 DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
     Source.HAL,

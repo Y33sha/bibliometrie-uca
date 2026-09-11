@@ -43,7 +43,7 @@ def insert_staging_hal(
         source_id=hal_id,
         doi=doi,
         raw_data=doc,
-        entry_mode="cross_import_hal",
+        entry_mode="fetch_missing_hal",
     )
 
 

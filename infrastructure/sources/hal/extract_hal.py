@@ -33,7 +33,7 @@ def _build_url(base_url: str) -> str:
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI nettoyé d'un document HAL (champ `doiId_s`).
 
-    `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste depuis l'API de recherche par hal-id (cross-import) : les deux formes sont gérées avant nettoyage.
+    `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste depuis l'API de recherche par hal-id (phase `fetch_missing`) : les deux formes sont gérées avant nettoyage.
     """
     doi = doc.get("doiId_s")
     return clean_doi(hal_text_field(doi))

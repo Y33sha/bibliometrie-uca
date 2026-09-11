@@ -130,6 +130,6 @@ class WosFetchMissingDoiAdapter:
             source_id=extract_ut(record),
             doi=extract_doi(record),
             raw_data=record,
-            entry_mode="cross_import_doi",
+            entry_mode="fetch_missing_doi",
         )
         return inserted

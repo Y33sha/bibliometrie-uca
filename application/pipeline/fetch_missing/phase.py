@@ -1,7 +1,7 @@
 """Orchestrateur de la phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Deux mécanismes, dans cet ordre :
 
-1. **Cross-import HAL** — deux canaux séquentiels : par hal-id (repéré dans OpenAlex/ScanR) et par NNT (thèses sans document HAL).
-2. **Cross-import par DOI** — pour chaque source cible configurée, en parallèle : cherche les DOI vus ailleurs mais absents de la source et les fetche.
+1. **Recherche dans HAL** — deux canaux séquentiels : par hal-id (repéré dans OpenAlex/ScanR) et par NNT (thèses sans document HAL).
+2. **Recherche par DOI** — pour chaque source cible configurée, en parallèle : cherche les DOI vus ailleurs mais absents de la source et les fetche.
 """
 
 import logging
@@ -17,7 +17,7 @@ from domain.sources.registry import DOI_SEARCHABLE_SOURCES
 FetchChannel = Callable[[], PhaseMetrics]
 """Runner d'un canal HAL (hal-id ou NNT) : rend les métriques du canal."""
 FetchDoiOne = Callable[[str], PhaseMetrics]
-"""Runner du cross-import par DOI d'une source cible, sous circuit-breaker."""
+"""Runner de la recherche par DOI dans une source cible, sous circuit-breaker."""
 CredentialsMissing = Callable[[str], "str | None"]
 """`(source) -> motif d'absence de credentials | None si configurée`."""
 
@@ -44,11 +44,11 @@ def run(
     credentials_missing: CredentialsMissing,
     logger: logging.Logger,
 ) -> PhaseMetrics:
-    """Enchaîne les canaux HAL puis le cross-import par DOI parallèle, et assemble les métriques."""
+    """Enchaîne les canaux HAL puis la recherche par DOI parallèle, et assemble les métriques."""
     metrics = PhaseMetrics()
     by_channel: dict[str, dict[str, float]] = {}
 
-    # Étape 1 : cross-import HAL, deux canaux distincts (hal-id, NNT).
+    # Étape 1 : recherche dans HAL, deux canaux distincts (hal-id, NNT).
     if not sources or "hal" in sources:
         id_metrics, id_duration = timed_metrics(fetch_hal_by_id)
         metrics.merge(id_metrics)

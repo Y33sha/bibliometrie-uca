@@ -1,7 +1,7 @@
 """Détecteur central de présence des credentials par source d'API tierce.
 
 `source_credentials_missing` est la seule source de vérité consultée par toutes
-les phases (extraction, cross-import, refresh stale, enrichissements). HAL et
+les phases (extract, fetch_missing, fetch_stale, enrichissements). HAL et
 theses.fr sont des API publiques ; OpenAlex accepte clé API ou email ; WoS exige
 sa clé ; ScanR ses identifiants ; Crossref/DataCite/Unpaywall l'adresse polite pool.
 """

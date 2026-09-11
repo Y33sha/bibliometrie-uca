@@ -20,7 +20,7 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici."""
+        """Les DOI proviennent de la vue `candidate_dois` — la même liste que la recherche par DOI de la phase `fetch_missing` (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cette recherche soit résolu ici."""
         result = self._conn.execute(
             text(
                 """

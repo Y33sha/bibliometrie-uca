@@ -187,14 +187,14 @@ class TestPlafondsParRun:
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'unpaywall_max_per_run'"))
         assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
 
-    def test_le_plafond_du_cross_import_configure_est_lu(self, sa_sync_conn):
+    def test_le_plafond_de_fetch_missing_configure_est_lu(self, sa_sync_conn):
         _set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
         assert get_fetch_missing_max_per_source(sa_sync_conn) == 5000
 
-    def test_zero_vaut_illimite_pour_le_cross_import(self, sa_sync_conn):
+    def test_zero_vaut_illimite_pour_fetch_missing(self, sa_sync_conn):
         _set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
         assert get_fetch_missing_max_per_source(sa_sync_conn) is None
 
-    def test_le_cross_import_sans_cle_est_illimite(self, sa_sync_conn):
+    def test_fetch_missing_sans_cle_est_illimite(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_missing_max_per_source'"))
         assert get_fetch_missing_max_per_source(sa_sync_conn) is None
