@@ -176,7 +176,7 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes distinctes au même identifiant brut : le CTE projette `(person_id, id_type, id_value)` des signatures (via `author_identifying_keys`, hors `_dubious`), le self-join les apparie, hors paires déjà distinctes.
+# Paires de personnes distinctes au même identifiant brut, hors `_dubious` et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH person_identifier_keys AS (
         SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
@@ -192,6 +192,12 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         FROM person_identifier_keys k1
         JOIN person_identifier_keys k2
           ON k1.id_type = k2.id_type AND k1.id_value = k2.id_value AND k1.person_id < k2.person_id
+        WHERE EXISTS (
+            SELECT 1 FROM person_identifiers pi
+            WHERE pi.id_type::text = k1.id_type
+              AND pi.id_value = k1.id_value
+              AND pi.status = '{AttributionStatus.PENDING.value}'
+        )
     )
     SELECT id_a, id_b,
            json_agg(DISTINCT jsonb_build_object('id_type', id_type, 'id_value', id_value)) AS shared
@@ -205,7 +211,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
 
 
 def identifier_conflicts_count(conn: Connection) -> int:
-    """Nombre de paires de personnes au même identifiant brut (badge de l'onglet)."""
+    """Nombre de paires de personnes au même identifiant brut en attente de validation (badge de l'onglet)."""
     row = conn.execute(
         text(f"SELECT count(*) AS total FROM ({_IDENTIFIER_CONFLICT_PAIRS}) sub")
     ).one()
@@ -251,7 +257,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
 def identifier_conflicts(
     conn: Connection, *, page: int, per_page: int
 ) -> IdentifierConflictsResponse:
-    """Paires de personnes au même identifiant brut, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
+    """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
     total = identifier_conflicts_count(conn)
     offset = (page - 1) * per_page
     rows = conn.execute(

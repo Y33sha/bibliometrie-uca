@@ -1,5 +1,6 @@
 """Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
 
+import pytest
 from sqlalchemy import text
 
 from infrastructure.read_models.persons.admin import (
@@ -137,6 +138,19 @@ def _sa_with_identifiers(conn, sd, position, person_id, identifiers):
     )
 
 
+def _attribute(conn, person_id, id_type, id_value, status):
+    """Attribution `person_identifiers` ; le statut `authenticated` exige le drapeau de l'import dédié."""
+    if status == "authenticated":
+        conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
+    conn.execute(
+        text(
+            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+            "VALUES (:pid, :t, :v, 'auto', CAST(:s AS identifier_status))"
+        ),
+        {"pid": person_id, "t": id_type, "v": id_value, "s": status},
+    )
+
+
 class TestIdentifierConflicts:
     """La détection projette `(person_id, id_type, id_value)` à la volée depuis
     `source_authorships` ⋈ `author_identifying_keys` : rien à rafraîchir, la lecture voit
@@ -146,6 +160,7 @@ class TestIdentifierConflicts:
         p1 = _create_person(sa_sync_conn, last="Smith", first="John")
         p2 = _create_person(sa_sync_conn, last="Smith", first="J")
         sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
 
@@ -164,6 +179,27 @@ class TestIdentifierConflicts:
         sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0009-9999-9999_dubious"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0009-9999-9999_dubious"})
+
+        assert identifier_conflicts_count(sa_sync_conn) == 0
+
+    @pytest.mark.parametrize("status", ["confirmed", "rejected", "authenticated"])
+    def test_settled_attribution_excluded(self, sa_sync_conn, status):
+        """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
+        p1 = _create_person(sa_sync_conn, last="Veyssiere", first="Hugo")
+        p2 = _create_person(sa_sync_conn, last="Pinard", first="Celeste")
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0003-2202-7362"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0003-2202-7362"})
+
+        assert identifier_conflicts_count(sa_sync_conn) == 0
+
+    def test_unattributed_value_excluded(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
+        p2 = _create_person(sa_sync_conn, last="Lee", first="A")
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
