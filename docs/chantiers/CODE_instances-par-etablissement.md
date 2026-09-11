@@ -25,18 +25,18 @@ Obstacles :
 ## Décisions
 
 - **Une base par établissement** sur le serveur PostgreSQL existant : `bibliometrie_lorraine`, `bibliometrie_nantes`…
-- **Seed commun et seed d'établissement.** Le seed commun contient les référentiels partagés par tous les établissements. Le seed d'établissement contient les structures, leurs tutelles, les périmètres, les formes de noms et la configuration propre à l'établissement.
+- **Seed commun et seed d'établissement.** Le seed commun contient les référentiels partagés par tous les établissements. Le seed d'établissement contient les structures, leurs tutelles, les périmètres, les formes de noms et la configuration propre à l'établissement. Le seed d'établissement UCA reste versionné et sert d'exemple.
 - **Les fichiers des autres établissements sont stockés dans `data/`**, hors versionnement. `data/instances/<nom>/` contient la configuration de l'instance (`instance.env`) et son seed (`seed.sql`).
 - **Configuration par surcharge.** `BIBLIO_INSTANCE=<nom>` désigne l'instance. Son `instance.env` se charge après le `.env` racine et contient seulement les valeurs propres à l'instance : `DB_NAME`, les ports, `API_TARGET`. Le backend (`Settings`, `infrastructure/__init__.py`) et le frontend (`svelte.config.js`, `vite.config.ts`) appliquent la même règle. Sans `BIBLIO_INSTANCE`, seul le `.env` racine s'applique.
 - **Un nom d'hôte par instance** : `<nom>.localhost`. Les navigateurs le résolvent vers la boucle locale, et chaque instance a son propre cookie de session.
-- **Le pipeline des autres établissements tourne sans `--raw-store`.**
-- **Une constante porte le nom de l'établissement**, et tous les endroits qui l'affichent la référencent.
+- **Le pipeline des autres établissements tourne sans `--raw-store`, avec `LOG_TO_FILE=false`.**
+- **Le nom de l'établissement est le nom du périmètre `perimeter_persons`** (`perimeters.name`). Le seed d'établissement le fournit, et la lecture publique de la configuration le sert au frontend.
 
 ## Phasage
 
 ### Phase 1 — Seed commun et seed d'établissement
 
-- [ ] `generate_seed` produit deux fichiers : le seed commun (`infrastructure/db/seed.sql`) et le seed d'établissement.
+- [ ] `generate_seed` produit deux fichiers : le seed commun (`infrastructure/db/seed.sql`) et le seed d'établissement UCA.
 - [ ] Répartir les clés de `config` entre les deux seeds.
 - [ ] Mettre à jour l'initialisation de la base dans `docs/exploitation/01-developpement-local.md` et `02-production.md`.
 
@@ -53,7 +53,8 @@ Obstacles :
 
 ### Phase 4 — Nom de l'établissement
 
-- [ ] Constante du nom, référencée par les titres, les libellés du frontend et du backend, et le titre de l'API.
+- [ ] Servir le nom du périmètre `perimeter_persons` au frontend par la lecture publique de la configuration.
+- [ ] Référencer ce nom dans les titres, les libellés du frontend et du backend, et le titre de l'API.
 - [ ] Remplacer la logique qui dépend de l'identifiant 169 et des codes `uca` et `alliance_uca`.
 
 ### Phase 5 — Seeds d'autres établissements
@@ -62,9 +63,6 @@ Obstacles :
 - [ ] Seeds Université de Lorraine et Nantes Université dans `data/instances/`.
 - [ ] Faire tourner le pipeline sur chaque instance et examiner le résultat dans l'interface.
 
-## Questions ouvertes
+### Phase 6 — Valeurs de filtre
 
-- **Seed d'établissement UCA.** La production s'initialise depuis `infrastructure/db/seed.sql`. Le seed UCA reste-t-il versionné, ou rejoint-il `data/` comme les autres ?
-- **Valeur du nom par instance.** Une constante de code a la même valeur dans toutes les instances. Pour Lorraine ou Nantes, sa valeur vient-elle de `instance.env` ou de la table `config` du seed d'établissement ?
-- **Valeurs de filtre `uca`, `non_uca`, `other_uca`.** L'API les expose, et elles reposent sur `perimeter_persons`. Faut-il les renommer avec la phase 4 ?
-- **Journaux sur disque.** Avec `LOG_TO_FILE=true`, toutes les instances écrivent sous le même `logs/`.
+- [ ] Renommer les valeurs de filtre `uca`, `non_uca` et `other_uca` exposées par l'API.
