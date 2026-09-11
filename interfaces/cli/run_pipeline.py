@@ -212,7 +212,7 @@ def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
 
     Le cross-import HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. Le cross-import par DOI cherche ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
-    Les deux se bornent d'eux-mêmes : un identifiant introuvable est marqué `not_found_at` dans le staging, un DOI absent d'une source reçoit un délai avant nouvelle tentative dans `doi_lookups`.
+    Les deux se bornent d'eux-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
 
     Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
     """

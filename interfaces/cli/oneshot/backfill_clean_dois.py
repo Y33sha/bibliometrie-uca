@@ -5,7 +5,7 @@
 
 Deux opérations :
 
-1. **Purge des négatifs de lookup non canoniques.** Un négatif de `doi_lookups` (les misses de cross-import par DOI) mémorisé sous une forme de DOI sale porte sur cette forme, pas sur la forme propre : il est invalide et supprimé, pour que la forme propre soit re-tentée au prochain run. Les négatifs déjà propres sont conservés (vrai miss).
+1. **Purge des échecs de recherche par DOI non normalisés.** Un échec de `failed_lookups` inscrit sous une forme de DOI sale porte sur cette forme, pas sur la forme propre : il est invalide et supprimé, pour que la forme propre soit cherchée au prochain run. Les échecs déjà sous forme propre sont conservés.
 
 2. **Normalisation en place des colonnes source de vérité :**
    - `staging.doi` (records réels) ;
@@ -39,25 +39,28 @@ log = setup_logger("backfill_clean_dois", os.path.dirname(__file__))
 
 
 def _purge_dirty_negatives(conn: Connection, apply: bool) -> None:
-    """Supprime les négatifs de `doi_lookups` dont le `doi` n'est pas déjà sous forme
-    canonique — jamais interrogés sous leur forme propre, donc invalides."""
-    lookups = conn.execute(text("SELECT source::text AS source, doi FROM doi_lookups")).all()
-    lk_del = [{"s": r.source, "d": r.doi} for r in lookups if clean_doi(r.doi) != r.doi]
-    log.info("doi_lookups à doi sale : %d / %d", len(lk_del), len(lookups))
+    """Supprime de `failed_lookups` les échecs par DOI dont le DOI n'est pas sous forme normalisée : jamais cherchés sous leur forme propre, ils sont invalides."""
+    lookups = conn.execute(
+        text("SELECT source::text AS source, id_value FROM failed_lookups WHERE id_type = 'doi'")
+    ).all()
+    lk_del = [
+        {"s": r.source, "d": r.id_value} for r in lookups if clean_doi(r.id_value) != r.id_value
+    ]
+    log.info("failed_lookups à DOI sale : %d / %d", len(lk_del), len(lookups))
     if apply and lk_del:
         conn.execute(
-            text("DELETE FROM doi_lookups WHERE source = CAST(:s AS source_type) AND doi = :d"),
+            text(
+                "DELETE FROM failed_lookups "
+                "WHERE source = CAST(:s AS source_type) AND id_type = 'doi' AND id_value = :d"
+            ),
             lk_del,
         )
 
 
 def _clean_staging_doi(conn: Connection, apply: bool) -> None:
-    """Normalise `staging.doi` des records réels (hors stubs not-found)."""
+    """Normalise `staging.doi`."""
     rows = conn.execute(
-        text(
-            "SELECT source::text AS source, source_id, doi FROM staging "
-            "WHERE doi IS NOT NULL AND not_found_at IS NULL"
-        )
+        text("SELECT source::text AS source, source_id, doi FROM staging WHERE doi IS NOT NULL")
     ).all()
     upd = [
         {"s": r.source, "sid": r.source_id, "c": c}

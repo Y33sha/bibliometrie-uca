@@ -32,7 +32,9 @@ Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'a
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les sources Crossref et DataCite sont seulement interrogées ici : elles sont omises du moissonnage initial car non interrogeables par affiliation.
 
-Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Les recherches infructueuses sont stockées dans `doi_lookups` et retentées après un délai de 30 jours.
+Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`.
+
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, 30 jours plus tard. L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
 
 
 ## Documents périmés et disparus (`fetch_stale`)

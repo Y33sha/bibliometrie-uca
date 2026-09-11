@@ -18,9 +18,9 @@ from application.ports.pipeline.fetch_missing.doi import (
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    record_doi_not_found,
+from infrastructure.pipeline.fetch_missing.failed_lookups import (
+    forget_failed_doi_lookups,
+    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
@@ -71,7 +71,7 @@ class HalFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "hal", as_str(record["_doi"]) or "")
+            record_failed_lookup(conn, "hal", "doi", as_str(record["_doi"]) or "")
             return False
 
         hal_id = hal_text_field(record.get("halId_s"))
@@ -88,7 +88,7 @@ class HalFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        forget_doi_lookups(conn, "hal", [doi])
+        forget_failed_doi_lookups(conn, "hal", [doi])
         return inserted
 
 

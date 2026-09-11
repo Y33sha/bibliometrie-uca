@@ -30,13 +30,7 @@ _NOT_FOUND_STATUS = "not_found"
 def not_found_marker(doi: str) -> Mapping[str, JsonValue]:
     """Sentinelle « DOI introuvable » émise par `fetch_async`.
 
-    Un adapter émet ce marqueur (au lieu d'un record API) pour un DOI que
-    la source a **confirmé** absent (réponse vide ou 404), par opposition à
-    une erreur transitoire (réseau, timeout) où il retourne `[]` sans rien
-    émettre. `insert()` mémorise le marqueur dans `doi_lookups` : `next_retry`
-    daté (backoff) pour les sources non natives, `next_retry` NULL (définitif)
-    pour les sources dont le DOI est l'identifiant natif. L'orchestrateur
-    l'exclut du compteur `fetched`.
+    Un adapter émet ce marqueur, au lieu d'un record API, pour un DOI que la source a **confirmé** absent (réponse vide ou 404). Sur une erreur transitoire (réseau, timeout), il retourne `[]` sans rien émettre. `insert()` inscrit le marqueur dans `failed_lookups`. L'orchestrateur l'exclut du compteur `fetched`.
     """
     return {"_status": _NOT_FOUND_STATUS, "_doi": doi}
 

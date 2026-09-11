@@ -21,9 +21,9 @@ from application.ports.pipeline.fetch_missing.doi import (
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    record_doi_not_found,
+from infrastructure.pipeline.fetch_missing.failed_lookups import (
+    forget_failed_doi_lookups,
+    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
@@ -84,7 +84,7 @@ class ScanrFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "scanr", as_str(record["_doi"]) or "")
+            record_failed_lookup(conn, "scanr", "doi", as_str(record["_doi"]) or "")
             return False
 
         scanr_id = as_str(record.get("id")) or ""
@@ -107,5 +107,5 @@ class ScanrFetchMissingDoiAdapter:
             entry_mode="cross_import_doi",
         )
         # ScanR rend un même document pour chacun de ses DOI : aucun n'est introuvable.
-        forget_doi_lookups(conn, "scanr", dois)
+        forget_failed_doi_lookups(conn, "scanr", dois)
         return inserted

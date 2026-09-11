@@ -75,8 +75,8 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [Personnes](04-personnes.md) |
 | `distinct_publications` | paires marquées distinctes malgré un titre identique | [Publications](03-publications.md) |
-| `doi_lookups` | temporisation des échecs de cross-import par DOI | [Authorships et sources](05-authorships-et-sources.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [Publications](03-publications.md) |
+| `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de la prochaine tentative | [Authorships et sources](05-authorships-et-sources.md) |
 | `journal_name_forms` | formes de noms pour reconnaître une revue | [Publications](03-publications.md) |
 | `journals` | référentiel des revues | [Publications](03-publications.md) |
 | `perimeter_structures` | appartenance au périmètre, recalculée par le pipeline | [Structures](02-structures.md) |

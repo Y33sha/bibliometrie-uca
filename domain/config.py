@@ -46,6 +46,9 @@ MAX_YEAR = 2100
 STALE_REFRESH_AFTER_DAYS = 90
 """Âge, en jours, au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
 
+FAILED_LOOKUP_RETRY_DAYS = 30
+"""Délai, en jours, avant de chercher de nouveau un identifiant resté introuvable dans une source. La recherche d'un identifiant natif de la source est définitive."""
+
 
 def _as_int(value: JsonValue) -> int | None:
     """Entier porté par `value`, ou `None`. Un booléen est écarté, Python le tenant pour un entier."""

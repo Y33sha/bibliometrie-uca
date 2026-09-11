@@ -6,7 +6,7 @@ Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette
 
 Le pool de DOI candidats est filtré en amont par `get_missing_dois` : seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu) sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
 
-DataCite est la source native du DOI pour ses préfixes : un miss (DOI absent de la réponse du batch) est définitif (DOI erroné ou non DataCite). Il est mémorisé dans `doi_lookups` avec `next_retry = NULL` (jamais retenté).
+DataCite est la source native du DOI pour ses préfixes : un DOI absent de la réponse du batch est définitivement introuvable (DOI erroné ou non DataCite). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative.
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ from application.ports.pipeline.fetch_missing.doi import (
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.doi import (
-    forget_doi_lookups,
-    record_doi_not_found,
+from infrastructure.pipeline.fetch_missing.failed_lookups import (
+    forget_failed_doi_lookups,
+    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
@@ -87,7 +87,7 @@ class DataciteFetchMissingDoiAdapter:
         if not isinstance(records, list):
             return []
 
-        # DOI demandés non retournés = confirmés absents de DataCite (source native du DOI pour ses préfixes) : miss définitif, stub `staging`.
+        # DOI demandés non retournés = confirmés absents de DataCite. insert() les inscrit dans failed_lookups.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for rec in records:
             if doi := _record_doi(as_mapping(rec)):
@@ -98,8 +98,7 @@ class DataciteFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            # Source native du DOI pour ses préfixes : miss définitif → doi_lookups permanent.
-            record_doi_not_found(conn, "datacite", as_str(record["_doi"]) or "", permanent=True)
+            record_failed_lookup(conn, "datacite", "doi", as_str(record["_doi"]) or "")
             return False
 
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.
@@ -114,5 +113,5 @@ class DataciteFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        forget_doi_lookups(conn, "datacite", [doi])
+        forget_failed_doi_lookups(conn, "datacite", [doi])
         return inserted

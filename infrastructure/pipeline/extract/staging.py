@@ -1,6 +1,6 @@
-"""Écritures `staging` à l'extraction et au cross-import : UPSERT canonique et stub introuvable.
+"""Écriture `staging` : UPSERT des documents rendus par les sources, commun à toutes les voies d'entrée.
 
-Appelées par les adapters d'extraction et de cross-import (`infrastructure/sources/*`), et par la base de refresh stale. Le commit est à la charge de l'appelant.
+Appelée par les adapters d'extraction, de la phase `fetch_missing` et de la phase `fetch_stale` (`infrastructure/sources/*`). Le commit est à la charge de l'appelant.
 """
 
 from collections.abc import Mapping
@@ -41,8 +41,7 @@ _UPSERT_STAGING_SQL = text(
             ELSE staging.authors_truncated
         END,
         -- `entry_mode` n'est PAS réécrit : il garde la provenance de première création.
-        -- Un document trouvé avec un vrai contenu n'est ni introuvable ni disparu : la réapparition efface les deux marqueurs d'absence, sans quoi un stub `not_found_at` (cross-import) violerait `staging_not_found_at_implies_processed` dès que `processed` repasse à FALSE.
-        not_found_at = NULL,
+        -- Un document rendu par sa source efface le marqueur de disparition.
         disappeared_at = NULL,
         last_seen_at = now()
     RETURNING (xmax = 0) AS inserted,
@@ -61,7 +60,7 @@ def upsert_staging(
     authors_truncated: bool = False,
     entry_mode: str = "bulk",
 ) -> tuple[bool, bool]:
-    """UPSERT canonique d'une ligne `staging`, partagé par toutes les voies d'entrée (extraction bulk **et** cross-import — un seul endroit pour la logique d'UPSERT).
+    """UPSERT d'une ligne `staging`, commun à toutes les voies d'entrée : extraction, phases `fetch_missing` et `fetch_stale`.
 
     `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` : réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé, met toujours à jour `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement). Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
 
@@ -84,30 +83,3 @@ def upsert_staging(
         },
     ).one()
     return (bool(row.inserted), bool(row.changed))
-
-
-_NOT_FOUND_STUB_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed, entry_mode)
-    VALUES (:source, :source_id, :doi, '{}'::jsonb, now(), TRUE, :entry_mode)
-    ON CONFLICT (source, source_id) DO UPDATE SET not_found_at = now()
-    """
-)
-
-
-def upsert_not_found_stub(
-    conn: Connection,
-    *,
-    source: str,
-    source_id: str,
-    doi: str | None = None,
-    entry_mode: str,
-) -> None:
-    """Pose un stub `staging` « introuvable » (raw_data vide, `not_found_at`, `processed`).
-
-    Utilisé par le cross-import HAL (hal-id / NNT), dont l'identifiant natif est le hal-id : le stub est keyé par `(source, source_id)` et ré-arme `not_found_at` sur conflit (le miss est retriable — HAL peut publier le document plus tard). Ne commit pas. Les misses par DOI, eux, vivent dans `doi_lookups` (cf. `record_doi_not_found`).
-    """
-    conn.execute(
-        _NOT_FOUND_STUB_SQL,
-        {"source": source, "source_id": source_id, "doi": doi, "entry_mode": entry_mode},
-    )
