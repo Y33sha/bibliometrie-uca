@@ -4,6 +4,7 @@ import httpx2
 import pytest
 from sqlalchemy import bindparam, text
 
+from application.ports.pipeline.fetch_missing.hal import NntInsertResult
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
@@ -170,6 +171,25 @@ class TestInsertResults:
             text("SELECT id_type, next_retry > now() AS pending FROM failed_lookups")
         ).one()
         assert (row.id_type, row.pending) == ("nnt", True)
+
+    def test_un_document_trouve_par_nnt_entre_en_staging(self, sa_sync_conn):
+        result = PgHalFetchMissingAdapter().insert_nnt_result(
+            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}
+        )
+        staged = sa_sync_conn.execute(
+            text("SELECT count(*) FROM staging WHERE source = 'hal' AND source_id = 'tel-01'")
+        ).scalar_one()
+        assert result == NntInsertResult(api_found=True, inserted=True)
+        assert staged == 1
+
+    def test_un_document_deja_en_staging_n_est_pas_nouveau(self, sa_sync_conn):
+        sa_sync_conn.execute(
+            text("INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', 'tel-01', '{}')")
+        )
+        result = PgHalFetchMissingAdapter().insert_nnt_result(
+            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}
+        )
+        assert result == NntInsertResult(api_found=True, inserted=False)
 
 
 class TestSearchOne:
