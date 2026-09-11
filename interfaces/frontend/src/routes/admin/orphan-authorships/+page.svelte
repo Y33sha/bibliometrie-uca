@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institution } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
@@ -215,7 +216,7 @@
 </div>
 
 <div class="info-box">
-	Authorships UCA non reliées à une personne. Pour chaque authorship, vous pouvez l'attribuer à une personne existante ou créer une nouvelle personne.
+	Authorships {institution.name} non reliées à une personne. Pour chaque authorship, vous pouvez l'attribuer à une personne existante ou créer une nouvelle personne.
 </div>
 
 <div class="toolbar">

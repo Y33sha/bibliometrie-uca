@@ -45,6 +45,7 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
+from infrastructure.read_models.perimeters import get_persons_perimeter_name
 
 
 class _PublicationFacetsBuilder:
@@ -325,10 +326,13 @@ class _PublicationFacetsBuilder:
             {"id": lab_ids[0]},
         ).one_or_none()
         lab_label = label_row.label if label_row else "ce labo"
+        institution = get_persons_perimeter_name(self.conn)
         return [
             FacetOption(value="this_lab", label=f"APC — {lab_label}", count=r.apc_this_lab),
-            FacetOption(value="other_uca", label="APC — autres UCA", count=r.apc_other_uca),
-            FacetOption(value="non_uca", label="APC hors UCA", count=r.apc_non_uca),
+            FacetOption(
+                value="other_uca", label=f"APC — autres {institution}", count=r.apc_other_uca
+            ),
+            FacetOption(value="non_uca", label=f"APC hors {institution}", count=r.apc_non_uca),
             FacetOption(value="none", label="Sans APC", count=r.apc_none),
         ]
 
@@ -357,7 +361,9 @@ class _PublicationFacetsBuilder:
             {**binds, "apc_facet_root_ids": self.perimeter_structure_ids},
         ).one()
         return [
-            FacetOption(value="uca", label="APC — UCA", count=r.apc_uca),
+            FacetOption(
+                value="uca", label=f"APC — {get_persons_perimeter_name(self.conn)}", count=r.apc_uca
+            ),
             FacetOption(value="other", label="APC — autres", count=r.apc_other),
             FacetOption(value="none", label="Sans APC", count=r.apc_none),
         ]
@@ -473,7 +479,7 @@ class _PublicationFacetsBuilder:
             {**binds, "inp_pid": self.filters.person_id},
         ).one()
         return [
-            FacetOption(value="yes", label="UCA", count=r.yes),
+            FacetOption(value="yes", label=get_persons_perimeter_name(self.conn), count=r.yes),
             FacetOption(value="no", label="Hors périmètre", count=r.no),
         ]
 

@@ -8,6 +8,7 @@ Les fonctions libres sont partagées par l'extraction, le pipeline et les adapte
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.perimeters_queries import (
+    InstitutionOut,
     PerimeterOut,
     PerimetersQueries,
     PerimeterStructureItem,
@@ -72,6 +73,15 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
     return list(row.root_structure_ids) if row.root_structure_ids else []
 
 
+def get_persons_perimeter_name(conn: Connection) -> str:
+    """Nom du périmètre des personnes, qui désigne l'établissement dans l'interface, ou son code s'il manque."""
+    code = _config_perimeter_code(conn, PERIMETER_PERSONS_KEY, "uca")
+    name = conn.execute(
+        text("SELECT name FROM perimeters WHERE code = :code"), {"code": code}
+    ).scalar_one_or_none()
+    return name or code
+
+
 # ── Adapter Pg* pour le port read_models ──────────────────────────
 
 
@@ -80,6 +90,12 @@ class PgPerimetersQueries(PerimetersQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def institution(self) -> InstitutionOut:
+        return InstitutionOut(
+            name=get_persons_perimeter_name(self._conn),
+            root_structure_ids=get_persons_perimeter_root_ids(self._conn),
+        )
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
         """Liste tous les périmètres avec leurs structures racines et le décompte de leur ensemble effectif, lu dans `perimeter_structures`."""

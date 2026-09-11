@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pageTitle, siteTitle } from '$lib/institution.svelte';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { auth } from '$lib/api';
@@ -23,12 +24,12 @@
 </script>
 
 <svelte:head>
-	<title>Connexion — Bibliométrie UCA</title>
+	<title>{pageTitle("Connexion")}</title>
 </svelte:head>
 
 <div class="login-wrapper">
 	<form class="login-card" onsubmit={handleLogin}>
-		<h1>Bibliométrie UCA</h1>
+		<h1>{siteTitle()}</h1>
 		<p class="login-subtitle">Accès administration</p>
 
 		{#if error}

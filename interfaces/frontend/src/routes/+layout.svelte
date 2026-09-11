@@ -7,8 +7,11 @@
   import type { Snippet } from "svelte";
   import { auth } from "$lib/api";
   import DialogHost from "$lib/components/DialogHost.svelte";
+  import { loadInstitution, siteTitle } from "$lib/institution.svelte";
 
   let { children }: { children: Snippet } = $props();
+
+  loadInstitution();
 
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
@@ -43,7 +46,7 @@
     <div class="site-brand">
       <img src="{base}/connectome.png" alt="" class="site-icon" />
       <h1 class="site-title">
-        Bibliométrie UCA <span class="site-title-admin">Admin</span>
+        {siteTitle()} <span class="site-title-admin">Admin</span>
       </h1>
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
@@ -77,7 +80,7 @@
   {:else}
     <div class="site-brand">
       <img src="{base}/favicon.png" alt="" class="site-icon" />
-      <h1 class="site-title">Bibliométrie UCA</h1>
+      <h1 class="site-title">{siteTitle()}</h1>
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
       <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}>Statistiques</a>

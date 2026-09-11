@@ -231,7 +231,10 @@ def list_publications(
                     'institution', ap.institution,
                     'lab_id', ap.lab_structure_id,
                     'lab_acronym', ls.acronym,
-                    'budget_structure_id', ap.budget_structure_id
+                    'budget_structure_id', ap.budget_structure_id,
+                    'in_perimeter', COALESCE(
+                        ap.budget_structure_id = ANY(CAST(:apc_perimeter_ids AS int[])), FALSE
+                    )
                  ))
                  FROM apc_payments ap
                  LEFT JOIN structures ls ON ls.id = ap.lab_structure_id
@@ -256,6 +259,7 @@ def list_publications(
             **binds,
             "focus_person": filters.person_id,
             "person_lab_a4": filters.person_id,
+            "apc_perimeter_ids": perimeter_structure_ids,
             "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
             "pg_limit": per_page,
             "pg_offset": offset,

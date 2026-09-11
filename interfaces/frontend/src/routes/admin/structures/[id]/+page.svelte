@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { onMount, onDestroy } from "svelte";
   import { base } from "$app/paths";
   import { goto } from "$app/navigation";
@@ -399,7 +400,7 @@
 </script>
 
 <svelte:head>
-  <title>Admin - Structure - Bibliométrie UCA</title>
+  <title>{pageTitle("Admin - Structure")}</title>
 </svelte:head>
 
 <p class="back-link"><a href="{base}/admin/structures">← Retour aux structures</a></p>

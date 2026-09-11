@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { onMount } from "svelte";
   import { api } from "$lib/api";
   import type { components } from "$lib/api/schema";
@@ -57,7 +58,7 @@
   });
 </script>
 
-<svelte:head><title>Pipeline — Bibliométrie UCA</title></svelte:head>
+<svelte:head><title>{pageTitle("Pipeline")}</title></svelte:head>
 
 <div class="page-header">
   <h2>Pipeline</h2>

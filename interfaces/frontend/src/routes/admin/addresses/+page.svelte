@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institution, loadInstitution, pageTitle } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
@@ -197,10 +198,10 @@
 		structures = grouped;
 	}
 
-	/** Structure de scope par défaut : UCA, sinon la première du premier type peuplé. */
+	/** Structure de scope par défaut : une racine du périmètre de l'établissement, sinon la première du premier type peuplé. */
 	function defaultStructureId(): number | null {
-		const uca = allStructures.find((s) => s.code === 'uca');
-		if (uca) return uca.id;
+		const root = allStructures.find((s) => institution.rootStructureIds.includes(s.id));
+		if (root) return root.id;
 		for (const type of ALLOWED_TYPES) {
 			if (structures[type]?.length) return structures[type][0].id;
 		}
@@ -437,7 +438,7 @@
 		structurePredicates = url.structurePredicates;
 		currentPage = url.p;
 
-		loadStructures().then(() => {
+		Promise.all([loadStructures(), loadInstitution()]).then(() => {
 			resolveScopeStructure();
 			loadStats();
 			loadAddresses();
@@ -446,7 +447,7 @@
 </script>
 
 <svelte:head>
-	<title>Admin - Adresses - Bibliométrie UCA</title>
+	<title>{pageTitle("Admin - Adresses")}</title>
 </svelte:head>
 
 <div class="page-addresses">

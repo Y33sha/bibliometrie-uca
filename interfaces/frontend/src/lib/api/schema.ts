@@ -1677,7 +1677,7 @@ export interface paths {
         };
         /**
          * Hal Affiliation Conflicts
-         * @description Publications affiliées UCA dans HAL mais pas dans une autre source.
+         * @description Publications affiliées à l'établissement dans HAL mais pas dans une autre source.
          */
         get: operations["hal_affiliation_conflicts_api_hal_problems_affiliation_conflicts_get"];
         put?: never;
@@ -1702,6 +1702,26 @@ export interface paths {
          *     Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
          */
         get: operations["list_config_api_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/institution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Institution
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         */
+        get: operations["institution_api_config_institution_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3286,6 +3306,16 @@ export interface components {
             status: string;
         };
         /**
+         * InstitutionOut
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         */
+        InstitutionOut: {
+            /** Name */
+            name: string;
+            /** Root Structure Ids */
+            root_structure_ids: number[];
+        };
+        /**
          * IntruderOccurrenceOut
          * @description Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form` est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif.
          */
@@ -4170,6 +4200,8 @@ export interface components {
             lab_acronym: string | null;
             /** Budget Structure Id */
             budget_structure_id: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
         };
         /** PubLabItem */
         PubLabItem: {
@@ -7929,6 +7961,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigItem"][];
+                };
+            };
+        };
+    };
+    institution_api_config_institution_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionOut"];
                 };
             };
         };

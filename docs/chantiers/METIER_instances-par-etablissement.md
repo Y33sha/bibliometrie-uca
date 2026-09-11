@@ -57,9 +57,10 @@ Obstacles :
 
 ### Phase 4 — Nom de l'établissement
 
-- [ ] Servir le nom du périmètre `perimeter_persons` au frontend par la lecture publique de la configuration.
-- [ ] Référencer ce nom dans les titres, les libellés du frontend et du backend, et le titre de l'API.
-- [ ] Remplacer la logique qui dépend de l'identifiant 169 et des codes `uca` et `alliance_uca`.
+- [x] Servir le nom du périmètre `perimeter_persons` au frontend par la lecture publique de la configuration (`GET /api/config/institution`).
+- [x] Référencer ce nom dans les titres et les libellés du frontend et du backend. Le titre de l'API vaut « Bibliométrie ».
+- [x] Remplacer la logique du frontend qui dépend de l'identifiant 169 et du code `uca`. Les lignes APC portent `in_perimeter`, calculé par l'API.
+- [ ] Trancher le sort des valeurs de repli `"uca"` et `"alliance_uca"`, appliquées quand `config` ne désigne aucun périmètre.
 
 ### Phase 5 — Seeds d'autres établissements
 

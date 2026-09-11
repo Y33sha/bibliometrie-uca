@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from '$lib/institution.svelte';
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
@@ -278,7 +279,7 @@
 </script>
 
 <svelte:head>
-  <title>Admin - Qualité détection - Bibliométrie UCA</title>
+  <title>{pageTitle("Admin - Qualité détection")}</title>
 </svelte:head>
 
 <svelte:window onclick={handleOutsideClick} />

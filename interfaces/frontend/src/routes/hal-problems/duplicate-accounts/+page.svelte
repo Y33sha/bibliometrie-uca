@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { page as pageStore } from "$app/stores";
@@ -43,7 +44,7 @@
 </script>
 
 <svelte:head>
-  <title>Doublons comptes HAL — Bibliométrie UCA</title>
+  <title>{pageTitle("Doublons comptes HAL")}</title>
 </svelte:head>
 
 <h1>Doublons d'auteurs HAL</h1>

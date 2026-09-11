@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
+from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
@@ -18,6 +19,7 @@ from interfaces.api.deps import (
     config_queries,
     config_repository,
     db_conn,
+    perimeters_queries,
 )
 from interfaces.api.models import ConfigValueUpdate
 
@@ -34,6 +36,12 @@ def list_config(
     Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
     """
     return queries.list_config(public_only=admin_user is None)
+
+
+@router.get("/institution", response_model=InstitutionOut)
+def institution(queries: PerimetersQueries = Depends(perimeters_queries)) -> InstitutionOut:
+    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes."""
+    return queries.institution()
 
 
 @router.put("/{key}", response_model=ConfigItem)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { api, auth } from "$lib/api";
@@ -72,7 +73,7 @@
       const entries = [hal, oa, wos, scanr].filter((x): x is SourceAuthorship => x !== null);
 
       let conflict = false;
-      // Conflit : auteur UCA dans une source mais absent d'une autre source présente
+      // Conflit : auteur du périmètre dans une source mais absent d'une autre source présente
       const ucaEntries = entries.filter((e) => e.in_perimeter);
       if (ucaEntries.length > 0) {
         if (hal === null && data.hal_authorships.length > 0) conflict = true;
@@ -85,7 +86,7 @@
         .filter((e) => e.person_id !== null)
         .map((e) => e.person_id!);
       if (new Set(personIds).size > 1) conflict = true;
-      // Conflit : auteur UCA résolu aligné avec auteur non résolu
+      // Conflit : auteur du périmètre résolu aligné avec auteur non résolu
       if (
         ucaEntries.some((e) => e.person_id !== null) &&
         entries.some((e) => e.person_id === null)
@@ -127,7 +128,7 @@
 </script>
 
 <svelte:head>
-  <title>{pub?.title ? pub.title.slice(0, 80) : "Publication"} — Bibliométrie UCA</title>
+  <title>{pageTitle(pub?.title ? pub.title.slice(0, 80) : "Publication")}</title>
 </svelte:head>
 
 {#if canGoBack}

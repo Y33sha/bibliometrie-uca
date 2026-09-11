@@ -103,6 +103,8 @@ class PubApcPayment(BaseModel):
     lab_id: int | None
     lab_acronym: str | None
     budget_structure_id: int | None
+    # Paiement sur le budget d'une structure du périmètre des personnes, même règle que le filtre `has_apc`.
+    in_perimeter: bool
 
 
 class PublicationListItem(BaseModel):

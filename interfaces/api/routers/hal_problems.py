@@ -83,5 +83,5 @@ def hal_affiliation_conflicts(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalAffiliationConflictsResponse:
-    """Publications affiliées UCA dans HAL mais pas dans une autre source."""
+    """Publications affiliées à l'établissement dans HAL mais pas dans une autre source."""
     return queries.hal_affiliation_conflicts(page=page, per_page=per_page)

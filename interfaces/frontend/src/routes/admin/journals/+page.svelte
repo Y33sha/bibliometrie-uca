@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
@@ -155,7 +156,7 @@
 	});
 </script>
 
-<svelte:head><title>Revues — Bibliométrie UCA</title></svelte:head>
+<svelte:head><title>{pageTitle("Revues")}</title></svelte:head>
 
 <h2>Revues</h2>
 

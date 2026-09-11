@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { api, ApiError, publishers as publishersApi } from '$lib/api';
@@ -113,7 +114,7 @@
 	});
 </script>
 
-<svelte:head><title>Éditeurs — Bibliométrie UCA</title></svelte:head>
+<svelte:head><title>{pageTitle("Éditeurs")}</title></svelte:head>
 
 <h2>Éditeurs</h2>
 

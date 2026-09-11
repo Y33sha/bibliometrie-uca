@@ -1,15 +1,16 @@
 <script lang="ts">
+	import { institution, pageTitle } from '$lib/institution.svelte';
 	import PublishersListView from '$lib/components/PublishersListView.svelte';
 </script>
 
 <svelte:head>
-	<title>Éditeurs — Bibliométrie UCA</title>
+	<title>{pageTitle("Éditeurs")}</title>
 </svelte:head>
 
 <h1>Éditeurs</h1>
 <p class="hint">
 	Liste des éditeurs des revues observées sur les publications du périmètre
-	UCA. Cliquer sur un éditeur pour explorer son portfolio de revues et ses
+	{institution.name}. Cliquer sur un éditeur pour explorer son portfolio de revues et ses
 	publications.
 </p>
 
