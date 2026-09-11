@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institution } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
 	import { autofocus } from '$lib/actions/focus';
 	import { page } from '$app/stores';
@@ -80,12 +81,12 @@
 		showHalStatusColumn?: boolean;
 		/** Affiche la colonne et la facet « Auteur correspondant ». */
 		showCorrespondingColumn?: boolean;
-		/** Affiche la facet « UCA » (in_perimeter). */
+		/** Affiche la facet du périmètre de l'établissement (in_perimeter). */
 		showPerimeterFacet?: boolean;
 		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
-		 *  - 'uca' : filtre par budget_structure_id === 169 (défaut)
+		 *  - 'uca' : paiements sur un budget du périmètre de l'établissement (défaut)
 		 *  - 'lab' : filtre par lab_id === externalFilters.labId
 		 *  - 'person-uca' : 'uca' + classe `apc-other` si !is_corresponding */
 		apcMode?: ApcMode;
@@ -446,7 +447,7 @@
 		{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 		{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
 		{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
-		{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
+		{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label={institution.name} options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
 		{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />{/if}
 		<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 		<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
@@ -540,11 +541,11 @@
 									</span>
 								{/if}
 							{:else}
-								{@const ucaApc = p.apc.filter(a => a.budget_structure_id === 169)}
+								{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
 								{@const isPersonNonCorr = apcMode === 'person-uca' && !p.is_corresponding}
 								{#if ucaApc.length > 0}
 									<span class="apc-tag" class:apc-other={isPersonNonCorr}
-										title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || 'UCA'})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+										title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
 										{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
 									</span>
 								{:else}

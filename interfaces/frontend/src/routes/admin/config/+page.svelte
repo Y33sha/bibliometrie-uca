@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { onMount } from "svelte";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { STRUCTURE_TYPES } from "$lib/structureTypes";
@@ -223,7 +224,7 @@
   onMount(load);
 </script>
 
-<svelte:head><title>Configuration — Bibliométrie UCA</title></svelte:head>
+<svelte:head><title>{pageTitle("Configuration")}</title></svelte:head>
 
 <h2>Configuration du pipeline</h2>
 <p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
@@ -371,7 +372,7 @@
 {#if perimModal}
   <Modal title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"} maxWidth="460px" onclose={() => (perimModal = null)}>
     <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: alliance_uca" /></label>
-    <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
+    <label>Nom <input bind:value={perimModal.name} placeholder="ex: périmètre élargi" /></label>
     <label for="perim-struct-search">Structures racines</label>
     <div class="perimeter-rules" style="margin: 4px 0 8px;">
       {#each perimModal.structures as struct (struct.id)}

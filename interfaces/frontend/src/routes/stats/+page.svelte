@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount, tick } from 'svelte';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
@@ -541,7 +542,7 @@
 </script>
 
 <svelte:head>
-	<title>Statistiques — Bibliométrie UCA</title>
+	<title>{pageTitle("Statistiques")}</title>
 </svelte:head>
 
 <div class="stats-page">

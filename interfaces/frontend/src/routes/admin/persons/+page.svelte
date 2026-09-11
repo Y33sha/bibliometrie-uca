@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { institution, pageTitle } from "$lib/institution.svelte";
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
@@ -542,7 +543,7 @@
 </script>
 
 <svelte:head>
-  <title>Admin - Personnes - Bibliom&eacute;trie UCA</title>
+  <title>{pageTitle("Admin - Personnes")}</title>
 </svelte:head>
 
 <nav class="hub-tabs">
@@ -603,7 +604,7 @@
 
 {#if orphanCount > 0}
   <a href="{base}/admin/orphan-authorships" class="orphan-link">
-    {orphanCount} authorship{orphanCount > 1 ? "s" : ""} UCA orpheline{orphanCount > 1
+    {orphanCount} authorship{orphanCount > 1 ? "s" : ""} {institution.name} orpheline{orphanCount > 1
       ? "s"
       : ""} (non reliée{orphanCount > 1 ? "s" : ""} à une personne)
   </a>
@@ -622,7 +623,7 @@
           >Publis{sortIndicator("signatures")}</th
         >
         <th class="sortable" onclick={() => toggleSort("in_perimeter_signatures")}
-          >UCA{sortIndicator("in_perimeter_signatures")}</th
+          >{institution.name}{sortIndicator("in_perimeter_signatures")}</th
         >
       </tr>
     </thead>

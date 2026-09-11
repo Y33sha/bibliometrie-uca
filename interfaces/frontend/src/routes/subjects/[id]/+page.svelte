@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
@@ -59,7 +60,7 @@
 </script>
 
 <svelte:head>
-  <title>{data?.subject.label ?? "Sujet"} — Bibliométrie UCA</title>
+  <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
 </svelte:head>
 
 <a href="{base}/subjects" class="back">← Retour à la liste</a>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pageTitle } from '$lib/institution.svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -162,7 +163,7 @@
 </script>
 
 <svelte:head>
-	<title>{displayName || 'Personne'} — Bibliométrie UCA</title>
+	<title>{pageTitle(displayName || 'Personne')}</title>
 </svelte:head>
 
 {#if canGoBack}

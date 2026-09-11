@@ -8,6 +8,7 @@ from application.ports.read_models._common import FacetOption
 from application.ports.read_models.stats_queries import StatsFacetsResponse, StatsFilters
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import WhereClause, assemble_where
+from infrastructure.read_models.perimeters import get_persons_perimeter_name
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 
 
@@ -123,7 +124,14 @@ def stats_facets(
     apc_row = conn.execute(text(sqls["apc"][0]), sqls["apc"][1]).one()
     doc_type_rows = conn.execute(text(sqls["doc_type"][0]), sqls["doc_type"][1]).all()
 
-    return _build_facets_result(year_rows, lab_rows, oa_rows, apc_row, doc_type_rows)
+    return _build_facets_result(
+        year_rows,
+        lab_rows,
+        oa_rows,
+        apc_row,
+        doc_type_rows,
+        institution=get_persons_perimeter_name(conn),
+    )
 
 
 def _build_facets_result(
@@ -132,6 +140,8 @@ def _build_facets_result(
     oa_rows: Sequence[Row[tuple[object, ...]]],
     apc_row: Row[tuple[object, ...]],
     doc_type_rows: Sequence[Row[tuple[object, ...]]],
+    *,
+    institution: str,
 ) -> StatsFacetsResponse:
     return StatsFacetsResponse(
         years=[FacetOption(value=str(r.pub_year), count=r.n) for r in year_rows],
@@ -139,8 +149,10 @@ def _build_facets_result(
         oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
         doc_types=[FacetOption(value=r.value, count=r.n) for r in doc_type_rows],
         apc=[
-            FacetOption(value="uca", label="APC UCA", count=apc_row.apc_uca),
-            FacetOption(value="non_uca", label="APC hors UCA", count=apc_row.apc_non_uca),
+            FacetOption(value="uca", label=f"APC {institution}", count=apc_row.apc_uca),
+            FacetOption(
+                value="non_uca", label=f"APC hors {institution}", count=apc_row.apc_non_uca
+            ),
             FacetOption(value="none", label="Sans APC", count=apc_row.apc_none),
         ],
     )

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pageTitle } from "$lib/institution.svelte";
   import { onMount } from "svelte";
   import { autofocus } from "$lib/actions/focus";
   import { base } from "$app/paths";
@@ -56,7 +57,7 @@
 </script>
 
 <svelte:head>
-  <title>Sujets — Bibliométrie UCA</title>
+  <title>{pageTitle("Sujets")}</title>
 </svelte:head>
 
 <h1>Sujets</h1>

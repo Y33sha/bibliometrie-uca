@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { institution, pageTitle } from '$lib/institution.svelte';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { page as pageStore } from '$app/stores';
@@ -72,13 +73,13 @@
 </script>
 
 <svelte:head>
-	<title>Manques collections HAL — Bibliométrie UCA</title>
+	<title>{pageTitle("Manques collections HAL")}</title>
 </svelte:head>
 
 <h1>Manques collections HAL</h1>
 
 <div class="info-box">
-	Publications présentes dans OpenAlex ou WoS avec signature d'un labo UCA, et présentes dans HAL mais absentes de la collection HAL de ce labo.
+	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
 </div>
 
 <div class="toolbar">

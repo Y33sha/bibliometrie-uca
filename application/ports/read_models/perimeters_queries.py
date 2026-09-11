@@ -1,4 +1,4 @@
-"""Port : lectures sur les périmètres pour le router /api/perimeters/.
+"""Port : lectures sur les périmètres et l'établissement servi par l'instance.
 
 Implémenté par `infrastructure.read_models.perimeters.PgPerimetersQueries`.
 """
@@ -26,7 +26,16 @@ class PerimeterOut(BaseModel):
     structure_count: int
 
 
+class InstitutionOut(BaseModel):
+    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes."""
+
+    name: str
+    root_structure_ids: list[int]
+
+
 class PerimetersQueries(Protocol):
-    """Lectures pour /api/perimeters."""
+    """Lectures sur les périmètres et l'établissement servi par l'instance."""
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]: ...
+
+    def institution(self) -> InstitutionOut: ...

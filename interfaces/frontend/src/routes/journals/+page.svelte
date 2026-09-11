@@ -1,14 +1,15 @@
 <script lang="ts">
+	import { institution, pageTitle } from '$lib/institution.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
 </script>
 
 <svelte:head>
-	<title>Revues — Bibliométrie UCA</title>
+	<title>{pageTitle("Revues")}</title>
 </svelte:head>
 
 <h1>Revues</h1>
 <p class="hint">
-	Liste des revues observées sur les publications du périmètre UCA. Cliquer
+	Liste des revues observées sur les publications du périmètre {institution.name}. Cliquer
 	sur une revue pour explorer ses publications, sa répartition par type/OA
 	et ses données DOAJ.
 </p>

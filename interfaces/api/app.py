@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # surface d'API, admin comprise. Activées en développement, absentes en production.
 _expose_docs = settings.expose_api_docs
 app = FastAPI(
-    title="Bibliométrie UCA",
+    title="Bibliométrie",
     lifespan=lifespan,
     root_path=os.environ.get("ROOT_PATH", ""),
     docs_url="/docs" if _expose_docs else None,
