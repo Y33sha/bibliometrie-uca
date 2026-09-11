@@ -19,11 +19,20 @@ const basePath = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
 // vers un backend qui n'est pas celui du projet.
 // Le conteneur frontend ne reçoit que `interfaces/frontend` : le `.env` racine y est
 // absent, et la variable que docker-compose injecte (`http://backend:8000`) s'applique.
-const apiTarget = fileEnv.API_TARGET || process.env.API_TARGET || 'http://127.0.0.1:8000';
+// Sans `API_TARGET`, la cible se déduit de `API_PORT`, port de l'API lancée par `start.sh`
+// (8000 par défaut, comme dans `infrastructure/settings.py`).
+const apiPort = fileEnv.API_PORT ?? process.env.API_PORT ?? '8000';
+const apiTarget = fileEnv.API_TARGET || process.env.API_TARGET || `http://127.0.0.1:${apiPort}`;
+
+// `FRONT_PORT` : port du serveur vite. Un port occupé est une erreur (`strictPort`) : vite en
+// prendrait sinon un autre, et l'adresse de l'instance changerait.
+const frontPort = Number(fileEnv.FRONT_PORT ?? process.env.FRONT_PORT ?? 5173);
 
 export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
+		port: frontPort,
+		strictPort: true,
 		proxy: {
 			[`${basePath}/api`]: {
 				target: apiTarget,

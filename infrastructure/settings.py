@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # l'API elle-même (même origine).
     cors_origins: Annotated[list[str], NoDecode] = []
 
+    # ----- Serveur de développement -----
+    # Port d'écoute de l'API lancée par `start.sh`. Le proxy de vite en déduit sa cible, avec le
+    # même défaut (cf. `interfaces/frontend/vite.config.ts`).
+    api_port: int = 8000
+
     # ----- Base de données -----
     db_host: str = "localhost"
     db_port: int = 5432
