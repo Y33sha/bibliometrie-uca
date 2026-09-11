@@ -15,7 +15,9 @@ from alembic.command import upgrade
 from alembic.config import Config
 
 from infrastructure import INSTANCE_ENV_FILE, PROJECT_ROOT
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.settings import settings
 from interfaces.cli.dev.pg_tools import owner_connection_args, owner_env, resolve_pg_tool
 
@@ -85,6 +87,9 @@ def main() -> None:
     _migrate()
     for script in (_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed):
         _run_psql(script)
+    # Les lectures de l'API passent par la clôture matérialisée des périmètres du seed.
+    with get_sync_engine().begin() as conn:
+        refresh_perimeter_structures(conn)
     log.info("Instance %s créée sur la base %s", seed.parent.name, settings.db_name)
 
 
