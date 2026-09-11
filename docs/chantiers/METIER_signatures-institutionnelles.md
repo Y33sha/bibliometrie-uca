@@ -47,7 +47,7 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 
 ### Phase 2 — Typologie des erreurs de signature
 
-- [ ] Inventorier les cas d'erreur observés (adresse mal rattachée, signature attendue absente, etc.).
+- [ ] Inventorier les cas d'erreur observés (omission d'un élément, forme erronée d'un élément, ordre non respecté, élément superflu...).
 - [ ] Qualifier chaque type par son caractère bloquant ou non.
 
 ### Phase 3 — Métrique de justesse
