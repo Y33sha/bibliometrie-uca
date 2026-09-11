@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import httpx2
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.hal import (
     HalFetchMissingAdapter,
@@ -32,12 +32,12 @@ HAL_MAX_CONCURRENT = 5
 
 def insert_staging_hal(
     conn: Connection, hal_id: str, doi: str | None, doc: Mapping[str, JsonValue]
-) -> None:
-    """Insère un document dans staging HAL.
+) -> bool:
+    """Insère un document dans staging HAL. Retourne True sur une insertion, False quand la ligne existait.
 
     Si le document existe et a changé (hash différent), met à jour et remet `processed = FALSE`.
     """
-    upsert_staging(
+    inserted, _ = upsert_staging(
         conn,
         source="hal",
         source_id=hal_id,
@@ -45,6 +45,7 @@ def insert_staging_hal(
         raw_data=doc,
         entry_mode="fetch_missing_hal",
     )
+    return inserted
 
 
 class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
@@ -116,11 +117,5 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         hal_id = as_str(doc.get("halId_s"))
         if not hal_id:
             return NntInsertResult(api_found=True, inserted=False)
-        exists = conn.execute(
-            text("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = :id"),
-            {"id": hal_id},
-        ).first()
-        if exists:
-            return NntInsertResult(api_found=True, inserted=False)
-        insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
-        return NntInsertResult(api_found=True, inserted=True)
+        inserted = insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
+        return NntInsertResult(api_found=True, inserted=inserted)
