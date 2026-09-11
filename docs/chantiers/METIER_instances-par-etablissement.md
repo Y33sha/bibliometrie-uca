@@ -64,8 +64,10 @@ Obstacles :
 
 ### Phase 5 — Seeds d'autres établissements
 
-- [ ] Générer le seed d'un établissement à partir de ROR (structures filles), du référentiel des structures HAL et des identifiants d'institution OpenAlex. Les formes de noms de départ viennent des noms et des acronymes.
-- [ ] Seeds Université de Lorraine et Nantes Université dans `instances/`.
+- [x] Générer le seed d'un établissement à partir de ROR (structures filles) et de l'identifiant d'institution OpenAlex (`interfaces/cli/dev/seed_from_ror.py`). Les formes de noms de départ viennent des noms, alias et acronymes.
+- [ ] Compléter le seed avec les collections HAL, absentes de ROR. Sans collection, l'extraction HAL est sautée.
+- [x] Seed Université de Lorraine dans `instances/lorraine/`.
+- [ ] Seed Nantes Université dans `instances/`.
 - [ ] Faire tourner le pipeline sur chaque instance et examiner le résultat dans l'interface.
 
 ### Phase 6 — Valeurs de filtre

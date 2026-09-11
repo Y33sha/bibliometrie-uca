@@ -19,6 +19,7 @@ API_BASE_URLS: dict[str, str] = {
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",
+    "openalex_institutions": "https://api.openalex.org/institutions",
     "unpaywall": "https://api.unpaywall.org/v2",
     # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
     "doaj": "https://doaj.org/api",
