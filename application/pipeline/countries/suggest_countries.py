@@ -16,7 +16,7 @@ from collections.abc import Iterable, Sequence
 import ahocorasick
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import attente
 from application.ports.pipeline.countries import CountryQueries
@@ -84,7 +84,7 @@ def run(
     counts = queries.count_suggest_eligible(conn)
     total = counts.eligible + (counts.empty_attempted if retry_empty else 0)
     if total == 0:
-        logger.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(logger)
         return PhaseMetrics()
 
     processed = 0

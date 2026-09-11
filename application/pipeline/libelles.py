@@ -47,6 +47,11 @@ def etape(logger: ScopedOrPlainLogger, titre: str, *args: object) -> None:
     logger.info(ligne, *args)
 
 
+def rien_a_faire(logger: ScopedOrPlainLogger) -> None:
+    """Ferme une sous-étape qui n'a rien à traiter."""
+    logger.info("%sRien à faire", DERNIERE_BRANCHE)
+
+
 def forme(n: int, singulier: str, pluriel: str | None = None) -> str:
     """Rend « préfixe » ou « préfixes » selon `n`. Zéro prend le singulier, comme le veut le français.
 
@@ -71,4 +76,5 @@ __all__ = [
     "branche_de_source",
     "etape",
     "forme",
+    "rien_a_faire",
 ]

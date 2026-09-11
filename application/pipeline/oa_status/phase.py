@@ -13,7 +13,14 @@ from collections.abc import Awaitable, Callable
 import httpx2
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import (
+    BRANCHE,
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.oa_status import OaStatusQueries
@@ -90,7 +97,7 @@ async def run(
 
     etape(logger, "Vérification du statut open access sur Unpaywall")
     if not total:
-        logger.info("%sRien à faire", DERNIERE_BRANCHE)
+        rien_a_faire(logger)
         return _result()
 
     logger.info(
