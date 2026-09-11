@@ -1,20 +1,18 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
-import { config as loadEnv } from 'dotenv';
-import { fileURLToPath } from 'node:url';
+import { loadProjectEnv } from './project-env.js';
 
-// Lit le `.env` racine (cf. svelte.config.js) sans polluer `process.env` : le fichier
-// fait autorité sur les deux variables consommées ici, sans que leur valeur fuite vers
+// Fichiers d'environnement du projet (cf. project-env.js), lus sans polluer `process.env` :
+// ils font autorité sur les deux variables consommées ici, sans que leur valeur fuite vers
 // les processus enfants.
-const fileEnv =
-	loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), quiet: true }).parsed ?? {};
+const fileEnv = loadProjectEnv();
 
-// `BASE_PATH` : préfixe de déploiement, le `.env` fait autorité (cf. svelte.config.js).
+// `BASE_PATH` : préfixe de déploiement, les fichiers font autorité (cf. svelte.config.js).
 // Doit matcher `paths.base` dans svelte.config.js. Vide par défaut (app à la racine) ;
 // en dev, vite strip ce préfixe avant de proxyfier vers le backend.
 const basePath = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
 
-// `API_TARGET` : cible du proxy, le `.env` fait autorité comme pour `BASE_PATH`. Un
+// `API_TARGET` : cible du proxy, les fichiers font autorité comme pour `BASE_PATH`. Un
 // environnement peut en porter une valeur périmée — VSCode injecte le `.env` dans ses
 // terminaux et un terminal ouvert avant une modification du fichier en garde l'état
 // antérieur —, qui masquerait en silence la valeur du fichier et dirigerait le proxy
@@ -34,6 +32,6 @@ export default defineConfig({
 		}
 	},
 	test: {
-		include: ['src/**/*.test.ts'],
+		include: ['src/**/*.test.ts', 'project-env.test.ts'],
 	}
 });

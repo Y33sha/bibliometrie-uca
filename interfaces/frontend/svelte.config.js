@@ -1,26 +1,20 @@
 import adapter from '@sveltejs/adapter-static';
-import { config as loadEnv } from 'dotenv';
-import { fileURLToPath } from 'node:url';
+import { loadProjectEnv } from './project-env.js';
 
-// Source unique de configuration : le `.env` racine, déjà lu par le backend
-// (python-dotenv) et docker-compose. On le charge ici aussi pour que `BASE_PATH`
-// pilote le préfixe en dev (`npm run dev`) sans variable de shell ni argument.
-// `override: true` : le `.env` fait autorité, même si l'environnement injecte
-// déjà `BASE_PATH` (cas de l'extension Python `useEnvFile`, dont la valeur est
-// par ailleurs corrompue par la conversion de chemin POSIX→Windows de Git Bash).
-// `quiet` : le chargeur écrit sinon dans la sortie des messages promotionnels pour des services tiers, qui varient d'une exécution à l'autre et brouillent les journaux d'intégration.
-loadEnv({
-	path: fileURLToPath(new URL('../../.env', import.meta.url)),
-	override: true,
-	quiet: true
-});
+// Source unique de configuration : les fichiers d'environnement du projet (cf.
+// project-env.js), déjà lus par le backend et docker-compose. `BASE_PATH` pilote
+// ainsi le préfixe en dev (`npm run dev`) sans variable de shell ni argument.
+// Les fichiers font autorité, même si l'environnement injecte déjà `BASE_PATH`
+// (cas de l'extension Python `useEnvFile`, dont la valeur est par ailleurs
+// corrompue par la conversion de chemin POSIX→Windows de Git Bash).
+const fileEnv = loadProjectEnv();
 
 // `BASE_PATH` : préfixe de déploiement (cf. ROOT_PATH côté backend).
 // Vide par défaut → app servie à la racine (cas du dépôt cloné lancé via
 // `docker compose`). Définir un sous-chemin (ex. `/bibliometrie`) pour un
 // déploiement derrière un reverse-proxy. Lu au build ; à exporter avant
 // `npm run build` ou `npm run dev`.
-const basePathBrut = process.env.BASE_PATH ?? '';
+const basePathBrut = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
 if (basePathBrut !== '' && !basePathBrut.startsWith('/')) {
 	throw new Error(`BASE_PATH est vide ou commence par « / » ; reçu : « ${basePathBrut} »`);
 }
