@@ -59,15 +59,15 @@ Puis :
 
 ### 3. Vocabulaire
 
-- [ ] Établir le lexique : un mot par notion, en langue courante, pour les objets que le journal nomme — document moissonné, publication, signature, personne, structure.
-- [ ] Réécrire les messages de chaque phase avec ce lexique.
-- [ ] Dire ce que chaque phase produit à son ouverture, en une ligne lisible sans connaître le schéma.
+- [x] Établir le lexique : un mot par notion, en langue courante, pour les objets que le journal nomme — document moissonné, publication, signature, personne, structure.
+- [x] Réécrire les messages de chaque phase avec ce lexique.
+- [x] Dire ce que chaque phase produit à son ouverture, en une ligne lisible sans connaître le schéma.
 
 ### 4. Conventions
 
-- [ ] Trancher la numérotation des sous-étapes : partout ou nulle part.
-- [ ] Uniformiser la forme du début de phase, de la fin de phase et du bilan.
-- [ ] Vérifier que toutes les phases s'y tiennent.
+- [x] Trancher la numérotation des sous-étapes : partout ou nulle part.
+- [x] Uniformiser la forme du début de phase, de la fin de phase et du bilan.
+- [x] Vérifier que toutes les phases s'y tiennent.
 
 ## Questions ouvertes
 

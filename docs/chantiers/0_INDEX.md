@@ -11,7 +11,6 @@
 ### Non commencé
 
 - [Instances par établissement](METIER_instances-par-etablissement.md)
-- [Journal du pipeline](CODE_logs-du-pipeline.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
 - 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
 - 2026-07-25 — [Vocabulaires fermés : StrEnum plutôt que Literal / chaînes](archived/2026-07-25_CODE_vocabulaires-fermes-strenum.md)
