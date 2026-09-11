@@ -8,6 +8,7 @@ exécution synchrone déterministe.
 import logging
 
 from application.pipeline.fetch_missing import phase
+from application.pipeline.libelles import DERNIERE_BRANCHE
 from application.pipeline.metrics import PhaseMetrics
 
 _LOG = logging.getLogger("test")
@@ -54,6 +55,45 @@ def test_nnt_channel_only_in_full_mode():
     )
 
     assert calls == ["id"]  # NNT réservé au mode full
+
+
+def _run_doi_only(fetch_doi_one, caplog) -> str:
+    """Joue la seule recherche par DOI (HAL hors du filtre `sources`) et rend le journal."""
+    with caplog.at_level(logging.INFO, logger=_LOG.name):
+        phase.run(
+            mode="daily",
+            sources={"openalex", "scanr"},
+            include_wos=False,
+            fetch_hal_by_id=PhaseMetrics,
+            fetch_hal_by_nnt=PhaseMetrics,
+            fetch_doi_one=fetch_doi_one,
+            run_parallel=_sync_run_parallel,
+            credentials_missing=lambda source: None,
+            logger=_LOG,
+        )
+    return caplog.text
+
+
+def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(caplog):
+    journal = _run_doi_only(lambda source: PhaseMetrics(), caplog)
+    assert f"{DERNIERE_BRANCHE}Rien à faire" in journal
+
+
+def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(caplog):
+    journal = _run_doi_only(
+        lambda source: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(), caplog
+    )
+    assert "Rien à faire" not in journal
+
+
+def test_une_source_indisponible_n_est_pas_un_rien_a_faire(caplog):
+    indisponible = PhaseMetrics(
+        signals=[{"level": "warning", "code": "source_unavailable", "message": "openalex"}]
+    )
+    journal = _run_doi_only(
+        lambda source: indisponible if source == "openalex" else PhaseMetrics(), caplog
+    )
+    assert "Rien à faire" not in journal
 
 
 def test_hal_skipped_when_sources_excludes_it():
