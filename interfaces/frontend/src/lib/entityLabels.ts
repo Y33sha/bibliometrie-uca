@@ -1,5 +1,5 @@
 /**
- * Libellés des éditeurs, des revues et des personnes, par identifiant. Un libellé connu par ailleurs (option choisie dans une facette) est retenu ; les autres sont lus sur `/api/entity-labels`, qui rend `null` pour une entité introuvable.
+ * Libellés des éditeurs, des revues, des personnes et des sujets, par identifiant. Un libellé connu par ailleurs (option choisie dans une facette) est retenu ; les autres sont lus sur `/api/entity-labels`, qui rend `null` pour une entité introuvable.
  */
 import { api } from '$lib/api';
 import type { components } from '$lib/api/schema';
@@ -7,7 +7,7 @@ import { titleCase } from '$lib/utils';
 
 type EntityLabelResponse = components['schemas']['EntityLabelResponse'];
 
-export type EntityKind = 'publisher' | 'journal' | 'person';
+export type EntityKind = 'publisher' | 'journal' | 'person' | 'subject';
 
 /** Libellé affiché. Un nom de personne passe par `titleCase`, certains étant enregistrés en majuscules. */
 export function displayEntityLabel(kind: EntityKind, label: string): string {

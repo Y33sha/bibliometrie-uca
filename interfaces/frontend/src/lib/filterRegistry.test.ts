@@ -12,6 +12,7 @@ import {
 	isShown,
 	presenceSummary,
 	restoreValues,
+	summarizeParts,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -72,6 +73,15 @@ const journal: EntityChoiceFilter = {
 	group: 'Revue et éditeur',
 	showColumns: ['journal'],
 };
+const subjects: EntityChoiceFilter = {
+	key: 'subjects',
+	control: 'entity',
+	label: 'Sujets',
+	param: 'subject_id',
+	entity: 'subject',
+	multiple: true,
+	group: 'Sujets',
+};
 const sources: PresenceFilter = {
 	key: 'sources',
 	control: 'presence',
@@ -84,7 +94,7 @@ const sources: PresenceFilter = {
 		{ key: 'oa', label: 'OpenAlex' },
 	],
 };
-const FILTERS: ListFilter[] = [years, types, labs, perimeter, journal, sources];
+const FILTERS: ListFilter[] = [years, types, labs, perimeter, journal, subjects, sources];
 
 describe('filterRegistry', () => {
 	beforeEach(() => {
@@ -95,13 +105,15 @@ describe('filterRegistry', () => {
 	it('écrit dans la requête les seuls filtres qui filtrent', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.years = ['2024', '2023'];
-		values.entity.journal = '12';
+		values.entity.journal = ['12'];
+		values.entity.subjects = ['3', '5'];
 		values.presence.sources = { hal: 'yes', wos: 'no', oa: 'all' };
 		const params = new URLSearchParams();
 		appendFilterParams(FILTERS, values, params);
 		expect(Object.fromEntries(params)).toEqual({
 			year: '2024,2023',
 			journal_id: '12',
+			subject_id: '3,5',
 			source_filter: 'hal_yes,wos_no',
 		});
 	});
@@ -129,6 +141,7 @@ describe('filterRegistry', () => {
 		expect(groups.map((g) => [g.label, g.filters.map((f) => f.key)])).toEqual([
 			['Auteurs', ['perimeter', 'sources']],
 			['Revue et éditeur', ['journal']],
+			['Sujets', ['subjects']],
 		]);
 	});
 
@@ -136,23 +149,28 @@ describe('filterRegistry', () => {
 		const defs = urlFilterDefs(FILTERS);
 		expect(defs.types).toEqual({ type: 'single', urlKey: 'doc_type', defaultValue: 'article' });
 		expect(defs.years).toEqual({ type: 'string_array', urlKey: 'year' });
-		expect(defs.journal).toEqual({ type: 'single', urlKey: 'journal_id' });
+		expect(defs.journal).toEqual({ type: 'string_array', urlKey: 'journal_id' });
 		expect(defs.sources).toEqual({ type: 'source_states', urlKey: 'source_filter' });
 
 		const values = initialValues(FILTERS);
 		expect(urlState(FILTERS, values).types).toBe('all');
 
-		restoreValues(FILTERS, { types: 'all', years: ['2024'], journal: '12', sources: { hal: 'no' } }, values);
+		restoreValues(
+			FILTERS,
+			{ types: 'all', years: ['2024'], journal: ['12'], subjects: ['3', '5'], sources: { hal: 'no' } },
+			values,
+		);
 		expect(values.checkbox.types).toEqual([]);
 		expect(values.checkbox.years).toEqual(['2024']);
-		expect(values.entity.journal).toBe('12');
+		expect(values.entity.journal).toEqual(['12']);
+		expect(values.entity.subjects).toEqual(['3', '5']);
 		expect(values.presence.sources).toEqual({ hal: 'no' });
 	});
 
 	it('vide la sélection de chaque type de filtre', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.years = ['2024'];
-		values.entity.journal = '12';
+		values.entity.journal = ['12'];
 		values.presence.sources = { hal: 'yes' };
 		for (const f of FILTERS) clearValue(f, values);
 		expect(values).toEqual(initialValues(FILTERS));
@@ -165,7 +183,7 @@ describe('filterRegistry', () => {
 	it('rend les colonnes des filtres actifs proposés dans la page', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.types = ['article'];
-		values.entity.journal = '12';
+		values.entity.journal = ['12'];
 		values.checkbox.perimeter = ['yes'];
 		perimeterEnabled = false;
 		expect(activeColumns(FILTERS, values).sort()).toEqual(['journal', 'type']);
@@ -183,7 +201,7 @@ describe('filterRegistry', () => {
 		];
 		expect(checkboxSummary(types, ['article', 'book', 'thesis'], options)).toBe('Publications, Thèses');
 		expect(checkboxSummary(types, ['article'], options)).toBe('Articles');
-		expect(checkboxSummary(years, ['2024', '2023', '2022', '2021'], [])).toBe('2024, 2023 +2');
+		expect(summarizeParts(['2024', '2023', '2022', '2021'])).toBe('2024, 2023 +2');
 	});
 
 	it('résume un filtre de présence', () => {

@@ -91,7 +91,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         publisher_id_clause(filters.publisher_id),
         journal_id_clause(filters.journal_id),
         country_clause(filters.country_values),
-        subject_clause(filters.subject_id),
+        subject_clause(filters.subject_ids),
         author_clause(filters.author_id),
     ]
     return out

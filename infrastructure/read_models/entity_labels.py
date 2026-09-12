@@ -1,4 +1,4 @@
-"""Résolution id → libellé d'une entité à forte cardinalité (revue, éditeur, personne).
+"""Résolution id → libellé d'une entité à forte cardinalité (revue, éditeur, personne, sujet).
 
 Lookup sans contexte : le libellé d'une entité est le même partout. Sert à réafficher la pastille d'une facette d'entité quand seule l'identité (l'id) est connue — typiquement au rechargement d'une page dont l'URL ne porte que l'id. Une sélection se mémorise par son id ; le libellé en est dérivé et relu ici à la demande.
 """

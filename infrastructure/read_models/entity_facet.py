@@ -1,4 +1,4 @@
-"""Facette d'entité à forte cardinalité (éditeur, revue, auteur), commune à la liste des publications et au tableau de bord.
+"""Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet), commune à la liste des publications et au tableau de bord.
 
 Rend les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte. Une recherche par nom borne la requête.
 """
@@ -18,11 +18,11 @@ class EntitySql(NamedTuple):
     table: str
     id: str
     label: str
-    # Jointure depuis `publications p` : une ligne par couple publication–entité.
+    # Jointure depuis `publications p` vers l'entité.
     join: str
 
 
-# La revue sort de `publications.journal_id`, l'éditeur de la revue. L'auteur passe par `authorships`, unique par couple publication–personne ; une personne rejetée n'est pas proposée.
+# La revue sort de `publications.journal_id`, l'éditeur de la revue. L'auteur passe par `authorships` ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "journal": EntitySql(
         table="journals j",
@@ -45,6 +45,15 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
             "JOIN persons pe ON pe.id = au.person_id AND pe.rejected IS NOT TRUE"
         ),
     ),
+    "subject": EntitySql(
+        table="subjects s",
+        id="s.id",
+        label="s.label",
+        join=(
+            "JOIN publication_subjects ps ON ps.publication_id = p.id "
+            "JOIN subjects s ON s.id = ps.subject_id"
+        ),
+    ),
 }
 
 
@@ -59,7 +68,7 @@ def entity_facet_rows(
 ) -> list[EntityFacetItem]:
     """Entités `kind` les plus représentées parmi les publications `p` qui satisfont `where_sql`.
 
-    La jointure de l'entité rend une ligne par couple publication–entité. `COUNT(*)` par entité égale donc le nombre de publications distinctes, pourvu que `where_sql` se compose de filtres scalaires ou en `EXISTS`. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
+    Le décompte porte sur les publications distinctes : la jointure d'un sujet rend une ligne par source. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
     """
     sql = ENTITY_SQL[kind]
     params = dict(binds)
@@ -71,7 +80,7 @@ def entity_facet_rows(
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""
-            SELECT {sql.id} AS id, {sql.label} AS label, COUNT(*) AS n
+            SELECT {sql.id} AS id, {sql.label} AS label, COUNT(DISTINCT p.id) AS n
             FROM publications p
             {sql.join}
             WHERE {where_sql}{name_filter}

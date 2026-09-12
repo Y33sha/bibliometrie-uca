@@ -443,13 +443,14 @@ def country_clause(country_values: list[str]) -> WhereClause | None:
     )
 
 
-def subject_clause(subject_id: int | None) -> WhereClause | None:
-    if not subject_id:
+def subject_clause(subject_ids: list[int]) -> WhereClause | None:
+    """Filtre : la publication porte au moins un des sujets."""
+    if not subject_ids:
         return None
     return WhereClause(
         "EXISTS (SELECT 1 FROM publication_subjects ps "
-        "WHERE ps.publication_id = p.id AND ps.subject_id = :flt_subject_id)",
-        {"flt_subject_id": subject_id},
+        "WHERE ps.publication_id = p.id AND ps.subject_id = ANY(CAST(:flt_subject_ids AS int[])))",
+        {"flt_subject_ids": subject_ids},
     )
 
 
