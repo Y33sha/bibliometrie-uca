@@ -50,9 +50,21 @@ APC_ORIGINS_NEEDING_LAB: frozenset[str] = frozenset({"this_lab", "other_uca"})
 
 # Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles
 # paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le
-# titre et les liens paraissent quoi qu'il arrive, et l'éditeur suit la visibilité de la revue.
+# titre et les liens paraissent quoi qu'il arrive.
 EXPORT_COLUMNS: frozenset[str] = frozenset(
-    {"type", "year", "title", "journal", "labs", "corr", "apc", "oa", "oa_status", "links"}
+    {
+        "type",
+        "year",
+        "title",
+        "journal",
+        "publisher",
+        "labs",
+        "corr",
+        "apc",
+        "oa",
+        "oa_status",
+        "links",
+    }
 )
 
 
