@@ -24,7 +24,7 @@
       <div class="detail-sublabel">Mots-clés libres</div>
       <div class="detail-tags">
         {#each keywords as kw (kw)}
-          <span class="free-keyword">{kw}</span>
+          <span class="detail-tag free-keyword">{kw}</span>
         {/each}
       </div>
     {/if}
@@ -32,7 +32,11 @@
 {/if}
 
 <style>
-  .free-keyword {
+  /* Mot-clé libre : même pastille que les sujets, en contour et sans lien, car hors du référentiel des sujets. Le padding compense la bordure pour garder la même hauteur. */
+  .detail-tags .free-keyword {
+    padding: 2px 9px;
+    border: 1px solid var(--border);
+    background: transparent;
     color: var(--muted);
   }
 </style>
