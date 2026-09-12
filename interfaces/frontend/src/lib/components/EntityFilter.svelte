@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
 	import type { components } from '$lib/api/schema';
-	import { entityLabel, rememberEntityLabel, type EntityKind } from '$lib/entityLabels';
+	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '$lib/entityLabels';
 
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
@@ -62,7 +62,7 @@
 		if (query.trim().length >= 2) p.set('entity_search', query.trim());
 		try {
 			const data = await api<EntityFacetResponse>(`${endpoint}/entities?` + p);
-			results = data.entities.map((e) => ({ value: String(e.id), text: e.label, count: e.count }));
+			results = data.entities.map((e) => ({ value: String(e.id), text: displayEntityLabel(kind, e.label), count: e.count }));
 		} catch {
 			results = [];
 		}
