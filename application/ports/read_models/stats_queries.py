@@ -8,7 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.read_models._common import EntityFacetResponse, FacetOption
+from application.ports.read_models._common import EntityFacetResponse, EntityKind, FacetOption
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +96,7 @@ class StatsQueries(Protocol):
     def stats_entity_facet(
         self,
         *,
-        kind: Literal["publisher", "journal"],
+        kind: EntityKind,
         search: str,
         filters: StatsFilters,
     ) -> EntityFacetResponse: ...

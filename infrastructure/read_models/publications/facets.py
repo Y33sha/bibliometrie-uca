@@ -10,7 +10,12 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models._common import EntityFacetItem, FacetOption, YesNoCount
+from application.ports.read_models._common import (
+    EntityFacetItem,
+    EntityKind,
+    FacetOption,
+    YesNoCount,
+)
 from application.ports.read_models.publications_queries import (
     PublicationFilters,
     PublicationsFacetsResponse,
@@ -20,6 +25,7 @@ from domain.publications.metadata import OaStatus
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
+from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
@@ -548,52 +554,19 @@ def publications_facets(
     )
 
 
-# Liaison SQL des facettes-entités à forte cardinalité (recherche serveur). La revue sort directement de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
-_ENTITY_SQL: dict[str, dict[str, str]] = {
-    "journal": {"id": "j.id", "label": "j.title", "join": ""},
-    "publisher": {
-        "id": "pub.id",
-        "label": "pub.name",
-        "join": "JOIN publishers pub ON pub.id = j.publisher_id",
-    },
-}
-
-
 def publications_entity_facet(
     conn: Connection,
     *,
-    kind: str,
+    kind: EntityKind,
     search: str,
     filters: PublicationFilters,
     perimeter_structure_ids: list[int],
     limit: int = 20,
 ) -> list[EntityFacetItem]:
-    """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs,
-    en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent
-    appliqués → corrélation). Décompte par `COUNT(*)` (filtres scalaires ou `EXISTS`, sans
-    démultiplication). Recherche serveur par nom."""
+    """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
     builder = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     builder._preload_lab_hal_col()
     where_sql, binds = builder._clauses_skipping(kind)
-
-    sp = _ENTITY_SQL[kind]
-    name_filter = ""
-    if len(search.strip()) >= 2:
-        name_filter = f" AND unaccent({sp['label']}) ILIKE unaccent(:q)"
-        binds["q"] = f"%{search.strip()}%"
-    binds["lim"] = limit
-
-    conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(
-        text(f"""
-            SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS n
-            FROM publications p
-            LEFT JOIN journals j ON j.id = p.journal_id {sp["join"]}
-            WHERE {where_sql} AND {sp["id"]} IS NOT NULL{name_filter}
-            GROUP BY {sp["id"]}, {sp["label"]}
-            ORDER BY n DESC, label
-            LIMIT :lim
-        """),
-        binds,
-    ).all()
-    return [EntityFacetItem(id=r.id, label=r.label, count=r.n) for r in rows]
+    return entity_facet_rows(
+        conn, kind=kind, where_sql=where_sql, binds=binds, search=search, limit=limit
+    )
