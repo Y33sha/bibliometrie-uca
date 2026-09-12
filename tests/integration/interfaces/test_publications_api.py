@@ -238,6 +238,25 @@ class TestPublicationsExports:
         r = client.get("/api/publications/export.csv", params={"columns": "journal"})
         assert "Éditeur" not in r.text.splitlines()[0]
 
+    def test_csv_export_hal_status_column(self, client):
+        """Le statut HAL d'une page labo s'exporte, comme sa colonne s'affiche."""
+        r = client.get(
+            "/api/publications/export.csv",
+            params={"columns": "hal_status", "lab_id": "1", "hal_status": "ok,notice"},
+        )
+        assert r.status_code == 200
+        assert "Statut HAL" in r.text.splitlines()[0]
+
+    def test_hal_status_facet_and_filter_on_a_lab(self, client):
+        r = client.get("/api/publications/facets", params={"lab_id": "1", "hal_status": "hors_hal"})
+        assert r.status_code == 200
+        assert [o["value"] for o in r.json()["hal_status"]] == [
+            "ok",
+            "notice",
+            "hors_collection",
+            "hors_hal",
+        ]
+
     def test_csv_export_is_streamed(self, client):
         """La réponse part en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant et les copies de sa relecture."""
         with client.stream("GET", "/api/publications/export.csv") as r:
