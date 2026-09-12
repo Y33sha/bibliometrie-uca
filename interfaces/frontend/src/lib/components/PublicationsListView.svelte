@@ -514,7 +514,7 @@
 
 <div class="toolbar-card toolbar-sticky pub-toolbar">
 	<div class="toolbar pub-toolbar-main">
-		<input type="search" class="pub-search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<input type="search" class="pub-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 		<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 		{#if showStatsLink}<a href={statsUrl} class="pub-link">Statistiques &rarr;</a>{/if}

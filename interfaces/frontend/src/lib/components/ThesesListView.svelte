@@ -177,7 +177,7 @@
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
 		type="search"
-		placeholder="Rechercher par titre..."
+		placeholder="Rechercher par titre ou sujet..."
 		bind:value={search}
 		use:autofocus
 		oninput={onSearchInput}
