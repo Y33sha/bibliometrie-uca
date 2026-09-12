@@ -27,13 +27,6 @@
 	let filterText = $state('');
 	let allMode = $state(true);
 
-	// Resynchronise allMode quand selected est posé de l'extérieur (ex. paramètres d'URL)
-	$effect(() => {
-		if (selected.length > 0 && allMode) {
-			allMode = false;
-		}
-	});
-
 	const instanceId = Symbol();
 
 	const filteredOptions = $derived(
@@ -121,6 +114,8 @@
 				return;
 			}
 			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
+			// La sélection change aussi hors du panneau (URL, barre des filtres actifs) : « Tous » est coché quand elle est vide.
+			allMode = selected.length === 0;
 			open = true;
 			filterText = '';
 		}}

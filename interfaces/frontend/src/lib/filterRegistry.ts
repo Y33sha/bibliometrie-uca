@@ -1,8 +1,10 @@
 /**
- * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes et les colonnes à afficher.
+ * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes, les colonnes à afficher et la place du contrôle dans la page.
  */
+import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 import type { FacetDef } from '$lib/composables/useFacets.svelte';
 import type { FilterDef as UrlFilterDef } from '$lib/composables/useUrlFilters.svelte';
+import type { EntityKind } from '$lib/entityLabels';
 
 /** État d'un filtre de présence, par élément : `yes` retient les présents, `no` les absents. */
 export type PresenceStates = Record<string, 'all' | 'yes' | 'no'>;
@@ -13,12 +15,12 @@ interface BaseFilter {
 	label: string;
 	/** Paramètre de la requête, repris comme clé d'URL. */
 	param: string;
+	/** Rubrique du panneau « Plus de filtres ». Sans rubrique, le contrôle figure dans la barre principale. */
+	group?: string;
 	/** Valeur imposée par la page : elle remplace la sélection dans la requête, et le contrôle disparaît. */
 	fixed?: () => string | null;
 	/** Filtre proposé dans cette page. Vrai par défaut. */
 	enabled?: () => boolean;
-	/** Colonne du tableau dont l'affichage conditionne celui du contrôle. */
-	column?: string;
 	/** Colonnes affichées quand le filtre est actif au chargement de la page. */
 	showColumns?: string[];
 }
@@ -39,7 +41,7 @@ export interface CheckboxFilter extends BaseFilter {
 
 export interface EntityChoiceFilter extends BaseFilter {
 	control: 'entity';
-	entity: 'publisher' | 'journal';
+	entity: EntityKind;
 }
 
 export interface PresenceFilter extends BaseFilter {
@@ -56,13 +58,16 @@ export interface FilterValues {
 	presence: Record<string, PresenceStates>;
 }
 
+/** Vide la sélection d'un filtre. */
+export function clearValue(filter: ListFilter, values: FilterValues): void {
+	if (filter.control === 'checkbox') values.checkbox[filter.key] = [];
+	else if (filter.control === 'entity') values.entity[filter.key] = null;
+	else values.presence[filter.key] = {};
+}
+
 export function initialValues(filters: ListFilter[]): FilterValues {
 	const values: FilterValues = { checkbox: {}, entity: {}, presence: {} };
-	for (const f of filters) {
-		if (f.control === 'checkbox') values.checkbox[f.key] = [];
-		else if (f.control === 'entity') values.entity[f.key] = null;
-		else values.presence[f.key] = {};
-	}
+	for (const f of filters) clearValue(f, values);
 	return values;
 }
 
@@ -71,16 +76,24 @@ export function isAvailable(filter: ListFilter): boolean {
 	return (filter.enabled?.() ?? true) && (filter.fixed?.() ?? null) === null;
 }
 
-/** Contrôle à afficher : filtre disponible, colonne associée visible, et options présentes quand le filtre l'exige. */
-export function isShown(
-	filter: ListFilter,
-	isColumnVisible: (column: string) => boolean,
-	optionCount: (key: string) => number,
-): boolean {
+/** Contrôle à afficher : filtre disponible, avec des options quand le filtre l'exige. */
+export function isShown(filter: ListFilter, optionCount: (key: string) => number): boolean {
 	if (!isAvailable(filter)) return false;
-	if (filter.column && !isColumnVisible(filter.column)) return false;
-	if (filter.control === 'checkbox' && filter.hideWhenEmpty && optionCount(filter.key) === 0) return false;
-	return true;
+	return !(filter.control === 'checkbox' && filter.hideWhenEmpty && optionCount(filter.key) === 0);
+}
+
+/** Contrôles de la barre principale, puis rubriques du panneau « Plus de filtres », dans l'ordre de déclaration. */
+export function filterSections(filters: ListFilter[]): {
+	primary: ListFilter[];
+	groups: { label: string; filters: ListFilter[] }[];
+} {
+	const primary: ListFilter[] = [];
+	const groups = new Map<string, ListFilter[]>();
+	for (const f of filters) {
+		if (f.group) groups.set(f.group, [...(groups.get(f.group) ?? []), f]);
+		else primary.push(f);
+	}
+	return { primary, groups: [...groups].map(([label, members]) => ({ label, filters: members })) };
 }
 
 /** Sélection d'un filtre de présence sous la forme `hal_yes,wos_no`. */
@@ -91,10 +104,37 @@ export function encodePresence(states: PresenceStates): string {
 		.join(',');
 }
 
-function isActive(filter: ListFilter, values: FilterValues): boolean {
+export function isActive(filter: ListFilter, values: FilterValues): boolean {
 	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).length > 0;
 	if (filter.control === 'entity') return (values.entity[filter.key] ?? null) !== null;
 	return encodePresence(values.presence[filter.key] ?? {}) !== '';
+}
+
+/** Nombre maximal d'éléments nommés dans le résumé d'une sélection ; au-delà, le dernier devient un décompte. */
+const SUMMARY_PARTS = 3;
+
+/** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé. */
+export function checkboxSummary(filter: CheckboxFilter, selected: string[], options: FacetOption[]): string {
+	const text = new Map(options.map((o) => [o.value, o.text]));
+	const parts: string[] = [];
+	let rest = selected;
+	for (const g of filter.groups ?? []) {
+		if (g.values.length && g.values.every((v) => rest.includes(v))) {
+			parts.push(g.label);
+			rest = rest.filter((v) => !g.values.includes(v));
+		}
+	}
+	for (const v of rest) parts.push(text.get(v) ?? v);
+	if (parts.length <= SUMMARY_PARTS) return parts.join(', ');
+	return `${parts.slice(0, SUMMARY_PARTS - 1).join(', ')} +${parts.length - SUMMARY_PARTS + 1}`;
+}
+
+/** Résumé d'un filtre de présence, sous la forme « avec HAL, sans WoS ». */
+export function presenceSummary(filter: PresenceFilter, states: PresenceStates): string {
+	return filter.items
+		.filter((i) => states[i.key] === 'yes' || states[i.key] === 'no')
+		.map((i) => `${states[i.key] === 'yes' ? 'avec' : 'sans'} ${i.label}`)
+		.join(', ');
 }
 
 /** Valeur d'un filtre dans la requête, ou `null` quand il ne filtre rien. */

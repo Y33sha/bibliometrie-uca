@@ -9,12 +9,17 @@
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
+	import ActiveFilterBar from '$lib/components/ActiveFilterBar.svelte';
 	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import {
 		activeColumns,
 		appendFilterParams,
+		clearValue,
 		facetDefs,
+		filterSections,
 		initialValues,
+		isActive,
+		isAvailable,
 		isShown,
 		restoreValues,
 		urlFilterDefs,
@@ -159,7 +164,7 @@
 
 	const fixedId = (id: number | undefined): string | null => (id != null ? String(id) : null);
 
-	// Ordre du tableau = ordre d'affichage des contrôles.
+	// Ordre du tableau = ordre d'affichage. Un filtre sans `group` figure dans la barre principale.
 	const FILTERS: ListFilter[] = [
 		{
 			key: 'docTypes',
@@ -168,7 +173,6 @@
 			param: 'doc_type',
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
-			column: 'type',
 			showColumns: ['type'],
 			url: {
 				encode: docTypeFilterToken,
@@ -182,25 +186,6 @@
 			label: 'Années',
 			param: 'year',
 			facet: { type: 'simple', apiKey: 'years' },
-			column: 'year',
-		},
-		{
-			key: 'journal',
-			control: 'entity',
-			label: 'Revue',
-			param: 'journal_id',
-			entity: 'journal',
-			fixed: () => fixedId(externalFilters?.journalId),
-			showColumns: ['journal'],
-		},
-		{
-			key: 'publisher',
-			control: 'entity',
-			label: 'Éditeur',
-			param: 'publisher_id',
-			entity: 'publisher',
-			fixed: () => fixedId(externalFilters?.publisherId),
-			showColumns: ['journal'],
 		},
 		{
 			key: 'labs',
@@ -209,7 +194,6 @@
 			param: 'lab_id',
 			facet: { type: 'labeled', apiKey: 'labs' },
 			searchable: true,
-			column: 'labs',
 			fixed: () => fixedId(externalFilters?.labId),
 			// « Aucun labo » ne se combine pas avec un laboratoire.
 			normalize: (selected) =>
@@ -223,8 +207,37 @@
 			label: 'Accès',
 			param: 'access',
 			facet: { type: 'labeled', apiKey: 'access' },
-			column: 'oa',
 			showColumns: ['oa', 'oa_status'],
+		},
+		{
+			key: 'journal',
+			control: 'entity',
+			label: 'Revue',
+			param: 'journal_id',
+			entity: 'journal',
+			group: 'Revue et éditeur',
+			fixed: () => fixedId(externalFilters?.journalId),
+			showColumns: ['journal'],
+		},
+		{
+			key: 'publisher',
+			control: 'entity',
+			label: 'Éditeur',
+			param: 'publisher_id',
+			entity: 'publisher',
+			group: 'Revue et éditeur',
+			fixed: () => fixedId(externalFilters?.publisherId),
+			showColumns: ['journal'],
+		},
+		{
+			key: 'apc',
+			control: 'checkbox',
+			label: 'APC',
+			param: 'has_apc',
+			facet: { type: 'labeled', apiKey: 'apc' },
+			group: 'Revue et éditeur',
+			tooltip: "Pas d'info après 2024\nSans APC = ou APC non documentés",
+			showColumns: ['apc'],
 		},
 		{
 			key: 'oa',
@@ -232,7 +245,7 @@
 			label: 'Voies OA',
 			param: 'oa_status',
 			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			column: 'oa_status',
+			group: 'Accès ouvert',
 			showColumns: ['oa', 'oa_status'],
 		},
 		{
@@ -241,8 +254,8 @@
 			label: 'Statut HAL',
 			param: 'hal_status',
 			facet: { type: 'labeled', apiKey: 'hal_status' },
+			group: 'Accès ouvert',
 			enabled: () => showHalStatusColumn,
-			column: 'hal_status',
 			showColumns: ['hal_status'],
 		},
 		{
@@ -251,8 +264,8 @@
 			label: 'Corresp.',
 			param: 'is_corresponding',
 			facet: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			group: 'Auteurs',
 			enabled: () => showCorrespondingColumn,
-			column: 'corr',
 			hideWhenEmpty: true,
 			showColumns: ['corr'],
 		},
@@ -264,18 +277,9 @@
 			},
 			param: 'in_perimeter',
 			facet: { type: 'labeled', apiKey: 'in_perimeter' },
+			group: 'Auteurs',
 			enabled: () => showPerimeterFacet,
 			hideWhenEmpty: true,
-		},
-		{
-			key: 'apc',
-			control: 'checkbox',
-			label: 'APC',
-			param: 'has_apc',
-			facet: { type: 'labeled', apiKey: 'apc' },
-			tooltip: "Pas d'info après 2024\nSans APC = ou APC non documentés",
-			column: 'apc',
-			showColumns: ['apc'],
 		},
 		{
 			key: 'countries',
@@ -287,12 +291,25 @@
 				apiKey: 'countries',
 				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
 			},
+			group: 'Auteurs',
 			searchable: true,
 		},
-		{ key: 'sources', control: 'presence', label: 'Sources', param: 'source_filter', items: SOURCE_ITEMS },
+		{
+			key: 'sources',
+			control: 'presence',
+			label: 'Sources',
+			param: 'source_filter',
+			group: 'Sources',
+			items: SOURCE_ITEMS,
+		},
 	];
+	const sections = filterSections(FILTERS);
 
 	let values = $state(initialValues(FILTERS));
+	let showMoreFilters = $state(false);
+	const moreFiltersActive = $derived(
+		sections.groups.flatMap((g) => g.filters).filter((f) => isAvailable(f) && isActive(f, values)).length,
+	);
 
 	// Le bandeau ne signale que le sujet, contexte fixé par la route (sans facette propre ici).
 	const subjectBannerText = $derived(
@@ -416,6 +433,18 @@
 		onFilterChange();
 	}
 
+	function clearFilter(filter: ListFilter) {
+		clearValue(filter, values);
+		onFilterChange();
+	}
+
+	function clearAllFilters() {
+		for (const f of FILTERS) clearValue(f, values);
+		onFilterChange();
+	}
+
+	const optionCount = (key: string): number => facets.options[key]?.length ?? 0;
+
 	const onSearchInput = url.debouncedSearch(() => {
 		pubs.page = 1;
 		syncUrl();
@@ -492,19 +521,40 @@
 	</div>
 	<div class="toolbar pub-toolbar-facets">
 		<span class="facets-label">Filtrer par&nbsp;:</span>
-		{#each FILTERS as f (f.key)}
-			{#if isShown(f, col, (key) => facets.options[key]?.length ?? 0)}
-				{#if f.control === 'checkbox'}
-					<FacetDropdown label={f.label} options={facets.options[f.key] ?? []} searchable={f.searchable} groups={f.groups} tooltip={f.tooltip} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
-				{:else if f.control === 'entity'}
-					<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} buildParams={buildFilterParams} selectedId={values.entity[f.key]} onchange={(id) => onEntityChange(f, id)} />
-				{:else}
-					<PresenceFilterToggle label={f.label} items={f.items} bind:states={values.presence[f.key]} counts={facets.sourceCounts} onchange={onFilterChange} />
-				{/if}
-			{/if}
+		{#each sections.primary as f (f.key)}
+			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 		{/each}
+		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
+			Plus de filtres
+			{#if moreFiltersActive > 0}<span class="more-filters-badge">{moreFiltersActive}</span>{/if}
+			<span class="more-filters-arrow">{showMoreFilters ? '▴' : '▾'}</span>
+		</button>
 	</div>
+	{#if showMoreFilters}
+		<div class="more-filters">
+			{#each sections.groups as g (g.label)}
+				{@const shown = g.filters.filter((f) => isShown(f, optionCount))}
+				{#if shown.length}
+					<div class="filter-group">
+						<span class="filter-group-label">{g.label}</span>
+						{#each shown as f (f.key)}{@render filterControl(f)}{/each}
+					</div>
+				{/if}
+			{/each}
+		</div>
+	{/if}
+	<ActiveFilterBar filters={FILTERS} {values} options={facets.options} onclear={clearFilter} onclearall={clearAllFilters} />
 </div>
+
+{#snippet filterControl(f: ListFilter)}
+	{#if f.control === 'checkbox'}
+		<FacetDropdown label={f.label} options={facets.options[f.key] ?? []} searchable={f.searchable} groups={f.groups} tooltip={f.tooltip} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+	{:else if f.control === 'entity'}
+		<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} buildParams={buildFilterParams} selectedId={values.entity[f.key]} onchange={(id) => onEntityChange(f, id)} />
+	{:else}
+		<PresenceFilterToggle label={f.label} items={f.items} bind:states={values.presence[f.key]} counts={facets.sourceCounts} onchange={onFilterChange} />
+	{/if}
+{/snippet}
 
 <div class="table-scroll">
 <table class="pub-table">
@@ -715,6 +765,52 @@
 	}
 	.pub-link:hover { opacity: 0.9; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
+	.more-filters-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 6px 10px;
+		border: 1px dashed var(--border);
+		border-radius: 4px;
+		background: none;
+		font: inherit;
+		font-size: 0.95rem;
+		color: var(--accent);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.more-filters-btn:hover,
+	.more-filters-btn.open { border-color: var(--accent); }
+	.more-filters-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: var(--accent);
+		color: white;
+		font-size: 0.8rem;
+		font-weight: 600;
+	}
+	.more-filters-arrow { font-size: 0.7rem; }
+	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
+	.more-filters {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 8px;
+		border-top: 1px solid var(--border-subtle);
+	}
+	.filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.filter-group-label {
+		width: 130px;
+		flex-shrink: 0;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--muted);
+	}
 	.pub-table {
 		width: 100%;
 		min-width: 760px;
