@@ -241,14 +241,29 @@ def source_clause(source_values: list[str]) -> WhereClause | None:
     return WhereClause(" AND ".join(parts), {})
 
 
+def _authored_by(person_id: int, bind: str) -> WhereClause:
+    """La personne est auteur (rôle 'author') de la publication ; son id est lié sous `:bind`."""
+    return WhereClause(
+        f"""EXISTS (SELECT 1 FROM authorships a
+                WHERE a.publication_id = p.id AND a.person_id = :{bind}
+                  AND a.roles && ARRAY['author']::text[])""",
+        {bind: person_id},
+    )
+
+
 def person_clause(person_id: int) -> WhereClause:
     """Filtre : la personne donnée est auteur (rôle 'author') de la publication."""
-    return WhereClause(
-        """EXISTS (SELECT 1 FROM authorships a
-                WHERE a.publication_id = p.id AND a.person_id = :flt_person_id
-                  AND a.roles && ARRAY['author']::text[])""",
-        {"flt_person_id": person_id},
-    )
+    return _authored_by(person_id, "flt_person_id")
+
+
+def author_clause(author_id: int | None) -> WhereClause | None:
+    """Filtre : la personne choisie en facette est auteur de la publication.
+
+    Se combine à `person_clause` sur une page personne (publications cosignées), d'où un paramètre lié distinct.
+    """
+    if not author_id:
+        return None
+    return _authored_by(author_id, "flt_author_id")
 
 
 def _person_toggle_clause(

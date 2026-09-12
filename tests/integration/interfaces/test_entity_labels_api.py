@@ -49,6 +49,21 @@ class TestEntityLabels:
         )
         assert r.json() == {"label": name}
 
+    def test_person_reads_first_then_last_name(self, client):
+        """Le libellé d'une personne est celui que propose la facette des auteurs."""
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
+                "VALUES ('Dupont', 'Jeanne', 'dupont', 'jeanne') RETURNING id"
+            )
+            person_id = cur.fetchone()["id"]
+        try:
+            r = client.get("/api/entity-labels", params={"kind": "person", "entity_id": person_id})
+            assert r.json() == {"label": "Jeanne Dupont"}
+        finally:
+            with owner_pool() as cur:
+                cur.execute("DELETE FROM persons WHERE id = %s", (person_id,))
+
     def test_unknown_kind_rejected(self, client):
-        r = client.get("/api/entity-labels", params={"kind": "person", "entity_id": 1})
+        r = client.get("/api/entity-labels", params={"kind": "structure", "entity_id": 1})
         assert r.status_code == 422

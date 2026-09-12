@@ -1,22 +1,50 @@
-"""Facette d'entité à forte cardinalité (éditeur, revue), commune à la liste des publications et au tableau de bord.
+"""Facette d'entité à forte cardinalité (éditeur, revue, auteur), commune à la liste des publications et au tableau de bord.
 
 Rend les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte. Une recherche par nom borne la requête.
 """
 
 from collections.abc import Mapping
+from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import EntityFacetItem, EntityKind
 
-# Liaison SQL par entité : identifiant, libellé, jointure additionnelle. La revue sort de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
-_ENTITY_SQL: dict[EntityKind, dict[str, str]] = {
-    "journal": {"id": "j.id", "label": "j.title", "join": ""},
-    "publisher": {
-        "id": "pub.id",
-        "label": "pub.name",
-        "join": "JOIN publishers pub ON pub.id = j.publisher_id",
-    },
+
+class EntitySql(NamedTuple):
+    """Fragments SQL d'un type d'entité (valeurs figées, aucune injection)."""
+
+    # Table de l'entité avec son alias, pour lire un libellé par identifiant.
+    table: str
+    id: str
+    label: str
+    # Jointure depuis `publications p` : une ligne par couple publication–entité.
+    join: str
+
+
+# La revue sort de `publications.journal_id`, l'éditeur de la revue. L'auteur passe par `authorships`, unique par couple publication–personne ; une personne rejetée n'est pas proposée.
+ENTITY_SQL: dict[EntityKind, EntitySql] = {
+    "journal": EntitySql(
+        table="journals j",
+        id="j.id",
+        label="j.title",
+        join="JOIN journals j ON j.id = p.journal_id",
+    ),
+    "publisher": EntitySql(
+        table="publishers pub",
+        id="pub.id",
+        label="pub.name",
+        join="JOIN journals j ON j.id = p.journal_id JOIN publishers pub ON pub.id = j.publisher_id",
+    ),
+    "person": EntitySql(
+        table="persons pe",
+        id="pe.id",
+        label="pe.first_name || ' ' || pe.last_name",
+        join=(
+            "JOIN authorships au ON au.publication_id = p.id AND au.roles && ARRAY['author']::text[] "
+            "JOIN persons pe ON pe.id = au.person_id AND pe.rejected IS NOT TRUE"
+        ),
+    ),
 }
 
 
@@ -31,23 +59,23 @@ def entity_facet_rows(
 ) -> list[EntityFacetItem]:
     """Entités `kind` les plus représentées parmi les publications `p` qui satisfont `where_sql`.
 
-    `where_sql` se compose de filtres scalaires ou en `EXISTS` : sans jointure démultipliante, `COUNT(*)` par entité égale le nombre de publications distinctes. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
+    La jointure de l'entité rend une ligne par couple publication–entité. `COUNT(*)` par entité égale donc le nombre de publications distinctes, pourvu que `where_sql` se compose de filtres scalaires ou en `EXISTS`. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
     """
-    sql = _ENTITY_SQL[kind]
+    sql = ENTITY_SQL[kind]
     params = dict(binds)
     name_filter = ""
     if len(search.strip()) >= 2:
-        name_filter = f" AND unaccent({sql['label']}) ILIKE unaccent(:q)"
+        name_filter = f" AND unaccent({sql.label}) ILIKE unaccent(:q)"
         params["q"] = f"%{search.strip()}%"
     params["lim"] = limit
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""
-            SELECT {sql["id"]} AS id, {sql["label"]} AS label, COUNT(*) AS n
+            SELECT {sql.id} AS id, {sql.label} AS label, COUNT(*) AS n
             FROM publications p
-            LEFT JOIN journals j ON j.id = p.journal_id {sql["join"]}
-            WHERE {where_sql} AND {sql["id"]} IS NOT NULL{name_filter}
-            GROUP BY {sql["id"]}, {sql["label"]}
+            {sql.join}
+            WHERE {where_sql}{name_filter}
+            GROUP BY {sql.id}, {sql.label}
             ORDER BY n DESC, label
             LIMIT :lim
         """),

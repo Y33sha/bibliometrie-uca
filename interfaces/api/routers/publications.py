@@ -85,6 +85,7 @@ class PublicationFilterParams:
     publisher_id: Annotated[int | None, Query()] = None
     journal_id: Annotated[int | None, Query()] = None
     person_id: Annotated[int | None, Query()] = None
+    author_id: Annotated[int | None, Query()] = None
     subject_id: Annotated[int | None, Query()] = None
     access: Annotated[str, Query()] = ""
     oa_status: Annotated[str, Query()] = ""
@@ -108,6 +109,7 @@ class PublicationFilterParams:
             publisher_id=self.publisher_id,
             journal_id=self.journal_id,
             person_id=self.person_id,
+            author_id=self.author_id,
             subject_id=self.subject_id,
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
             oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
@@ -154,7 +156,7 @@ def publications_entity_facet(
     entity_search: SearchTerm = "",
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityFacetResponse:
-    """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+    """Facette contextuelle des éditeurs, des revues ou des auteurs : les premières entités sous les filtres actifs, avec leur décompte.
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
     """

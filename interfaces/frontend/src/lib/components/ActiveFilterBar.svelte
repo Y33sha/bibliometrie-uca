@@ -24,7 +24,7 @@
 
 	const active = $derived(filters.filter((f) => isAvailable(f) && isActive(f, values)));
 
-	// Libellés des éditeurs et revues sélectionnés, par `kind:id`.
+	// Libellés des entités sélectionnées (éditeur, revue, auteur), par `kind:id`.
 	let entityLabels = $state<Record<string, string>>({});
 	$effect(() => {
 		for (const f of active) {
