@@ -10,6 +10,19 @@
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
 	import { SOURCE_ITEMS } from '$lib/filterItems';
+	import {
+		activeColumns,
+		appendFilterParams,
+		facetDefs,
+		initialValues,
+		isShown,
+		restoreValues,
+		urlFilterDefs,
+		urlState,
+		type CheckboxFilter,
+		type EntityChoiceFilter,
+		type ListFilter,
+	} from '$lib/filterRegistry';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { oaLabelsMap } from '$lib/labels';
 	import {
@@ -140,24 +153,146 @@
 	const cv = useColumnVisibility(columnDefs, initialHidden);
 	const col = cv.col;
 
-	// --- Filter state ---
+	// --- Filtres ---
 	let search = $state('');
 	let currentSort = $state('year_desc');
-	let selectedYears: string[] = $state([]);
-	let selectedLabs: string[] = $state([]);
-	let sourceStates = $state<Record<string, 'all' | 'yes' | 'no'>>({});
-	let selectedDocTypes: string[] = $state([]);
-	let selectedAccess: string[] = $state([]);
-	let selectedOa: string[] = $state([]);
-	let selectedApc: string[] = $state([]);
-	let selectedCountries: string[] = $state([]);
-	let selectedHalStatus: string[] = $state([]);
-	let selectedCorr: string[] = $state([]);
-	let selectedPerimeter: string[] = $state([]);
 
-	// Facettes éditeur / revue (recherche serveur) : seul l'id sélectionné est conservé — état canonique. Le libellé de la pastille est résolu par le composant EntityFilter.
-	let filterPublisherId: string | null = $state(null);
-	let filterJournalId: string | null = $state(null);
+	const fixedId = (id: number | undefined): string | null => (id != null ? String(id) : null);
+
+	// Ordre du tableau = ordre d'affichage des contrôles.
+	const FILTERS: ListFilter[] = [
+		{
+			key: 'docTypes',
+			control: 'checkbox',
+			label: 'Types',
+			param: 'doc_type',
+			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
+			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
+			column: 'type',
+			showColumns: ['type'],
+			url: {
+				encode: docTypeFilterToken,
+				decode: docTypeFilterFromToken,
+				defaultValue: publicationsDocTypes.join(','),
+			},
+		},
+		{
+			key: 'years',
+			control: 'checkbox',
+			label: 'Années',
+			param: 'year',
+			facet: { type: 'simple', apiKey: 'years' },
+			column: 'year',
+		},
+		{
+			key: 'journal',
+			control: 'entity',
+			label: 'Revue',
+			param: 'journal_id',
+			entity: 'journal',
+			fixed: () => fixedId(externalFilters?.journalId),
+			showColumns: ['journal'],
+		},
+		{
+			key: 'publisher',
+			control: 'entity',
+			label: 'Éditeur',
+			param: 'publisher_id',
+			entity: 'publisher',
+			fixed: () => fixedId(externalFilters?.publisherId),
+			showColumns: ['journal'],
+		},
+		{
+			key: 'labs',
+			control: 'checkbox',
+			label: 'Laboratoires',
+			param: 'lab_id',
+			facet: { type: 'labeled', apiKey: 'labs' },
+			searchable: true,
+			column: 'labs',
+			fixed: () => fixedId(externalFilters?.labId),
+			// « Aucun labo » ne se combine pas avec un laboratoire.
+			normalize: (selected) =>
+				selected.includes('none') && selected.length > 1
+					? selected.filter((v) => v !== 'none')
+					: selected,
+		},
+		{
+			key: 'access',
+			control: 'checkbox',
+			label: 'Accès',
+			param: 'access',
+			facet: { type: 'labeled', apiKey: 'access' },
+			column: 'oa',
+			showColumns: ['oa', 'oa_status'],
+		},
+		{
+			key: 'oa',
+			control: 'checkbox',
+			label: 'Voies OA',
+			param: 'oa_status',
+			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
+			column: 'oa_status',
+			showColumns: ['oa', 'oa_status'],
+		},
+		{
+			key: 'halStatus',
+			control: 'checkbox',
+			label: 'Statut HAL',
+			param: 'hal_status',
+			facet: { type: 'labeled', apiKey: 'hal_status' },
+			enabled: () => showHalStatusColumn,
+			column: 'hal_status',
+			showColumns: ['hal_status'],
+		},
+		{
+			key: 'corresponding',
+			control: 'checkbox',
+			label: 'Corresp.',
+			param: 'is_corresponding',
+			facet: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			enabled: () => showCorrespondingColumn,
+			column: 'corr',
+			hideWhenEmpty: true,
+			showColumns: ['corr'],
+		},
+		{
+			key: 'perimeter',
+			control: 'checkbox',
+			get label() {
+				return institution.name;
+			},
+			param: 'in_perimeter',
+			facet: { type: 'labeled', apiKey: 'in_perimeter' },
+			enabled: () => showPerimeterFacet,
+			hideWhenEmpty: true,
+		},
+		{
+			key: 'apc',
+			control: 'checkbox',
+			label: 'APC',
+			param: 'has_apc',
+			facet: { type: 'labeled', apiKey: 'apc' },
+			tooltip: "Pas d'info après 2024\nSans APC = ou APC non documentés",
+			column: 'apc',
+			showColumns: ['apc'],
+		},
+		{
+			key: 'countries',
+			control: 'checkbox',
+			label: 'Pays',
+			param: 'country',
+			facet: {
+				type: 'labeled',
+				apiKey: 'countries',
+				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
+			},
+			searchable: true,
+		},
+		{ key: 'sources', control: 'presence', label: 'Sources', param: 'source_filter', items: SOURCE_ITEMS },
+	];
+
+	let values = $state(initialValues(FILTERS));
 
 	// Le bandeau ne signale que le sujet, contexte fixé par la route (sans facette propre ici).
 	const subjectBannerText = $derived(
@@ -166,33 +301,25 @@
 			: '',
 	);
 
-	function onPublisherFilter(id: string | null) {
-		filterPublisherId = id;
-		onFilterChange();
-	}
-	function onJournalFilter(id: string | null) {
-		filterJournalId = id;
-		onFilterChange();
-	}
-
 	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la route fixe une dimension hors de sa portée (personne, sujet).
 	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId);
 	const statsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
-		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
-		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
+		const { checkbox, entity } = values;
+		if (checkbox.years.length) p.set('year', checkbox.years.join(','));
+		p.set('doc_type', docTypeFilterToken(checkbox.docTypes));
+		if (checkbox.oa.length) p.set('oa_status', checkbox.oa.join(','));
+		if (checkbox.apc.length) p.set('has_apc', checkbox.apc.join(','));
 		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
 		const labId =
 			externalFilters?.labId != null
 				? String(externalFilters.labId)
-				: selectedLabs.filter((v) => v !== 'none').join(',');
+				: checkbox.labs.filter((v) => v !== 'none').join(',');
 		if (labId) p.set('lab_id', labId);
-		// Éditeur / revue : id + libellé, pour restaurer la facette du tableau de bord sans relecture.
-		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : filterPublisherId;
+		// Éditeur / revue : fixés par la route ou choisis en facette.
+		const publisherId = fixedId(externalFilters?.publisherId) ?? entity.publisher;
 		if (publisherId) p.set('publisher_id', publisherId);
-		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : filterJournalId;
+		const journalId = fixedId(externalFilters?.journalId) ?? entity.journal;
 		if (journalId) p.set('journal_id', journalId);
 		return base + '/stats?' + paramsToQuery(p);
 	});
@@ -209,37 +336,9 @@
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
-		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		// `lab_id` : soit imposé par la route (externalFilters.labId), soit choisi par l'utilisatrice via la facet "Laboratoires". Les deux modes sont exclusifs (la facet est masquée si labId est fixe).
-		if (externalFilters?.labId != null) {
-			params.set('lab_id', String(externalFilters.labId));
-		} else if (selectedLabs.length) {
-			params.set('lab_id', selectedLabs.join(','));
-		}
 		if (externalFilters?.personId != null) params.set('person_id', String(externalFilters.personId));
-		const sf = Object.entries(sourceStates).filter(([, v]) => v === 'yes' || v === 'no').map(([k, v]) => `${k}_${v}`).join(',');
-		if (sf) params.set('source_filter', sf);
-		if (selectedDocTypes.length) params.set('doc_type', selectedDocTypes.join(','));
-		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
-		if (selectedOa.length) params.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) params.set('has_apc', selectedApc.join(','));
-		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		if (selectedHalStatus.length) params.set('hal_status', selectedHalStatus.join(','));
-		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
-		if (selectedPerimeter.length) params.set('in_perimeter', selectedPerimeter.join(','));
-		// `publisher_id` : externalFilters (/publishers/[id]) ou URL.
-		if (externalFilters?.publisherId != null) {
-			params.set('publisher_id', String(externalFilters.publisherId));
-		} else if (filterPublisherId) {
-			params.set('publisher_id', filterPublisherId);
-		}
-		// `journal_id` : soit imposé par la route (/journals/[id]), soit choisi par l'utilisatrice via l'URL (?journal_id=). Les deux modes sont exclusifs ; externalFilters l'emporte sur le filtre URL.
-		if (externalFilters?.journalId != null) {
-			params.set('journal_id', String(externalFilters.journalId));
-		} else if (filterJournalId) {
-			params.set('journal_id', filterJournalId);
-		}
 		if (externalFilters?.subjectId) params.set('subject_id', String(externalFilters.subjectId));
+		appendFilterParams(FILTERS, values, params);
 		return params;
 	}
 
@@ -270,19 +369,7 @@
 			return params;
 		},
 		sourceCountsKey: 'source_counts',
-		facets: {
-			years:         { type: 'simple',    apiKey: 'years' },
-			labs:          { type: 'labeled',   apiKey: 'labs' },
-			docTypes:      { type: 'label_map', apiKey: 'doc_types',   labels: docTypePlural },
-			access:        { type: 'labeled',   apiKey: 'access' },
-			oa:            { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			apc:           { type: 'labeled',   apiKey: 'apc' },
-			halStatus:     { type: 'labeled',   apiKey: 'hal_status' },
-			corresponding: { type: 'boolean',   apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
-			perimeter:     { type: 'labeled',   apiKey: 'in_perimeter' },
-			countries:     { type: 'labeled',   apiKey: 'countries',
-				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }) },
-		},
+		facets: facetDefs(FILTERS),
 		afterLoad(data, options) {
 			options.labs = [
 				{ value: 'none', text: '— Aucun labo —', count: (data.no_lab_count as number) ?? 0 },
@@ -294,22 +381,10 @@
 	const url = useUrlFilters({
 		basePath: () => basePath,
 		filters: {
-			selectedYears:     { type: 'string_array',  urlKey: 'year' },
-			selectedLabs:      { type: 'string_array',  urlKey: 'lab_id' },
-			sourceStates:      { type: 'source_states', urlKey: 'source_filter' },
-			selectedDocTypes:  { type: 'single',        urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
-			selectedAccess:    { type: 'string_array',  urlKey: 'access' },
-			selectedOa:        { type: 'string_array',  urlKey: 'oa_status' },
-			selectedApc:       { type: 'string_array',  urlKey: 'has_apc' },
-			selectedCountries: { type: 'string_array',  urlKey: 'country' },
-			selectedHalStatus: { type: 'string_array',  urlKey: 'hal_status' },
-			selectedCorr:      { type: 'string_array',  urlKey: 'is_corresponding' },
-			selectedPerimeter: { type: 'string_array',  urlKey: 'in_perimeter' },
-			search:            { type: 'single',        urlKey: 'search' },
-			currentSort:       { type: 'single',        urlKey: 'sort', defaultValue: 'year_desc' },
-			currentPage:       { type: 'page',          urlKey: 'page' },
-			filterPublisherId: { type: 'single',        urlKey: 'publisher_id' },
-			filterJournalId:   { type: 'single',        urlKey: 'journal_id' },
+			...urlFilterDefs(FILTERS),
+			search:      { type: 'single', urlKey: 'search' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' },
+			currentPage: { type: 'page',   urlKey: 'page' },
 		},
 	});
 
@@ -317,13 +392,10 @@
 	function syncUrl() {
 		if (!urlSync) return;
 		url.syncUrl(() => ({
-			selectedYears, selectedLabs, sourceStates,
-			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
-			selectedAccess, selectedOa, selectedApc, selectedCountries,
-			selectedHalStatus, selectedCorr, selectedPerimeter,
-			search, currentSort,
+			...urlState(FILTERS, values),
+			search,
+			currentSort,
 			currentPage: pubs.page,
-			filterPublisherId, filterJournalId,
 		}));
 	}
 
@@ -334,12 +406,13 @@
 		facets.load();
 	}
 
-	function onLabChange(newSelection: string[]) {
-		const hadNone = selectedLabs.includes('none');
-		const hasNone = newSelection.includes('none');
-		if (hasNone && !hadNone) selectedLabs = ['none'];
-		else if (hasNone && newSelection.length > 1) selectedLabs = newSelection.filter((v) => v !== 'none');
-		else selectedLabs = newSelection;
+	function onCheckboxChange(filter: CheckboxFilter, selected: string[]) {
+		values.checkbox[filter.key] = filter.normalize ? filter.normalize(selected) : selected;
+		onFilterChange();
+	}
+
+	function onEntityChange(filter: EntityChoiceFilter, id: string | null) {
+		values.entity[filter.key] = id;
 		onFilterChange();
 	}
 
@@ -386,38 +459,19 @@
 	onMount(async () => {
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
-			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
-			if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
-			if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
-			if (restored.selectedDocTypes != null)
-				selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
-			if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
-			if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
-			if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
-			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
-			if (restored.selectedHalStatus) selectedHalStatus = restored.selectedHalStatus as string[];
-			if (restored.selectedCorr) selectedCorr = restored.selectedCorr as string[];
-			if (restored.selectedPerimeter) selectedPerimeter = restored.selectedPerimeter as string[];
+			restoreValues(FILTERS, restored, values);
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) pubs.page = restored.currentPage as number;
-			if (restored.filterPublisherId) filterPublisherId = restored.filterPublisherId as string;
-			if (restored.filterJournalId) filterJournalId = restored.filterJournalId as string;
 		}
 
 		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous » l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
 		if (restrictToPublications && !(urlSync && $page.url.searchParams.has('doc_type'))) {
-			selectedDocTypes = [...publicationsDocTypes];
+			values.checkbox.docTypes = [...publicationsDocTypes];
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
-		const needed: string[] = [];
-		if (selectedOa.length || selectedAccess.length) needed.push('oa', 'oa_status');
-		if (selectedApc.length) needed.push('apc');
-		if (filterPublisherId || filterJournalId) needed.push('journal');
-		if (selectedDocTypes.length) needed.push('type');
-		if (showHalStatusColumn && selectedHalStatus.length) needed.push('hal_status');
-		if (showCorrespondingColumn && selectedCorr.length) needed.push('corr');
+		const needed = activeColumns(FILTERS, values);
 		if (needed.length) cv.ensure(needed);
 
 		await facets.load();
@@ -438,19 +492,17 @@
 	</div>
 	<div class="toolbar pub-toolbar-facets">
 		<span class="facets-label">Filtrer par&nbsp;:</span>
-		{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
-		{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-		{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets" kind="journal" buildParams={buildFilterParams} selectedId={filterJournalId} onchange={onJournalFilter} />{/if}
-		{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets" kind="publisher" buildParams={buildFilterParams} selectedId={filterPublisherId} onchange={onPublisherFilter} />{/if}
-		{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
-		{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
-		{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
-		{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
-		{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
-		{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label={institution.name} options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
-		{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />{/if}
-		<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-		<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+		{#each FILTERS as f (f.key)}
+			{#if isShown(f, col, (key) => facets.options[key]?.length ?? 0)}
+				{#if f.control === 'checkbox'}
+					<FacetDropdown label={f.label} options={facets.options[f.key] ?? []} searchable={f.searchable} groups={f.groups} tooltip={f.tooltip} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
+				{:else if f.control === 'entity'}
+					<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} buildParams={buildFilterParams} selectedId={values.entity[f.key]} onchange={(id) => onEntityChange(f, id)} />
+				{:else}
+					<PresenceFilterToggle label={f.label} items={f.items} bind:states={values.presence[f.key]} counts={facets.sourceCounts} onchange={onFilterChange} />
+				{/if}
+			{/if}
+		{/each}
 	</div>
 </div>
 

@@ -36,7 +36,7 @@ interface PageFilter {
 	urlKey: string;
 }
 
-type FilterDef = StringArrayFilter | SingleValueFilter | SourceStatesFilter | PageFilter;
+export type FilterDef = StringArrayFilter | SingleValueFilter | SourceStatesFilter | PageFilter;
 
 interface UrlFiltersConfig {
 	/** Chemin de la page propriétaire. Accepte un getter `() => ...` quand il dérive d'un prop/route réactif (ex. `/persons/${personId}`) : il est alors relu à chaque `syncUrl` au lieu d'être capturé au montage. */
