@@ -3,33 +3,40 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	activeColumns,
 	appendFilterParams,
+	checkboxSummary,
+	clearValue,
 	encodePresence,
 	facetDefs,
+	filterSections,
 	initialValues,
 	isShown,
+	presenceSummary,
 	restoreValues,
 	urlFilterDefs,
 	urlState,
+	type CheckboxFilter,
+	type EntityChoiceFilter,
 	type ListFilter,
+	type PresenceFilter,
 } from './filterRegistry';
 
 let fixedLab: string | null = null;
 let perimeterEnabled = true;
 
-const years: ListFilter = {
+const years: CheckboxFilter = {
 	key: 'years',
 	control: 'checkbox',
 	label: 'Années',
 	param: 'year',
 	facet: { type: 'simple', apiKey: 'years' },
-	column: 'year',
 };
-const types: ListFilter = {
+const types: CheckboxFilter = {
 	key: 'types',
 	control: 'checkbox',
 	label: 'Types',
 	param: 'doc_type',
 	facet: { type: 'simple', apiKey: 'doc_types' },
+	groups: [{ label: 'Publications', values: ['article', 'book'] }],
 	url: {
 		encode: (selected) => (selected.length ? selected.join(',') : 'all'),
 		decode: (raw) => (raw === 'all' ? [] : raw.split(',')),
@@ -37,7 +44,7 @@ const types: ListFilter = {
 	},
 	showColumns: ['type'],
 };
-const labs: ListFilter = {
+const labs: CheckboxFilter = {
 	key: 'labs',
 	control: 'checkbox',
 	label: 'Laboratoires',
@@ -45,32 +52,39 @@ const labs: ListFilter = {
 	facet: { type: 'labeled', apiKey: 'labs' },
 	fixed: () => fixedLab,
 };
-const perimeter: ListFilter = {
+const perimeter: CheckboxFilter = {
 	key: 'perimeter',
 	control: 'checkbox',
 	label: 'Périmètre',
 	param: 'in_perimeter',
 	facet: { type: 'labeled', apiKey: 'in_perimeter' },
+	group: 'Auteurs',
 	enabled: () => perimeterEnabled,
 	hideWhenEmpty: true,
 	showColumns: ['corr'],
 };
-const journal: ListFilter = {
+const journal: EntityChoiceFilter = {
 	key: 'journal',
 	control: 'entity',
 	label: 'Revue',
 	param: 'journal_id',
 	entity: 'journal',
+	group: 'Revue et éditeur',
 	showColumns: ['journal'],
 };
-const sources: ListFilter = {
+const sources: PresenceFilter = {
 	key: 'sources',
 	control: 'presence',
 	label: 'Sources',
 	param: 'source_filter',
-	items: [],
+	group: 'Auteurs',
+	items: [
+		{ key: 'hal', label: 'HAL' },
+		{ key: 'wos', label: 'WoS' },
+		{ key: 'oa', label: 'OpenAlex' },
+	],
 };
-const FILTERS = [years, types, labs, perimeter, journal, sources];
+const FILTERS: ListFilter[] = [years, types, labs, perimeter, journal, sources];
 
 describe('filterRegistry', () => {
 	beforeEach(() => {
@@ -99,15 +113,23 @@ describe('filterRegistry', () => {
 		const params = new URLSearchParams();
 		appendFilterParams(FILTERS, values, params);
 		expect(params.get('lab_id')).toBe('7');
-		expect(isShown(labs, () => true, () => 1)).toBe(false);
+		expect(isShown(labs, () => 1)).toBe(false);
 	});
 
-	it('masque un contrôle dont la colonne est cachée, ou qui attend des options', () => {
-		expect(isShown(years, (column) => column !== 'year', () => 1)).toBe(false);
-		expect(isShown(perimeter, () => true, () => 0)).toBe(false);
-		expect(isShown(perimeter, () => true, () => 2)).toBe(true);
+	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {
+		expect(isShown(perimeter, () => 0)).toBe(false);
+		expect(isShown(perimeter, () => 2)).toBe(true);
 		perimeterEnabled = false;
-		expect(isShown(perimeter, () => true, () => 2)).toBe(false);
+		expect(isShown(perimeter, () => 2)).toBe(false);
+	});
+
+	it('range les contrôles sans rubrique dans la barre principale, les autres par rubrique', () => {
+		const { primary, groups } = filterSections(FILTERS);
+		expect(primary.map((f) => f.key)).toEqual(['years', 'types', 'labs']);
+		expect(groups.map((g) => [g.label, g.filters.map((f) => f.key)])).toEqual([
+			['Auteurs', ['perimeter', 'sources']],
+			['Revue et éditeur', ['journal']],
+		]);
 	});
 
 	it("écrit la sélection dans l'URL sous sa forme propre, et la relit", () => {
@@ -127,6 +149,15 @@ describe('filterRegistry', () => {
 		expect(values.presence.sources).toEqual({ hal: 'no' });
 	});
 
+	it('vide la sélection de chaque type de filtre', () => {
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.entity.journal = '12';
+		values.presence.sources = { hal: 'yes' };
+		for (const f of FILTERS) clearValue(f, values);
+		expect(values).toEqual(initialValues(FILTERS));
+	});
+
 	it('déclare les décomptes des seules cases à cocher', () => {
 		expect(Object.keys(facetDefs(FILTERS))).toEqual(['years', 'types', 'labs', 'perimeter']);
 	});
@@ -142,5 +173,20 @@ describe('filterRegistry', () => {
 
 	it("ignore l'état « tous » d'un filtre de présence", () => {
 		expect(encodePresence({ hal: 'all' })).toBe('');
+	});
+
+	it('résume une sélection en nommant les groupes entièrement cochés', () => {
+		const options = [
+			{ value: 'article', text: 'Articles' },
+			{ value: 'book', text: 'Ouvrages' },
+			{ value: 'thesis', text: 'Thèses' },
+		];
+		expect(checkboxSummary(types, ['article', 'book', 'thesis'], options)).toBe('Publications, Thèses');
+		expect(checkboxSummary(types, ['article'], options)).toBe('Articles');
+		expect(checkboxSummary(years, ['2024', '2023', '2022', '2021'], [])).toBe('2024, 2023 +2');
+	});
+
+	it('résume un filtre de présence', () => {
+		expect(presenceSummary(sources, { hal: 'yes', wos: 'no', oa: 'all' })).toBe('avec HAL, sans WoS');
 	});
 });

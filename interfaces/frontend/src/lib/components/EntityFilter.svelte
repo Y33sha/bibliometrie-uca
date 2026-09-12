@@ -2,8 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
 	import type { components } from '$lib/api/schema';
+	import { entityLabel, rememberEntityLabel, type EntityKind } from '$lib/entityLabels';
 
-	type EntityLabelResponse = components['schemas']['EntityLabelResponse'];
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
 	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
@@ -13,7 +13,7 @@
 		label: string;
 		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
 		endpoint: string;
-		kind: 'publisher' | 'journal';
+		kind: EntityKind;
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
 		buildParams: () => URLSearchParams;
 		/** Id de l'entité sélectionnée (état canonique), ou null. */
@@ -48,9 +48,9 @@
 		if (selectedId === resolvedId) return;
 		resolvedId = selectedId;
 		const id = selectedId;
-		api<EntityLabelResponse>(`/api/entity-labels?kind=${kind}&entity_id=${id}`)
-			.then((d) => {
-				if (resolvedId === id) selectedLabel = d.label;
+		entityLabel(kind, id)
+			.then((label) => {
+				if (resolvedId === id) selectedLabel = label;
 			})
 			.catch(() => {});
 	});
@@ -76,6 +76,7 @@
 
 	function pick(r: Result | null) {
 		// Le libellé de l'option choisie est déjà connu : on l'adopte sans relecture.
+		if (r) rememberEntityLabel(kind, r.value, r.text);
 		selectedLabel = r?.text ?? null;
 		resolvedId = r?.value ?? null;
 		onchange?.(r?.value ?? null);
