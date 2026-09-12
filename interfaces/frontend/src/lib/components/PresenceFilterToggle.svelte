@@ -141,61 +141,7 @@
 </div>
 
 <style>
-	.facet {
-		position: relative;
-		display: inline-block;
-	}
-	.facet-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
-		font-size: 0.95rem;
-		cursor: pointer;
-		color: var(--text);
-		white-space: nowrap;
-		font-family: inherit;
-	}
-	.facet-btn:hover {
-		border-color: #ccc;
-	}
-	.facet-btn.has-selection {
-		border-color: var(--accent);
-		background: var(--accent-light);
-	}
-	.facet-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 5px;
-		border-radius: 9px;
-		background: var(--accent);
-		color: white;
-		font-size: 0.8rem;
-		font-weight: 600;
-	}
-	.facet-arrow {
-		font-size: 0.7rem;
-		color: var(--muted);
-		margin-left: 2px;
-	}
-	.facet-panel {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		min-width: 220px;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-		z-index: 100;
-		padding: 4px 0;
-	}
+	/* Bouton et panneau : styles communs des facettes, dans shared.css. */
 	.item-row {
 		display: flex;
 		align-items: center;
