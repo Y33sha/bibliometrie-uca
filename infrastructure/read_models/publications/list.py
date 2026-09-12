@@ -15,6 +15,7 @@ from application.ports.read_models.publications_queries import (
     PublicationListResponse,
 )
 from domain.normalize import normalize_text, to_plain_text
+from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
@@ -30,6 +31,7 @@ from infrastructure.read_models.filters import (
     doc_type_clause,
     excluded_doc_type_clause,
     hal_status_clause,
+    hal_status_expression,
     in_perimeter_person_clause,
     journal_id_clause,
     lab_clause,
@@ -95,15 +97,22 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
     return out
 
 
+def lab_hal_collection(conn: Connection, lab_ids: list[int]) -> str | None:
+    """Collection HAL du laboratoire quand un seul est sélectionné, au regard de laquelle se lit le statut HAL."""
+    if len(lab_ids) != 1:
+        return None
+    row = conn.execute(
+        text("SELECT hal_collection FROM structures WHERE id = :sid"), {"sid": lab_ids[0]}
+    ).one_or_none()
+    return row.hal_collection if row else None
+
+
 def _hal_status_clause(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
-    """Charge la collection HAL du labo unique pour le filtre hal_status."""
+    """Filtre hal_status, lu au regard de la collection du labo unique."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
-        row = conn.execute(
-            text("SELECT hal_collection FROM structures WHERE id = :sid"),
-            {"sid": filters.lab_ids[0]},
-        ).one_or_none()
-        lab_hal_col = row.hal_collection if row else None
-        return hal_status_clause(filters.hal_status_values, lab_hal_col)
+        return hal_status_clause(
+            filters.hal_status_values, lab_hal_collection(conn, filters.lab_ids)
+        )
     return None
 
 
@@ -425,6 +434,16 @@ def export_publications_csv(
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
     order = _ORDER_MAP[sort]
 
+    # Titre et liens (DOI + Sources) toujours présents. `columns` vide => toutes.
+    requested = set(columns) if columns else set(EXPORT_COLUMNS)
+    requested |= {"title", "links"}
+    # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
+    hal_status = (
+        hal_status_expression(lab_hal_collection(conn, filters.lab_ids))
+        if "hal_status" in requested
+        else WhereClause("NULL", {})
+    )
+
     if filters.person_id:
         person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"
     else:
@@ -437,6 +456,7 @@ def export_publications_csv(
                 p.oa_status::text AS oa_status,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
+                {hal_status.sql} AS hal_status,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
                 src_ids.wos_id, src_ids.theses_id,
                 (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
@@ -468,6 +488,7 @@ def export_publications_csv(
             **binds,
             "person_lab_a3": filters.person_id,
             "focus_person": filters.person_id,
+            **hal_status.binds,
             "export_limit": MAX_EXPORT_ROWS + 1,
         },
     ).all()
@@ -479,9 +500,7 @@ def export_publications_csv(
             filters,
         )
 
-    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents. `columns` vide => toutes.
-    requested = set(columns) if columns else set(EXPORT_COLUMNS)
-    requested |= {"title", "links"}
+    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage.
     spec: list[tuple[str, str]] = [
         ("type", "Type"),
         ("year", "Année"),
@@ -493,6 +512,7 @@ def export_publications_csv(
         ("apc", "APC (€)"),
         ("oa", "Accès"),
         ("oa_status", "Voie OA"),
+        ("hal_status", "Statut HAL"),
         ("links", "DOI"),
         ("links", "Sources"),
     ]
@@ -529,6 +549,7 @@ def _publication_lines(
             "APC (€)": round(row.apc_total) if row.apc_total else "",
             "Accès": "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé",
             "Voie OA": row.oa_status or "",
+            "Statut HAL": HAL_DEPOSIT_STATUS_LABELS.get(row.hal_status or "", ""),
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
         }

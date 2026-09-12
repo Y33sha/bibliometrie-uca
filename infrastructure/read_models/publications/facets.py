@@ -22,7 +22,7 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.countries import NO_COUNTRY_CODE
 from domain.publications.metadata import OaStatus
-from domain.sources.registry import Source
+from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models.entity_facet import entity_facet_rows
@@ -40,6 +40,7 @@ from infrastructure.read_models.filters import (
     doc_type_clause,
     excluded_doc_type_clause,
     hal_status_clause,
+    hal_status_expression,
     in_perimeter_person_clause,
     journal_id_clause,
     lab_clause,
@@ -53,6 +54,7 @@ from infrastructure.read_models.filters import (
     year_clause,
 )
 from infrastructure.read_models.perimeters import get_persons_perimeter_name
+from infrastructure.read_models.publications.list import lab_hal_collection
 
 
 class _PublicationFacetsBuilder:
@@ -73,12 +75,7 @@ class _PublicationFacetsBuilder:
 
     def _preload_lab_hal_col(self) -> None:
         """Charge la hal_collection du labo (si un seul labo est sélectionné)."""
-        if len(self.filters.lab_ids) == 1:
-            row = self.conn.execute(
-                text("SELECT hal_collection FROM structures WHERE id = :sid"),
-                {"sid": self.filters.lab_ids[0]},
-            ).one_or_none()
-            self.lab_hal_col = row.hal_collection if row else None
+        self.lab_hal_col = lab_hal_collection(self.conn, self.filters.lab_ids)
 
     def _base_clauses(self) -> list[WhereClause | None]:
         """Conditions de base : publications UCA ou par personne."""
@@ -404,65 +401,19 @@ class _PublicationFacetsBuilder:
         if len(self.filters.lab_ids) != 1:
             return []
         where_sql, binds = self._clauses_skipping("hal_status")
-        col = self.lab_hal_col
-        if col:
-            r = self.conn.execute(
-                text(f"""
-                    SELECT
-                        COUNT(*) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                        )) AS hors_hal,
-                        COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                        ) AND NOT EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                              AND sd.hal_collections @> ARRAY[:hf_col]
-                        )) AS hors_collection,
-                        COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                              AND sd.hal_collections @> ARRAY[:hf_col]
-                        ) AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL})
-                        ) AS notice,
-                        COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                              AND sd.hal_collections @> ARRAY[:hf_col]
-                        ) AND p.oa_status IS NOT NULL
-                          AND p.oa_status::text NOT IN {OA_CLOSED_SQL}
-                        ) AS ok
-                    FROM publications p
-                    WHERE {where_sql}
-                """),
-                {**binds, "hf_col": col},
-            ).one()
-        else:
-            r = self.conn.execute(
-                text(f"""
-                    SELECT
-                        COUNT(*) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                        )) AS hors_hal,
-                        COUNT(*) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
-                        )) AS hors_collection,
-                        0 AS notice,
-                        0 AS ok
-                    FROM publications p
-                    WHERE {where_sql}
-                """),
-                binds,
-            ).one()
+        status = hal_status_expression(self.lab_hal_col)
+        rows = self.conn.execute(
+            text(f"""
+                SELECT value, COUNT(*) AS n
+                FROM (SELECT {status.sql} AS value FROM publications p WHERE {where_sql}) s
+                GROUP BY value
+            """),
+            {**binds, **status.binds},
+        ).all()
+        counts = {r.value: r.n for r in rows}
         return [
-            FacetOption(value="ok", label="OK", count=r.ok),
-            FacetOption(value="notice", label="Notice", count=r.notice),
-            FacetOption(value="hors_collection", label="Hors collection", count=r.hors_collection),
-            FacetOption(value="hors_hal", label="Hors HAL", count=r.hors_hal),
+            FacetOption(value=s, label=HAL_DEPOSIT_STATUS_LABELS[s], count=counts.get(s, 0))
+            for s in HAL_DEPOSIT_STATUSES
         ]
 
     def _facet_in_perimeter(self) -> list[FacetOption]:

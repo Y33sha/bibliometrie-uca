@@ -309,53 +309,35 @@ _SQL_IN_COLLECTION_SA = (
 )
 
 
+def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
+    """Statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
+
+    Sans collection déclarée, aucune publication n'est en collection : une notice HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
+    """
+    if lab_hal_col is None:
+        return WhereClause(
+            f"(CASE WHEN {_SQL_HAS_HAL_SA} THEN 'hors_collection' ELSE 'hors_hal' END)", {}
+        )
+    return WhereClause(
+        f"""(CASE
+            WHEN NOT {_SQL_HAS_HAL_SA} THEN 'hors_hal'
+            WHEN NOT {_SQL_IN_COLLECTION_SA} THEN 'hors_collection'
+            WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN 'notice'
+            ELSE 'ok'
+        END)""",
+        {"flt_hal_collection": lab_hal_col},
+    )
+
+
 def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause | None:
-    """Variante SA de `apply_hal_status_filter`. `:flt_hal_collection` est
-    partagé entre les sous-clauses qui en ont besoin (valeur unique par
-    requête)."""
+    """Filtre : le statut de dépôt HAL de la publication est l'un de `values`."""
     if not values:
         return None
-    parts: list[str] = []
-    needs_collection = False
-    for v in values:
-        if v == "hors_hal":
-            parts.append(f"NOT {_SQL_HAS_HAL_SA}")
-        elif v == "hors_collection":
-            if lab_hal_col is None:
-                parts.append(_SQL_HAS_HAL_SA)
-            else:
-                parts.append(
-                    f"({_SQL_HAS_HAL_SA} "
-                    "AND NOT EXISTS (SELECT 1 FROM source_publications sd "
-                    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
-                    "AND sd.hal_collections @> ARRAY[:flt_hal_collection]))"
-                )
-                needs_collection = True
-        elif v == "notice":
-            if lab_hal_col is None:
-                # Aucune collection déclarée : aucune publication n'est « en collection », `ok`/`notice` ne matchent rien.
-                parts.append("FALSE")
-            else:
-                parts.append(
-                    f"({_SQL_IN_COLLECTION_SA} "
-                    f"AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL}))"
-                )
-                needs_collection = True
-        elif v == "ok":
-            if lab_hal_col is None:
-                parts.append("FALSE")
-            else:
-                parts.append(
-                    f"({_SQL_IN_COLLECTION_SA} "
-                    f"AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN {OA_CLOSED_SQL})"
-                )
-                needs_collection = True
-    if not parts:
-        return None
-    binds: dict[str, object] = {"flt_hal_collection": lab_hal_col} if needs_collection else {}
-    if len(parts) == 1:
-        return WhereClause(parts[0], binds)
-    return WhereClause("(" + " OR ".join(parts) + ")", binds)
+    status = hal_status_expression(lab_hal_col)
+    return WhereClause(
+        f"{status.sql} = ANY(CAST(:flt_hal_status AS text[]))",
+        {**status.binds, "flt_hal_status": values},
+    )
 
 
 def apc_clause(

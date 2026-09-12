@@ -63,6 +63,7 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "apc",
         "oa",
         "oa_status",
+        "hal_status",
         "links",
     }
 )

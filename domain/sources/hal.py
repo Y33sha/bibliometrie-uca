@@ -17,6 +17,14 @@ from domain.types import JsonValue
 # Les trois premières se lisent au regard d'une collection ; seule la dernière s'en passe.
 HAL_DEPOSIT_STATUSES: tuple[str, ...] = ("ok", "notice", "hors_collection", "hors_hal")
 
+# Libellés d'affichage des statuts, partagés par la facette et l'export.
+HAL_DEPOSIT_STATUS_LABELS: dict[str, str] = {
+    "ok": "OK",
+    "notice": "Notice",
+    "hors_collection": "Hors collection",
+    "hors_hal": "Hors HAL",
+}
+
 # Code d'un domaine CCSD : des segments alphanumériques séparés par des points
 # (`sdv`, `sdv.bbm.bm`), le tiret étant admis dans un segment (`info.info-oh`).
 _DOMAIN_CODE = re.compile(r"^[a-z0-9]+(?:[-.][a-z0-9]+)*$")
