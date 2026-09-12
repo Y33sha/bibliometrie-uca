@@ -6,9 +6,9 @@
 
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
-	/** Facette d'entité à forte cardinalité (éditeur, revue, auteur) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
+	/** Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
 	 *
-	 * L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Ce libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
+	 * Le parent tient la sélection sous forme d'**ids** : un au plus en choix simple, plusieurs avec `multiple`. Les libellés sont de la donnée dérivée, gérée ici : connus d'emblée quand l'utilisateur choisit une option, sinon résolus par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Un libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {
 		label: string;
 		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
@@ -16,12 +16,14 @@
 		kind: EntityKind;
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
 		buildParams: () => URLSearchParams;
-		/** Id de l'entité sélectionnée (état canonique), ou null. */
-		selectedId?: string | null;
-		onchange?: (id: string | null) => void;
+		/** Ids des entités sélectionnées. */
+		selected?: string[];
+		/** Cases à cocher : plusieurs entités, retenues si l'une au moins porte la publication. Sinon, un seul choix. */
+		multiple?: boolean;
+		onchange?: (ids: string[]) => void;
 	}
 
-	let { label, endpoint, kind, buildParams, selectedId = null, onchange }: Props = $props();
+	let { label, endpoint, kind, buildParams, selected = [], multiple = false, onchange }: Props = $props();
 
 	interface Result {
 		value: string;
@@ -33,27 +35,32 @@
 	let query = $state('');
 	let results = $state<Result[]>([]);
 	let loading = $state(false);
-	let selectedLabel = $state<string | null>(null);
-	let resolvedId: string | null = null; // id pour lequel `selectedLabel` est à jour
+	// Libellés des entités sélectionnées, par id.
+	let labels = $state<Record<string, string>>({});
 	let debounce: ReturnType<typeof setTimeout>;
 	const instanceId = Symbol();
 
-	// Résolution du libellé de la pastille. Quand un id est présélectionné (restauré de l'URL) dont on ne connaît pas encore le nom, on le demande à l'endpoint. Idempotent (mémoïsé par `resolvedId`), et tolérant aux changements rapides (on n'applique la réponse que si l'id n'a pas changé entre-temps).
+	// Résout le libellé des ids sélectionnés dont le nom est inconnu (restaurés de l'URL). `entityLabel` mémorise les réponses.
 	$effect(() => {
-		if (!selectedId) {
-			selectedLabel = null;
-			resolvedId = null;
-			return;
+		for (const id of selected) {
+			if (id in labels) continue;
+			entityLabel(kind, id)
+				.then((l) => {
+					labels[id] = l ?? id;
+				})
+				.catch(() => {});
 		}
-		if (selectedId === resolvedId) return;
-		resolvedId = selectedId;
-		const id = selectedId;
-		entityLabel(kind, id)
-			.then((label) => {
-				if (resolvedId === id) selectedLabel = label;
-			})
-			.catch(() => {});
 	});
+
+	const buttonText = $derived(!multiple && selected.length ? (labels[selected[0]] ?? label) : label);
+	// Sélection absente des résultats (hors des premières entités, ou écartée par la recherche) : affichée en tête, pour rester visible et décochable.
+	const selectedOutside = $derived(selected.filter((id) => !results.some((r) => r.value === id)));
+	// En choix multiple, les entités cochées passent en tête.
+	const orderedResults = $derived(
+		multiple
+			? [...results.filter((r) => selected.includes(r.value)), ...results.filter((r) => !selected.includes(r.value))]
+			: results,
+	);
 
 	async function search() {
 		loading = true;
@@ -75,12 +82,28 @@
 	}
 
 	function pick(r: Result | null) {
-		// Le libellé de l'option choisie est déjà connu : on l'adopte sans relecture.
-		if (r) rememberEntityLabel(kind, r.value, r.text);
-		selectedLabel = r?.text ?? null;
-		resolvedId = r?.value ?? null;
-		onchange?.(r?.value ?? null);
-		open = false;
+		if (r) {
+			// Le libellé de l'option choisie est déjà connu : on l'adopte sans relecture.
+			rememberEntityLabel(kind, r.value, r.text);
+			labels[r.value] = r.text;
+		}
+		if (!multiple) {
+			onchange?.(r ? [r.value] : []);
+			open = false;
+		} else if (!r) {
+			onchange?.([]);
+		} else {
+			onchange?.(selected.includes(r.value) ? selected.filter((v) => v !== r.value) : [...selected, r.value]);
+		}
+	}
+
+	function pickAll(e: Event & { currentTarget: HTMLInputElement }) {
+		// « Tous » sans sélection reste coché : il n'y a rien à retirer.
+		if (!selected.length) {
+			e.currentTarget.checked = true;
+			return;
+		}
+		pick(null);
 	}
 
 	function openPanel() {
@@ -103,14 +126,17 @@
 	<button
 		type="button"
 		class="facet-btn"
-		class:has-selection={!!selectedId}
+		class:has-selection={selected.length > 0}
 		onclick={(e) => {
 			e.stopPropagation();
 			if (open) open = false;
 			else openPanel();
 		}}
 	>
-		<span class="facet-label">{selectedLabel ?? label}</span>
+		<span class="facet-label">{buttonText}</span>
+		{#if multiple && selected.length}
+			<span class="facet-badge">{selected.length}</span>
+		{/if}
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 
@@ -120,18 +146,22 @@
 			<input type="text" class="facet-search" placeholder="Rechercher..." bind:value={query} oninput={onInput} />
 			<div class="facet-options">
 				<label>
-					<input type="radio" checked={!selectedId} onchange={() => pick(null)} />
+					<input type={multiple ? 'checkbox' : 'radio'} checked={!selected.length} onchange={pickAll} />
 					<span style="font-weight:500">Tous</span>
 				</label>
-				{#if selectedId && !results.some((r) => r.value === selectedId)}
+				{#each selectedOutside as id (id)}
 					<label>
-						<input type="radio" checked onchange={() => (open = false)} />
-						<span class="facet-name" title={selectedLabel ?? selectedId}>{selectedLabel ?? selectedId}</span>
+						<input
+							type={multiple ? 'checkbox' : 'radio'}
+							checked
+							onchange={() => (multiple ? pick({ value: id, text: labels[id] ?? id, count: 0 }) : (open = false))}
+						/>
+						<span class="facet-name" title={labels[id] ?? id}>{labels[id] ?? id}</span>
 					</label>
-				{/if}
-				{#each results as e (e.value)}
+				{/each}
+				{#each orderedResults as e (e.value)}
 					<label>
-						<input type="radio" checked={selectedId === e.value} onchange={() => pick(e)} />
+						<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
 						<span class="facet-name" title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>
 				{/each}
@@ -175,6 +205,20 @@
 		border-color: var(--accent);
 		background: var(--accent-light);
 	}
+	.facet-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: var(--accent);
+		color: white;
+		font-size: 0.8rem;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
 	.facet-arrow {
 		font-size: 0.7rem;
 		color: var(--muted);
@@ -216,7 +260,8 @@
 	.facet-options label:hover {
 		background: #f5f5f2;
 	}
-	.facet-options input[type='radio'] {
+	.facet-options input[type='radio'],
+	.facet-options input[type='checkbox'] {
 		margin: 0;
 		flex-shrink: 0;
 	}

@@ -303,6 +303,16 @@
 			searchable: true,
 		},
 		{
+			key: 'subjects',
+			control: 'entity',
+			label: 'Sujets',
+			param: 'subject_id',
+			entity: 'subject',
+			multiple: true,
+			group: 'Sujets',
+			fixed: () => fixedId(externalFilters?.subjectId),
+		},
+		{
 			key: 'sources',
 			control: 'presence',
 			label: 'Sources',
@@ -342,9 +352,9 @@
 				: checkbox.labs.filter((v) => v !== 'none').join(',');
 		if (labId) p.set('lab_id', labId);
 		// Éditeur / revue : fixés par la route ou choisis en facette.
-		const publisherId = fixedId(externalFilters?.publisherId) ?? entity.publisher;
+		const publisherId = fixedId(externalFilters?.publisherId) ?? entity.publisher.join(',');
 		if (publisherId) p.set('publisher_id', publisherId);
-		const journalId = fixedId(externalFilters?.journalId) ?? entity.journal;
+		const journalId = fixedId(externalFilters?.journalId) ?? entity.journal.join(',');
 		if (journalId) p.set('journal_id', journalId);
 		return base + '/stats?' + paramsToQuery(p);
 	});
@@ -362,7 +372,6 @@
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
 		if (externalFilters?.personId != null) params.set('person_id', String(externalFilters.personId));
-		if (externalFilters?.subjectId) params.set('subject_id', String(externalFilters.subjectId));
 		appendFilterParams(FILTERS, values, params);
 		return params;
 	}
@@ -436,8 +445,8 @@
 		onFilterChange();
 	}
 
-	function onEntityChange(filter: EntityChoiceFilter, id: string | null) {
-		values.entity[filter.key] = id;
+	function onEntityChange(filter: EntityChoiceFilter, ids: string[]) {
+		values.entity[filter.key] = ids;
 		onFilterChange();
 	}
 
@@ -558,7 +567,7 @@
 	{#if f.control === 'checkbox'}
 		<FacetDropdown label={f.label} options={facets.options[f.key] ?? []} searchable={f.searchable} groups={f.groups} tooltip={f.tooltip} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
 	{:else if f.control === 'entity'}
-		<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} buildParams={buildFilterParams} selectedId={values.entity[f.key]} onchange={(id) => onEntityChange(f, id)} />
+		<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} multiple={f.multiple} buildParams={buildFilterParams} selected={values.entity[f.key]} onchange={(ids) => onEntityChange(f, ids)} />
 	{:else}
 		<PresenceFilterToggle label={f.label} items={f.items} bind:states={values.presence[f.key]} counts={facets.sourceCounts} onchange={onFilterChange} />
 	{/if}

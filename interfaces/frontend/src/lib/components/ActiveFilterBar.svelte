@@ -6,6 +6,7 @@
 		isActive,
 		isAvailable,
 		presenceSummary,
+		summarizeParts,
 		type FilterValues,
 		type ListFilter,
 	} from '$lib/filterRegistry';
@@ -24,28 +25,28 @@
 
 	const active = $derived(filters.filter((f) => isAvailable(f) && isActive(f, values)));
 
-	// Libellés des entités sélectionnées (éditeur, revue, auteur), par `kind:id`.
+	// Libellés des entités sélectionnées (éditeur, revue, auteur, sujet), par `kind:id`.
 	let entityLabels = $state<Record<string, string>>({});
 	$effect(() => {
 		for (const f of active) {
 			if (f.control !== 'entity') continue;
-			const id = values.entity[f.key];
-			if (!id) continue;
-			const key = `${f.entity}:${id}`;
-			if (key in entityLabels) continue;
-			entityLabel(f.entity, id)
-				.then((label) => {
-					entityLabels[key] = label ?? id;
-				})
-				.catch(() => {});
+			for (const id of values.entity[f.key] ?? []) {
+				const key = `${f.entity}:${id}`;
+				if (key in entityLabels) continue;
+				entityLabel(f.entity, id)
+					.then((label) => {
+						entityLabels[key] = label ?? id;
+					})
+					.catch(() => {});
+			}
 		}
 	});
 
 	function summary(f: ListFilter): string {
 		if (f.control === 'checkbox') return checkboxSummary(f, values.checkbox[f.key] ?? [], options[f.key] ?? []);
 		if (f.control === 'presence') return presenceSummary(f, values.presence[f.key] ?? {});
-		const id = values.entity[f.key];
-		return (id && entityLabels[`${f.entity}:${id}`]) || '…';
+		const ids = values.entity[f.key] ?? [];
+		return summarizeParts(ids.map((id) => entityLabels[`${f.entity}:${id}`] ?? '…'));
 	}
 </script>
 

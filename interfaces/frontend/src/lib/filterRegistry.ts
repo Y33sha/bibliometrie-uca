@@ -42,6 +42,8 @@ export interface CheckboxFilter extends BaseFilter {
 export interface EntityChoiceFilter extends BaseFilter {
 	control: 'entity';
 	entity: EntityKind;
+	/** Cases à cocher : plusieurs entités, retenues si l'une au moins porte la publication. Sinon, un seul choix. */
+	multiple?: boolean;
 }
 
 export interface PresenceFilter extends BaseFilter {
@@ -51,17 +53,17 @@ export interface PresenceFilter extends BaseFilter {
 
 export type ListFilter = CheckboxFilter | EntityChoiceFilter | PresenceFilter;
 
-/** Valeurs des filtres, par type de contrôle et par clé. */
+/** Valeurs des filtres, par type de contrôle et par clé. Un filtre d'entité porte des ids : un au plus en choix simple. */
 export interface FilterValues {
 	checkbox: Record<string, string[]>;
-	entity: Record<string, string | null>;
+	entity: Record<string, string[]>;
 	presence: Record<string, PresenceStates>;
 }
 
 /** Vide la sélection d'un filtre. */
 export function clearValue(filter: ListFilter, values: FilterValues): void {
 	if (filter.control === 'checkbox') values.checkbox[filter.key] = [];
-	else if (filter.control === 'entity') values.entity[filter.key] = null;
+	else if (filter.control === 'entity') values.entity[filter.key] = [];
 	else values.presence[filter.key] = {};
 }
 
@@ -106,12 +108,18 @@ export function encodePresence(states: PresenceStates): string {
 
 export function isActive(filter: ListFilter, values: FilterValues): boolean {
 	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).length > 0;
-	if (filter.control === 'entity') return (values.entity[filter.key] ?? null) !== null;
+	if (filter.control === 'entity') return (values.entity[filter.key] ?? []).length > 0;
 	return encodePresence(values.presence[filter.key] ?? {}) !== '';
 }
 
 /** Nombre maximal d'éléments nommés dans le résumé d'une sélection ; au-delà, le dernier devient un décompte. */
 const SUMMARY_PARTS = 3;
+
+/** Résumé d'une liste de libellés, pour la barre des filtres actifs. */
+export function summarizeParts(parts: string[]): string {
+	if (parts.length <= SUMMARY_PARTS) return parts.join(', ');
+	return `${parts.slice(0, SUMMARY_PARTS - 1).join(', ')} +${parts.length - SUMMARY_PARTS + 1}`;
+}
 
 /** Résumé d'une sélection de cases à cocher. Un groupe entièrement coché est nommé par son libellé. */
 export function checkboxSummary(filter: CheckboxFilter, selected: string[], options: FacetOption[]): string {
@@ -125,8 +133,7 @@ export function checkboxSummary(filter: CheckboxFilter, selected: string[], opti
 		}
 	}
 	for (const v of rest) parts.push(text.get(v) ?? v);
-	if (parts.length <= SUMMARY_PARTS) return parts.join(', ');
-	return `${parts.slice(0, SUMMARY_PARTS - 1).join(', ')} +${parts.length - SUMMARY_PARTS + 1}`;
+	return summarizeParts(parts);
 }
 
 /** Résumé d'un filtre de présence, sous la forme « avec HAL, sans WoS ». */
@@ -142,7 +149,7 @@ function paramValue(filter: ListFilter, values: FilterValues): string | null {
 	const fixed = filter.fixed?.() ?? null;
 	if (fixed !== null) return fixed;
 	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).join(',') || null;
-	if (filter.control === 'entity') return values.entity[filter.key] || null;
+	if (filter.control === 'entity') return (values.entity[filter.key] ?? []).join(',') || null;
 	return encodePresence(values.presence[filter.key] ?? {}) || null;
 }
 
@@ -168,14 +175,12 @@ export function facetDefs(filters: ListFilter[]): Record<string, FacetDef> {
 export function urlFilterDefs(filters: ListFilter[]): Record<string, UrlFilterDef> {
 	const defs: Record<string, UrlFilterDef> = {};
 	for (const f of filters) {
-		if (f.control === 'checkbox') {
-			defs[f.key] = f.url
-				? { type: 'single', urlKey: f.param, defaultValue: f.url.defaultValue }
-				: { type: 'string_array', urlKey: f.param };
-		} else if (f.control === 'entity') {
-			defs[f.key] = { type: 'single', urlKey: f.param };
-		} else {
+		if (f.control === 'checkbox' && f.url) {
+			defs[f.key] = { type: 'single', urlKey: f.param, defaultValue: f.url.defaultValue };
+		} else if (f.control === 'presence') {
 			defs[f.key] = { type: 'source_states', urlKey: f.param };
+		} else {
+			defs[f.key] = { type: 'string_array', urlKey: f.param };
 		}
 	}
 	return defs;
@@ -189,7 +194,7 @@ export function urlState(filters: ListFilter[], values: FilterValues): Record<st
 			const selected = values.checkbox[f.key] ?? [];
 			state[f.key] = f.url ? f.url.encode(selected) : selected;
 		} else if (f.control === 'entity') {
-			state[f.key] = values.entity[f.key] ?? null;
+			state[f.key] = values.entity[f.key] ?? [];
 		} else {
 			state[f.key] = values.presence[f.key] ?? {};
 		}
@@ -209,7 +214,7 @@ export function restoreValues(
 		if (f.control === 'checkbox') {
 			values.checkbox[f.key] = f.url ? f.url.decode(raw as string) : (raw as string[]);
 		} else if (f.control === 'entity') {
-			values.entity[f.key] = raw as string;
+			values.entity[f.key] = raw as string[];
 		} else {
 			values.presence[f.key] = raw as PresenceStates;
 		}

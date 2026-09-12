@@ -41,7 +41,7 @@ class FacetOption(BaseModel):
     count: int
 
 
-EntityKind = Literal["publisher", "journal", "person"]
+EntityKind = Literal["publisher", "journal", "person", "subject"]
 
 
 class EntityFacetItem(BaseModel):
@@ -51,7 +51,7 @@ class EntityFacetItem(BaseModel):
 
 
 class EntityFacetResponse(BaseModel):
-    """Facette d'entité à forte cardinalité (éditeur, revue, auteur).
+    """Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
     Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications), d'où des décomptes contextuels et une corrélation entre entités (une revue sélectionnée restreint les éditeurs proposés). La recherche par nom borne la requête.
     """

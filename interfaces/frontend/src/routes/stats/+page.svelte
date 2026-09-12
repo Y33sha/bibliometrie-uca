@@ -616,10 +616,10 @@
 		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('journal')}
-		<EntityFilter label="Revue" endpoint="/api/stats/facets" kind="journal" buildParams={chartParams} selectedId={selectedJournalId} onchange={onJournalFilter} />
+		<EntityFilter label="Revue" endpoint="/api/stats/facets" kind="journal" buildParams={chartParams} selected={selectedJournalId ? [selectedJournalId] : []} onchange={(ids) => onJournalFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('publisher')}
-		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selectedId={selectedPublisherId} onchange={onPublisherFilter} />
+		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />

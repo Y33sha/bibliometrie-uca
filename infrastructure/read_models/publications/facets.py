@@ -124,7 +124,7 @@ class _PublicationFacetsBuilder:
         if skip != "in_perimeter":
             clauses.append(in_perimeter_person_clause(f.in_perimeter, f.person_id))
         if skip != "subject":
-            clauses.append(subject_clause(f.subject_id))
+            clauses.append(subject_clause(f.subject_ids))
         if skip != "person":
             clauses.append(author_clause(f.author_id))
         return assemble_where(clauses)
@@ -517,7 +517,7 @@ def publications_entity_facet(
     perimeter_structure_ids: list[int],
     limit: int = 20,
 ) -> list[EntityFacetItem]:
-    """Facette éditeur, revue ou auteur contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
+    """Facette éditeur, revue, auteur ou sujet contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
     builder = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     builder._preload_lab_hal_col()
     where_sql, binds = builder._clauses_skipping(kind)

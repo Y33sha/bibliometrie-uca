@@ -207,7 +207,7 @@ export interface paths {
         };
         /**
          * Publications Entity Facet
-         * @description Facette contextuelle des éditeurs, des revues ou des auteurs : les premières entités sous les filtres actifs, avec leur décompte.
+         * @description Facette contextuelle des éditeurs, des revues, des auteurs ou des sujets : les premières entités sous les filtres actifs, avec leur décompte.
          *
          *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
          */
@@ -2938,7 +2938,7 @@ export interface components {
         };
         /**
          * EntityFacetResponse
-         * @description Facette d'entité à forte cardinalité (éditeur, revue, auteur).
+         * @description Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
          *
          *     Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications), d'où des décomptes contextuels et une corrélation entre entités (une revue sélectionnée restreint les éditeurs proposés). La recherche par nom borne la requête.
          */
@@ -5298,7 +5298,7 @@ export interface operations {
     stats_entity_facet_api_stats_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person";
+                kind: "publisher" | "journal" | "person" | "subject";
                 entity_search?: string;
                 lab_id?: string;
                 year?: string;
@@ -5441,7 +5441,7 @@ export interface operations {
                 journal_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: number | null;
+                subject_id?: string;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
@@ -5482,7 +5482,7 @@ export interface operations {
     publications_entity_facet_api_publications_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person";
+                kind: "publisher" | "journal" | "person" | "subject";
                 entity_search?: string;
                 search?: string;
                 lab_id?: string;
@@ -5491,7 +5491,7 @@ export interface operations {
                 journal_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: number | null;
+                subject_id?: string;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
@@ -5541,7 +5541,7 @@ export interface operations {
                 journal_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: number | null;
+                subject_id?: string;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
@@ -5758,7 +5758,7 @@ export interface operations {
                 journal_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
-                subject_id?: number | null;
+                subject_id?: string;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
@@ -5799,7 +5799,7 @@ export interface operations {
     resolve_entity_label_api_entity_labels_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person";
+                kind: "publisher" | "journal" | "person" | "subject";
                 entity_id: number;
             };
             header?: never;

@@ -64,6 +64,20 @@ class TestEntityLabels:
             with owner_pool() as cur:
                 cur.execute("DELETE FROM persons WHERE id = %s", (person_id,))
 
+    def test_subject_reads_its_label(self, client):
+        label = f"Sujet {uuid.uuid4().hex[:8]}"
+        with owner_pool() as cur:
+            cur.execute("INSERT INTO subjects (label) VALUES (%s) RETURNING id", (label,))
+            subject_id = cur.fetchone()["id"]
+        try:
+            r = client.get(
+                "/api/entity-labels", params={"kind": "subject", "entity_id": subject_id}
+            )
+            assert r.json() == {"label": label}
+        finally:
+            with owner_pool() as cur:
+                cur.execute("DELETE FROM subjects WHERE id = %s", (subject_id,))
+
     def test_unknown_kind_rejected(self, client):
         r = client.get("/api/entity-labels", params={"kind": "structure", "entity_id": 1})
         assert r.status_code == 422

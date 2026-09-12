@@ -85,6 +85,10 @@ class TestPublicationsList:
         r = client.get("/api/publications", params={"subject_id": 1})
         assert r.status_code == 200
 
+    def test_filter_by_several_subjects(self, client):
+        r = client.get("/api/publications", params={"subject_id": "1,2"})
+        assert r.status_code == 200
+
     def test_sort_by_year_desc(self, client):
         r = client.get("/api/publications", params={"sort": "year_desc"})
         assert r.status_code == 200
@@ -189,6 +193,14 @@ class TestPublicationsFacets:
                 "person_id": "1",
                 "author_id": "2",
             },
+        )
+        assert r.status_code == 200
+
+    def test_entity_facet_subject_under_a_subject_selection(self, client):
+        # Facette sujets sous sa propre sélection (sautée) et sous une recherche de libellé.
+        r = client.get(
+            "/api/publications/facets/entities",
+            params={"kind": "subject", "entity_search": "chim", "subject_id": "1,2"},
         )
         assert r.status_code == 200
 
