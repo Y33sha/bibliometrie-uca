@@ -543,7 +543,7 @@
 		{/each}
 		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
 			Plus de filtres
-			{#if moreFiltersActive > 0}<span class="more-filters-badge">{moreFiltersActive}</span>{/if}
+			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
 			<span class="more-filters-arrow">{showMoreFilters ? '▴' : '▾'}</span>
 		</button>
 	</div>
@@ -798,19 +798,6 @@
 	}
 	.more-filters-btn:hover,
 	.more-filters-btn.open { border-color: var(--accent); }
-	.more-filters-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 5px;
-		border-radius: 9px;
-		background: var(--accent);
-		color: white;
-		font-size: 0.8rem;
-		font-weight: 600;
-	}
 	.more-filters-arrow { font-size: 0.7rem; }
 	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
 	.more-filters {

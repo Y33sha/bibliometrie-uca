@@ -156,13 +156,13 @@
 							checked
 							onchange={() => (multiple ? pick({ value: id, text: labels[id] ?? id, count: 0 }) : (open = false))}
 						/>
-						<span class="facet-name" title={labels[id] ?? id}>{labels[id] ?? id}</span>
+						<span class="facet-option-text"title={labels[id] ?? id}>{labels[id] ?? id}</span>
 					</label>
 				{/each}
 				{#each orderedResults as e (e.value)}
 					<label>
 						<input type={multiple ? 'checkbox' : 'radio'} checked={selected.includes(e.value)} onchange={() => pick(e)} />
-						<span class="facet-name" title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
+						<span class="facet-option-text"title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>
 				{/each}
 				{#if !loading && results.length === 0}
@@ -174,23 +174,8 @@
 </div>
 
 <style>
-	.facet {
-		position: relative;
-		display: inline-block;
-	}
+	/* Bouton, panneau et options : styles communs des facettes, dans shared.css. Le nom choisi s'affiche sur le bouton, d'où une largeur bornée. */
 	.facet-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
-		font-size: 0.95rem;
-		cursor: pointer;
-		color: var(--text);
-		white-space: nowrap;
-		font-family: inherit;
 		max-width: 240px;
 	}
 	.facet-label {
@@ -198,86 +183,8 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.facet-btn:hover {
-		border-color: #ccc;
-	}
-	.facet-btn.has-selection {
-		border-color: var(--accent);
-		background: var(--accent-light);
-	}
-	.facet-badge {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 5px;
-		border-radius: 9px;
-		background: var(--accent);
-		color: white;
-		font-size: 0.8rem;
-		font-weight: 600;
-		flex-shrink: 0;
-	}
-	.facet-arrow {
-		font-size: 0.7rem;
-		color: var(--muted);
-		margin-left: 2px;
-		flex-shrink: 0;
-	}
 	.facet-panel {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
 		min-width: 260px;
-		max-width: 360px;
-		max-height: 320px;
-		overflow-y: auto;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-		z-index: 100;
-		padding: 6px 0;
-	}
-	.facet-search {
-		display: block;
-		width: calc(100% - 12px);
-		margin: 2px 6px 6px;
-		padding: 5px 8px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		font-size: 0.85rem;
-	}
-	.facet-options label {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 4px 12px;
-		font-size: 0.95rem;
-		cursor: pointer;
-	}
-	.facet-options label:hover {
-		background: #f5f5f2;
-	}
-	.facet-options input[type='radio'],
-	.facet-options input[type='checkbox'] {
-		margin: 0;
-		flex-shrink: 0;
-	}
-	.facet-name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		/* Indispensable pour que l'ellipse s'applique à un enfant flex (sinon min-width: auto empêche le rétrécissement et le panneau s'élargit au plus long nom). */
-		min-width: 0;
-	}
-	.facet-count {
-		font-size: 0.8rem;
-		color: #888;
-		margin-left: auto;
-		padding-left: 12px;
-		flex-shrink: 0;
 	}
 	.facet-empty {
 		padding: 6px 12px;
