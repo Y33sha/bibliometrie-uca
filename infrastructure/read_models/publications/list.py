@@ -24,6 +24,7 @@ from infrastructure.read_models.filters import (
     access_clause,
     apc_clause,
     assemble_where,
+    author_clause,
     corresponding_clause,
     country_clause,
     doc_type_clause,
@@ -89,6 +90,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         journal_id_clause(filters.journal_id),
         country_clause(filters.country_values),
         subject_clause(filters.subject_id),
+        author_clause(filters.author_id),
     ]
     return out
 

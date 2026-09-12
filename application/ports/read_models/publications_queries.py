@@ -75,6 +75,8 @@ class PublicationFilters:
     Les trois lectures répondent aux mêmes questions sur le même ensemble : leurs décomptes, leurs lignes et leur export ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Tous les champs ont un défaut, ce qui autorise les constructions partielles.
 
     Les listes valent absence de filtre quand elles sont vides. `lab_none` retient les publications qu'aucun laboratoire ne signe ; `is_corresponding`, `has_apc` et `in_perimeter` portent une sélection de `yes` / `no` combinée en OR, où cocher les deux ne contraint rien.
+
+    `person_id` définit l'ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui. `author_id` restreint l'ensemble courant aux publications d'un auteur ; les deux se combinent.
     """
 
     search: str = ""
@@ -89,6 +91,7 @@ class PublicationFilters:
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
     person_id: int | None = None
+    author_id: int | None = None
     is_corresponding: list[str] = field(default_factory=list)
     has_apc: list[str] = field(default_factory=list)
     country_values: list[str] = field(default_factory=list)

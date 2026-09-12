@@ -6,7 +6,7 @@
 
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
-	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
+	/** Facette d'entité à forte cardinalité (éditeur, revue, auteur) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
 	 *
 	 * L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Ce libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {

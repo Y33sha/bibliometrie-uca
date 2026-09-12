@@ -259,6 +259,14 @@
 			showColumns: ['hal_status'],
 		},
 		{
+			key: 'author',
+			control: 'entity',
+			label: 'Auteur',
+			param: 'author_id',
+			entity: 'person',
+			group: 'Auteurs',
+		},
+		{
 			key: 'corresponding',
 			control: 'checkbox',
 			label: 'Corresp.',

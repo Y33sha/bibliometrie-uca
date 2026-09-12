@@ -178,6 +178,29 @@ class TestPublicationsFacets:
         )
         assert r.status_code == 200
 
+    def test_entity_facet_person_on_a_person_page(self, client):
+        # Facette auteur sous filtres + recherche de nom, sur une page personne avec un auteur choisi.
+        r = client.get(
+            "/api/publications/facets/entities",
+            params={
+                "kind": "person",
+                "entity_search": "du",
+                "year": "2024",
+                "person_id": "1",
+                "author_id": "2",
+            },
+        )
+        assert r.status_code == 200
+
+    def test_author_filter_applies_to_list_facets_and_export(self, client):
+        for path in (
+            "/api/publications",
+            "/api/publications/facets",
+            "/api/publications/export.csv",
+        ):
+            r = client.get(path, params={"author_id": "1"})
+            assert r.status_code == 200, path
+
 
 class TestPublicationsExports:
     """Exports CSV/JSON — génèrent des réponses non-JSON."""
