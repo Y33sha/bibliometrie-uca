@@ -205,6 +205,16 @@ class TestPublicationsExports:
         assert "Laboratoires" not in header
         assert "Accès" not in header
 
+    def test_csv_export_publisher_is_its_own_column(self, client):
+        """L'éditeur sort quand sa colonne est demandée, indépendamment de la revue."""
+        r = client.get("/api/publications/export.csv", params={"columns": "publisher"})
+        assert r.status_code == 200
+        header = r.text.splitlines()[0].lstrip("﻿").split(",")
+        assert "Éditeur" in header
+        assert "Revue" not in header
+        r = client.get("/api/publications/export.csv", params={"columns": "journal"})
+        assert "Éditeur" not in r.text.splitlines()[0]
+
     def test_csv_export_is_streamed(self, client):
         """La réponse part en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant et les copies de sa relecture."""
         with client.stream("GET", "/api/publications/export.csv") as r:

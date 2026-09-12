@@ -413,7 +413,7 @@ def export_publications_csv(
     sort: str,
     columns: list[str],
 ) -> Iterator[str]:
-    """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit la visibilité de « Revue ».
+    """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens (DOI + Sources) toujours présents.
 
     Rend le CSV par blocs, à emballer dans une réponse en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant, la copie de sa relecture et l'ajout du BOM en tête.
 
@@ -477,7 +477,7 @@ def export_publications_csv(
             filters,
         )
 
-    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue » (clé `journal`). `columns` vide => toutes (compat ascendante).
+    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents. `columns` vide => toutes.
     requested = set(columns) if columns else set(EXPORT_COLUMNS)
     requested |= {"title", "links"}
     spec: list[tuple[str, str]] = [
@@ -485,7 +485,7 @@ def export_publications_csv(
         ("year", "Année"),
         ("title", "Titre"),
         ("journal", "Revue"),
-        ("journal", "Éditeur"),
+        ("publisher", "Éditeur"),
         ("labs", "Laboratoires"),
         ("corr", "Corresp."),
         ("apc", "APC (€)"),
