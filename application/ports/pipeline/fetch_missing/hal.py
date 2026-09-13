@@ -53,7 +53,12 @@ class HalFetchMissingAdapter(Protocol):
     # ── SQL (inserts) ──────────────────────────────────────────
 
     def insert_halid_result(
-        self, conn: Connection, hal_id: str, doc: Mapping[str, JsonValue] | None
+        self,
+        conn: Connection,
+        hal_id: str,
+        doc: Mapping[str, JsonValue] | None,
+        *,
+        retry_after_days: int,
     ) -> bool:
         """Insère le doc, ou inscrit l'échec dans `failed_lookups` si `doc is None`.
 
@@ -61,6 +66,11 @@ class HalFetchMissingAdapter(Protocol):
         """
 
     def insert_nnt_result(
-        self, conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None
+        self,
+        conn: Connection,
+        nnt: str,
+        doc: Mapping[str, JsonValue] | None,
+        *,
+        retry_after_days: int,
     ) -> NntInsertResult:
-        """Insère le doc HAL trouvé par NNT, ou inscrit l'échec dans `failed_lookups` si `doc is None`. `inserted` est faux si son halId était déjà en staging."""
+        """Insère le doc HAL trouvé par NNT, ou inscrit l'échec dans `failed_lookups` si `doc is None`, repris après `retry_after_days` jours. `inserted` est faux si son halId était déjà en staging."""

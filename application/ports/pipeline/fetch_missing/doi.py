@@ -64,7 +64,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
         """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
         async partagé. Retourne les records trouvés (vide si rien trouvé)."""
 
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        """Insère le record dans staging. Retourne True si nouveau, False
-        si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Ne commite
-        pas : `run_async` commite par lot."""
+    def insert(
+        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
+    ) -> bool:
+        """Insère le record dans staging. Retourne True si nouveau, False si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Une sentinelle `not_found_marker` inscrit l'échec dans `failed_lookups`, repris après `retry_after_days` jours. Ne commite pas : `run_async` commite par lot."""

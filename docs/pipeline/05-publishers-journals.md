@@ -8,7 +8,7 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 
 2. **`enrich_journals_from_openalex`** — lit les [sources OpenAlex](../sources/03-openalex.md) pour renseigner le type de revue, le montant et la devise des frais de publication (APC). Sont reprises les revues qui portent un `openalex_id` et dont le type est inconnu (`journal_type = 'unknown'`).
 
-3. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus de 30 jours.
+3. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
 
 ## Import manuel d'un export DOAJ
 

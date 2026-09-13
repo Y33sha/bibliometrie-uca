@@ -72,6 +72,45 @@ def get_fetch_missing_max_per_source(conn: Connection) -> int | None:
     return _plafond(conn, "fetch_missing_max_per_source", None)
 
 
+FETCH_STALE_AFTER_DAYS_DEFAULT = 90
+"""Délai retenu quand la configuration ne porte pas `fetch_stale_after_days`."""
+
+FETCH_MISSING_RETRY_AFTER_DAYS_DEFAULT = 30
+"""Délai retenu quand la configuration ne porte pas `fetch_missing_retry_after_days`."""
+
+UNPAYWALL_RECHECK_AFTER_DAYS_DEFAULT = 15
+"""Délai retenu quand la configuration ne porte pas `unpaywall_recheck_after_days`."""
+
+DOAJ_REFRESH_AFTER_DAYS_DEFAULT = 30
+"""Délai retenu quand la configuration ne porte pas `doaj_refresh_after_days`."""
+
+
+def _delai(conn: Connection, key: str, defaut: int) -> int:
+    """Délai de réinterrogation lu en configuration, en jours. `defaut` s'applique quand la clé est absente, illisible ou inférieure à un jour."""
+    valeur = _config_int(conn, key)
+    return valeur if valeur is not None and valeur >= 1 else defaut
+
+
+def get_fetch_stale_after_days(conn: Connection) -> int:
+    """Âge, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source."""
+    return _delai(conn, "fetch_stale_after_days", FETCH_STALE_AFTER_DAYS_DEFAULT)
+
+
+def get_fetch_missing_retry_after_days(conn: Connection) -> int:
+    """Délai, en jours, avant de chercher de nouveau un identifiant introuvable dans une source."""
+    return _delai(conn, "fetch_missing_retry_after_days", FETCH_MISSING_RETRY_AFTER_DAYS_DEFAULT)
+
+
+def get_unpaywall_recheck_after_days(conn: Connection) -> int:
+    """Délai, en jours, avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall."""
+    return _delai(conn, "unpaywall_recheck_after_days", UNPAYWALL_RECHECK_AFTER_DAYS_DEFAULT)
+
+
+def get_doaj_refresh_after_days(conn: Connection) -> int:
+    """Délai, en jours, avant de télécharger de nouveau le fichier du DOAJ."""
+    return _delai(conn, "doaj_refresh_after_days", DOAJ_REFRESH_AFTER_DAYS_DEFAULT)
+
+
 def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
     """Retourne les années à extraire : `[start_year … année courante]`.
 

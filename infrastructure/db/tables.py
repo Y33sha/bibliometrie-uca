@@ -31,7 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
+from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
@@ -127,6 +127,12 @@ config = Table(
         f"AND (value)::numeric BETWEEN {MIN_YEAR} AND {MAX_YEAR} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_year_is_in_range",
+    ),
+    CheckConstraint(
+        f"key NOT IN ({', '.join(repr(key) for key in sorted(DELAY_KEYS))}) "
+        "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 1 "
+        "AND (value)::numeric = trunc((value)::numeric))",
+        name="config_delay_is_positive_integer",
     ),
 )
 

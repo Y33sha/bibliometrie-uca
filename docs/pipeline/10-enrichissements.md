@@ -52,6 +52,6 @@ Code : `application/pipeline/countries/`, un module par étape.
 
 Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publications.oa_status` — souvent plus à jour que le statut renseigné dans les sources.
 
-Incrémentale : pour lisser dans le temps les appels API, chaque exécution est plafonnée (10 000 DOI) et ne (re)vérifie que les publications jamais interrogées ou dont le statut n'a pas été revu depuis 15 jours.
+Incrémentale : pour lisser dans le temps les appels API, chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les publications jamais interrogées, ou dont le statut n'a pas été revu depuis le délai `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`).
 
 Code : `application/pipeline/oa_status/phase.py`.

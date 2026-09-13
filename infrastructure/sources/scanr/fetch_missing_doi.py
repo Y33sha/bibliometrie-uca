@@ -82,9 +82,17 @@ class ScanrFetchMissingDoiAdapter:
         missed = [not_found_marker(d) for d in dois if d not in found]
         return records + missed
 
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
+    def insert(
+        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
+    ) -> bool:
         if is_not_found_marker(record):
-            record_failed_lookup(conn, "scanr", "doi", as_str(record["_doi"]) or "")
+            record_failed_lookup(
+                conn,
+                "scanr",
+                "doi",
+                as_str(record["_doi"]) or "",
+                retry_after_days=retry_after_days,
+            )
             return False
 
         scanr_id = as_str(record.get("id")) or ""

@@ -40,6 +40,7 @@ async def run_async(
     log: logging.Logger,
     *,
     missing_dois_reader: MissingDoisReader,
+    retry_after_days: int,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
@@ -54,6 +55,7 @@ async def run_async(
         adapter: instance source-spécifique async.
         log: logger.
         missing_dois_reader: callable `(conn, source) -> list[doi]`.
+        retry_after_days: délai, en jours, avant de chercher de nouveau un DOI confirmé absent.
         limit: nombre max de DOI à traiter.
 
     Returns:
@@ -112,7 +114,7 @@ async def run_async(
             batch_inserted = 0
             try:
                 for record in records:
-                    if adapter.insert(conn, record):
+                    if adapter.insert(conn, record, retry_after_days=retry_after_days):
                         batch_inserted += 1
                 progress["inserted"] += batch_inserted
             except Exception as e:

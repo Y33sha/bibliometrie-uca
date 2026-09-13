@@ -10,6 +10,7 @@
 
 Configuration du [moissonnage](../pipeline/02-extract.md) :
 - années interrogées (modes *weekly* et *full*);
+- délais de réinterrogation des sources ;
 - définition et CRUD des périmètres (`uca`, `alliance_uca`);
 - périmètre utilisé à différentes étapes du pipeline (extraction, détection des affiliations, création de personnes).
 

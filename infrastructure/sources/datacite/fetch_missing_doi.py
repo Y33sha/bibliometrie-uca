@@ -96,9 +96,17 @@ class DataciteFetchMissingDoiAdapter:
         out.extend(not_found_marker(d) for d in dois if clean_doi(d) not in found)
         return out
 
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
+    def insert(
+        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
+    ) -> bool:
         if is_not_found_marker(record):
-            record_failed_lookup(conn, "datacite", "doi", as_str(record["_doi"]) or "")
+            record_failed_lookup(
+                conn,
+                "datacite",
+                "doi",
+                as_str(record["_doi"]) or "",
+                retry_after_days=retry_after_days,
+            )
             return False
 
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.

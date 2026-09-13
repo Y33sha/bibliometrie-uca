@@ -100,19 +100,29 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
     # ── SQL (inserts) ──────────────────────────────────────────
 
     def insert_halid_result(
-        self, conn: Connection, hal_id: str, doc: Mapping[str, JsonValue] | None
+        self,
+        conn: Connection,
+        hal_id: str,
+        doc: Mapping[str, JsonValue] | None,
+        *,
+        retry_after_days: int,
     ) -> bool:
         if doc:
             insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
             return True
-        record_failed_lookup(conn, "hal", "hal_id", hal_id)
+        record_failed_lookup(conn, "hal", "hal_id", hal_id, retry_after_days=retry_after_days)
         return False
 
     def insert_nnt_result(
-        self, conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None
+        self,
+        conn: Connection,
+        nnt: str,
+        doc: Mapping[str, JsonValue] | None,
+        *,
+        retry_after_days: int,
     ) -> NntInsertResult:
         if not doc:
-            record_failed_lookup(conn, "hal", "nnt", nnt)
+            record_failed_lookup(conn, "hal", "nnt", nnt, retry_after_days=retry_after_days)
             return NntInsertResult(api_found=False, inserted=False)
         hal_id = as_str(doc.get("halId_s"))
         if not hal_id:

@@ -1,7 +1,7 @@
 # STATUS: recurring (imports)
 """Import d'un dump CSV DOAJ **local** dans `journals.doaj_payload`.
 
-Le pipeline télécharge et importe le dump automatiquement tous les ~30 jours (cf. `_run_enrich_journals_from_doaj`). Cette CLI sert à forcer l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
+Le pipeline télécharge et importe le dump automatiquement, au terme du délai `doaj_refresh_after_days` (cf. `_run_enrich_journals_from_doaj`). Cette CLI sert à forcer l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
 
 La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit dans `application/pipeline/publishers_journals/import_journals_from_doaj_dump` ; ce script n'est qu'un point d'entrée CLI.
 

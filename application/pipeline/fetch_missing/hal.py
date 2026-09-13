@@ -93,6 +93,8 @@ async def fetch_missing_hal_by_id(
     conn: Connection,
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
+    *,
+    retry_after_days: int,
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
 
@@ -110,7 +112,7 @@ async def fetch_missing_hal_by_id(
     def _insert(
         conn: Connection, hal_id: str, doc: Mapping[str, JsonValue] | None
     ) -> tuple[int, int]:
-        found = adapter.insert_halid_result(conn, hal_id, doc)
+        found = adapter.insert_halid_result(conn, hal_id, doc, retry_after_days=retry_after_days)
         return (1, 0) if found else (0, 1)
 
     fetched, not_found = await _fetch_ids_async(
@@ -131,10 +133,12 @@ async def fetch_missing_hal_by_nnt(
     conn: Connection,
     adapter: HalFetchMissingAdapter,
     log: logging.Logger,
+    *,
+    retry_after_days: int,
 ) -> PhaseMetrics:
     """Fetch des documents HAL de thèses soutenues repérées par NNT (theses.fr).
 
-    `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL. `total` = NNT (thèses soutenues) sans document HAL.
+    `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL, cherchés de nouveau après `retry_after_days` jours. `total` = NNT (thèses soutenues) sans document HAL.
     """
     adapter.configure(conn)
 
@@ -146,7 +150,9 @@ async def fetch_missing_hal_by_nnt(
         return metrics
 
     def _insert(conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None) -> tuple[int, int]:
-        api_found, inserted = adapter.insert_nnt_result(conn, nnt, doc)
+        api_found, inserted = adapter.insert_nnt_result(
+            conn, nnt, doc, retry_after_days=retry_after_days
+        )
         return (1 if inserted else 0, 0 if api_found else 1)
 
     fetched, not_found = await _fetch_ids_async(

@@ -61,7 +61,7 @@ class _FakeAdapter:
             raise self._fetch_result
         return [{"doi": dois[0]}]
 
-    def insert(self, conn, record):  # noqa: ARG002
+    def insert(self, conn, record, *, retry_after_days):  # noqa: ARG002
         self.inserted_records.append(record)
         return True
 
@@ -87,6 +87,7 @@ class TestRunAsyncOrchestrator:
             adapter,
             logging.getLogger("test"),
             missing_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
+            retry_after_days=30,
         )
         assert result == PhaseMetrics(seen=3, new=3, extras={"fetched": 3, "not_found": 0})
         assert len(adapter.inserted_records) == 3
@@ -104,6 +105,7 @@ class TestRunAsyncOrchestrator:
             adapter,
             logging.getLogger("test"),
             missing_dois_reader=_reader(dois),
+            retry_after_days=30,
         )
         assert max(in_flight) <= 3
         # Avec 10 DOIs et 3 workers, on doit avoir vu les 3 workers saturés au moins une fois
@@ -117,6 +119,7 @@ class TestRunAsyncOrchestrator:
             adapter,
             logging.getLogger("test"),
             missing_dois_reader=_reader([f"10.1/{i}" for i in range(10)]),
+            retry_after_days=30,
             limit=3,
         )
         assert result.total == 3
@@ -129,6 +132,7 @@ class TestRunAsyncOrchestrator:
             adapter,
             logging.getLogger("test"),
             missing_dois_reader=_reader([]),
+            retry_after_days=30,
         )
         assert result == PhaseMetrics()
 
@@ -151,6 +155,7 @@ class TestRunAsyncOrchestrator:
             adapter,
             logging.getLogger("test"),
             missing_dois_reader=_reader(["10.1/ok1", "10.1/bad", "10.1/ok2"]),
+            retry_after_days=30,
         )
         assert result.total == 3
         assert result.extras["fetched"] == 2  # seulement les 2 OK

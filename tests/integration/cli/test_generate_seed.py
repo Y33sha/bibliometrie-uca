@@ -72,6 +72,8 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
     assert "VALUES ('perimeter_persons'" not in common_sql
     assert "VALUES ('unpaywall_max_per_run'" in common_sql
     assert "VALUES ('unpaywall_max_per_run'" not in institution_sql
+    # Les délais de réinterrogation, que la migration pose, suivent le seed commun.
+    assert "VALUES ('fetch_stale_after_days'" in common_sql
     # Chaque seed supprime seulement ses propres clés : l'ordre de chargement est indifférent.
     assert "DELETE FROM config WHERE key NOT IN (" in common_sql
     assert "DELETE FROM config WHERE key IN (" in institution_sql

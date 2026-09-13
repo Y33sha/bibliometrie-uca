@@ -77,9 +77,17 @@ class OpenalexFetchMissingDoiAdapter:
             return [not_found_marker(doi)]
         return results[:1]
 
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
+    def insert(
+        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
+    ) -> bool:
         if is_not_found_marker(record):
-            record_failed_lookup(conn, "openalex", "doi", as_str(record["_doi"]) or "")
+            record_failed_lookup(
+                conn,
+                "openalex",
+                "doi",
+                as_str(record["_doi"]) or "",
+                retry_after_days=retry_after_days,
+            )
             return False
 
         doi = extract_doi(record)

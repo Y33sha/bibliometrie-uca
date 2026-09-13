@@ -158,7 +158,9 @@ class TestFindMissingNnts:
 
 class TestInsertResults:
     def test_un_hal_id_absent_de_hal_est_inscrit_definitivement(self, sa_sync_conn):
-        found = PgHalFetchMissingAdapter().insert_halid_result(sa_sync_conn, "hal-01234567", None)
+        found = PgHalFetchMissingAdapter().insert_halid_result(
+            sa_sync_conn, "hal-01234567", None, retry_after_days=30
+        )
         row = sa_sync_conn.execute(
             text("SELECT id_type, id_value, next_retry FROM failed_lookups")
         ).one()
@@ -166,7 +168,9 @@ class TestInsertResults:
         assert (row.id_type, row.id_value, row.next_retry) == ("hal_id", "hal-01234567", None)
 
     def test_un_nnt_absent_de_hal_attend_son_delai(self, sa_sync_conn):
-        PgHalFetchMissingAdapter().insert_nnt_result(sa_sync_conn, "2024UCA0001", None)
+        PgHalFetchMissingAdapter().insert_nnt_result(
+            sa_sync_conn, "2024UCA0001", None, retry_after_days=30
+        )
         row = sa_sync_conn.execute(
             text("SELECT id_type, next_retry > now() AS pending FROM failed_lookups")
         ).one()
@@ -174,7 +178,7 @@ class TestInsertResults:
 
     def test_un_document_trouve_par_nnt_entre_en_staging(self, sa_sync_conn):
         result = PgHalFetchMissingAdapter().insert_nnt_result(
-            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}
+            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}, retry_after_days=30
         )
         staged = sa_sync_conn.execute(
             text("SELECT count(*) FROM staging WHERE source = 'hal' AND source_id = 'tel-01'")
@@ -187,7 +191,7 @@ class TestInsertResults:
             text("INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', 'tel-01', '{}')")
         )
         result = PgHalFetchMissingAdapter().insert_nnt_result(
-            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}
+            sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}, retry_after_days=30
         )
         assert result == NntInsertResult(api_found=True, inserted=False)
 

@@ -69,11 +69,11 @@ class _FakeHalAdapter:
     async def fetch_by_nnt(self, client, nnt: str):
         return self._rendu(nnt)
 
-    def insert_halid_result(self, conn, hal_id: str, doc) -> bool:
+    def insert_halid_result(self, conn, hal_id: str, doc, *, retry_after_days) -> bool:
         self.inseres.append(hal_id)
         return doc is not None
 
-    def insert_nnt_result(self, conn, nnt: str, doc) -> NntInsertResult:
+    def insert_nnt_result(self, conn, nnt: str, doc, *, retry_after_days) -> NntInsertResult:
         self.inseres.append(nnt)
         if doc is None:
             return NntInsertResult(api_found=False, inserted=False)
@@ -87,7 +87,9 @@ class TestParHalId:
             docs={"hal-1": {"halId_s": "hal-1"}},
         )
 
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+        metrics = await fetch_missing_hal_by_id(
+            _FakeConnection(), adapter, _LOG, retry_after_days=30
+        )
 
         assert metrics.seen == 2
         assert metrics.new == 1
@@ -100,7 +102,9 @@ class TestParHalId:
             hal_ids=["hal-1", "hal-2"], docs={"hal-1": {}}, en_echec={"hal-2"}
         )
 
-        metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+        metrics = await fetch_missing_hal_by_id(
+            _FakeConnection(), adapter, _LOG, retry_after_days=30
+        )
 
         assert adapter.inseres == ["hal-1"]
         assert metrics.new == 1
@@ -114,7 +118,7 @@ class TestParHalId:
         )
         conn = _FakeConnection()
 
-        metrics = await fetch_missing_hal_by_id(conn, adapter, _LOG)
+        metrics = await fetch_missing_hal_by_id(conn, adapter, _LOG, retry_after_days=30)
 
         assert metrics.new == 60
         assert conn.commits == 2  # un au 50e document, un en sortie de pool
@@ -124,7 +128,9 @@ class TestParHalId:
         adapter = _FakeHalAdapter()
 
         with caplog.at_level(logging.INFO):
-            metrics = await fetch_missing_hal_by_id(_FakeConnection(), adapter, _LOG)
+            metrics = await fetch_missing_hal_by_id(
+                _FakeConnection(), adapter, _LOG, retry_after_days=30
+            )
 
         assert metrics.seen == 0
         assert adapter.telecharges == []
@@ -139,7 +145,9 @@ class TestParNnt:
             deja_en_staging={"2024UCA0001"},
         )
 
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
+        metrics = await fetch_missing_hal_by_nnt(
+            _FakeConnection(), adapter, _LOG, retry_after_days=30
+        )
 
         assert metrics.seen == 1
         assert metrics.new == 0
@@ -152,7 +160,9 @@ class TestParNnt:
             docs={"2024UCA0001": {}},
         )
 
-        metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
+        metrics = await fetch_missing_hal_by_nnt(
+            _FakeConnection(), adapter, _LOG, retry_after_days=30
+        )
 
         assert metrics.new == 1
         assert metrics.extras["not_found"] == 1
@@ -162,7 +172,9 @@ class TestParNnt:
         adapter = _FakeHalAdapter()
 
         with caplog.at_level(logging.INFO):
-            metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), adapter, _LOG)
+            metrics = await fetch_missing_hal_by_nnt(
+                _FakeConnection(), adapter, _LOG, retry_after_days=30
+            )
 
         assert metrics.seen == 0
         assert adapter.telecharges == []

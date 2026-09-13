@@ -137,12 +137,22 @@
   ];
   const CAP_KEYS = new Set(CAPS.map((cap) => cap.key));
 
+  /** Délais au-delà desquels le pipeline interroge de nouveau une source, en jours. */
+  const DELAYS = [
+    { key: "fetch_stale_after_days", label: "Documents non revus" },
+    { key: "fetch_missing_retry_after_days", label: "Recherches infructueuses" },
+    { key: "unpaywall_recheck_after_days", label: "Statut open access (Unpaywall)" },
+    { key: "doaj_refresh_after_days", label: "Fichier du DOAJ" },
+  ];
+  const DELAY_KEYS = new Set(DELAYS.map((delay) => delay.key));
+
   const MIN_YEAR = 1970;
   const MAX_YEAR = 2100;
 
   /** Bornes du champ pour une clé numérique, `null` pour les autres. */
   function numericBounds(key: string): { min: number; max: number } | null {
     if (CAP_KEYS.has(key)) return { min: 0, max: 10_000_000 };
+    if (DELAY_KEYS.has(key)) return { min: 1, max: 3650 };
     if (key === "pipeline_start_year_full") return { min: MIN_YEAR, max: MAX_YEAR };
     return null;
   }
@@ -150,6 +160,10 @@
   /** Plafond d'interrogations : zéro retire la borne. */
   function capLabel(value: number): string {
     return value > 0 ? `${value.toLocaleString("fr-FR")} par run` : "Illimité";
+  }
+
+  function delayLabel(value: number): string {
+    return `${value} jour${value > 1 ? "s" : ""}`;
   }
 
   function configByKey(key: string): ConfigItem | undefined {
@@ -268,6 +282,26 @@
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
           <button class="btn btn-sm" onclick={() => startEdit(cap.key)}>Modifier</button>
+        {/if}
+      </div>
+    {/if}
+  {/each}
+</div>
+
+<!-- ═══ DÉLAIS ═══ -->
+<h3 class="section-title">Délais de réinterrogation</h3>
+<p class="help-text">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
+<div class="config-grid">
+  {#each DELAYS as delay (delay.key)}
+    {@const item = configByKey(delay.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">{delay.label}</span>
+        {#if editingKey === delay.key}
+          {@render inlineEdit(delay.key)}
+        {:else}
+          <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
+          <button class="btn btn-sm" onclick={() => startEdit(delay.key)}>Modifier</button>
         {/if}
       </div>
     {/if}

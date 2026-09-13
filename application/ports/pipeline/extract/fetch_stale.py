@@ -63,8 +63,10 @@ class FetchStaleAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL, auth) depuis la base avant la boucle."""
 
-    def find_stale(self, conn: Connection, years: list[int] | None) -> list[StaleRow]:
-        """SELECT des rows staging de la source dont `last_seen_at` a expiré.
+    def find_stale(
+        self, conn: Connection, years: list[int] | None, *, after_days: int
+    ) -> list[StaleRow]:
+        """SELECT des rows staging de la source dont `last_seen_at` date de plus de `after_days` jours.
 
         `years` borne la sélection à la fenêtre d'années du run (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
         """

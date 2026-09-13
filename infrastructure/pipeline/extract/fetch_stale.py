@@ -1,23 +1,21 @@
 """Sélection des rows `staging` périmées et marquage des disparues (phase `fetch_stale`).
 
-`get_stale_rows` liste les rows dont `last_seen_at` a franchi le seuil ; `set_disappeared_by_source_id` marque celles dont le refetch a confirmé l'absence. Le commit est à la charge de l'appelant.
+`get_stale_rows` liste les rows dont `last_seen_at` a franchi le délai ; `set_disappeared_by_source_id` marque celles dont le refetch a confirmé l'absence. Le commit est à la charge de l'appelant.
 """
 
 from sqlalchemy import Connection, text
 
-from domain.config import STALE_REFRESH_AFTER_DAYS
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 
 __all__ = [
-    "STALE_REFRESH_AFTER_DAYS",
     "get_stale_rows",
     "set_disappeared_by_source_id",
 ]
 
-# La phase refetche par identifiant natif les rows dont `last_seen_at` a franchi le seuil : trouvé
+# La phase refetche par identifiant natif les rows dont `last_seen_at` a franchi le délai : trouvé
 # → `last_seen_at` mis à jour et `raw_data` rafraîchi ; absence confirmée → `disappeared_at`.
-# Tournant à chaque exécution, le seuil étale la charge sans `LIMIT` : chaque passe ne ramasse que
-# ce qui vient de franchir le délai.
+# Tournant à chaque exécution, le délai étale la charge sans `LIMIT` : chaque passe ramasse
+# seulement ce qui vient de le franchir.
 
 # Filtre année (`{year_clause}`) : `pub_year` vient de `source_publications` (LEFT JOIN ; NULL si absent, conservé).
 _STALE_ROWS_SQL_TEMPLATE = """
@@ -42,9 +40,9 @@ _SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
 
 
 def get_stale_rows(
-    conn: Connection, source: str, years: list[int] | None = None
+    conn: Connection, source: str, years: list[int] | None = None, *, after_days: int
 ) -> list[tuple[int, str]]:
-    """Rows `(id, source_id)` de `source` dont `last_seen_at` dépasse STALE_REFRESH_AFTER_DAYS.
+    """Rows `(id, source_id)` de `source` dont `last_seen_at` date de plus de `after_days` jours.
 
     Alimente la phase `fetch_stale` : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`) : la sélection ne dépend pas de la présence d'un DOI. Exclut les rows déjà marquées disparues.
 
@@ -52,7 +50,7 @@ def get_stale_rows(
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-    params: dict[str, object] = {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
+    params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
         year_clause = "AND (sp.pub_year IS NULL OR sp.pub_year = ANY(:years))"

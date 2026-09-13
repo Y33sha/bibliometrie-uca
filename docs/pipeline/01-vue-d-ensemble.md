@@ -9,7 +9,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 - [Moissonnage](02-extract.md#moissonnage-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
 - [Identification des agences d'enregistrement des DOI](02-extract.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
 - [Documents absents d'une source](02-extract.md#documents-absents-dune-source-fetch_missing) : cherche dans chaque source les documents que le moissonnage initial n'y a pas trouvés.
-- [Documents périmés et disparus](02-extract.md#documents-périmés-et-disparus-fetch_stale) : réinterroge les documents vus pour la dernière fois il y a plus de 90 jours, rafraîchit leurs métadonnées et marque (`disappeared_at`) ceux qui ont disparu.
+- [Documents périmés et disparus](02-extract.md#documents-périmés-et-disparus-fetch_stale) : réinterroge les documents non revus depuis un délai réglable (90 jours par défaut), rafraîchit leurs métadonnées et marque (`disappeared_at`) ceux qui ont disparu.
 - [Listes d'auteurs tronquées](02-extract.md#listes-dauteurs-tronquées-fetch_truncated) : retélécharge un par un les documents OpenAlex de 100 auteurs, que le plafond de l'API a tronqués.
 
 ## Normalisation
