@@ -596,12 +596,19 @@ th.sorted .sort-arrow {
 	background: #c6e8e0;
 }
 
+/* Lien DOI : l'icône seule, sans pastille, qui prend la couleur d'accent au survol. */
 .source-doi {
-	background: #f0f0f0;
+	color: var(--text-muted);
 }
 
 .source-doi:hover {
-	background: #e0e0e0;
+	color: var(--accent);
+	transform: none;
+}
+
+.source-doi :is(svg) {
+	width: 18px;
+	height: 18px;
 }
 
 .source-placeholder {
