@@ -472,60 +472,55 @@ def journal_id_clause(journal_id: int | None) -> WhereClause | None:
     return WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id})
 
 
-def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClause | None:
-    """Variante SA de `apply_person_has_identifier_filter`.
+def person_has_identifier_sql(id_type: str) -> str:
+    """Prédicat : la personne `p` porte un identifiant `id_type` au statut hors `rejected`.
 
-    `id_type` est une constante d'appel (orcid/idhal/idref) — interpolée
-    en SQL. `value` commande la présence ou l'absence d'un EXISTS, donc pas de bind.
+    `id_type` est une constante d'appel (orcid/idhal/idref), interpolée en SQL.
     """
-    if value is None:
-        return None
-    negate = "" if value else "NOT "
-    return WhereClause(
-        f"""{negate}EXISTS (
+    return f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id
               AND pi.id_type = '{id_type}'
               AND pi.status != '{AttributionStatus.REJECTED.value}'
-        )""",
-        {},
-    )
+        )"""
 
 
-def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | None:
-    """Personnes ayant ≥1 forme de nom au statut `pending` (à confirmer).
-
-    Les formes dérivées du nom canonique (source `'persons'`) sont confirmées d'office :
-    `status = 'pending'` ne capte donc que les formes bibliographiques non encore tranchées."""
+def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClause | None:
+    """Filtre : la personne porte (`value` vrai) ou non un identifiant `id_type` (`person_has_identifier_sql`)."""
     if value is None:
         return None
     negate = "" if value else "NOT "
-    return WhereClause(
-        f"""{negate}EXISTS (
+    return WhereClause(f"{negate}{person_has_identifier_sql(id_type)}", {})
+
+
+# Prédicat : la personne `p` a ≥1 forme de nom au statut `pending` (à confirmer). Les formes dérivées du nom de la personne (source `'persons'`) sont confirmées d'office : `status = 'pending'` capte donc seulement les formes bibliographiques non encore tranchées.
+PERSON_HAS_PENDING_NAME_FORMS_SQL = f"""EXISTS (
             SELECT 1 FROM person_name_forms pnf
             WHERE pnf.person_id = p.id AND pnf.status = '{AttributionStatus.PENDING.value}'
-        )""",
-        {},
-    )
+        )"""
 
-
-def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | None:
-    """Personnes ayant ≥1 identifiant **public** au statut `pending` (à confirmer).
-
-    Restreint aux types exposés en UI (`PUBLIC_PERSON_IDENTIFIER_TYPES`) : un
-    `hal_person_id` en attente est interne et jamais présenté à l'arbitrage, il ne
-    doit donc pas faire remonter la personne dans la file « à confirmer »."""
-    if value is None:
-        return None
-    negate = "" if value else "NOT "
-    return WhereClause(
-        f"""{negate}EXISTS (
+# Prédicat : la personne `p` a ≥1 identifiant **public** au statut `pending` (à confirmer). Restreint aux types exposés en UI (`PUBLIC_PERSON_IDENTIFIER_TYPES`) : un `hal_person_id` en attente est interne et jamais présenté à l'arbitrage, il ne doit donc pas faire remonter la personne dans la file « à confirmer ».
+PERSON_HAS_PENDING_IDENTIFIERS_SQL = f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.status = '{AttributionStatus.PENDING.value}'
               AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
-        )""",
-        {},
-    )
+        )"""
+
+
+def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | None:
+    """Filtre : la personne a (`value` vrai) ou non une forme de nom à confirmer (`PERSON_HAS_PENDING_NAME_FORMS_SQL`)."""
+    if value is None:
+        return None
+    negate = "" if value else "NOT "
+    return WhereClause(f"{negate}{PERSON_HAS_PENDING_NAME_FORMS_SQL}", {})
+
+
+def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | None:
+    """Filtre : la personne a (`value` vrai) ou non un identifiant à confirmer (`PERSON_HAS_PENDING_IDENTIFIERS_SQL`)."""
+    if value is None:
+        return None
+    negate = "" if value else "NOT "
+    return WhereClause(f"{negate}{PERSON_HAS_PENDING_IDENTIFIERS_SQL}", {})
 
 
 def person_department_clause(departments: list[str]) -> WhereClause | None:
