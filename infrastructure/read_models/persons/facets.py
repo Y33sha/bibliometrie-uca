@@ -8,11 +8,13 @@ from application.ports.read_models.persons_queries import (
     PersonsFacetsResponse,
 )
 from infrastructure.read_models.filters import (
-    PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
+    PERSON_HAS_PENDING_IDENTIFIERS_SQL,
+    PERSON_HAS_PENDING_NAME_FORMS_SQL,
     WhereClause,
     assemble_where,
     person_department_clause,
     person_has_identifier_clause,
+    person_has_identifier_sql,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
@@ -30,14 +32,6 @@ def _yesno(predicate: str, prefix: str = "") -> str:
     return (
         f"COUNT(*) FILTER (WHERE {predicate}) AS {prefix}yes, "
         f"COUNT(*) FILTER (WHERE NOT ({predicate})) AS {prefix}no"
-    )
-
-
-def _has_identifier(id_type: str) -> str:
-    """Prédicat : la personne `p` porte un identifiant `id_type` au statut hors 'rejected'."""
-    return (
-        "EXISTS (SELECT 1 FROM person_identifiers pi "
-        f"WHERE pi.person_id = p.id AND pi.id_type = '{id_type}' AND pi.status != 'rejected')"
     )
 
 
@@ -97,9 +91,9 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     where_sql, binds = assemble_where(base_clauses(skip="ids"))
     ids = conn.execute(
         text(f"""
-            SELECT {_yesno(_has_identifier("orcid"), "orcid_")},
-                   {_yesno(_has_identifier("idhal"), "idhal_")},
-                   {_yesno(_has_identifier("idref"), "idref_")}
+            SELECT {_yesno(person_has_identifier_sql("orcid"), "orcid_")},
+                   {_yesno(person_has_identifier_sql("idhal"), "idhal_")},
+                   {_yesno(person_has_identifier_sql("idref"), "idref_")}
             FROM {_BASE_FROM} WHERE {where_sql}
         """),
         binds,
@@ -114,24 +108,19 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
 
     # FORMES DE NOM À CONFIRMER (≥1 forme `pending`)
     where_sql, binds = assemble_where(base_clauses(skip="pending_forms"))
-    pending_forms_pred = (
-        "EXISTS (SELECT 1 FROM person_name_forms pnf "
-        "WHERE pnf.person_id = p.id AND pnf.status = 'pending')"
-    )
     pending_forms = conn.execute(
-        text(f"SELECT {_yesno(pending_forms_pred)} FROM {_BASE_FROM} WHERE {where_sql}"),
+        text(
+            f"SELECT {_yesno(PERSON_HAS_PENDING_NAME_FORMS_SQL)} FROM {_BASE_FROM} WHERE {where_sql}"
+        ),
         binds,
     ).one()
 
-    # IDENTIFIANTS À CONFIRMER (≥1 identifiant public `pending`) — mêmes types que la cellule d'affichage, un `hal_person_id` en attente est interne.
+    # IDENTIFIANTS À CONFIRMER
     where_sql, binds = assemble_where(base_clauses(skip="pending_identifiers"))
-    pending_ids_pred = (
-        "EXISTS (SELECT 1 FROM person_identifiers pi "
-        "WHERE pi.person_id = p.id AND pi.status = 'pending' "
-        f"AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL})"
-    )
     pending_identifiers = conn.execute(
-        text(f"SELECT {_yesno(pending_ids_pred)} FROM {_BASE_FROM} WHERE {where_sql}"),
+        text(
+            f"SELECT {_yesno(PERSON_HAS_PENDING_IDENTIFIERS_SQL)} FROM {_BASE_FROM} WHERE {where_sql}"
+        ),
         binds,
     ).one()
 
