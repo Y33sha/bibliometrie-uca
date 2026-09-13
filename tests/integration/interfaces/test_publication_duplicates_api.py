@@ -1,7 +1,6 @@
 """Tests d'intégration pour les endpoints de déduplication du router `interfaces.api.routers.publications`.
 
 Couvre :
-- GET /api/publications/duplicates/next (pair candidate ou null)
 - POST /api/publications/duplicates/merge (validation, 404, happy path)
 - POST /api/publications/duplicates/mark-distinct (validation, happy path)
 """
@@ -57,31 +56,6 @@ def _cleanup_after_module():
             "TRUNCATE TABLE publications, source_publications, distinct_publications, audit_log "
             "RESTART IDENTITY CASCADE"
         )
-
-
-class TestNextDuplicateCandidate:
-    def test_returns_total_and_pair_shape(self, client):
-        # Sur une DB sans paires candidates → total=0, pair=None.
-        r = client.get("/api/publications/duplicates/next")
-        assert r.status_code == 200
-        body = r.json()
-        assert "total" in body
-        assert "offset" in body
-        assert "pair" in body  # peut être None
-
-    def test_min_title_len_below_minimum_rejected(self, client):
-        # Query param `min_title_len` est `Query(30, ge=10)` → < 10 = 422.
-        r = client.get("/api/publications/duplicates/next", params={"min_title_len": 5})
-        assert r.status_code == 422
-
-    def test_negative_offset_rejected(self, client):
-        r = client.get("/api/publications/duplicates/next", params={"offset": -1})
-        assert r.status_code == 422
-
-    def test_offset_zero_default(self, client):
-        r = client.get("/api/publications/duplicates/next", params={"offset": 0})
-        assert r.status_code == 200
-        assert r.json()["offset"] == 0
 
 
 class TestMergeDuplicatePublications:

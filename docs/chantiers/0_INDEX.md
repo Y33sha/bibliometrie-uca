@@ -13,6 +13,7 @@
 ### Non commencé
 
 - [Conférences et actes](METIER_conferences-et-actes.md)
+- [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)

@@ -39,7 +39,7 @@ Légende :
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
 - **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
-- **`distinct_publications`** : paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
+- **`distinct_publications`** : paires de publications déclarées **distinctes** par l'administration.
 - **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.

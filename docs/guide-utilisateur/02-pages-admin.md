@@ -46,7 +46,7 @@ Gestion du référentiel de personnes :
 
 - **Édition du nom**.
 - **Rejet** : marquer une personne comme fausse entité (mauvais parsing, noms d'équipes de recherche…).
-- **Identifiants** : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref) avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
+- **Identifiants** : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), compte HAL, avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
 - **Formes de nom** : chaque personne a des formes de nom normalisées issues des sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre personne). Cliquer sur une forme ouvre un modal permettant de consulter les authorships liées et de les détacher.
 - **Fusion** : le bouton "Fusionner" permet de chercher un doublon et de fusionner deux personnes. Bloqué si les deux ont une fiche RH.
 
@@ -59,6 +59,12 @@ Authorships UCA dont l'auteur n'est pas encore identifié (`person_id = NULL`). 
 - **Traitement par lot** : sélectionner plusieurs authorships et les attribuer en une fois
 
 Le dropdown de recherche affiche le département RH (si existant) ou l'id interne (sinon) pour départager les homonymes.
+
+### Publications
+
+`/admin/publications`
+
+Liste des publications, avec les filtres de la page publique.
 
 ### Éditeurs
 TODO: à compléter
@@ -91,27 +97,3 @@ Les ajouts/suppressions de formes de noms seront prises en compte à la prochain
 
 Attribution et correction des pays liés aux adresses.
 Les corrections se propagent automatiquement aux publications liées, sans besoin de relancer le pipeline.
-
-## Dédoublonnage
-
-### Publications
-
-`/admin/duplicates`
-
-Paires de publications potentiellement identiques (logique de détection dans [infrastructure/read_models/publications/duplicates.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/read_models/publications/duplicates.py)).<!--TODO: à réviser et documenter-->
-
-Pour chaque paire, on peut :
-
-- **Fusionner** : absorber une publication dans l'autre
-- **Marquer comme distinctes** : indiquer que ce n'est pas un doublon
-- **Passer** : reporter la décision
-
-### Personnes
-
-`/admin/person-duplicates`
-
-Paires de personnes potentiellement identiques. Mêmes opérations que pour les doublons de publications.
-
-Deux modes de détection des candidats au dédoublonnage:
-- Par similitude de noms (tolérance aux initiales et aux noms composés vs simples);
-- Par conflit entre sources (deux personnes en même position auteur sur la même publication).
