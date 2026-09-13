@@ -17,6 +17,7 @@ from application.pipeline.subjects.extractors import (
 from application.pipeline.subjects.ingestion import run
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+from infrastructure.repositories.publication_repository import PgPublicationRepository
 
 
 class TestExtractors:
@@ -137,6 +138,11 @@ def _subjects_of(conn, pub_id):
     ).all()
 
 
+def _publications_updated(metrics):
+    """Nombre de publications traitées par un passage."""
+    return metrics.details["summary"]["publications_updated"]
+
+
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
         pub = _create_pub(sa_sync_conn)
@@ -154,7 +160,7 @@ class TestRunOrchestrator:
         assert m1.new == 1
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
 
-        # Sans changement : updated_at <= created_at des liens → ignorée.
+        # Déjà ingérée : `subjects_ingested_at` est posé → ignorée.
         m2 = run(sa_sync_conn, queries, logger)
         assert m2.new == 0
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
@@ -171,23 +177,50 @@ class TestRunOrchestrator:
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
 
-        # Changement de contenu : nouveau topic + bump de publications.updated_at (ce
-        # que fait refresh_from_sources en réel quand une source change).
+        # Changement de contenu : nouveau topic, puis enregistrement de la publication
+        # recalculée depuis ses sources, qui vide `subjects_ingested_at`.
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"
             ),
             {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
         )
-        sa_sync_conn.execute(
-            text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
-            {"id": pub},
-        )
+        repo = PgPublicationRepository(sa_sync_conn)
+        repo.save(repo.find_by_id(pub))
+
         m2 = run(sa_sync_conn, queries, logger)
         assert m2.new == 1
         rows = _subjects_of(sa_sync_conn, pub)
         assert len(rows) == 1
         assert rows[0].label == "Physique"
+
+    def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
+        # Une publication sans sujet est datée comme les autres : elle ne revient pas.
+        pub = _create_pub(sa_sync_conn)
+        _create_source_pub(sa_sync_conn, source="hal", source_id="h1", publication_id=pub)
+        logger = logging.getLogger("test")
+
+        assert _publications_updated(run(sa_sync_conn, queries, logger)) == 1
+        assert _publications_updated(run(sa_sync_conn, queries, logger)) == 0
+
+    def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
+        # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
+        pub = _create_pub(sa_sync_conn)
+        _create_source_pub(
+            sa_sync_conn,
+            source="hal",
+            source_id="h1",
+            publication_id=pub,
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        )
+        logger = logging.getLogger("test")
+        run(sa_sync_conn, queries, logger)
+
+        sa_sync_conn.execute(
+            text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
+            {"id": pub},
+        )
+        assert _publications_updated(run(sa_sync_conn, queries, logger)) == 0
 
     def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
         # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.

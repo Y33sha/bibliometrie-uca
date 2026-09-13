@@ -80,20 +80,17 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         return [
             r.id
             for r in conn.execute(
-                text(
-                    """
-                    SELECT p.id
-                    FROM publications p
-                    LEFT JOIN (
-                        SELECT publication_id, max(created_at) AS last_ingest
-                        FROM publication_subjects
-                        GROUP BY publication_id
-                    ) li ON li.publication_id = p.id
-                    WHERE li.last_ingest IS NULL OR p.updated_at > li.last_ingest
-                    """
-                )
+                text("SELECT id FROM publications WHERE subjects_ingested_at IS NULL")
             ).all()
         ]
+
+    def mark_subjects_ingested(self, conn: Connection, *, publication_ids: list[int]) -> None:
+        if not publication_ids:
+            return
+        conn.execute(
+            text("UPDATE publications SET subjects_ingested_at = now() WHERE id = ANY(:ids)"),
+            {"ids": publication_ids},
+        )
 
     def select_all_publication_ids(self, conn: Connection) -> list[int]:
         return [r.id for r in conn.execute(text("SELECT id FROM publications")).all()]

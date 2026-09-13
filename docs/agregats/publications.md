@@ -10,7 +10,7 @@ Une publication est la référence unifiée d'un document : plusieurs enregistre
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `pub_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `unpaywall_checked_at`, `meta` |
+| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `pub_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `unpaywall_checked_at`, `subjects_ingested_at`, `meta` |
 | `authorships` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
 | `publication_relations` | Lien orienté entre deux publications | `from_publication_id`, `relation_type`, `target_publication_id` **ou** `target_doi`, `source` |
 | `distinct_publications` | Paires déclarées comme deux documents différents | `(pub_id_a, pub_id_b)`, avec `a < b` |
