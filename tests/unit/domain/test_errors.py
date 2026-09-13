@@ -3,7 +3,6 @@
 from domain.errors import (
     AuthorshipAlreadyAssignedError,
     CannotAttributeConflict,
-    DistinctDoiError,
     PublisherMergeBlockedError,
     RejectedPairError,
 )
@@ -47,14 +46,6 @@ class TestPublisherMergeBlockedError:
     def test_plusieurs_paires(self):
         exc = PublisherMergeBlockedError([_paire_de_revues(), _paire_de_revues()])
         assert str(exc) == "Fusion bloquée par 2 paires de revues à traiter manuellement"
-
-
-class TestDistinctDoiError:
-    def test_porte_les_deux_publications_et_leurs_doi(self):
-        exc = DistinctDoiError(1, 2, "10.1/x", "10.2/y")
-        assert (exc.target_id, exc.source_id) == (1, 2)
-        assert (exc.target_doi, exc.source_doi) == ("10.1/x", "10.2/y")
-        assert str(exc) == "Fusion refusée : #1 (10.1/x) et #2 (10.2/y) ont des DOI distincts"
 
 
 class TestAuthorshipAlreadyAssignedError:

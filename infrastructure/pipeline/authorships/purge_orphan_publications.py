@@ -16,7 +16,6 @@ class PgPurgeOrphanPublicationsQueries(PurgeOrphanPublicationsQueries):
     """Adapter PostgreSQL pour le port `PurgeOrphanPublicationsQueries`."""
 
     def purge_orphan_publications(self, conn: Connection, *, limit: int | None = None) -> int:
-        # Les marqueurs `distinct_publications` d'une publication purgée partent en CASCADE (cas marginal).
         limit_clause = "LIMIT :lim" if limit is not None else ""
         return conn.execute(
             text(

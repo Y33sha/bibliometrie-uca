@@ -765,22 +765,6 @@ distinct_persons = Table(
 )
 
 
-distinct_publications = Table(
-    "distinct_publications",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("pub_id_a", Integer, nullable=False),
-    Column("pub_id_b", Integer, nullable=False),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    CheckConstraint("pub_id_a < pub_id_b", name="distinct_pubs_ordered"),
-    UniqueConstraint(
-        "pub_id_a",
-        "pub_id_b",
-        name="distinct_publications_pub_id_a_pub_id_b_key",
-    ),
-)
-
-
 # Relevés de paiements de frais de publication (Article Processing Charges) :
 # une ligne par paiement, importés depuis des exports comptables (colonnes à
 # plat ; `source_file` trace le fichier d'origine). `publication_id`,

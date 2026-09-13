@@ -29,11 +29,11 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 
 ### 1. Page et liste
 
-- [x] Route `admin/publications`, entrée « Publications » dans le menu « Référentiels ».
-- [x] Liste des publications.
-- [x] Emplacement des onglets, avec la liste pour premier onglet : composant `HubTabs`, partagé avec le référentiel Personnes.
-- [x] Suppression de `admin/duplicates`, de son entrée de menu, et de la lecture des paires candidates (point d'entrée, port, adaptateur, tests, doc).
-- [ ] Fusion et distinction manuelles : points d'entrée, client, services et table, selon la question ouverte.
+- [x] Route `admin/publications`, entrée « Publications » dans le menu « Référentiels » (a85c42ed).
+- [x] Liste des publications (a85c42ed).
+- [x] Emplacement des onglets, avec la liste pour premier onglet : composant `HubTabs`, partagé avec le référentiel Personnes (13b4ed89).
+- [x] Suppression de `admin/duplicates`, de son entrée de menu, et de la lecture des paires candidates (point d'entrée, port, adaptateur, tests, doc) (a85c42ed).
+- [x] Suppression de la fusion et de la distinction manuelles, sans effet durable : points d'entrée, client, services, erreur `DistinctDoiError`, table `distinct_publications`.
 
 ### 2. Volet
 
@@ -56,4 +56,3 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 - **Disposition du volet** : une colonne par source et une ligne par champ, ou l'inverse ? Largeur ?
 - **Premiers détecteurs** : lesquels, parmi ceux de la conception antérieure ? Les paires de titres identiques de `admin/duplicates` en font-elles partie ?
 - **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les notices sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation.
-- **Fusion et distinction manuelles** : que deviennent les points d'entrée `POST /api/publications/duplicates/merge` et `mark-distinct`, leurs services `merge_publications` et `mark_distinct`, et la table `distinct_publications` ? La page `admin/duplicates` était leur seul appelant, et le pipeline ne lit pas la table.

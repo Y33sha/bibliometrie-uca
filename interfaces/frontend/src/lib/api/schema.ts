@@ -266,50 +266,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publications/duplicates/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Merge Duplicate Publications
-         * @description Fusionne deux publications doublons.
-         *
-         *     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées de la publication depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 422 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
-         */
-        post: operations["merge_duplicate_publications_api_publications_duplicates_merge_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/publications/duplicates/mark-distinct": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark Publications Distinct
-         * @description Marque deux publications comme distinctes (non-doublon confirmé).
-         *
-         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
-         */
-        post: operations["mark_publications_distinct_api_publications_duplicates_mark_distinct_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/publications/{pub_id}": {
         parameters: {
             query?: never;
@@ -3425,20 +3381,6 @@ export interface components {
             /** Person Id B */
             person_id_b: number;
         };
-        /** MarkDistinctPublications */
-        MarkDistinctPublications: {
-            /** Pub Id A */
-            pub_id_a: number;
-            /** Pub Id B */
-            pub_id_b: number;
-        };
-        /** MergePublications */
-        MergePublications: {
-            /** Pub Id A */
-            pub_id_a: number;
-            /** Pub Id B */
-            pub_id_b: number;
-        };
         /**
          * MergeRequest
          * @description Fusionne l'entité `source_id` dans celle désignée par le chemin.
@@ -5506,72 +5448,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    merge_duplicate_publications_api_publications_duplicates_merge_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MergePublications"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MergeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mark_publications_distinct_api_publications_duplicates_mark_distinct_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MarkDistinctPublications"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */

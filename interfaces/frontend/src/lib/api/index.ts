@@ -20,4 +20,3 @@ export * as config from './config';
 export * as nameForms from './nameForms';
 export * as addresses from './addresses';
 export * as orphanAuthorships from './orphanAuthorships';
-export * as duplicates from './duplicates';

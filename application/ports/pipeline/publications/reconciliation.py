@@ -69,7 +69,7 @@ class PublicationsReconciliationQueries(Protocol):
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
-        """Re-pointe les dépendants curatés/importés d'une publication **dissoute** vers son successeur : paires `distinct_publications` (réordonnées + dédupliquées) et `apc_payments`. À appeler avant la suppression de la publication dissoute (sinon CASCADE / SET NULL les perdrait)."""
+        """Re-pointe les paiements APC (`apc_payments`) d'une publication **dissoute** vers son successeur. À appeler avant la suppression de la publication dissoute, qui les détacherait (SET NULL)."""
         ...
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:

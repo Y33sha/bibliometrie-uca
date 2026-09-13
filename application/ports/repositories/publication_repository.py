@@ -7,7 +7,7 @@ from domain.source_publications.source_publication import SourcePublication
 
 
 class PublicationRepository(Protocol):
-    """Contrat d'accès à l'agrégat Publication (tables publications, source_publications et distinct_publications)."""
+    """Contrat d'accès à l'agrégat Publication (tables publications et source_publications)."""
 
     # ── Chargement / persistance de l'aggregate ────────────────────
 
@@ -64,24 +64,8 @@ class PublicationRepository(Protocol):
         """Insère une publication (INSERT brut, la déduplication relève du caller) et retourne son `id`. Les colonnes hors NOT NULL et DOI prennent leur défaut ; `save` les pose."""
         ...
 
-    # ── Fusion ─────────────────────────────────────────────────────
-
-    def merge_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la publication `source_id` dans `target_id` : transfère `source_publications` et authorships (dédup par personne), repointe les paires `distinct_publications`, puis supprime la source. Les métadonnées canoniques de la cible sont recomputées ensuite par le caller via `refresh_from_sources`."""
-        ...
-
     # ── Suppression ────────────────────────────────────────────────
 
     def delete(self, pub_id: int) -> None:
-        """Supprime une publication. Le cascade DB nettoie `authorships`, `distinct_publications`, `publication_subjects` ; `apc_payments` et `source_publications.publication_id` passent à NULL."""
-        ...
-
-    # ── distinct_publications ──────────────────────────────────────
-
-    def mark_distinct(
-        self,
-        pub_id_a: int,
-        pub_id_b: int,
-    ) -> tuple[int, int] | None:
-        """Marque deux publications comme distinctes (idempotent). Retourne `(a, b)` si la paire vient d'être insérée, `None` sinon."""
+        """Supprime une publication. Le cascade DB nettoie `authorships` et `publication_subjects` ; `apc_payments` et `source_publications.publication_id` passent à NULL."""
         ...

@@ -47,8 +47,6 @@ AUDITE: dict[tuple[str, str], str] = {
     ("PATCH", "/api/persons/{person_id}/name"): "person.name_updated",
     ("PATCH", "/api/persons/{person_id}/name-forms/status"): "person_name_form.status_changed",
     ("PATCH", "/api/persons/{person_id}/reject"): "person.rejected",
-    ("POST", "/api/publications/duplicates/mark-distinct"): "publication.marked_distinct",
-    ("POST", "/api/publications/duplicates/merge"): "publication.merged",
     ("PUT", "/api/publishers/{publisher_id}"): "publisher.updated",
     ("POST", "/api/publishers/{publisher_id}/merge"): "publisher.merged",
     ("POST", "/api/structures"): "structure.created",
