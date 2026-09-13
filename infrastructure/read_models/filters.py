@@ -205,18 +205,23 @@ def search_clause(search: str) -> WhereClause | None:
 
 
 def person_search_clause(search: str) -> WhereClause | None:
-    """Recherche annuaire : nom ou prénom (accent-insensible).
+    """Recherche par nom : chaque mot saisi figure dans le nom ou le prénom (accent-insensible).
 
-    Partagée par l'annuaire des personnes et ses facettes (mêmes résultats).
-    Alias `p` = persons. Bind `:flt_person_search`.
+    L'ordre des mots est indifférent : « Valérie Legué » et « Legué Valérie » trouvent la même personne. Partagée par l'annuaire des personnes, ses facettes et l'autocomplétion. Alias `p` = persons. Binds `:flt_person_search_<rang du mot>`.
     """
-    if not search:
+    words = search.split()
+    if not words:
         return None
-    return WhereClause(
-        "(unaccent(p.last_name) ILIKE unaccent(:flt_person_search) "
-        "OR unaccent(p.first_name) ILIKE unaccent(:flt_person_search))",
-        {"flt_person_search": f"%{search}%"},
-    )
+    conditions: list[str] = []
+    binds: dict[str, object] = {}
+    for i, word in enumerate(words):
+        key = f"flt_person_search_{i}"
+        conditions.append(
+            f"(unaccent(p.last_name) ILIKE unaccent(:{key}) "
+            f"OR unaccent(p.first_name) ILIKE unaccent(:{key}))"
+        )
+        binds[key] = f"%{word}%"
+    return WhereClause(" AND ".join(conditions), binds)
 
 
 def source_clause(source_values: list[str]) -> WhereClause | None:

@@ -38,21 +38,11 @@ _LAB_SCOPED_SIGNATURES = (
 
 
 def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonSearchResult]:
-    """Recherche rapide (autocomplete) : chaque mot doit matcher dans last ou first name."""
-    words = search.strip().split()
-    if not words:
+    """Recherche rapide (autocomplete) parmi les personnes non rejetées, par la règle de l'annuaire (`person_search_clause`)."""
+    search_clause = person_search_clause(search)
+    if search_clause is None:
         return []
-    clauses: list[WhereClause | None] = [WhereClause("p.rejected = FALSE", {})]
-    for i, w in enumerate(words):
-        key = f"search_word_{i}"
-        clauses.append(
-            WhereClause(
-                f"(unaccent(p.last_name) ILIKE unaccent(:{key}) "
-                f"OR unaccent(p.first_name) ILIKE unaccent(:{key}))",
-                {key: f"%{w}%"},
-            )
-        )
-    where_sql, binds = assemble_where(clauses)
+    where_sql, binds = assemble_where([WhereClause("p.rejected = FALSE", {}), search_clause])
     rows = conn.execute(
         text(f"""
             SELECT p.id, p.last_name, p.first_name, prh.department_name,
