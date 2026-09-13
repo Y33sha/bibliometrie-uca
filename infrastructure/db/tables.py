@@ -654,6 +654,10 @@ publications = Table(
     # (NULL = jamais), qu'elle ait trouvé la publication ou non. La phase `oa_status`
     # re-vérifie les jamais-interrogées, puis les plus périmées.
     Column("unpaywall_checked_at", DateTime(timezone=True)),
+    # Date de la dernière ingestion des sujets (NULL = à ingérer), posée par la phase
+    # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
+    # publication recalculée depuis ses sources la remet à NULL.
+    Column("subjects_ingested_at", DateTime(timezone=True)),
     # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
     # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité

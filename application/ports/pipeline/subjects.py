@@ -57,7 +57,11 @@ class SubjectsIngestionQueries(Protocol):
         ...
 
     def select_publications_to_reingest(self, conn: Connection) -> list[int]:
-        """Ids des publications dont les sujets sont à (ré)ingérer : contenu canonique modifié depuis la dernière ingestion (`publications.updated_at` > `max(publication_subjects.created_at)`), ou jamais ingérées."""
+        """Ids des publications dont les sujets sont à (ré)ingérer : `publications.subjects_ingested_at` vide, soit jamais ingérées, soit recalculées depuis leurs sources après leur dernière ingestion."""
+        ...
+
+    def mark_subjects_ingested(self, conn: Connection, *, publication_ids: list[int]) -> None:
+        """Pose `subjects_ingested_at = now()` sur les publications données : elles sortent de la sélection jusqu'à leur prochain recalcul depuis leurs sources."""
         ...
 
     def select_all_publication_ids(self, conn: Connection) -> list[int]:

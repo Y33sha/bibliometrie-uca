@@ -4,12 +4,16 @@
 
 ### En cours
 
+- [Preprints fusionnés avec leur article par substitution de DOI](DATA_fusions-preprints-par-doi.md)
+
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé
 
+- [Conférences et actes](METIER_conferences-et-actes.md)
+- [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
@@ -21,7 +25,10 @@
 - 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
 - 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
+- 2026-07-29 — [Rationaliser les couches d'accès aux données](archived/2026-07-29_CODE_couches-acces-donnees.md)
+- 2026-07-27 — [Recentrer `infrastructure/sources` sur le dialogue avec les API](archived/2026-07-27_CODE_perimetre-infrastructure-sources.md)
 - 2026-07-25 — [Vocabulaires fermés : StrEnum plutôt que Literal / chaînes](archived/2026-07-25_CODE_vocabulaires-fermes-strenum.md)
+- 2026-07-23 — [Conversion des adapters de lecture vers des DTO typés](archived/2026-07-23_CODE_adapters-dto-typés.md)
 - 2026-07-19 — [Projections de lecture des personnes : deux endpoints pour une entité](archived/2026-07-19_CODE_projections-de-lecture-des-personnes.md)
 - 2026-07-19 — [Structures et laboratoires : une entité, deux piles de lecture](archived/2026-07-19_CODE_structures-et-laboratoires.md)
 - 2026-07-19 — [Typage des paramètres de requête : ce que `str` ne dit pas](archived/2026-07-19_CODE_typage-des-parametres-de-requete.md)

@@ -1,16 +1,15 @@
 """Ingestion des sujets d'une publication — première étape de la phase `subjects` (avant les co-occurrences).
 
 Incrémental et publication-centré :
-  1. Sélectionne les publications dont le contenu canonique a changé depuis la dernière ingestion de leurs sujets (`publications.updated_at` > `max(publication_subjects.created_at)`), ou jamais ingérées.
+  1. Sélectionne les publications à ingérer : `publications.subjects_ingested_at` vide. L'enregistrement d'une publication recalculée depuis ses sources vide cette date ; les autres écritures sur la publication (statut OA…) la laissent en place.
   2. Dégage leurs liens `publication_subjects` (non rejetés).
   3. Ré-ingère, par `source_publication`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
-  4. Purge les `subjects` devenus orphelins (plus aucun lien).
+  4. Date l'ingestion de chaque publication traitée, qu'elle ait des sujets ou non.
+  5. Purge les `subjects` devenus orphelins (plus aucun lien).
 
 Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_publications` et affichés via `publications_detail.keywords`, hors de `subjects`.
 
 On lit les `source_publications` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
-
-Aucune colonne d'état dédiée : la référence « dernière ingestion » est le `created_at` des liens eux-mêmes ; la purge des orphelins (étape 4) remplace l'ancien référentiel « jamais purgé ».
 """
 
 import logging
@@ -39,7 +38,7 @@ def run(
     *,
     rebuild: bool = False,
 ) -> PhaseMetrics:
-    """Ré-ingère les sujets des publications modifiées depuis la dernière passe (ou de toutes si `rebuild`).
+    """Ré-ingère les sujets des publications à ingérer (ou de toutes si `rebuild`).
 
     `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
 
@@ -94,6 +93,7 @@ def run(
             ]
             n_links += cache.link_bulk(conn, source=r.source, rows=links)
 
+    queries.mark_subjects_ingested(conn, publication_ids=pub_ids)
     queries.purge_orphan_subjects(conn)
     subjects_after = queries.count_all_subjects(conn)
 

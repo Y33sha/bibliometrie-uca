@@ -155,6 +155,8 @@ class PgPublicationRepository(PublicationRepository):
                     is_retracted = :is_retracted,
                     countries = CAST(:countries AS text[]),
                     meta = CAST(:meta AS jsonb),
+                    -- Sources recalculées : la phase subjects ingère de nouveau la publication.
+                    subjects_ingested_at = NULL,
                     updated_at = now()
                 WHERE id = :id
             """),
