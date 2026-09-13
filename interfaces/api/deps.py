@@ -26,10 +26,7 @@ from application.ports.read_models.journals_queries import JournalQueries
 from application.ports.read_models.perimeters_queries import PerimetersQueries
 from application.ports.read_models.persons_queries import PersonsQueries
 from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
-from application.ports.read_models.publications_queries import (
-    PublicationDuplicatesQueries,
-    PublicationsQueries,
-)
+from application.ports.read_models.publications_queries import PublicationsQueries
 from application.ports.read_models.publishers_queries import PublisherQueries
 from application.ports.read_models.stats_queries import StatsQueries
 from application.ports.read_models.structures_queries import StructuresQueries
@@ -65,7 +62,6 @@ from infrastructure.read_models.perimeters import PgPerimetersQueries
 from infrastructure.read_models.persons import PgPersonsQueries
 from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
 from infrastructure.read_models.publications import PgPublicationsQueries
-from infrastructure.read_models.publications.duplicates import PgPublicationDuplicatesQueries
 from infrastructure.read_models.publishers import PgPublisherQueries
 from infrastructure.read_models.stats import PgStatsQueries
 from infrastructure.read_models.structures import PgStructuresQueries
@@ -200,12 +196,6 @@ def audit_repo(conn: Connection = Depends(db_conn)) -> AuditRepository:
 
 def publication_repo(conn: Connection = Depends(db_conn)) -> PublicationRepository:
     return publication_repository(conn)
-
-
-def publication_duplicates_queries(
-    conn: Connection = Depends(db_conn),
-) -> PublicationDuplicatesQueries:
-    return PgPublicationDuplicatesQueries(conn)
 
 
 def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:

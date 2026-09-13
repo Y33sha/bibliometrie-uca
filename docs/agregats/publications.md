@@ -62,4 +62,3 @@ Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une c
 | Détail (`GET /api/publications/{id}`) | Métadonnées consolidées jointes à la revue et à l'éditeur, provenance par source, auteurs consolidés et auteurs tels que chaque source les donne, relations entrantes et sortantes, sujets, identifiants externes |
 | Listes, facettes, export | Liste paginée et export CSV, avec une douzaine de facettes dont le laboratoire, le statut de dépôt HAL et les frais de publication |
 | Statistiques et tableaux croisés | Ventilations par année, statut d'accès, type de document, laboratoire, éditeur et revue ; collaborations d'après les pays |
-| Candidat au dédoublonnage (`GET /api/publications/duplicates/next`) | Paires proches par le titre, l'année et le DOI, hors paires déclarées distinctes — c'est cette lecture qui alimente la fusion manuelle |

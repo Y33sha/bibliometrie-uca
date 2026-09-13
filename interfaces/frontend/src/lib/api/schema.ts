@@ -266,28 +266,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publications/duplicates/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Duplicate Candidate
-         * @description Paire de publications candidate au dédoublonnage, à l'offset donné.
-         *
-         *     Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.
-         */
-        get: operations["next_duplicate_candidate_api_publications_duplicates_next_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/publications/duplicates/merge": {
         parameters: {
             query?: never;
@@ -2834,81 +2812,6 @@ export interface components {
             ra: string;
             /** Crossref Member Id */
             crossref_member_id?: number | null;
-        };
-        /** DuplicateAuthor */
-        DuplicateAuthor: {
-            /** Author Position */
-            author_position: number | null;
-            /** In Perimeter */
-            in_perimeter: boolean;
-            /** Person Id */
-            person_id: number | null;
-            /** Last Name */
-            last_name: string | null;
-            /** First Name */
-            first_name: string | null;
-            /** Full Name */
-            full_name: string | null;
-        };
-        /** DuplicateJournal */
-        DuplicateJournal: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string | null;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
-        };
-        /** DuplicatePair */
-        DuplicatePair: {
-            pub_a: components["schemas"]["DuplicatePublicationDetail"];
-            pub_b: components["schemas"]["DuplicatePublicationDetail"];
-        };
-        /** DuplicatePairResponse */
-        DuplicatePairResponse: {
-            /** Total */
-            total: number;
-            /** Offset */
-            offset: number;
-            pair: components["schemas"]["DuplicatePair"] | null;
-        };
-        /**
-         * DuplicatePublicationDetail
-         * @description Détail d'une publication pour la page de déduplication.
-         */
-        DuplicatePublicationDetail: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Title Normalized */
-            title_normalized: string;
-            /** Doi */
-            doi: string | null;
-            /** Pub Year */
-            pub_year: number | null;
-            /** Doc Type */
-            doc_type: string;
-            /** Container Title */
-            container_title: string | null;
-            /** Oa Status */
-            oa_status: string;
-            /** Language */
-            language: string | null;
-            journal: components["schemas"]["DuplicateJournal"] | null;
-            /** Sources */
-            sources: components["schemas"]["DuplicateSource"][];
-            /** Authors */
-            authors: components["schemas"]["DuplicateAuthor"][];
-        };
-        /** DuplicateSource */
-        DuplicateSource: {
-            /** Source */
-            source: string;
-            /** Source Id */
-            source_id: string;
         };
         /**
          * EcoleDoctorale
@@ -5603,38 +5506,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    next_duplicate_candidate_api_publications_duplicates_next_get: {
-        parameters: {
-            query?: {
-                min_title_len?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DuplicatePairResponse"];
                 };
             };
             /** @description Validation Error */

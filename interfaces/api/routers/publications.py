@@ -1,6 +1,6 @@
-"""Router des publications : listes, facettes, détail, export, et revue des doublons. Sert `/api/publications/*`.
+"""Router des publications : listes, facettes, détail, export, fusion et distinction de doublons. Sert `/api/publications/*`.
 
-Les lectures passent par les ports `PublicationsQueries` et `PublicationDuplicatesQueries`, les écritures par les command handlers de `application.services.publications.commands`.
+Les lectures passent par le port `PublicationsQueries`, les écritures par les command handlers de `application.services.publications.commands`.
 
 Les chemins littéraux — `/facets`, `/export.csv`, `/export-theses.csv`, `/duplicates/*` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
 """
@@ -16,9 +16,7 @@ from sqlalchemy import Connection
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
     EXPORT_COLUMNS,
-    DuplicatePairResponse,
     PublicationDetailResponse,
-    PublicationDuplicatesQueries,
     PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
@@ -35,7 +33,6 @@ from domain.sources.registry import SOURCE_FILTER_VALUES
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
-    publication_duplicates_queries,
     publication_repo,
     publications_queries,
 )
@@ -243,19 +240,6 @@ def export_theses_csv(
     )
 
 
-@router.get("/duplicates/next", response_model=DuplicatePairResponse)
-def next_duplicate_candidate(
-    min_title_len: int = Query(30, ge=10),
-    offset: int = Query(0, ge=0),
-    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
-) -> DuplicatePairResponse:
-    """Paire de publications candidate au dédoublonnage, à l'offset donné.
-
-    Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.
-    """
-    return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
-
-
 @router.post("/duplicates/merge", response_model=MergeResponse)
 def merge_duplicate_publications(
     body: MergePublications,
@@ -281,7 +265,7 @@ def mark_publications_distinct(
 ) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
-    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
+    Persiste l'annotation dans `distinct_publications`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
     """
     publication_commands.mark_distinct(
         conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit

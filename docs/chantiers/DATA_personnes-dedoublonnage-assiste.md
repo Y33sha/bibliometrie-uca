@@ -100,7 +100,7 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 * [ ] faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
 * [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
 * [x] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. **Enterré** : le détecteur position-conflit a un apport propre minuscule (108 paires à noms compatibles, dont 12 masquées par le cap >50, toutes des initiales-vs-prénom qu'un rapprochement par nom attrape) noyé dans le bruit des méga-papers ; détecteur retiré au profit de la file « Doublons par nom ». Le désalignement lui-même n'est pas réparable à moindre coût et ne vaut pas de fiche.
-* [x] repenser entièrement la page `admin/person-duplicates` — **supprimée** (560267ca), remplacée par les files de triage du hub `admin/persons`. (`admin/duplicates`, dédoublonnage des publications, reste inchangée.)
+* [x] repenser entièrement la page `admin/person-duplicates` — **supprimée** (560267ca), remplacée par les files de triage du hub `admin/persons`.
 * [ ] quoi faire des entités aberrantes (auteurs mal parsés)? *a minima*, s'assurer qu'elles n'apparaissent pas dans `admin/orphan-authorships`
 
 ## Questions ouvertes
