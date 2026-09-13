@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict miecXcaqu04J2rssq3LEoe2Hm5GNclBOxuBiNnW0DsrYbaRpcpZiqkVIRQxnaE0
+\restrict xGQqaSvjCcuMwiQdXKxHUUhqcXXXDOvklT9p92QxxJb5xgaxTEkZvr4djPjIwjn
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -567,7 +567,9 @@ CREATE TABLE public.config (
     key text NOT NULL,
     value jsonb NOT NULL,
     description text,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['unpaywall_max_per_run'::text, 'fetch_missing_max_per_source'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
 );
 
 
@@ -894,18 +896,6 @@ ALTER SEQUENCE public.distinct_publications_id_seq OWNED BY public.distinct_publ
 
 
 --
--- Name: doi_lookups; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.doi_lookups (
-    source public.source_type NOT NULL,
-    doi text NOT NULL,
-    not_found_at timestamp with time zone NOT NULL,
-    next_retry timestamp with time zone
-);
-
-
---
 -- Name: doi_prefixes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -922,6 +912,27 @@ CREATE TABLE public.doi_prefixes (
     datacite_client_symbol text,
     publisher_checked_at timestamp with time zone
 );
+
+
+--
+-- Name: failed_lookups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.failed_lookups (
+    source public.source_type NOT NULL,
+    id_type text NOT NULL,
+    id_value text NOT NULL,
+    not_found_at timestamp with time zone NOT NULL,
+    next_retry timestamp with time zone,
+    CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])))
+);
+
+
+--
+-- Name: TABLE failed_lookups; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.failed_lookups IS 'Identifiants cherchés en vain dans une source par la phase fetch_missing. next_retry porte la date de la prochaine tentative. Il est NULL quand l''identifiant est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : l''échec est alors définitif.';
 
 
 --
@@ -1450,12 +1461,10 @@ CREATE TABLE public.staging (
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
-    not_found_at timestamp with time zone,
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
-    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text])))
 );
 
 
@@ -1463,7 +1472,7 @@ CREATE TABLE public.staging (
 -- Name: TABLE staging; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.staging IS 'Documents moissonnés, en transit vers les tables sources. Trois états : à traiter (processed FALSE, raw_data porte le payload de la source), normalisée (processed TRUE, raw_data vidé), introuvable (processed TRUE, not_found_at horodaté, raw_data jamais peuplé). Le dernier est posé par la phase fetch_missing quand HAL ne rend pas un document demandé par hal-id ou NNT.';
+COMMENT ON TABLE public.staging IS 'Documents moissonnés, en transit vers les tables sources. Deux états : à traiter (processed FALSE, raw_data porte le payload de la source), normalisée (processed TRUE, raw_data vidé).';
 
 
 --
@@ -1968,19 +1977,19 @@ ALTER TABLE ONLY public.distinct_publications
 
 
 --
--- Name: doi_lookups doi_lookups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.doi_lookups
-    ADD CONSTRAINT doi_lookups_pkey PRIMARY KEY (source, doi);
-
-
---
 -- Name: doi_prefixes doi_prefixes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.doi_prefixes
     ADD CONSTRAINT doi_prefixes_pkey PRIMARY KEY (prefix);
+
+
+--
+-- Name: failed_lookups failed_lookups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.failed_lookups
+    ADD CONSTRAINT failed_lookups_pkey PRIMARY KEY (source, id_type, id_value);
 
 
 --
@@ -3447,5 +3456,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict miecXcaqu04J2rssq3LEoe2Hm5GNclBOxuBiNnW0DsrYbaRpcpZiqkVIRQxnaE0
+\unrestrict xGQqaSvjCcuMwiQdXKxHUUhqcXXXDOvklT9p92QxxJb5xgaxTEkZvr4djPjIwjn
 

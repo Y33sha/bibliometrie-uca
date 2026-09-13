@@ -3,13 +3,13 @@
 --
 -- Seed commun : référentiels partagés par tous les établissements.
 -- Prérequis : schéma appliqué par les migrations (alembic upgrade head)
--- Usage : psql -d bibliometrie -f infrastructure/db/seed.sql
+-- Usage : psql -d bibliometrie -f infrastructure\db\seed.sql
 
 BEGIN;
 
 -- config (4 lignes)
 DELETE FROM config WHERE key NOT IN ('perimeter_extraction', 'perimeter_persons');
-INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '10000', 'Nombre maximum de DOI interrogés par source cible au cross-import, par run. 0 = illimité.');
+INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '10000', 'Nombre maximum de DOI interrogés par source cible à la phase fetch_missing, par run. 0 = illimité.');
 INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo", "admin"]', 'Types de structure affichés sur la page publique des laboratoires');
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.');
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.');
@@ -192,9 +192,10 @@ INSERT INTO countries (code, name) VALUES ('za', 'Afrique du Sud');
 INSERT INTO countries (code, name) VALUES ('zm', 'Zambie');
 INSERT INTO countries (code, name) VALUES ('zw', 'Zimbabwe');
 
--- place_name_forms (509 lignes)
+-- place_name_forms (510 lignes)
 DELETE FROM place_name_forms WHERE kind <> 'institution';
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (1, 'fr', 'france', 'country');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (2, 'fr', 'france.', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (3, 'fr', 'fra', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (4, 'fr', 'francia', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (5, 'de', 'germany', 'country');
@@ -577,6 +578,7 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (19780
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197804, 'us', 'austin', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197805, 'dk', 'aarhus', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197806, 'gb', 'leeds', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197807, 'us', 'columbia', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197808, 'us', 'portland', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197809, 'ch', 'basel', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197810, 'gb', 'york uk', 'city');
@@ -702,7 +704,6 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (23538
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235388, 'ca', 'montreal', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235390, 'fr', 'tourcoing', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235391, 'fr', 'clermont ferrand', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235392, 'by', 'republic of belarus', 'country');
 SELECT setval(pg_get_serial_sequence('place_name_forms', 'id'), (SELECT COALESCE(MAX(id), 0) FROM place_name_forms));
 
 COMMIT;
