@@ -37,9 +37,9 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 
 ### 2. Volet
 
-- [x] Volet droit ouvert par `?publication=<id>`, fermé par Échap et par le fond : composant `Drawer`, partagé avec le référentiel Personnes.
-- [x] Métadonnées de chaque notice source, confrontées, une colonne par notice : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA.
-- [x] Lecture de l'API qui rend les notices sources d'une publication, toutes sources confondues, sans champ nommé par source.
+- [x] Volet droit ouvert par `?publication=<id>`, fermé par Échap et par le fond : composant `Drawer`, partagé avec le référentiel Personnes (6736ac39).
+- [x] Métadonnées de chaque notice source, confrontées, une colonne par notice : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA (6736ac39).
+- [x] Lecture de l'API qui rend les notices sources d'une publication, toutes sources confondues, sans champ nommé par source (6736ac39).
 
 ### 3. Détection des fusions suspectes
 
