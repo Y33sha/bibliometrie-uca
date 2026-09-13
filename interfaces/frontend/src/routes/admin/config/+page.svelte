@@ -505,9 +505,13 @@
     font-size: 0.9rem;
     min-width: 180px;
   }
+  /* Valeur alignée à droite, contre le bouton : d'une ligne à l'autre, les valeurs se superposent. */
   .config-value-inline {
     font-size: 0.9rem;
     flex: 1;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    margin-right: 6px;
   }
   .config-editor-inline {
     width: 80px;
