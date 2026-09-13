@@ -3,7 +3,7 @@
 --
 -- Seed d'établissement : structures, tutelles, périmètres, formes de noms et clés de configuration des périmètres.
 -- Prérequis : schéma appliqué par les migrations (alembic upgrade head)
--- Usage : psql -d bibliometrie -f infrastructure\db\seed_uca.sql
+-- Usage : psql -d bibliometrie -f infrastructure/db/seed_uca.sql
 
 BEGIN;
 
