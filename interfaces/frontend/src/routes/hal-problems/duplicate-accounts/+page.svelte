@@ -5,7 +5,7 @@
   import { page as pageStore } from "$app/stores";
   import { onMount } from "svelte";
   import { api } from "$lib/api";
-  import { titleCase } from "$lib/utils";
+  import { halPersonUrl, titleCase } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
 
   import type { components } from "$lib/api/schema";
@@ -80,7 +80,7 @@
           <td class="hal-accounts">
             {#each p.hal_accounts as ha}
               <div class="hal-account">
-                <a href="https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D={ha.hal_person_id}" target="_blank" rel="noopener" class="hal-id">
+                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="hal-id">
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>

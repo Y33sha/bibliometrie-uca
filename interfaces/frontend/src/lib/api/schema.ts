@@ -3912,7 +3912,7 @@ export interface components {
         };
         /**
          * PersonIdentifierType
-         * @description Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` est l'identifiant interne HAL, conservé pour la dédup cross-source mais jamais exposé en UI.
+         * @description Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` désigne un compte HAL (`personId`).
          * @enum {string}
          */
         PersonIdentifierType: "orcid" | "idhal" | "idref" | "hal_person_id";

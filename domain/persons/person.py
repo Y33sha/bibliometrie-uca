@@ -6,7 +6,7 @@ Composition / associations :
 - `identifiers: tuple[IdentifierAttribution, ...]` — projection lecture (chaque `IdentifierAttribution` est un aggregate séparé).
 - `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues (VOs).
 
-`hal_person_id` n'est pas un attribut nu : c'est un `IdentifierAttribution` d'`id_type` = `"hal_person_id"`. Jamais exposé en UI.
+`hal_person_id` est un `IdentifierAttribution` d'`id_type` = `"hal_person_id"`.
 
 La logique métier touchant à une personne (fusion, matching cross-source, création contrôlée, normalisation des noms) vit ici.
 """

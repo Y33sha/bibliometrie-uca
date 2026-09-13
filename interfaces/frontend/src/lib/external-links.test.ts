@@ -36,7 +36,7 @@ const HOTES_AFFICHABLES = new Set([
 
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
-const COMPOSITION = /^(halDocUrl|halUrl|halCollectionUrl|scanrPubUrl|rorFullUrl|sourceExternalUrl|exportCsvUrl|relHref)\(/;
+const COMPOSITION = /^(halDocUrl|halPersonUrl|halUrl|halCollectionUrl|scanrPubUrl|rorFullUrl|sourceExternalUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl|accessUrl)$/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. */

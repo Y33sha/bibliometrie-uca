@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { halPersonUrl } from "$lib/utils";
 
   let {
     id_type,
@@ -33,6 +34,12 @@
       icon: "idref.png",
       cls: "id-idref",
       label: "IdRef",
+    },
+    hal_person_id: {
+      url: halPersonUrl,
+      icon: "hal.ico",
+      cls: "id-hal",
+      label: "Compte HAL",
     },
   };
 

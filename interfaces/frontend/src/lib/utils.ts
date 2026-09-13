@@ -181,6 +181,11 @@ export function halDocUrl(halid: string, oaStatus?: string | null): string {
 	return `https://hal.science/${halid}`;
 }
 
+/** Dépôts HAL d'un compte auteur. HAL indexe le `personId` du compte sous `authIdHal_i`. */
+export function halPersonUrl(halPersonId: string | number): string {
+	return `https://hal.science/search/index/?qa%5BauthIdHal_i%5D%5B%5D=${halPersonId}`;
+}
+
 export function scanrPubUrl(scanrId: string): string {
 	return `https://scanr.enseignementsup-recherche.gouv.fr/publications/${encodeURIComponent(scanrId)}`;
 }

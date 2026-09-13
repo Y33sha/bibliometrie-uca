@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.normalize import normalize_text
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.persons.identifiers import AttributionStatus
 from domain.publications.metadata import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
@@ -29,7 +29,6 @@ def _sql_list(values: Iterable[str]) -> str:
 
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
-PUBLIC_PERSON_IDENTIFIER_TYPES_SQL = _sql_list(PUBLIC_PERSON_IDENTIFIER_TYPES)
 
 # Colonnes de ventilation OA par statut (alias `p` = publications), partagées par les requêtes
 # stats (éditeurs/revues/labos/années) : une colonne par statut du vocabulaire `OaStatus`,
@@ -499,11 +498,10 @@ PERSON_HAS_PENDING_NAME_FORMS_SQL = f"""EXISTS (
             WHERE pnf.person_id = p.id AND pnf.status = '{AttributionStatus.PENDING.value}'
         )"""
 
-# Prédicat : la personne `p` a ≥1 identifiant **public** au statut `pending` (à confirmer). Restreint aux types exposés en UI (`PUBLIC_PERSON_IDENTIFIER_TYPES`) : un `hal_person_id` en attente est interne et jamais présenté à l'arbitrage, il ne doit donc pas faire remonter la personne dans la file « à confirmer ».
+# Prédicat : la personne `p` a ≥1 identifiant au statut `pending` (à confirmer).
 PERSON_HAS_PENDING_IDENTIFIERS_SQL = f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.status = '{AttributionStatus.PENDING.value}'
-              AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
         )"""
 
 
