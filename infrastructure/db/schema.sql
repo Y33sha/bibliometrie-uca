@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xGQqaSvjCcuMwiQdXKxHUUhqcXXXDOvklT9p92QxxJb5xgaxTEkZvr4djPjIwjn
+\restrict zqNaVIrTloAmq9xn46NFohQBbGbj00anN6akRSs1ye78BCNlMlEYnoQG1FlLqD3
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -569,6 +569,7 @@ CREATE TABLE public.config (
     description text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['unpaywall_max_per_run'::text, 'fetch_missing_max_per_source'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
 );
 
@@ -733,7 +734,8 @@ CREATE TABLE public.publications (
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
     in_perimeter boolean DEFAULT false NOT NULL,
-    unpaywall_checked_at timestamp with time zone
+    unpaywall_checked_at timestamp with time zone,
+    subjects_ingested_at timestamp with time zone
 );
 
 
@@ -860,39 +862,6 @@ CREATE SEQUENCE public.distinct_persons_id_seq
 --
 
 ALTER SEQUENCE public.distinct_persons_id_seq OWNED BY public.distinct_persons.id;
-
-
---
--- Name: distinct_publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.distinct_publications (
-    id integer NOT NULL,
-    pub_id_a integer NOT NULL,
-    pub_id_b integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT distinct_pubs_ordered CHECK ((pub_id_a < pub_id_b))
-);
-
-
---
--- Name: distinct_publications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.distinct_publications_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: distinct_publications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.distinct_publications_id_seq OWNED BY public.distinct_publications.id;
 
 
 --
@@ -1708,13 +1677,6 @@ ALTER TABLE ONLY public.distinct_persons ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- Name: distinct_publications id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.distinct_publications ALTER COLUMN id SET DEFAULT nextval('public.distinct_publications_id_seq'::regclass);
-
-
---
 -- Name: journal_name_forms id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1958,22 +1920,6 @@ ALTER TABLE ONLY public.distinct_persons
 
 ALTER TABLE ONLY public.distinct_persons
     ADD CONSTRAINT distinct_persons_pkey PRIMARY KEY (id);
-
-
---
--- Name: distinct_publications distinct_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.distinct_publications
-    ADD CONSTRAINT distinct_publications_pkey PRIMARY KEY (id);
-
-
---
--- Name: distinct_publications distinct_publications_pub_id_a_pub_id_b_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.distinct_publications
-    ADD CONSTRAINT distinct_publications_pub_id_a_pub_id_b_key UNIQUE (pub_id_a, pub_id_b);
 
 
 --
@@ -2507,20 +2453,6 @@ CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter
 --
 
 CREATE INDEX idx_confirmed_authorships_person ON public.confirmed_authorships USING btree (person_id);
-
-
---
--- Name: idx_distinct_pubs_a; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_distinct_pubs_a ON public.distinct_publications USING btree (pub_id_a);
-
-
---
--- Name: idx_distinct_pubs_b; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_distinct_pubs_b ON public.distinct_publications USING btree (pub_id_b);
 
 
 --
@@ -3189,22 +3121,6 @@ ALTER TABLE ONLY public.distinct_persons
 
 
 --
--- Name: distinct_publications distinct_publications_pub_id_a_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.distinct_publications
-    ADD CONSTRAINT distinct_publications_pub_id_a_fkey FOREIGN KEY (pub_id_a) REFERENCES public.publications(id) ON DELETE CASCADE;
-
-
---
--- Name: distinct_publications distinct_publications_pub_id_b_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.distinct_publications
-    ADD CONSTRAINT distinct_publications_pub_id_b_fkey FOREIGN KEY (pub_id_b) REFERENCES public.publications(id) ON DELETE CASCADE;
-
-
---
 -- Name: doi_prefixes doi_prefixes_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3456,5 +3372,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xGQqaSvjCcuMwiQdXKxHUUhqcXXXDOvklT9p92QxxJb5xgaxTEkZvr4djPjIwjn
+\unrestrict zqNaVIrTloAmq9xn46NFohQBbGbj00anN6akRSs1ye78BCNlMlEYnoQG1FlLqD3
 
