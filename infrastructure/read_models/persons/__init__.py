@@ -2,7 +2,7 @@
 
 Le package est organisé par thème :
 - `list` : `list_persons`, `search_persons`, `person_curation`, `person_name_forms`
-- `identifiers` : `public_identifiers`, partagée par la liste et le profil
+- `identifiers` : `person_identifiers`, partagée par la liste et le profil
 - `facets` : `persons_facets`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`

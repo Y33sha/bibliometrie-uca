@@ -376,7 +376,7 @@ def add_identifiers_from_authorships(
 
     Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
 
-    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`) ; la lecture filtre ensuite ceux réservés à l'usage interne (`PUBLIC_PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`'auto'`).
+    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`'auto'`).
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:

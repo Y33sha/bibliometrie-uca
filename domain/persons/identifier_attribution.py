@@ -17,7 +17,7 @@ from domain.persons.identifiers import AttributionStatus
 class IdentifierAttribution:
     """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, hal_person_id) à une personne, avec statut.
 
-    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur canonique stockée en base (déjà normalisée par les VOs ORCID/IdHAL/IdRef à la construction ; `hal_person_id` est stocké tel quel).
+    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur canonique stockée en base, normalisée par le value object de son type (`normalized_identifier_value`).
     """
 
     id: int | None

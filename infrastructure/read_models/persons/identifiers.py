@@ -1,32 +1,37 @@
-"""Lecture des identifiants publics d'un ensemble de personnes."""
+"""Lecture des identifiants d'un ensemble de personnes."""
 
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.persons_queries import PersonIdentifierOut
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES, AttributionStatus
 
 
-def public_identifiers(
-    conn: Connection, person_ids: list[int], *, include_rejected: bool
+def person_identifiers(
+    conn: Connection, person_ids: list[int], *, public_only: bool
 ) -> dict[int, list[PersonIdentifierOut]]:
-    """Identifiants de types publics, indexés par personne.
+    """Identifiants indexés par personne, chacun avec son type et son statut.
 
-    Chaque identifiant porte son `status`. `include_rejected` garde les attributions rejetées (écartées par la curation) : les vues de curation les affichent pour autoriser un retour en arrière, les vues publiques les excluent.
+    `public_only` sert le profil public : seuls les types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`), sans les attributions rejetées. Sinon, la lecture rend tous les identifiants : l'interface d'administration les arbitre tous, et l'annuaire public filtre types et statuts à l'affichage.
     """
     if not person_ids:
         return {}
 
-    rejected_filter = "" if include_rejected else " AND pi.status <> 'rejected'"
+    binds: dict[str, object] = {"ids": person_ids}
+    public_filter = ""
+    if public_only:
+        public_filter = (
+            f" AND pi.id_type = ANY(:public_id_types)"
+            f" AND pi.status <> '{AttributionStatus.REJECTED.value}'"
+        )
+        binds["public_id_types"] = list(PUBLIC_PERSON_IDENTIFIER_TYPES)
     rows = conn.execute(
         text(f"""
             SELECT pi.person_id, pi.id, pi.id_type, pi.id_value, pi.source, pi.status
             FROM person_identifiers pi
-            WHERE pi.person_id = ANY(:ids)
-              AND pi.id_type = ANY(:public_id_types)
-              {rejected_filter}
+            WHERE pi.person_id = ANY(:ids){public_filter}
             ORDER BY pi.id_type, pi.id_value
         """),
-        {"ids": person_ids, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
+        binds,
     ).all()
 
     by_person: dict[int, list[PersonIdentifierOut]] = {}

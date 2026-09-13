@@ -24,7 +24,7 @@ from domain.dates import today
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
-from infrastructure.read_models.persons.identifiers import public_identifiers
+from infrastructure.read_models.persons.identifiers import person_identifiers
 
 
 def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | None:
@@ -42,7 +42,7 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     ).one_or_none()
     if not person_row:
         return None
-    identifiers = public_identifiers(conn, [person_id], include_rejected=False).get(person_id, [])
+    identifiers = person_identifiers(conn, [person_id], public_only=True).get(person_id, [])
 
     theses_count_row = conn.execute(
         text(f"""

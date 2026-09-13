@@ -26,7 +26,7 @@ from infrastructure.read_models.filters import (
     person_search_clause,
     persons_sort_clause,
 )
-from infrastructure.read_models.persons.identifiers import public_identifiers
+from infrastructure.read_models.persons.identifiers import person_identifiers
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux signatures de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_SIGNATURES = (
@@ -143,8 +143,8 @@ def list_persons(
         """),
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
-    # Identifiants attachés à chaque personne, rejetés compris : chaque identifiant porte son statut, à charge pour chaque vue de filtrer selon ses besoins.
-    by_person = public_identifiers(conn, [r.id for r in rows], include_rejected=True)
+    # Tous les identifiants de chaque personne, rejetés compris, avec leur type et leur statut : chaque vue filtre selon ses besoins.
+    by_person = person_identifiers(conn, [r.id for r in rows], public_only=False)
     persons = [_person_out(r, by_person.get(r.id, [])) for r in rows]
 
     return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
@@ -226,5 +226,5 @@ def person_curation(conn: Connection, person_id: int) -> PersonOut | None:
     ).one_or_none()
     if row is None:
         return None
-    by_person = public_identifiers(conn, [row.id], include_rejected=True)
+    by_person = person_identifiers(conn, [row.id], public_only=False)
     return _person_out(row, by_person.get(row.id, []))

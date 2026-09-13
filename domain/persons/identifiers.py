@@ -40,7 +40,7 @@ class AttributionStatus(StrEnum):
 
 
 class PersonIdentifierType(StrEnum):
-    """Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` est l'identifiant interne HAL, conservé pour la dédup cross-source mais jamais exposé en UI."""
+    """Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` désigne un compte HAL (`personId`)."""
 
     ORCID = "orcid"
     IDHAL = "idhal"
@@ -48,17 +48,12 @@ class PersonIdentifierType(StrEnum):
     HAL_PERSON_ID = "hal_person_id"
 
 
-# Deux vues du vocabulaire, à ne pas confondre :
+# Deux vues du vocabulaire :
 #
-# - `PERSON_IDENTIFIER_TYPES` : liste complète des types admissibles dans
-#   `person_identifiers`. Utilisée par la promotion canonique depuis les
-#   `source_authorships` (`add_identifiers_from_authorships`).
-# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : sous-ensemble visible UI. Utilisée par les
-#   filtres SQL côté lecture (page personne, liste persons, doublons) et par la
-#   validation des routes d'ajout par l'utilisatrice ; `hal_person_id` en est exclu.
+# - `PERSON_IDENTIFIER_TYPES` : tous les types admissibles dans `person_identifiers`. La promotion depuis les `source_authorships` (`add_identifiers_from_authorships`) et l'interface d'administration les couvrent tous.
+# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : les types de l'interface publique, seuls attribuables à la main. `hal_person_id` en est exclu : l'extraction l'observe dans le TEI HAL.
 #
-# Un type ajouté à l'enum entre automatiquement dans `PERSON_IDENTIFIER_TYPES`, et
-# dans `PUBLIC_...` seulement s'il doit apparaître en UI.
+# Un type ajouté à l'enum entre automatiquement dans `PERSON_IDENTIFIER_TYPES`, et dans `PUBLIC_...` seulement s'il doit apparaître dans l'interface publique.
 
 PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = tuple(PersonIdentifierType)
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
@@ -221,10 +216,9 @@ class IdRef:
         return self.value
 
 
-# ── hal_person_id (identifiant interne HAL) ───────────────────────
+# ── hal_person_id (compte HAL) ────────────────────────────────────
 
-# `personId` HAL : entier positif. Conservé pour la déduplication cross-source,
-# jamais exposé en UI (cf. PUBLIC_PERSON_IDENTIFIER_TYPES).
+# `personId` HAL : entier positif.
 _HAL_PERSON_ID_CANONICAL = re.compile(r"^[1-9][0-9]*$")
 
 
@@ -240,7 +234,7 @@ def _normalize_hal_person_id(raw: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class HalPersonId:
-    """Identifiant interne de personne HAL (`personId`), entier positif."""
+    """Identifiant d'un compte HAL (`personId`), entier positif."""
 
     value: str
 
