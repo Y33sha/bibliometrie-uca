@@ -59,10 +59,6 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.publications import (
-    MarkDistinctPublications,
-    MergePublications,
-)
 from interfaces.api.models.structures import (
     NameFormCreate,
     NameFormUpdate,
@@ -98,8 +94,6 @@ __all__ = [
     "JournalTypeChangeImpact",
     "LoginRequest",
     "MarkDistinctPersons",
-    "MarkDistinctPublications",
-    "MergePublications",
     "MergeRequest",
     "MergeResponse",
     "NameFormCreate",

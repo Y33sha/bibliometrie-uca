@@ -1,13 +1,9 @@
 """Service Publications — écritures sur l'agrégat Publication, transaction-agnostiques.
 
-Quatre opérations : création, recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Toute écriture éditoriale passe par ici, pipeline compris (`create_publication` et `refresh_from_sources` à la réconciliation). Les appelants — phase `publications`, command handlers de l'API, CLI de maintenance — tiennent chacun leur propre frontière transactionnelle et commitent eux-mêmes.
+Deux opérations : la création d'une publication et le recalcul de ses métadonnées depuis les `source_publications`. Les appelants tiennent chacun leur propre frontière transactionnelle et commitent eux-mêmes.
 """
 
-from application.audit_log import emit_event
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services._merge import load_merge_pair
-from domain.errors import DistinctDoiError, ValidationError
 from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
@@ -113,61 +109,3 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
         corrections["doc_type"] = corrected.rule.value
         meta["corrections"] = corrections
         pub.meta = meta
-
-
-def mark_distinct(
-    pub_id_a: int,
-    pub_id_b: int,
-    *,
-    repo: PublicationRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    """Marque deux publications comme distinctes (non-doublon) dans `distinct_publications`. Idempotent.
-
-    Les IDs sont triés pour garantir l'unicité de la paire. Lève `ValidationError` sur deux identifiants égaux : une publication n'est pas un non-doublon d'elle-même.
-    """
-    if pub_id_a == pub_id_b:
-        raise ValidationError("Impossible de distinguer une publication d'elle-même")
-    inserted = repo.mark_distinct(pub_id_a, pub_id_b)
-    if inserted:
-        emit_event(
-            audit_repo,
-            "publication.marked_distinct",
-            "publication",
-            inserted[0],
-            {"other_id": inserted[1]},
-        )
-
-
-def merge_publications(
-    target_id: int,
-    source_id: int,
-    *,
-    repo: PublicationRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    """Fusionne la publication `source_id` dans `target_id`.
-
-    Orchestration :
-
-    1. Charge `target` et `source` comme entités `Publication` via le repo.
-    2. Garde « 1 DOI = 1 publication » : si les deux portent des DOI non-nuls différents, refuse (`DistinctDoiError`) — ce sont des œuvres distinctes, quelle que soit la clé qui les a rapprochées.
-    3. `repo.merge_into(target_id, source_id)` : reprise des clés étrangères (transfert des `source_publications` et authorships avec dédup, repointage des `distinct_publications`, DELETE de la ligne source).
-    4. `refresh_from_sources(target_id)` : recalcule les métadonnées canoniques de la cible depuis ses `source_publications`, à ce stade l'union des siennes et de celles de la source.
-
-    Lève `ValidationError` sur deux identifiants égaux ; `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError` si les deux portent des DOI non-nuls différents.
-    """
-    target, source = load_merge_pair(target_id, source_id, repo.find_by_id, label="Publication")
-
-    if target.doi and source.doi and target.doi != source.doi:
-        raise DistinctDoiError(target_id, source_id, str(target.doi), str(source.doi))
-
-    repo.merge_into(target_id, source_id)
-    refresh_from_sources(target_id, repo=repo)
-    emit_event(
-        audit_repo,
-        "publication.merged",
-        "publication",
-        target_id,
-        {"source_id": source_id},
-    )

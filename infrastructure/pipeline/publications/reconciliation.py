@@ -167,26 +167,6 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
-        # distinct_publications : re-pointer chaque paire (from, autre) en (autre, to) réordonnée,
-        # écarter l'auto-paire, dédupliquer, puis supprimer les paires de `from`.
-        conn.execute(
-            text("""
-                INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-                SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
-                FROM (
-                    SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
-                    FROM distinct_publications
-                    WHERE pub_id_a = :s OR pub_id_b = :s
-                ) pairs
-                WHERE other_id <> :t
-                ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
-            """),
-            {"s": from_publication_id, "t": to_publication_id},
-        )
-        conn.execute(
-            text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
-            {"s": from_publication_id},
-        )
         conn.execute(
             text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
             {"s": from_publication_id, "t": to_publication_id},

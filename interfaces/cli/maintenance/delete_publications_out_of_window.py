@@ -10,7 +10,7 @@ Critères de suppression :
 
 Cascade FK mobilisée :
   - `source_publications` → `source_authorships` → `source_authorship_addresses`, `source_authorship_structures`
-  - `publications` → `authorships`, `publication_subjects`, `distinct_publications`
+  - `publications` → `authorships`, `publication_subjects`
   - `persons` → `person_identifiers`, `person_name_forms`
 
 Usage :

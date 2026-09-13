@@ -286,54 +286,6 @@ class PgPublicationRepository(PublicationRepository):
             )
         )
 
-    # ── Fusion ─────────────────────────────────────────────────────
-
-    def merge_into(self, target_id: int, source_id: int) -> None:
-        # 1. Transférer les source_publications
-        self._conn.execute(
-            text("UPDATE source_publications SET publication_id = :t WHERE publication_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        # 2. Transférer les authorships vérité (dédup par person_id)
-        self._conn.execute(
-            text("""
-                DELETE FROM authorships
-                WHERE publication_id = :s
-                  AND person_id IN (
-                      SELECT person_id FROM authorships WHERE publication_id = :t
-                  )
-            """),
-            {"s": source_id, "t": target_id},
-        )
-        self._conn.execute(
-            text("UPDATE authorships SET publication_id = :t WHERE publication_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        # 3. Repointer distinct_publications de source vers target : pour chaque paire (source, autre), insérer (autre, target) réordonnée. On écarte l'auto-paire (autre = target) et on dédoublonne via ON CONFLICT, puis on supprime les paires de source.
-        self._conn.execute(
-            text("""
-                INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-                SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
-                FROM (
-                    SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
-                    FROM distinct_publications
-                    WHERE pub_id_a = :s OR pub_id_b = :s
-                ) AS pairs
-                WHERE other_id <> :t
-                ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
-            {"s": source_id},
-        )
-
-        # 4. Supprimer la source.
-        self._conn.execute(text("DELETE FROM publications WHERE id = :s"), {"s": source_id})
-
     # ── Suppression ────────────────────────────────────────────────
 
     def delete(self, pub_id: int) -> None:
@@ -341,22 +293,6 @@ class PgPublicationRepository(PublicationRepository):
             text("DELETE FROM publications WHERE id = :id"),
             {"id": pub_id},
         )
-
-    # ── distinct_publications ──────────────────────────────────────
-
-    def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
-        row = self._conn.execute(
-            text("""
-                INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-                VALUES (LEAST(:a, :b), GREATEST(:a, :b))
-                ON CONFLICT DO NOTHING
-                RETURNING pub_id_a, pub_id_b
-            """),
-            {"a": pub_id_a, "b": pub_id_b},
-        ).first()
-        if not row:
-            return None
-        return row.pub_id_a, row.pub_id_b
 
 
 def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:

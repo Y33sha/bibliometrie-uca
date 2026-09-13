@@ -74,7 +74,6 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [Authorships et sources](05-authorships-et-sources.md) |
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [Personnes](04-personnes.md) |
-| `distinct_publications` | paires marquées distinctes malgré un titre identique | [Publications](03-publications.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [Publications](03-publications.md) |
 | `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de la prochaine tentative | [Authorships et sources](05-authorships-et-sources.md) |
 | `journal_name_forms` | formes de noms pour reconnaître une revue | [Publications](03-publications.md) |

@@ -106,7 +106,7 @@ TO bibliometrie_app;
 -- `INSERT … ON CONFLICT DO UPDATE` exige le droit de mise à jour, que la ligne entre en
 -- conflit ou non.
 GRANT INSERT, UPDATE, DELETE ON
-    confirmed_authorships, distinct_publications
+    confirmed_authorships
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON

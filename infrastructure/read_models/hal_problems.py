@@ -232,9 +232,6 @@ class PgHalProblemsQueries(HalProblemsQueries):
                   - (SELECT COUNT(*) FROM source_authorships sa2
                      WHERE sa2.source = 'hal' AND sa2.source_publication_id = hd2.id)
               ) <= 2
-              AND NOT EXISTS (SELECT 1 FROM distinct_publications dp
-                              WHERE dp.pub_id_a = LEAST(p1.id, p2.id)
-                                AND dp.pub_id_b = GREATEST(p1.id, p2.id))
         """
 
         total_row = self._conn.execute(text(f"SELECT COUNT(*) AS total {dup_query}")).one()

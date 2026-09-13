@@ -39,7 +39,6 @@ Légende :
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
 - **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
-- **`distinct_publications`** : paires de publications déclarées **distinctes** par l'administration.
 - **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.
@@ -64,5 +63,4 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `doi_prefixes` | pipeline | phases `resolve_ra` et `publishers_journals` |
 | `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |
 | `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
-| `distinct_publications` | admin | `application/services/publications/commands.py` |
 | `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |

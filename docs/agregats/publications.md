@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-06.*
 
-Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état consolidé depuis leur union. L'édition manuelle se limite à réunir deux publications ou à déclarer qu'elles sont distinctes.
+Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état consolidé depuis leur union.
 
 `domain/publications/` porte les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut *open access*.
 
@@ -13,7 +13,6 @@ Une publication est la référence unifiée d'un document : plusieurs enregistre
 | `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `pub_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `unpaywall_checked_at`, `subjects_ingested_at`, `meta` |
 | `authorships` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
 | `publication_relations` | Lien orienté entre deux publications | `from_publication_id`, `relation_type`, `target_publication_id` **ou** `target_doi`, `source` |
-| `distinct_publications` | Paires déclarées comme deux documents différents | `(pub_id_a, pub_id_b)`, avec `a < b` |
 | `apc_payments` | Frais de publication, importés puis corrigés à la main | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
 | `publications_detail` | Complément de métadonnées servi au détail | `publication_id`, recalculé à chaque `refresh_from_sources` |
 
@@ -39,15 +38,9 @@ Les liens vont du dépendant vers le parent, et les liens inverses sont dédoubl
 
 **Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
 
-## Écriture par l'API — édition manuelle
+## Écriture par l'API
 
-Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une commande vaut une transaction.
-
-**Réunir deux doublons** (`POST /api/publications/duplicates/merge`). L'opération est refusée si les deux portent des DOI différents. Les enregistrements sources sont repointés, les authorships dédoublonnés et repointés, les paires déclarées distinctes réordonnées, puis la publication absorbée est supprimée et la survivante rafraîchie. La cible est celle dont l'identifiant est le plus petit ; le sens de la fusion est sans conséquence, l'union des sources étant la même.
-
-**Déclarer deux publications distinctes** (`POST /api/publications/duplicates/mark-distinct`) inscrit la paire, sans effet si elle y figure déjà.
-
-**Aucune métadonnée consolidée ne s'édite.** Une valeur fausse se corrige en amont, par une règle de `metadata_correction` sur l'enregistrement source, ou en réunissant ou séparant des doublons. Les frais de publication arrivent par un import en ligne de commande (`interfaces/cli/imports/import_apc.py`) et l'API ne fait que les lire.
+L'API n'écrit rien sur les publications. Une valeur consolidée fausse se corrige en amont, par une règle de `metadata_correction` sur l'enregistrement source. Les frais de publication arrivent par un import en ligne de commande (`interfaces/cli/imports/import_apc.py`) et l'API ne fait que les lire.
 
 ## Lecture par le pipeline
 

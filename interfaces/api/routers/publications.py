@@ -1,8 +1,8 @@
-"""Router des publications : listes, facettes, détail, export, fusion et distinction de doublons. Sert `/api/publications/*`.
+"""Router des publications : listes, facettes, détail et export. Sert `/api/publications/*`.
 
-Les lectures passent par le port `PublicationsQueries`, les écritures par les command handlers de `application.services.publications.commands`.
+Les lectures passent par le port `PublicationsQueries`.
 
-Les chemins littéraux — `/facets`, `/export.csv`, `/export-theses.csv`, `/duplicates/*` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from collections.abc import Iterator
@@ -11,7 +11,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import Connection
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
@@ -23,19 +22,11 @@ from application.ports.read_models.publications_queries import (
     PublicationSort,
     PublicationsQueries,
 )
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.publications import commands as publication_commands
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
-from interfaces.api.deps import (
-    audit_repo,
-    db_conn,
-    publication_repo,
-    publications_queries,
-)
+from interfaces.api.deps import publications_queries
 from interfaces.api.filters import (
     TOGGLE_VALUES,
     parse_apc_origins,
@@ -43,12 +34,6 @@ from interfaces.api.filters import (
     parse_ints,
     parse_str_csv,
     parse_vocabulary_csv,
-)
-from interfaces.api.models import (
-    MarkDistinctPublications,
-    MergePublications,
-    MergeResponse,
-    OkResponse,
 )
 from interfaces.api.params import SearchTerm
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
@@ -238,39 +223,6 @@ def export_theses_csv(
     return _csv_stream(
         queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
     )
-
-
-@router.post("/duplicates/merge", response_model=MergeResponse)
-def merge_duplicate_publications(
-    body: MergePublications,
-    conn: Connection = Depends(db_conn),
-    repo: PublicationRepository = Depends(publication_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> MergeResponse:
-    """Fusionne deux publications doublons.
-
-    La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées de la publication depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 422 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
-    """
-    target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
-    publication_commands.merge_publications(conn, target_id, source_id, repo=repo, audit_repo=audit)
-    return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
-
-
-@router.post("/duplicates/mark-distinct", response_model=OkResponse)
-def mark_publications_distinct(
-    body: MarkDistinctPublications,
-    conn: Connection = Depends(db_conn),
-    repo: PublicationRepository = Depends(publication_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> OkResponse:
-    """Marque deux publications comme distinctes (non-doublon confirmé).
-
-    Persiste l'annotation dans `distinct_publications`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
-    """
-    publication_commands.mark_distinct(
-        conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit
-    )
-    return OkResponse()
 
 
 @router.get("/{pub_id}", response_model=PublicationDetailResponse)

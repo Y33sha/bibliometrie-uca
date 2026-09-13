@@ -56,7 +56,7 @@ class WorkGroup:
 class DissolvedPublication:
     """Publication vidée de toutes ses SP par la réconciliation (cas merge).
 
-    Avant suppression, ses dépendants curatés/importés (`distinct_publications`, `apc_payments`) sont re-pointés vers `successor_publication_id` — la publication qui a absorbé le gros de ses SP (porteuse du même DOI).
+    Avant suppression, ses paiements APC (`apc_payments`) sont re-pointés vers `successor_publication_id` — la publication qui a absorbé le gros de ses SP (porteuse du même DOI).
     """
 
     publication_id: int
