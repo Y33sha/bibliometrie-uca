@@ -23,6 +23,7 @@
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
+  import HubTabs from "$lib/components/HubTabs.svelte";
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
   import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
   import DetachableIntrudersList from "./DetachableIntrudersList.svelte";
@@ -546,43 +547,17 @@
   <title>{pageTitle("Admin - Personnes")}</title>
 </svelte:head>
 
-<nav class="hub-tabs">
-  <button class="hub-tab" class:active={tab === "all"} onclick={() => selectTab("all")}>
-    Toutes les personnes
-  </button>
-  <button
-    class="hub-tab"
-    class:active={tab === "ambiguous-forms"}
-    onclick={() => selectTab("ambiguous-forms")}
-  >
-    Formes ambigu&euml;s
-    {#if ambiguousCount > 0}<span class="tab-badge">{ambiguousCount}</span>{/if}
-  </button>
-  <button
-    class="hub-tab"
-    class:active={tab === "identifier-conflicts"}
-    onclick={() => selectTab("identifier-conflicts")}
-  >
-    Conflits d'identifiant
-    {#if identifierConflictCount > 0}<span class="tab-badge">{identifierConflictCount}</span>{/if}
-  </button>
-  <button
-    class="hub-tab"
-    class:active={tab === "detachable-intruders"}
-    onclick={() => selectTab("detachable-intruders")}
-  >
-    Intrus d&eacute;tachables
-    {#if detachableCount > 0}<span class="tab-badge">{detachableCount}</span>{/if}
-  </button>
-  <button
-    class="hub-tab"
-    class:active={tab === "name-duplicates"}
-    onclick={() => selectTab("name-duplicates")}
-  >
-    Doublons par nom
-    {#if nameDuplicateCount > 0}<span class="tab-badge">{nameDuplicateCount}</span>{/if}
-  </button>
-</nav>
+<HubTabs
+  tabs={[
+    { key: "all", label: "Toutes les personnes" },
+    { key: "ambiguous-forms", label: "Formes ambiguës", count: ambiguousCount },
+    { key: "identifier-conflicts", label: "Conflits d'identifiant", count: identifierConflictCount },
+    { key: "detachable-intruders", label: "Intrus détachables", count: detachableCount },
+    { key: "name-duplicates", label: "Doublons par nom", count: nameDuplicateCount },
+  ]}
+  active={tab}
+  onselect={(key) => selectTab(key as TabKey)}
+/>
 
 {#if tab === "all"}
   <PersonsToolbar
@@ -712,40 +687,6 @@
 
 
 <style>
-  .hub-tabs {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--border, #e0e0e0);
-    margin-bottom: 14px;
-  }
-  .hub-tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 8px 14px;
-    cursor: pointer;
-    font: inherit;
-    color: #666;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .hub-tab:hover {
-    color: #222;
-  }
-  .hub-tab.active {
-    color: var(--accent, #1976d2);
-    border-bottom-color: var(--accent, #1976d2);
-    font-weight: 600;
-  }
-  .tab-badge {
-    background: var(--accent, #1976d2);
-    color: white;
-    border-radius: 10px;
-    font-size: 0.72rem;
-    padding: 0 7px;
-    font-weight: 600;
-  }
   .data-table {
     overflow: visible;
   }
