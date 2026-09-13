@@ -1,5 +1,6 @@
 """Chargement des fichiers d'environnement : `.env` racine et fichier de l'instance désignée par `BIBLIO_INSTANCE`."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -45,5 +46,7 @@ def test_instance_file_wins_over_process_and_root_env(tmp_path):
 
 
 def test_missing_instance_file_raises(tmp_path):
-    with pytest.raises(FileNotFoundError, match="instances/nantes/instance.env"):
+    with pytest.raises(
+        FileNotFoundError, match=re.escape(str(Path("instances", "nantes", "instance.env")))
+    ):
         load_env_files(_project(tmp_path), {"BIBLIO_INSTANCE": "nantes"})
