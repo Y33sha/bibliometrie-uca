@@ -1,6 +1,6 @@
 """Orchestrateur du refresh des rows staging stale d'une source.
 
-Sélectionne les rows dont `last_seen_at` a dépassé `STALE_REFRESH_AFTER_DAYS` et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
+Sélectionne les rows dont `last_seen_at` date de plus que le délai `fetch_stale_after_days` et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
 
 Trois issues par row (cf. `application.ports.pipeline.extract.fetch_stale`) :
 
@@ -103,10 +103,11 @@ async def refresh(
     adapter: FetchStaleAdapter,
     log: logging.Logger,
     *,
+    after_days: int,
     years: list[int] | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
-    """Refetche par id natif les rows stale de la source de l'adapter.
+    """Refetche par id natif les rows de la source de l'adapter non revues depuis `after_days` jours.
 
     `years` borne le refresh à la fenêtre d'années du run courant (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
 
@@ -115,14 +116,19 @@ async def refresh(
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
 
-    stale = adapter.find_stale(conn, years)
+    stale = adapter.find_stale(conn, years, after_days=after_days)
     total = len(stale)
 
     metrics = PhaseMetrics(seen=total)
     if total == 0:
         return metrics
 
-    slog.info("%s à chercher", accord(total, "document"))
+    slog.info(
+        "%s non %s depuis %s",
+        accord(total, "document"),
+        forme(total, "revu"),
+        accord(after_days, "jour"),
+    )
 
     request_delay = getattr(adapter, "request_delay_s", 0.0)
     processed = 0

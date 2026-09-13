@@ -235,7 +235,7 @@ def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
 def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
-    Chaque row est réinterrogée par son identifiant natif (`staging.source_id`), avec ou sans DOI : trouvée, son `last_seen_at` et son `raw_data` sont rafraîchis ; absente de sa source, elle reçoit un `disappeared_at` ; sur échec réseau, elle attend le run suivant. Le seuil `STALE_REFRESH_AFTER_DAYS` étale la charge, chaque passe ne ramassant que les rows qui viennent de franchir le délai.
+    Chaque row est réinterrogée par son identifiant natif (`staging.source_id`), avec ou sans DOI : trouvée, son `last_seen_at` et son `raw_data` sont rafraîchis ; absente de sa source, elle reçoit un `disappeared_at` ; sur échec réseau, elle attend le run suivant. Le délai `fetch_stale_after_days` étale la charge, chaque passe ramassant seulement les rows qui viennent de le franchir.
 
     La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 
@@ -368,7 +368,7 @@ def _vacuum_staging(full: bool = False) -> None:
 def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     """Enrichissement du référentiel `journals`.
 
-    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus de trente jours.
+    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
 
     La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 
@@ -725,17 +725,16 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     return metrics
 
 
-# Délai minimal entre deux imports du dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`.
-_DOAJ_STALE_DAYS = 30
-
-
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
         run_import_doaj_dump,
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
-    from infrastructure.sources.config import get_polite_pool_email_optional
+    from infrastructure.sources.config import (
+        get_doaj_refresh_after_days,
+        get_polite_pool_email_optional,
+    )
     from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
     from infrastructure.sources.polite_pool import build_user_agent
 
@@ -743,9 +742,9 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     try:
         journal_repo = PgJournalGatewayQueries(conn)
         last = journal_repo.doaj_last_import_at()
-        threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
-        if last is not None and last > threshold:
-            prochain = last + datetime.timedelta(days=_DOAJ_STALE_DAYS)
+        delai = datetime.timedelta(days=get_doaj_refresh_after_days(conn))
+        if last is not None and last > datetime.datetime.now(datetime.UTC) - delai:
+            prochain = last + delai
             etape(
                 log,
                 "Référentiel DOAJ importé le %s : prochain import le %s",
@@ -867,13 +866,18 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_id
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     etape(log, "Recherche dans HAL des documents avec hal-id trouvés ailleurs")
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
-        metrics = asyncio.run(fetch_missing_hal_by_id(conn, adapter, log))
+        metrics = asyncio.run(
+            fetch_missing_hal_by_id(
+                conn, adapter, log, retry_after_days=get_fetch_missing_retry_after_days(conn)
+            )
+        )
     finally:
         conn.close()
     return metrics
@@ -883,13 +887,18 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_nnt
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     etape(log, "Recherche dans HAL des thèses avec NNT trouvées ailleurs")
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
-        metrics = asyncio.run(fetch_missing_hal_by_nnt(conn, adapter, log))
+        metrics = asyncio.run(
+            fetch_missing_hal_by_nnt(
+                conn, adapter, log, retry_after_days=get_fetch_missing_retry_after_days(conn)
+            )
+        )
     finally:
         conn.close()
     return metrics
@@ -937,7 +946,10 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
         reset_current_breaker,
         set_current_breaker,
     )
-    from infrastructure.sources.config import get_fetch_missing_max_per_source
+    from infrastructure.sources.config import (
+        get_fetch_missing_max_per_source,
+        get_fetch_missing_retry_after_days,
+    )
 
     adapter = _make_fetch_missing_doi_adapter(target)
 
@@ -953,6 +965,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                 adapter,
                 log,
                 missing_dois_reader=get_missing_dois,
+                retry_after_days=get_fetch_missing_retry_after_days(conn),
                 limit=get_fetch_missing_max_per_source(conn),
                 breaker=breaker,
             )
@@ -1005,6 +1018,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
         reset_current_breaker,
         set_current_breaker,
     )
+    from infrastructure.sources.config import get_fetch_stale_after_days
 
     adapter = _make_fetch_stale_adapter(target)
 
@@ -1014,7 +1028,16 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
     try:
-        metrics = asyncio.run(refresh(conn, adapter, log, years=years, breaker=breaker))
+        metrics = asyncio.run(
+            refresh(
+                conn,
+                adapter,
+                log,
+                after_days=get_fetch_stale_after_days(conn),
+                years=years,
+                breaker=breaker,
+            )
+        )
     except SourceUnavailableError:
         metrics = PhaseMetrics()
         signal_source_unavailable(metrics, target, logger=log, phase="fetch_stale")
@@ -1044,6 +1067,7 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     from infrastructure.sources.config import (
         get_polite_pool_email_optional,
         get_unpaywall_max_per_run,
+        get_unpaywall_recheck_after_days,
     )
     from infrastructure.sources.unpaywall.client import fetch_oa_status
 
@@ -1072,6 +1096,7 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
                     PgOaStatusQueries(),
                     log,
                     fetcher=fetcher,
+                    staleness_days=get_unpaywall_recheck_after_days(conn),
                     max_per_run=get_unpaywall_max_per_run(conn),
                 )
             )

@@ -30,7 +30,7 @@ class _FakeAdapter:
     def configure(self, conn) -> None:
         pass
 
-    def find_stale(self, conn, years) -> list[StaleRow]:
+    def find_stale(self, conn, years, *, after_days) -> list[StaleRow]:
         return [StaleRow(staging_id=i, source_id=sid) for i, sid in enumerate(self._outcomes)]
 
     async def fetch_by_native_id(self, client, source_id):
@@ -45,7 +45,7 @@ class _FakeAdapter:
 
 
 def _run(adapter) -> object:
-    return asyncio.run(refresh(MagicMock(), adapter, logging.getLogger("test")))
+    return asyncio.run(refresh(MagicMock(), adapter, logging.getLogger("test"), after_days=90))
 
 
 def test_routes_each_outcome():

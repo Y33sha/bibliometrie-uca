@@ -10,6 +10,7 @@ from domain.errors import ValidationError
 
 _PLAFOND = "unpaywall_max_per_run"
 _ANNEE = "pipeline_start_year_full"
+_DELAI = "fetch_stale_after_days"
 
 
 class TestPlafonds:
@@ -51,6 +52,19 @@ class TestAnnee:
     def test_hors_bornes_ou_illisible_est_refuse(self, valeur):
         with pytest.raises(ValidationError, match=str(MIN_YEAR)):
             normalize_config_value(_ANNEE, valeur)
+
+
+class TestDelais:
+    def test_un_nombre_de_jours_passe(self):
+        assert normalize_config_value(_DELAI, 90) == 90
+
+    def test_un_nombre_ecrit_en_chaine_est_lu(self):
+        assert normalize_config_value(_DELAI, "30") == 30
+
+    @pytest.mark.parametrize("valeur", [0, -1, None, "", "texte", True, 1.5, []])
+    def test_moins_d_un_jour_ou_illisible_est_refuse(self, valeur):
+        with pytest.raises(ValidationError, match="au moins 1"):
+            normalize_config_value(_DELAI, valeur)
 
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():

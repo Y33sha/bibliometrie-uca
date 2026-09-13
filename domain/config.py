@@ -1,8 +1,8 @@
 """Règles des paramètres applicatifs.
 
-La table `config` porte les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, types de structure affichés. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
+La table `config` porte les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, délais de réinterrogation, types de structure affichés. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
 
-Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, une année doit tomber dans les bornes.
+Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, un délai un nombre entier de jours d'au moins un, une année doit tomber dans les bornes.
 """
 
 from domain.errors import ValidationError
@@ -26,6 +26,20 @@ CAP_KEYS: frozenset[str] = frozenset(
 )
 """Plafonds d'interrogation, exprimés en entiers positifs. Zéro retire la borne."""
 
+DELAY_KEYS: frozenset[str] = frozenset(
+    {
+        # Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source.
+        "fetch_stale_after_days",
+        # Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. La recherche d'un identifiant natif de la source est définitive.
+        "fetch_missing_retry_after_days",
+        # Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall.
+        "unpaywall_recheck_after_days",
+        # Délai avant de télécharger de nouveau le fichier du DOAJ.
+        "doaj_refresh_after_days",
+    }
+)
+"""Délais de réinterrogation des sources, exprimés en nombres entiers de jours, au moins un."""
+
 YEAR_KEYS: frozenset[str] = frozenset({"pipeline_start_year_full"})
 """Clés portant une année."""
 
@@ -42,12 +56,6 @@ INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
 
 MIN_YEAR = 1970
 MAX_YEAR = 2100
-
-STALE_REFRESH_AFTER_DAYS = 90
-"""Âge, en jours, au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
-
-FAILED_LOOKUP_RETRY_DAYS = 30
-"""Délai, en jours, avant de chercher de nouveau un identifiant resté introuvable dans une source. La recherche d'un identifiant natif de la source est définitive."""
 
 
 def _as_int(value: JsonValue) -> int | None:
@@ -67,7 +75,7 @@ def _as_int(value: JsonValue) -> int | None:
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
     """Valeur à écrire pour `key`, ramenée à la forme que la clé impose.
 
-    Un plafond attend un entier positif ou nul, zéro retirant la borne ; une valeur absente ou vide y vaut zéro. Une année doit tomber dans les bornes. Toute autre valeur est refusée, aucune valeur de repli n'ayant de sens.
+    Un plafond attend un entier positif ou nul, zéro retirant la borne ; une valeur absente ou vide y vaut zéro. Un délai attend un nombre entier de jours, au moins un. Une année doit tomber dans les bornes. Toute autre valeur est refusée, aucune valeur de repli n'ayant de sens.
 
     Les autres clés passent telles quelles.
     """
@@ -78,6 +86,13 @@ def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
         if plafond is None or plafond < 0:
             raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
         return plafond
+    if key in DELAY_KEYS:
+        delai = _as_int(value)
+        if delai is None or delai < 1:
+            raise ValidationError(
+                f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
+            )
+        return delai
     if key in YEAR_KEYS:
         annee = _as_int(value)
         if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):

@@ -32,8 +32,6 @@ type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[str | None]
 # Constantes opérationnelles.
 BATCH_SIZE = 50
 MAX_CONCURRENT = 5
-STALENESS_DAYS = 15
-"""Au-delà, un statut OA est re-vérifié."""
 
 
 async def run(
@@ -42,19 +40,20 @@ async def run(
     logger: logging.Logger,
     *,
     fetcher: OaStatusFetcher,
+    staleness_days: int,
     max_per_run: int | None,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
     """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run.
 
-    `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
+    `staleness_days` est le délai, en jours, au-delà duquel une publication vérifiée l'est de nouveau. `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
     """
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
-        conn, limit=max_per_run, staleness_days=STALENESS_DAYS
+        conn, limit=max_per_run, staleness_days=staleness_days
     )
     total = len(pubs)
-    stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
+    stale_total = queries.count_stale_publications(conn, staleness_days=staleness_days)
     before_dist = queries.count_publications_by_oa_status(conn)
 
     progress = {"updated": 0, "skipped": 0, "not_found": 0}
@@ -106,7 +105,7 @@ async def run(
         accord(stale_total, "publication"),
         forme(stale_total, "jamais vérifiée"),
         forme(stale_total, "vérifiée"),
-        accord(STALENESS_DAYS, "jour"),
+        accord(staleness_days, "jour"),
     )
     if max_per_run and max_per_run < stale_total:
         reportees = stale_total - total

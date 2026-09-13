@@ -45,7 +45,7 @@ Le moissonnage nécessite des **structures** :
 
 ### Configuration du pipeline
 
-Les années et les périmètres moissonnés se règlent dans `admin/config`.
+Les années, les périmètres moissonnés et les délais de réinterrogation des sources se règlent dans `admin/config`.
 
 #### Années
 
@@ -54,6 +54,15 @@ Le pipeline a [deux modes](../pipeline/01-vue-d-ensemble.md): *full* et *daily*.
 - Le mode *full* interroge les sources depuis une année de début (`--start-year`) jusqu'à l'année courante. Sans argument `--start-year`, l'année par défaut est la valeur configurée dans `admin/config`.
 
 - Le mode *daily* ne réinterroge que les nouveaux dépôts HAL depuis le dernier lancement.
+
+#### Délais de réinterrogation
+
+Au-delà d'un délai réglable en jours, le pipeline interroge de nouveau une source :
+
+- un document non revu depuis ce délai est réinterrogé à sa source (90 jours par défaut) ;
+- un identifiant introuvable dans une source y est cherché de nouveau (30 jours par défaut) ;
+- le statut open access d'une publication est vérifié de nouveau auprès d'Unpaywall (15 jours par défaut) ;
+- le fichier du DOAJ est téléchargé de nouveau (30 jours par défaut).
 
 #### Périmètres
 

@@ -34,19 +34,19 @@ Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, Sca
 
 Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`.
 
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, 30 jours plus tard. L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
 
 
 ## Documents périmés et disparus (`fetch_stale`)
 
-Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la dernière fois il y a plus de `STALE_REFRESH_AFTER_DAYS` (90 jours) et repère ceux qui ont disparu de leur source.
+Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la dernière fois il y a plus que le délai `fetch_stale_after_days` (90 jours par défaut, réglable dans `admin/config`) et repère ceux qui ont disparu de leur source.
 
 Chaque ligne périmée est réinterrogée par son identifiant natif :
 - trouvée → `raw_data` rafraîchi et `last_seen_at` repoussé ;
 - absence confirmée → `disappeared_at` posé ;
 - erreur transitoire → laissée, retentée plus tard.
 
-La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir les 90 jours.
+La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ramasse seulement ce qui vient de franchir le délai.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 

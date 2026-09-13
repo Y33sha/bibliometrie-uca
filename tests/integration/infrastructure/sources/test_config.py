@@ -2,7 +2,7 @@
 
 Trois réglages en dépendent : les années à couvrir, les collections HAL à moissonner et les identifiants de structure à interroger par source. Les deux derniers se dérivent du périmètre d'extraction : les structures qui le composent portent la collection et les identifiants.
 
-Les clés dont la forme est imposée — plafonds d'interrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
+Les clés dont la forme est imposée — plafonds d'interrogation, délais de réinterrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
 """
 
 import json
@@ -14,11 +14,16 @@ from sqlalchemy.exc import IntegrityError
 from domain.dates import today
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.sources.config import (
+    FETCH_STALE_AFTER_DAYS_DEFAULT,
     UNPAYWALL_MAX_PER_RUN_DEFAULT,
+    get_doaj_refresh_after_days,
     get_extraction_api_ids,
     get_fetch_missing_max_per_source,
+    get_fetch_missing_retry_after_days,
+    get_fetch_stale_after_days,
     get_hal_collections,
     get_unpaywall_max_per_run,
+    get_unpaywall_recheck_after_days,
     get_years,
 )
 
@@ -90,6 +95,11 @@ class TestFormeImposeeEnBase:
     def test_un_plafond_hors_forme_est_refuse(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_cap_is_non_negative_integer"):
             _set_config(sa_sync_conn, "unpaywall_max_per_run", valeur)
+
+    @pytest.mark.parametrize("valeur", ["longtemps", 0, -3, True, 1.5])
+    def test_un_delai_hors_forme_est_refuse(self, sa_sync_conn, valeur):
+        with pytest.raises(IntegrityError, match="config_delay_is_positive_integer"):
+            _set_config(sa_sync_conn, "fetch_stale_after_days", valeur)
 
 
 class TestGetHalCollections:
@@ -198,3 +208,24 @@ class TestPlafondsParRun:
     def test_fetch_missing_sans_cle_est_illimite(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_missing_max_per_source'"))
         assert get_fetch_missing_max_per_source(sa_sync_conn) is None
+
+
+class TestDelais:
+    """Délais de réinterrogation lus en configuration, en jours."""
+
+    @pytest.mark.parametrize(
+        ("key", "lire"),
+        [
+            ("fetch_stale_after_days", get_fetch_stale_after_days),
+            ("fetch_missing_retry_after_days", get_fetch_missing_retry_after_days),
+            ("unpaywall_recheck_after_days", get_unpaywall_recheck_after_days),
+            ("doaj_refresh_after_days", get_doaj_refresh_after_days),
+        ],
+    )
+    def test_le_delai_configure_est_lu(self, sa_sync_conn, key, lire):
+        _set_config(sa_sync_conn, key, 7)
+        assert lire(sa_sync_conn) == 7
+
+    def test_la_cle_absente_laisse_le_delai_par_defaut(self, sa_sync_conn):
+        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_stale_after_days'"))
+        assert get_fetch_stale_after_days(sa_sync_conn) == FETCH_STALE_AFTER_DAYS_DEFAULT

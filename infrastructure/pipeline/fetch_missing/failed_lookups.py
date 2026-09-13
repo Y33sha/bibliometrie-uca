@@ -8,7 +8,6 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
-from domain.config import FAILED_LOOKUP_RETRY_DAYS
 from domain.publications.identifiers import clean_doi
 from domain.sources.registry import is_native_identifier
 
@@ -30,11 +29,11 @@ _RECORD_SQL = text(
 
 
 def record_failed_lookup(
-    conn: Connection, source: str, id_type: LookupIdType, id_value: str
+    conn: Connection, source: str, id_type: LookupIdType, id_value: str, *, retry_after_days: int
 ) -> None:
     """Inscrit, ou réarme, l'échec de la recherche de `id_value` dans `source`.
 
-    L'échec est définitif (`next_retry` NULL) quand `id_type` est l'identifiant natif de `source`. Sinon, la recherche reprend après `FAILED_LOOKUP_RETRY_DAYS` jours : la source peut indexer le document plus tard.
+    L'échec est définitif (`next_retry` NULL) quand `id_type` est l'identifiant natif de `source`. Sinon, la recherche reprend après `retry_after_days` jours : la source peut indexer le document plus tard.
 
     `id_value` est la valeur cherchée, telle que la sélection l'a fournie : la sélection la compare ensuite à cette même forme. Ne commit pas.
     """
@@ -45,7 +44,7 @@ def record_failed_lookup(
             "id_type": id_type,
             "id_value": id_value,
             "permanent": is_native_identifier(source, id_type),
-            "days": FAILED_LOOKUP_RETRY_DAYS,
+            "days": retry_after_days,
         },
     )
 
