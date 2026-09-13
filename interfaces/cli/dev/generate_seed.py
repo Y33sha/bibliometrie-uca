@@ -122,11 +122,11 @@ def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
 
 
 def _display_path(path: Path) -> str:
-    """Chemin relatif à la racine du dépôt quand le fichier s'y trouve, absolu sinon."""
+    """Chemin relatif à la racine du dépôt quand le fichier s'y trouve, absolu sinon. Les séparateurs sont des barres obliques, quel que soit le système."""
     resolved = path.resolve()
     if resolved.is_relative_to(PROJECT_ROOT):
-        return str(resolved.relative_to(PROJECT_ROOT))
-    return str(resolved)
+        return resolved.relative_to(PROJECT_ROOT).as_posix()
+    return resolved.as_posix()
 
 
 def render_seed(description: str, output_path: Path, sections: Sequence[SeedSection]) -> str:

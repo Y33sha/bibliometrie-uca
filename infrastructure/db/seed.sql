@@ -3,16 +3,20 @@
 --
 -- Seed commun : référentiels partagés par tous les établissements.
 -- Prérequis : schéma appliqué par les migrations (alembic upgrade head)
--- Usage : psql -d bibliometrie -f infrastructure\db\seed.sql
+-- Usage : psql -d bibliometrie -f infrastructure/db/seed.sql
 
 BEGIN;
 
--- config (4 lignes)
+-- config (8 lignes)
 DELETE FROM config WHERE key NOT IN ('perimeter_extraction', 'perimeter_persons');
+INSERT INTO config (key, value, description) VALUES ('doaj_refresh_after_days', '30', 'Délai, en jours, avant de télécharger de nouveau le fichier du DOAJ.');
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '10000', 'Nombre maximum de DOI interrogés par source cible à la phase fetch_missing, par run. 0 = illimité.');
+INSERT INTO config (key, value, description) VALUES ('fetch_missing_retry_after_days', '30', 'Délai, en jours, avant de chercher de nouveau un identifiant introuvable dans une source. L''échec sur un identifiant natif de la source est définitif.');
+INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '90', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.');
 INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo", "admin"]', 'Types de structure affichés sur la page publique des laboratoires');
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.');
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.');
+INSERT INTO config (key, value, description) VALUES ('unpaywall_recheck_after_days', '15', 'Délai, en jours, avant de vérifier de nouveau le statut open access d''une publication auprès d''Unpaywall.');
 
 -- countries (175 lignes)
 DELETE FROM countries;
