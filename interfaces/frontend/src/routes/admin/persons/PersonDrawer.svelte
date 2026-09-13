@@ -3,6 +3,7 @@
   import { api } from "$lib/api";
   import { titleCase } from "$lib/utils";
   import { autofocus } from "$lib/actions/focus";
+  import Drawer from "$lib/components/Drawer.svelte";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import type { components } from "$lib/api/schema";
   import IdentifiersCell from "./IdentifiersCell.svelte";
@@ -109,19 +110,16 @@
     return "";
   }
 
-  function onkeydown(e: KeyboardEvent) {
-    if (e.key !== "Escape") return;
+  // Échap annule d'abord l'édition du nom en cours.
+  function onescape() {
     if (editing) editing = false;
     else onclose();
   }
 </script>
 
-<svelte:window {onkeydown} />
-
-<button class="drawer-backdrop" aria-label="Fermer le panneau" onclick={onclose}></button>
-
-<aside class="drawer" class:rejected={person.rejected}>
-  <header class="drawer-head">
+<Drawer {onclose} {onescape}>
+  {#snippet head()}
+  <div class="person-head">
     {#if editing}
       <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
         <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" use:autofocus={{ select: true }} />
@@ -134,7 +132,7 @@
         >
       </form>
     {:else}
-      <div class="drawer-title">
+      <div class="drawer-title" class:rejected={person.rejected}>
         <a
           class="drawer-name-link"
           href="{base}/persons/{person.id}"
@@ -160,12 +158,11 @@
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
         </button>
-        <button class="drawer-close" title="Fermer" aria-label="Fermer" onclick={onclose}>&times;</button>
       </div>
     {/if}
-  </header>
+  </div>
+  {/snippet}
 
-  <div class="drawer-body">
     <div class="drawer-meta">
       <span>{person.signature_count ?? 0} signatures</span>
       <span>{person.in_perimeter_signature_count ?? 0} dans le périmètre</span>
@@ -244,46 +241,18 @@
         {onmerge}
       />
     </section>
-  </div>
-</aside>
+</Drawer>
 
 <style>
-  .drawer-backdrop {
-    position: fixed;
-    top: var(--header-height, 46px);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.25);
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    z-index: 90;
-  }
-  .drawer {
-    position: fixed;
-    top: var(--header-height, 46px);
-    right: 0;
-    height: calc(100vh - var(--header-height, 46px));
-    width: min(480px, 92vw);
-    background: #fff;
-    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
-    z-index: 91;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .drawer.rejected .drawer-title {
-    text-decoration: line-through;
-    opacity: 0.7;
-  }
-  .drawer-head {
+  .person-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border, #e0e0e0);
+  }
+  .drawer-title.rejected {
+    text-decoration: line-through;
+    opacity: 0.7;
   }
   .drawer-title {
     font-size: 1.1rem;
@@ -337,23 +306,6 @@
   }
   .icon-btn.rejected {
     color: var(--danger, #c0392b);
-  }
-  .drawer-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    line-height: 1;
-    cursor: pointer;
-    color: #888;
-    padding: 0 4px;
-  }
-  .drawer-close:hover {
-    color: #333;
-  }
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 18px;
   }
   .drawer-meta {
     display: flex;

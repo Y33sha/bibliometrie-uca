@@ -62,6 +62,7 @@
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `journal_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
+	// - `/admin/publications` (un clic sur un titre ouvre le volet de l'administration)
 	interface ExternalFilters {
 		subjectId?: number;
 		subjectLabel?: string;
@@ -89,6 +90,8 @@
 		perPage = 100,
 		restrictToPublications = false,
 		onExcludeAuthorship,
+		onopenPublication,
+		activePublicationId = null,
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
@@ -113,6 +116,10 @@
 		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
 		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
+		/** Ouvre la publication dans la page hôte au lieu de naviguer vers sa fiche. Un clic modifié (Ctrl, Cmd, Maj, Alt) garde la navigation. */
+		onopenPublication?: (pubId: number) => void;
+		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
+		activePublicationId?: number | null;
 	} = $props();
 
 	const hasFixedLab = $derived(externalFilters?.labId != null);
@@ -501,6 +508,12 @@
 		pubs.items = pubs.items.filter((item) => item.id !== p.id);
 	}
 
+	function onTitleClick(e: MouseEvent, pubId: number) {
+		if (!onopenPublication || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+		e.preventDefault();
+		onopenPublication(pubId);
+	}
+
 	onMount(async () => {
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
@@ -608,7 +621,7 @@
 			<TableStatusRow loading={pubs.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each pubs.items as p (p.id)}
-				<tr>
+				<tr class:active-row={p.id === activePublicationId}>
 					{#if showAdminExclude}
 						<td class="exclude-cell">
 							{#if p.authorship_id != null}
@@ -621,7 +634,7 @@
 						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
-					<td><a href="{base}/publications/{p.id}" class="pub-title"><PublicationTitle titre={p.title} /></a></td>
+					<td><a href="{base}/publications/{p.id}" class="pub-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
 					{#if col('journal')}<td class="journal-cell pub-col-journal">
 						{#if p.journal_id}
 							<a href="{base}/journals/{p.journal_id}">{p.journal}</a>
@@ -840,6 +853,7 @@
 		vertical-align: top;
 	}
 	.pub-table tr:hover td { background: var(--surface-hover); }
+	.pub-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
 
 	/* Statut HAL (lab) */
