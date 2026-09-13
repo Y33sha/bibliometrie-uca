@@ -2,29 +2,23 @@
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
-* [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
-* [ ] fetch_missing par NNT: stocker les tentatives, ajouter backoff
+* [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] suggested countries: jamais remis à null
-* [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
-* [ ] rendre les délais de staleness configurables (fetch_stale, fetch_missing après première tentative infructueuse, oa_statut unpaywall)
 
 # Code
 * [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
 
 # Données
-* [ ] 2 scripts pour importer APC: factoriser; supprimer colonnes jamais lues
-* [ ] distinguer conference_paper et conférence (critère: présence d'un journal_id?)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
-* publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
+* [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
-* [ ] ajouter colonne subjects_ingested_at dans publications
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -34,25 +28,20 @@
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
+* [ ] y a-t-il une API pour contrôler les ISSN?
 
 # UI
 ## Admin
-* [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
+* [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes)
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
-* [ ] recherche personnes par nom+prénom: interroger les 2 colonnes
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
-* [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
-* [ ] premier/dernier auteur (sur l'onglet publications de la page personne)
+* [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
-* [ ] Publications: facette sujets?
-* [ ] Facettes: tester l'option "caché par défaut" / + harmoniser singulier/pluriel
-* [ ] Facettes: bouton Supprimer les filtres
-* [ ] mots-clés libres: ajouter séparateurs + harmoniser style avec "sujets"
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
