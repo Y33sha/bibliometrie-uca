@@ -351,16 +351,35 @@ class TestInsertScanrDocumentChamps:
     def test_sans_mot_cle(self):
         assert self._call({"keywords": {"default": None}}).keywords is None
 
-    def test_disciplines_a_defaut_de_sujets(self):
-        """La source expose deux vocabulaires : le second sert quand le premier est vide."""
-        document = self._call({"domains": [{"label": "Physique"}]})
+    def test_concepts_wikidata_et_mots_cles_rejoignent_les_mots_cles(self):
+        """Les libellés s'ajoutent aux mots-clés de la notice, sans doublon de casse."""
+        document = self._call(
+            {
+                "keywords": {"default": ["Cirrhose"]},
+                "domains": [
+                    {"type": "wikidata", "code": "Q147778", "label": {"default": "cirrhose"}},
+                    {"type": "wikidata", "code": "Q929737", "label": {"default": "Liver Disease"}},
+                    {"type": "keyword", "label": {"default": "TIRF"}},
+                ],
+            }
+        )
 
-        assert document.topics == [{"label": "Physique"}]
+        assert document.keywords == ["Cirrhose", "Liver Disease", "TIRF"]
+        assert document.topics is None
 
-    def test_sujets_prioritaires_sur_les_disciplines(self):
-        document = self._call({"topics": [{"label": "Climat"}], "domains": [{"label": "Physique"}]})
+    def test_vedettes_sudoc_en_sujets(self):
+        vedette = {"type": "sudoc", "code": "027219046", "label": {"default": "Analgésie"}}
 
-        assert document.topics == [{"label": "Climat"}]
+        document = self._call({"domains": [vedette]})
+
+        assert document.topics == [vedette]
+        assert document.keywords is None
+
+    def test_topics_openalex_ignores(self):
+        """`topics` reprend les topics OpenAlex, que la source OpenAlex fournit."""
+        document = self._call({"topics": [{"id": "T11207", "display_name": "Alcohol Consumption"}]})
+
+        assert document.topics is None
 
     def test_citations_cumulees_sur_les_annees(self):
         document = self._call({"cited_by_counts_by_year": {"2023": 4, "2024": 6}})

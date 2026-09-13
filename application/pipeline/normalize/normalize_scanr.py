@@ -35,6 +35,7 @@ from domain.sources.scanr import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
     select_leaf_affiliations,
+    split_scanr_concepts,
 )
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
 
@@ -179,12 +180,11 @@ def insert_scanr_document(  # noqa: C901
     else:
         keywords = None
 
-    topics_raw = doc.get("topics")
-    topics = topics_raw if topics_raw else None
-    if not topics_raw:
-        domains = doc.get("domains")
-        if domains:
-            topics = domains
+    # `domains` porte les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics` reprend les topics OpenAlex, que la source OpenAlex fournit : il n'est pas lu.
+    concept_keywords, subjects = split_scanr_concepts(doc.get("domains"))
+    known = {k.lower() for k in keywords or ()}
+    keywords = [*(keywords or ()), *(k for k in concept_keywords if k.lower() not in known)] or None
+    topics = subjects or None
 
     cbc = as_mapping(doc.get("cited_by_counts_by_year"))
     annees = [n for v in cbc.values() if (n := as_int(v)) is not None]

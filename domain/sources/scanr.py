@@ -7,7 +7,11 @@ Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (f
 
 from collections.abc import Mapping
 
-from domain.types import JsonValue, as_mapping, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
+
+# Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, que ScanR détecte dans le texte, et les mots-clés sont des mots-clés libres.
+_SUBJECT_CONCEPT_TYPES = frozenset({"sudoc"})
+_KEYWORD_CONCEPT_TYPES = frozenset({"wikidata", "keyword"})
 
 
 def select_leaf_affiliations(
@@ -33,6 +37,27 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     if scanr_id and scanr_id.startswith("these"):
         return scanr_id[len("these") :].upper()
     return None
+
+
+def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:
+    """Répartit les concepts ScanR (`domains`) en mots-clés libres et en sujets.
+
+    Renvoie d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
+    """
+    keywords: list[str] = []
+    seen: set[str] = set()
+    subjects: list[JsonValue] = []
+    for entry in as_sequence(domains):
+        concept = as_mapping(entry)
+        kind = as_str(concept.get("type"))
+        if kind in _SUBJECT_CONCEPT_TYPES:
+            subjects.append(entry)
+        elif kind in _KEYWORD_CONCEPT_TYPES:
+            label = (as_str(as_mapping(concept.get("label")).get("default")) or "").strip()
+            if label and label.lower() not in seen:
+                seen.add(label.lower())
+                keywords.append(label)
+    return keywords, subjects
 
 
 def derive_scanr_oa_status(

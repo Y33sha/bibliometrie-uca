@@ -12,7 +12,9 @@ Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage
 
 4. **Sujets aberrants pour une revue** : signal de cohérence éditoriale non exploité (importé de [METIER_publishers-journals 4d](archived/2026-05-29_METIER_publishers-journals.md)).
 
-5. **Prolifération des keywords libres** : sur ~311k sujets, **303k sont des keywords libres** (sans ontologie), dont ~100k singletons (1 seule publication) et de nombreuses variantes non fusionnées (EN/FR, orthographe, pluriels). Bruit qui gonfle le référentiel et les co-occurrences. Réduction = famille du **matching approximatif** : normalisation + trigrammes (`pg_trgm`) / distance d'édition / phonétique / embeddings — pas Aho-Corasick (qui relève du matching de sous-chaînes, ex. détecteur d'adresses). Décision ouverte : faut-il ingérer les keywords libres comme sujets à part entière, ou les fusionner / les traiter à part ?
+5. **Domaines HAL réduits à leurs codes** : 28 186 notices HAL sur 52 500 (base locale) portent seulement des codes de domaine (`0.shs`, `1.shs.hist`). Elles ont été normalisées avant le passage au champ `fr_domainAllCodeLabel_fs`, qui porte les libellés, et jamais renormalisées depuis. L'extracteur n'en tire aucun sujet. Leurs données brutes portent seulement `domain_s` : une renormalisation effacerait leurs domaines. Le référentiel des domaines de l'API HAL (`ref/domain`, 393 codes, chemin complet des libellés) couvre 388 des 400 codes présents ; les 12 autres sont des codes retirés.
+
+6. **Libellés stockés dans chaque notice** : chaque `source_publication` porte le texte de ses sujets. Plusieurs sources donnent pourtant un code : domaines HAL, topics OpenAlex (`T11930`), vedettes sudoc de ScanR (PPN). Changer un libellé demande de renormaliser toutes les notices qui le portent.
 
 ### Constats empiriques de la session d'exploration
 
@@ -48,12 +50,15 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 - **Ordre** : bootstrap d'abord, Specter2 ensuite. Justification : le bootstrap retire les aberrations grossières grain domain avant calcul des centroïdes → centroïdes plus propres pour le grain topic. Les deux couches sont complémentaires (grains différents), pas redondantes.
 - **Cible long terme** : Specter2 autonome remplace le bootstrap. Aucune intégration permanente côté code applicatif pour la couche bootstrap.
 
+**Codes plutôt que libellés.** La refonte du traitement des sujets s'appuie sur une table de correspondance code → sujet, commune aux sources qui donnent un code. Les notices stockent les codes ; la table donne les libellés. Les notices HAL réduites à leurs codes redeviennent exploitables sans nouvel import.
+
 **Contraintes UI** : tous les sujets `rejected = TRUE` doivent être exclus des décomptes et des listings — pages `/subjects`, `/subjects/[id]`, dashboards `/persons/[id]` et `/laboratories/[id]`. Seule la page `/publications/[id]` continue à les afficher (temporairement), avec un style barré + grisé pour permettre un contrôle visuel des rejets au fil de l'eau.
 
 **Pistes mises de côté** : seuil de score OA seul (invalidé empiriquement), lift cooccurrence sujets feuille (invalidé : les aberrations sont récurrentes), seuil « autre support ≥ 2 » sur cleanup (trade-off rappel/précision défavorable). UI d'édition manuelle des rejets : utile en complément ponctuel, traitée hors de ce chantier.
 
 ## Phasage
 
+- [ ] **Phase 0 — Correspondance code → sujet** : schéma de la table (source, code, sujet) ; normalisation des codes par source (domaines HAL depuis `domain_s`, topics OpenAlex, vedettes sudoc ScanR) ; remplissage depuis les référentiels des sources (API HAL `ref/domain`…) ; ingestion par la table. Les 28 186 notices HAL réduites à leurs codes retrouvent leurs sujets.
 - [ ] **Phase 1 — One-shot `cleanup_oa_subjects`** : `interfaces/cli/oneshot/cleanup_oa_subjects.py`. Mapping arbitre en data du script (dict Python). SQL set-based : détection des rejets candidats + cascade descendants via la chaîne `parent`. UPDATE `publication_subjects SET rejected = TRUE`. Tests sur cas tirés du prototype SQL. `--dry-run` pour itération.
 - [ ] **Phase 2 — Ajustements UI** : filtrer `rejected = TRUE` partout sauf `/publications/[id]`. Style barré + grisé sur `/publications/[id]`. Vérifier que `recompute_usage_counts` et `recompute_cooccurrences` filtrent bien (déjà OK côté SQL au moment de la rédaction).
 - [ ] **Phase 3 — Prototype Specter2** : extraction embeddings (Specter2 base via HuggingFace, batch sur titres + abstracts existants). Persistance vecteurs (pgvector ou fichier numpy + lookup).
@@ -66,6 +71,9 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 - **Réversibilité du bootstrap** : un re-run de `cleanup_oa_subjects` doit-il reset les rejets précédents avant de recalculer ? (idempotence) Penche oui — sinon évolution du mapping arbitre = rejets fantômes persistants.
 - **Spécifications Specter2** : variante du modèle (`allenai/specter2_base` vs `proximity` vs `classification`), backend (HuggingFace local CPU/GPU vs hébergement), persistance vecteurs (pgvector vs fichier numpy + lookup).
 - **Volume corpus** : 46k publis × Specter2 embedding. CPU acceptable mais lent ; GPU bienvenu si disponible.
+- **Sources sans code** : WoS et la discipline theses.fr donnent-elles un code ? À défaut, leur libellé sert-il de code ?
+- **Codes retirés** : les 12 codes HAL absents du référentiel (`spi.energ`, `shs.info.*`…) gardent-ils un libellé repris de l'historique, ou seulement leurs niveaux parents ?
+- **Ordre** : la phase 0 change les libellés que le bootstrap prend pour arbitres. La mener avant la phase 1 évite de calibrer deux fois.
 
 ## Liens
 

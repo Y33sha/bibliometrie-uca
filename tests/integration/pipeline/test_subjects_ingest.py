@@ -67,14 +67,12 @@ class TestExtractors:
     def test_wos_non_dict(self):
         assert wos_labels([]) == []
 
-    def test_scanr_as_list(self):
-        assert scanr_labels(["Sciences de l'environnement"]) == ["Sciences de l'environnement"]
+    def test_scanr_sudoc_label(self):
+        topics = [{"type": "sudoc", "code": "027219046", "label": {"default": "Analgésie"}}]
+        assert scanr_labels(topics) == ["Analgésie"]
 
-    def test_scanr_as_dict_domains(self):
-        assert scanr_labels({"domains": ["Biologie", "Chimie"]}) == ["Biologie", "Chimie"]
-
-    def test_scanr_unknown_shape(self):
-        assert scanr_labels("x") == []
+    def test_scanr_non_list(self):
+        assert scanr_labels({"domains": []}) == []
 
     def test_theses_discipline_and_rameau(self):
         topics = {"discipline": "Informatique", "rameau": ["Algorithme", "Réseau de neurones"]}
