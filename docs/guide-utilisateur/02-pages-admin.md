@@ -66,6 +66,8 @@ Le dropdown de recherche affiche le département RH (si existant) ou l'id intern
 
 Liste des publications, avec les filtres de la page publique.
 
+Un clic sur un titre ouvre un volet qui confronte les métadonnées données par chaque source, une colonne par source : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA. Un champ absent de toutes les sources n'a pas de ligne. Une ligne surlignée signale des valeurs différentes selon les sources. Sous la revue et l'éditeur du référentiel figure, en gris, le nom donné par la source quand il diffère. Un Ctrl+clic sur le titre ouvre la fiche publique.
+
 ### Éditeurs
 TODO: à compléter
 

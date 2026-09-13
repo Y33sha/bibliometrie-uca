@@ -315,3 +315,9 @@ class TestPublicationDetail:
     def test_invalid_id(self, client):
         r = client.get("/api/publications/abc")
         assert r.status_code in (400, 422)
+
+
+class TestPublicationSources:
+    def test_not_found(self, client):
+        r = client.get("/api/publications/999999999/sources")
+        assert r.status_code == 404

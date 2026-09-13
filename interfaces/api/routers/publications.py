@@ -1,4 +1,4 @@
-"""Router des publications : listes, facettes, détail et export. Sert `/api/publications/*`.
+"""Router des publications : listes, facettes, détail, enregistrements sources et export. Sert `/api/publications/*`.
 
 Les lectures passent par le port `PublicationsQueries`.
 
@@ -20,6 +20,7 @@ from application.ports.read_models.publications_queries import (
     PublicationListResponse,
     PublicationsFacetsResponse,
     PublicationSort,
+    PublicationSourcesResponse,
     PublicationsQueries,
 )
 from domain.publications.doc_types import DOC_TYPES
@@ -235,6 +236,18 @@ def get_publication(
     if detail is None:
         raise HTTPException(status_code=404, detail="Publication introuvable")
     return detail
+
+
+@router.get("/{pub_id}/sources", response_model=PublicationSourcesResponse)
+def get_publication_sources(
+    pub_id: int,
+    queries: PublicationsQueries = Depends(publications_queries),
+) -> PublicationSourcesResponse:
+    """Métadonnées de chaque enregistrement source de la publication, toutes sources confondues."""
+    sources = queries.get_publication_sources(pub_id)
+    if sources is None:
+        raise HTTPException(status_code=404, detail="Publication introuvable")
+    return sources
 
 
 @router.get("", response_model=PublicationListResponse)

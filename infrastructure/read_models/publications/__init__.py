@@ -4,10 +4,11 @@ Le package est organisé par thème :
 - `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
+- `source_publications` : `get_publication_sources`
 
 Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipeline.metadata_correction`) vivent côté `infrastructure/pipeline/`.
 
-`PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port `application.ports.read_models.publications_queries.PublicationsQueries`. Les fonctions libres retournent des dicts (réutilisables hors API) ; la conversion vers les DTOs Pydantic est faite ici à la sortie de l'adapter.
+`PgPublicationsQueries` agrège ces lectures sous le port `application.ports.read_models.publications_queries.PublicationsQueries`.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module `.list` (le `from .list import …` ci-dessous l'attache au package, et le namespace global du __init__ shadow le builtin `list`).
@@ -26,6 +27,7 @@ from application.ports.read_models.publications_queries import (
     PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
+    PublicationSourcesResponse,
     PublicationsQueries,
 )
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
@@ -40,6 +42,9 @@ from infrastructure.read_models.publications.list import (
     export_publications_csv as _export_publications_csv,
     export_theses_csv as _export_theses_csv,
     list_publications as _list_publications,
+)
+from infrastructure.read_models.publications.source_publications import (
+    get_publication_sources as _get_publication_sources,
 )
 
 
@@ -121,6 +126,9 @@ class PgPublicationsQueries(PublicationsQueries):
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None:
         return _get_publication_detail(self._conn, pub_id)
+
+    def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
+        return _get_publication_sources(self._conn, pub_id)
 
 
 __all__ = ["PgPublicationsQueries"]

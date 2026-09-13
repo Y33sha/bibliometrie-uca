@@ -286,6 +286,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/{pub_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publication Sources
+         * @description Métadonnées de chaque enregistrement source de la publication, toutes sources confondues.
+         */
+        get: operations["get_publication_sources_api_publications__pub_id__sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications": {
         parameters: {
             query?: never;
@@ -4208,6 +4228,16 @@ export interface components {
             readonly pages: number;
         };
         /**
+         * PublicationSourcesResponse
+         * @description Enregistrements sources d'une publication, toutes sources confondues.
+         */
+        PublicationSourcesResponse: {
+            /** Title */
+            title: string;
+            /** Source Publications */
+            source_publications: components["schemas"]["SourcePublicationMetadataOut"][];
+        };
+        /**
          * PublicationsFacetsResponse
          * @description Facettes dynamiques pour la page publications.
          *
@@ -4570,6 +4600,64 @@ export interface components {
             source: string;
             /** Source Authorship Id */
             source_authorship_id: number;
+        };
+        /**
+         * SourcePublicationMetadataOut
+         * @description Métadonnées d'un enregistrement source, après normalisation.
+         *
+         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page.
+         */
+        SourcePublicationMetadataOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Doi */
+            doi: string | null;
+            /** Identifiers */
+            identifiers: {
+                [key: string]: string[];
+            };
+            /** Title */
+            title: string;
+            /** Title Normalized */
+            title_normalized: string | null;
+            /** Doc Type */
+            doc_type: string | null;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Language */
+            language: string | null;
+            /** Oa Status */
+            oa_status: string | null;
+            /** Journal Id */
+            journal_id: number | null;
+            /** Journal Title */
+            journal_title: string | null;
+            /** Journal Raw Title */
+            journal_raw_title: string | null;
+            /** Journal Raw Issn */
+            journal_raw_issn: string | null;
+            /** Journal Raw Eissn */
+            journal_raw_eissn: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Publisher Raw Name */
+            publisher_raw_name: string | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Volume */
+            volume: string | null;
+            /** Issue */
+            issue: string | null;
+            /** Pages */
+            pages: string | null;
+            /** Article Number */
+            article_number: string | null;
         };
         /** SourcePublicationOut */
         SourcePublicationOut: {
@@ -5479,6 +5567,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_publication_sources_api_publications__pub_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pub_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationSourcesResponse"];
                 };
             };
             /** @description Validation Error */

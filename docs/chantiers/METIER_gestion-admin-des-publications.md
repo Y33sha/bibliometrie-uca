@@ -33,13 +33,13 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 - [x] Liste des publications (a85c42ed).
 - [x] Emplacement des onglets, avec la liste pour premier onglet : composant `HubTabs`, partagé avec le référentiel Personnes (13b4ed89).
 - [x] Suppression de `admin/duplicates`, de son entrée de menu, et de la lecture des paires candidates (point d'entrée, port, adaptateur, tests, doc) (a85c42ed).
-- [x] Suppression de la fusion et de la distinction manuelles, sans effet durable : points d'entrée, client, services, erreur `DistinctDoiError`, table `distinct_publications`.
+- [x] Suppression de la fusion et de la distinction manuelles, sans effet durable : points d'entrée, client, services, erreur `DistinctDoiError`, table `distinct_publications` (b52fb3d6).
 
 ### 2. Volet
 
-- [ ] Volet droit ouvert par `?publication=<id>`, fermé par Échap et par le fond.
-- [ ] Métadonnées de chaque notice source, confrontées : identifiants, titre, type, année, revue, éditeur, langue, statut OA.
-- [ ] Lecture de l'API qui rend les notices sources d'une publication, toutes sources confondues, sans champ nommé par source.
+- [x] Volet droit ouvert par `?publication=<id>`, fermé par Échap et par le fond : composant `Drawer`, partagé avec le référentiel Personnes.
+- [x] Métadonnées de chaque notice source, confrontées, une colonne par notice : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA.
+- [x] Lecture de l'API qui rend les notices sources d'une publication, toutes sources confondues, sans champ nommé par source.
 
 ### 3. Détection des fusions suspectes
 
@@ -53,6 +53,6 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 ## Questions ouvertes
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
-- **Disposition du volet** : une colonne par source et une ligne par champ, ou l'inverse ? Largeur ?
+- **Disposition du volet** : une colonne par notice et une ligne par champ, à l'essai. À partir de combien de notices la disposition inverse devient-elle plus lisible ? Largeur ?
 - **Premiers détecteurs** : lesquels, parmi ceux de la conception antérieure ? Les paires de titres identiques de `admin/duplicates` en font-elles partie ?
 - **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les notices sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation.

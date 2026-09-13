@@ -345,6 +345,45 @@ class PublicationDetailResponse(BaseModel):
     external_identifiers: list[ExternalIdentifierOut]
 
 
+class SourcePublicationMetadataOut(BaseModel):
+    """Métadonnées d'un enregistrement source, après normalisation.
+
+    `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page.
+    """
+
+    id: int
+    source: str
+    source_id: str
+    doi: str | None
+    identifiers: dict[str, list[str]]  # `external_ids` hors ISSN, chaque valeur en liste
+    title: str
+    title_normalized: str | None  # forme de comparaison du titre
+    doc_type: str | None
+    pub_year: int | None
+    language: str | None
+    oa_status: str | None
+    journal_id: int | None
+    journal_title: str | None
+    journal_raw_title: str | None
+    journal_raw_issn: str | None
+    journal_raw_eissn: str | None
+    publisher_id: int | None
+    publisher_name: str | None
+    publisher_raw_name: str | None
+    container_title: str | None
+    volume: str | None
+    issue: str | None
+    pages: str | None
+    article_number: str | None
+
+
+class PublicationSourcesResponse(BaseModel):
+    """Enregistrements sources d'une publication, toutes sources confondues."""
+
+    title: str
+    source_publications: list[SourcePublicationMetadataOut]
+
+
 class PublicationsQueries(Protocol):
     """Lectures sync pour /api/publications/*.
 
@@ -379,3 +418,7 @@ class PublicationsQueries(Protocol):
     ) -> Iterator[str]: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
+
+    def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
+        """Métadonnées de chaque enregistrement source de la publication ; `None` si la publication n'existe pas."""
+        ...
