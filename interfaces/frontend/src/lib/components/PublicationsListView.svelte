@@ -210,6 +210,15 @@
 			showColumns: ['oa', 'oa_status'],
 		},
 		{
+			key: 'halStatus',
+			control: 'checkbox',
+			label: 'Statut HAL',
+			param: 'hal_status',
+			facet: { type: 'labeled', apiKey: 'hal_status' },
+			enabled: () => showHalStatusColumn,
+			showColumns: ['hal_status'],
+		},
+		{
 			key: 'journal',
 			control: 'entity',
 			label: 'Revue',
@@ -245,18 +254,8 @@
 			label: 'Voies OA',
 			param: 'oa_status',
 			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			group: 'Accès ouvert',
+			group: 'Revue et éditeur',
 			showColumns: ['oa', 'oa_status'],
-		},
-		{
-			key: 'halStatus',
-			control: 'checkbox',
-			label: 'Statut HAL',
-			param: 'hal_status',
-			facet: { type: 'labeled', apiKey: 'hal_status' },
-			group: 'Accès ouvert',
-			enabled: () => showHalStatusColumn,
-			showColumns: ['hal_status'],
 		},
 		{
 			key: 'author',
@@ -734,7 +733,7 @@
 						{/if}
 						{#if p.doi}
 							<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="source-tag source-doi" title={p.doi}>
-								<svg viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 									<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
 									<polyline points="15 3 21 3 21 9"/>
 									<line x1="10" y1="14" x2="21" y2="3"/>
