@@ -16,7 +16,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 ## Données récupérées
 
-- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), topics (hiérarchie OpenAlex domain/field/subfield/topic), domains (wikidata), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID)
+- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID)
 - **Journal/éditeur** : titre, ISSN, eISSN, éditeur
 - **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents
 

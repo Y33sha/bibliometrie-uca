@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 from application.pipeline.subjects._common import dedup_strs
 from domain.sources.hal import hal_domain_labels
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping, as_str
 
 # Niveaux OpenAlex, liés à plat : domain, field, subfield, topic.
 _OPENALEX_LEVELS = ("domain", "field", "subfield", "topic")
@@ -49,15 +49,12 @@ def wos_labels(topics: JsonValue) -> list[str]:
 
 
 def scanr_labels(topics: JsonValue) -> list[str]:
-    """Domaines ScanR : `topics` est soit une liste, soit un dict à clés `domains`/`topics`."""
-    if isinstance(topics, list):
-        return dedup_strs(topics)
-    if isinstance(topics, dict):
-        for key in ("domains", "topics"):
-            value = topics.get(key)
-            if isinstance(value, list):
-                return dedup_strs(value)
-    return []
+    """Vedettes sudoc (RAMEAU) de ScanR (`[{"type": "sudoc", "code": …, "label": {"default": …}}, ...]`), par leur libellé."""
+    if not isinstance(topics, list):
+        return []
+    return dedup_strs(
+        [as_str(as_mapping(as_mapping(entry).get("label")).get("default")) for entry in topics]
+    )
 
 
 def theses_labels(topics: JsonValue) -> list[str]:
