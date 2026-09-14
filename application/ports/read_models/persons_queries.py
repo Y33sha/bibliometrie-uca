@@ -258,6 +258,8 @@ class AmbiguousFormPersonOut(BaseModel):
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
+    # Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable.
+    canonical: bool
     has_rh: bool
     # Nom canonique compatible (par tokens) avec la forme : homonyme/doublon si
     # vrai, erreur d'attribution probable si faux.

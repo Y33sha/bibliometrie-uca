@@ -78,6 +78,11 @@
         <div class="form-persons">
           {#each form.persons as p (p.person_id)}
             <div class="person-row" class:incompatible={!p.compatible}>
+              {#if p.canonical}
+                <span class="canonical" title="Forme dérivée du nom de la personne, confirmée d'office"
+                  >nom</span
+                >
+              {:else}
               <span class="chip-controls">
                 <button
                   class="toggle-btn confirm"
@@ -102,6 +107,7 @@
                     )}>&#x2717;</button
                 >
               </span>
+              {/if}
               <button class="person-link" onclick={() => onopenPerson(p.person_id)}>
                 <span class="person-last">{titleCase(p.last_name)}</span>
                 {titleCase(p.first_name)}
@@ -152,6 +158,13 @@
   .form-count {
     font-size: 0.78rem;
     color: #888;
+  }
+  .canonical {
+    font-size: 0.68rem;
+    color: #888;
+    background: #f0f0f0;
+    border-radius: 8px;
+    padding: 0 6px;
   }
   .form-persons {
     display: flex;

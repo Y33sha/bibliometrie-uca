@@ -8,8 +8,9 @@ from typing import cast
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.person_repository import NameFormStatusRow
-from domain.errors import NotFoundError
+from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_name
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.sources.registry import AUTHOR_SOURCES
 from infrastructure.db.sql_fragments import in_clause
 
@@ -47,17 +48,28 @@ def add_name_form(
 def update_name_form_status(
     conn: Connection, person_id: int, name_form: str, status: str
 ) -> NameFormStatusRow:
+    """Pose le statut d'une forme de nom. Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse (`ConflictError`)."""
     row = conn.execute(
         text(
             "UPDATE person_name_forms SET status = CAST(:st AS identifier_status) "
             "WHERE name_form = :nf AND person_id = :pid "
+            f"AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)) "
             "RETURNING person_id, name_form, CAST(status AS text) AS status"
         ),
         {"st": status, "nf": name_form, "pid": person_id},
     ).first()
-    if not row:
-        raise NotFoundError(f"Forme de nom {name_form!r} introuvable pour la personne {person_id}")
-    return cast(NameFormStatusRow, dict(row._mapping))
+    if row:
+        return cast(NameFormStatusRow, dict(row._mapping))
+    exists = conn.execute(
+        text("SELECT 1 FROM person_name_forms WHERE name_form = :nf AND person_id = :pid"),
+        {"nf": name_form, "pid": person_id},
+    ).first()
+    if exists:
+        raise ConflictError(
+            f"La forme de nom {name_form!r} dérive du nom de la personne {person_id} : "
+            "confirmée d'office, son statut suit le nom."
+        )
+    raise NotFoundError(f"Forme de nom {name_form!r} introuvable pour la personne {person_id}")
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:

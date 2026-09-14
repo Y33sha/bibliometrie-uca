@@ -35,6 +35,7 @@ from application.services.persons.core import (
 )
 from domain.errors import (
     AuthorshipAlreadyAssignedError,
+    ConflictError,
     NotFoundError,
     RejectedPairError,
     ValidationError,
@@ -449,6 +450,32 @@ class TestMergePerson:
         with pytest.raises(NotFoundError):
             merge_person(p, 999999, repo=repo)
 
+    def test_absorbed_verdict_kept(self, sa_sync_conn, repo):
+        """Le rejet d'une forme de la personne absorbée survit à la fusion."""
+        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
+        _insert_name_form(sa_sync_conn, "intrus x", source, status="rejected")
+        merge_person(target, source, repo=repo)
+        assert _name_form_status(sa_sync_conn, "intrus x", target) == "rejected"
+
+    def test_target_verdict_prevails(self, sa_sync_conn, repo):
+        """Sur une forme commune, le verdict de la personne qui absorbe l'emporte."""
+        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
+        _insert_name_form(sa_sync_conn, "forme commune", target, status="confirmed")
+        _insert_name_form(sa_sync_conn, "forme commune", source, status="rejected")
+        merge_person(target, source, repo=repo)
+        assert _name_form_status(sa_sync_conn, "forme commune", target) == "confirmed"
+
+    def test_pending_target_takes_absorbed_verdict(self, sa_sync_conn, repo):
+        """Une forme commune en attente chez la personne qui absorbe reprend le verdict de l'autre."""
+        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
+        _insert_name_form(sa_sync_conn, "forme commune", target)
+        _insert_name_form(sa_sync_conn, "forme commune", source, status="rejected")
+        merge_person(target, source, repo=repo)
+        assert _name_form_status(sa_sync_conn, "forme commune", target) == "rejected"
+
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
 
@@ -855,36 +882,57 @@ class TestAddIdentifiersFromAuthorships:
 # ── update_name_form_status ────────────────────────────────────────
 
 
+def _insert_name_form(conn, form, person_id, *, status="pending", sources="{hal}"):
+    conn.execute(
+        text(
+            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+            "VALUES (:f, :p, CAST(:src AS text[]), CAST(:st AS identifier_status))"
+        ),
+        {"f": form, "p": person_id, "src": sources, "st": status},
+    )
+
+
+def _name_form_status(conn, form, person_id):
+    return conn.execute(
+        text("SELECT status::text FROM person_name_forms WHERE name_form = :f AND person_id = :p"),
+        {"f": form, "p": person_id},
+    ).scalar_one()
+
+
 class TestUpdateNameFormStatus:
     def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo, authorship_repo):
         """Rejeter une forme conserve la row (tombstone du verrou de non-retour)."""
-        person_id = create_person("Unique", "Name", repo=repo)
+        person_id = _insert_person(sa_sync_conn, "Unique", "Name")
+        _insert_name_form(sa_sync_conn, "intrus unique", person_id)
 
         row = update_name_form_status(
-            person_id, "name unique", "rejected", repo=repo, authorship_repo=authorship_repo
+            person_id, "intrus unique", "rejected", repo=repo, authorship_repo=authorship_repo
         )
 
         assert row["status"] == "rejected"
-        db = sa_sync_conn.execute(
-            text(
-                "SELECT status::text AS s FROM person_name_forms "
-                "WHERE name_form = 'name unique' AND person_id = :p"
-            ),
-            {"p": person_id},
-        ).one()
-        assert db.s == "rejected"
+        assert _name_form_status(sa_sync_conn, "intrus unique", person_id) == "rejected"
 
-    def test_confirm_overrides_previous_status(self, repo, authorship_repo):
-        person_id = create_person("Alpha", "Beta", repo=repo)
+    def test_confirm_overrides_previous_status(self, sa_sync_conn, repo, authorship_repo):
+        person_id = _insert_person(sa_sync_conn, "Alpha", "Beta")
+        _insert_name_form(sa_sync_conn, "alpha b", person_id)
 
         update_name_form_status(
-            person_id, "alpha beta", "rejected", repo=repo, authorship_repo=authorship_repo
+            person_id, "alpha b", "rejected", repo=repo, authorship_repo=authorship_repo
         )
         row = update_name_form_status(
-            person_id, "alpha beta", "confirmed", repo=repo, authorship_repo=authorship_repo
+            person_id, "alpha b", "confirmed", repo=repo, authorship_repo=authorship_repo
         )
 
         assert row["status"] == "confirmed"
+
+    def test_derived_form_status_refused(self, repo, authorship_repo):
+        """Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse."""
+        person_id = create_person("Gamma", "Delta", repo=repo)
+
+        with pytest.raises(ConflictError):
+            update_name_form_status(
+                person_id, "gamma delta", "rejected", repo=repo, authorship_repo=authorship_repo
+            )
 
     def test_unknown_form_raises(self, repo, authorship_repo):
         person_id = create_person("Gamma", "Delta", repo=repo)

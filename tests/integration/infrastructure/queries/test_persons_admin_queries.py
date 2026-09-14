@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from infrastructure.read_models.persons.admin import (
+    ambiguous_name_forms,
     detachable_intruders,
     detachable_intruders_count,
     identifier_conflicts,
@@ -323,3 +324,37 @@ class TestNameDuplicates:
             pair.overlaps.labs,
             pair.overlaps.journals,
         ) == (0, 0, 0, 0)
+
+
+class TestAmbiguousNameForms:
+    """Formes portées par plusieurs personnes, avec au moins un lien à trancher."""
+
+    def _form(self, conn, form, person_id, *, sources="{hal}"):
+        conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES (:f, :p, CAST(:src AS text[]), 'pending')"
+            ),
+            {"f": form, "p": person_id, "src": sources},
+        )
+
+    def _forms(self, conn):
+        return {f.name_form: f for f in ambiguous_name_forms(conn, page=1, per_page=500).forms}
+
+    def test_forme_derivee_du_nom_hors_de_la_file(self, sa_sync_conn):
+        """Une forme partagée seulement comme forme dérivée du nom de chaque personne n'attend aucune décision."""
+        a = _create_person(sa_sync_conn, last="Martin", first="Jean")
+        b = _create_person(sa_sync_conn, last="Martin", first="Jeanne")
+        self._form(sa_sync_conn, "j martin", a, sources="{persons}")
+        self._form(sa_sync_conn, "j martin", b, sources="{persons}")
+        assert "j martin" not in self._forms(sa_sync_conn)
+
+    def test_forme_derivee_du_nom_confirmee_d_office(self, sa_sync_conn):
+        """Face à une forme bibliographique en attente, la forme dérivée du nom apparaît confirmée et verrouillée."""
+        a = _create_person(sa_sync_conn, last="Martin", first="Jean")
+        b = _create_person(sa_sync_conn, last="Martin", first="Jacques")
+        self._form(sa_sync_conn, "j martin", a, sources="{persons}")
+        self._form(sa_sync_conn, "j martin", b)
+        persons = {p.person_id: p for p in self._forms(sa_sync_conn)["j martin"].persons}
+        assert (persons[a].canonical, persons[a].status) == (True, "confirmed")
+        assert (persons[b].canonical, persons[b].status) == (False, "pending")

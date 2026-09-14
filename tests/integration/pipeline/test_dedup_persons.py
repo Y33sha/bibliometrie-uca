@@ -289,9 +289,7 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, hal_as) != person_id
 
     def test_persons_name_forms_pending_with_persons_source_on_create(self, sa_sync_conn):
-        """Les formes dérivées du nom/prénom entrent `pending` avec la source 'persons' :
-        l'appartenance au nom canonique se lit dans `sources`, pas dans un statut confirmé
-        d'office (seule une action admin confirme)."""
+        """Les formes dérivées du nom et du prénom sont stockées `pending` avec la source 'persons', qui porte leur confirmation."""
         person_id = create_person("Brindacier", "Fifi", repo=person_repository(sa_sync_conn))
         rows = sa_sync_conn.execute(
             text(
@@ -314,12 +312,18 @@ class TestCascadeRun:
         pub = _insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "111222", "confirmed")
-        # "Jean Dupont" serait compatible par tokens, mais rejeté pour cette personne.
-        _set_name_form_status(sa_sync_conn, person_id, "Jean Dupont", "rejected")
+        # "Jean Dupond" est compatible avec le nom de la personne, mais rejeté pour elle.
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('jean dupond', :pid, '{hal}', 'rejected')"
+            ),
+            {"pid": person_id},
+        )
 
         hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-202", pub)
         hal_as = _insert_authorship(
-            sa_sync_conn, "hal", hal_sd, "Jean Dupont", identifiers={"hal_person_id": "111222"}
+            sa_sync_conn, "hal", hal_sd, "Jean Dupond", identifiers={"hal_person_id": "111222"}
         )
 
         _run_cascade(sa_sync_conn)
