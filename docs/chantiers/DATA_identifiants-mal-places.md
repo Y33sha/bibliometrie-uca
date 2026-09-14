@@ -50,17 +50,13 @@ Aucune.
 
 ## Phasage
 
-### 1. Cadrage
-
-- [x] Trancher les questions ouvertes.
-
-### 2. Déplacer la neutralisation hors de l'identité
+### 1. Déplacer la neutralisation hors de l'identité
 
 - [ ] Colonne des neutralisations sur `source_authorships`, lue par le matching et le consensus.
 - [ ] Le normalize y inscrit `shared` au lieu de suffixer les clés.
 - [ ] Migration : retirer le suffixe des 7 379 identités concernées, fusionner les 3 916 qui rejoignent une identité existante, repointer leurs 61 714 signatures, supprimer les identités vidées.
 
-### 3. Requalification par consensus
+### 2. Requalification par consensus
 
 - [ ] Passe de requalification, avant la cascade personnes, balayant tout le stock.
 - [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
