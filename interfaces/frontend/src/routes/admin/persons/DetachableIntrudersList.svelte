@@ -72,9 +72,11 @@
 
 {#if error}<p class="error">{error}</p>{/if}
 
-{#if data && data.groups.length === 0 && !loading}
+{#if !data}
+  <div class="empty">Chargement…</div>
+{:else if data.groups.length === 0 && !loading}
   <div class="empty">Aucun intrus détachable.</div>
-{:else if data}
+{:else}
   <div class="groups">
     {#each data.groups as g, i (i)}
       {@render groupBlock(g)}
