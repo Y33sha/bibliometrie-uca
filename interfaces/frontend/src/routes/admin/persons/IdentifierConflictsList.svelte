@@ -76,10 +76,8 @@
 </script>
 
 <p class="intro">
-  Paires de personnes portant la <strong>même valeur d'identifiant</strong> (ORCID, IdRef,
-  hal_person_id, idHAL). Mêmes nom et réseau (labos, publications) ⇒ <em>doublon</em> à fusionner ;
-  personnes manifestement distinctes ⇒ <em>erreur d'attribution</em> de l'identifiant, à laisser
-  (marquer distinctes).
+  Paires de personnes portant la <strong>même valeur d'identifiant</strong> (ORCID, IdRef, hal_person_id, idHAL). Mêmes nom et réseau (labos, publications) ⇒ <em>doublon</em> à fusionner ; personnes
+  manifestement distinctes ⇒ <em>erreur d'attribution</em> de l'identifiant, à laisser (marquer distinctes).
 </p>
 
 {#if error}<p class="error">{error}</p>{/if}
@@ -99,25 +97,13 @@
         <div class="pair-body">
           {@render personCol(pair.person_a)}
           <div class="actions">
-            <button
-              class="act keep"
-              disabled={acting}
-              title="Garder la personne de gauche, absorber celle de droite"
-              onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
+            <button class="act keep" disabled={acting} title="Garder la personne de gauche, absorber celle de droite" onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
               >&larr; Fusionner</button
             >
-            <button
-              class="act distinct"
-              disabled={acting}
-              title="Personnes distinctes (identifiant mal attribué)"
-              onclick={() => markDistinct(pair.person_a.person_id, pair.person_b.person_id)}
+            <button class="act distinct" disabled={acting} title="Personnes distinctes (identifiant mal attribué)" onclick={() => markDistinct(pair.person_a.person_id, pair.person_b.person_id)}
               >Distinctes</button
             >
-            <button
-              class="act keep"
-              disabled={acting}
-              title="Garder la personne de droite, absorber celle de gauche"
-              onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
+            <button class="act keep" disabled={acting} title="Garder la personne de droite, absorber celle de gauche" onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
               >Fusionner &rarr;</button
             >
           </div>
