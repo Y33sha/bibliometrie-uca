@@ -94,8 +94,8 @@ class TestAuthorRecords:
         }
         assert build_datacite_author_records(attrs)[0].person_identifiers is None
 
-    def test_shared_orcid_marked_dubious(self):
-        """Même ORCID sur 2 creators (dépôt de collaboration) → requalifié `_dubious`."""
+    def test_shared_orcid_kept_on_each_record(self):
+        """L'extracteur rend l'ORCID de chaque creator tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
         attrs = {
             "creators": [
                 {
@@ -114,8 +114,8 @@ class TestAuthorRecords:
         }
         recs = build_datacite_author_records(attrs)
         assert [r.person_identifiers for r in recs] == [
-            {"orcid_dubious": "0000-0002-1825-0097"},
-            {"orcid_dubious": "0000-0002-1825-0097"},
+            {"orcid": "0000-0002-1825-0097"},
+            {"orcid": "0000-0002-1825-0097"},
         ]
 
     def test_skips_organizational(self):

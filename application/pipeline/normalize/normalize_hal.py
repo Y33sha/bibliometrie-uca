@@ -31,7 +31,6 @@ from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.persons.identifiers import (
     compact_identifiers,
-    mark_shared_identifiers_dubious,
     normalize_orcid,
 )
 from domain.publications.authorship_roles import map_role
@@ -405,8 +404,6 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
     - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de structures).
-
-    Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul champ HAL qui les attache proprement à chaque position d'auteur.
@@ -447,18 +444,15 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
-    # Identifiants normalisés par position, puis requalification des partagés : un même identifiant (compte HAL, ORCID, idref…) porté par ≥2 signatures du *même dépôt* est une corruption de saisie (un identifiant ne peut pas désigner deux signatures dans un même document) → suffixé `_dubious`, conservé mais invisible au matching personnes.
-    ids_by_position = mark_shared_identifiers_dubious(
-        [
-            compact_identifiers(
-                orcid=(tei_ids[pos].get("orcid") if pos < len(tei_ids) else None),
-                idref=(tei_ids[pos].get("idref") if pos < len(tei_ids) else None),
-                idhal=(tei_ids[pos].get("idhal") if pos < len(tei_ids) else None),
-                hal_person_id=hal_person_id_by_pos.get(pos),
-            )
-            for pos in range(len(names))
-        ]
-    )
+    ids_by_position = [
+        compact_identifiers(
+            orcid=(tei_ids[pos].get("orcid") if pos < len(tei_ids) else None),
+            idref=(tei_ids[pos].get("idref") if pos < len(tei_ids) else None),
+            idhal=(tei_ids[pos].get("idhal") if pos < len(tei_ids) else None),
+            hal_person_id=hal_person_id_by_pos.get(pos),
+        )
+        for pos in range(len(names))
+    ]
 
     records: list[AuthorRecord] = []
     for position, name in enumerate(names):

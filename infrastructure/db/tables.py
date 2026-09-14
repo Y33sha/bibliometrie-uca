@@ -532,6 +532,14 @@ source_authorships = Table(
     # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
     # MetaData).
     Column("identity_id", Integer, nullable=False),
+    Column(
+        "neutralized_identifiers",
+        Jsonb,
+        comment=(
+            "Identifiants de l'identité que la résolution des personnes ignore pour cette"
+            ' signature, avec leur motif : {"orcid": "shared"}.'
+        ),
+    ),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "source_publication_id",

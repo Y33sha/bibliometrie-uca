@@ -7,6 +7,7 @@ Coût : O(1) round-trips Python↔PG par document (vs N+1 par auteur avec l'écr
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
@@ -23,6 +24,7 @@ from domain.normalize import (
     normalize_text,
     sanitize_raw_text,
 )
+from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.types import JsonValue
 
 
@@ -65,11 +67,12 @@ def write_source_authorships(
 
     Enchaîne, par document :
       1. clear des authorships existantes (re-traitement → table blanche)
-      2. bulk upsert `source_authorships` puis fetch des ids par position
-      3. écriture des adresses via `write_addresses` (clé par `sa_id`)
+      2. neutralisation des identifiants partagés entre signatures du document (`shared_identifier_neutralizations`)
+      3. bulk upsert `source_authorships` puis fetch des ids par position
+      4. écriture des adresses via `write_addresses` (clé par `sa_id`)
 
     Les `author_position` de `records` doivent être uniques : c'est la clé qui
-    remappe les `sa_id` fraîchement insérés (étape 3) et la contrainte
+    remappe les `sa_id` fraîchement insérés (étape 4) et la contrainte
     `(source_publication_id, author_position)` en base. Chaque parser la garantit
     (les cinq sources par `enumerate` ; WoS, qui lit la position du payload,
     dédoublonne dans son parser).
@@ -78,7 +81,7 @@ def write_source_authorships(
     if not records:
         return
 
-    def _to_item(rec: AuthorRecord) -> SourceAuthorshipItem:
+    def _to_item(rec: AuthorRecord, neutralized: Mapping[str, str] | None) -> SourceAuthorshipItem:
         # Nom nettoyé une fois : sert de nom brut stocké et de base au nom normalisé (clé d'identité), pour qu'aucun parasite ne franchisse le writer.
         clean_name = clean_raw_author_name(rec.raw_name)
         return {
@@ -90,9 +93,14 @@ def write_source_authorships(
             "roles": rec.roles,
             "raw_author_name": clean_name,
             "person_identifiers": rec.person_identifiers,
+            "neutralized_identifiers": neutralized,
         }
 
-    sa_values: list[SourceAuthorshipItem] = [_to_item(rec) for rec in records]
+    neutralizations = shared_identifier_neutralizations([rec.person_identifiers for rec in records])
+    sa_values: list[SourceAuthorshipItem] = [
+        _to_item(rec, neutralized)
+        for rec, neutralized in zip(records, neutralizations, strict=True)
+    ]
     queries.upsert_source_authorships_batch(conn, sa_values)
 
     sa_id_by_position = queries.fetch_source_authorship_ids_by_position(

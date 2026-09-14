@@ -9,8 +9,8 @@ from domain.persons.identifiers import (
     IdHAL,
     IdRef,
     compact_identifiers,
-    mark_shared_identifiers_dubious,
     normalized_identifier_value,
+    shared_identifier_neutralizations,
 )
 
 # ── ORCID ──────────────────────────────────────────────────────────
@@ -211,58 +211,33 @@ class TestCompactIdentifiers:
         assert compact_identifiers(hal_person_id=42) == {"hal_person_id": 42}
 
 
-# ── mark_shared_identifiers_dubious ─────────────────────────────────
+# ── shared_identifier_neutralizations ───────────────────────────────
 
 
-class TestMarkSharedIdentifiersDubious:
-    def test_no_sharing_unchanged(self):
-        ids = [{"orcid": "X"}, {"orcid": "Y"}, None]
-        assert mark_shared_identifiers_dubious(ids) is ids
-
-    def test_shared_value_requalifies_all_carriers(self):
-        """Un ORCID porté par 2 positions → les deux requalifiées (la 3e, distincte, intacte)."""
-        out = mark_shared_identifiers_dubious([{"orcid": "X"}, {"orcid": "X"}, {"orcid": "Y"}])
-        assert out == [{"orcid_dubious": "X"}, {"orcid_dubious": "X"}, {"orcid": "Y"}]
-
-    def test_taints_all_ids_of_a_carrier_position(self):
-        """Comportement « blindé » : une position dont une valeur est partagée voit *tous*
-        ses identifiants suffixés, pas seulement le type partagé."""
-        out = mark_shared_identifiers_dubious(
-            [{"hal_person_id": 7, "idref": "r1"}, {"hal_person_id": 7}]
-        )
-        assert out == [
-            {"hal_person_id_dubious": 7, "idref_dubious": "r1"},
-            {"hal_person_id_dubious": 7},
+class TestSharedIdentifierNeutralizations:
+    def test_no_sharing(self):
+        assert shared_identifier_neutralizations([{"orcid": "X"}, {"orcid": "Y"}, None]) == [
+            None,
+            None,
+            None,
         ]
 
-    def test_distinct_types_same_value_not_shared(self):
-        """Le partage se compte par (type, valeur) : un orcid 'X' et un idref 'X' ne se
-        confondent pas."""
-        ids = [{"orcid": "X"}, {"idref": "X"}]
-        assert mark_shared_identifiers_dubious(ids) is ids
+    def test_shared_value_neutralized_on_every_carrier(self):
+        """Un ORCID porté par deux signatures est neutralisé sur les deux ; la troisième, distincte, reste intacte."""
+        out = shared_identifier_neutralizations([{"orcid": "X"}, {"orcid": "X"}, {"orcid": "Y"}])
+        assert out == [{"orcid": "shared"}, {"orcid": "shared"}, None]
 
-    def test_none_positions_preserved(self):
-        out = mark_shared_identifiers_dubious([{"orcid": "X"}, None, {"orcid": "X"}])
-        assert out == [{"orcid_dubious": "X"}, None, {"orcid_dubious": "X"}]
-
-    def test_idempotent(self):
-        ids = [{"orcid": "X", "idref": "r"}, {"orcid": "X"}, {"orcid": "Y"}]
-        once = mark_shared_identifiers_dubious(ids)
-        assert mark_shared_identifiers_dubious(once) == once
-
-    def test_already_dubious_keys_ignored_in_detection(self):
-        """Une clé déjà `_dubious` ne participe pas au comptage : une valeur portée par une
-        seule position nue (l'autre étant déjà `_dubious`) n'est pas requalifiée."""
-        ids = [{"orcid_dubious": "X"}, {"orcid": "X"}]
-        assert mark_shared_identifiers_dubious(ids) is ids
-
-    def test_shared_dubious_keys_leave_bare_keys_alone(self):
-        """Une valeur partagée seulement sous des clés `_dubious` ne requalifie pas les clés nues."""
-        ids = [{"orcid_dubious": "X", "idref": "r1"}, {"orcid_dubious": "X", "idref": "r2"}]
-        assert mark_shared_identifiers_dubious(ids) is ids
-
-    def test_already_dubious_key_is_not_suffixed_twice(self):
-        out = mark_shared_identifiers_dubious(
-            [{"orcid_dubious": "X", "idref": "r"}, {"idref": "r"}]
+    def test_every_identifier_of_a_carrier_neutralized(self):
+        """Une signature dont une valeur est partagée voit tous ses identifiants neutralisés, au-delà du type partagé."""
+        out = shared_identifier_neutralizations(
+            [{"hal_person_id": 7, "idref": "r1"}, {"hal_person_id": 7}]
         )
-        assert out == [{"orcid_dubious": "X", "idref_dubious": "r"}, {"idref_dubious": "r"}]
+        assert out == [{"hal_person_id": "shared", "idref": "shared"}, {"hal_person_id": "shared"}]
+
+    def test_distinct_types_same_value_not_shared(self):
+        """Le partage se compte par couple (type, valeur) : un orcid 'X' et un idref 'X' sont distincts."""
+        assert shared_identifier_neutralizations([{"orcid": "X"}, {"idref": "X"}]) == [None, None]
+
+    def test_signature_without_identifier(self):
+        out = shared_identifier_neutralizations([{"orcid": "X"}, None, {"orcid": "X"}])
+        assert out == [{"orcid": "shared"}, None, {"orcid": "shared"}]

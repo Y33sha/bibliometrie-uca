@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
 
+import json
+
 import pytest
 from sqlalchemy import text
 
@@ -123,18 +125,25 @@ class TestNameFormAuthorships:
 # la query est maintenant exposée par PgHalProblemsQueries.
 
 
-def _sa_with_identifiers(conn, sd, position, person_id, identifiers):
+def _sa_with_identifiers(conn, sd, position, person_id, identifiers, neutralized=None):
     """Signature portant `identifiers` : l'identité (nom normalisé absent + identifiants) est
-    upsertée dans `author_identifying_keys`, la signature la référence par `identity_id`."""
+    upsertée dans `author_identifying_keys`, la signature la référence par `identity_id` et
+    porte la carte `neutralized` de ses identifiants neutralisés."""
     identity_id = upsert_identity(conn, person_identifiers=identifiers)
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position, person_id,
-                 raw_author_name, identity_id)
-            VALUES ('hal', :sd, :pos, :pid, 'X', :iid)
+                 raw_author_name, identity_id, neutralized_identifiers)
+            VALUES ('hal', :sd, :pos, :pid, 'X', :iid, CAST(:neu AS jsonb))
         """),
-        {"sd": sd, "pos": position, "pid": person_id, "iid": identity_id},
+        {
+            "sd": sd,
+            "pos": position,
+            "pid": person_id,
+            "iid": identity_id,
+            "neu": json.dumps(neutralized) if neutralized else None,
+        },
     )
 
 
@@ -173,12 +182,21 @@ class TestIdentifierConflicts:
             ("orcid", "0000-0001-2345-6789")
         ]
 
-    def test_dubious_excluded(self, sa_sync_conn):
+    def test_neutralized_identifier_excluded(self, sa_sync_conn):
+        """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
         p1 = _create_person(sa_sync_conn, last="Brown", first="Anne")
         p2 = _create_person(sa_sync_conn, last="Brown", first="A")
         sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
-        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0009-9999-9999_dubious"})
-        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0009-9999-9999_dubious"})
+        _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
+        for position, person in ((0, p1), (1, p2)):
+            _sa_with_identifiers(
+                sa_sync_conn,
+                sd,
+                position,
+                person,
+                {"orcid": "0000-0009-9999-9999"},
+                neutralized={"orcid": "shared"},
+            )
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 

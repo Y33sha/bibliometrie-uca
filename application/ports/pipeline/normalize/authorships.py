@@ -31,6 +31,8 @@ class SourceAuthorshipItem(TypedDict):
     raw_author_name: str
     person_identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
+    neutralized_identifiers: Mapping[str, str] | None
+    """Identifiants de `person_identifiers` que la résolution des personnes ignore pour cette signature, avec leur motif (`IdentifierNeutralization`)."""
 
 
 class AddressBatchItem(TypedDict):
