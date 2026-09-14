@@ -4,11 +4,9 @@ Utilisées par le pipeline (matching cross-source dans `domain/persons/matching.
 """
 
 import re
+from enum import Enum
 
 from domain.normalize import clean_raw_author_name, normalize_name
-
-# Longueur minimale de deux mots comparés à une faute près : les initiales en sont exclues, « b » et « x » restent distincts.
-_TYPO_MIN_LENGTH = 2
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
@@ -43,7 +41,7 @@ def _name_words(*parts: str) -> list[str]:
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
     """Vrai si deux noms désignent la même personne, à une variation de graphie près.
 
-    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit s'apparier à un mot distinct de l'autre. Une initiale couvre donc un seul mot : « s solomon » et « sanya solodkov » restent distincts. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
+    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit s'apparier à un mot distinct de l'autre. Une initiale couvre donc un seul mot : « s solomon » et « sanya solodkov » restent distincts. Un appariement par initiale exige au moins un appariement entre deux mots entiers : « s pierre » et « p simon » restent distincts. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
 
     Les entrées peuvent être brutes ou déjà normalisées. Le découpage nom/prénom est indifférent, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
     """
@@ -69,15 +67,28 @@ def _edit_distance(a: str, b: str) -> int:
     return d[la][lb]
 
 
-def _words_match(word: str, other: str, *, typo: bool) -> bool:
-    """Mot identique, initiale de l'autre, ou, si `typo`, à une faute près."""
-    if word == other:
-        return True
-    if (len(word) == 1 and other.startswith(word)) or (len(other) == 1 and word.startswith(other)):
-        return True
-    return (
-        typo and min(len(word), len(other)) >= _TYPO_MIN_LENGTH and _edit_distance(word, other) <= 1
-    )
+class _Pairing(Enum):
+    """Nature de l'appariement de deux mots."""
+
+    WORDS = "words"
+    """Deux mots entiers, identiques ou à une faute près."""
+    INITIAL = "initial"
+    """Une initiale et un mot entier qu'elle commence."""
+    INITIALS = "initials"
+    """Deux initiales identiques."""
+
+
+def _pairing(word: str, other: str, *, typo: bool) -> _Pairing | None:
+    """Nature de l'appariement de deux mots, `None` s'ils ne s'apparient pas. Un mot d'une lettre est une initiale ; la faute n'est tolérée qu'entre deux mots entiers, et seulement si `typo`."""
+    if len(word) == 1 or len(other) == 1:
+        if word == other:
+            return _Pairing.INITIALS
+        if other.startswith(word) or word.startswith(other):
+            return _Pairing.INITIAL
+        return None
+    if word == other or (typo and _edit_distance(word, other) <= 1):
+        return _Pairing.WORDS
+    return None
 
 
 def _words_compatible(words1: list[str], words2: list[str]) -> bool:
@@ -88,13 +99,26 @@ def _words_compatible(words1: list[str], words2: list[str]) -> bool:
     return _pair_up(small, big, typo=len(small) >= 2)
 
 
-def _pair_up(words: list[str], others: list[str], *, typo: bool) -> bool:
-    """Vrai si chaque mot de `words` s'apparie à un mot distinct de `others`. Un mot de `others` apparié à un mot n'en couvre pas un second."""
+def _pair_up(
+    words: list[str],
+    others: list[str],
+    *,
+    typo: bool,
+    initial: bool = False,
+    whole: bool = False,
+) -> bool:
+    """Vrai si chaque mot de `words` s'apparie à un mot distinct de `others`, et si un appariement par initiale s'accompagne d'au moins un appariement entre deux mots entiers. `initial` et `whole` disent si les appariements déjà faits en contiennent un."""
     if not words:
-        return True
+        return whole or not initial
     word, rest = words[0], words[1:]
-    return any(
-        _words_match(word, other, typo=typo)
-        and _pair_up(rest, others[:i] + others[i + 1 :], typo=typo)
-        for i, other in enumerate(others)
-    )
+    for i, other in enumerate(others):
+        pairing = _pairing(word, other, typo=typo)
+        if pairing is not None and _pair_up(
+            rest,
+            others[:i] + others[i + 1 :],
+            typo=typo,
+            initial=initial or pairing is _Pairing.INITIAL,
+            whole=whole or pairing is _Pairing.WORDS,
+        ):
+            return True
+    return False
