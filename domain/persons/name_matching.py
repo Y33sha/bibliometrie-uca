@@ -7,8 +7,6 @@ import re
 
 from domain.normalize import clean_raw_author_name, normalize_name
 
-# Nombre maximal de mots consécutifs qu'une graphie accole (« de la fontaine » / « delafontaine »).
-_MAX_JOINED_WORDS = 3
 # Longueur minimale de deux mots comparés à une faute près : les initiales en sont exclues, « b » et « x » restent distincts.
 _TYPO_MIN_LENGTH = 2
 
@@ -45,13 +43,11 @@ def _name_words(*parts: str) -> list[str]:
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
     """Vrai si deux noms désignent la même personne, à une variation de graphie près.
 
-    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit trouver un correspondant dans l'autre. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), une faute de frappe ou de translittération par mot (« erick » ↔ « eric »), et les mots accolés (« le roy » ↔ « leroy »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
+    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit trouver un correspondant dans l'autre. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
 
     Les entrées peuvent être brutes ou déjà normalisées. Le découpage nom/prénom est indifférent, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
     """
-    variants1 = _joined_variants(_name_words(ln1, fn1))
-    variants2 = _joined_variants(_name_words(ln2, fn2))
-    return any(_words_compatible(v1, v2) for v1 in variants1 for v2 in variants2)
+    return _words_compatible(_name_words(ln1, fn1), _name_words(ln2, fn2))
 
 
 def _edit_distance(a: str, b: str) -> int:
@@ -71,16 +67,6 @@ def _edit_distance(a: str, b: str) -> int:
             if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
                 d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
     return d[la][lb]
-
-
-def _joined_variants(words: list[str]) -> list[list[str]]:
-    """La suite de mots d'un nom, puis chaque variante où une série de mots consécutifs est accolée en un seul."""
-    variants = [words]
-    for size in range(2, _MAX_JOINED_WORDS + 1):
-        for start in range(len(words) - size + 1):
-            joined = "".join(words[start : start + size])
-            variants.append([*words[:start], joined, *words[start + size :]])
-    return variants
 
 
 def _words_match(word: str, other: str, *, typo: bool) -> bool:

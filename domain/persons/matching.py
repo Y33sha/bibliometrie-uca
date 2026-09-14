@@ -156,7 +156,7 @@ def decide_match_by_identifier(
     Corroboration par le nom, du verdict humain au test heuristique :
 
     1. Le statut du couple `(signature_form, person_id)` dans `person_name_forms` (`name_form_status`) tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
-    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« abdelmouhcine » pour « abdel mouhcine ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
+    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« toufic » pour « toufik ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
 
     Un refus est matérialisé dans `rejection` pour journalisation.
     """
