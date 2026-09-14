@@ -7,7 +7,7 @@ Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) :
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
-6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les personnes vidées.
+6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune signature ne porte, et supprime les personnes vidées.
 
 Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
