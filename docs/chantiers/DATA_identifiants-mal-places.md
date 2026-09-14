@@ -18,6 +18,16 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 
 **La table des identités.** `author_identifying_keys` est unique sur `(author_name_normalized, person_identifiers)` et référencée par `source_authorships.identity_id`. Deux lignes de même nom, dont l'une porte le suffixe, sont deux identités distinctes.
 
+**Trois verdicts portent sur trois objets.** Le statut `rejected` en désigne deux, d'où une collision de vocabulaire.
+
+| Verdict | Objet | Portée |
+|---|---|---|
+| `person_identifiers.status` | valeur d'identifiant ↔ personne | la valeur n'appartient pas à cette personne |
+| `person_name_forms.status` | forme de nom ↔ personne | la graphie ne désigne pas cette personne |
+| carte des neutralisations | nom ↔ identifiant, sur une signature | l'appariement des deux est cassé sur cet enregistrement |
+
+Les deux premiers portent sur une personne, le troisième sur un enregistrement source. Toutes les requêtes de la cascade excluent déjà les attributions rejetées.
+
 ## Décisions
 
 - **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
@@ -28,17 +38,20 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 - **La carte des neutralisations vit sur la signature.** `source_authorships` porte une colonne jsonb, `{"orcid": "shared"}`, vide dans le cas courant. Deux signatures de documents différents peuvent porter le même nom et les mêmes identifiants bruts, l'une partageant son identifiant avec une autre signature de son document et l'autre non : une identité unique sur le brut ne peut pas porter ces deux verdicts.
 - **`shared` prime sur `misplaced`.** Un identifiant partagé est douteux avant tout examen du consensus, et les conflits qu'il produit ne valent pas d'être tranchés.
 - **Aucune colonne de repointage.** L'identité reste stable quand un verdict change, donc rien à repointer en régime courant. La fusion des identités que le suffixe sépare relève de la migration.
+- **La neutralisation porte sur l'identifiant, jamais sur le nom.** Un appariement cassé laisse ignorer lequel des deux éléments est fautif. Neutraliser l'identifiant retire un raccourci, et le rattachement par nom reste ouvert ; garder l'identifiant rattache la signature au propriétaire du consensus avec l'autorité d'un identifiant. Le canal le plus autoritaire cède.
+- **Une attribution rejetée ne produit pas de neutralisation.** Elle porte sur le lien entre une valeur et une personne, pas sur la place de cette valeur dans un enregistrement.
+- **La règle du consensus vaut pour tous les types d'identifiant.**
+- **La reprise du stock est automatique.** Les deux motifs se déduisent des données, donc se recalculent à chaque exécution. La passe balaye tout le stock : un consensus bascule sans que le document concerné change.
 
 ## Questions ouvertes
 
-- **Types d'identifiant concernés.** La règle du partage vaut pour tous les types. Celle du consensus vaut-elle pour `idref`, `hal_person_id` et `researcher_id` autant que pour l'ORCID ?
-- **Reprise du stock.** Les identités déjà construites portent les erreurs. Faut-il une reprise, ou la requalification à l'exécution suivante suffit-elle ?
+Aucune.
 
 ## Phasage
 
 ### 1. Cadrage
 
-- [ ] Trancher les questions ouvertes.
+- [x] Trancher les questions ouvertes.
 - [ ] Mesurer la précision de la règle de consensus sur un échantillon relu.
 
 ### 2. Déplacer la neutralisation hors de l'identité
@@ -49,7 +62,7 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 
 ### 3. Requalification par consensus
 
-- [ ] Passe de requalification, avant la cascade personnes.
+- [ ] Passe de requalification, avant la cascade personnes, balayant tout le stock.
 - [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
 
 ## Liens
