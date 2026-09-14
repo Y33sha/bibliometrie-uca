@@ -3,8 +3,6 @@
 Avant la cascade personnes, les conflits détectés sur le snapshot (`IdentifierConflict` : une valeur qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés par le **consensus** des porteurs — l'`author_name_normalized` majoritaire de la valeur. La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont transférables ; les `confirmed` (verrou admin) sont laissées.
 
 Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert.
-
-La remédiation du stock déjà rattaché (déplacer les captures historiques et recomputer les formes des personnes délestées) est un chantier séparé, en oneshot sur la base de prod.
 """
 
 import logging
