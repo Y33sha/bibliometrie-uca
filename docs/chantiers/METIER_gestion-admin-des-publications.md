@@ -18,12 +18,24 @@
 
 La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_fusions-preprints-par-doi.md) renvoie un cas de fusion erronée à « l'outil admin de dédoublonnage ».
 
+**Volumétrie des quatre détecteurs**, mesurée sur 63 164 publications et 255 267 notices sources, dont 60 257 groupes de deux notices ou plus.
+
+- *Recouvrement d'auteurs* : 381 groupes dont deux notices ne partagent aucun mot de nom d'auteur, 492 sous 20 % de recouvrement. Parmi les 381, 65 opposent un collectif (`collaboration`, `consortium`, le substitut `UNAP` de DataCite) à une liste de noms, et 278 un collectif ou une notice réduite à un seul nom.
+- *Taille du groupe* : les `dataset` et les `software` occupent la queue de distribution, jusqu'à 1198 notices sous un seul DOI. Recherche Data Gouv et Zenodo émettent un DOI de collection que chaque pièce d'un jeu de données réutilise, et OpenAlex crée une notice par pièce. Hors ces deux types, 136 groupes atteignent 8 notices, dont 45 `conference_paper` et 42 `article`.
+- *Conteneur divergent des chapitres* : 214 chapitres comparables une fois écarté l'artefact décrit ci-dessous, dont 57 sous 20 % de similarité trigramme.
+- *Titres identiques* : 2 424 titres partagés par 5 063 publications, dont 131 titres qu'aucune publication ne porte avec un DOI.
+
+**OpenAlex renseigne `container_title` avec le nom du repository** pour 17 345 notices, plus de la moitié de celles où il fournit un conteneur : « HAL (Le Centre pour la Communication Scientifique Directe) ». Le volet affiche cette valeur, et un détecteur fondé sur le conteneur la remonte. Relève de la correction des métadonnées, hors du périmètre de ce chantier.
+
 ## Décisions
 
 - **Une page `admin/publications`**, dans le menu « Référentiels », affiche la liste des publications de la page publique (`PublicationsListView`), inchangée.
 - **Un clic sur une publication ouvre un volet droit**, comme dans le référentiel Personnes, bien plus large : il sert à confronter toutes les métadonnées des sources.
 - **Des onglets**, comme dans le référentiel Personnes, accueillent la détection automatisée des fusions suspectes.
 - **La page `admin/duplicates` et son entrée de menu disparaissent.**
+- **Le premier détecteur porte le recouvrement des noms d'auteurs** entre les notices d'un même groupe.
+- **La taille du groupe ne fait pas un signal par elle-même.** Un jeu de données de plusieurs centaines de pièces se regroupe correctement. Le signal reste à évaluer hors `dataset` et `software`.
+- **Les titres identiques ne font pas une file de triage** : 5 063 publications, sans discriminant.
 
 ## Phasage
 
@@ -43,8 +55,9 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 
 ### 3. Détection des fusions suspectes
 
-- [ ] Premiers détecteurs, un onglet chacun, avec leur compteur.
-- [ ] Mesure de leur précision sur des cas relus.
+- [ ] Onglet « Recouvrement d'auteurs » et son compteur.
+- [ ] Mesure de sa précision sur des cas relus.
+- [ ] Taille du groupe hors `dataset` et `software` : évaluer le signal.
 
 ### 4. Verdicts durables
 
@@ -54,5 +67,4 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_f
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
 - **Disposition du volet** : une colonne par notice et une ligne par champ, à l'essai. À partir de combien de notices la disposition inverse devient-elle plus lisible ? Largeur ?
-- **Premiers détecteurs** : lesquels, parmi ceux de la conception antérieure ? Les paires de titres identiques de `admin/duplicates` en font-elles partie ?
 - **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les notices sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation.
