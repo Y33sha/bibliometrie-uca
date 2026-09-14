@@ -43,8 +43,8 @@
 
 ### 3. Facette
 
-- [x] Filtre et facette « Langues » dans les listes de publications, avec les libellés du référentiel.
-- [x] Nom de la langue dans le volet des publications de l'administration, avec en note la valeur que donnait la source.
+- [x] Filtre et facette « Langues » dans les listes de publications, avec les libellés du référentiel (0bccb2cf).
+- [x] Nom de la langue dans le volet des publications de l'administration, avec en note la valeur que donnait la source (0bccb2cf).
 
 ## Questions ouvertes
 

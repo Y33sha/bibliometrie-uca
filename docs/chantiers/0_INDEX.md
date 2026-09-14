@@ -16,7 +16,6 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
-- [Langues : référentiel, normalisation et facette](DATA_langues.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
@@ -24,6 +23,7 @@
 
 ## Chantiers archivés
 
+- 2026-09-14 — [Langues : référentiel, normalisation et facette](archived/2026-09-14_DATA_langues.md)
 - 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
 - 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
