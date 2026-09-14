@@ -816,6 +816,10 @@ languages = Table(
     metadata,
     Column("code", Text, primary_key=True),
     Column("name", Text, nullable=False),
+    comment=(
+        "Référentiel des langues. code : ISO 639-1, ou ISO 639-3 pour une langue sans code "
+        "à deux lettres. name : nom français, affiché."
+    ),
 )
 
 
@@ -824,6 +828,10 @@ language_forms = Table(
     metadata,
     Column("form_normalized", Text, primary_key=True),
     Column("language_code", Text, nullable=False),
+    comment=(
+        "Formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux "
+        "et trois lettres, nom anglais."
+    ),
 )
 
 
