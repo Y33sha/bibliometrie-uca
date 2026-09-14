@@ -31,7 +31,7 @@ Les deux premiers portent sur une personne, le troisième sur un enregistrement 
 ## Décisions
 
 - **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
-- **Le consensus tranche à partir de deux voix sur trois.** En deçà, il ne désigne personne.
+- **Le consensus est le nom qui porte le plus de voix**, dès trois signatures. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration.
 - **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
 - **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
 - **L'identité garde les identifiants bruts.** `person_identifiers` porte la forme d'origine, et l'unicité reste sur `(author_name_normalized, person_identifiers)`. Les identifiants exploitables se déduisent : ceux du brut dont la clé est absente de la carte des neutralisations.
