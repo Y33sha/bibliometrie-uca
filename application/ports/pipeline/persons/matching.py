@@ -82,10 +82,10 @@ class PersonsMatchingQueries(Protocol):
         """`{publication_id: {person_id, ...}}` depuis `rejected_authorships` — les paires rejetées, que la cascade écarte de ses candidats."""
         ...
 
-    def fetch_identifier_consensus(
+    def fetch_identifier_votes(
         self, conn: Connection, id_type: str, values: list[str]
-    ) -> dict[str, str]:
-        """`{id_value: author_name_normalized}` — pour chaque valeur demandée, le nom porté par le plus de signatures (poids en signatures, non en identités)."""
+    ) -> dict[str, dict[str, int]]:
+        """`{id_value: {author_name_normalized: signatures}}` — pour chaque valeur demandée, le nombre de signatures qui la portent sous chaque nom (poids en signatures, non en identités). Le consensus s'en déduit par `consensus_name`."""
         ...
 
     def fetch_person_name_forms(

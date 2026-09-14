@@ -4,12 +4,33 @@ from domain.persons.matching import (
     IdentifiedPerson,
     NameFormDecision,
     PersonMatchDecision,
+    consensus_name,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
     form_matches_person,
 )
+
+
+class TestConsensusName:
+    def test_strict_majority(self):
+        assert consensus_name({"martin p": 2, "dupont j": 1}) == "martin p"
+
+    def test_relative_majority(self):
+        assert consensus_name({"a": 35, "b": 33, "c": 32}) == "a"
+
+    def test_single_vote(self):
+        assert consensus_name({"martin p": 1}) == "martin p"
+
+    def test_tie_at_the_top(self):
+        assert consensus_name({"aubert p": 1, "dupont j": 1}) is None
+
+    def test_tie_below_the_top(self):
+        assert consensus_name({"a": 3, "b": 1, "c": 1}) == "a"
+
+    def test_no_vote(self):
+        assert consensus_name({}) is None
 
 
 class TestFormMatchesPerson:

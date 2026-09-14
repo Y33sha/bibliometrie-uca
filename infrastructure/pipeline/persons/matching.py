@@ -279,10 +279,10 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         ).all()
         return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
-    def fetch_identifier_consensus(
+    def fetch_identifier_votes(
         self, conn: Connection, id_type: str, values: list[str]
-    ) -> dict[str, str]:
-        """Pour chaque valeur, l'`author_name_normalized` porté par le plus de **signatures** (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Query ciblée sur les seules valeurs demandées : on part des identités portant l'une d'elles (`author_identifying_keys`, filtré par `person_identifiers->>id_type`), jointes aux `source_authorships` (index `identity_id`) pour le comptage — jamais de scan complet. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
+    ) -> dict[str, dict[str, int]]:
+        """Pour chaque valeur, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Query ciblée sur les seules valeurs demandées : on part des identités portant l'une d'elles (`author_identifying_keys`, filtré par `person_identifiers->>id_type`), jointes aux `source_authorships` (index `identity_id`) pour le comptage — jamais de scan complet. Une signature qui neutralise la valeur ne vote pas. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
         if not values:
             return {}
         source_filter = (
@@ -293,24 +293,23 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
             params["orcid_sources"] = list(ORCID_MATCH_SOURCES)
         rows = conn.execute(
             text(f"""
-                SELECT DISTINCT ON (id_value) id_value, author_name_normalized
-                FROM (
-                    SELECT aik.person_identifiers->>:id_type AS id_value,
-                           aik.author_name_normalized,
-                           count(*) AS n
-                    FROM author_identifying_keys aik
-                    JOIN source_authorships sa ON sa.identity_id = aik.id
-                    WHERE aik.person_identifiers->>:id_type = ANY(:values)
-                      AND aik.author_name_normalized IS NOT NULL
-                      AND NOT {_ID_TYPE_NEUTRALIZED}
-                      {source_filter}
-                    GROUP BY 1, 2
-                ) t
-                ORDER BY id_value, n DESC, author_name_normalized
+                SELECT aik.person_identifiers->>:id_type AS id_value,
+                       aik.author_name_normalized AS name,
+                       count(*) AS votes
+                FROM author_identifying_keys aik
+                JOIN source_authorships sa ON sa.identity_id = aik.id
+                WHERE aik.person_identifiers->>:id_type = ANY(:values)
+                  AND aik.author_name_normalized IS NOT NULL
+                  AND NOT {_ID_TYPE_NEUTRALIZED}
+                  {source_filter}
+                GROUP BY 1, 2
             """),
             params,
         ).all()
-        return {r.id_value: r.author_name_normalized for r in rows}
+        votes: dict[str, dict[str, int]] = {}
+        for r in rows:
+            votes.setdefault(r.id_value, {})[r.name] = int(r.votes)
+        return votes
 
     def fetch_person_name_forms(
         self, conn: Connection, person_ids: list[int]
