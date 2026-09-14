@@ -447,6 +447,15 @@ def country_clause(country_values: list[str]) -> WhereClause | None:
     )
 
 
+def language_clause(language_codes: list[str]) -> WhereClause | None:
+    """Filtre : la langue de la publication est l'une des langues choisies."""
+    if not language_codes:
+        return None
+    return WhereClause(
+        "p.language = ANY(CAST(:flt_languages AS text[]))", {"flt_languages": language_codes}
+    )
+
+
 def subject_clause(subject_ids: list[int]) -> WhereClause | None:
     """Filtre : la publication porte au moins un des sujets."""
     if not subject_ids:

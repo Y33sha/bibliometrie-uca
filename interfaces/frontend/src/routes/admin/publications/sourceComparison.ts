@@ -147,7 +147,13 @@ function fields(records: SourceRecord[]): Field[] {
 		textField('issue', 'Numéro', (r) => r.issue),
 		textField('pages', 'Pages', (r) => r.pages),
 		textField('article_number', "Numéro d'article", (r) => r.article_number),
-		textField('language', 'Langue', (r) => r.language),
+		{
+			key: 'language',
+			label: 'Langue',
+			// Nom du référentiel, avec en note la valeur que donnait la source quand la normalisation l'a changée.
+			cell: (r) => ({ text: r.language_name ?? r.language, note: r.language_raw ?? undefined }),
+			compared: (r) => r.language,
+		},
 		{
 			key: 'oa_status',
 			label: 'Statut OA',

@@ -37,13 +37,14 @@
 
 ### 2. Normalisation
 
-- [x] Fonction du domaine qui ramène une valeur de source à un code du référentiel.
-- [x] Appel dans la passe unaire de `metadata_correction`, valeur source gardée dans `raw_metadata.language`.
-- [x] Reprise de `publications.language` : la passe marque `keys_dirty` sur les `source_publications` dont la langue change, et la réconciliation recalcule la langue de leurs publications.
+- [x] Fonction du domaine qui ramène une valeur de source à un code du référentiel (e61ee8d3).
+- [x] Appel dans la passe unaire de `metadata_correction`, valeur source gardée dans `raw_metadata.language` (e61ee8d3).
+- [x] Reprise de `publications.language` : la passe marque `keys_dirty` sur les `source_publications` dont la langue change, et la réconciliation recalcule la langue de leurs publications (e61ee8d3).
 
 ### 3. Facette
 
-- [ ] Filtre et facette « Langues » dans les listes de publications, avec les libellés du référentiel.
+- [x] Filtre et facette « Langues » dans les listes de publications, avec les libellés du référentiel.
+- [x] Nom de la langue dans le volet des publications de l'administration, avec en note la valeur que donnait la source.
 
 ## Questions ouvertes
 

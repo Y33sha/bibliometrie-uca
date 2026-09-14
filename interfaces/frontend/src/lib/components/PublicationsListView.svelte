@@ -319,6 +319,15 @@
 			fixed: () => fixedId(externalFilters?.subjectId),
 		},
 		{
+			key: 'languages',
+			control: 'checkbox',
+			label: 'Langues',
+			param: 'language',
+			facet: { type: 'labeled', apiKey: 'languages' },
+			group: 'Langues',
+			searchable: true,
+		},
+		{
 			key: 'sources',
 			control: 'presence',
 			label: 'Sources',

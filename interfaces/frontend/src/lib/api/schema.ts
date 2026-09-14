@@ -4266,6 +4266,8 @@ export interface components {
             apc: components["schemas"]["FacetOption"][];
             /** Countries */
             countries: components["schemas"]["FacetOption"][];
+            /** Languages */
+            languages: components["schemas"]["FacetOption"][];
             /** Hal Status */
             hal_status: components["schemas"]["FacetOption"][];
             /** In Perimeter */
@@ -4605,7 +4607,7 @@ export interface components {
          * SourcePublicationMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page.
+         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
         SourcePublicationMetadataOut: {
             /** Id */
@@ -4630,6 +4632,10 @@ export interface components {
             pub_year: number | null;
             /** Language */
             language: string | null;
+            /** Language Name */
+            language_name: string | null;
+            /** Language Raw */
+            language_raw: string | null;
             /** Oa Status */
             oa_status: string | null;
             /** Journal Id */
@@ -5383,6 +5389,7 @@ export interface operations {
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
+                language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -5433,6 +5440,7 @@ export interface operations {
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
+                language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -5483,6 +5491,7 @@ export interface operations {
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
+                language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };
@@ -5633,6 +5642,7 @@ export interface operations {
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
+                language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
             };

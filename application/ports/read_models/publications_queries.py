@@ -96,6 +96,7 @@ class PublicationFilters:
     is_corresponding: list[str] = field(default_factory=list)
     has_apc: list[str] = field(default_factory=list)
     country_values: list[str] = field(default_factory=list)
+    language_codes: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
     subject_ids: list[int] = field(default_factory=list)
@@ -177,6 +178,7 @@ class PublicationsFacetsResponse(BaseModel):
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
     countries: list[FacetOption]
+    languages: list[FacetOption]
     hal_status: list[FacetOption]
     in_perimeter: list[FacetOption]
 
@@ -348,7 +350,7 @@ class PublicationDetailResponse(BaseModel):
 class SourcePublicationMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
-    `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page.
+    `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
     """
 
     id: int
@@ -361,6 +363,8 @@ class SourcePublicationMetadataOut(BaseModel):
     doc_type: str | None
     pub_year: int | None
     language: str | None
+    language_name: str | None
+    language_raw: str | None
     oa_status: str | None
     journal_id: int | None
     journal_title: str | None
