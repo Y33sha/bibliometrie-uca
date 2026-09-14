@@ -89,6 +89,37 @@ class TestBuildAuthorshipsRebuildFull:
         )
 
 
+class TestBuildAuthorshipsRebuildRollback:
+    """Un rebuild annulé par rollback laisse la séquence des ids devant les lignes restaurées."""
+
+    def test_insert_after_rolled_back_rebuild(self, sa_sync_conn):
+        import logging
+
+        from sqlalchemy import text
+
+        from application.pipeline.authorships.build_authorships import build
+        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+
+        setup_persons_test_data(sa_sync_conn)
+        run_create_persons(sa_sync_conn)
+        _run_build_authorships(sa_sync_conn)
+        # Des ids au-delà du nombre de lignes, comme après des suppressions de liens.
+        sa_sync_conn.execute(text("DELETE FROM authorships"))
+        _run_build_authorships(sa_sync_conn)
+
+        savepoint = sa_sync_conn.begin_nested()
+        build(
+            sa_sync_conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"), rebuild_full=True
+        )
+        savepoint.rollback()
+
+        # Le lien d'id maximal, supprimé puis recréé, reçoit un id libre.
+        sa_sync_conn.execute(
+            text("DELETE FROM authorships WHERE id = (SELECT max(id) FROM authorships)")
+        )
+        _run_build_authorships(sa_sync_conn)
+
+
 def _snapshot_authorships_content(conn) -> list[tuple]:
     """Contenu d'`authorships` hors identité (id) : ce qui doit être identique
     entre un build incrémental et un rebuild full."""
