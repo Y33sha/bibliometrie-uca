@@ -32,7 +32,7 @@ from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
-from infrastructure.db.sql_fragments import in_clause
+from infrastructure.db.sql_fragments import identifier_neutralized, in_clause, usable_identifiers
 
 # ── Name-form authorships ────────────────────────────────────────
 
@@ -176,7 +176,7 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes distinctes au même identifiant brut, hors `_dubious` et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending`.
+# Paires de personnes distinctes au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH person_identifier_keys AS (
         SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
@@ -185,7 +185,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         WHERE sa.person_id IS NOT NULL
           AND aik.person_identifiers ? k.k
-          AND (aik.person_identifiers ->> k.k) NOT LIKE '%_dubious'
+          AND NOT {identifier_neutralized("k.k")}
     ),
     pairs AS (
         SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
@@ -292,10 +292,10 @@ _REPEATED_CANDIDATES_SQL = text("""
 """)
 
 # Occurrences des seules paires candidates (pas tous les auteurs des méga-publications) : `unnest` zippe les deux tableaux parallèles en couples exacts `(source_publication, personne)`.
-_REPEATED_OCCURRENCES_SQL = text("""
+_REPEATED_OCCURRENCES_SQL = text(f"""
     SELECT sa.source_publication_id AS spid, sa.person_id,
            sa.source::text AS source, sa.raw_author_name AS name,
-           aik.author_name_normalized AS norm, aik.person_identifiers AS identifiers
+           aik.author_name_normalized AS norm, {usable_identifiers()} AS identifiers
     FROM source_authorships sa
     JOIN author_identifying_keys aik ON aik.id = sa.identity_id
     WHERE (sa.source_publication_id, sa.person_id) IN (
@@ -316,14 +316,10 @@ _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
 
 
 def _occurrence_identifiers(raw: Mapping[str, JsonValue] | None) -> list[IdentifierRef]:
-    """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
+    """Identifiants que porte une signature, hors ceux qu'elle neutralise — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
     if not raw:
         return []
-    return [
-        IdentifierRef(id_type=k, id_value=str(raw[k]))
-        for k in _IDENTIFIER_KEYS
-        if raw.get(k) and not str(raw[k]).endswith("_dubious")
-    ]
+    return [IdentifierRef(id_type=k, id_value=str(raw[k])) for k in _IDENTIFIER_KEYS if raw.get(k)]
 
 
 def _detachable_groups(

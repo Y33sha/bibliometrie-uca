@@ -23,10 +23,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
-from domain.persons.identifiers import (
-    compact_identifiers,
-    mark_shared_identifiers_dubious,
-)
+from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
@@ -445,10 +442,9 @@ def build_wos_author_records(
             )
         return []
 
-    # Identifiant (researcher_id) partagé entre ≥2 signatures du record → `_dubious`.
-    ids_by_position = mark_shared_identifiers_dubious(
-        [compact_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept]
-    )
+    ids_by_position = [
+        compact_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept
+    ]
 
     records: list[AuthorRecord] = []
     for idx, author in enumerate(authors_kept):

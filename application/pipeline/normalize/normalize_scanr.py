@@ -25,7 +25,6 @@ from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
     compact_identifiers,
-    mark_shared_identifiers_dubious,
     normalize_orcid,
 )
 from domain.publications.authorship_roles import map_role
@@ -256,16 +255,13 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation).
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
-    # Identifiant (orcid/idref) partagé entre ≥2 signatures du doc → `_dubious`.
-    ids_by_position = mark_shared_identifiers_dubious(
-        [
-            compact_identifiers(
-                orcid=normalize_orcid(as_str(as_mapping(a.get("denormalized")).get("orcid"))),
-                idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
-            )
-            for a in authors
-        ]
-    )
+    ids_by_position = [
+        compact_identifiers(
+            orcid=normalize_orcid(as_str(as_mapping(a.get("denormalized")).get("orcid"))),
+            idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
+        )
+        for a in authors
+    ]
 
     records: list[AuthorRecord] = []
     for position, author_data in enumerate(authors):

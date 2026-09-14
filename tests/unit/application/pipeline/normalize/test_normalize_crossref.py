@@ -401,9 +401,8 @@ class TestBuildCrossrefAuthorRecords:
         rec = build_crossref_author_records({"author": [{"family": "Dupont"}]})[0]
         assert rec.person_identifiers is None
 
-    def test_shared_orcid_marked_dubious(self):
-        """ORCID recopié sur 2 co-auteurs (corruption méga-papier crossref) → requalifié
-        `_dubious` sur les deux, donc invisible au matching personnes."""
+    def test_shared_orcid_kept_on_each_record(self):
+        """L'extracteur rend l'ORCID de chaque auteur tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
         msg = {
             "author": [
                 {"family": "Acharya", "ORCID": "https://orcid.org/0000-0001-2345-6789"},
@@ -412,8 +411,8 @@ class TestBuildCrossrefAuthorRecords:
         }
         recs = build_crossref_author_records(msg)
         assert [r.person_identifiers for r in recs] == [
-            {"orcid_dubious": "0000-0001-2345-6789"},
-            {"orcid_dubious": "0000-0001-2345-6789"},
+            {"orcid": "0000-0001-2345-6789"},
+            {"orcid": "0000-0001-2345-6789"},
         ]
 
 

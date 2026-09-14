@@ -18,6 +18,15 @@ from domain.persons.matching import (
     ResolutionMode,
 )
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from infrastructure.db.sql_fragments import identifier_neutralized, usable_identifier
+
+# Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
+_ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
+
+
+def _usable(id_type: str) -> str:
+    """Valeur de l'identifiant `id_type` de la signature `sa_auth`, NULL quand elle le neutralise."""
+    return usable_identifier(f"'{id_type}'", signature="sa_auth")
 
 
 def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
@@ -40,14 +49,15 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
 
 # Colonnes communes des projections d'authorship non-liée (`BareUnlinkedAuthorship`).
 # Chaque requête y ajoute ses deux colonnes finales `in_perimeter` et `current_person_id`.
-_BARE_PROJECTION_HEAD = """
+# Un identifiant que la signature neutralise vaut NULL.
+_BARE_PROJECTION_HEAD = f"""
     sa_auth.id AS authorship_id,
     sa_auth.source::text AS source,
     sa_auth.raw_author_name AS full_name,
     aik.author_name_normalized,
-    aik.person_identifiers->>'orcid' AS orcid,
-    aik.person_identifiers->>'hal_person_id' AS hal_person_id,
-    aik.person_identifiers->>'idref' AS idref,
+    {_usable("orcid")} AS orcid,
+    {_usable("hal_person_id")} AS hal_person_id,
+    {_usable("idref")} AS idref,
     sa_auth.roles,
     sd.publication_id,
     sa_auth.author_position"""
@@ -69,8 +79,9 @@ _OOP_COMMON_WHERE = """
 def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
     """Branche « identifiant-ancré » : signature hors-périmètre dont l'identifiant `id_type` (jsonb) est déjà porté par une personne connue (non rejetée).
 
-    Le rapprochement par valeur jsonb (`->>'{id_type}' = pi.id_value`) porte sur `author_identifying_keys` (~645 k identités), non sur les 19 M signatures : la valeur jsonb reste non indexable, mais scannée sur la table d'identités, 25× plus petite. On rejoint ensuite les signatures par `identity_id` (index `idx_sa_identity`). `person_identifiers ? '{id_type}'` et la restriction de source ORCID sont des filtres de correction, pas d'optimisation.
+    Le rapprochement par valeur jsonb (`->>'{id_type}' = pi.id_value`) porte sur `author_identifying_keys` (~645 k identités), non sur les 19 M signatures : la valeur jsonb reste non indexable, mais scannée sur la table d'identités, 25× plus petite. On rejoint ensuite les signatures par `identity_id` (index `idx_sa_identity`). `person_identifiers ? '{id_type}'`, la neutralisation par la signature et la restriction de source ORCID sont des filtres de correction, pas d'optimisation.
     """
+    neutralized = identifier_neutralized(f"'{id_type}'", "sa_auth")
     return f"""
         SELECT {_OOP_PROJECTION}
         FROM person_identifiers pi
@@ -82,6 +93,7 @@ def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
         WHERE pi.id_type = '{id_type}'
           AND pi.status <> '{AttributionStatus.REJECTED.value}'
           AND aik.person_identifiers ? '{id_type}'
+          AND NOT {neutralized}
           {source_filter}
           AND {_OOP_COMMON_WHERE}
     """
@@ -290,6 +302,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                     JOIN source_authorships sa ON sa.identity_id = aik.id
                     WHERE aik.person_identifiers->>:id_type = ANY(:values)
                       AND aik.author_name_normalized IS NOT NULL
+                      AND NOT {_ID_TYPE_NEUTRALIZED}
                       {source_filter}
                     GROUP BY 1, 2
                 ) t
@@ -352,6 +365,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                 FROM source_authorships sa
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE aik.person_identifiers ? :id_type
+                  AND NOT {_ID_TYPE_NEUTRALIZED}
                   AND sa.person_id IS NOT NULL
                   {source_filter}
                 GROUP BY 1, 2
@@ -384,6 +398,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                   AND sa.person_id = :old_owner
                   AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
                   AND aik.person_identifiers->>:id_type = :id_value
+                  AND NOT {_ID_TYPE_NEUTRALIZED}
                   AND NOT EXISTS (
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
                   )

@@ -27,18 +27,25 @@ from application.ports.read_models.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from infrastructure.db.sql_fragments import usable_identifier
 from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
 )
 
+# Identifiants d'une signature `sa`, hors ceux qu'elle neutralise.
+_HAL_PERSON_ID = usable_identifier("'hal_person_id'")
+_ORCID = usable_identifier("'orcid'")
+_IDHAL = usable_identifier("'idhal'")
+_IDREF = usable_identifier("'idref'")
+
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
-_HAL_ACCOUNT_SIGNATURES = """
+_HAL_ACCOUNT_SIGNATURES = f"""
     FROM source_authorships sa
     JOIN author_identifying_keys aik ON aik.id = sa.identity_id
     WHERE sa.source = 'hal'
       AND sa.person_id IS NOT NULL
-      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
+      AND {_HAL_PERSON_ID} IS NOT NULL
 """
 
 # Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
@@ -46,7 +53,7 @@ _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     SELECT sa.person_id
     {_HAL_ACCOUNT_SIGNATURES}
     GROUP BY sa.person_id
-    HAVING COUNT(DISTINCT aik.person_identifiers->>'hal_person_id') >= 2
+    HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
 """
 
 
@@ -123,14 +130,14 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 WITH hal_accounts AS (
                     SELECT
                         sa.person_id,
-                        (aik.person_identifiers->>'hal_person_id')::int AS hal_person_id,
+                        ({_HAL_PERSON_ID})::int AS hal_person_id,
                         MIN(sa.raw_author_name) AS full_name,
-                        MIN(aik.person_identifiers->>'orcid') AS orcid,
-                        MIN(aik.person_identifiers->>'idhal') AS idhal,
-                        MIN(aik.person_identifiers->>'idref') AS idref,
+                        MIN({_ORCID}) AS orcid,
+                        MIN({_IDHAL}) AS idhal,
+                        MIN({_IDREF}) AS idref,
                         COUNT(*) AS pub_count
                     {_HAL_ACCOUNT_SIGNATURES}
-                    GROUP BY sa.person_id, aik.person_identifiers->>'hal_person_id'
+                    GROUP BY sa.person_id, {_HAL_PERSON_ID}
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,

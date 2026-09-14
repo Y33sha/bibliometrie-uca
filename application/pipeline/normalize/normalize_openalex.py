@@ -26,7 +26,6 @@ from application.services.publishers.core import find_or_create_publisher
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
     compact_identifiers,
-    mark_shared_identifiers_dubious,
     normalize_orcid,
 )
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
@@ -363,10 +362,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
-    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du work : sur les méga-papers, OpenAlex hérite de crossref l'ORCID du premier auteur recopié sur tous les co-auteurs — invisibilise-le alors au matching.
-    ids_by_position = mark_shared_identifiers_dubious(
-        [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
-    )
+    ids_by_position = [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
 
     records: list[AuthorRecord] = []
     for position, authorship in enumerate(authorships):

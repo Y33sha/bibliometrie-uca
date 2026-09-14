@@ -465,8 +465,8 @@ class TestBuildOpenalexAuthorRecords:
     def test_no_authorships(self):
         assert build_openalex_author_records({"authorships": []}) == []
 
-    def test_shared_orcid_marked_dubious(self):
-        """ORCID hérité de crossref recopié sur 2 signatures du work → `_dubious`."""
+    def test_shared_orcid_kept_on_each_record(self):
+        """L'extracteur rend l'ORCID de chaque signature tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
         work = {
             "authorships": [
                 {
@@ -478,8 +478,8 @@ class TestBuildOpenalexAuthorRecords:
         }
         recs = build_openalex_author_records(work)
         assert [r.person_identifiers for r in recs] == [
-            {"orcid_dubious": "0000-0001-2345-6789"},
-            {"orcid_dubious": "0000-0001-2345-6789"},
+            {"orcid": "0000-0001-2345-6789"},
+            {"orcid": "0000-0001-2345-6789"},
         ]
 
     def test_skip_without_raw_name(self):

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict j9kwBIGiobl1FflPgoI8NigrgH12rG8BxYPkhqWdygWrZpS0q7d4d714fjncvUw
+\restrict Mhj4mvBA3uYnlmr8NJyIWsbnPVKFgnV7TM6N6zGkDhzTttFG13Lbgr5N0R9CxVW
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -644,8 +644,16 @@ CREATE TABLE public.source_authorships (
     created_at timestamp with time zone DEFAULT now(),
     countries_dirty boolean DEFAULT true NOT NULL,
     identity_id integer NOT NULL,
-    resolution_mode public.resolution_mode
+    resolution_mode public.resolution_mode,
+    neutralized_identifiers jsonb
 );
+
+
+--
+-- Name: COLUMN source_authorships.neutralized_identifiers; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.source_authorships.neutralized_identifiers IS 'Identifiants de l''identité que la résolution des personnes ignore pour cette signature, avec leur motif : {"orcid": "shared"}.';
 
 
 --
@@ -2803,7 +2811,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
@@ -3430,5 +3438,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict j9kwBIGiobl1FflPgoI8NigrgH12rG8BxYPkhqWdygWrZpS0q7d4d714fjncvUw
+\unrestrict Mhj4mvBA3uYnlmr8NJyIWsbnPVKFgnV7TM6N6zGkDhzTttFG13Lbgr5N0R9CxVW
 

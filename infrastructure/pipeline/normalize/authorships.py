@@ -49,16 +49,20 @@ _INSERT_AUTHORSHIP_SQL = text(
     """
     INSERT INTO source_authorships
         (source, source_publication_id, author_position,
-         is_corresponding, roles, raw_author_name, identity_id)
+         is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers)
     VALUES (:source, :source_publication_id, :author_position,
             :is_corresponding, :roles, :raw_author_name,
             (SELECT id FROM author_identifying_keys
              WHERE key_hash = """
     + key_hash_sql(":author_name_normalized", ":person_identifiers")
-    + """))
+    + """),
+            :neutralized_identifiers)
     RETURNING id
 """
-).bindparams(bindparam("person_identifiers", type_=Jsonb))
+).bindparams(
+    bindparam("person_identifiers", type_=Jsonb),
+    bindparam("neutralized_identifiers", type_=Jsonb),
+)
 
 
 def delete_orphan_identities(conn: Connection) -> int:
@@ -108,6 +112,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 "roles": v["roles"],
                 "raw_author_name": v["raw_author_name"],
                 "person_identifiers": v["person_identifiers"],
+                "neutralized_identifiers": v["neutralized_identifiers"],
             }
             for v in values
         ]
@@ -129,13 +134,13 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             """
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 is_corresponding, roles, raw_author_name, identity_id)
+                 is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers)
             SELECT :source, :spid, t.author_position,
-                   t.is_corresponding, t.roles, t.raw_author_name, aik.id
+                   t.is_corresponding, t.roles, t.raw_author_name, aik.id, t.neutralized_identifiers
             FROM jsonb_to_recordset(:payload) AS t(
                 author_position smallint, author_name_normalized text,
                 is_corresponding boolean, roles text[],
-                raw_author_name text, person_identifiers jsonb)
+                raw_author_name text, person_identifiers jsonb, neutralized_identifiers jsonb)
             JOIN author_identifying_keys aik
               ON aik.key_hash = """
             + key_hash_sql("t.author_name_normalized", "t.person_identifiers")

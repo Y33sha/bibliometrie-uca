@@ -10,6 +10,7 @@ Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui 
 
 import re
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -290,30 +291,28 @@ def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
     return out or None
 
 
-def mark_shared_identifiers_dubious(
-    ids_by_position: list[dict[str, JsonValue] | None],
-) -> list[dict[str, JsonValue] | None]:
-    """Requalifie `_dubious` les identifiants partagés entre signatures d'un même enregistrement.
+class IdentifierNeutralization(StrEnum):
+    """Motif pour lequel une signature neutralise un identifiant de son identité : l'identifiant reste enregistré, et la résolution des personnes l'ignore pour cette signature."""
 
-    Un identifiant — quel que soit son type — porté par **≥2 positions d'auteur distinctes** au sein d'un même enregistrement source est une corruption : un identifiant ne peut pas désigner deux signatures dans un même document (dépôt HAL référençant deux fois le même compte, ORCID du premier auteur recopié sur tous les co-auteurs d'un méga-papier crossref/openalex…). Toute position portant une valeur partagée voit **tous** ses identifiants suffixés `_dubious` : conservés (réversible, diagnosticable) mais invisibles au matching personnes, qui lit les clés non suffixées.
+    SHARED = "shared"
+    """Valeur portée par plusieurs signatures d'un même document."""
 
-    On requalifie y compris la position du vrai propriétaire de l'identifiant : rien ne la distingue des usurpations. Le match par identifiant est sacrifié sur ce document (la signature matchera par nom), pour éviter de mal-attribuer les autres.
 
-    Un par position, tels que produits par `compact_identifiers` (`None` = aucun identifiant). Idempotent : les clés déjà suffixées `_dubious` sont ignorées à la détection et ne sont pas re-suffixées — réappliquer la fonction (re-normalisation, backfill ré-exécuté) ne change rien. Au normalize, l'entrée est toujours nue : comportement inchangé.
+def shared_identifier_neutralizations(
+    ids_by_signature: Sequence[Mapping[str, JsonValue] | None],
+) -> list[dict[str, IdentifierNeutralization] | None]:
+    """Identifiants neutralisés de chaque signature d'un document, pour cause de partage.
+
+    Une valeur d'identifiant, quel que soit son type, portée par plusieurs signatures d'un même document est une corruption : un identifiant désigne une seule signature par document. Toute signature portant une valeur partagée voit tous ses identifiants neutralisés, y compris celle du vrai propriétaire, que rien ne distingue des autres. `None` pour une signature sans identifiant neutralisé.
     """
-
-    def bare(ids: dict[str, JsonValue] | None) -> list[tuple[str, JsonValue]]:
-        return [(k, v) for k, v in ids.items() if not k.endswith("_dubious")] if ids else []
-
     counts: Counter[tuple[str, JsonValue]] = Counter()
-    for ids in ids_by_position:
-        counts.update(bare(ids))
+    for ids in ids_by_signature:
+        if ids:
+            counts.update(ids.items())
     shared = {kv for kv, n in counts.items() if n >= 2}
-    if not shared:
-        return ids_by_position
     return [
-        {(k if k.endswith("_dubious") else f"{k}_dubious"): v for k, v in ids.items()}
-        if ids and any(kv in shared for kv in bare(ids))
-        else ids
-        for ids in ids_by_position
+        dict.fromkeys(ids, IdentifierNeutralization.SHARED)
+        if ids and any(kv in shared for kv in ids.items())
+        else None
+        for ids in ids_by_signature
     ]

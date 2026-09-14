@@ -35,7 +35,6 @@ from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.persons.identifiers import (
     compact_identifiers,
-    mark_shared_identifiers_dubious,
     normalize_orcid,
 )
 from domain.publications.identifiers import clean_doi
@@ -167,13 +166,10 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
     if not isinstance(creators, list):
         return []
 
-    # ORCID partagé entre ≥2 creators du record → `_dubious`.
-    ids_by_position = mark_shared_identifiers_dubious(
-        [
-            compact_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
-            for c in creators
-        ]
-    )
+    ids_by_position = [
+        compact_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
+        for c in creators
+    ]
 
     records: list[AuthorRecord] = []
     for position, creator in enumerate(creators):
