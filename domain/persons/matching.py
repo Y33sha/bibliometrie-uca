@@ -30,10 +30,11 @@ class PersonNameForms(NamedTuple):
 # (ScanR relève de l'autorité française IdRef/SUDOC) mais à objectiver : mesurer le
 # taux d'accord de l'IdRef ScanR vs sources fiables avant de le garder ou de le
 # source-restreindre comme l'ORCID.
-ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
+ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
 """Sources dont l'ORCID porté par une authorship est déposé par l'auteur, fiable comme signal de matching personne.
 
 - `crossref` : ORCID fourni par l'auteur à l'éditeur lors de la soumission.
+- `datacite` : ORCID du créateur, déposé avec la notice (`creators[].nameIdentifiers`).
 - `openalex` : `raw_orcid` recopié par OpenAlex de la métadonnée brute de la source amont (cf. `_extract_openalex_orcid`) — même provenance que Crossref.
 - `hal` : ORCID attaché à l'auteur dans le TEI HAL (`label_xml`).
 

@@ -7,7 +7,7 @@ Deux populations de candidats traversent la même cascade :
 
 `match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
 
-1. **ORCID** déposé par l'auteur (`ORCID_MATCH_SOURCES` : crossref / openalex / hal) — l'ORCID WoS, algorithmique, n'est pas un signal.
+1. **ORCID** déposé par l'auteur (sources de `ORCID_MATCH_SOURCES`).
 2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
 3. **IdRef**.
 4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne. Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
@@ -149,7 +149,7 @@ class _Cascade:
         hal_decision = decide_match_by_identifier(
             a.hal_person_id, self._hal_account_map, a.full_name, form, self._name_form_status
         )
-        # ORCID comme signal uniquement quand il est déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ; l'ORCID WoS, algorithmique, est ignoré ici (mais enregistré sur person_identifiers via add_identifiers).
+        # ORCID comme signal seulement depuis les sources à dépôt auteur (`ORCID_MATCH_SOURCES`) ; les autres restent enregistrés sur person_identifiers via add_identifiers.
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
         orcid_decision = decide_match_by_identifier(
             orcid_signal, self._orcid_map, a.full_name, form, self._name_form_status
