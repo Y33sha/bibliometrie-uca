@@ -13,6 +13,8 @@ SAME = [
     (("martin", "jean"), ("jean", "martin")),
     # Initiales d'un prénom composé.
     (("bailly", "j l"), ("bailly", "jean luc")),
+    # Initiales des deux côtés, patronyme entier en commun.
+    (("martin", "j pierre"), ("martin", "jean p")),
     # Typo ou translittération du prénom (distance 1).
     (("beyssac", "erick"), ("beyssac", "eric")),
     (("khalil", "toufik"), ("khalil", "toufic")),
@@ -54,6 +56,10 @@ DISTINCT = [
     # Une initiale couvre un seul mot de l'autre nom.
     (("s solomon", ""), ("sanya solodkov", "")),
     (("s solomon", ""), ("sukanya sinha", "")),
+    # Un appariement par initiale exige deux mots entiers appariés.
+    (("s pierre", ""), ("p simon", "")),
+    (("solomon", "s"), ("spinali", "s")),
+    (("j m", ""), ("jean martin", "")),
     # Un nom n'est jamais réduit à un seul mot accolé que couvrirait une initiale de l'autre.
     (("m morandin", ""), ("monteil", "stephane")),
     (("m j morello", ""), ("monteil", "stephane")),
