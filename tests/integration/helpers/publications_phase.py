@@ -35,7 +35,10 @@ def apply_metadata_corrections(conn: Connection) -> None:
     queries = PgMetadataCorrectionQueries()
 
     unary_rows = queries.fetch_for_unary_correction(conn)
-    unary_updates = [u for row in unary_rows if (u := compute_unary_update(row)) is not None]
+    language_forms = queries.fetch_language_forms(conn)
+    unary_updates = [
+        u for row in unary_rows if (u := compute_unary_update(row, language_forms)) is not None
+    ]
     queries.persist_corrections(conn, unary_updates)
 
     cluster_updates = compute_cluster_updates(queries.fetch_doi_cluster_candidates(conn))

@@ -33,13 +33,13 @@
 
 ### 1. Référentiel
 
-- [ ] Tables `languages` et `language_forms`, remplies par la migration depuis les données d'ISO 639 (pycountry), exportées par le seed commun.
+- [x] Tables `languages` et `language_forms`, remplies par la migration depuis les données d'ISO 639 (pycountry), exportées par le seed commun (fa51da9c).
 
 ### 2. Normalisation
 
-- [ ] Fonction du domaine qui ramène une valeur de source à un code du référentiel.
-- [ ] Appel dans la passe unaire de `metadata_correction`, valeur source gardée dans `raw_metadata.language`.
-- [ ] Reprise de `publications.language`, qui reprend des valeurs brutes.
+- [x] Fonction du domaine qui ramène une valeur de source à un code du référentiel.
+- [x] Appel dans la passe unaire de `metadata_correction`, valeur source gardée dans `raw_metadata.language`.
+- [x] Reprise de `publications.language` : la passe marque `keys_dirty` sur les `source_publications` dont la langue change, et la réconciliation recalcule la langue de leurs publications.
 
 ### 3. Facette
 

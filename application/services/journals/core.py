@@ -166,7 +166,8 @@ def _correct_for_journal(
     À enchaîner avec `refresh_from_sources` des publications du journal, qui repart de la colonne `source_publication` rafraîchie ici.
     """
     rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
-    updates = [u for row in rows if (u := compute_update(row)) is not None]
+    language_forms = queries.fetch_language_forms(conn)
+    updates = [u for row in rows if (u := compute_update(row, language_forms)) is not None]
     return queries.persist_corrections(conn, updates)
 
 

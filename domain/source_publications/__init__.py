@@ -7,5 +7,6 @@ Sous-modules :
 - `keys` : projection des clés de confirmation (dédup)
 - `correction` : règles de correction des métadonnées
 - `doc_types` : mapping des types de document source → vocabulaire canonique
+- `languages` : langue donnée par la source → code du référentiel des langues
 - `raw_metadata` : accès aux métadonnées brutes
 """

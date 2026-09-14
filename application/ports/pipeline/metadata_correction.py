@@ -17,7 +17,7 @@ from domain.types import JsonValue
 class UnaryCorrectionRow(NamedTuple):
     """Une `source_publication` candidate à la correction unaire, jointe à son journal.
 
-    Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+    Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
     L'adapter construit les lignes par appariement de noms : chaque champ porte le nom de la colonne qui l'alimente.
     """
@@ -29,6 +29,7 @@ class UnaryCorrectionRow(NamedTuple):
     doi: str | None
     journal_id: int | None
     oa_status: str | None
+    language: str | None
     urls: list[str] | None
     external_ids: dict[str, JsonValue]
     journal_type: str | None
@@ -59,6 +60,7 @@ class CorrectionUpdate(NamedTuple):
     id: int
     doc_type: str | None
     oa_status: str | None
+    language: str | None
     external_ids: dict[str, JsonValue]
     raw_metadata: dict[str, JsonValue]
 
@@ -128,8 +130,12 @@ class MetadataCorrectionQueries(Protocol):
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_publications` voient leur correction journal-dépendante bouger."""
         ...
 
+    def fetch_language_forms(self, conn: Connection) -> dict[str, str]:
+        """Formes de `language_forms`, chacune associée au code de sa langue."""
+        ...
+
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation ; celle-ci recalcule aussi la langue de la publication. Retourne le nombre de lignes mises à jour."""
         ...
 
     def fetch_journal_doi_prefixes(self, conn: Connection) -> list[JournalDoiPrefixRow]:
