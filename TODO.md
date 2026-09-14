@@ -38,11 +38,13 @@
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
+* [ ] admin/countries: aligner les boutons à droite
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
-* [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
+* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
+* [ ] Facette éditeur dans la page Revues
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
