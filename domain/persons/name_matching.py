@@ -7,6 +7,11 @@ import re
 
 from domain.normalize import clean_raw_author_name, normalize_name
 
+# Nombre maximal de mots consécutifs qu'une graphie accole (« de la fontaine » / « delafontaine »).
+_MAX_JOINED_WORDS = 3
+# Longueur minimale de deux mots comparés à une faute près : les initiales en sont exclues, « b » et « x » restent distincts.
+_TYPO_MIN_LENGTH = 2
+
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """Parse un raw_author_name en (last_name, first_name).
@@ -28,42 +33,25 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     return raw, ""
 
 
-def _clean_name_tokens(*parts: str) -> set[str]:
-    """Ensemble de tokens normalisés d'un nom, sans les chiffres.
+def _name_words(*parts: str) -> list[str]:
+    """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 
-    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux signatures de type SUDOC (« Chiari, Sophie 1977- ») parasiteraient sinon les tokens. Exception assumée à la normalisation habituelle, qui conserve [a-z0-9] pour les identifiants.
+    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux signatures de type SUDOC (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve [a-z0-9] pour les identifiants.
     """
     text = re.sub(r"\d+", " ", normalize_name(" ".join(part for part in parts if part)))
-    return set(text.split())
-
-
-def _tokens_compatible(tokens1: set[str], tokens2: set[str]) -> bool:
-    """Vrai si chaque token du plus petit ensemble a un correspondant dans l'autre.
-
-    Correspondance = token identique, ou initiale (une lettre seule préfixe d'un token de l'autre ensemble). Indépendant de l'ordre.
-    """
-    if not tokens1 or not tokens2:
-        return False
-    small, big = (tokens1, tokens2) if len(tokens1) <= len(tokens2) else (tokens2, tokens1)
-    for token in small:
-        if token in big:
-            continue
-        if len(token) == 1 and any(other.startswith(token) for other in big):
-            continue
-        if any(len(other) == 1 and token.startswith(other) for other in big):
-            continue
-        return False
-    return True
+    return text.split()
 
 
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
-    """Vrai si deux noms (nom, prénom) désignent vraisemblablement la même personne.
+    """Vrai si deux noms désignent la même personne, à une variation de graphie près.
 
-    Comparaison par ensemble de tokens : indépendante de l'ordre — gère l'inversion nom/prénom et les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes ») — et tolérante aux initiales (« J-L Bailly » ↔ « Jean Luc Bailly »). Chaque token du nom le plus court doit correspondre à un token de l'autre.
+    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit trouver un correspondant dans l'autre. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), une faute de frappe ou de translittération par mot (« erick » ↔ « eric »), et les mots accolés (« le roy » ↔ « leroy »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
 
-    Les entrées peuvent être brutes ou déjà normalisées (`_clean_name_tokens` normalise dans tous les cas). Le découpage nom/prénom n'a pas d'importance — les tokens sont mis en commun —, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
+    Les entrées peuvent être brutes ou déjà normalisées. Le découpage nom/prénom est indifférent, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
     """
-    return _tokens_compatible(_clean_name_tokens(ln1, fn1), _clean_name_tokens(ln2, fn2))
+    variants1 = _joined_variants(_name_words(ln1, fn1))
+    variants2 = _joined_variants(_name_words(ln2, fn2))
+    return any(_words_compatible(v1, v2) for v1 in variants1 for v2 in variants2)
 
 
 def _edit_distance(a: str, b: str) -> int:
@@ -85,31 +73,31 @@ def _edit_distance(a: str, b: str) -> int:
     return d[la][lb]
 
 
-def _concat_name(part: str) -> str:
-    """Fragment de nom normalisé, tokens accolés dans l'ordre (chiffres retirés)."""
-    return re.sub(r"\d+", "", normalize_name(part)).replace(" ", "")
+def _joined_variants(words: list[str]) -> list[list[str]]:
+    """La suite de mots d'un nom, puis chaque variante où une série de mots consécutifs est accolée en un seul."""
+    variants = [words]
+    for size in range(2, _MAX_JOINED_WORDS + 1):
+        for start in range(len(words) - size + 1):
+            joined = "".join(words[start : start + size])
+            variants.append([*words[:start], joined, *words[start + size :]])
+    return variants
 
 
-def _part_close(a: str, b: str) -> bool:
-    """Deux fragments de nom (nom **ou** prénom) proches à la graphie près : tokens compatibles au sens de `_tokens_compatible` (ordre indifférent, initiales — « r » / « roman »), concaténation égale (« abdel mouhcine » / « abdelmouhcine », « st paul » / « stpaul »), ou distance d'édition ≤ 1 sur la concaténation (typo, translittération). Les fragments réduits à une seule lettre (initiales) sont exclus du volet distance — « b » et « x » ne sont pas proches."""
-    ta, tb = _clean_name_tokens(a), _clean_name_tokens(b)
-    if not ta or not tb:
+def _words_match(word: str, other: str, *, typo: bool) -> bool:
+    """Mot identique, initiale de l'autre, ou, si `typo`, à une faute près."""
+    if word == other:
+        return True
+    if (len(word) == 1 and other.startswith(word)) or (len(other) == 1 and word.startswith(other)):
+        return True
+    return (
+        typo and min(len(word), len(other)) >= _TYPO_MIN_LENGTH and _edit_distance(word, other) <= 1
+    )
+
+
+def _words_compatible(words1: list[str], words2: list[str]) -> bool:
+    """Vrai si chaque mot du nom le plus court trouve un correspondant dans l'autre ; la faute n'est tolérée que si ce nom compte au moins deux mots."""
+    if not words1 or not words2:
         return False
-    if _tokens_compatible(ta, tb):
-        return True
-    ca, cb = _concat_name(a), _concat_name(b)
-    if ca == cb:
-        return True
-    return len(ca) >= 2 and len(cb) >= 2 and _edit_distance(ca, cb) <= 1
-
-
-def same_person_name(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
-    """Vrai si deux noms désignent la même personne, à une variation de graphie près.
-
-    Sur-ensemble de `names_compatible` (qui gère déjà l'inversion nom/prénom et les initiales) : ajoute la tolérance aux variantes orthographiques d'une même personne — concaténation (« abdel mouhcine » / « abdelmouhcine »), particule accolée (« st paul » / « stpaul », « le roy » / « leroy »), typo ou translittération (« eric » / « erick », « toufik » / « toufic ») —, en exigeant que le nom **et** le prénom soient chacun proches. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
-
-    Sert de corroboration tolérante au matching par identifiant : reconnaître qu'une signature est la variante de graphie du propriétaire de l'identifiant évite de la rejeter puis d'en créer un doublon au canal nominal.
-    """
-    if names_compatible(ln1, fn1, ln2, fn2):
-        return True
-    return _part_close(ln1, ln2) and _part_close(fn1, fn2)
+    small, big = (words1, words2) if len(words1) <= len(words2) else (words2, words1)
+    typo = len(small) >= 2
+    return all(any(_words_match(word, other, typo=typo) for other in big) for word in small)

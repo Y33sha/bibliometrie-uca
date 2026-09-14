@@ -5,11 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, NamedTuple
 
-from domain.persons.name_matching import (
-    names_compatible,
-    parse_raw_author_name,
-    same_person_name,
-)
+from domain.persons.name_matching import names_compatible, parse_raw_author_name
 
 
 class IdentifiedPerson(NamedTuple):
@@ -160,7 +156,7 @@ def decide_match_by_identifier(
     Corroboration par le nom, du verdict humain au test heuristique :
 
     1. Le statut du couple `(signature_form, person_id)` dans `person_name_forms` (`name_form_status`) tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
-    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `same_person_name` : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« abdelmouhcine » pour « abdel mouhcine ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
+    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« abdelmouhcine » pour « abdel mouhcine ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
 
     Un refus est matérialisé dans `rejection` pour journalisation.
     """
@@ -180,7 +176,7 @@ def decide_match_by_identifier(
         )
 
     sig_last, sig_first = parse_raw_author_name(signature)
-    if same_person_name(sig_last, sig_first, target.last_name, target.first_name):
+    if names_compatible(sig_last, sig_first, target.last_name, target.first_name):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
 
@@ -213,6 +209,11 @@ def consensus_name(votes: Mapping[str, int]) -> str | None:
     if others and others[0] == best:
         return None
     return max(votes, key=votes.__getitem__)
+
+
+def identifier_misplaced(signature_form: str, consensus: str | None) -> bool:
+    """Vrai quand le consensus d'une valeur d'identifiant désigne une autre personne que le nom de la signature qui la porte. Sans consensus, aucun identifiant n'est mal placé."""
+    return consensus is not None and not names_compatible(signature_form, "", consensus, "")
 
 
 @dataclass(frozen=True)
