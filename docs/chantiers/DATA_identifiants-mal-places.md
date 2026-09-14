@@ -20,16 +20,16 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 
 ## Décisions
 
-À prendre.
+- **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
+- **Le consensus tranche à partir de deux voix sur trois.** En deçà, il ne désigne personne.
+- **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
+- **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un enregistrement à la fois.
 
 ## Questions ouvertes
 
-- **Le recalcul du consensus inclut-il les identifiants requalifiés ?** Une valeur recopiée sur trois mille positions d'un même enregistrement pèse trois mille signatures et emporte le consensus ; une valeur isolée mal placée en pèse une et le laisse intact. La réponse dépend du motif de la requalification.
 - **Un marqueur par motif ?** `shared` pour la valeur partagée entre positions d'un même enregistrement, `misplaced` pour la contradiction avec le consensus. Détermine la forme du suffixe, ce que le matching lit, et ce qu'une requête de diagnostic sait distinguer.
-- **Lever le marqueur quand l'identifiant rejoint le consensus.** La signature retrouve alors son identité nue, ce qui fusionne deux lignes d'`author_identifying_keys` et repointe `source_authorships.identity_id`. À quelle fréquence réévaluer, et que faire de la ligne devenue orpheline ?
-- **Où placer la requalification par consensus ?** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un enregistrement à la fois. La passe doit lire le consensus avant la cascade personnes.
-- **Convergence.** Requalifier change le consensus, qui change la requalification. Une passe unique par exécution, ou une itération jusqu'au point fixe ?
-- **Seuil d'autorité du consensus.** Une valeur attestée par une seule signature a pour consensus son propre nom. En dessous de combien de signatures le consensus ne tranche-t-il rien ?
+- **Garder la trace du brut sur l'identité.** Une `source_publication` conserve la valeur d'origine dans `raw_metadata`, et chaque passage de `metadata_correction` repart du brut reconstitué : la correction se rejoue sans dommage et se défait quand elle devient caduque. Une identité, elle, porte les identifiants déjà requalifiés, sans trace de leur forme d'origine. Le brut est le payload de la source, que le normalize relit quand il réécrit les signatures d'un enregistrement — mais la passe de consensus s'exécute hors de ce chemin. Sans trace du brut, elle ne peut pas recalculer sa correction, seulement l'empiler. À explorer : une trace des identifiants d'origine sur `author_identifying_keys`, sur le modèle de `raw_metadata`.
+- **Lever le marqueur quand l'identifiant rejoint le consensus.** La signature retrouve alors son identité nue, ce qui fusionne deux lignes d'`author_identifying_keys` et repointe `source_authorships.identity_id`. Que faire de la ligne devenue orpheline ?
 - **Types d'identifiant concernés.** La règle du partage vaut pour tous les types. Celle du consensus vaut-elle pour `idref`, `hal_person_id` et `researcher_id` autant que pour l'ORCID ?
 - **Reprise du stock.** Les identités déjà construites portent les erreurs. Faut-il une reprise, ou la requalification à l'exécution suivante suffit-elle ?
 
