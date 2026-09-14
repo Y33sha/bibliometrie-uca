@@ -11,6 +11,8 @@ SAME = [
     # Initiale, inversion nom/prénom.
     (("martin", "jean"), ("martin", "j")),
     (("martin", "jean"), ("jean", "martin")),
+    # Initiales d'un prénom composé.
+    (("bailly", "j l"), ("bailly", "jean luc")),
     # Typo ou translittération du prénom (distance 1).
     (("beyssac", "erick"), ("beyssac", "eric")),
     (("khalil", "toufik"), ("khalil", "toufic")),
@@ -49,6 +51,9 @@ DISTINCT = [
     # Voisins alphabétiques d'une liste de collaboration.
     (("t dado", ""), ("s dahbi", "")),
     (("tulin varol", ""), ("d varouchas", "")),
+    # Une initiale couvre un seul mot de l'autre nom.
+    (("s solomon", ""), ("sanya solodkov", "")),
+    (("s solomon", ""), ("sukanya sinha", "")),
     # Un nom n'est jamais réduit à un seul mot accolé que couvrirait une initiale de l'autre.
     (("m morandin", ""), ("monteil", "stephane")),
     (("m j morello", ""), ("monteil", "stephane")),

@@ -43,7 +43,7 @@ def _name_words(*parts: str) -> list[str]:
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
     """Vrai si deux noms désignent la même personne, à une variation de graphie près.
 
-    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit trouver un correspondant dans l'autre. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
+    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit s'apparier à un mot distinct de l'autre. Une initiale couvre donc un seul mot : « s solomon » et « sanya solodkov » restent distincts. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
 
     Les entrées peuvent être brutes ou déjà normalisées. Le découpage nom/prénom est indifférent, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
     """
@@ -81,9 +81,20 @@ def _words_match(word: str, other: str, *, typo: bool) -> bool:
 
 
 def _words_compatible(words1: list[str], words2: list[str]) -> bool:
-    """Vrai si chaque mot du nom le plus court trouve un correspondant dans l'autre ; la faute n'est tolérée que si ce nom compte au moins deux mots."""
+    """Vrai si chaque mot du nom le plus court s'apparie à un mot distinct de l'autre ; la faute n'est tolérée que si ce nom compte au moins deux mots."""
     if not words1 or not words2:
         return False
     small, big = (words1, words2) if len(words1) <= len(words2) else (words2, words1)
-    typo = len(small) >= 2
-    return all(any(_words_match(word, other, typo=typo) for other in big) for word in small)
+    return _pair_up(small, big, typo=len(small) >= 2)
+
+
+def _pair_up(words: list[str], others: list[str], *, typo: bool) -> bool:
+    """Vrai si chaque mot de `words` s'apparie à un mot distinct de `others`. Un mot de `others` apparié à un mot n'en couvre pas un second."""
+    if not words:
+        return True
+    word, rest = words[0], words[1:]
+    return any(
+        _words_match(word, other, typo=typo)
+        and _pair_up(rest, others[:i] + others[i + 1 :], typo=typo)
+        for i, other in enumerate(others)
+    )
