@@ -176,15 +176,20 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes distinctes au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending`.
+# Paires de personnes distinctes au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
-    WITH person_identifier_keys AS (
-        SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
-        FROM source_authorships sa
-        JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    WITH pending AS (
+        SELECT DISTINCT id_type::text AS id_type, id_value
+        FROM person_identifiers
+        WHERE status = '{AttributionStatus.PENDING.value}'
+    ),
+    person_identifier_keys AS (
+        SELECT DISTINCT sa.person_id, p.id_type, p.id_value
+        FROM author_identifying_keys aik
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
+        JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
+        JOIN source_authorships sa ON sa.identity_id = aik.id
         WHERE sa.person_id IS NOT NULL
-          AND aik.person_identifiers ? k.k
           AND NOT {identifier_neutralized("k.k")}
     ),
     pairs AS (
@@ -192,12 +197,6 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         FROM person_identifier_keys k1
         JOIN person_identifier_keys k2
           ON k1.id_type = k2.id_type AND k1.id_value = k2.id_value AND k1.person_id < k2.person_id
-        WHERE EXISTS (
-            SELECT 1 FROM person_identifiers pi
-            WHERE pi.id_type::text = k1.id_type
-              AND pi.id_value = k1.id_value
-              AND pi.status = '{AttributionStatus.PENDING.value}'
-        )
     )
     SELECT id_a, id_b,
            json_agg(DISTINCT jsonb_build_object('id_type', id_type, 'id_value', id_value)) AS shared
