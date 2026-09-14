@@ -10,7 +10,7 @@ from application.ports.repositories.person_repository import (
 )
 from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.identifiers import AttributionStatus
+from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from infrastructure.db.scalars import row_int
 
 
@@ -32,7 +32,7 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> Identifier
         id_type=m["id_type"],
         id_value=m["id_value"],
         status=AttributionStatus(m["status"]),
-        source=m["source"],
+        source=IdentifierOrigin(m["source"]),
     )
 
 
@@ -122,9 +122,9 @@ def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> Authenti
         conn.execute(
             text(
                 "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:pid, 'orcid', :v, 'manual', 'authenticated')"
+                "VALUES (:pid, 'orcid', :v, :src, 'authenticated')"
             ),
-            {"pid": person_id, "v": orcid},
+            {"pid": person_id, "v": orcid, "src": IdentifierOrigin.MANUAL.value},
         )
         return AuthenticateOrcidOutcome.INSERTED
     if existing.person_id == person_id and existing.status == "authenticated":
@@ -137,10 +137,10 @@ def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> Authenti
     conn.execute(
         text(
             "UPDATE person_identifiers "
-            "SET person_id = :pid, status = 'authenticated', source = 'manual' "
+            "SET person_id = :pid, status = 'authenticated', source = :src "
             "WHERE id = :id"
         ),
-        {"pid": person_id, "id": existing.id},
+        {"pid": person_id, "id": existing.id, "src": IdentifierOrigin.MANUAL.value},
     )
     return outcome
 

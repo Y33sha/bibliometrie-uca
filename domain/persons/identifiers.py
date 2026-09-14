@@ -18,6 +18,15 @@ from domain.errors import ValidationError
 from domain.types import JsonValue
 
 
+class IdentifierOrigin(StrEnum):
+    """Origine d'une attribution `IdentifierAttribution ↔ Person`, valeur de l'enum Postgres `identifier_origin`."""
+
+    MANUAL = "manual"
+    """Décision d'une utilisatrice."""
+    AUTO = "auto"
+    """Résolution par le pipeline."""
+
+
 class AttributionStatus(StrEnum):
     """Statut d'une attribution `IdentifierAttribution ↔ Person`.
 

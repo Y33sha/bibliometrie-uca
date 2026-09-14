@@ -5,7 +5,7 @@ from sqlalchemy import Connection, text
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.identifiers import AttributionStatus
+from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person
 from infrastructure.db.scalars import scalar_int
@@ -40,7 +40,7 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
             id_type=r.id_type,
             id_value=r.id_value,
             status=AttributionStatus(r.status),
-            source=r.source,
+            source=IdentifierOrigin(r.source),
         )
         for r in id_rows
     )
