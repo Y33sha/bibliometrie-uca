@@ -53,7 +53,6 @@ Aucune.
 ### 1. Cadrage
 
 - [x] Trancher les questions ouvertes.
-- [ ] Mesurer la précision de la règle de consensus sur un échantillon relu.
 
 ### 2. Déplacer la neutralisation hors de l'identité
 
