@@ -355,9 +355,9 @@ def authenticate_orcids(
 
 
 class IdentifierConflict(NamedTuple):
-    """Conflit d'attribution collecté par le traitement par lot : une valeur d'identifiant portée par une signature du candidat est déjà attribuée à un autre propriétaire.
+    """Conflit d'attribution détecté sur le snapshot (`detect_identifier_conflicts`) : une valeur d'identifiant portée par une signature du candidat est déjà attribuée à un autre propriétaire.
 
-    Arbitré après la cascade par le consensus des porteurs (canal identifiant ordre-indépendant) : la valeur est transférée au candidat si le consensus le désigne face au propriétaire. `owner_status` distingue le `pending` (transférable) du `confirmed` (verrou admin, jamais transféré)."""
+    Arbitré avant la cascade par le consensus des porteurs (canal identifiant ordre-indépendant) : la valeur est transférée au candidat si le consensus le désigne face au propriétaire. `owner_status` distingue le `pending` (transférable) du `confirmed` (verrou admin, jamais transféré)."""
 
     id_type: str
     id_value: str
