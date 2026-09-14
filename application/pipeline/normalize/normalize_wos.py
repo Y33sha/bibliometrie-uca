@@ -101,7 +101,7 @@ def _parse_api_authors(
         researcher_id = as_str(name_obj.get("r_id"))
 
         # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un faux signal de matching).
-        # Les ORCID fiables viennent des sources à dépôt auteur (Crossref, OpenAlex `raw_orcid`, HAL).
+        # Les ORCID fiables viennent des sources à dépôt auteur (`ORCID_MATCH_SOURCES`).
 
         is_corresponding = as_str(name_obj.get("reprint")) == "Y"
 

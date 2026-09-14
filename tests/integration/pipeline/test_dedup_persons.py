@@ -400,6 +400,26 @@ class TestCascadeRun:
 
         assert _get_person_id(sa_sync_conn, wos_as) != person_id
 
+    def test_datacite_orcid_links(self, sa_sync_conn):
+        """ORCID DataCite, déposé avec la notice → signal de matching. Hors périmètre, seul l'identifiant peut rattacher la signature."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+
+        dc_sd = _insert_source_document(sa_sync_conn, "datacite", "10.5281/zenodo.1", pub)
+        dc_as = _insert_authorship(
+            sa_sync_conn,
+            "datacite",
+            dc_sd,
+            "Jean Dupont",
+            in_perimeter=False,
+            identifiers={"orcid": "0000-0001-2345-6789"},
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, dc_as) == person_id
+
     def test_name_form_match_imports_identifiers(self, sa_sync_conn):
         """Match par name_form → identifiers importés en pending (pour vérification
         manuelle ultérieure). Sans cet import, une base initialement vide n'aurait
