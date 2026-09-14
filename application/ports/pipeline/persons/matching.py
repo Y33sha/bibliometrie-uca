@@ -153,3 +153,7 @@ class PersonsMatchingQueries(Protocol):
     def delete_empty_persons(self, conn: Connection) -> int:
         """Supprime les personnes vidées de toute signature, hors référentiel RH ; leurs formes de nom partent en cascade. Retourne le nombre supprimé."""
         ...
+
+    def delete_unsupported_identifier_attributions(self, conn: Connection) -> int:
+        """Supprime les attributions d'identifiant d'origine `auto`, en attente, qu'aucune signature de leur personne ne porte. Retourne le nombre supprimé."""
+        ...

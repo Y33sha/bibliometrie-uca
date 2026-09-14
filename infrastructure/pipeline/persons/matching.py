@@ -17,6 +17,7 @@ from application.ports.pipeline.persons.matching import (
 from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierNeutralization,
+    IdentifierOrigin,
     PersonIdentifierType,
 )
 from domain.persons.matching import (
@@ -559,5 +560,23 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                 DELETE FROM persons p
                 WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.person_id = p.id)
                   AND NOT EXISTS (SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id)
+            """)
+        ).rowcount
+
+    def delete_unsupported_identifier_attributions(self, conn: Connection) -> int:
+        """Supprime les attributions d'identifiant posées par le pipeline (origine `auto`), encore en attente, qu'aucune signature de leur personne ne porte. Une signature qui neutralise l'identifiant ne le porte pas. Les attributions confirmées, authentifiées ou saisies à la main restent."""
+        return conn.execute(
+            text(f"""
+                DELETE FROM person_identifiers pi
+                WHERE pi.source = '{IdentifierOrigin.AUTO.value}'
+                  AND pi.status = '{AttributionStatus.PENDING.value}'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM source_authorships sa
+                      JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                      WHERE sa.person_id = pi.person_id
+                        AND aik.person_identifiers ->> pi.id_type::text = pi.id_value
+                        AND NOT {identifier_neutralized("pi.id_type::text")}
+                  )
             """)
         ).rowcount
