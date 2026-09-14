@@ -63,9 +63,11 @@
   homonymes (à confirmer chacune), soit un doublon (à fusionner).
 </p>
 
-{#if data && data.forms.length === 0 && !loading}
+{#if !data}
+  <div class="empty">Chargement…</div>
+{:else if data.forms.length === 0 && !loading}
   <div class="empty">Aucune forme ambiguë à trancher.</div>
-{:else if data}
+{:else}
   <div class="forms">
     {#each data.forms as form (form.name_form)}
       <div class="form-block">

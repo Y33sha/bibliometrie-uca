@@ -82,9 +82,11 @@
 
 {#if error}<p class="error">{error}</p>{/if}
 
-{#if data && data.pairs.length === 0 && !loading}
+{#if !data}
+  <div class="empty">Chargement…</div>
+{:else if data.pairs.length === 0 && !loading}
   <div class="empty">Aucune paire en conflit d'identifiant.</div>
-{:else if data}
+{:else}
   <div class="pairs">
     {#each data.pairs as pair, i (i)}
       {@const shared = pair.shared_identifiers}
