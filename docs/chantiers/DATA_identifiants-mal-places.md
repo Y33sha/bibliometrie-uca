@@ -10,7 +10,7 @@
 
 Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu » porte l'ORCID de Stefan Raimund Maschek, que 56 autres signatures attestent.
 
-**Aucun décalage d'indice systématique.** Sur les 54 087 enregistrements portant au moins trois ORCID, 10 sont majoritairement contradictoires, et aucun ne s'explique par un décalage uniforme de la suite des identifiants de −3 à +3 positions.
+**Le décalage est local.** Sur les 54 087 enregistrements portant au moins trois ORCID, aucun ne s'explique par un décalage uniforme de la suite des identifiants de −3 à +3 positions. Mais sur 2 385 signatures contredisant un consensus, le nom du consensus signe le même document dans 1 346 cas : à la position voisine dans 561 cas, à deux positions dans 101 cas. Les listes de collaboration étant alphabétiques, l'identifiant se retrouve sur un voisin alphabétique (Dado / Dahbi, Varol / Varouchas, McMahon / McNamara).
 
 **Deux limites de la mesure.** 15 045 des 68 646 valeurs d'ORCID apparaissent dans un seul enregistrement source : leur consensus est leur propre nom local, donc une erreur y est invisible. Le test de compatibilité valide dès qu'un mot d'au moins trois lettres est commun, donc 8 235 est un minorant.
 
@@ -31,13 +31,14 @@ Les deux premiers portent sur une personne, le troisième sur un enregistrement 
 ## Décisions
 
 - **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
-- **Le consensus est le nom qui porte le plus de voix**, dès trois signatures. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration.
+- **Le consensus est le nom qui porte le plus de voix**, dès trois signatures. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration. Une égalité en tête ne désigne aucun nom, et la passe laisse les signatures intactes.
 - **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
 - **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
 - **L'identité garde les identifiants bruts.** `person_identifiers` porte la forme d'origine, et l'unicité reste sur `(author_name_normalized, person_identifiers)`. Les identifiants exploitables se déduisent : ceux du brut dont la clé est absente de la carte des neutralisations.
 - **La carte des neutralisations vit sur la signature.** `source_authorships` porte une colonne jsonb, `{"orcid": "shared"}`, vide dans le cas courant. Deux signatures de documents différents peuvent porter le même nom et les mêmes identifiants bruts, l'une partageant son identifiant avec une autre signature de son document et l'autre non : une identité unique sur le brut ne peut pas porter ces deux verdicts.
 - **`shared` prime sur `misplaced`.** Un identifiant partagé est douteux avant tout examen du consensus, et les conflits qu'il produit ne valent pas d'être tranchés.
 - **Aucune colonne de repointage.** L'identité reste stable quand un verdict change, donc rien à repointer en régime courant. La fusion des identités que le suffixe sépare relève de la migration.
+- **Un identifiant mal placé est neutralisé, sans être réattribué.** Dans un décalage local, la signature propriétaire porte l'identifiant de son voisin, lui aussi neutralisé : les deux signatures se rattachent par leur nom. Réattribuer exigerait de porter des identifiants ajoutés en plus des neutralisés, de départager les cibles ambiguës et de suivre les décalages en chaîne.
 - **La neutralisation porte sur l'identifiant, jamais sur le nom.** Un appariement cassé laisse ignorer lequel des deux éléments est fautif. Neutraliser l'identifiant retire un raccourci, et le rattachement par nom reste ouvert ; garder l'identifiant rattache la signature au propriétaire du consensus avec l'autorité d'un identifiant. Le canal le plus autoritaire cède.
 - **Une attribution rejetée ne produit pas de neutralisation.** Elle porte sur le lien entre une valeur et une personne, pas sur la place de cette valeur dans un enregistrement.
 - **La règle du consensus vaut pour tous les types d'identifiant.**
