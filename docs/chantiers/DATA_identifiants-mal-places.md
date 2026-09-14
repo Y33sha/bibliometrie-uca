@@ -32,10 +32,10 @@ Les deux premiers portent sur une personne, le troisième sur un enregistrement 
 
 ## Décisions
 
-- **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
+- **Les signatures neutralisées pour partage ne votent pas ; les signatures mal placées votent.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : l'inclure n'apporte rien. Une signature mal placée contredit le consensus, donc son vote ne change pas le nom majoritaire. La faire voter rend la requalification indépendante des exécutions précédentes, et permet la levée de la neutralisation quand le consensus change.
 - **Le consensus est le nom qui porte strictement plus de voix que tous les autres.** Aucun seuil : une signature seule ne peut pas se contredire, et deux voix sur deux tranchent. Une égalité ne désigne aucun nom. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration.
 - **Un seul consensus sert la requalification et les transferts.** Il se calcule pour toutes les valeurs. Les transferts adoptent la règle d'égalité : une égalité ne produit aucun transfert.
-- **La contradiction se teste avec `same_person_name`**, la comparaison qui corrobore déjà un rattachement par identifiant.
+- **La contradiction se teste avec `names_compatible`**, la comparaison qui corrobore déjà un rattachement par identifiant. Elle compare les noms mot à mot, sans découpage nom/prénom, et tolère une initiale, une faute par mot et des mots accolés. La faute n'est tolérée que si le nom le plus court compte au moins deux mots.
 - **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
 - **La requalification s'intègre à l'étape d'arbitrage des conflits d'identifiant**, avant la cascade personnes. Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
 - **La requalification précède la détection des conflits.** Une signature dont l'identifiant est neutralisé sort des porteurs de la valeur, et les conflits qu'elle créait disparaissent avant l'arbitrage.
@@ -67,9 +67,10 @@ Aucune.
 ### 2. Requalification par consensus
 
 - [x] Règle du consensus (`consensus_name`) : majorité stricte, égalité sans effet. Les transferts la lisent.
-- [ ] Requalification `misplaced` dans l'étape d'arbitrage, avant la détection des conflits, sur tout le stock, avec un consensus calculé pour toutes les valeurs et partagé avec les transferts.
-- [ ] Remise à NULL des signatures résolues par identifiant qui portent un identifiant neutralisé.
-- [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
+- [x] Comparaison de noms mot à mot et tolérante à la graphie (`names_compatible`), sans découpage nom/prénom.
+- [x] Requalification `misplaced` dans l'étape d'arbitrage, avant la détection des conflits, sur tout le stock, avec un consensus calculé pour toutes les valeurs et partagé avec les transferts.
+- [x] Remise à NULL des signatures résolues par identifiant qui gagnent un identifiant neutralisé.
+- [x] Levée de la neutralisation quand l'identifiant rejoint le consensus : la requalification repart des données à chaque exécution.
 
 ## Liens
 

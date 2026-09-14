@@ -296,6 +296,8 @@ class IdentifierNeutralization(StrEnum):
 
     SHARED = "shared"
     """Valeur portée par plusieurs signatures d'un même document."""
+    MISPLACED = "misplaced"
+    """Valeur dont le consensus désigne une autre personne que le nom de la signature."""
 
 
 def shared_identifier_neutralizations(
