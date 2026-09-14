@@ -17,6 +17,7 @@
 
 # Données
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
+* [ ] place_name_forms n'a pas de clé étrangère vers countries
 * [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 ## Corrections
