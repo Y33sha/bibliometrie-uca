@@ -4,7 +4,7 @@
 
 Il existe deux façons de casser un lien personne ↔ publication, et elles ne se comportent pas de la même manière face aux rebuilds du pipeline.
 
-**Rejet canonique** — le bouton de suppression (croix) sur la fiche personne (`PATCH /api/authorships/{id}/exclude` → `exclude_authorship`). Il écrit la paire `(publication_id, person_id)` dans `rejected_authorships` puis supprime la row `authorships`. Les sites qui insèrent dans `authorships` anti-joignent ce store, donc le rejet survit aux rebuilds (mécanique posée par le chantier `archived/2026-06-01_DATA_rejected-authorships-sidecar`).
+**Retrait d'une contribution** — le bouton de suppression sur la fiche personne (`PATCH /api/authorships/{id}/exclude` → `exclude_authorship`). Il écrit la paire `(publication_id, person_id)` dans `rejected_authorships` puis supprime la row `authorships`. Les sites qui insèrent dans `authorships` anti-joignent ce store, donc le rejet survit aux rebuilds (mécanique posée par le chantier `archived/2026-06-01_DATA_rejected-authorships-sidecar`).
 
 **Détachement source** — « Détacher *n* authorships » depuis `admin/persons` (`POST /api/persons/{id}/detach-authorships` → `detach_authorships`). Il nulle `person_id` sur les `source_authorships` sélectionnées et supprime les `authorships` canoniques devenues orphelines. **Il n'écrit pas dans `rejected_authorships`.**
 
@@ -34,7 +34,7 @@ Effet : `person_id` n'est jamais re-posé sur une `source_authorship` d'une pair
 - [x] Test d'intégration : paire rejetée non re-rattachée à la `source_authorship` ; élimination désambiguïsant une forme de nom.
 - [x] Doc `pipeline/07-persons` : garde de rejet dans la cascade + désambiguïsation par élimination.
 
-### Phase 2 — Rejeter = opération unifiée (croix canonique ∪ détachement)
+### Phase 2 — Rejeter = opération unifiée (retrait d'une contribution ∪ détachement)
 
 La garde en place, rejeter une paire `(publication_id, person_id)` est une seule opération (`reject_pair`), quel que soit le point d'entrée :
 
@@ -48,7 +48,7 @@ Nettoyage des formes de nom (décidé en cours de chantier) : après le rejet, o
 Deux points d'entrée convergent sur ce cœur :
 
 - **Détachement** (`detach_authorships`) : résout l'ensemble distinct des `publication_id` des authorships sélectionnées et applique `reject_pair` à chaque paire. Le rejet porte sur la publication entière — les sources référencent la même publi, donc « cette personne n'est pas l'auteur de cette publication » vaut pour toutes ses sources.
-- **Croix canonique** (`exclude_authorship`) : aujourd'hui écrit le store + supprime la canonique mais **laisse** `person_id` sur les sources (le chantier sidecar avait abandonné le détachement source, jugé non durable et inutile vu l'anti-join). La garde (phase 1) renverse cette prémisse : le détachement source devient durable et utile (supprime le zombie, stoppe l'attribution erronée de forme de nom). La croix gagne donc l'étape 2 — elle applique le même `reject_pair`.
+- **Retrait d'une contribution** (`exclude_authorship`) : écrit le registre et supprime la ligne consolidée, en laissant `person_id` sur les sources. La garde (phase 1) rend le détachement source durable et utile : il supprime la ligne orpheline et arrête l'attribution erronée de forme de nom. Le retrait gagne donc l'étape 2 — il applique le même `reject_pair`.
 
 - [x] Op repo `unlink_all_source_authorships_for_pair(publication_id, person_id)` (port + impl) : nulle `person_id` sur toutes les sa dont `source_publication.publication_id = pub` et `person_id = pid`.
 - [x] Cœur `reject_pair(publication_id, person_id)` : store + détacher toutes les sources + supprimer la canonique + audit.
