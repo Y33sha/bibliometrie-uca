@@ -78,6 +78,7 @@ class PublicationFilterParams:
     is_corresponding: Annotated[str, Query()] = ""
     has_apc: Annotated[str, Query()] = ""
     country: Annotated[str, Query()] = ""
+    language: Annotated[str, Query()] = ""
     hal_status: Annotated[str, Query()] = ""
     in_perimeter: Annotated[str, Query()] = ""
 
@@ -108,6 +109,7 @@ class PublicationFilterParams:
             ),
             has_apc=parse_apc_origins(self.has_apc, lab_ids=lab_ids),
             country_values=parse_str_csv(self.country),
+            language_codes=parse_str_csv(self.language),
             hal_status_values=parse_vocabulary_csv(
                 self.hal_status, allowed=HAL_DEPOSIT_STATUSES, param="hal_status"
             ),

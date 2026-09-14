@@ -19,6 +19,8 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		doc_type: 'article',
 		pub_year: 2024,
 		language: 'en',
+		language_name: 'Anglais',
+		language_raw: null,
 		oa_status: 'green',
 		journal_id: null,
 		journal_title: null,
@@ -109,5 +111,10 @@ describe('comparisonRows', () => {
 			record({ id: 2, journal_id: 8, journal_title: 'Nature' }),
 		]);
 		expect(row(rows, 'journal').divergent).toBe(true);
+	});
+
+	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {
+		const rows = comparisonRows([record({ source: 'wos', language_raw: 'English' })]);
+		expect(row(rows, 'language').cells).toEqual([{ text: 'Anglais', note: 'English' }]);
 	});
 });

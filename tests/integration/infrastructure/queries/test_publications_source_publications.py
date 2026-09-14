@@ -151,3 +151,23 @@ class TestGetPublicationSources:
         )
         [record] = _records(sa_sync_conn, pub)
         assert (record.pages, record.article_number) == ("e1234", "e1234")
+
+    def test_language_name_and_source_value(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        _create_source_publication(sa_sync_conn, pub, source="wos", source_id="WOS:1")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_publications SET language = 'en', "
+                "raw_metadata = CAST(:rm AS jsonb) WHERE publication_id = :pid"
+            ),
+            {
+                "rm": json.dumps({"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}),
+                "pid": pub,
+            },
+        )
+        [record] = _records(sa_sync_conn, pub)
+        assert (record.language, record.language_name, record.language_raw) == (
+            "en",
+            "Anglais",
+            "English",
+        )

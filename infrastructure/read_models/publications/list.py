@@ -35,6 +35,7 @@ from infrastructure.read_models.filters import (
     in_perimeter_person_clause,
     journal_id_clause,
     lab_clause,
+    language_clause,
     no_lab_clause,
     oa_clause,
     person_clause,
@@ -91,6 +92,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         publisher_id_clause(filters.publisher_id),
         journal_id_clause(filters.journal_id),
         country_clause(filters.country_values),
+        language_clause(filters.language_codes),
         subject_clause(filters.subject_ids),
         author_clause(filters.author_id),
     ]

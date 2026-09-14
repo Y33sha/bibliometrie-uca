@@ -161,6 +161,13 @@ class TestPublicationsFacets:
         data = r.json()
         assert "years" in data
 
+    def test_language_filter_and_facet(self, client):
+        r = client.get("/api/publications/facets", params={"language": "en,fr"})
+        assert r.status_code == 200
+        assert "languages" in r.json()
+        r = client.get("/api/publications", params={"language": "en"})
+        assert r.status_code == 200
+
     def test_facets_with_filters(self, client):
         """Les facettes doivent refléter le contexte de filtrage."""
         r = client.get(

@@ -56,6 +56,8 @@ def _record(r: Row[tuple[object, ...]]) -> SourcePublicationMetadataOut:
         doc_type=r.doc_type,
         pub_year=r.pub_year,
         language=r.language,
+        language_name=r.language_name,
+        language_raw=r.language_raw,
         oa_status=r.oa_status,
         journal_id=r.journal_id,
         journal_title=r.journal_title,
@@ -84,12 +86,15 @@ def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSources
         text("""
             SELECT sp.id, sp.source::text AS source, sp.source_id, sp.doi, sp.external_ids,
                    sp.title, sp.title_normalized, sp.doc_type, sp.pub_year, sp.language,
+                   lang.name AS language_name,
+                   sp.raw_metadata->'language'->>'raw' AS language_raw,
                    sp.oa_status, sp.container_title, sp.biblio,
                    j.id AS journal_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name
             FROM source_publications sp
             LEFT JOIN journals j ON j.id = sp.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN languages lang ON lang.code = sp.language
             WHERE sp.publication_id = :pid
             ORDER BY sp.source, sp.source_id
         """),

@@ -44,6 +44,7 @@ from infrastructure.read_models.filters import (
     in_perimeter_person_clause,
     journal_id_clause,
     lab_clause,
+    language_clause,
     no_lab_clause,
     oa_clause,
     person_clause,
@@ -119,6 +120,8 @@ class _PublicationFacetsBuilder:
             clauses.append(journal_id_clause(f.journal_id))
         if skip != "country":
             clauses.append(country_clause(f.country_values))
+        if skip != "language":
+            clauses.append(language_clause(f.language_codes))
         if skip != "hal_status":
             clauses.append(hal_status_clause(f.hal_status_values, self.lab_hal_col))
         if skip != "in_perimeter":
@@ -396,6 +399,21 @@ class _PublicationFacetsBuilder:
             if r.code.strip() != NO_COUNTRY_CODE
         ]
 
+    def _facet_languages(self) -> list[FacetOption]:
+        where_sql, binds = self._clauses_skipping("language")
+        rows = self.conn.execute(
+            text(f"""
+                SELECT l.code, l.name, COUNT(*) AS n
+                FROM publications p
+                JOIN languages l ON l.code = p.language
+                WHERE {where_sql}
+                GROUP BY l.code, l.name
+                ORDER BY n DESC
+            """),
+            binds,
+        ).all()
+        return [FacetOption(value=r.code, label=r.name, count=r.n) for r in rows]
+
     def _facet_hal_status(self) -> list[FacetOption]:
         """HAL status : seulement si un seul labo est sélectionné."""
         if len(self.filters.lab_ids) != 1:
@@ -478,6 +496,7 @@ def publications_facets(
         "source_counts": "_facet_source_counts",
         "apc": "_facet_apc",
         "countries": "_facet_countries",
+        "languages": "_facet_languages",
         "hal_status": "_facet_hal_status",
         "in_perimeter": "_facet_in_perimeter",
     }
@@ -503,6 +522,7 @@ def publications_facets(
         source_counts=results["source_counts"],
         apc=results["apc"],
         countries=results["countries"],
+        languages=results["languages"],
         hal_status=results["hal_status"],
         in_perimeter=results["in_perimeter"],
     )
