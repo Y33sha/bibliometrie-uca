@@ -4,7 +4,7 @@
 
 **Un identifiant partagé au sein d'un enregistrement est requalifié.** `mark_shared_identifiers_dubious` ([identifiers.py](../../domain/persons/identifiers.py)) s'applique au normalize, dans les six extracteurs. Une valeur portée par au moins deux positions d'auteur d'un même enregistrement est une corruption : un identifiant désigne une seule signature par document. Toute position portant une valeur partagée voit ses identifiants suffixés `_dubious`. Ils restent en base, invisibles au matching, qui lit les clés nues. Le rattachement par nom reste ouvert.
 
-**Le consensus d'une valeur d'identifiant est le nom que portent le plus de signatures.** `fetch_identifier_consensus` ([matching.py](../../infrastructure/pipeline/persons/matching.py)) le calcule pour les seules valeurs disputées, et départage une égalité par ordre alphabétique. L'étape d'arbitrage des conflits d'identifiant s'en sert pour trancher à qui appartient une valeur disputée. Elle précède la cascade dans la phase `persons` ([phase.py](../../application/pipeline/persons/phase.py)).
+**Le consensus d'une valeur d'identifiant se déduit des voix de ses signatures.** `fetch_identifier_votes` ([matching.py](../../infrastructure/pipeline/persons/matching.py)) compte, pour les seules valeurs disputées, les signatures qui portent la valeur sous chaque nom, et `consensus_name` ([matching.py](../../domain/persons/matching.py)) en tire le consensus. L'étape d'arbitrage des conflits d'identifiant s'en sert pour trancher à qui appartient une valeur disputée. Elle précède la cascade dans la phase `persons` ([phase.py](../../application/pipeline/persons/phase.py)).
 
 **Une attribution `pending` naît de la cascade.** La cascade attribue à une personne, en `pending`, les identifiants des signatures qu'elle lui rattache. Une valeur déjà attribuée à une autre personne n'est pas écrasée : le conflit passe à l'arbitrage de l'exécution suivante. Un identifiant mal placé sur une signature rattachée par son nom est ainsi attribué à la mauvaise personne.
 
@@ -66,8 +66,8 @@ Aucune.
 
 ### 2. Requalification par consensus
 
-- [ ] Consensus commun à la requalification et aux transferts : majorité stricte, égalité sans effet, calculé pour toutes les valeurs.
-- [ ] Requalification `misplaced` dans l'étape d'arbitrage, avant la détection des conflits, sur tout le stock.
+- [x] Règle du consensus (`consensus_name`) : majorité stricte, égalité sans effet. Les transferts la lisent.
+- [ ] Requalification `misplaced` dans l'étape d'arbitrage, avant la détection des conflits, sur tout le stock, avec un consensus calculé pour toutes les valeurs et partagé avec les transferts.
 - [ ] Remise à NULL des signatures résolues par identifiant qui portent un identifiant neutralisé.
 - [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
 

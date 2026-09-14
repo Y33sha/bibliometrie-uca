@@ -1,8 +1,8 @@
 """Passe de résolution : arbitrage par consensus des conflits d'attribution d'identifiant.
 
-Avant la cascade personnes, les conflits détectés sur le snapshot (`IdentifierConflict` : une valeur qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés par le **consensus** des porteurs — l'`author_name_normalized` majoritaire de la valeur. La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont transférables ; les `confirmed` (verrou admin) sont laissées.
+Avant la cascade personnes, les conflits détectés sur le snapshot (`IdentifierConflict` : une valeur qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés par le **consensus** des porteurs — le nom normalisé qui porte strictement plus de voix que chacun des autres (`consensus_name`). La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont transférables ; les `confirmed` (verrou admin) sont laissées.
 
-Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert.
+Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert, pas plus qu'une égalité en tête.
 """
 
 import logging
@@ -14,7 +14,7 @@ from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, for
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
-from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
+from domain.persons.matching import ORCID_MATCH_SOURCES, consensus_name, form_matches_person
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.
 _CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
@@ -67,10 +67,9 @@ def resolve_identifier_transfers(
         values_by_type[c.id_type].add(c.id_value)
     consensus: dict[tuple[str, str], str] = {}
     for id_type, values in values_by_type.items():
-        for value, form in queries.fetch_identifier_consensus(
-            conn, id_type, sorted(values)
-        ).items():
-            consensus[(id_type, value)] = form
+        for value, votes in queries.fetch_identifier_votes(conn, id_type, sorted(values)).items():
+            if (name := consensus_name(votes)) is not None:
+                consensus[(id_type, value)] = name
 
     # Nom-prénom + formes confirmées des personnes impliquées (propriétaires et candidats).
     person_ids = {c.candidate_person_id for c in pending} | {c.owner_person_id for c in pending}

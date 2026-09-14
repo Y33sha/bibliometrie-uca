@@ -10,8 +10,8 @@ from tests.integration.helpers.authorships import upsert_identity
 _ORCID = "0000-0001-2345-6789"
 
 
-def _signature(conn, neutralized):
-    """Signature du périmètre, non rattachée, portant un ORCID et la carte `neutralized`."""
+def _signature(conn, neutralized, *, name="dupont jean", source_id="c-neutralisation"):
+    """Signature crossref du périmètre, non rattachée, portant un ORCID et la carte `neutralized`."""
     pub = conn.execute(
         text(
             "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
@@ -21,12 +21,12 @@ def _signature(conn, neutralized):
     sd = conn.execute(
         text(
             "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES ('crossref', 'c-neutralisation', 'X', :p) RETURNING id"
+            "VALUES ('crossref', :sid, 'X', :p) RETURNING id"
         ),
-        {"p": pub},
+        {"sid": source_id, "p": pub},
     ).scalar_one()
     identity_id = upsert_identity(
-        conn, author_name_normalized="dupont jean", person_identifiers={"orcid": _ORCID}
+        conn, author_name_normalized=name, person_identifiers={"orcid": _ORCID}
     )
     conn.execute(
         text("""
@@ -53,3 +53,10 @@ def test_orcid_neutralise_absent_de_la_projection(sa_sync_conn):
 def test_orcid_non_neutralise_present_dans_la_projection(sa_sync_conn):
     _signature(sa_sync_conn, None)
     assert _orcid_projete(sa_sync_conn) == _ORCID
+
+
+def test_signature_neutralisee_ne_vote_pas(sa_sync_conn):
+    _signature(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
+    _signature(sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2")
+    votes = PgPersonsMatchingQueries().fetch_identifier_votes(sa_sync_conn, "orcid", [_ORCID])
+    assert votes == {_ORCID: {"dupont jean": 1}}

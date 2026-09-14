@@ -202,6 +202,19 @@ def form_matches_person(
     return any(names_compatible(form, "", cf, "") for cf in confirmed_forms)
 
 
+def consensus_name(votes: Mapping[str, int]) -> str | None:
+    """Consensus d'une valeur d'identifiant : le nom qui porte strictement plus de voix que chacun des autres.
+
+    `votes` compte les signatures portant la valeur sous chaque nom normalisé. `None` en cas d'égalité en tête ou sans aucune voix.
+    """
+    if not votes:
+        return None
+    best, *others = sorted(votes.values(), reverse=True)
+    if others and others[0] == best:
+        return None
+    return max(votes, key=votes.__getitem__)
+
+
 @dataclass(frozen=True)
 class PersonMatchDecision:
     """Décision de la cascade de matching unifiée.
