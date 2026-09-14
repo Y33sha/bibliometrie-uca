@@ -1,10 +1,10 @@
 # Personnes — cycle de vie
 
-*À jour le 2026-09-06.*
+*À jour le 2026-09-14.*
 
 Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
-`domain/persons/` porte les règles pures : la décision de résolution (`decide_person_match`), la comparaison des noms (`names_compatible`, `same_person_name`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
+`domain/persons/` porte les règles pures : la décision de résolution (`decide_person_match`), la comparaison des noms (`names_compatible`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
 
 ## Tables
 

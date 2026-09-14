@@ -1,18 +1,14 @@
-"""Tests de `same_person_name` — prédicat « même personne » à la graphie près.
+"""Tests de `names_compatible` — prédicat « même personne » à la graphie près.
 
-Cas réels observés sur le canal identifiant (noms des porteurs d'une valeur vs son propriétaire).
+Cas réels observés sur le canal identifiant (noms des porteurs d'une valeur vs son propriétaire) et sur les listes de collaboration.
 """
 
 import pytest
 
-from domain.persons.name_matching import (
-    _edit_distance,
-    names_compatible,
-    same_person_name,
-)
+from domain.persons.name_matching import _edit_distance, names_compatible
 
 SAME = [
-    # Cas déjà couverts par names_compatible : initiale, inversion nom/prénom.
+    # Initiale, inversion nom/prénom.
     (("martin", "jean"), ("martin", "j")),
     (("martin", "jean"), ("jean", "martin")),
     # Concaténation du prénom.
@@ -31,10 +27,14 @@ SAME = [
     (("blanquet doit", "stephanie"), ("blanquet diot", "stephanie")),
     # Particules accolées : plusieurs espaces retirés.
     (("de la fontaine", "jean"), ("delafontaine", "jean")),
-    # Année de naissance d'une signature SUDOC, retirée de la concaténation.
+    # Année de naissance d'une signature SUDOC, retirée.
     (("le roy 1977", "pascale"), ("leroy", "pascale")),
     # Graphie proche du patronyme et initiale du prénom, cumulées.
     (("mueller", "roman"), ("muller", "r")),
+    # Formes normalisées entières, dont l'ordre des parties dépend de la source.
+    (("dupont jean", ""), ("jean dupont", "")),
+    (("mueller roman", ""), ("r muller", "")),
+    (("j bielcikova", ""), ("bielckova j", "")),
 ]
 
 DISTINCT = [
@@ -55,19 +55,22 @@ DISTINCT = [
     (("bouchhar", "n"), ("bouaouda", "k")),
     # Patronyme absent d'un côté : le prénom proche ne suffit pas.
     (("", "eric"), ("beyssac", "erick")),
+    # Voisins alphabétiques d'une liste de collaboration.
+    (("t dado", ""), ("s dahbi", "")),
+    (("tulin varol", ""), ("d varouchas", "")),
 ]
 
 
 @pytest.mark.parametrize(("a", "b"), SAME)
 def test_same_person(a, b):
-    assert same_person_name(a[0], a[1], b[0], b[1])
-    assert same_person_name(b[0], b[1], a[0], a[1])  # symétrique
+    assert names_compatible(a[0], a[1], b[0], b[1])
+    assert names_compatible(b[0], b[1], a[0], a[1])  # symétrique
 
 
 @pytest.mark.parametrize(("a", "b"), DISTINCT)
 def test_distinct_person(a, b):
-    assert not same_person_name(a[0], a[1], b[0], b[1])
-    assert not same_person_name(b[0], b[1], a[0], a[1])
+    assert not names_compatible(a[0], a[1], b[0], b[1])
+    assert not names_compatible(b[0], b[1], a[0], a[1])
 
 
 def test_un_nom_vide_n_est_compatible_avec_aucun_autre():

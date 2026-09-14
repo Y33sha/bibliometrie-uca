@@ -10,6 +10,7 @@ from domain.persons.matching import (
     decide_name_form_outcome,
     decide_person_match,
     form_matches_person,
+    identifier_misplaced,
 )
 
 
@@ -31,6 +32,20 @@ class TestConsensusName:
 
     def test_no_vote(self):
         assert consensus_name({}) is None
+
+
+class TestIdentifierMisplaced:
+    def test_consensus_names_another_person(self):
+        assert identifier_misplaced("t dado", "s dahbi")
+
+    def test_consensus_names_the_signature(self):
+        assert not identifier_misplaced("dahbi s", "s dahbi")
+
+    def test_spelling_variant_is_not_misplaced(self):
+        assert not identifier_misplaced("mueller roman", "r muller")
+
+    def test_no_consensus(self):
+        assert not identifier_misplaced("t dado", None)
 
 
 class TestFormMatchesPerson:
