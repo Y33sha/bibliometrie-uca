@@ -811,6 +811,22 @@ countries = Table(
 )
 
 
+languages = Table(
+    "languages",
+    metadata,
+    Column("code", Text, primary_key=True),
+    Column("name", Text, nullable=False),
+)
+
+
+language_forms = Table(
+    "language_forms",
+    metadata,
+    Column("form_normalized", Text, primary_key=True),
+    Column("language_code", Text, nullable=False),
+)
+
+
 staging = Table(
     "staging",
     metadata,

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zqNaVIrTloAmq9xn46NFohQBbGbj00anN6akRSs1ye78BCNlMlEYnoQG1FlLqD3
+\restrict j9kwBIGiobl1FflPgoI8NigrgH12rG8BxYPkhqWdygWrZpS0q7d4d714fjncvUw
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -985,6 +985,40 @@ ALTER SEQUENCE public.journals_id_seq OWNED BY public.journals.id;
 
 
 --
+-- Name: language_forms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.language_forms (
+    form_normalized text NOT NULL,
+    language_code text NOT NULL
+);
+
+
+--
+-- Name: TABLE language_forms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.language_forms IS 'Formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux et trois lettres, nom anglais.';
+
+
+--
+-- Name: languages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.languages (
+    code text NOT NULL,
+    name text NOT NULL
+);
+
+
+--
+-- Name: TABLE languages; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.languages IS 'Référentiel des langues. code : ISO 639-1, ou ISO 639-3 pour une langue sans code à deux lettres. name : nom français, affiché.';
+
+
+--
 -- Name: perimeters_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1960,6 +1994,22 @@ ALTER TABLE ONLY public.journals
 
 ALTER TABLE ONLY public.journals
     ADD CONSTRAINT journals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: language_forms language_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.language_forms
+    ADD CONSTRAINT language_forms_pkey PRIMARY KEY (form_normalized);
+
+
+--
+-- Name: languages languages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.languages
+    ADD CONSTRAINT languages_pkey PRIMARY KEY (code);
 
 
 --
@@ -3153,6 +3203,14 @@ ALTER TABLE ONLY public.journals
 
 
 --
+-- Name: language_forms language_forms_language_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.language_forms
+    ADD CONSTRAINT language_forms_language_code_fkey FOREIGN KEY (language_code) REFERENCES public.languages(code) ON DELETE CASCADE;
+
+
+--
 -- Name: perimeter_structures perimeter_structures_perimeter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3372,5 +3430,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zqNaVIrTloAmq9xn46NFohQBbGbj00anN6akRSs1ye78BCNlMlEYnoQG1FlLqD3
+\unrestrict j9kwBIGiobl1FflPgoI8NigrgH12rG8BxYPkhqWdygWrZpS0q7d4d714fjncvUw
 

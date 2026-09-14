@@ -78,6 +78,8 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de la prochaine tentative | [Authorships et sources](05-authorships-et-sources.md) |
 | `journal_name_forms` | formes de noms pour reconnaître une revue | [Publications](03-publications.md) |
 | `journals` | référentiel des revues | [Publications](03-publications.md) |
+| `language_forms` | formes sous lesquelles les sources désignent une langue | [Publications](03-publications.md) |
+| `languages` | référentiel des langues | [Publications](03-publications.md) |
 | `perimeter_structures` | appartenance au périmètre, recalculée par le pipeline | [Structures](02-structures.md) |
 | `perimeters` | définition des périmètres | [Structures](02-structures.md) |
 | `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [Personnes](04-personnes.md) |
