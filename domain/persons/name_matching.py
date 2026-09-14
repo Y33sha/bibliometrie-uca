@@ -91,11 +91,11 @@ def _concat_name(part: str) -> str:
 
 
 def _part_close(a: str, b: str) -> bool:
-    """Deux fragments de nom (nom **ou** prénom) proches à la graphie près : même jeu de tokens (ordre indifférent), concaténation égale (« abdel mouhcine » / « abdelmouhcine », « st paul » / « stpaul »), ou distance d'édition ≤ 1 sur la concaténation (typo, translittération). Les fragments réduits à une seule lettre (initiales) sont exclus du volet distance — « b » et « x » ne sont pas proches."""
+    """Deux fragments de nom (nom **ou** prénom) proches à la graphie près : tokens compatibles au sens de `_tokens_compatible` (ordre indifférent, initiales — « r » / « roman »), concaténation égale (« abdel mouhcine » / « abdelmouhcine », « st paul » / « stpaul »), ou distance d'édition ≤ 1 sur la concaténation (typo, translittération). Les fragments réduits à une seule lettre (initiales) sont exclus du volet distance — « b » et « x » ne sont pas proches."""
     ta, tb = _clean_name_tokens(a), _clean_name_tokens(b)
     if not ta or not tb:
         return False
-    if ta == tb:
+    if _tokens_compatible(ta, tb):
         return True
     ca, cb = _concat_name(a), _concat_name(b)
     if ca == cb:

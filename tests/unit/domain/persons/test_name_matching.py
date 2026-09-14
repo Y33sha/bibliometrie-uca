@@ -33,6 +33,8 @@ SAME = [
     (("de la fontaine", "jean"), ("delafontaine", "jean")),
     # Année de naissance d'une signature SUDOC, retirée de la concaténation.
     (("le roy 1977", "pascale"), ("leroy", "pascale")),
+    # Graphie proche du patronyme et initiale du prénom, cumulées.
+    (("mueller", "roman"), ("muller", "r")),
 ]
 
 DISTINCT = [
@@ -42,6 +44,8 @@ DISTINCT = [
     (("duclos", "martine"), ("duclos", "michel")),
     # Deux initiales différentes (pas de signal de distance).
     (("zhang", "b"), ("zhang", "x")),
+    # Graphie proche du patronyme, deux initiales différentes.
+    (("mueller", "b"), ("muller", "x")),
     # Distance 2 sur le prénom : tenu pour distinct (choix conservateur).
     (("bonin", "patrick"), ("bonin", "patricia")),
     # Patronyme différent (nom marié : hors périmètre du prédicat, réglé
