@@ -24,6 +24,11 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
         "à une comparaison de tableaux : une valeur inconnue ne rend aucune ligne, au lieu "
         "d'annuler le filtre."
     ),
+    ("publications.py", "self.language"): (
+        "Codes du référentiel des langues, qui vit dans les données et non dans le code. La "
+        "valeur est liée à une comparaison `= ANY` : une valeur inconnue ne rend aucune ligne, "
+        "au lieu d'annuler le filtre."
+    ),
     ("publishers.py", "country"): (
         "Mêmes codes pays que la liste des publications, même liaison, même comportement."
     ),
