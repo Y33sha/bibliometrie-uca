@@ -70,6 +70,8 @@ COMMON_SEED = SeedSpec(
     tables=(
         {"table": tables.config, "where": f"key NOT IN ({_INSTITUTION_KEYS_SQL})"},
         {"table": tables.countries},
+        {"table": tables.languages},
+        {"table": tables.language_forms},
         {"table": tables.place_name_forms, "where": "kind <> 'institution'"},
     ),
     default_path=_DB_DIR / "seed.sql",

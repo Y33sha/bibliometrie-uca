@@ -42,6 +42,8 @@ Légende :
 - **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.
+- **`languages`** : référentiel des langues, avec leur code ISO 639-1, ou ISO 639-3 à défaut, et leur nom français.
+- **`language_forms`** : formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux et trois lettres, nom anglais.
 
 ## Sujets / mots-clés
 
@@ -61,6 +63,7 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `subjects`, `publication_subjects` | pipeline | `application/pipeline/subjects/ingestion.py` |
 | `subject_cooccurrences` | pipeline | `application/pipeline/subjects/cooccurrences.py` (matview) |
 | `doi_prefixes` | pipeline | phases `resolve_ra` et `publishers_journals` |
+| `languages`, `language_forms` | seed | `seed.sql` |
 | `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |
 | `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
 | `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
