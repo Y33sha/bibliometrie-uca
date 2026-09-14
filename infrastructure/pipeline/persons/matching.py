@@ -3,14 +3,21 @@
 Appelé par les orchestrateurs `application/pipeline/persons/{reset,cascade,purge}.py`. Regroupe les SELECT du rattachement (comptes HAL, cross-source, IdRef/ORCID connus, lookup `person_name_forms`) et les réinitialisations ordre-indépendantes de la phase : re-orphelinage des signatures nominales à forme devenue ambiguë, suppression des personnes vidées.
 """
 
-from sqlalchemy import Connection, Row, text
+from collections.abc import Mapping, Sequence
+
+from sqlalchemy import Connection, Row, bindparam, text
 
 from application.ports.pipeline.persons.matching import (
     BareUnlinkedAuthorship,
+    IdentityIdentifier,
     LinkedAuthorshipRow,
     PersonsMatchingQueries,
 )
-from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.identifiers import (
+    AttributionStatus,
+    IdentifierNeutralization,
+    PersonIdentifierType,
+)
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     IdentifiedPerson,
@@ -18,10 +25,14 @@ from domain.persons.matching import (
     ResolutionMode,
 )
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.sql_fragments import identifier_neutralized, usable_identifier
 
 # Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
 _ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
+# Même condition, restreinte au partage de la valeur entre signatures d'un document.
+_ID_TYPE_SHARED = identifier_neutralized(":id_type", reason=IdentifierNeutralization.SHARED.value)
+_MISPLACED = IdentifierNeutralization.MISPLACED.value
 
 
 def _usable(id_type: str) -> str:
@@ -279,16 +290,14 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         ).all()
         return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
-    def fetch_identifier_votes(
-        self, conn: Connection, id_type: str, values: list[str]
-    ) -> dict[str, dict[str, int]]:
-        """Pour chaque valeur, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Query ciblée sur les seules valeurs demandées : on part des identités portant l'une d'elles (`author_identifying_keys`, filtré par `person_identifiers->>id_type`), jointes aux `source_authorships` (index `identity_id`) pour le comptage — jamais de scan complet. Une signature qui neutralise la valeur ne vote pas. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
-        if not values:
-            return {}
+    def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
+        """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
+
+        Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
         source_filter = (
             "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
         )
-        params: dict[str, object] = {"id_type": id_type, "values": list(values)}
+        params: dict[str, object] = {"id_type": id_type}
         if id_type == PersonIdentifierType.ORCID:
             params["orcid_sources"] = list(ORCID_MATCH_SOURCES)
         rows = conn.execute(
@@ -298,9 +307,9 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                        count(*) AS votes
                 FROM author_identifying_keys aik
                 JOIN source_authorships sa ON sa.identity_id = aik.id
-                WHERE aik.person_identifiers->>:id_type = ANY(:values)
+                WHERE aik.person_identifiers ? :id_type
                   AND aik.author_name_normalized IS NOT NULL
-                  AND NOT {_ID_TYPE_NEUTRALIZED}
+                  AND NOT {_ID_TYPE_SHARED}
                   {source_filter}
                 GROUP BY 1, 2
             """),
@@ -310,6 +319,79 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         for r in rows:
             votes.setdefault(r.id_value, {})[r.name] = int(r.votes)
         return votes
+
+    def fetch_identity_identifiers(
+        self, conn: Connection, id_type: str
+    ) -> list[IdentityIdentifier]:
+        """Identités portant un identifiant du type, avec leur nom normalisé."""
+        rows = conn.execute(
+            text("""
+                SELECT id, author_name_normalized AS name, person_identifiers->>:id_type AS value
+                FROM author_identifying_keys
+                WHERE person_identifiers ? :id_type AND author_name_normalized IS NOT NULL
+            """),
+            {"id_type": id_type},
+        ).all()
+        return [IdentityIdentifier(r.id, r.name, r.value) for r in rows]
+
+    def write_misplaced_neutralizations(
+        self, conn: Connection, misplaced: Mapping[int, Sequence[str]]
+    ) -> list[int]:
+        """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites.
+
+        Retourne les signatures résolues par identifiant, non épinglées, qui gagnent un identifiant neutralisé : leur rattachement a pu passer par lui."""
+        payload = [
+            {"identity_id": identity_id, "carte": dict.fromkeys(id_types, _MISPLACED)}
+            for identity_id, id_types in misplaced.items()
+        ]
+        rows = conn.execute(
+            text(f"""
+                WITH marques AS (
+                    SELECT m.identity_id, m.carte
+                    FROM jsonb_to_recordset(:payload) AS m(identity_id integer, carte jsonb)
+                ),
+                cibles AS (
+                    SELECT sa.id,
+                           sa.neutralized_identifiers AS avant,
+                           NULLIF(
+                               coalesce(m.carte, '{{}}'::jsonb)
+                               || coalesce(
+                                   (SELECT jsonb_object_agg(e.k, e.v)
+                                      FROM jsonb_each(sa.neutralized_identifiers) AS e(k, v)
+                                     WHERE e.v <> to_jsonb('{_MISPLACED}'::text)),
+                                   '{{}}'::jsonb),
+                               '{{}}'::jsonb
+                           ) AS apres
+                    FROM source_authorships sa
+                    LEFT JOIN marques m ON m.identity_id = sa.identity_id
+                    WHERE m.identity_id IS NOT NULL
+                       OR (sa.neutralized_identifiers IS NOT NULL
+                           AND EXISTS (
+                               SELECT 1 FROM jsonb_each_text(sa.neutralized_identifiers) AS e(k, v)
+                               WHERE e.v = '{_MISPLACED}'
+                           ))
+                ),
+                modifiees AS (
+                    UPDATE source_authorships sa
+                    SET neutralized_identifiers = c.apres
+                    FROM cibles c
+                    WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
+                    RETURNING sa.id, sa.resolution_mode, c.avant, c.apres
+                )
+                SELECT id FROM modifiees
+                WHERE resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
+                  AND EXISTS (
+                      SELECT 1 FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
+                      WHERE NOT coalesce(avant ? k, false)
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = modifiees.id
+                  )
+                ORDER BY id
+            """).bindparams(bindparam("payload", type_=Jsonb)),
+            {"payload": payload},
+        ).all()
+        return [r.id for r in rows]
 
     def fetch_person_name_forms(
         self, conn: Connection, person_ids: list[int]

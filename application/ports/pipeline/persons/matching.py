@@ -5,6 +5,7 @@ Les lectures alimentent la cascade de matching (signatures non liées, index d'a
 Implémenté par `infrastructure.pipeline.persons.matching.PgPersonsMatchingQueries`.
 """
 
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
@@ -45,6 +46,14 @@ class LinkedAuthorshipRow(NamedTuple):
     source: str
 
 
+class IdentityIdentifier(NamedTuple):
+    """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
+
+    identity_id: int
+    name: str
+    value: str
+
+
 class PersonsMatchingQueries(Protocol):
     """Opérations SQL pour le rattachement des authorships aux personnes."""
 
@@ -82,10 +91,20 @@ class PersonsMatchingQueries(Protocol):
         """`{publication_id: {person_id, ...}}` depuis `rejected_authorships` — les paires rejetées, que la cascade écarte de ses candidats."""
         ...
 
-    def fetch_identifier_votes(
-        self, conn: Connection, id_type: str, values: list[str]
-    ) -> dict[str, dict[str, int]]:
-        """`{id_value: {author_name_normalized: signatures}}` — pour chaque valeur demandée, le nombre de signatures qui la portent sous chaque nom (poids en signatures, non en identités). Le consensus s'en déduit par `consensus_name`."""
+    def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
+        """`{id_value: {author_name_normalized: signatures}}` — pour chaque valeur du type, le nombre de signatures qui la portent sous chaque nom (poids en signatures, non en identités). Le consensus s'en déduit par `consensus_name`."""
+        ...
+
+    def fetch_identity_identifiers(
+        self, conn: Connection, id_type: str
+    ) -> list[IdentityIdentifier]:
+        """Identités portant un identifiant du type, avec leur nom normalisé."""
+        ...
+
+    def write_misplaced_neutralizations(
+        self, conn: Connection, misplaced: Mapping[int, Sequence[str]]
+    ) -> list[int]:
+        """Réécrit les neutralisations `misplaced` de toutes les signatures d'après `misplaced` (`{identity_id: types d'identifiant}`). Retourne les signatures résolues par identifiant, non épinglées, qui gagnent un identifiant neutralisé."""
         ...
 
     def fetch_person_name_forms(

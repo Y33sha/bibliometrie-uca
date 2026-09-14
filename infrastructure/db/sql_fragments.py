@@ -15,12 +15,16 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
     return f"CASE {col} {whens} END"
 
 
-def identifier_neutralized(id_type: str, signature: str = "sa") -> str:
-    """Condition vraie quand la signature aliasée `signature` neutralise l'identifiant `id_type`.
+def identifier_neutralized(
+    id_type: str, signature: str = "sa", *, reason: str | None = None
+) -> str:
+    """Condition vraie quand la signature aliasée `signature` neutralise l'identifiant `id_type`, pour le motif `reason` s'il est donné.
 
     `id_type` est une expression SQL : littéral (`'orcid'`), paramètre (`:id_type`) ou colonne.
     """
-    return f"coalesce({signature}.neutralized_identifiers ? {id_type}, false)"
+    if reason is None:
+        return f"coalesce({signature}.neutralized_identifiers ? {id_type}, false)"
+    return f"coalesce({signature}.neutralized_identifiers ->> {id_type} = '{reason}', false)"
 
 
 def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "aik") -> str:

@@ -11,10 +11,11 @@ from collections import defaultdict
 from sqlalchemy import Connection
 
 from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme
+from application.pipeline.persons.requalify_identifiers import IdentifierConsensus
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
-from domain.persons.matching import ORCID_MATCH_SOURCES, consensus_name, form_matches_person
+from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.
 _CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
@@ -49,27 +50,18 @@ def resolve_identifier_transfers(
     conn: Connection,
     conflicts: list[IdentifierConflict],
     *,
+    consensus: IdentifierConsensus,
     queries: PersonsMatchingQueries,
     repo: PersonRepository,
     logger: logging.Logger,
 ) -> dict[str, int]:
-    """Arbitre les conflits d'attribution collectés et transfère les identifiants captés.
+    """Arbitre les conflits d'attribution collectés et transfère les identifiants captés, d'après le `consensus` des valeurs d'identifiant (`compute_identifier_consensus`).
 
     Retourne les compteurs `{conflicts, pending, transferred}`.
     """
     pending = [c for c in conflicts if c.owner_status == "pending"]
     if not pending:
         return {"conflicts": len(conflicts), "pending": 0, "transferred": 0}
-
-    # Consensus des seules valeurs en conflit (query ciblée, par type d'identifiant).
-    values_by_type: dict[str, set[str]] = defaultdict(set)
-    for c in pending:
-        values_by_type[c.id_type].add(c.id_value)
-    consensus: dict[tuple[str, str], str] = {}
-    for id_type, values in values_by_type.items():
-        for value, votes in queries.fetch_identifier_votes(conn, id_type, sorted(values)).items():
-            if (name := consensus_name(votes)) is not None:
-                consensus[(id_type, value)] = name
 
     # Nom-prénom + formes confirmées des personnes impliquées (propriétaires et candidats).
     person_ids = {c.candidate_person_id for c in pending} | {c.owner_person_id for c in pending}

@@ -3,7 +3,7 @@
 Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
-2. **arbitrage des conflits d'identifiant** — tranche par consensus des porteurs (les signatures captées repassent à NULL).
+2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
