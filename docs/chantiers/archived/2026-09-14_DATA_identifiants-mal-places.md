@@ -2,9 +2,9 @@
 
 ## Contexte
 
-**Un identifiant partagé au sein d'un enregistrement est requalifié.** `mark_shared_identifiers_dubious` ([identifiers.py](../../domain/persons/identifiers.py)) s'applique au normalize, dans les six extracteurs. Une valeur portée par au moins deux positions d'auteur d'un même enregistrement est une corruption : un identifiant désigne une seule signature par document. Toute position portant une valeur partagée voit ses identifiants suffixés `_dubious`. Ils restent en base, invisibles au matching, qui lit les clés nues. Le rattachement par nom reste ouvert.
+**Un identifiant partagé au sein d'un enregistrement est requalifié.** `mark_shared_identifiers_dubious` ([identifiers.py](../../../domain/persons/identifiers.py)) s'applique au normalize, dans les six extracteurs. Une valeur portée par au moins deux positions d'auteur d'un même enregistrement est une corruption : un identifiant désigne une seule signature par document. Toute position portant une valeur partagée voit ses identifiants suffixés `_dubious`. Ils restent en base, invisibles au matching, qui lit les clés nues. Le rattachement par nom reste ouvert.
 
-**Le consensus d'une valeur d'identifiant se déduit des voix de ses signatures.** `fetch_identifier_votes` ([matching.py](../../infrastructure/pipeline/persons/matching.py)) compte, pour les seules valeurs disputées, les signatures qui portent la valeur sous chaque nom, et `consensus_name` ([matching.py](../../domain/persons/matching.py)) en tire le consensus. L'étape d'arbitrage des conflits d'identifiant s'en sert pour trancher à qui appartient une valeur disputée. Elle précède la cascade dans la phase `persons` ([phase.py](../../application/pipeline/persons/phase.py)).
+**Le consensus d'une valeur d'identifiant se déduit des voix de ses signatures.** `fetch_identifier_votes` ([matching.py](../../../infrastructure/pipeline/persons/matching.py)) compte, pour les seules valeurs disputées, les signatures qui portent la valeur sous chaque nom, et `consensus_name` ([matching.py](../../../domain/persons/matching.py)) en tire le consensus. L'étape d'arbitrage des conflits d'identifiant s'en sert pour trancher à qui appartient une valeur disputée. Elle précède la cascade dans la phase `persons` ([phase.py](../../../application/pipeline/persons/phase.py)).
 
 **Une attribution `pending` naît de la cascade.** La cascade attribue à une personne, en `pending`, les identifiants des signatures qu'elle lui rattache. Une valeur déjà attribuée à une autre personne n'est pas écrasée : le conflit passe à l'arbitrage de l'exécution suivante. Un identifiant mal placé sur une signature rattachée par son nom est ainsi attribué à la mauvaise personne.
 
@@ -16,7 +16,7 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 
 **Deux limites de la mesure.** 15 045 des 68 646 valeurs d'ORCID apparaissent dans un seul enregistrement source : leur consensus est leur propre nom local, donc une erreur y est invisible. Le test de compatibilité valide dès qu'un mot d'au moins trois lettres est commun, donc 8 235 est un minorant.
 
-**L'effet sur le rattachement des personnes.** Une signature dont l'identifiant désigne quelqu'un d'autre attribue la publication à cette autre personne. Le rejet de la forme de nom, qui est le geste de correction disponible, écarte alors la forme pour la personne entière : le verdict `rejected` refuse même la corroboration par identifiant ([matching.py](../../domain/persons/matching.py)). Sur 8 348 paires (personne, publication) dont une signature détachée porte un ORCID enregistré pour cette personne, 2 325 ont perdu tout lien.
+**L'effet sur le rattachement des personnes.** Une signature dont l'identifiant désigne quelqu'un d'autre attribue la publication à cette autre personne. Le rejet de la forme de nom, qui est le geste de correction disponible, écarte alors la forme pour la personne entière : le verdict `rejected` refuse même la corroboration par identifiant ([matching.py](../../../domain/persons/matching.py)). Sur 8 348 paires (personne, publication) dont une signature détachée porte un ORCID enregistré pour cette personne, 2 325 ont perdu tout lien.
 
 **La table des identités.** `author_identifying_keys` est unique sur `(author_name_normalized, person_identifiers)` et référencée par `source_authorships.identity_id`. Deux lignes de même nom, dont l'une porte le suffixe, sont deux identités distinctes.
 
@@ -74,5 +74,5 @@ Aucune.
 
 ## Liens
 
-- [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) — le volet qui confronte les enregistrements sources d'une publication.
-- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
+- [Gestion des publications dans l'administration](../METIER_gestion-admin-des-publications.md) — le volet qui confronte les enregistrements sources d'une publication.
+- [Gestion et dédoublonnage assistés de la base personnes](../DATA_personnes-dedoublonnage-assiste.md)

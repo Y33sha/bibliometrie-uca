@@ -14,7 +14,6 @@
 
 - [Conférences et actes](METIER_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Identifiants d'auteur mal placés dans un enregistrement source](DATA_identifiants-mal-places.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
@@ -24,6 +23,7 @@
 
 ## Chantiers archivés
 
+- 2026-09-14 — [Identifiants d'auteur mal placés dans un enregistrement source](archived/2026-09-14_DATA_identifiants-mal-places.md)
 - 2026-09-14 — [Langues : référentiel, normalisation et facette](archived/2026-09-14_DATA_langues.md)
 - 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
