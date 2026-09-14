@@ -393,14 +393,13 @@ def add_person_identifier(
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
+    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
     """
     result = person_commands.add_identifier(
         conn,
         person_id,
         data.id_type,
         data.id_value,
-        source="manual",
         repo=repo,
         audit_repo=audit,
     )

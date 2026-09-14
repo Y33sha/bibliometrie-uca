@@ -15,6 +15,7 @@ from application.pipeline.persons.requalify_identifiers import IdentifierConsens
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
+from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.
@@ -96,7 +97,7 @@ def resolve_identifier_transfers(
         ident = repo.find_identifier(id_type, id_value)
         if ident is None or ident.person_id != owner_id:
             continue  # l'état a changé entre la collecte et la résolution
-        ident.transfer_to(target, source="auto")
+        ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)

@@ -10,7 +10,7 @@ La logique métier touchant aux attributions d'identifiants (transitions de stat
 from dataclasses import dataclass
 
 from domain.errors import CannotAttributeConflict
-from domain.persons.identifiers import AttributionStatus
+from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 
 
 @dataclass(slots=True)
@@ -25,14 +25,14 @@ class IdentifierAttribution:
     id_type: str
     id_value: str
     status: AttributionStatus = AttributionStatus.PENDING
-    source: str | None = None
+    source: IdentifierOrigin | None = None
 
-    def reattribute_to(self, new_person_id: int, *, source: str) -> None:
+    def reattribute_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
         """Déplace l'attribution vers une autre personne.
 
         Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
 
-        `source` trace l'origine de la réattribution : "manual" pour une décision humaine, "auto" pour une résolution du pipeline.
+        `source` trace l'origine de la réattribution (`IdentifierOrigin`).
         """
         if self.status is not AttributionStatus.REJECTED:
             raise CannotAttributeConflict(
@@ -44,7 +44,7 @@ class IdentifierAttribution:
         self.status = AttributionStatus.PENDING
         self.source = source
 
-    def transfer_to(self, new_person_id: int, *, source: str) -> None:
+    def transfer_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
         """Transfère une attribution `pending` vers une autre personne.
 
         Réservé à l'arbitrage automatique par consensus du canal identifiant : une valeur captée par le premier arrivé (statut `pending`) est déplacée vers la personne que soutient la majorité des porteurs. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).

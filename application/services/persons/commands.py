@@ -14,6 +14,7 @@ from application.ports.repositories.person_repository import (
 )
 from application.services.persons import core as persons_service
 from application.services.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
+from domain.persons.identifiers import IdentifierOrigin
 
 # ── Identifiants ──────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ def add_identifier(
     id_type: str,
     id_value: str,
     *,
-    source: str = "manual",
+    source: IdentifierOrigin = IdentifierOrigin.MANUAL,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:

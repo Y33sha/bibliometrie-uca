@@ -27,6 +27,7 @@ from domain.persons.identifiers import (
     PERSON_IDENTIFIER_TYPES,
     PUBLIC_PERSON_IDENTIFIER_TYPES,
     AttributionStatus,
+    IdentifierOrigin,
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
@@ -219,7 +220,7 @@ def add_identifier(
     id_type: str,
     id_value: str,
     *,
-    source: str = "auto",
+    source: IdentifierOrigin = IdentifierOrigin.AUTO,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
@@ -242,17 +243,17 @@ def add_identifier(
     forme canonique sert aux deux et soit renvoyée dans le résultat. Lève
     `ValidationError` si elle est malformée.
 
-    `source="manual"` désigne l'attribution par une utilisatrice, et resserre deux gardes que
+    `IdentifierOrigin.MANUAL` désigne l'attribution par une utilisatrice, et resserre deux gardes que
     l'appel automatique n'a pas lieu de payer :
 
     - les types se restreignent à `PUBLIC_PERSON_IDENTIFIER_TYPES` — `hal_person_id` est la
       référence d'un compte HAL, que l'extraction observe dans le TEI, et que personne
       n'attribue à la main ;
     - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
-      promotion depuis les signatures (`source="auto"`) en fait l'économie : elle boucle sur
+      promotion depuis les signatures (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
       une personne que la cascade vient de créer ou de rapprocher.
     """
-    if source == "manual":
+    if source == IdentifierOrigin.MANUAL:
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
         if repo.find_by_id(person_id) is None:
@@ -376,7 +377,7 @@ def add_identifiers_from_authorships(
 
     Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
 
-    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`'auto'`).
+    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`IdentifierOrigin.AUTO`).
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:
