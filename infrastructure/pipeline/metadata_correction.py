@@ -46,7 +46,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 _SELECT = """
     SELECT sp.id, sp.source::text AS source,
            sp.title, sp.doc_type, sp.doi,
-           sp.journal_id, sp.oa_status,
+           sp.journal_id, sp.oa_status, sp.language,
            sp.urls, sp.external_ids,
            j.journal_type::text AS journal_type, j.oa_model,
            sp.raw_metadata,
@@ -62,7 +62,7 @@ _SELECT = """
 # s'interpole dans le SQL — un paramètre lié ne peut porter qu'une valeur, jamais un
 # identifiant —, donc il ne vient d'aucune autre origine que cette liste.
 _CORRECTABLE_COLUMNS: frozenset[str] = frozenset(
-    {"doc_type", "oa_status", "external_ids", "raw_metadata", "journal_id", "doi"}
+    {"doc_type", "oa_status", "language", "external_ids", "raw_metadata", "journal_id", "doi"}
 )
 
 # Garde-fou de dérive : une colonne renommée dans le schéma fait échouer l'import, plutôt que
@@ -117,11 +117,15 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
         return rows_as(UnaryCorrectionRow, rows)
 
+    def fetch_language_forms(self, conn: Connection) -> dict[str, str]:
+        rows = conn.execute(text("SELECT form_normalized, language_code FROM language_forms"))
+        return {r.form_normalized: r.language_code for r in rows}
+
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],
-            set_columns=("doc_type", "oa_status", "external_ids", "raw_metadata"),
+            set_columns=("doc_type", "oa_status", "language", "external_ids", "raw_metadata"),
             jsonb_params=("external_ids", "raw_metadata"),
         )
 
