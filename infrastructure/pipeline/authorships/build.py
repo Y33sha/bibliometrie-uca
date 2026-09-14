@@ -22,11 +22,9 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
             )
         )
         # DELETE plutôt que TRUNCATE : Postgres refuse TRUNCATE dès qu'une FK existe (même `SET NULL`).
+        # La séquence des ids continue : un rollback restaure les lignes supprimées, pas une
+        # séquence remise à zéro.
         conn.execute(text("DELETE FROM authorships"))
-        # `setval` plutôt que `ALTER SEQUENCE … RESTART` : les deux remettent le compteur à un,
-        # mais l'altération d'une séquence exige d'en être propriétaire, sans droit accordable,
-        # là où `setval` s'accorde. Le troisième argument à faux rend `1` au prochain appel.
-        conn.execute(text("SELECT setval('authorships_id_seq', 1, false)"))
         return n
 
     def insert_missing_authorships(self, conn: Connection) -> int:
