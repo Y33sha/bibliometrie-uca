@@ -29,7 +29,7 @@ def arbitrate_identifier_conflicts(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
 
-    Retourne `{misplaced_identities, detached, transferred}`. Le commit est laissé au caller.
+    Retourne `{neutralized, detached, transferred}`. Le commit est laissé au caller.
     """
     etape(logger, "Identifiants mal placés et conflits d'attribution")
     consensus = compute_identifier_consensus(conn, queries)
@@ -40,7 +40,7 @@ def arbitrate_identifier_conflicts(
     )["transferred"]
 
     return {
-        "misplaced_identities": requalified["identities"],
+        "neutralized": requalified["neutralized"],
         "detached": requalified["detached"],
         "transferred": transferred,
     }

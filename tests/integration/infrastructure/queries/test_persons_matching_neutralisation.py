@@ -4,6 +4,7 @@ import json
 
 from sqlalchemy import text
 
+from application.ports.pipeline.persons.matching import MisplacedNeutralizations
 from domain.persons.matching import ResolutionMode
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_identity
@@ -110,12 +111,14 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     )
     queries = PgPersonsMatchingQueries()
 
-    assert queries.write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]}) == [
-        signature_id
-    ]
+    assert queries.write_misplaced_neutralizations(
+        sa_sync_conn, {identity_id: ["orcid"]}
+    ) == MisplacedNeutralizations(neutralized=1, to_detach=[signature_id])
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "misplaced"}
 
-    assert queries.write_misplaced_neutralizations(sa_sync_conn, {}) == []
+    assert queries.write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
+        neutralized=0, to_detach=[]
+    )
     assert _carte(sa_sync_conn, signature_id) is None
 
 

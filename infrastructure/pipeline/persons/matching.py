@@ -11,6 +11,7 @@ from application.ports.pipeline.persons.matching import (
     BareUnlinkedAuthorship,
     IdentityIdentifier,
     LinkedAuthorshipRow,
+    MisplacedNeutralizations,
     PersonsMatchingQueries,
 )
 from domain.persons.identifiers import (
@@ -336,10 +337,8 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
     def write_misplaced_neutralizations(
         self, conn: Connection, misplaced: Mapping[int, Sequence[str]]
-    ) -> list[int]:
-        """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites.
-
-        Retourne les signatures résolues par identifiant, non épinglées, qui gagnent un identifiant neutralisé : leur rattachement a pu passer par lui."""
+    ) -> MisplacedNeutralizations:
+        """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites."""
         payload = [
             {"identity_id": identity_id, "carte": dict.fromkeys(id_types, _MISPLACED)}
             for identity_id, id_types in misplaced.items()
@@ -378,20 +377,24 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                     WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
                     RETURNING sa.id, sa.resolution_mode, c.avant, c.apres
                 )
-                SELECT id FROM modifiees
-                WHERE resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
-                  AND EXISTS (
-                      SELECT 1 FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
-                      WHERE NOT coalesce(avant ? k, false)
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = modifiees.id
-                  )
+                SELECT id,
+                       coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
+                       AND NOT EXISTS (
+                           SELECT 1 FROM confirmed_authorships ca
+                           WHERE ca.source_authorship_id = modifiees.id
+                       ) AS a_detacher
+                FROM modifiees
+                WHERE EXISTS (
+                    SELECT 1 FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
+                    WHERE NOT coalesce(avant ? k, false)
+                )
                 ORDER BY id
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         ).all()
-        return [r.id for r in rows]
+        return MisplacedNeutralizations(
+            neutralized=len(rows), to_detach=[r.id for r in rows if r.a_detacher]
+        )
 
     def fetch_person_name_forms(
         self, conn: Connection, person_ids: list[int]
