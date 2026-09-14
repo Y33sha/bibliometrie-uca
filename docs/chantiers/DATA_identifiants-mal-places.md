@@ -52,9 +52,11 @@ Aucune.
 
 ### 1. Déplacer la neutralisation hors de l'identité
 
-- [ ] Colonne des neutralisations sur `source_authorships`, lue par le matching et le consensus.
-- [ ] Le normalize y inscrit `shared` au lieu de suffixer les clés.
-- [ ] Migration : retirer le suffixe des 7 379 identités concernées, fusionner les 3 916 qui rejoignent une identité existante, repointer leurs 61 714 signatures, supprimer les identités vidées.
+- [x] Sauvegarde CSV de `author_identifying_keys` et des liens des signatures vers les identités suffixées, repérées par `(source_publication_id, author_position)` (`data/backups/`).
+- [ ] Fragment SQL unique pour lire un identifiant non neutralisé d'une signature (`infrastructure/db/sql_fragments.py`).
+- [ ] Colonne `neutralized_identifiers` sur `source_authorships`. Les lecteurs de `person_identifiers` passent par le fragment : cascade personnes, problèmes HAL, files de l'administration.
+- [ ] Le normalize inscrit `shared` dans la colonne au lieu de suffixer les clés.
+- [ ] Migration, dans une transaction et livrée avec le code qui lit la colonne : carte `shared` sur les 61 714 signatures, repointage des signatures des 3 916 identités qui rejoignent une identité nue existante, suppression de ces identités, retrait du suffixe des 3 463 autres. Le retour arrière reconstruit les identités suffixées depuis la carte.
 
 ### 2. Requalification par consensus
 
