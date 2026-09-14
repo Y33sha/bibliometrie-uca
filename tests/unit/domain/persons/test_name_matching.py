@@ -11,13 +11,6 @@ SAME = [
     # Initiale, inversion nom/prénom.
     (("martin", "jean"), ("martin", "j")),
     (("martin", "jean"), ("jean", "martin")),
-    # Concaténation du prénom.
-    (("gannoun", "abdel mouhcine"), ("gannoun", "abdelmouhcine")),
-    (("zhu", "zheng ze"), ("zhu", "zhengze")),
-    (("kolovi", "so fia"), ("kolovi", "sofia")),
-    # Particule / composé accolé (patronyme).
-    (("st paul", "nicolas"), ("stpaul", "nicolas")),
-    (("le roy", "pascale"), ("leroy", "pascale")),
     # Typo ou translittération du prénom (distance 1).
     (("beyssac", "erick"), ("beyssac", "eric")),
     (("khalil", "toufik"), ("khalil", "toufic")),
@@ -25,10 +18,8 @@ SAME = [
     (("lavrentiev", "alexey"), ("lavrentiev", "alexei")),
     # Typo du patronyme (transposition), prénom identique.
     (("blanquet doit", "stephanie"), ("blanquet diot", "stephanie")),
-    # Particules accolées : plusieurs espaces retirés.
-    (("de la fontaine", "jean"), ("delafontaine", "jean")),
     # Année de naissance d'une signature SUDOC, retirée.
-    (("le roy 1977", "pascale"), ("leroy", "pascale")),
+    (("chiari 1977", "sophie"), ("chiari", "sophie")),
     # Graphie proche du patronyme et initiale du prénom, cumulées.
     (("mueller", "roman"), ("muller", "r")),
     # Formes normalisées entières, dont l'ordre des parties dépend de la source.
@@ -58,6 +49,11 @@ DISTINCT = [
     # Voisins alphabétiques d'une liste de collaboration.
     (("t dado", ""), ("s dahbi", "")),
     (("tulin varol", ""), ("d varouchas", "")),
+    # Un nom n'est jamais réduit à un seul mot accolé que couvrirait une initiale de l'autre.
+    (("m morandin", ""), ("monteil", "stephane")),
+    (("m j morello", ""), ("monteil", "stephane")),
+    (("mu", "z m"), ("monteil", "s")),
+    (("merk", "m"), ("monteil", "s")),
 ]
 
 

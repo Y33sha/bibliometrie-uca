@@ -323,12 +323,10 @@ class TestDecideMatchByIdentifier:
         assert result.person_id == 7
 
     def test_graphie_variant_corroborates(self):
-        """Variante de graphie du propriétaire (concaténation) : corrobore et se
+        """Variante de graphie du propriétaire (faute de frappe) : corrobore et se
         rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
-        idref_map = {"x": IdentifiedPerson(42, "gannoun", "abdel mouhcine")}
-        result = decide_match_by_identifier(
-            "x", idref_map, "Abdelmouhcine Gannoun", "abdelmouhcine gannoun", {}
-        )
+        idref_map = {"x": IdentifiedPerson(42, "khalil", "toufik")}
+        result = decide_match_by_identifier("x", idref_map, "Toufic Khalil", "toufic khalil", {})
         assert result.person_id == 42
         assert result.rejection is None
 
