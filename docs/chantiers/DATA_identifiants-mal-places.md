@@ -23,13 +23,14 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 - **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
 - **Le consensus tranche à partir de deux voix sur trois.** En deçà, il ne désigne personne.
 - **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
-- **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un enregistrement à la fois.
+- **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
+- **L'identité garde les identifiants bruts.** `person_identifiers` porte la forme d'origine, et l'unicité reste sur `(author_name_normalized, person_identifiers)`. Les identifiants exploitables se déduisent : ceux du brut dont la clé est absente de la carte des neutralisations.
+- **La carte des neutralisations vit sur la signature.** `source_authorships` porte une colonne jsonb, `{"orcid": "shared"}`, vide dans le cas courant. Deux signatures de documents différents peuvent porter le même nom et les mêmes identifiants bruts, l'une partageant son identifiant avec une autre signature de son document et l'autre non : une identité unique sur le brut ne peut pas porter ces deux verdicts.
+- **`shared` prime sur `misplaced`.** Un identifiant partagé est douteux avant tout examen du consensus, et les conflits qu'il produit ne valent pas d'être tranchés.
+- **Aucune colonne de repointage.** L'identité reste stable quand un verdict change, donc rien à repointer en régime courant. La fusion des identités que le suffixe sépare relève de la migration.
 
 ## Questions ouvertes
 
-- **Un marqueur par motif ?** `shared` pour la valeur partagée entre positions d'un même enregistrement, `misplaced` pour la contradiction avec le consensus. Détermine la forme du suffixe, ce que le matching lit, et ce qu'une requête de diagnostic sait distinguer.
-- **Garder la trace du brut sur l'identité.** Une `source_publication` conserve la valeur d'origine dans `raw_metadata`, et chaque passage de `metadata_correction` repart du brut reconstitué : la correction se rejoue sans dommage et se défait quand elle devient caduque. Une identité, elle, porte les identifiants déjà requalifiés, sans trace de leur forme d'origine. Le brut est le payload de la source, que le normalize relit quand il réécrit les signatures d'un enregistrement — mais la passe de consensus s'exécute hors de ce chemin. Sans trace du brut, elle ne peut pas recalculer sa correction, seulement l'empiler. À explorer : une trace des identifiants d'origine sur `author_identifying_keys`, sur le modèle de `raw_metadata`.
-- **Lever le marqueur quand l'identifiant rejoint le consensus.** La signature retrouve alors son identité nue, ce qui fusionne deux lignes d'`author_identifying_keys` et repointe `source_authorships.identity_id`. Que faire de la ligne devenue orpheline ?
 - **Types d'identifiant concernés.** La règle du partage vaut pour tous les types. Celle du consensus vaut-elle pour `idref`, `hal_person_id` et `researcher_id` autant que pour l'ORCID ?
 - **Reprise du stock.** Les identités déjà construites portent les erreurs. Faut-il une reprise, ou la requalification à l'exécution suivante suffit-elle ?
 
@@ -40,11 +41,16 @@ Exemple : sur `10.1140/epjc/s10052-021-09775-5`, la signature « bogdan malaescu
 - [ ] Trancher les questions ouvertes.
 - [ ] Mesurer la précision de la règle de consensus sur un échantillon relu.
 
-### 2. Requalification
+### 2. Déplacer la neutralisation hors de l'identité
 
-- [ ] Marqueur par motif.
-- [ ] Passe de requalification par consensus, avant la cascade personnes.
-- [ ] Levée du marqueur quand l'identifiant rejoint le consensus.
+- [ ] Colonne des neutralisations sur `source_authorships`, lue par le matching et le consensus.
+- [ ] Le normalize y inscrit `shared` au lieu de suffixer les clés.
+- [ ] Migration : retirer le suffixe des 7 379 identités concernées, fusionner les 3 916 qui rejoignent une identité existante, repointer leurs 61 714 signatures, supprimer les identités vidées.
+
+### 3. Requalification par consensus
+
+- [ ] Passe de requalification, avant la cascade personnes.
+- [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
 
 ## Liens
 
