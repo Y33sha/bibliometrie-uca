@@ -537,7 +537,7 @@ class TestUpdateNameFormStatus:
     def test_reject_sets_status(self, auth_client):
         pid = _seed_person("RejectForm", "Nf")
         nf = _uniq("RejectForm Nf")
-        _seed_name_form(pid, nf)
+        _seed_name_form(pid, nf, source="hal")
         r = auth_client.patch(
             f"/api/persons/{pid}/name-forms/status", json={"name_form": nf, "status": "rejected"}
         )

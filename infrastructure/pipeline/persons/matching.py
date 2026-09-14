@@ -250,13 +250,14 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         return {r.id_value: IdentifiedPerson(r.person_id, r.ln or "", r.fn or "") for r in rows}
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
-        """Agrégation par `name_form` sur la table dénormalisée `(name_form, person_id, sources[], status)` : un dict trié par `person_id` croissant pour stabilité. Les liens `status = 'rejected'` sont exclus : une forme de nom rejetée pour une personne reste écartée du matching par nom (verrou de non-retour)."""
+        """Agrégation par `name_form` sur la table dénormalisée `(name_form, person_id, sources[], status)` : un dict trié par `person_id` croissant pour stabilité. Les liens `status = 'rejected'` sont exclus : une forme de nom rejetée pour une personne reste écartée du matching par nom (verrou de non-retour). Une forme dérivée du nom de la personne reste toujours active."""
         rows = conn.execute(
             text(f"""
                 SELECT name_form,
                        array_agg(person_id ORDER BY person_id) AS person_ids
                 FROM person_name_forms
                 WHERE status <> '{AttributionStatus.REJECTED.value}'
+                   OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
                 GROUP BY name_form
             """)
         ).all()
@@ -265,12 +266,14 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
     def fetch_name_form_status_map(self, conn: Connection) -> dict[tuple[str, int], str]:
         """Sert à la corroboration du matching par identifiant : quand un identifiant résout vers une personne, le verdict du couple (forme de la signature, personne) tranche sans test de compatibilité de nom — `confirmed` corrobore, `rejected` refuse ; en l'absence de verdict, on retombe sur la comparaison par tokens.
 
-        Le verdict combine le statut admin et l'appartenance au nom canonique : un rejet admin l'emporte ; une confirmation admin (`status = 'confirmed'`) ou une forme dérivée du nom canonique (`'persons' ∈ sources`) corrobore. Les formes seulement `pending` et non canoniques sont omises.
+        Le verdict combine le statut admin et la provenance de la forme : une forme dérivée du nom de la personne (`'persons' ∈ sources`) corrobore toujours ; sinon un rejet admin refuse et une confirmation admin (`status = 'confirmed'`) corrobore. Les formes seulement `pending` et non dérivées du nom sont omises.
         """
         rows = conn.execute(
             text(f"""
                 SELECT name_form, person_id,
-                       CASE WHEN status = '{AttributionStatus.REJECTED.value}'
+                       CASE WHEN '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
+                            THEN '{AttributionStatus.CONFIRMED.value}'
+                            WHEN status = '{AttributionStatus.REJECTED.value}'
                             THEN '{AttributionStatus.REJECTED.value}'
                             ELSE '{AttributionStatus.CONFIRMED.value}' END AS status
                 FROM person_name_forms
@@ -514,6 +517,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                           SELECT name_form
                           FROM person_name_forms
                           WHERE status <> '{AttributionStatus.REJECTED.value}'
+                             OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
                           GROUP BY name_form
                           HAVING count(DISTINCT person_id) >= 2
                       )
@@ -527,7 +531,8 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                       SELECT count(DISTINCT pnf.person_id)
                       FROM person_name_forms pnf
                       WHERE pnf.name_form = c.name_form
-                        AND pnf.status <> '{AttributionStatus.REJECTED.value}'
+                        AND (pnf.status <> '{AttributionStatus.REJECTED.value}'
+                             OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
                         AND NOT EXISTS (
                             SELECT 1 FROM rejected_authorships r
                             WHERE r.publication_id = sp.publication_id

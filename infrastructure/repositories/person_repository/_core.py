@@ -262,16 +262,21 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         """),
         {"t": target_id, "s": source_id},
     )
-    # Transférer les rows (name_form, source_id) vers (name_form, target_id) : UPSERT cross-person_id qui fusionne les sources si la name_form existe déjà côté target, puis DELETE des rows source résiduelles.
+    # Formes de la personne absorbée transférées avec leur statut ; sur une forme commune, le verdict de la cible prime sur une attente.
     conn.execute(
-        text("""
-            INSERT INTO person_name_forms (name_form, person_id, sources)
-            SELECT name_form, :t, sources FROM person_name_forms WHERE person_id = :s
+        text(f"""
+            INSERT INTO person_name_forms (name_form, person_id, sources, status)
+            SELECT name_form, :t, sources, status FROM person_name_forms WHERE person_id = :s
             ON CONFLICT (name_form, person_id) DO UPDATE SET
                 sources = (
-                    SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
+                    SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{{}}'::text[])
                     FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
-                )
+                ),
+                status = CASE
+                    WHEN person_name_forms.status = '{AttributionStatus.PENDING.value}'
+                    THEN EXCLUDED.status
+                    ELSE person_name_forms.status
+                END
         """),
         {"t": target_id, "s": source_id},
     )

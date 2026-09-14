@@ -441,7 +441,7 @@ def update_name_form_status(
 
     `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des signatures portant cette forme : leurs `source_authorships` sont nullées et les `authorships` canoniques devenues sans source sont supprimées.
 
-    Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas.
+    Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":

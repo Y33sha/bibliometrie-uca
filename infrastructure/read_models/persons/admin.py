@@ -97,9 +97,10 @@ def name_form_authorships(
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending` (les liens déjà tranchés confirmed/rejected sortent du travail à faire).
+# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending` hors forme canonique : les liens tranchés et les formes dérivées du nom de la personne, confirmées d'office, sortent du travail à faire.
 _AMBIGUOUS_FORMS_HAVING = (
-    f"HAVING count(*) >= 2 AND bool_or(status = '{AttributionStatus.PENDING.value}')"
+    f"HAVING count(*) >= 2 AND bool_or(status = '{AttributionStatus.PENDING.value}' "
+    f"AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)))"
 )
 
 
@@ -121,7 +122,7 @@ def ambiguous_name_forms(
 ) -> AmbiguousNameFormsResponse:
     """Formes de nom ambiguës paginées, avec les personnes qui les portent.
 
-    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme et un drapeau `compatible` (nom canonique compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible).
+    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne porte le drapeau `canonical` et le statut `confirmed`.
     """
     total = ambiguous_name_forms_count(conn)
     offset = (page - 1) * per_page
@@ -139,8 +140,9 @@ def ambiguous_name_forms(
     persons_by_form: dict[str, list[AmbiguousFormPersonOut]] = {f: [] for f in forms}
     if forms:
         rows = conn.execute(
-            text("""
+            text(f"""
                 SELECT pnf.name_form, pnf.person_id, pnf.status::text AS status,
+                       ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)) AS canonical,
                        p.first_name, p.last_name,
                        p.last_name_normalized AS ln, p.first_name_normalized AS fn,
                        EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
@@ -157,7 +159,8 @@ def ambiguous_name_forms(
                     person_id=r.person_id,
                     first_name=r.first_name,
                     last_name=r.last_name,
-                    status=r.status,
+                    status=AttributionStatus.CONFIRMED if r.canonical else r.status,
+                    canonical=r.canonical,
                     has_rh=r.has_rh,
                     compatible=names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
                 )
