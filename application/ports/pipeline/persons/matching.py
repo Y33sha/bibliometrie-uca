@@ -54,6 +54,15 @@ class IdentityIdentifier(NamedTuple):
     value: str
 
 
+class MisplacedNeutralizations(NamedTuple):
+    """Résultat d'une réécriture des neutralisations `misplaced`."""
+
+    neutralized: int
+    """Signatures qui gagnent un identifiant neutralisé."""
+    to_detach: list[int]
+    """Parmi elles, les signatures résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
+
+
 class PersonsMatchingQueries(Protocol):
     """Opérations SQL pour le rattachement des authorships aux personnes."""
 
@@ -103,8 +112,8 @@ class PersonsMatchingQueries(Protocol):
 
     def write_misplaced_neutralizations(
         self, conn: Connection, misplaced: Mapping[int, Sequence[str]]
-    ) -> list[int]:
-        """Réécrit les neutralisations `misplaced` de toutes les signatures d'après `misplaced` (`{identity_id: types d'identifiant}`). Retourne les signatures résolues par identifiant, non épinglées, qui gagnent un identifiant neutralisé."""
+    ) -> MisplacedNeutralizations:
+        """Réécrit les neutralisations `misplaced` de toutes les signatures d'après `misplaced` (`{identity_id: types d'identifiant}`)."""
         ...
 
     def fetch_person_name_forms(

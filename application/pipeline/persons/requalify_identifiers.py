@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, accord, forme
+from application.pipeline.libelles import BRANCHE, accord
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
 from domain.persons.matching import consensus_name, identifier_misplaced
@@ -37,7 +37,7 @@ def requalify_misplaced_identifiers(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés et détache les signatures qu'ils ont pu rattacher.
 
-    Retourne `{identities, detached}` : le nombre d'identités portant au moins un identifiant mal placé, et de signatures détachées pour que la cascade les re-résolve.
+    Retourne `{neutralized, detached}` : le nombre de signatures qui gagnent un identifiant neutralisé, et de celles qui sont détachées pour que la cascade les re-résolve.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
@@ -45,14 +45,11 @@ def requalify_misplaced_identifiers(
             if identifier_misplaced(identity.name, consensus.get((id_type, identity.value))):
                 misplaced[identity.identity_id].append(id_type)
 
-    gained = queries.write_misplaced_neutralizations(conn, misplaced)
-    detached = queries.detach_authorships(conn, gained) if gained else 0
+    written = queries.write_misplaced_neutralizations(conn, misplaced)
+    detached = queries.detach_authorships(conn, written.to_detach) if written.to_detach else 0
     logger.info(
-        "%s%s %s d'un identifiant mal placé, %s %s",
+        "%sIdentifiants mal placés neutralisés sur %s",
         BRANCHE,
-        accord(len(misplaced), "identité"),
-        forme(len(misplaced), "porteuse"),
-        accord(detached, "signature"),
-        forme(detached, "détachée"),
+        accord(written.neutralized, "signature"),
     )
-    return {"identities": len(misplaced), "detached": detached}
+    return {"neutralized": written.neutralized, "detached": detached}
