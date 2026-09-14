@@ -4,7 +4,9 @@
 
 **Un identifiant partagé au sein d'un enregistrement est requalifié.** `mark_shared_identifiers_dubious` ([identifiers.py](../../domain/persons/identifiers.py)) s'applique au normalize, dans les six extracteurs. Une valeur portée par au moins deux positions d'auteur d'un même enregistrement est une corruption : un identifiant désigne une seule signature par document. Toute position portant une valeur partagée voit ses identifiants suffixés `_dubious`. Ils restent en base, invisibles au matching, qui lit les clés nues. Le rattachement par nom reste ouvert.
 
-**Le consensus d'une valeur d'identifiant est le nom que portent le plus de signatures.** `fetch_identifier_consensus` ([matching.py](../../infrastructure/pipeline/persons/matching.py)) le calcule sur les clés nues, donc hors des `_dubious`. `resolve_identifier_transfers` s'en sert après la cascade personnes pour arbitrer à qui appartient une valeur disputée.
+**Le consensus d'une valeur d'identifiant est le nom que portent le plus de signatures.** `fetch_identifier_consensus` ([matching.py](../../infrastructure/pipeline/persons/matching.py)) le calcule pour les seules valeurs disputées, et départage une égalité par ordre alphabétique. L'étape d'arbitrage des conflits d'identifiant s'en sert pour trancher à qui appartient une valeur disputée. Elle précède la cascade dans la phase `persons` ([phase.py](../../application/pipeline/persons/phase.py)).
+
+**Une attribution `pending` naît de la cascade.** La cascade attribue à une personne, en `pending`, les identifiants des signatures qu'elle lui rattache. Une valeur déjà attribuée à une autre personne n'est pas écrasée : le conflit passe à l'arbitrage de l'exécution suivante. Un identifiant mal placé sur une signature rattachée par son nom est ainsi attribué à la mauvaise personne.
 
 **Des identifiants isolés contredisent le nom qu'ils accompagnent.** Audit sur 3 486 317 positions de 126 226 enregistrements sources : 8 235 positions portent un identifiant dont le nom de consensus ne partage aucun mot avec le nom local, réparties sur 2 409 enregistrements. Par source : DataCite 3 660, HAL 2 137, OpenAlex 1 246, Crossref 1 152, ScanR 40. La contradiction est ponctuelle — 1 249 enregistrements n'en portent qu'une seule — et les enregistrements les plus touchés sont des articles de collaboration de deux à trois mille auteurs, avec 5 à 28 positions fausses.
 
@@ -31,9 +33,13 @@ Les deux premiers portent sur une personne, le troisième sur un enregistrement 
 ## Décisions
 
 - **Le consensus se calcule sur les clés nues.** Une valeur recopiée sur trois mille positions d'un même enregistrement y porte trois mille noms différents, donc trois mille voix d'une signature chacune : elle ne déplace pas le consensus. L'inclure n'apporte rien.
-- **Le consensus est le nom qui porte le plus de voix**, dès trois signatures. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration. Une égalité en tête ne désigne aucun nom, et la passe laisse les signatures intactes.
+- **Le consensus est le nom qui porte strictement plus de voix que tous les autres.** Aucun seuil : une signature seule ne peut pas se contredire, et deux voix sur deux tranchent. Une égalité ne désigne aucun nom. Une faible majorité signale plutôt un doublon de personne, que la fusion de personnes règle dans l'administration.
+- **Un seul consensus sert la requalification et les transferts.** Il se calcule pour toutes les valeurs. Les transferts adoptent la règle d'égalité : une égalité ne produit aucun transfert.
+- **La contradiction se teste avec `same_person_name`**, la comparaison qui corrobore déjà un rattachement par identifiant.
 - **Une passe par exécution suffit.** La requalification retire des voix aux seuls noms qui contredisent le consensus, jamais au nom majoritaire : le consensus en sort inchangé ou renforcé. Aucune itération jusqu'au point fixe.
-- **La passe lit le consensus avant la cascade personnes.** Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
+- **La requalification s'intègre à l'étape d'arbitrage des conflits d'identifiant**, avant la cascade personnes. Le consensus est un agrégat de tout le stock, incalculable au normalize, qui traite un document à la fois.
+- **La requalification précède la détection des conflits.** Une signature dont l'identifiant est neutralisé sort des porteurs de la valeur, et les conflits qu'elle créait disparaissent avant l'arbitrage.
+- **Une signature résolue par identifiant et portant un identifiant neutralisé repasse à NULL**, comme une signature captée lors d'un transfert. La cascade la re-résout.
 - **L'identité garde les identifiants bruts.** `person_identifiers` porte la forme d'origine, et l'unicité reste sur `(author_name_normalized, person_identifiers)`. Les identifiants exploitables se déduisent : ceux du brut dont la clé est absente de la carte des neutralisations.
 - **La carte des neutralisations vit sur la signature.** `source_authorships` porte une colonne jsonb, `{"orcid": "shared"}`, vide dans le cas courant. Deux signatures de documents différents peuvent porter le même nom et les mêmes identifiants bruts, l'une partageant son identifiant avec une autre signature de son document et l'autre non : une identité unique sur le brut ne peut pas porter ces deux verdicts.
 - **`shared` prime sur `misplaced`.** Un identifiant partagé est douteux avant tout examen du consensus, et les conflits qu'il produit ne valent pas d'être tranchés.
@@ -60,7 +66,9 @@ Aucune.
 
 ### 2. Requalification par consensus
 
-- [ ] Passe de requalification, avant la cascade personnes, balayant tout le stock.
+- [ ] Consensus commun à la requalification et aux transferts : majorité stricte, égalité sans effet, calculé pour toutes les valeurs.
+- [ ] Requalification `misplaced` dans l'étape d'arbitrage, avant la détection des conflits, sur tout le stock.
+- [ ] Remise à NULL des signatures résolues par identifiant qui portent un identifiant neutralisé.
 - [ ] Levée de la neutralisation quand l'identifiant rejoint le consensus.
 
 ## Liens
