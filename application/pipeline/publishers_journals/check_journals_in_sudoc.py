@@ -11,8 +11,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalSudocQueries, JournalSudocRow
 from domain.journals.issn_check import (
@@ -71,54 +72,58 @@ def run_check_journals_in_sudoc(
 
     record_by_ppn: dict[str, SudocSerialRecord | None] = {}
     processed = 0
-    for i in range(0, total, BATCH_SIZE):
-        if breaker.tripped:
-            logger.warning(
-                "⚡ Coupe-circuit Sudoc : vérification interrompue à %d/%d, reste repris au prochain run.",
-                processed,
-                total,
-            )
-            break
-        batch = [(row, _journal_issns(row)) for row in rows[i : i + BATCH_SIZE]]
-        wanted = {issn for _, journal in batch for issn in journal.own()}
-        wanted |= {c for _, journal in batch for c in correction_candidates(journal.rejected)}
-        records: dict[str, SudocSerialRecord] = {}
-        for issn, ppns in fetch_ppns(sorted(wanted)).items():
-            ppn = ppns[0]
-            if ppn not in record_by_ppn:
-                record_by_ppn[ppn] = fetch_record(ppn)
-            if (record := record_by_ppn[ppn]) is not None:
-                records[issn] = record
+    # Le compteur de la barre porte les revues présentes dans le Sudoc.
+    with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
+        for i in range(0, total, BATCH_SIZE):
+            if breaker.tripped:
+                logger.warning(
+                    "⚡ Coupe-circuit Sudoc : vérification interrompue à %d/%d, reste repris au prochain run.",
+                    processed,
+                    total,
+                )
+                break
+            batch = [(row, _journal_issns(row)) for row in rows[i : i + BATCH_SIZE]]
+            wanted = {issn for _, journal in batch for issn in journal.own()}
+            wanted |= {c for _, journal in batch for c in correction_candidates(journal.rejected)}
+            records: dict[str, SudocSerialRecord] = {}
+            for issn, ppns in fetch_ppns(sorted(wanted)).items():
+                ppn = ppns[0]
+                if ppn not in record_by_ppn:
+                    record_by_ppn[ppn] = fetch_record(ppn)
+                if (record := record_by_ppn[ppn]) is not None:
+                    records[issn] = record
 
-        checked_at = datetime.now(UTC)
-        for row, journal in batch:
-            check = check_journal_issns(journal, records)
-            _log_check(logger, row, check)
-            journal_repo.record_sudoc_check(
-                row.id,
-                issn=check.issn,
-                eissn=check.eissn,
-                issnl=check.issnl,
-                rejected_issns=check.rejected,
-                checked_at=checked_at,
-            )
-            changed = (check.issn, check.eissn, check.issnl, check.rejected) != (
-                row.issn,
-                row.eissn,
-                row.issnl,
-                row.rejected_issns,
-            )
-            metrics.add(
-                updated=int(changed),
-                unchanged=int(not changed),
-                sudoc_found=int(check.found),
-                issn_removed=len(check.intruders),
-                issn_corrected=len(check.corrections),
-                issnl_conflicts=int(check.conflict),
-                issn_unranged=int(check.ambiguous_support),
-            )
-            processed += 1
-        conn.commit()
+            checked_at = datetime.now(UTC)
+            for row, journal in batch:
+                check = check_journal_issns(journal, records)
+                _log_check(logger, row, check)
+                journal_repo.record_sudoc_check(
+                    row.id,
+                    issn=check.issn,
+                    eissn=check.eissn,
+                    issnl=check.issnl,
+                    rejected_issns=check.rejected,
+                    checked_at=checked_at,
+                )
+                changed = (check.issn, check.eissn, check.issnl, check.rejected) != (
+                    row.issn,
+                    row.eissn,
+                    row.issnl,
+                    row.rejected_issns,
+                )
+                metrics.add(
+                    updated=int(changed),
+                    unchanged=int(not changed),
+                    sudoc_found=int(check.found),
+                    issn_removed=len(check.intruders),
+                    issn_corrected=len(check.corrections),
+                    issnl_conflicts=int(check.conflict),
+                    issn_unranged=int(check.ambiguous_support),
+                )
+                processed += 1
+                avancement.avance()
+                avancement.retient(int(check.found))
+            conn.commit()
 
     logger.info(
         "%sTerminé : %d/%d %s vérifiées, %d présentes dans le Sudoc, %d modifiées",
