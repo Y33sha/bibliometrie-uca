@@ -73,6 +73,23 @@ async def test_fetch_echoue_garde_le_marqueur():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("works", "titre"),
+    [
+        ({"W1": _work(100)}, "▶ 1 document de 100 auteurs, potentiellement tronqué"),
+        (
+            {"W1": _work(100), "W2": _work(150)},
+            "▶ 2 documents de 100 auteurs, potentiellement tronqués",
+        ),
+    ],
+)
+async def test_l_etape_annonce_les_documents_a_verifier(works, titre, caplog):
+    with caplog.at_level(logging.INFO, logger="test"):
+        await refetch(MagicMock(), _adapter(works), _LOGGER)
+    assert titre in caplog.messages
+
+
+@pytest.mark.asyncio
 async def test_lot_mele():
     adapter = _adapter({"W1": _work(150), "W2": _work(100), "W3": None, "W4": _work(200)})
     metrics = await refetch(MagicMock(), adapter, _LOGGER)

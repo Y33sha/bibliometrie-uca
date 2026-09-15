@@ -16,7 +16,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import accord
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.extract.fetch_truncated import (
@@ -46,14 +46,19 @@ async def refetch(
     if not truncated:
         return metrics
 
-    log.info("%s", accord(total, "document tronqué", "documents tronqués"))
+    etape(
+        log,
+        "%s de 100 auteurs, potentiellement %s",
+        accord(total, "document"),
+        forme(total, "tronqué"),
+    )
 
     async def _fetch(
         client: httpx2.AsyncClient, ref: TruncatedWork
     ) -> Mapping[str, JsonValue] | None:
         return await adapter.fetch_work(client, ref.openalex_id)
 
-    with progression(total, "documents tronqués", log) as avancement:
+    with progression(total, DERNIERE_BRANCHE.rstrip(), log) as avancement:
 
         def _write(
             conn: Connection, ref: TruncatedWork, work: Mapping[str, JsonValue] | None
