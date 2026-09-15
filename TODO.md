@@ -39,6 +39,7 @@
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
 * [ ] admin/countries: aligner les boutons à droite
+* [ ] runs pipeline: les messages d'erreur n'affichent aucune info utile (Can't reconnect until invalid transaction is rolled back. Please rollback() fully before proceeding (Background on this error at: https://sqlalche.me/e/20/8s2b))
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
@@ -57,6 +58,7 @@
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
 * [ ] "Total phase persons : 3 new, 51333 updated" comment est-ce possible, avec 14k personnes en base?
 * [ ] 172655 titre mal formé (notation mathématique mal développée)
+* 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités

@@ -19,6 +19,9 @@ MARQUEURS_SKILL = (
     "skills/doc-style",
     # Réponse du harnais quand le skill est déjà chargé : ses instructions restent en place.
     "/doc-style is already loaded",
+        # Réponse du harnais à une nouvelle invocation d'un skill déjà chargé.
+    "Skill /doc-style was loaded earlier",
+
 )
 
 
