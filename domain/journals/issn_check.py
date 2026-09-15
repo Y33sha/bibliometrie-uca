@@ -2,7 +2,7 @@
 
 Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent à la revue.
 
-Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
+Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides sont réexaminés avec les mêmes règles ; un groupe fait seulement d'ISSN rejetés devient principal si son titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
 """
 
 from __future__ import annotations
@@ -45,9 +45,14 @@ class JournalIssns:
     issnl: str | None
     rejected: tuple[str, ...]
 
-    def own(self) -> tuple[str, ...]:
+    def columns(self) -> tuple[str, ...]:
         """ISSN des trois colonnes de la revue, sans doublon, dans l'ordre des colonnes."""
         return tuple(dict.fromkeys(v for v in (self.issn, self.eissn, self.issnl) if v))
+
+    def examined(self) -> tuple[str, ...]:
+        """ISSN des trois colonnes, puis ISSN rejetés valides, sans doublon."""
+        valid = (r for r in self.rejected if ISSN.try_parse(r) is not None)
+        return tuple(dict.fromkeys((*self.columns(), *valid)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +68,7 @@ class SudocCheck:
     conflict: bool
     """Deux groupes d'ISSN de même taille et de titres aussi proches : rien n'est modifié."""
     set_aside: tuple[tuple[str, SetAsideReason], ...]
-    """ISSN rangés parmi les ISSN rejetés, avec leur motif."""
+    """ISSN que la vérification ajoute aux ISSN rejetés, avec leur motif."""
     corrections: tuple[tuple[str, str], ...]
     """Couples (valeur rejetée, ISSN corrigé)."""
     ambiguous_support: Support | None
@@ -97,9 +102,9 @@ def _same_title(a: str | None, b: str | None) -> bool:
     return normalize_text(a) == normalize_text(b)
 
 
-def _complementary(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
-    """L'une des notices décrit le papier, l'autre l'en ligne."""
-    return {a.support, b.support} == {Support.PRINT, Support.ELECTRONIC}
+def _complementary(a: Support | None, b: Support | None) -> bool:
+    """L'un des supports est le papier, l'autre l'en ligne."""
+    return {a, b} == {Support.PRINT, Support.ELECTRONIC}
 
 
 def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
@@ -107,13 +112,20 @@ def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
         return True
     if (b.issn in a.other_support_issns) or (a.issn in b.other_support_issns):
         return True
-    return _complementary(a, b) and _nested_titles(a.title, b.title)
+    return _complementary(a.support, b.support) and _nested_titles(a.title, b.title)
 
 
-def _support_change(linking: SudocSerialRecord, linked: SudocSerialRecord) -> bool:
-    """`linked`, que `linking` désigne comme titre précédent ou suivant, est la même publication sur l'autre support : même titre ou même ISSN-L. Le Sudoc code ainsi l'arrêt du papier au profit de l'en ligne."""
+def _support_change(
+    linking: SudocSerialRecord, issn: str, linked: SudocSerialRecord | None
+) -> bool:
+    """`issn`, que `linking` désigne comme titre précédent ou suivant, est la même publication sur l'autre support. Le Sudoc code ainsi l'arrêt du papier au profit de l'en ligne.
+
+    La notice `linked` de `issn` a le même titre ou le même ISSN-L. Sans notice, `linking` désigne aussi `issn` comme autre support, avec une mention de support (`452$t`).
+    """
+    if linked is None:
+        return _complementary(linking.support, dict(linking.other_support_hints).get(issn))
     same_issnl = linking.issnl is not None and linking.issnl == linked.issnl
-    return _complementary(linking, linked) and (
+    return _complementary(linking.support, linked.support) and (
         same_issnl or _same_title(linking.title, linked.title)
     )
 
@@ -184,11 +196,18 @@ def check_journal_issns(
             issn=None if online else journal.issn,
             eissn=journal.eissn if online else None,
         )
-    own = journal.own()
-    known = [i for i in own if i in records]
+    own = journal.examined()
+    columns = set(journal.columns())
+    # Une notice d'un autre support (CD-ROM) ne forme pas de groupe : l'ISSN rejoint les rejetés.
+    known = [i for i in own if i in records and records[i].support is not Support.OTHER]
     main: list[str] = []
     if groups := _groups(known, records):
-        chosen = _main_group(groups, records, journal.title)
+        eligible = [
+            g
+            for g in groups
+            if any(i in columns or _nested_titles(journal.title, records[i].title) for i in g)
+        ]
+        chosen = _main_group(eligible, records, journal.title) if eligible else []
         if chosen is None:
             return SudocCheck(
                 journal.issn,
@@ -208,10 +227,7 @@ def check_journal_issns(
     def title_links(links: Callable[[SudocSerialRecord], tuple[str, ...]]) -> set[str]:
         """ISSN que les notices du groupe principal désignent comme titres précédents ou suivants, hors changements de support."""
         return {
-            x
-            for r in main_records
-            for x in links(r)
-            if (linked := records.get(x)) is None or not _support_change(r, linked)
+            x for r in main_records for x in links(r) if not _support_change(r, x, records.get(x))
         }
 
     preceding = title_links(lambda r: r.preceding_issns)
@@ -229,7 +245,7 @@ def check_journal_issns(
         support = record.support if record is not None else hints.get(i)
         if i in cancelled:
             set_aside.append((i, SetAsideReason.CANCELLED))
-        elif (i in main or record is None) and support is Support.OTHER:
+        elif support is Support.OTHER:
             set_aside.append((i, SetAsideReason.OTHER_SUPPORT))
         elif i in preceding or (record is not None and i not in main and i in related):
             set_aside.append((i, SetAsideReason.RELATED_TITLE))
@@ -282,7 +298,7 @@ def check_journal_issns(
         rejected,
         found=bool(known) or bool(corrections),
         conflict=False,
-        set_aside=tuple(set_aside),
+        set_aside=tuple((i, reason) for i, reason in set_aside if i not in journal.rejected),
         corrections=tuple(corrections),
         ambiguous_support=placement.ambiguous_support,
     )

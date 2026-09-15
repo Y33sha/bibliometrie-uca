@@ -485,6 +485,107 @@ class TestCoherence:
         assert check.set_aside == (("2273-7766", SetAsideReason.RELATED_TITLE),)
 
 
+class TestRejectedReexamined:
+    def test_support_change_without_record(self):
+        """Cas réel (Revista Hospitalidade) : la notice en ligne désigne l'ISSN papier, sans notice, comme titre précédent et comme autre support « (Print) »."""
+        check = check_journal_issns(
+            _journal(eissn="2179-9164", issnl="2179-9164", rejected=("1807-975X",)),
+            {
+                "2179-9164": _record(
+                    "2179-9164",
+                    "2179-9164",
+                    ELECTRONIC,
+                    other=("1807-975X",),
+                    preceding=("1807-975X",),
+                    hints=(("1807-975X", PRINT),),
+                )
+            },
+        )
+        assert (check.issn, check.eissn) == ("1807-975X", "2179-9164")
+        assert check.rejected == ()
+
+    def test_rejected_issn_of_the_journal_returns_to_its_column(self):
+        """Cas réel : un passage antérieur a rejeté l'ISSN en ligne de European Archives of Oto-Rhino-Laryngology."""
+        check = check_journal_issns(
+            _journal(
+                issn="0937-4477",
+                rejected=("1434-4726",),
+                title="European Archives of Oto-Rhino-Laryngology",
+            ),
+            {
+                "0937-4477": _record(
+                    "0937-4477",
+                    "0937-4477",
+                    PRINT,
+                    title="European archives of oto-rhino-laryngology",
+                ),
+                "1434-4726": _record(
+                    "1434-4726",
+                    "1434-4726",
+                    ELECTRONIC,
+                    title="European archives of oto-rhino-laryngology and head & neck",
+                ),
+            },
+        )
+        assert (check.issn, check.eissn) == ("0937-4477", "1434-4726")
+        assert check.rejected == ()
+
+    def test_rejected_issn_of_another_publication_stays_rejected(self):
+        """Un ISSN déjà rejeté qui le reste n'est pas signalé."""
+        check = check_journal_issns(
+            _journal(
+                issn="1740-634X",
+                issnl="0893-133X",
+                rejected=("0007-0920",),
+                title="Neuropsychopharmacology",
+            ),
+            {
+                "1740-634X": _record(
+                    "1740-634X", "0893-133X", ELECTRONIC, title="Neuropsychopharmacology"
+                ),
+                "0007-0920": _record(
+                    "0007-0920", "0007-0920", PRINT, title="British journal of cancer"
+                ),
+                "0893-133X": _record(
+                    "0893-133X", "0893-133X", PRINT, title="Neuropsychopharmacology"
+                ),
+            },
+        )
+        assert check.rejected == ("0007-0920",)
+        assert check.set_aside == ()
+
+    def test_group_of_rejected_issns_with_another_title_stays_rejected(self):
+        check = check_journal_issns(
+            _journal(issn="0028-0836", rejected=("0007-0920",), title="Nature"),
+            {
+                "0007-0920": _record(
+                    "0007-0920", "0007-0920", PRINT, title="British journal of cancer"
+                )
+            },
+        )
+        assert (check.issn, check.rejected) == ("0028-0836", ("0007-0920",))
+
+    def test_print_issn_prevails_over_the_cd_rom(self):
+        """Cas réel : la revue « Methods in enzymology on CD-ROM/Methods in enzymology » a ses ISSN papier et CD-ROM parmi les rejetés."""
+        check = check_journal_issns(
+            _journal(
+                eissn="1557-7988",
+                rejected=("0076-6879", "1079-2376"),
+                title="Methods in enzymology on CD-ROM/Methods in enzymology",
+            ),
+            {
+                "0076-6879": _record(
+                    "0076-6879", "0076-6879", PRINT, title="Methods in enzymology"
+                ),
+                "1079-2376": _record(
+                    "1079-2376", None, OTHER, title="Methods in enzymology on CD-ROM"
+                ),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("0076-6879", "1557-7988", "0076-6879")
+        assert check.rejected == ("1079-2376",)
+
+
 class TestCorrection:
     def test_rejected_issn_is_corrected(self):
         """Cas réel : `1950-2051` pour la revue Constructif, dont l'ISSN est `1950-5051`."""

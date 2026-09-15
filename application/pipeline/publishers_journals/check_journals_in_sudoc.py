@@ -107,7 +107,7 @@ async def run_check_journals_in_sudoc(
     ) -> dict[str, SudocSerialRecord] | None:
         """Notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
         journal = _journal_issns(row)
-        issns = (*journal.own(), *correction_candidates(journal.rejected))
+        issns = (*journal.examined(), *correction_candidates(journal.rejected))
         records: dict[str, SudocSerialRecord] = {}
         try:
             await _read(client, issns, records)
