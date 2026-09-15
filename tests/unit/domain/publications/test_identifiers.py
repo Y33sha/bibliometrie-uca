@@ -8,6 +8,8 @@ import pytest
 from domain.errors import ValidationError
 from domain.publications.identifiers import (
     DOI,
+    ISBN,
+    ISSN,
     NNT,
     PMCID,
     PMID,
@@ -354,6 +356,53 @@ class TestPubMedArxivVOs:
         assert ArxivId.try_parse(None) is None
         with pytest.raises(ValidationError):
             ArxivId("garbage")
+
+
+# ── ISSN / ISBN ────────────────────────────────────────────────────
+
+
+class TestISSN:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("0028-0836", "0028-0836"),
+            ("00280836", "0028-0836"),  # sans tiret
+            ("ISSN 0028-0836", "0028-0836"),  # préfixe
+            ("0071-190x", "0071-190X"),  # clé de contrôle 10, en majuscule
+            ("0028–0836", "0028-0836"),  # tiret typographique
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert ISSN(raw).value == expected
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["1789-1504", "(Internet)", "9781450348850", "0028-083", ""],
+    )
+    def test_try_parse_rejects_invalid(self, raw):
+        assert ISSN.try_parse(raw) is None
+
+
+class TestISBN:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("9780128104224", "9780128104224"),
+            ("978-0-12-810422-4", "9780128104224"),  # tirets
+            ("ISBN 978 0 12 810422 4", "9780128104224"),  # préfixe et espaces
+            ("0-306-40615-2", "9780306406157"),  # ISBN-10 converti en ISBN-13
+            ("080442957x", "9780804429573"),  # ISBN-10 à clé de contrôle 10
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert ISBN(raw).value == expected
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["9780128104225", "0306406153", "978012810422", "1234567890123", ""],
+    )
+    def test_try_parse_rejects_invalid(self, raw):
+        assert ISBN.try_parse(raw) is None
 
 
 # ── clean_doi_prefix ───────────────────────────────────────────────

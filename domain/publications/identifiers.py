@@ -1,8 +1,6 @@
 """Value objects et helpers de normalisation des identifiants publication.
 
-DOI, HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed),
-PMCID (PubMed Central), ArxivId (arXiv). VOs immuables et auto-validés au
-même contrat que `domain/persons/identifiers.py` :
+DOI, HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre). VOs immuables et auto-validés au même contrat que `domain/persons/identifiers.py` :
 
 - `X("...")` strict : lève `ValidationError` si malformé
 - `X.try_parse(...)` tolérant : renvoie None si malformé
@@ -381,6 +379,109 @@ class ArxivId:
 
     @classmethod
     def try_parse(cls, raw: str | None) -> "ArxivId | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# ── ISSN ───────────────────────────────────────────────────────────
+
+_ISSN_RE = re.compile(r"(?:ISSN[:\s]*)?(\d{4})-?(\d{3})([\dX])", re.IGNORECASE | re.ASCII)
+
+
+def _mod11_check_digit(digits: str) -> str:
+    """Clé de contrôle modulo 11 (ISSN, ISBN-10) : poids décroissants jusqu'à 2, `X` pour 10."""
+    total = sum(int(c) * w for c, w in zip(digits, range(len(digits) + 1, 1, -1), strict=True))
+    check = (11 - total % 11) % 11
+    return "X" if check == 10 else str(check)
+
+
+def _normalize_issn(raw: str | None) -> str | None:
+    """ISSN sous la forme `NNNN-NNNC`, `X` en majuscule. Tolère l'absence de tiret et le préfixe `ISSN`. None si la clé de contrôle est fausse."""
+    if not raw:
+        return None
+    m = _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION))
+    if not m:
+        return None
+    first, middle, check = m.group(1), m.group(2), m.group(3).upper()
+    if _mod11_check_digit(first + middle) != check:
+        return None
+    return f"{first}-{middle}{check}"
+
+
+@dataclass(frozen=True)
+class ISSN:
+    """International Standard Serial Number (`NNNN-NNNC`), clé de contrôle vérifiée."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_issn(self.value)
+        if not cleaned:
+            raise ValidationError(f"ISSN invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "ISSN | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# ── ISBN ───────────────────────────────────────────────────────────
+
+_ISBN_PREFIX_RE = re.compile(r"ISBN(?:-1[03])?[:\s]*", re.IGNORECASE)
+_ISBN_SEPARATORS_RE = re.compile(r"[\s-]")
+_ISBN13_RE = re.compile(r"97[89]\d{10}", re.ASCII)
+_ISBN10_RE = re.compile(r"\d{9}[\dX]", re.ASCII)
+
+
+def _isbn13_check_digit(digits: str) -> str:
+    """Clé de contrôle modulo 10 d'un ISBN-13 : poids alternés 1 et 3."""
+    total = sum(int(c) * (3 if i % 2 else 1) for i, c in enumerate(digits))
+    return str((10 - total % 10) % 10)
+
+
+def _normalize_isbn(raw: str | None) -> str | None:
+    """ISBN-13 sans séparateur. Un ISBN-10 est converti en ISBN-13 (préfixe 978). Tolère tirets, espaces et préfixe `ISBN`. None si la clé de contrôle est fausse."""
+    if not raw:
+        return None
+    s = _ISBN_PREFIX_RE.sub("", raw.strip().translate(_DASH_TRANSLATION), count=1)
+    s = _ISBN_SEPARATORS_RE.sub("", s).upper()
+    if _ISBN13_RE.fullmatch(s):
+        return s if _isbn13_check_digit(s[:12]) == s[12] else None
+    if _ISBN10_RE.fullmatch(s) and _mod11_check_digit(s[:9]) == s[9]:
+        body = f"978{s[:9]}"
+        return body + _isbn13_check_digit(body)
+    return None
+
+
+@dataclass(frozen=True)
+class ISBN:
+    """International Standard Book Number, sous sa forme ISBN-13 sans séparateur, clé de contrôle vérifiée. Accepte un ISBN-10."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_isbn(self.value)
+        if not cleaned:
+            raise ValidationError(f"ISBN invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "ISBN | None":
         if not raw:
             return None
         try:
