@@ -53,6 +53,14 @@ def full_openalex_id(id_or_url: str) -> str:
 
 
 # =============================================================
+# AUTEURS
+# =============================================================
+
+BULK_AUTHORSHIPS_CAP = 100
+"""Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en porte autant est peut-être tronqué ; sa requête individuelle rend tous ses auteurs."""
+
+
+# =============================================================
 # LOCATIONS
 # =============================================================
 
