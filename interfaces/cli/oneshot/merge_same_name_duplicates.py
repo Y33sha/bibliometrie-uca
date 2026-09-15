@@ -31,7 +31,7 @@ log = setup_logger("merge_same_name_duplicates", os.path.dirname(__file__))
 _SINGLE_VALUED = ("orcid", "idref", "idhal")
 
 
-def _groups(conn: Connection) -> list[list[Row]]:
+def _groups(conn: Connection) -> list[list[Row[tuple[object, ...]]]]:
     """Groupes d'au moins deux personnes non rejetées aux nom et prénom plein normalisés identiques, chacun trié par id."""
     rows = conn.execute(
         text("""
@@ -44,7 +44,7 @@ def _groups(conn: Connection) -> list[list[Row]]:
             ORDER BY p.id
         """)
     ).all()
-    groups: dict[tuple[str, str], list[Row]] = defaultdict(list)
+    groups: dict[tuple[str, str], list[Row[tuple[object, ...]]]] = defaultdict(list)
     for r in rows:
         if normalize_name(r.first_name) and first_name_initials(r.first_name) is None:
             groups[(normalize_name(r.last_name), normalize_name(r.first_name))].append(r)
@@ -67,7 +67,7 @@ def _identifiers(conn: Connection) -> dict[tuple[int, str], set[str]]:
 
 
 def _blocker(
-    group: list[Row],
+    group: list[Row[tuple[object, ...]]],
     identifiers: dict[tuple[int, str], set[str]],
     distinct: set[frozenset[int]],
 ) -> str | None:
@@ -82,7 +82,7 @@ def _blocker(
     return None
 
 
-def _describe(r: Row) -> str:
+def _describe(r: Row[tuple[object, ...]]) -> str:
     return f"{r.id}{' RH' if r.has_rh else ''} ({r.signatures} sig.)"
 
 

@@ -117,7 +117,7 @@ def insert_source_document(
     Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta.nnt
-    external_ids = {ExternalIdType.NNT: nnt} if nnt else None
+    external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
     sujets = as_sequence(these.get("sujets"))
