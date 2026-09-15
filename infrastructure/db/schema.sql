@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ED4QH7veg9CVsF3IVGEYF9dHrYxQArhWBxGvgYC5977KpXG9n9lqAcfd3Ng78ZU
+\restrict 0NkVW4LUgsbmV6G99AUTJFMbuOgEBCf0J3kH3STEfk95U9EW33yJXJYZU3gIUSc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -978,7 +978,7 @@ CREATE TABLE public.journals (
 -- Name: COLUMN journals.rejected_issns; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN invalides reçus des sources pour cette revue, tels que reçus. La vérification dans le Sudoc tente leur correction.';
+COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN rejetés des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant). Ils servent au rapprochement ; la vérification dans le Sudoc tente de corriger les fautifs.';
 
 
 --
@@ -3454,5 +3454,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ED4QH7veg9CVsF3IVGEYF9dHrYxQArhWBxGvgYC5977KpXG9n9lqAcfd3Ng78ZU
+\unrestrict 0NkVW4LUgsbmV6G99AUTJFMbuOgEBCf0J3kH3STEfk95U9EW33yJXJYZU3gIUSc
 
