@@ -1,19 +1,10 @@
 """Ordre-dépendance de la phase persons — canal nominal.
 
-Deux signatures d'une **même personne** sans identifiant partagé, l'une en forme pleine
-(« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit
-`sa.id` (ORDER BY déterministe de `fetch_unlinked_authorships`).
+Deux signatures d'une **même personne** sans identifiant partagé, l'une en forme pleine (« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit `sa.id` (ORDER BY déterministe de `fetch_unlinked_authorships`).
 
-Dans un run isolé, la création live sème la map en mémoire via `compute_person_name_forms`
-(ordres + initiales) : une signature initiale du même run rattrape une personne créée en
-forme pleine, mais pas l'inverse — une initiale ne peut pas générer la forme pleine, donc
-« initiale puis pleine » sépare encore. La réinitialisation nominale (re-orphelinage des
-formes devenues ambiguës + GC des personnes vidées) referme ce résidu **sur plusieurs
-runs**, dès que le peuplement canonique donne à « Jean Martin » sa forme initiale
-« j martin » et la rend ambiguë.
+La création live sème la map en mémoire via `compute_person_name_forms` (ordres + initiales) : une signature initiale rattrape une personne créée en forme pleine. Dans l'ordre inverse, la signature pleine rejoint la personne réduite par ses initiales compatibles, et la personne prend le prénom plein. Les deux ordres donnent une seule personne dès le premier run.
 
-Les tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback de
-la fixture) ; le peuplement des formes canoniques est simulé par `_populate_canonical_forms`.
+Les tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback de la fixture) ; `_populate_canonical_forms` simule le peuplement des formes de nom.
 """
 
 import logging
@@ -23,6 +14,7 @@ from sqlalchemy import text
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.purge import purge
+from application.services.persons.core import create_person
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
@@ -157,43 +149,116 @@ def test_full_then_initial_merges(sa_sync_conn):
     assert _martin_count(sa_sync_conn) == 1
 
 
-def test_initial_then_full_splits_in_a_single_run(sa_sync_conn):
-    """Dans un run isolé, forme initiale (id bas) puis pleine : « J Martin » ne peut pas
-    générer « jean martin », donc « Jean Martin » crée une seconde personne. Le résidu
-    est levé sur plusieurs runs par la réinitialisation nominale — cf.
-    `test_initial_then_full_converges_over_runs`."""
-    _seed_signature(sa_sync_conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
-    _seed_signature(sa_sync_conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
-    _run_create(sa_sync_conn)
-    assert _martin_count(sa_sync_conn) == 2
-
-
-def test_initial_then_full_converges_over_runs(sa_sync_conn):
-    """Le résidu « initiale puis pleine » se résorbe en deux runs complets. Le premier crée
-    « J Martin » et « Jean Martin » séparément ; le peuplement rend « j martin » ambiguë (c'est
-    l'initiale de « Jean Martin »), et la purge supprime la personne réduite vidée. Au run
-    suivant, « j martin » redevenue univoque, la signature libérée rejoint « Jean Martin »."""
-    conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
-    _seed_signature(conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
-
-    _run_phase(conn)  # crée A + B, peuple, purge la réduite
-    assert _martin_count(conn) == 1  # la personne réduite a fondu dès ce run
-    assert _person_of(conn, 95003) is None  # sa signature reste orpheline le temps d'un run
-
-    _run_phase(conn)  # « j martin » univoque → la signature rejoint « Jean Martin »
-    remaining = conn.execute(
-        text("SELECT id, first_name_normalized FROM persons WHERE last_name_normalized = 'martin'")
-    ).one()
-    assert remaining.first_name_normalized == "jean"  # la forme pleine survit
-    persons_on = (
+def _martin_first_names(conn) -> list[str]:
+    return (
         conn.execute(
-            text("SELECT DISTINCT person_id FROM source_authorships WHERE id IN (95003, 95004)")
+            text(
+                "SELECT first_name_normalized FROM persons "
+                "WHERE last_name_normalized = 'martin' ORDER BY first_name_normalized"
+            )
         )
         .scalars()
         .all()
     )
-    assert persons_on == [remaining.id]  # les deux signatures sur la même personne
+
+
+def _seed_person(conn, last_name, first_name, *, signatures=()):
+    """Personne existante, rattachée par son nom aux signatures `signatures` (ids)."""
+    pid = create_person(last_name, first_name, repo=person_repository(conn))
+    for sa_id in signatures:
+        conn.execute(
+            text(
+                "UPDATE source_authorships SET person_id = :p, resolution_mode = 'name' "
+                "WHERE id = :s"
+            ),
+            {"p": pid, "s": sa_id},
+        )
+    return pid
+
+
+def test_initial_then_full_joins_in_a_single_run(sa_sync_conn):
+    """Forme initiale (id bas) puis pleine : « J Martin » crée « Martin J » ; « Jean Martin », de forme inconnue, la rejoint par ses initiales compatibles, et la personne prend le prénom « Jean »."""
+    _seed_signature(sa_sync_conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
+    _seed_signature(sa_sync_conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
+    _run_create(sa_sync_conn)
+    assert _martin_first_names(sa_sync_conn) == ["jean"]
+    assert _person_of(sa_sync_conn, 95003) == _person_of(sa_sync_conn, 95004)
+
+
+def test_initial_then_full_stays_joined_over_runs(sa_sync_conn):
+    """Le peuplement des formes et la purge ne défont pas le regroupement : « j martin » reste univoque, portée par « Jean Martin » seule."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
+    _seed_signature(conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
+    _run_phase(conn)
+    _run_phase(conn)
+    assert _martin_first_names(conn) == ["jean"]
+    assert _person_of(conn, 95003) is not None
+    assert _person_of(conn, 95003) == _person_of(conn, 95004)
+
+
+def test_reduced_signature_joins_a_compound_first_name(sa_sync_conn):
+    """« Al-Izeri, A. » rejoint « Abdul-Majeed Al-Izeri » : les formes à initiales d'un prénom composé ne donnent que « a m al izeri », les initiales compatibles couvrent « a »."""
+    conn = sa_sync_conn
+    _seed_signature(
+        conn, pub_id=95070, raw_name="Abdul-Majeed Al-Izeri", name_norm="abdul majeed al izeri"
+    )
+    _seed_signature(conn, pub_id=95071, raw_name="Al-Izeri, A.", name_norm="al izeri a")
+    _run_create(conn)
+    count = conn.execute(
+        text("SELECT COUNT(*) FROM persons WHERE last_name_normalized = 'al izeri'")
+    ).scalar_one()
+    assert count == 1
+    assert _person_of(conn, 95070) == _person_of(conn, 95071)
+
+
+def test_a_completed_first_name_turns_away_another_first_name(sa_sync_conn):
+    """« Martin J » complétée en « Jean » : « Julie Martin » crée sa propre personne, et « J Martin », devenue ambiguë entre Jean et Julie, est re-orphelinée par la purge."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95080, raw_name="J Martin", name_norm="j martin")
+    _seed_signature(conn, pub_id=95081, raw_name="Jean Martin", name_norm="jean martin")
+    _run_phase(conn)
+
+    _seed_signature(conn, pub_id=95082, raw_name="Julie Martin", name_norm="julie martin")
+    _run_phase(conn)
+
+    assert _martin_first_names(conn) == ["jean", "julie"]
+    assert _person_of(conn, 95082) != _person_of(conn, 95081)
+    assert _person_of(conn, 95080) is None
+
+
+def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
+    """Une personne « Tnourji A. » que ses signatures nomment « Abdellah » prend ce prénom avant la cascade ; « Abdelkader Tnourji » crée alors sa propre personne."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95090, raw_name="Tnourji, A.", name_norm="tnourji a")
+    _seed_signature(conn, pub_id=95091, raw_name="Abdellah Tnourji", name_norm="abdellah tnourji")
+    reduced = _seed_person(conn, "Tnourji", "A.", signatures=(95090, 95091))
+    _seed_signature(
+        conn, pub_id=95092, raw_name="Abdelkader Tnourji", name_norm="abdelkader tnourji"
+    )
+    _run_create(conn)
+
+    first_name = conn.execute(
+        text("SELECT first_name FROM persons WHERE id = :p"), {"p": reduced}
+    ).scalar_one()
+    assert first_name == "Abdellah"
+    assert _person_of(conn, 95092) not in (None, reduced)
+
+
+def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_conn):
+    """Les signatures de « Martin J » la nomment « Jean » et « Julien » : elle garde ses initiales, et « Jacques Martin » ne s'y rattache pas."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95100, raw_name="Jean Martin", name_norm="jean martin")
+    _seed_signature(conn, pub_id=95101, raw_name="Julien Martin", name_norm="julien martin")
+    reduced = _seed_person(conn, "Martin", "J", signatures=(95100, 95101))
+    _seed_signature(conn, pub_id=95102, raw_name="Jacques Martin", name_norm="jacques martin")
+    _run_create(conn)
+
+    first_name = conn.execute(
+        text("SELECT first_name FROM persons WHERE id = :p"), {"p": reduced}
+    ).scalar_one()
+    assert first_name == "J"
+    assert _person_of(conn, 95102) not in (None, reduced)
 
 
 def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):

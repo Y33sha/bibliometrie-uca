@@ -10,7 +10,7 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
-from domain.persons.matching import IdentifiedPerson, PersonNameForms
+from domain.persons.matching import IdentifiedPerson, Namesake, PersonNameForms
 
 
 class BareUnlinkedAuthorship(NamedTuple):
@@ -98,6 +98,16 @@ class PersonsMatchingQueries(Protocol):
 
     def fetch_rejected_person_ids_by_pub(self, conn: Connection) -> dict[int, frozenset[int]]:
         """`{publication_id: {person_id, ...}}` depuis `rejected_authorships` — les paires rejetées, que la cascade écarte de ses candidats."""
+        ...
+
+    def fetch_namesakes(self, conn: Connection) -> list[Namesake]:
+        """Les personnes non rejetées, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
+        ...
+
+    def fetch_linked_signature_names(
+        self, conn: Connection, person_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """`{person_id: [raw_author_name, ...]}` — les noms bruts des signatures rattachées à chacune des personnes."""
         ...
 
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:

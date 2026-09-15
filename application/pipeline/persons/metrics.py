@@ -16,6 +16,7 @@ _MATCHING_METHODS: dict[str, str] = {
     "idref": "par IdRef",
     "cross_source": "par comparaison entre sources",
     "single_name": "par nom sans homonymie",
+    "compatible_name": "par initiales compatibles",
 }
 
 
@@ -33,6 +34,8 @@ class CascadeResult(NamedTuple):
     # Incrémental cross-source : les signatures cross-source re-jugées ce run, et celles réellement re-résolues. Le complément (candidates − résolues) est détaché par la phase.
     cross_source_candidate_ids: set[int]
     resolved_cross_source_ids: set[int]
+    # Personnes au prénom réduit à des initiales qui prennent un prénom plein, avant la cascade ou à un rattachement.
+    first_names_completed: int = 0
 
 
 def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
@@ -69,6 +72,7 @@ def build_metrics(
     }
     metrics.details["summary"] = {
         "created": created,
+        "first_names_completed": result.first_names_completed,
         "skipped_ambiguous": skipped.get("ambiguous_name_form", 0),
         "corroboration_rejected": result.corroboration_rejected,
         "corroboration_rejected_distinct": result.corroboration_rejected_distinct,

@@ -186,6 +186,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   persons: {
     summary: [
       { key: "created", label: "Personnes créées" },
+      { key: "first_names_completed", label: "Prénoms complétés" },
       { key: "skipped_ambiguous", label: "Ignorées (nom ambigu)" },
       { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
       { key: "corroboration_rejected_distinct", label: "dont identifiants distincts" },
@@ -201,6 +202,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
           idref: "IdRef",
           cross_source: "Cross-source",
           single_name: "Forme de nom",
+          compatible_name: "Initiales compatibles",
         },
         columns: [{ key: "count", label: "Rattachées", pct: true }],
         total: true,
