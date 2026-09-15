@@ -265,6 +265,18 @@ journals = Table(
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_pubs` / le tri / l'affichage.
     Column("pub_count", Integer, nullable=False, server_default="0"),
+    Column(
+        "rejected_issns",
+        ARRAY(Text),
+        nullable=False,
+        server_default="{}",
+        comment="ISSN invalides reçus des sources pour cette revue, tels que reçus. La vérification dans le Sudoc tente leur correction.",
+    ),
+    Column(
+        "sudoc_checked_at",
+        DateTime(timezone=True),
+        comment="Date de la dernière vérification des ISSN de la revue dans le Sudoc. NULL : revue jamais vérifiée.",
+    ),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
 )
 

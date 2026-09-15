@@ -34,13 +34,14 @@ logger = logging.getLogger(__name__)
 _ISSN_FIELDS = frozenset({"issn", "eissn", "issnl"})
 
 
-def _valid_issn(value: str | None, field: str, title: str) -> str | None:
-    """ISSN normalisé, ou `None` pour une valeur vide ou invalide. Une valeur invalide est journalisée."""
+def _valid_issn(value: str | None, field: str, title: str, rejected: list[str]) -> str | None:
+    """ISSN normalisé, ou `None` pour une valeur vide ou invalide. Une valeur invalide est journalisée et ajoutée à `rejected`."""
     if not value:
         return None
     issn = ISSN.try_parse(value)
     if issn is None:
         logger.warning("ISSN écarté (revue %r) : %s = %r", title, field, value)
+        rejected.append(value.strip())
         return None
     return str(issn)
 
@@ -58,7 +59,7 @@ def find_or_create_journal(
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
-    Les ISSN passent par le value object `ISSN`. Une valeur invalide est écartée et journalisée.
+    Les ISSN passent par le value object `ISSN`. Une valeur invalide est journalisée et conservée dans `rejected_issns` de la revue.
 
     Cascade de recherche : `openalex_id`, puis chacun des identifiants ISSN fournis (`issn`, `eissn`, `issnl`) cherché indifféremment dans les trois colonnes, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
@@ -72,9 +73,10 @@ def find_or_create_journal(
     # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
     title = to_plain_text(title)
     title_normalized = normalize_text(title)
-    issn = _valid_issn(issn, "issn", title)
-    eissn = _valid_issn(eissn, "eissn", title)
-    issnl = _valid_issn(issnl, "issnl", title)
+    rejected: list[str] = []
+    issn = _valid_issn(issn, "issn", title, rejected)
+    eissn = _valid_issn(eissn, "eissn", title, rejected)
+    issnl = _valid_issn(issnl, "issnl", title, rejected)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
@@ -89,48 +91,54 @@ def find_or_create_journal(
         repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
         return journal_id
 
-    # 1. Par openalex_id
-    if openalex_id:
-        jid = repo.find_journal_by_openalex_id(openalex_id)
-        if jid:
-            # Cas openalex_id : enrichit sans passer openalex_id/oa_model
-            # (déjà présents par définition)
-            return _match_and_enrich(jid, with_openalex=False)
-        # openalex_id inconnu : on cherche quand même par ISSN/name_form
-        # avant de créer, pour rattacher l'openalex_id à un journal existant
+    def _find_or_create() -> int:
+        # 1. Par openalex_id
+        if openalex_id:
+            jid = repo.find_journal_by_openalex_id(openalex_id)
+            if jid:
+                # Cas openalex_id : enrichit sans passer openalex_id/oa_model
+                # (déjà présents par définition)
+                return _match_and_enrich(jid, with_openalex=False)
+            # openalex_id inconnu : on cherche quand même par ISSN/name_form
+            # avant de créer, pour rattacher l'openalex_id à un journal existant
 
-    # 2-4. Par ISSN / eISSN / ISSN-L (dans n'importe lequel des 3 champs)
-    for value in (issn, eissn, issnl):
-        if not value:
-            continue
-        jid = repo.find_journal_by_issn_any(value)
-        if jid:
-            return _match_and_enrich(jid)
+        # 2-4. Par ISSN / eISSN / ISSN-L (dans n'importe lequel des 3 champs)
+        for value in (issn, eissn, issnl):
+            if not value:
+                continue
+            jid = repo.find_journal_by_issn_any(value)
+            if jid:
+                return _match_and_enrich(jid)
 
-    # 5. Par forme de nom (priorité aux journals avec eISSN)
-    jid = repo.find_journal_by_name_form(title_normalized, publisher_id)
-    if jid:
-        repo.enrich_journal(
-            jid,
+        # 5. Par forme de nom (priorité aux journals avec eISSN)
+        jid = repo.find_journal_by_name_form(title_normalized, publisher_id)
+        if jid:
+            repo.enrich_journal(
+                jid,
+                issn=issn,
+                eissn=eissn,
+                publisher_id=publisher_id,
+                openalex_id=openalex_id,
+                oa_model=oa_model,
+            )
+            return jid
+
+        # 6. Créer + enregistrer la forme de nom
+        created = repo.create_journal(
+            title=title,
             issn=issn,
             eissn=eissn,
+            issnl=issnl,
             publisher_id=publisher_id,
             openalex_id=openalex_id,
             oa_model=oa_model,
         )
-        return jid
+        repo.add_journal_name_form(created, title_normalized, publisher_id)
+        return created
 
-    # 6. Créer + enregistrer la forme de nom
-    journal_id = repo.create_journal(
-        title=title,
-        issn=issn,
-        eissn=eissn,
-        issnl=issnl,
-        publisher_id=publisher_id,
-        openalex_id=openalex_id,
-        oa_model=oa_model,
-    )
-    repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
+    journal_id = _find_or_create()
+    if rejected:
+        repo.add_rejected_issns(journal_id, rejected)
     return journal_id
 
 

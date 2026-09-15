@@ -196,13 +196,20 @@ class PgJournalRepository(JournalRepository):
                 journals.c.apc_amount,
                 journals.c.apc_currency,
                 journals.c.oa_model,
+                journals.c.rejected_issns,
             ).where(journals.c.id == source_id)
         ).one()
+        target_rejected = self._conn.execute(
+            select(journals.c.rejected_issns).where(journals.c.id == target_id)
+        ).scalar_one()
         self._conn.execute(delete(journals).where(journals.c.id == source_id))
         self._conn.execute(
             update(journals)
             .where(journals.c.id == target_id)
             .values(
+                # La cible porte des ISSN absorbés, pas encore vérifiés dans le Sudoc.
+                rejected_issns=sorted(set(target_rejected) | set(src.rejected_issns)),
+                sudoc_checked_at=None,
                 issn=func.coalesce(journals.c.issn, src.issn),
                 eissn=func.coalesce(journals.c.eissn, src.eissn),
                 issnl=func.coalesce(journals.c.issnl, src.issnl),

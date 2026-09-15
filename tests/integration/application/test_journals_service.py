@@ -310,12 +310,27 @@ class TestFindOrCreateJournal:
         found = find_or_create_journal("Nature Variant", issn="ISSN 00280836", repo=gateway)
         assert found == existing
 
-    def test_invalid_issn_is_dropped_and_logged(self, sa_sync_conn, gateway, caplog):
+    def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
         j_id = find_or_create_journal("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j_id)
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT issn, eissn, rejected_issns FROM journals WHERE id = :id",
+            id=j_id,
+        )
         assert row.issn is None
         assert row.eissn == "1476-4687"
+        assert row.rejected_issns == ["(Internet)"]
         assert "ISSN écarté (revue 'Nature') : issn = '(Internet)'" in caplog.text
+
+    def test_rejected_issns_accumulate_without_duplicates(self, sa_sync_conn, gateway):
+        """Les ISSN invalides s'ajoutent à ceux de la revue trouvée, sans doublon."""
+        j_id = find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        find_or_create_journal("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
+        row = _fetch_one(
+            sa_sync_conn, "SELECT rejected_issns FROM journals WHERE id = :id", id=j_id
+        )
+        assert row.rejected_issns == ["1234-5678", "1476-4688"]
 
 
 # ── update_journal_apc ─────────────────────────────────────────────
@@ -715,6 +730,41 @@ class TestMergeJournals:
         assert (
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
+
+    def test_unites_rejected_issns_and_resets_sudoc_check(
+        self, sa_sync_conn, repo, publication_repo
+    ):
+        """La cible reçoit les ISSN invalides de la source et redevient à vérifier dans le Sudoc."""
+        target = _insert_journal(sa_sync_conn, "Target")
+        source = _insert_journal(sa_sync_conn, "Source")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE journals SET rejected_issns = '{1234-5678}', sudoc_checked_at = now() "
+                "WHERE id = :id"
+            ),
+            {"id": target},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET rejected_issns = '{1234-5678,(Internet)}' WHERE id = :id"),
+            {"id": source},
+        )
+
+        merge_journals(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            publication_repo=publication_repo,
+        )
+
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT rejected_issns, sudoc_checked_at FROM journals WHERE id = :id",
+            id=target,
+        )
+        assert row.rejected_issns == ["(Internet)", "1234-5678"]
+        assert row.sudoc_checked_at is None
 
     def test_enriches_target_metadata(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
