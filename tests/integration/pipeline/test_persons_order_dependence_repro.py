@@ -245,6 +245,28 @@ def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
     assert _person_of(conn, 95092) not in (None, reduced)
 
 
+def test_full_signature_with_a_double_family_name_joins_the_reduced_person(sa_sync_conn):
+    """« Florence Caldefie Chezet », sans virgule, rejoint « Caldefie-Chezet F. » par le découpage aux deux derniers mots, et la personne prend le prénom « Florence »."""
+    conn = sa_sync_conn
+    _seed_signature(
+        conn, pub_id=95110, raw_name="Caldefie-Chezet, F.", name_norm="caldefie chezet f"
+    )
+    reduced = _seed_person(conn, "Caldefie-Chezet", "F.", signatures=(95110,))
+    _seed_signature(
+        conn,
+        pub_id=95111,
+        raw_name="Florence Caldefie Chezet",
+        name_norm="florence caldefie chezet",
+    )
+    _run_create(conn)
+
+    assert _person_of(conn, 95111) == reduced
+    first_name = conn.execute(
+        text("SELECT first_name FROM persons WHERE id = :p"), {"p": reduced}
+    ).scalar_one()
+    assert first_name == "Florence"
+
+
 def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_conn):
     """Les signatures de « Martin J » la nomment « Jean » et « Julien » : elle garde ses initiales, et « Jacques Martin » ne s'y rattache pas."""
     conn = sa_sync_conn
