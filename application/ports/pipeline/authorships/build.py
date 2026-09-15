@@ -46,7 +46,7 @@ class AuthorshipsBuildQueries(Protocol):
     def analyze_source_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `source_authorships`.
 
-        À appeler après `link_source_authorships_to_authorships`, qui vient de poser `authorship_id` sur des centaines de milliers de lignes : en état committé la colonne est quasi 100% NULL (`null_frac ≈ 1`), donc sans ce ANALYZE le planner de `propagate_authorship_attributes` estime que `WHERE authorship_id IS NOT NULL` ne ramène rien (`rows = 1`) et part en Nested Loop. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante.
+        À appeler avant une requête qui filtre sur une colonne réécrite en masse : `person_id` (phases normalize et persons) avant `insert_missing_authorships`, `authorship_id` (`link_source_authorships_to_authorships`) avant `propagate_authorship_attributes`. Avec des stats périmées (`null_frac ≈ 1`), le planner estime `rows = 1` sur `WHERE ... IS NOT NULL` et part en Nested Loop. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante.
         """
         ...
 
