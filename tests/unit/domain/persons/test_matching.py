@@ -13,6 +13,7 @@ from domain.persons.matching import (
     decide_name_form_outcome,
     decide_person_match,
     form_matches_person,
+    full_namesakes,
     identifier_misplaced,
 )
 
@@ -312,6 +313,19 @@ class TestCompatibleNamesakes:
 
     def test_signature_without_first_name(self):
         assert compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
+
+
+class TestFullNamesakes:
+    def test_keeps_full_first_names_that_the_initials_open(self):
+        namesakes = [
+            Namesake(1, "Caillaud", "Denis M."),
+            Namesake(2, "Caillaud", "D."),
+            Namesake(3, "Caillaud", "Marc"),
+        ]
+        assert full_namesakes(("d",), namesakes) == [1]
+
+    def test_initials_must_open_the_first_name(self):
+        assert full_namesakes(("b",), [Namesake(1, "Zhang", "Xiao-Bing")]) == []
 
 
 class TestAttestedFullFirstNames:
