@@ -275,7 +275,7 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
 
 
 class CurationPersonOut(BaseModel):
-    """Fiche personne allégée, commune aux files de curation (conflits d'identifiant, intrus détachables, doublons par nom) ; le détail complet est dans le drawer."""
+    """Fiche personne allégée, commune aux files de curation (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer."""
 
     person_id: int
     first_name: str
@@ -301,38 +301,6 @@ class IdentifierConflictPairOut(BaseModel):
 
 class IdentifierConflictsResponse(PaginatedResponse):
     pairs: list[IdentifierConflictPairOut]
-
-
-class AnchorOccurrenceOut(BaseModel):
-    """Signature légitime (nom compatible avec une forme confirmée) de la personne."""
-
-    source: str
-    raw_author_name: str
-
-
-class IntruderOccurrenceOut(BaseModel):
-    """Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form` est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif."""
-
-    source: str
-    raw_author_name: str
-    name_form: str
-    identifiers: list[IdentifierRef]
-
-
-class DetachableIntruderGroupOut(BaseModel):
-    """Une personne rattachée à ≥2 signatures d'une même publication, avec ancre(s) et intrus."""
-
-    source_publication_id: int
-    publication_id: int | None
-    title: str | None
-    pub_year: int | None
-    person: CurationPersonOut
-    anchors: list[AnchorOccurrenceOut]
-    intruders: list[IntruderOccurrenceOut]
-
-
-class DetachableIntrudersResponse(PaginatedResponse):
-    groups: list[DetachableIntruderGroupOut]
 
 
 class OverlapCountsOut(BaseModel):
@@ -412,10 +380,6 @@ class PersonsQueries(Protocol):
     def identifier_conflicts_count(self) -> int: ...
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse: ...
-
-    def detachable_intruders_count(self) -> int: ...
-
-    def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse: ...
 
     def name_duplicates_count(self) -> int: ...
 

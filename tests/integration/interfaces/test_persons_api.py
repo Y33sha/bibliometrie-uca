@@ -580,12 +580,11 @@ class TestPersonDashboardAndSubjects:
 
 
 class TestTriageQueues:
-    """Les quatre files de triage et leurs compteurs, exercées sur une base sans cas à trancher."""
+    """Les files de triage et leurs compteurs, exercées sur une base sans cas à trancher."""
 
     QUEUES = (
         "ambiguous-name-forms",
         "identifier-conflicts",
-        "detachable-intruders",
         "name-duplicates",
     )
 

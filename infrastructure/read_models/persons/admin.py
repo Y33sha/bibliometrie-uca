@@ -1,23 +1,17 @@
 """Query services admin pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
-from collections.abc import Mapping
-from typing import NamedTuple
 
-from sqlalchemy import Connection, Row, bindparam, text
+from sqlalchemy import Connection, bindparam, text
 
 from application.ports.read_models.persons_queries import (
     AmbiguousFormPersonOut,
     AmbiguousNameFormOut,
     AmbiguousNameFormsResponse,
-    AnchorOccurrenceOut,
     CurationPersonOut,
-    DetachableIntruderGroupOut,
-    DetachableIntrudersResponse,
     IdentifierConflictPairOut,
     IdentifierConflictsResponse,
     IdentifierRef,
-    IntruderOccurrenceOut,
     NameDuplicatePairOut,
     NameDuplicatesResponse,
     NameFormAuthorshipRef,
@@ -31,13 +25,11 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
-from domain.types import JsonValue
 from infrastructure.db.sql_fragments import (
     identifier_neutralized,
     in_clause,
     name_form_holder,
     other_name_form_holders,
-    usable_identifiers,
 )
 
 # ── Name-form authorships ────────────────────────────────────────
@@ -277,147 +269,6 @@ def identifier_conflicts(
         if r.id_a in persons and r.id_b in persons
     ]
     return IdentifierConflictsResponse(total=total, page=page, per_page=per_page, pairs=pairs)
-
-
-# ── Intrus détachables (file de triage du hub) ───────────────────
-
-# Une même personne rattachée à ≥2 signatures d'une même `source_publication` : impossible (on ne signe pas deux positions d'un enregistrement), une des signatures est mal rattachée.
-_REPEATED_CANDIDATES_SQL = text("""
-    SELECT source_publication_id AS spid, person_id
-    FROM source_authorships
-    WHERE person_id IS NOT NULL
-    GROUP BY source_publication_id, person_id
-    HAVING count(*) >= 2
-""")
-
-# Occurrences des seules paires candidates (pas tous les auteurs des méga-publications) : `unnest` zippe les deux tableaux parallèles en couples exacts `(source_publication, personne)`.
-_REPEATED_OCCURRENCES_SQL = text(f"""
-    SELECT sa.source_publication_id AS spid, sa.person_id,
-           sa.source::text AS source, sa.raw_author_name AS name,
-           aik.author_name_normalized AS norm, {usable_identifiers()} AS identifiers
-    FROM source_authorships sa
-    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-    WHERE (sa.source_publication_id, sa.person_id) IN (
-        SELECT spid, pid FROM unnest(CAST(:spids AS bigint[]), CAST(:pids AS bigint[])) AS t(spid, pid)
-    )
-      AND aik.author_name_normalized IS NOT NULL
-""").bindparams(bindparam("spids"), bindparam("pids"))
-
-# Formes qui font ancre : confirmées par admin, ou dérivées du nom canonique de la personne (`'persons' ∈ sources`, confirmées d'office).
-_CONFIRMED_FORMS_SQL = text(f"""
-    SELECT person_id, name_form FROM person_name_forms
-    WHERE (status = '{AttributionStatus.CONFIRMED.value}'
-           OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources))
-      AND person_id = ANY(:pids)
-""").bindparams(bindparam("pids"))
-
-_IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
-
-
-def _occurrence_identifiers(raw: Mapping[str, JsonValue] | None) -> list[IdentifierRef]:
-    """Identifiants que porte une signature, hors ceux qu'elle neutralise — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
-    if not raw:
-        return []
-    return [IdentifierRef(id_type=k, id_value=str(raw[k])) for k in _IDENTIFIER_KEYS if raw.get(k)]
-
-
-def _detachable_groups(
-    conn: Connection,
-) -> list[tuple[int, int, list[Row[tuple[object, ...]]], list[Row[tuple[object, ...]]]]]:
-    """Groupes `(source_publication, personne)` à ≥2 signatures dont au moins une est légitime (compatible avec une forme `confirmed`) et au moins une est intruse (incompatible).
-
-    Reprend le départage de l'audit `audit_repeated_person_in_publication` : seules les formes `confirmed` servent d'ancre ; une occurrence sans aucune forme confirmée compatible est intruse. Retourne `(spid, person_id, ancres, intrus)`."""
-    candidates = conn.execute(_REPEATED_CANDIDATES_SQL).all()
-    if not candidates:
-        return []
-    spids = [r.spid for r in candidates]
-    pids = [r.person_id for r in candidates]
-
-    confirmed: dict[int, list[str]] = defaultdict(list)
-    for r in conn.execute(_CONFIRMED_FORMS_SQL, {"pids": sorted(set(pids))}):
-        confirmed[r.person_id].append(r.name_form)
-
-    occurrences: dict[tuple[int, int], list[Row[tuple[object, ...]]]] = defaultdict(list)
-    for r in conn.execute(_REPEATED_OCCURRENCES_SQL, {"spids": spids, "pids": pids}):
-        occurrences[(r.spid, r.person_id)].append(r)
-
-    groups: list[tuple[int, int, list[Row[tuple[object, ...]]], list[Row[tuple[object, ...]]]]] = []
-    for (spid, pid), occs in occurrences.items():
-        forms = confirmed.get(pid, [])
-        legit = [any(names_compatible(o.norm, "", f, "") for f in forms) for o in occs]
-        if any(legit) and not all(legit):
-            anchors = [o for o, ok in zip(occs, legit, strict=True) if ok]
-            intruders = [o for o, ok in zip(occs, legit, strict=True) if not ok]
-            groups.append((spid, pid, anchors, intruders))
-    groups.sort(key=lambda g: (g[0], g[1]))
-    return groups
-
-
-def detachable_intruders_count(conn: Connection) -> int:
-    """Nombre de groupes détachables (badge de l'onglet)."""
-    return len(_detachable_groups(conn))
-
-
-class _PublicationRef(NamedTuple):
-    """Publication portant une signature, telle qu'affichée à côté du groupe détachable."""
-
-    publication_id: int | None
-    title: str | None
-    pub_year: int | None
-
-
-_PUBLICATION_INCONNUE = _PublicationRef(None, None, None)
-
-
-def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, _PublicationRef]:
-    if not spids:
-        return {}
-    rows = conn.execute(
-        text("""
-            SELECT sd.id AS spid, sd.publication_id, sd.title, sd.pub_year
-            FROM source_publications sd WHERE sd.id = ANY(:spids)
-        """).bindparams(bindparam("spids")),
-        {"spids": spids},
-    ).all()
-    return {r.spid: _PublicationRef(r.publication_id, r.title, r.pub_year) for r in rows}
-
-
-def detachable_intruders(
-    conn: Connection, *, page: int, per_page: int
-) -> DetachableIntrudersResponse:
-    """Groupes détachables paginés : la personne, son occurrence-ancre, son occurrence-intrus (avec la forme de nom à rejeter et l'identifiant fautif) et la publication où les deux coexistent.
-
-    L'action de résolution est le rejet de la forme de nom de l'intrus (`name_form`), qui détache les signatures et pose le verrou de non-retour."""
-    groups = _detachable_groups(conn)
-    total = len(groups)
-    offset = (page - 1) * per_page
-    page_groups = groups[offset : offset + per_page]
-
-    persons = _curation_persons(conn, sorted({pid for _, pid, _, _ in page_groups}))
-    pubs = _publications_for_spids(conn, sorted({spid for spid, _, _, _ in page_groups}))
-
-    items = [
-        DetachableIntruderGroupOut(
-            source_publication_id=spid,
-            publication_id=pubs.get(spid, _PUBLICATION_INCONNUE).publication_id,
-            title=pubs.get(spid, _PUBLICATION_INCONNUE).title,
-            pub_year=pubs.get(spid, _PUBLICATION_INCONNUE).pub_year,
-            person=persons[pid],
-            anchors=[AnchorOccurrenceOut(source=o.source, raw_author_name=o.name) for o in anchors],
-            intruders=[
-                IntruderOccurrenceOut(
-                    source=o.source,
-                    raw_author_name=o.name,
-                    name_form=o.norm,
-                    identifiers=_occurrence_identifiers(o.identifiers),
-                )
-                for o in intruders
-            ],
-        )
-        for spid, pid, anchors, intruders in page_groups
-        if pid in persons
-    ]
-    return DetachableIntrudersResponse(total=total, page=page, per_page=per_page, groups=items)
 
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
