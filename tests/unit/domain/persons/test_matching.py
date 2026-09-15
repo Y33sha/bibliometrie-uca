@@ -3,7 +3,10 @@
 from domain.persons.matching import (
     IdentifiedPerson,
     NameFormDecision,
+    Namesake,
     PersonMatchDecision,
+    attested_full_first_names,
+    compatible_namesakes,
     consensus_name,
     decide_cross_source_match,
     decide_match_by_identifier,
@@ -253,6 +256,80 @@ class TestDecideNameFormOutcome:
         assert decision.action == "skip"
         assert decision.reason == "ambiguous_name_form"
 
+    def test_unknown_form_single_compatible_person_matches(self):
+        """Forme inconnue, une seule personne aux initiales compatibles : rattachement, pas de création."""
+        decision = decide_name_form_outcome(None, allow_create=True, compatible_person_ids=[42])
+        assert decision == NameFormDecision(action="match", person_id=42, reason="compatible_name")
+
+    def test_unknown_form_several_compatible_persons_skip(self):
+        decision = decide_name_form_outcome(None, allow_create=True, compatible_person_ids=[42, 17])
+        assert decision == NameFormDecision(action="skip", reason="ambiguous_name_form")
+
+    def test_unknown_form_compatible_person_rejected_skips(self):
+        """La seule personne compatible est rejetée pour la publication : orpheline, pas de création."""
+        decision = decide_name_form_outcome(
+            None, allow_create=True, rejected_person_ids=frozenset({42}), compatible_person_ids=[42]
+        )
+        assert decision == NameFormDecision(action="skip", reason="ambiguous_name_form")
+
+    def test_known_form_ignores_compatible_persons(self):
+        decision = decide_name_form_outcome([7], allow_create=True, compatible_person_ids=[42])
+        assert decision == NameFormDecision(action="match", person_id=7)
+
+
+class TestCompatibleNamesakes:
+    def test_full_signature_finds_the_reduced_person(self):
+        assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "A.")]) == [1]
+
+    def test_reduced_signature_finds_the_compound_first_name(self):
+        """« A. » prolonge « Abdul-Majeed », dont les formes à initiales ne donnent que « a m »."""
+        assert compatible_namesakes("A.", [Namesake(1, "Al-Izeri", "Abdul-Majeed")]) == [1]
+
+    def test_reduced_signature_finds_every_compatible_person(self):
+        namesakes = [
+            Namesake(1, "Martin", "Julie"),
+            Namesake(2, "Martin", "Joseph"),
+            Namesake(3, "Martin", "Paul"),
+        ]
+        assert compatible_namesakes("J.", namesakes) == [1, 2]
+
+    def test_initials_follow_the_order_of_the_first_name(self):
+        """« H. » ne prolonge pas « Bo-Hyung » : l'initiale doit commencer le prénom."""
+        assert compatible_namesakes("H.", [Namesake(1, "Lee", "Bo-Hyung")]) == []
+        assert compatible_namesakes("Bo-Hyung", [Namesake(1, "Lee", "H.")]) == []
+
+    def test_reduced_person_claimed_by_a_full_namesake_is_not_a_candidate(self):
+        """« Martin J. » a déjà son prénom plein possible, « Martin Jean » : « Julien » ne s'y rattache pas."""
+        namesakes = [Namesake(1, "Martin", "J."), Namesake(2, "Martin", "Jean")]
+        assert compatible_namesakes("Julien", namesakes) == []
+
+    def test_conflicting_reduced_person_is_not_a_candidate(self):
+        assert compatible_namesakes("Julien", [Namesake(1, "Martin", "J.", conflicting=True)]) == []
+
+    def test_full_signature_ignores_full_namesakes(self):
+        """Deux prénoms pleins distincts désignent deux personnes, même à initiales communes."""
+        assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "Abdelkader")]) == []
+
+    def test_signature_without_first_name(self):
+        assert compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
+
+
+class TestAttestedFullFirstNames:
+    def test_keeps_compatible_full_first_names_of_the_same_family_name(self):
+        names = ["Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont"]
+        assert attested_full_first_names("Tnourji", ("a",), names) == {"abdellah": "Abdellah"}
+
+    def test_incompatible_first_name_is_ignored(self):
+        assert attested_full_first_names("Tnourji", ("a",), ["Karim Tnourji"]) == {}
+
+    def test_most_frequent_spelling_wins(self):
+        names = ["Stephane Monteil", "Stéphane Monteil", "Stéphane Monteil"]
+        assert attested_full_first_names("Monteil", ("s",), names) == {"stephane": "Stéphane"}
+
+    def test_several_distinct_first_names(self):
+        names = ["Jean Martin", "Julien Martin"]
+        assert attested_full_first_names("Martin", ("j",), names).keys() == {"jean", "julien"}
+
 
 class TestDecideMatchByIdentifier:
     def test_compatible_name_returns_person_id(self):
@@ -385,6 +462,32 @@ class TestDecidePersonMatch:
             name_form_outcome=NameFormDecision(action="match", person_id=7),
         )
         assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
+
+    def test_cross_source_wins_over_compatible_initials(self):
+        decision = decide_person_match(
+            orcid_match=None,
+            hal_match=None,
+            idref_match=None,
+            cross_source_match=42,
+            name_form_outcome=NameFormDecision(
+                action="match", person_id=7, reason="compatible_name"
+            ),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=42, reason="cross_source")
+
+    def test_compatible_initials_match_without_cross_source(self):
+        decision = decide_person_match(
+            orcid_match=None,
+            hal_match=None,
+            idref_match=None,
+            cross_source_match=None,
+            name_form_outcome=NameFormDecision(
+                action="match", person_id=7, reason="compatible_name"
+            ),
+        )
+        assert decision == PersonMatchDecision(
+            action="match", person_id=7, reason="compatible_name"
+        )
 
     def test_cross_source_wins_over_name_creation(self):
         # Le cross-source passe avant la création : une signature à créer préfère rejoindre

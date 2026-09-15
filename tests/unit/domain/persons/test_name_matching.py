@@ -5,7 +5,12 @@ Cas réels observés sur le canal identifiant (noms des porteurs d'une valeur vs
 
 import pytest
 
-from domain.persons.name_matching import _edit_distance, names_compatible
+from domain.persons.name_matching import (
+    _edit_distance,
+    first_name_initials,
+    initials_extend,
+    names_compatible,
+)
 
 SAME = [
     # Initiale, inversion nom/prénom.
@@ -112,3 +117,35 @@ def test_un_nom_vide_n_est_compatible_avec_aucun_autre():
 def test_distance_d_edition(a, b, distance):
     assert _edit_distance(a, b) == distance
     assert _edit_distance(b, a) == distance
+
+
+@pytest.mark.parametrize(
+    ("first_name", "initials"),
+    [
+        ("A.", ("a",)),
+        ("J.-P.", ("j", "p")),
+        ("A M", ("a", "m")),
+        ("JP", ("j", "p")),
+        ("Abdellah", None),
+        ("Denis M.", None),
+        ("", None),
+    ],
+)
+def test_initiales_d_un_prenom(first_name, initials):
+    assert first_name_initials(first_name) == initials
+
+
+@pytest.mark.parametrize(
+    ("initials", "first_name", "extend"),
+    [
+        (("a",), "Abdul-Majeed", True),
+        (("a", "m"), "Abdul-Majeed", True),
+        (("d",), "Denis M.", True),
+        (("j",), "J.-P.", True),
+        (("h",), "Bo-Hyung", False),
+        (("c", "g"), "Chloé", False),
+        (("a",), "", False),
+    ],
+)
+def test_initiales_qui_commencent_un_prenom(initials, first_name, extend):
+    assert initials_extend(initials, first_name) is extend
