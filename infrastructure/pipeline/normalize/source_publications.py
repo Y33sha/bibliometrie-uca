@@ -7,6 +7,8 @@ Une `source_publication` est la vue normalisée d'un import : le dernier import 
 L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes marquées `keys_dirty` — ce que chaque écriture fait ici. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
 
+import logging
+from collections.abc import Mapping
 from dataclasses import fields
 
 from sqlalchemy import Connection, bindparam, text
@@ -16,9 +18,12 @@ from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationUpsert,
 )
 from domain.publications.metadata import normalized_title
+from domain.source_publications.external_ids import normalize_external_ids
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
+
+logger = logging.getLogger(__name__)
 
 _FIELDS = fields(SourcePublicationUpsert)
 
@@ -54,6 +59,29 @@ class PgSourcePublicationQueries(SourcePublicationQueries):
     def upsert_source_publication(self, conn: Connection, row: SourcePublicationUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
-        # `external_ids` est `NOT NULL` et contraint à un objet JSON.
-        params["external_ids"] = {} if row.external_ids is None else row.external_ids
+        params["external_ids"] = _external_ids(row)
         return scalar_int(conn.execute(_UPSERT_SQL, params))
+
+
+def _external_ids(row: SourcePublicationUpsert) -> dict[str, JsonValue]:
+    """`external_ids` normalisé, objet JSON vide à défaut : la colonne est `NOT NULL` et contrainte à un objet. Chaque entrée écartée est journalisée."""
+    if row.external_ids is None:
+        return {}
+    if not isinstance(row.external_ids, Mapping):
+        logger.warning(
+            "external_ids écarté (%s %s) : objet attendu, reçu %r",
+            row.source,
+            row.source_id,
+            row.external_ids,
+        )
+        return {}
+    clean, rejected = normalize_external_ids(row.external_ids)
+    for entry in rejected:
+        logger.warning(
+            "external_ids écarté (%s %s) : %s = %r",
+            row.source,
+            row.source_id,
+            entry.key,
+            entry.value,
+        )
+    return clean

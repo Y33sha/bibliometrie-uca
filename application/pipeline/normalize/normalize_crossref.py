@@ -36,6 +36,7 @@ from domain.persons.identifiers import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -124,10 +125,10 @@ def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | Non
     ext: dict[str, JsonValue] = {}
     issns = msg.get("ISSN") or []
     if isinstance(issns, list) and issns:
-        ext["issn"] = [s for s in issns if isinstance(s, str)]
+        ext[ExternalIdType.ISSN] = [s for s in issns if isinstance(s, str)]
     isbns = msg.get("ISBN") or []
     if isinstance(isbns, list) and isbns:
-        ext["isbn"] = [s for s in isbns if isinstance(s, str)]
+        ext[ExternalIdType.ISBN] = [s for s in isbns if isinstance(s, str)]
     return ext or None
 
 

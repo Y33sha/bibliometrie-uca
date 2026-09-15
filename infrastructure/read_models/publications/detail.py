@@ -17,6 +17,7 @@ from application.ports.read_models.publications_queries import (
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
+from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
 
@@ -344,10 +345,10 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
 
 # Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
 _EXTERNAL_IDENTIFIER_KEYS = (
-    ("arxiv", "arxiv_id"),
-    ("pmid", "pmid"),
-    ("pmcid", "pmcid"),
-    ("nnt", "nnt"),
+    ("arxiv", ExternalIdType.ARXIV_ID),
+    ("pmid", ExternalIdType.PMID),
+    ("pmcid", ExternalIdType.PMCID),
+    ("nnt", ExternalIdType.NNT),
 )
 
 

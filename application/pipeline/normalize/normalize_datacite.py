@@ -39,6 +39,7 @@ from domain.persons.identifiers import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.datacite import (
     extract_datacite_doc_type_token,
     extract_datacite_meta,
@@ -254,7 +255,7 @@ def process_work(
     related_dois = extract_related_dois(attributes, doi)
     external_ids: dict[str, JsonValue] = {}
     if related_dois:
-        external_ids["related_dois"] = related_dois
+        external_ids[ExternalIdType.RELATED_DOIS] = related_dois
 
     source_publication_id = queries.upsert_source_publication(
         conn,

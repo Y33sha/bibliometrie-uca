@@ -9,7 +9,11 @@ from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
-from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
+from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.keys import (
+    DISCRIMINANT_TITLE_MIN_LENGTH,
+    SCALAR_CONFIRMATION_ID_TYPES,
+)
 from infrastructure.db.scalars import scalar_int
 
 # Voisinage 1-hop : les `source_publications` dirty (orphelines comprises) et celles qui
@@ -24,7 +28,6 @@ _COLS = (
 )
 
 # Un bras UNION par clé de confirmation scalaire d'`external_ids` : égalité directe (index btree). `hal_id` (array) a son propre bras.
-_SCALAR_CONFIRMATION_KEYS = tuple(k for k in ConfirmationKey if k is not ConfirmationKey.HAL_ID)
 _SCALAR_KEY_ARMS = "".join(
     f"""
     UNION
@@ -33,7 +36,7 @@ _SCALAR_KEY_ARMS = "".join(
     JOIN source_publications o ON o.external_ids ->> '{k}' = d.external_ids ->> '{k}'
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.external_ids ? '{k}'"""
-    for k in _SCALAR_CONFIRMATION_KEYS
+    for k in SCALAR_CONFIRMATION_ID_TYPES
 )
 
 _UNIVERSE_SQL = text(f"""
@@ -58,10 +61,10 @@ _UNIVERSE_SQL = text(f"""
     UNION
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> '{ConfirmationKey.HAL_ID}') AS dh(hal)
-    JOIN source_publications o ON o.external_ids -> '{ConfirmationKey.HAL_ID}' @> jsonb_build_array(dh.hal)
+    CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> '{ExternalIdType.HAL_ID}') AS dh(hal)
+    JOIN source_publications o ON o.external_ids -> '{ExternalIdType.HAL_ID}' @> jsonb_build_array(dh.hal)
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE jsonb_typeof(d.external_ids -> '{ConfirmationKey.HAL_ID}') = 'array'
+    WHERE jsonb_typeof(d.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
     UNION
     -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
     SELECT {_COLS.format(a="o")}

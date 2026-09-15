@@ -8,9 +8,10 @@ from application.ports.read_models.publications_queries import (
     PublicationSourcesResponse,
     SourcePublicationMetadataOut,
 )
+from domain.source_publications.external_ids import ExternalIdType
 
 # L'ISSN identifie la revue : il figure avec elle, depuis `biblio`.
-_JOURNAL_IDENTIFIERS = frozenset({"issn"})
+_JOURNAL_IDENTIFIERS = frozenset({ExternalIdType.ISSN})
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:

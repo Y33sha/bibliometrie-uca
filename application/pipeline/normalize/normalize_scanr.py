@@ -30,6 +30,7 @@ from domain.persons.identifiers import (
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.scanr import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
@@ -144,7 +145,7 @@ def insert_scanr_document(  # noqa: C901
     """
     ext: dict[str, JsonValue] = {}
     if nnt := pub_meta.nnt:
-        ext["nnt"] = nnt
+        ext[ExternalIdType.NNT] = nnt
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
     dois: list[str] = []
@@ -158,15 +159,15 @@ def insert_scanr_document(  # noqa: C901
         if etype == "hal" and valeur not in hal_ids:
             hal_ids.append(valeur)
         elif etype == "pmid":
-            ext["pmid"] = valeur
+            ext[ExternalIdType.PMID] = valeur
         elif etype == "doi" and (doi := clean_doi(valeur)) and doi not in dois:
             dois.append(doi)
     if hal_ids:
-        ext["hal_id"] = hal_ids
+        ext[ExternalIdType.HAL_ID] = hal_ids
     # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
     # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
     if related_dois := [d for d in dois if d != pub_meta.doi]:
-        ext["related_dois"] = related_dois
+        ext[ExternalIdType.RELATED_DOIS] = related_dois
     external_ids = ext if ext else None
 
     abstract = as_str(as_mapping(doc.get("summary")).get("default"))

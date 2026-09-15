@@ -6,6 +6,7 @@
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from infrastructure.pipeline.fetch_missing.failed_lookups import pending_failed_lookup_sql
 
@@ -52,9 +53,9 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
             UNION
             SELECT d.value
             FROM source_publications sp
-            CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> 'related_dois') d(value)
+            CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') d(value)
             WHERE sp.source = CAST(:target AS source_type)
-              AND jsonb_typeof(sp.external_ids -> 'related_dois') = 'array'
+              AND jsonb_typeof(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') = 'array'
         )
         SELECT DISTINCT c.doi
         FROM candidate_dois c

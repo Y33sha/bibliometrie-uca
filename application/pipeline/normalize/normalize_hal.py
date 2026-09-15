@@ -42,6 +42,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, hal_text_field
 from domain.types import JsonValue, as_int, as_sequence, as_strs
 
@@ -145,19 +146,19 @@ def build_hal_external_ids(
 
     `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
-    external_ids: dict[str, JsonValue] = {"hal_id": [hal_id]}
+    external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
-        external_ids["nnt"] = nnt
+        external_ids[ExternalIdType.NNT] = nnt
     if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
-        external_ids["pmid"] = pmid
+        external_ids[ExternalIdType.PMID] = pmid
     brut = doc.get("linkExtUrl_s")
     link_urls = [brut] if isinstance(brut, str) else as_sequence(brut)
     for entree in link_urls:
         url = hal_text_field(entree)
-        if "pmcid" not in external_ids and (pmcid := normalize_pmcid(url)):
-            external_ids["pmcid"] = pmcid
-        if "arxiv_id" not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
-            external_ids["arxiv_id"] = arxiv_id
+        if ExternalIdType.PMCID not in external_ids and (pmcid := normalize_pmcid(url)):
+            external_ids[ExternalIdType.PMCID] = pmcid
+        if ExternalIdType.ARXIV_ID not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
+            external_ids[ExternalIdType.ARXIV_ID] = arxiv_id
     return external_ids
 
 
