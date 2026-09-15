@@ -143,9 +143,10 @@ class PgJournalGatewayQueries(
         ).one_or_none()
         new_issn = False
         if carried is not None:
-            # Un ISSN que la revue porte déjà n'est pas réécrit dans une autre colonne : la
-            # vérification Sudoc range chaque ISSN dans la colonne de son support.
-            known = {v for v in carried if v}
+            # Un ISSN que la revue porte déjà dans `issn` ou `eissn` n'est pas réécrit dans
+            # l'autre : la vérification Sudoc range chaque ISSN dans la colonne de son support.
+            # `issnl` reste hors de la comparaison, l'ISSN-L étant lui-même l'ISSN d'un support.
+            known = {v for v in (carried.issn, carried.eissn) if v}
             issn = None if issn in known else issn
             eissn = None if eissn in known or eissn == issn else eissn
             new_issn = (issn is not None and carried.issn is None) or (

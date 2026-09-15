@@ -65,7 +65,7 @@ class JournalFindOrCreateQueries(Protocol):
     ) -> None:
         """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée.
 
-        Un ISSN que la revue porte déjà, dans l'une des trois colonnes, n'est pas réécrit dans une autre. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
+        Un ISSN que la revue porte déjà dans `issn` ou `eissn` n'est pas réécrit dans l'autre. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
         """
         ...
 

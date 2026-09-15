@@ -346,6 +346,13 @@ class TestFindOrCreateJournal:
         assert row.eissn == "1476-4687"
         assert row.sudoc_checked_at is not None
 
+    def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
+        """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
+        j_id = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
+        find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
+        row = _fetch_one(sa_sync_conn, "SELECT issn, issnl FROM journals WHERE id = :id", id=j_id)
+        assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
+
     def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
