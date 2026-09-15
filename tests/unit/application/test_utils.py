@@ -1,5 +1,7 @@
 """Tests unitaires — fonctions pures, sans base de données."""
 
+import pytest
+
 from domain.normalize import normalize_name
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import (
@@ -98,6 +100,21 @@ class TestParseRawAuthorName:
 
     def test_multiple_first_names(self):
         assert parse_raw_author_name("Jean Pierre Dupont") == ("Dupont", "Jean Pierre")
+
+    @pytest.mark.parametrize(
+        ("raw", "parsed"),
+        [
+            ("Alison da Silva", ("da Silva", "Alison")),
+            ("Nada El Osta", ("El Osta", "Nada")),
+            ("Jan van der Berg", ("van der Berg", "Jan")),
+            ("Benjamin van Wyk de Vries", ("van Wyk de Vries", "Benjamin")),
+            ("Jean d' Ormesson", ("d' Ormesson", "Jean")),
+            ("Marie d'Aboville Lefort", ("d'Aboville Lefort", "Marie")),
+            ("Guilherme D. da Fonseca", ("da Fonseca", "Guilherme D.")),
+        ],
+    )
+    def test_family_name_opens_at_the_first_particle(self, raw, parsed):
+        assert parse_raw_author_name(raw) == parsed
 
     def test_single_name(self):
         assert parse_raw_author_name("Dupont") == ("Dupont", "")

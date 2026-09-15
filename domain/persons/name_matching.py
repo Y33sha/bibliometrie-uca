@@ -8,13 +8,27 @@ from enum import Enum
 
 from domain.normalize import clean_raw_author_name, normalize_name
 
+# Particules qui ouvrent un nom de famille (« da Silva », « van der Berg », « d'Incan »).
+_PARTICLES = frozenset(
+    {
+        "abu", "ait", "al", "ben", "bin", "da", "das", "de", "del", "della", "den", "der",
+        "des", "di", "do", "dos", "du", "el", "ibn", "la", "le", "les", "saint", "st", "van",
+        "von",
+    }
+)  # fmt: skip
+
+
+def _opens_family_name(word: str) -> bool:
+    """Vrai si le mot est une particule, élidée comprise (« d'Incan »)."""
+    return normalize_name(word) in _PARTICLES or re.match(r"d['’ʼ]", word.lower()) is not None
+
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """Parse un raw_author_name en (last_name, first_name).
 
     Formats gérés :
     - "LastName, FirstName" (WoS, HAL parfois)
-    - "FirstName LastName" (OpenAlex)
+    - "FirstName LastName" (OpenAlex) : le nom de famille commence à la première particule après le premier mot (« Alison da Silva »), sinon il se réduit au dernier mot.
     """
     if not raw_name:
         return "", ""
@@ -24,9 +38,12 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
         parts = raw.split(",", 1)
         return parts[0].strip(), parts[1].strip()
     words = raw.split()
-    if len(words) >= 2:
-        return words[-1], " ".join(words[:-1])
-    return raw, ""
+    if len(words) < 2:
+        return raw, ""
+    start = next(
+        (i for i in range(1, len(words) - 1) if _opens_family_name(words[i])), len(words) - 1
+    )
+    return " ".join(words[start:]), " ".join(words[:start])
 
 
 def first_name_initials(first_name: str) -> tuple[str, ...] | None:
