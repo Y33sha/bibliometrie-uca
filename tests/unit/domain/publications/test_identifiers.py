@@ -171,6 +171,9 @@ class TestHALIdConstruction:
             ("dumas-01234567", "dumas-01234567"),
             ("insu-00112233", "insu-00112233"),
             ("in2p3-04445555", "in2p3-04445555"),  # code de collection avec chiffres
+            ("sic_01848892", "sic_01848892"),  # portail ArchiveSIC : séparateur `_`
+            ("https://archivesic.ccsd.cnrs.fr/sic_01848892v1", "sic_01848892"),
+            ("pmh:oai:HAL:sic_01848892v1", "sic_01848892"),
             ("hal-04123456v2", "hal-04123456"),  # strip suffixe version
             ("HAL-04123456", "hal-04123456"),  # lowercase
             ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL

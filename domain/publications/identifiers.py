@@ -132,7 +132,7 @@ class DOI:
 
 # ── HAL ID (document) ──────────────────────────────────────────────
 
-# Un HAL ID est `<code de collection>-<numéro à 8 chiffres>`. Le code de collection est ouvert :
+# Un HAL ID est `<code de collection>-<numéro à 8 chiffres>`, avec `_` pour séparateur sur le portail ArchiveSIC (`sic_01848892`). Le code de collection est ouvert :
 # `hal`, `tel`, `halshs`, `dumas`, `emse`, `in2p3`, `inserm`, `insu`, `cea`… — des dizaines de
 # portails institutionnels, et de nouveaux apparaissent. On matche donc tout préfixe alphanumérique
 # plutôt qu'une liste blanche fermée, qui exclurait silencieusement de la déduplication les
@@ -142,7 +142,7 @@ class DOI:
 # base, tous portails confondus, ont exactement 8 chiffres). Ce plancher écarte les fragments
 # `mot-chiffres` glanés dans des URLs étrangères — un suffixe de DOI DataCite (`pubdb-2020`,
 # `rwth-2020`) ou un PURL (`gro-2`) ne ressemble plus à un hal_id.
-_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d{8,})", re.IGNORECASE)
+_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*[-_]\d{8,})", re.IGNORECASE)
 
 # Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`. Les works OpenAlex
 # exposent la source structurée de leurs locations sous cette forme : `oai:HAL:hal-04123456v1` pour
