@@ -88,6 +88,31 @@ class TestBuildAuthorshipsRebuildFull:
             f"  avant : {counts_before}\n  après : {counts_after}"
         )
 
+    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, caplog):
+        """Le journal annonce la purge, sans quoi tous les liens paraîtraient nouveaux."""
+        import logging
+
+        from sqlalchemy import text
+
+        from application.pipeline.authorships.build_authorships import build
+        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+
+        setup_persons_test_data(sa_sync_conn)
+        run_create_persons(sa_sync_conn)
+        _run_build_authorships(sa_sync_conn)
+        liens = sa_sync_conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
+
+        with caplog.at_level(logging.INFO, logger="test"):
+            build(
+                sa_sync_conn,
+                PgAuthorshipsBuildQueries(),
+                logging.getLogger("test"),
+                rebuild_full=True,
+            )
+
+        assert "▶ Reconstruction complète" in caplog.messages
+        assert f"  └─ {liens} liens supprimés" in caplog.messages
+
 
 class TestBuildAuthorshipsRebuildRollback:
     """Un rebuild annulé par rollback laisse la séquence des ids devant les lignes restaurées."""

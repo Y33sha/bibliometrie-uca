@@ -96,11 +96,16 @@ def reconcile(
     *,
     publication_repo: PublicationRepository,
     logger: logging.Logger | None = None,
+    rebuild: bool = False,
 ) -> ReconcileStats | None:
     """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
 
+    `rebuild` marque d'abord toutes les `source_publications` dirty : la réconciliation reprend alors le stock entier.
+
     Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici.
     """
+    if rebuild:
+        queries.mark_keys_dirty(conn)
     queries.mark_publication_siblings_dirty(conn)
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
@@ -111,9 +116,10 @@ def reconcile(
     if logger:
         etape(
             logger,
-            "%s %s (nouveaux ou mis à jour)",
+            "%s %s (%s)",
             accord(len(dirty_ids), "document"),
             forme(len(dirty_ids), "examiné"),
+            "reconstruction complète" if rebuild else "nouveaux ou mis à jour",
         )
     with attente(BRANCHE, logger) as ligne:
         rows = queries.fetch_reconciliation_universe(conn)
@@ -191,9 +197,12 @@ def run(
     logger: logging.Logger,
     *,
     publication_repo: PublicationRepository,
+    rebuild: bool = False,
 ) -> ReconcileStats | None:
     try:
-        stats = reconcile(conn, queries, publication_repo=publication_repo, logger=logger)
+        stats = reconcile(
+            conn, queries, publication_repo=publication_repo, logger=logger, rebuild=rebuild
+        )
         if stats is None:
             return None
         conn.commit()
