@@ -1,6 +1,5 @@
 """Tests du consensus des porteurs d'identifiant et de la requalification des identifiants mal placés."""
 
-import logging
 from unittest.mock import ANY, MagicMock
 
 from application.pipeline.persons.requalify_identifiers import (
@@ -33,9 +32,7 @@ def test_identite_contredisant_le_consensus_neutralisee_et_detachee():
     )
     queries.detach_authorships.return_value = 1
 
-    result = requalify_misplaced_identifiers(
-        MagicMock(), {("orcid", "X"): "s dahbi"}, queries, logging.getLogger(__name__)
-    )
+    result = requalify_misplaced_identifiers(MagicMock(), {("orcid", "X"): "s dahbi"}, queries)
 
     queries.write_misplaced_neutralizations.assert_called_once_with(ANY, {2: ["orcid"]})
     queries.detach_authorships.assert_called_once_with(ANY, [10])

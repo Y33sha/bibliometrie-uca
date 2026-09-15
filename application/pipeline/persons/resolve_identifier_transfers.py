@@ -10,7 +10,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme, rien_a_faire
 from application.pipeline.persons.requalify_identifiers import IdentifierConsensus
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
@@ -62,6 +62,7 @@ def resolve_identifier_transfers(
     """
     pending = [c for c in conflicts if c.owner_status == "pending"]
     if not pending:
+        rien_a_faire(logger)
         return {"conflicts": len(conflicts), "pending": 0, "transferred": 0}
 
     # Nom-prénom + formes confirmées des personnes impliquées (propriétaires et candidats).
@@ -116,7 +117,7 @@ def resolve_identifier_transfers(
 
     # Un conflit dont l'attribution est confirmée par l'admin est tranché : seuls les autres comptent.
     logger.info(
-        "%s%s → %s %s",
+        "%s%s à arbitrer → %s %s",
         DERNIERE_BRANCHE,
         accord(len(pending), "conflit"),
         accord(transferred, "identifiant"),
