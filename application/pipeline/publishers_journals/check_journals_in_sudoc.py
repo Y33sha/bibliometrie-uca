@@ -37,6 +37,24 @@ def _journal_issns(row: JournalSudocRow) -> JournalIssns:
     return JournalIssns(row.title, row.issn, row.eissn, row.issnl, row.rejected_issns)
 
 
+def _records(
+    issns: Sequence[str],
+    ppns_by_issn: dict[str, tuple[str, ...]],
+    record_by_ppn: dict[str, SudocSerialRecord | None],
+    fetch_record: FetchRecord,
+) -> dict[str, SudocSerialRecord]:
+    """Notice de chaque ISSN connu du Sudoc. `record_by_ppn` garde les notices déjà lues."""
+    records: dict[str, SudocSerialRecord] = {}
+    for issn in issns:
+        if not (ppns := ppns_by_issn.get(issn)):
+            continue
+        if ppns[0] not in record_by_ppn:
+            record_by_ppn[ppns[0]] = fetch_record(ppns[0])
+        if (record := record_by_ppn[ppns[0]]) is not None:
+            records[issn] = record
+    return records
+
+
 def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) -> None:
     label = f"Revue {row.id} ({row.title!r})"
     if check.conflict:
@@ -85,16 +103,13 @@ def run_check_journals_in_sudoc(
             batch = [(row, _journal_issns(row)) for row in rows[i : i + BATCH_SIZE]]
             wanted = {issn for _, journal in batch for issn in journal.own()}
             wanted |= {c for _, journal in batch for c in correction_candidates(journal.rejected)}
-            records: dict[str, SudocSerialRecord] = {}
-            for issn, ppns in fetch_ppns(sorted(wanted)).items():
-                ppn = ppns[0]
-                if ppn not in record_by_ppn:
-                    record_by_ppn[ppn] = fetch_record(ppn)
-                if (record := record_by_ppn[ppn]) is not None:
-                    records[issn] = record
+            ppns_by_issn = fetch_ppns(sorted(wanted))
 
             checked_at = datetime.now(UTC)
             for row, journal in batch:
+                # Les notices se lisent revue par revue : la barre avance au rythme du téléchargement.
+                issns = (*journal.own(), *correction_candidates(journal.rejected))
+                records = _records(issns, ppns_by_issn, record_by_ppn, fetch_record)
                 check = check_journal_issns(journal, records)
                 _log_check(logger, row, check)
                 journal_repo.record_sudoc_check(
