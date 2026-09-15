@@ -44,3 +44,17 @@ def test_consensus_du_proprietaire_ne_transfere_pas():
 
 def test_sans_consensus_rien_ne_transfere():
     assert _transferred(None) == 0
+
+
+def test_sans_conflit_a_arbitrer_l_etape_se_ferme(caplog):
+    """Un conflit confirmé par l'admin est tranché : l'étape se ferme sur « Rien à faire »."""
+    with caplog.at_level(logging.INFO):
+        resolve_identifier_transfers(
+            MagicMock(),
+            [IdentifierConflict("orcid", _ORCID, _CANDIDATE, _OWNER, "confirmed")],
+            consensus={},
+            queries=MagicMock(),
+            repo=MagicMock(),
+            logger=logging.getLogger(__name__),
+        )
+    assert caplog.messages == ["  └─ Rien à faire"]

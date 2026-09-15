@@ -3,12 +3,10 @@
 Le consensus d'une valeur d'identifiant est le nom que portent strictement plus de signatures que chacun des autres (`consensus_name`). Une identité dont le nom ne désigne pas la personne du consensus porte la valeur par erreur : ses signatures la neutralisent avec le motif `misplaced`. Le calcul repart des données à chaque exécution, si bien qu'une neutralisation disparaît quand le consensus change.
 """
 
-import logging
 from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, accord
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
 from domain.persons.matching import consensus_name, identifier_misplaced
@@ -33,7 +31,6 @@ def requalify_misplaced_identifiers(
     conn: Connection,
     consensus: IdentifierConsensus,
     queries: PersonsMatchingQueries,
-    logger: logging.Logger,
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés et détache les signatures qu'ils ont pu rattacher.
 
@@ -47,9 +44,4 @@ def requalify_misplaced_identifiers(
 
     written = queries.write_misplaced_neutralizations(conn, misplaced)
     detached = queries.detach_authorships(conn, written.to_detach) if written.to_detach else 0
-    logger.info(
-        "%sIdentifiants mal placés neutralisés sur %s",
-        BRANCHE,
-        accord(written.neutralized, "signature"),
-    )
     return {"neutralized": written.neutralized, "detached": detached}
