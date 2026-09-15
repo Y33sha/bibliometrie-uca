@@ -84,7 +84,6 @@ class NameFormSummaryOut(BaseModel):
 
     name_form: str
     sources: list[str]
-    ambiguous: bool
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]

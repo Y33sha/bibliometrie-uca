@@ -11,7 +11,7 @@ from application.ports.read_models.persons_queries import (
     PersonSearchResult,
 )
 from domain.sources.registry import AUTHOR_SOURCES
-from infrastructure.db.sql_fragments import in_clause
+from infrastructure.db.sql_fragments import in_clause, other_name_form_holders
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -162,17 +162,16 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
 def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryOut]:
     """Formes de nom d'une personne, avec leur état d'arbitrage.
 
-    Toutes les formes, y compris celles entièrement dérivées du nom canonique (source `persons` seule) : la fiche d'une personne les présente à la curation. `shared_count` compte les personnes qui portent la même forme, `ambiguous` dit qu'elles sont plusieurs, et `pub_count` les publications distinctes que la forme signe.
+    Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui portent la forme, au sens de `other_name_form_holders`. `pub_count` compte les publications distinctes que la forme signe.
     """
     rows = conn.execute(
         text(f"""
             SELECT pnf.name_form,
                    pnf.sources,
                    pnf.status::text AS status,
-                   (SELECT COUNT(*) FROM person_name_forms p2
-                    WHERE p2.name_form = pnf.name_form) AS shared_count,
-                   (SELECT COUNT(*) > 1 FROM person_name_forms p2
-                    WHERE p2.name_form = pnf.name_form) AS ambiguous,
+                   (SELECT COUNT(*)
+                    FROM ({other_name_form_holders("pnf.name_form", "pnf.person_id")}) holders
+                   ) AS shared_count,
                    (SELECT COUNT(DISTINCT sd.publication_id)
                     FROM source_authorships sa
                     JOIN author_identifying_keys aik ON aik.id = sa.identity_id
@@ -191,7 +190,6 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
         NameFormSummaryOut(
             name_form=r.name_form,
             sources=r.sources,
-            ambiguous=r.ambiguous,
             status=r.status,
             shared_count=r.shared_count,
             pub_count=r.pub_count,

@@ -3526,8 +3526,6 @@ export interface components {
             name_form: string;
             /** Sources */
             sources: string[];
-            /** Ambiguous */
-            ambiguous: boolean;
             /**
              * Status
              * @enum {string}

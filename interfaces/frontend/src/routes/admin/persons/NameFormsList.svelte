@@ -87,12 +87,12 @@
     <span class="pub-count" class:zero={nf.pub_count === 0}>
       {nf.pub_count} pub.
     </span>
-    {#if nf.shared_count > 1}
+    {#if nf.shared_count > 0}
       <span
         class="shared"
-        title="Aussi portée par {nf.shared_count - 1} autre(s) personne(s)"
+        title="Aussi portée par {nf.shared_count} autre(s) personne(s)"
       >
-        &#9094; {nf.shared_count - 1}
+        &#9094; {nf.shared_count}
       </span>
     {/if}
   </div>

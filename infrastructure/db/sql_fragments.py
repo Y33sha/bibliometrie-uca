@@ -3,6 +3,8 @@
 Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une signature), et des expressions SQL figées réutilisées par plusieurs adaptateurs.
 """
 
+from domain.persons.identifiers import AttributionStatus
+
 
 def in_clause(values: tuple[str, ...]) -> str:
     """Contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`."""
@@ -40,6 +42,20 @@ def usable_identifiers(*, signature: str = "sa", identity: str = "aik") -> str:
     return (
         f"({identity}.person_identifiers - ARRAY(SELECT jsonb_object_keys("
         f"coalesce({signature}.neutralized_identifiers, '{{}}'::jsonb))))"
+    )
+
+
+def other_name_form_holders(name_form: str, person_id: str) -> str:
+    """Sous-requête (`person_id`) des autres personnes qui portent la forme de nom : forme non rejetée, personne non rejetée, `person_id` exclu.
+
+    `name_form` et `person_id` sont des expressions SQL : paramètres (`:nf`) ou colonnes de la requête hôte.
+    """
+    return (
+        "SELECT holder.person_id FROM person_name_forms holder"
+        " JOIN persons holder_person ON holder_person.id = holder.person_id"
+        f" WHERE holder.name_form = {name_form} AND holder.person_id <> {person_id}"
+        f" AND holder.status <> '{AttributionStatus.REJECTED.value}'"
+        " AND NOT holder_person.rejected"
     )
 
 
