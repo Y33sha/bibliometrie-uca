@@ -23,7 +23,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
-from application.pipeline.libelles import accord, branche_de_source, forme
+from application.pipeline.libelles import branche_de_source
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
@@ -123,13 +123,6 @@ async def refresh(
     if total == 0:
         return metrics
 
-    slog.info(
-        "%s non %s depuis %s",
-        accord(total, "document"),
-        forme(total, "revu"),
-        accord(after_days, "jour"),
-    )
-
     request_delay = getattr(adapter, "request_delay_s", 0.0)
     processed = 0
 
@@ -177,12 +170,4 @@ async def refresh(
             processed,
             total,
         )
-    disparus = metrics.extras.get("disappeared", 0)
-    retrouves = metrics.updated + metrics.unchanged
-    bilan = f"{retrouves}/{total} {forme(total, 'document')} {forme(retrouves, 'retrouvé')}"
-    if disparus:
-        bilan += f", {disparus} {forme(disparus, 'disparu')}"
-    if metrics.errors:
-        bilan += f", {metrics.errors} {forme(metrics.errors, 'erreur')}"
-    slog.info("%s", bilan)
     return metrics

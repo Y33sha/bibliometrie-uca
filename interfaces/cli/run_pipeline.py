@@ -1328,10 +1328,33 @@ def _encadre(lignes: list[str]) -> list[str]:
     ]
 
 
-def _titre_de_phase(name: str) -> list[str]:
-    """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
+def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
+    from infrastructure.sources.config import get_fetch_stale_after_days
+
+    return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
+
+
+_CHAMPS_DE_LIBELLE: dict[str, Callable[["Connection"], dict[str, str]]] = {
+    "fetch_stale": _champs_fetch_stale,
+}
+"""Valeurs des champs de chaque libellé de phase qui en porte, lues en configuration."""
+
+
+def _libelle_de_phase(name: str) -> str | None:
+    """Ce que la phase produit, ses champs remplis par la configuration."""
     # `PHASE_LIBELLES` couvre les phases du pipeline ; les tests en nomment d'autres.
     libelle = PHASE_LIBELLES.get(name)
+    champs = _CHAMPS_DE_LIBELLE.get(name)
+    if libelle is None or champs is None:
+        return libelle
+    from infrastructure.db.engine import get_sync_engine
+
+    with get_sync_engine().connect() as conn:
+        return libelle.format(**champs(conn))
+
+
+def _titre_de_phase(name: str, libelle: str | None) -> list[str]:
+    """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
     return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
 
 
@@ -1427,7 +1450,7 @@ def _run_one_phase(
     try:
         # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.
         log.info("")
-        for ligne in _titre_de_phase(name):
+        for ligne in _titre_de_phase(name, _libelle_de_phase(name)):
             log.info("%s", ligne)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
