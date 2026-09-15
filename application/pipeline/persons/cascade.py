@@ -15,7 +15,7 @@ Deux populations de candidats traversent la même cascade :
 
 Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
+`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
 
 Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
@@ -122,22 +122,34 @@ class _Cascade:
                     first_norm=a.first_norm,
                     candidates=candidates,
                 )
-        rejected_for_pub = (
-            self._rejected_by_pub.get(a.publication_id, frozenset())
-            if a.publication_id is not None
-            else frozenset()
-        )
+        rejected_for_pub = self._rejected_for(a)
         # Barreau name_form réservé au périmètre : hors-périmètre, un nom seul ne peut ni attacher ni créer (on n'a que des candidats ancrés sur identifiant ou position).
         if a.in_perimeter:
-            norm = a.author_name_normalized
-            name_form_outcome = decide_name_form_outcome(
-                self._name_form_map.get(norm) if norm else None,
-                a.allow_create,
-                rejected_person_ids=rejected_for_pub,
-            )
+            name_form_outcome = self._name_form_outcome(a, rejected_for_pub)
         else:
             name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
         return cross_source_match, name_form_outcome, rejected_for_pub
+
+    def _rejected_for(self, a: EnrichedAuthorship) -> frozenset[int]:
+        """Personnes rejetées pour la publication de la signature."""
+        if a.publication_id is None:
+            return frozenset()
+        return self._rejected_by_pub.get(a.publication_id, frozenset())
+
+    def _name_form_outcome(
+        self, a: EnrichedAuthorship, rejected_for_pub: frozenset[int]
+    ) -> NameFormDecision:
+        """Décision par la forme du nom, contre l'index vivant des formes."""
+        norm = a.author_name_normalized
+        return decide_name_form_outcome(
+            self._name_form_map.get(norm) if norm else None,
+            a.allow_create,
+            rejected_person_ids=rejected_for_pub,
+        )
+
+    def name_form_ambiguous(self, a: EnrichedAuthorship) -> bool:
+        """Vrai quand la forme du nom ne désigne aucune personne unique parmi celles qui la portent : la signature ne peut ni se rattacher par son nom, ni créer de personne."""
+        return self._name_form_outcome(a, self._rejected_for(a)).reason == "ambiguous_name_form"
 
     def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
@@ -183,6 +195,18 @@ class _Cascade:
             name_form_outcome=name_form_outcome,
             rejected_person_ids=rejected_for_pub,
         )
+
+    def resolve_or_create(self, a: EnrichedAuthorship) -> bool:
+        """Rattache, crée ou écarte la signature d'après la décision cross-source et nom. Rend `True` sur une création."""
+        decision = self.decide_cross_and_name(a)
+        if decision.action == "match":
+            self.apply_match(a, decision.person_id, decision.reason)
+        elif decision.action == "create":
+            self.apply_create(a)
+            return True
+        else:
+            self.skipped_counts[decision.reason] += 1
+        return False
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> bool:
         """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
@@ -293,27 +317,32 @@ def run_cascade(
     # hors périmètre, ou déjà liées en cross-source — n'attendent de cette passe qu'un
     # rattachement à une personne qu'elle vient de créer ; la passe suivante du run d'après les
     # rejuge contre l'état ferme complet.
-    a_creer = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
+    sans_personne = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
+    non_identifiees = [a for a in sans_personne if a.allow_create]
+    # Une création ajoute des personnes aux formes de nom sans en retirer : une forme ambiguë le reste.
+    indecidables = [a for a in non_identifiees if c.name_form_ambiguous(a)]
+    indecidables_ids = {a.authorship_id for a in indecidables}
+    a_creer = [a for a in non_identifiees if a.authorship_id not in indecidables_ids]
 
     etape(logger, "Création de nouvelles personnes")
     logger.info(
         "%s%s %s",
         BRANCHE,
-        accord(len(a_creer), "signature"),
-        forme(len(a_creer), "non identifiée"),
+        accord(len(non_identifiees), "signature"),
+        forme(len(non_identifiees), "non identifiée"),
     )
+    logger.info("%s%s (forme de nom ambiguë)", BRANCHE, accord(len(indecidables), "indécidable"))
     creees_avant = c.created
     with progression(len(a_creer), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
         for a in a_creer:
             avancement.avance()
-            decision = c.decide_cross_and_name(a)
-            if decision.action == "match":
-                c.apply_match(a, decision.person_id, decision.reason)
-            elif decision.action == "create":
-                c.apply_create(a)
+            if c.resolve_or_create(a):
                 avancement.retient()
-            else:
-                c.skipped_counts[decision.reason] += 1
+    # Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë —
+    # peuvent encore rejoindre en cross-source une personne créée pour une co-signature. Traitées
+    # après toutes les créations, elles en reçoivent tous les ancrages.
+    for a in [*(a for a in sans_personne if not a.allow_create), *indecidables]:
+        c.resolve_or_create(a)
     logger.info(
         "%s%s %s",
         DERNIERE_BRANCHE,

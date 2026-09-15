@@ -212,6 +212,48 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     assert _person_of(conn, 95011) is None  # orpheline, plus collée à Hervé
 
 
+def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
+    """« H Chanal » désigne Hervé et Hélène : sa signature est comptée parmi les non identifiées, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95040, raw_name="Hervé Chanal", name_norm="herve chanal")
+    _seed_signature(conn, pub_id=95041, raw_name="Hélène Chanal", name_norm="helene chanal")
+    _run_create(conn)
+    _populate_canonical_forms(conn)  # « h chanal » désigne les deux personnes
+
+    _seed_signature(conn, pub_id=95042, raw_name="H Chanal", name_norm="h chanal")
+    _seed_signature(conn, pub_id=95043, raw_name="Paul Durand", name_norm="paul durand")
+    with caplog.at_level(logging.INFO, logger="test"):
+        _run_create(conn)
+
+    assert "  ├─ 2 signatures non identifiées" in caplog.messages
+    assert "  ├─ 1 indécidable (forme de nom ambiguë)" in caplog.messages
+    assert "  └─ 1 personne créée" in caplog.messages
+
+
+def test_une_forme_ambigue_rejoint_la_creation_de_sa_co_signature(sa_sync_conn):
+    """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des signatures. Traitée après les créations, elle rejoint en cross-source la personne que crée sa co-signature."""
+    conn = sa_sync_conn
+    _seed_signature(conn, pub_id=95050, raw_name="Julie Martin", name_norm="julie martin")
+    _seed_signature(conn, pub_id=95051, raw_name="Joseph Martin", name_norm="joseph martin")
+    _run_create(conn)
+    _populate_canonical_forms(conn)  # « j martin » désigne les deux personnes
+
+    _seed_cross_source_pair(
+        conn,
+        pub_id=95060,
+        sa1_id=95062,
+        raw1="Jacques Martin",
+        norm1="jacques martin",
+        sa2_id=95061,
+        raw2="J Martin",
+        norm2="j martin",
+    )
+    _run_create(conn)
+
+    assert _person_of(conn, 95061) is not None
+    assert _person_of(conn, 95061) == _person_of(conn, 95062)
+
+
 def test_cross_source_pair_merges_via_deferred_creation(sa_sync_conn):
     """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex), même publication × position, sont le
     même auteur pour le cross-source (`names_compatible`), mais leurs formes de nom sont
