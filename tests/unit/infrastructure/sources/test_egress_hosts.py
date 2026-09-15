@@ -26,6 +26,7 @@ HOTES_DECLARES = frozenset(
         "doi.org",
         "theses.fr",
         "cluster-production.elasticsearch.dataesr.ovh",
+        "www.sudoc.fr",
         # Le référentiel des revues en libre accès n'est pas servi par `doaj.org`, qui redirige
         # vers un lien signé sur son stockage objet. Seule redirection que le code suive, et
         # vers ce seul hôte (`ALLOWED_DUMP_HOSTS`).

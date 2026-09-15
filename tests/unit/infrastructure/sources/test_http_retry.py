@@ -88,6 +88,27 @@ def test_success_returns_json():
         assert http_retry.http_request_with_retry("GET", "http://x", label="t") == {}
 
 
+def test_text_variant_returns_body():
+    resp = _resp(200)
+    resp.text = "<record/>"
+    with (
+        patch.object(http_retry.httpx2, "request", return_value=resp),
+        patch.object(http_retry.time, "sleep"),
+    ):
+        assert http_retry.http_get_text_with_retry("http://x", label="t") == "<record/>"
+
+
+def test_text_variant_retries_empty_body():
+    resp = _resp(200)
+    resp.text = ""
+    with (
+        patch.object(http_retry.httpx2, "request", return_value=resp) as req,
+        patch.object(http_retry.time, "sleep"),
+    ):
+        assert http_retry.http_get_text_with_retry("http://x", label="t", max_retries=3) == ""
+    assert req.call_count == 3  # corps vide retenté jusqu'au dernier essai
+
+
 # ── variante asynchrone (httpx2) ──────────────────────────────────
 
 
