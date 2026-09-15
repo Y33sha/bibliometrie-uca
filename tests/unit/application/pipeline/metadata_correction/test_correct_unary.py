@@ -1,9 +1,13 @@
 """Tests purs de `compute_update` : mapping source→canonique puis correction unaire idempotente."""
 
+import logging
+from unittest.mock import MagicMock
+
 from application.pipeline.metadata_correction.correct_unary import (
     DOC_TYPE_MAP_MARKER,
     LANGUAGE_MAP_MARKER,
     compute_update,
+    run,
     tally_corrections,
 )
 from application.ports.pipeline.metadata_correction import CorrectionUpdate, UnaryCorrectionRow
@@ -275,6 +279,19 @@ def test_unknown_language_gives_none_with_source_value_kept():
     assert upd is not None
     assert upd.language is None
     assert upd.raw_metadata == {"language": {"raw": "und", "corrected_by": "LANGUAGE_MAP"}}
+
+
+def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
+    """Un type de document seulement traduit (`ART` → `article`) est mis à jour sans être corrigé."""
+    queries = MagicMock()
+    queries.fetch_for_unary_correction.return_value = [
+        _sp(id=1, source="hal", doc_type="ART"),
+        _sp(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
+    ]
+    queries.fetch_language_forms.return_value = _FORMS
+    with caplog.at_level(logging.INFO, logger="test"):
+        run(MagicMock(), queries, logging.getLogger("test"))
+    assert "  ├─ 1 document corrigé" in caplog.messages
 
 
 def test_language_already_mapped_is_idempotent_noop():
