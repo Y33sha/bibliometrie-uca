@@ -115,24 +115,20 @@ def reconcile(
             accord(len(dirty_ids), "document"),
             forme(len(dirty_ids), "examiné"),
         )
-    rows = queries.fetch_reconciliation_universe(conn)
-    rows_by_sp = {row.id: row for row in rows}
-    existing_pub_by_doi = queries.fetch_publication_ids_by_doi(conn)
-    plan = plan_reconciliation(
-        (_member(row) for row in rows), existing_pub_by_doi=existing_pub_by_doi
-    )
-    if logger:
+    with attente(f"{BRANCHE}résolution en cours", logger) as ligne:
+        rows = queries.fetch_reconciliation_universe(conn)
+        rows_by_sp = {row.id: row for row in rows}
+        existing_pub_by_doi = queries.fetch_publication_ids_by_doi(conn)
+        plan = plan_reconciliation(
+            (_member(row) for row in rows), existing_pub_by_doi=existing_pub_by_doi
+        )
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
         a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)
         existantes = len(plan.groups) - a_creer
-        logger.info(
-            "%srésolus en %s (%d déjà %s, %s ; %s à fusionner)",
-            BRANCHE,
-            accord(len(plan.groups), "publication"),
-            existantes,
-            forme(existantes, "existante"),
-            accord(a_creer, "nouvelle"),
-            accord(len(plan.dissolved), "doublon"),
+        ligne.conclut(
+            f"{BRANCHE}résolus en {accord(len(plan.groups), 'publication')} "
+            f"({existantes} déjà {forme(existantes, 'existante')}, {accord(a_creer, 'nouvelle')} ; "
+            f"{accord(len(plan.dissolved), 'doublon')} à fusionner)"
         )
 
     survivors: set[int] = set()
