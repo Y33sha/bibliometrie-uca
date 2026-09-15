@@ -12,18 +12,21 @@ Les valeurs sont lues sur la `source_publication` **corrigée** (colonnes typée
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import StrEnum
 
 from domain.publications.identifiers import DOI, NNT, PMID, ArxivId, HALId
+from domain.source_publications.external_ids import MULTIVALUED_ID_TYPES, ExternalIdType
 
-
-class ConfirmationKey(StrEnum):
-    """Identifiant `external_ids` par lequel deux `source_publications` attestent du même document. Le DOI (colonne dédiée) et le token métadonnée sont d'autres familles de clés de confirmation, hors de cet enum."""
-
-    HAL_ID = "hal_id"
-    ARXIV_ID = "arxiv_id"
-    PMID = "pmid"
-    NNT = "nnt"
+# Types d'`external_ids` par lesquels deux `source_publications` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
+CONFIRMATION_ID_TYPES = (
+    ExternalIdType.HAL_ID,
+    ExternalIdType.ARXIV_ID,
+    ExternalIdType.PMID,
+    ExternalIdType.NNT,
+)
+# Clés de confirmation à valeur unique, comparées par égalité directe. `hal_id` est une liste.
+SCALAR_CONFIRMATION_ID_TYPES = tuple(
+    t for t in CONFIRMATION_ID_TYPES if t not in MULTIVALUED_ID_TYPES
+)
 
 
 # Seuil de longueur de `title_normalized` (caractères, strict) en-deçà duquel un titre est trop
@@ -55,14 +58,14 @@ class ConfirmationKeys:
         if self.doi:
             toks.add(("doi", self.doi))
         if self.nnt:
-            toks.add((ConfirmationKey.NNT, self.nnt))
+            toks.add((ExternalIdType.NNT, self.nnt))
         if self.pmid:
-            toks.add((ConfirmationKey.PMID, self.pmid))
+            toks.add((ExternalIdType.PMID, self.pmid))
         if self.arxiv_id:
-            toks.add((ConfirmationKey.ARXIV_ID, self.arxiv_id))
+            toks.add((ExternalIdType.ARXIV_ID, self.arxiv_id))
         if self.metadata_block:
             toks.add(("metadata_block", self.metadata_block))
-        toks.update((ConfirmationKey.HAL_ID, hal) for hal in self.hal_ids)
+        toks.update((ExternalIdType.HAL_ID, hal) for hal in self.hal_ids)
         return frozenset(toks)
 
 
@@ -81,16 +84,16 @@ def project_confirmation_keys(
 
     doi_vo = DOI.try_parse(doi) if isinstance(doi, str) else None
 
-    nnt_raw = ids.get(ConfirmationKey.NNT)
+    nnt_raw = ids.get(ExternalIdType.NNT)
     nnt_vo = NNT.try_parse(nnt_raw) if isinstance(nnt_raw, str) else None
 
-    pmid_raw = ids.get(ConfirmationKey.PMID)
+    pmid_raw = ids.get(ExternalIdType.PMID)
     pmid_vo = PMID.try_parse(pmid_raw) if isinstance(pmid_raw, str) else None
 
-    arxiv_raw = ids.get(ConfirmationKey.ARXIV_ID)
+    arxiv_raw = ids.get(ExternalIdType.ARXIV_ID)
     arxiv_vo = ArxivId.try_parse(arxiv_raw) if isinstance(arxiv_raw, str) else None
 
-    raw_hal = ids.get(ConfirmationKey.HAL_ID)
+    raw_hal = ids.get(ExternalIdType.HAL_ID)
     hal_ids = tuple(
         str(hal_vo)
         for hal in (raw_hal if isinstance(raw_hal, list) else [])

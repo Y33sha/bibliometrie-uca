@@ -29,6 +29,7 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.openalex import (
     OpenalexLocation,
     extract_external_ids_from_urls,
@@ -73,7 +74,9 @@ def extract_locations_data(
     external_ids: dict[str, JsonValue] = dict(extract_external_ids_from_urls(urls))
     # hal_id et related_dois sont multivalués et apparaissent aussi dans les location.id (absents des URLs quand la landing page est une page éditeur).
     # On balaie URLs + location.id en une passe.
-    hal_ids: list[str] = [h for e in as_sequence(external_ids.get("hal_id")) if (h := as_str(e))]
+    hal_ids: list[str] = [
+        h for e in as_sequence(external_ids.get(ExternalIdType.HAL_ID)) if (h := as_str(e))
+    ]
     related_dois: list[str] = []
     for s in (*urls, *location_ids):
         if (hal_id := extract_hal_id_from_url(s)) and hal_id not in hal_ids:
@@ -81,9 +84,9 @@ def extract_locations_data(
         if (doi := extract_doi_from_url(s)) and doi not in related_dois:
             related_dois.append(doi)
     if hal_ids:
-        external_ids["hal_id"] = hal_ids
+        external_ids[ExternalIdType.HAL_ID] = hal_ids
     if related_dois:
-        external_ids["related_dois"] = related_dois
+        external_ids[ExternalIdType.RELATED_DOIS] = related_dois
     return urls, external_ids
 
 
@@ -241,14 +244,14 @@ def insert_openalex_document(  # noqa: C901
     # URLs et identifiants extraits des locations
     urls, external_ids = extract_locations_data(work)
     if nnt := pub_meta.nnt:
-        external_ids["nnt"] = nnt
+        external_ids[ExternalIdType.NNT] = nnt
     # related_dois (collecté depuis les locations) = DOI secondaires : on retire
     # le DOI primaire de la publication, qui vit sur la colonne `doi`.
-    if related_dois := as_sequence(external_ids.get("related_dois")):
+    if related_dois := as_sequence(external_ids.get(ExternalIdType.RELATED_DOIS)):
         if remaining := [d for d in related_dois if d != pub_meta.doi]:
-            external_ids["related_dois"] = remaining
+            external_ids[ExternalIdType.RELATED_DOIS] = remaining
         else:
-            del external_ids["related_dois"]
+            del external_ids[ExternalIdType.RELATED_DOIS]
 
     cited_by_count = as_int(work.get("cited_by_count"))
     is_retracted = bool(work.get("is_retracted"))

@@ -18,6 +18,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import OaStatus
+from domain.source_publications.external_ids import ExternalIdType
 from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 
@@ -223,19 +224,19 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]
     for url in urls:
         if (hal_id := extract_hal_id_from_url(url)) and hal_id not in hal_ids:
             hal_ids.append(hal_id)
-        if "nnt" not in external_ids:
+        if ExternalIdType.NNT not in external_ids:
             m = _THESES_FR_URL_RE.search(url)
             if m:
-                external_ids["nnt"] = m.group(1)
-        if "pmid" not in external_ids:
+                external_ids[ExternalIdType.NNT] = m.group(1)
+        if ExternalIdType.PMID not in external_ids:
             if pmid := normalize_pmid(url):
-                external_ids["pmid"] = pmid
-        if "pmcid" not in external_ids:
+                external_ids[ExternalIdType.PMID] = pmid
+        if ExternalIdType.PMCID not in external_ids:
             if pmcid := normalize_pmcid(url):
-                external_ids["pmcid"] = pmcid
-        if "arxiv_id" not in external_ids:
+                external_ids[ExternalIdType.PMCID] = pmcid
+        if ExternalIdType.ARXIV_ID not in external_ids:
             if arxiv_id := normalize_arxiv_id(url):
-                external_ids["arxiv_id"] = arxiv_id
+                external_ids[ExternalIdType.ARXIV_ID] = arxiv_id
     if hal_ids:
-        external_ids["hal_id"] = hal_ids
+        external_ids[ExternalIdType.HAL_ID] = hal_ids
     return external_ids

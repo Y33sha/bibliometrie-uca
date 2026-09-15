@@ -463,7 +463,6 @@ module = [
     "application.ports.read_models.config_queries",        # `value` : JSON de forme libre
     "application.ports.read_models.pipeline_runs_queries", # `details` : JSON de forme libre
     "interfaces.api.models.config",                        # `value` : JSON de forme libre
-    "infrastructure.jsonb_models.publication",             # validateur Pydantic prenant `ValidationInfo`
     "infrastructure.read_models.publications.facets",      # facette appelée par son nom (`getattr`)
 ]
 disallow_any_explicit = false
@@ -522,10 +521,6 @@ matches = "interfaces/api/models/config.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
-[[tool.pyrefly.sub-config]]
-matches = "infrastructure/jsonb_models/publication.py"
-[tool.pyrefly.sub-config.errors]
-explicit-any = false
 
 [[tool.pyrefly.sub-config]]
 matches = "infrastructure/read_models/publications/facets.py"

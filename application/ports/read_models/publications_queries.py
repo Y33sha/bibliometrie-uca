@@ -274,12 +274,9 @@ class ThesesAuthorshipOut(BaseModel):
 
 
 class EcoleDoctorale(BaseModel):
-    """École doctorale d'une thèse (metadata theses.fr).
+    """École doctorale d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
 
-    Sert à la fois de DTO API (champ de `ThesisMeta` dans la réponse
-    détail publication) et de modèle de la colonne JSONB `meta.ecoles_doctorales`
-    (importé par `infrastructure/jsonb_models/publication.py`).
-    `extra="allow"` pour tolérer des clés inconnues côté JSONB sans casser.
+    Lu depuis la colonne JSONB `meta.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -288,11 +285,9 @@ class EcoleDoctorale(BaseModel):
 
 
 class PartenaireThese(BaseModel):
-    """Partenaire de recherche d'une thèse (metadata theses.fr).
+    """Partenaire de recherche d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
 
-    Sert à la fois de DTO API et de modèle de la colonne JSONB
-    `meta.partenaires`. `extra="allow"` pour tolérer des clés inconnues
-    côté JSONB sans casser.
+    Lu depuis la colonne JSONB `meta.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
     """
 
     model_config = ConfigDict(extra="allow")

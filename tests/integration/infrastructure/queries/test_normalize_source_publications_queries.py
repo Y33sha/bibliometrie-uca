@@ -105,3 +105,27 @@ class TestUpsertSourcePublication:
             ).scalar_one()
             == {}
         )
+
+    def test_external_ids_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
+        """Chaque valeur passe par son value object. Une valeur invalide ou une clé inconnue est écartée et journalisée."""
+        staging_id = _create_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_publication(
+            sa_sync_conn,
+            _row(
+                staging_id,
+                external_ids={
+                    "hal_id": ["HAL-04123456v2", "10995/102143"],
+                    "nnt": "2023abc001",
+                    "pmc": "PMC9016621",
+                },
+            ),
+        )
+        assert sa_sync_conn.execute(
+            text("SELECT external_ids FROM source_publications WHERE id = :id"),
+            {"id": sp_id},
+        ).scalar_one() == {"hal_id": ["hal-04123456"], "nnt": "2023ABC001"}
+        logged = [r.getMessage() for r in caplog.records if "external_ids écarté" in r.getMessage()]
+        assert logged == [
+            "external_ids écarté (theses 2023ABC001) : hal_id = '10995/102143'",
+            "external_ids écarté (theses 2023ABC001) : pmc = 'PMC9016621'",
+        ]

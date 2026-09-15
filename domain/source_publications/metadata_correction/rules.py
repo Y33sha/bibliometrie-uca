@@ -19,6 +19,7 @@ from typing import NamedTuple, TypedDict
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
+from domain.source_publications.external_ids import ExternalIdType
 from domain.types import JsonValue
 
 
@@ -504,8 +505,8 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
 
     Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui pointent l'article). Pur. Le caller n'appelle cette fonction que sur les `source_publications` corrigées thèse→article (`THESIS_WITH_JOURNAL_TO_ARTICLE`).
     """
-    result = {k: v for k, v in external_ids.items() if k != "nnt"}
-    hal_ids = result.get("hal_id")
+    result = {k: v for k, v in external_ids.items() if k != ExternalIdType.NNT}
+    hal_ids = result.get(ExternalIdType.HAL_ID)
     if isinstance(hal_ids, list):
         kept = [
             h
@@ -513,7 +514,7 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
             if not (isinstance(h, str) and h.startswith(_DISSERTATION_HALID_PREFIXES))
         ]
         if kept:
-            result["hal_id"] = kept
+            result[ExternalIdType.HAL_ID] = kept
         else:
-            result.pop("hal_id", None)
+            result.pop(ExternalIdType.HAL_ID, None)
     return result

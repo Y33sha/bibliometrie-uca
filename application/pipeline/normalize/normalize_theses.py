@@ -25,6 +25,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from domain.dates import french_date_to_iso
 from domain.normalize import clean_raw_author_name, normalize_name_form
 from domain.publications.identifiers import clean_doi, normalize_nnt
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
@@ -116,7 +117,7 @@ def insert_source_document(
     Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta.nnt
-    external_ids = {"nnt": nnt} if nnt else None
+    external_ids = {ExternalIdType.NNT: nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
     sujets = as_sequence(these.get("sujets"))

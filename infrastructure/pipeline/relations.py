@@ -15,7 +15,11 @@ from application.ports.pipeline.relations import (
     TitleMatch,
 )
 from domain.publications.doc_types import DocType
-from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
+from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.keys import (
+    DISCRIMINANT_TITLE_MIN_LENGTH,
+    SCALAR_CONFIRMATION_ID_TYPES,
+)
 from domain.sources.registry import Source
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
@@ -30,17 +34,17 @@ _SCALAR_KEY_ROWS = "".join(
         SELECT sp.publication_id, '{k}', sp.external_ids->>'{k}'
         FROM source_publications sp
         WHERE sp.publication_id IS NOT NULL AND sp.external_ids->>'{k}' IS NOT NULL"""
-    for k in (ConfirmationKey.ARXIV_ID, ConfirmationKey.PMID, ConfirmationKey.NNT)
+    for k in SCALAR_CONFIRMATION_ID_TYPES
 )
 
 # Paires de publications distinctes (DOI distincts) partageant une clé de confirmation (`source_publications.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
-        SELECT sp.publication_id AS pid, '{ConfirmationKey.HAL_ID}' AS ktype, h AS kval
+        SELECT sp.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
         FROM source_publications sp
-        CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'{ConfirmationKey.HAL_ID}') h
+        CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'{ExternalIdType.HAL_ID}') h
         WHERE sp.publication_id IS NOT NULL
-          AND jsonb_typeof(sp.external_ids->'{ConfirmationKey.HAL_ID}') = 'array'
+          AND jsonb_typeof(sp.external_ids->'{ExternalIdType.HAL_ID}') = 'array'
         {_SCALAR_KEY_ROWS}
     )
     SELECT DISTINCT
