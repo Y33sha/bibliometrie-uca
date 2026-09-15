@@ -97,14 +97,9 @@
                 >
                 <button
                   class="toggle-btn reject"
-                  class:active={p.status === "rejected"}
-                  title={p.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
-                  onclick={() =>
-                    setStatus(
-                      p.person_id,
-                      form.name_form,
-                      p.status === "rejected" ? "pending" : "rejected",
-                    )}>&#x2717;</button
+                  title="Rejeter"
+                  onclick={() => setStatus(p.person_id, form.name_form, "rejected")}
+                  >&#x2717;</button
                 >
               </span>
               {/if}
