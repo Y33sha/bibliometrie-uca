@@ -1,6 +1,6 @@
 """Requêtes HTTP avec retry, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-`http_request_with_retry` émet une requête httpx2 synchrone (extracteurs page à page, clients de préfixes DOI) et rend le corps JSON ; `http_get_text_with_retry` rend le corps en texte (notices XML du Sudoc) ; `http_request_with_retry_async` s'appuie sur un `httpx2.AsyncClient` partagé entre coroutines (recherche par DOI de la phase `fetch_missing`, enrichissements concurrents). La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
+`http_request_with_retry` émet une requête httpx2 synchrone (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` s'appuie sur un `httpx2.AsyncClient` partagé entre coroutines (recherche par DOI de la phase `fetch_missing`, enrichissements concurrents), et `http_get_text_with_retry_async` rend le corps de la réponse en texte (notices XML du Sudoc). La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
 
 Politique de retry :
   - 429 (Too Many Requests) et 5xx (panne source) : pause `initial_backoff * 2^attempt` puis retry, jusqu'à `max_retries` ; l'épuisement compte un échec au circuit-breaker. À l'épuisement sous breaker, la version sync coupe la source (`SourceUnavailableError`, l'appelant page à page ne peut pas avancer) ; la version async laisse remonter l'erreur brute, que les appelants concurrents attrapent par requête, l'accumulation coupant au seuil.
@@ -95,77 +95,6 @@ def http_request_with_retry(
 
     `max_retries=3` avec le backoff par défaut donne des pauses de 1, 2, 4 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Lève la dernière exception rencontrée si `max_retries` est atteint sans succès. Le corps est rendu tel que la source l'a écrit : la plupart répondent par un objet, `doi.org/ra` par un tableau — l'appelant en tire la forme qu'il attend (`as_mapping`, `as_sequence`).
     """
-    return _request_with_retry(
-        method,
-        url,
-        decode=_json_body,
-        exhausted={},
-        params=params,
-        json_body=json_body,
-        headers=headers,
-        auth=auth,
-        timeout=timeout,
-        max_retries=max_retries,
-        initial_backoff=initial_backoff,
-        retry_on_empty_body=retry_on_empty_body,
-        label=label,
-    )
-
-
-def http_get_text_with_retry(
-    url: str,
-    *,
-    params: Mapping[str, str | int | float | bool | None] | None = None,
-    headers: Mapping[str, str] | None = None,
-    timeout: int = 30,
-    max_retries: int = 3,
-    initial_backoff: float = 1.0,
-    label: str = "",
-) -> str:
-    """Requête GET synchrone qui rend le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry`. Un corps vide est retenté."""
-    return _request_with_retry(
-        "GET",
-        url,
-        decode=_text_body,
-        exhausted="",
-        params=params,
-        json_body=None,
-        headers=headers,
-        auth=None,
-        timeout=timeout,
-        max_retries=max_retries,
-        initial_backoff=initial_backoff,
-        retry_on_empty_body=True,
-        label=label,
-    )
-
-
-def _json_body(resp: httpx2.Response) -> JsonValue:
-    """Corps JSON de la réponse. Lève `json.JSONDecodeError` sur un corps illisible, qui est retenté."""
-    return cast("JsonValue", resp.json())
-
-
-def _text_body(resp: httpx2.Response) -> str:
-    return resp.text
-
-
-def _request_with_retry[T](
-    method: str,
-    url: str,
-    *,
-    decode: Callable[[httpx2.Response], T],
-    exhausted: T,
-    params: Mapping[str, str | int | float | bool | None] | None,
-    json_body: Mapping[str, JsonValue] | None,
-    headers: Mapping[str, str] | None,
-    auth: tuple[str, str] | None,
-    timeout: int,
-    max_retries: int,
-    initial_backoff: float,
-    retry_on_empty_body: bool,
-    label: str,
-) -> T:
-    """Boucle de retry synchrone commune. `decode` lit le corps d'une réponse aboutie ; `exhausted` est rendu quand la boucle s'épuise sur des corps vides sans autre erreur."""
     breaker, label = _prepared_label(label)
     last_error: Exception | None = None
     for attempt in range(max_retries):
@@ -204,14 +133,14 @@ def _request_with_retry[T](
         reason = _retry_reason(resp, retry_on_empty_body=retry_on_empty_body)
         if reason is None:
             try:
-                data = decode(resp)
+                data = resp.json()
             except json.JSONDecodeError as e:
                 last_error = e
                 reason = "JSON invalide"
             else:
                 if breaker is not None:
                     breaker.record_success()
-                return data
+                return cast("JsonValue", data)
 
         if _is_retryable_status(resp.status_code) and is_last:
             if breaker is not None:
@@ -229,7 +158,7 @@ def _request_with_retry[T](
     logger.error("Échec après %s tentatives %s", max_retries, label)
     if last_error:
         raise last_error
-    return exhausted
+    return {}
 
 
 async def http_request_with_retry_async(
@@ -251,6 +180,81 @@ async def http_request_with_retry_async(
 
     Le `httpx2.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs. Le corps est rendu tel que la source l'a écrit, comme pour la variante synchrone.
     """
+    return await _request_with_retry_async(
+        client,
+        method,
+        url,
+        decode=_json_body,
+        exhausted={},
+        params=params,
+        json_body=json_body,
+        headers=headers,
+        auth=auth,
+        timeout=timeout,
+        max_retries=max_retries,
+        initial_backoff=initial_backoff,
+        retry_on_empty_body=retry_on_empty_body,
+        label=label,
+    )
+
+
+async def http_get_text_with_retry_async(
+    client: httpx2.AsyncClient,
+    url: str,
+    *,
+    params: Mapping[str, str | int | float | bool | None] | None = None,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+    label: str = "",
+) -> str:
+    """Requête GET asynchrone qui rend le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
+    return await _request_with_retry_async(
+        client,
+        "GET",
+        url,
+        decode=_text_body,
+        exhausted="",
+        params=params,
+        json_body=None,
+        headers=headers,
+        auth=None,
+        timeout=timeout,
+        max_retries=max_retries,
+        initial_backoff=initial_backoff,
+        retry_on_empty_body=True,
+        label=label,
+    )
+
+
+def _json_body(resp: httpx2.Response) -> JsonValue:
+    """Corps JSON de la réponse. Lève `json.JSONDecodeError` sur un corps illisible, qui est retenté."""
+    return cast("JsonValue", resp.json())
+
+
+def _text_body(resp: httpx2.Response) -> str:
+    return resp.text
+
+
+async def _request_with_retry_async[T](
+    client: httpx2.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    decode: Callable[[httpx2.Response], T],
+    exhausted: T,
+    params: Mapping[str, str | int | float | bool | None] | None,
+    json_body: Mapping[str, JsonValue] | None,
+    headers: Mapping[str, str] | None,
+    auth: tuple[str, str] | None,
+    timeout: float,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
+    max_retries: int,
+    initial_backoff: float,
+    retry_on_empty_body: bool,
+    label: str,
+) -> T:
+    """Boucle de retry asynchrone commune. `decode` lit le corps d'une réponse aboutie ; `exhausted` est rendu quand la boucle s'épuise sur des corps vides sans autre erreur."""
     breaker, label = _prepared_label(label)
     last_error: Exception | None = None
     for attempt in range(max_retries):
@@ -290,14 +294,14 @@ async def http_request_with_retry_async(
         reason = _retry_reason(resp, retry_on_empty_body=retry_on_empty_body)
         if reason is None:
             try:
-                data = resp.json()
+                data = decode(resp)
             except json.JSONDecodeError as e:
                 last_error = e
                 reason = "JSON invalide"
             else:
                 if breaker is not None:
                     breaker.record_success()
-                return cast("JsonValue", data)
+                return data
 
         if _is_retryable_status(resp.status_code) and is_last:
             if breaker is not None:
@@ -314,4 +318,4 @@ async def http_request_with_retry_async(
     logger.error("Échec après %s tentatives %s", max_retries, label)
     if last_error:
         raise last_error
-    return {}
+    return exhausted

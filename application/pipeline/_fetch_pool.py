@@ -10,10 +10,32 @@ les workers cessent de tirer de nouveaux items.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable, Sequence
 
 import httpx2
 from sqlalchemy import Connection
+
+
+class RequestPace:
+    """Plafond de débit commun à des requêtes simultanées : deux départs de requête sont espacés d'au moins `1 / max_per_second` seconde.
+
+    Une pause propre à chaque worker donne un débit qui dépend du temps de réponse de la source ; ce rythme partagé le borne quelle que soit la concurrence.
+    """
+
+    def __init__(self, max_per_second: float) -> None:
+        self._interval_s = 1 / max_per_second
+        self._next_start = 0.0
+        self._lock = asyncio.Lock()
+
+    async def wait(self) -> None:
+        """Attend le prochain départ autorisé et le réserve."""
+        async with self._lock:
+            now = time.monotonic()
+            start = max(now, self._next_start)
+            self._next_start = start + self._interval_s
+        if start > now:
+            await asyncio.sleep(start - now)
 
 
 async def run_fetch_pool[Item, Fetched](

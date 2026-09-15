@@ -1,12 +1,11 @@
 """Client Sudoc : correspondance ISSN → PPN (service `issn2ppn`) et notices MARCXML des publications en série.
 
-Le HTTP passe par les helpers partagés de `http_retry` : retry, backoff et alimentation du circuit-breaker de source. Le XML est lu avec `defusedxml`, qui refuse les déclarations d'entités. L'interprétation des zones de la notice appartient à `domain.sources.sudoc`.
+Le HTTP passe par les helpers asynchrones de `http_retry`, sur un `httpx2.AsyncClient` partagé : retry, backoff et alimentation du circuit-breaker de source. Le XML est lu avec `defusedxml`, qui refuse les déclarations d'entités. L'interprétation des zones de la notice appartient à `domain.sources.sudoc`.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Sequence
 
 import defusedxml.ElementTree as ET
@@ -16,8 +15,11 @@ from defusedxml.common import DefusedXmlException
 from domain.publications.identifiers import ISSN
 from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
 from domain.types import as_mapping, as_sequence, as_str
-from infrastructure.sources.api_params import SUDOC_DELAY, SUDOC_ISSN2PPN_BATCH
-from infrastructure.sources.http_retry import http_get_text_with_retry, http_request_with_retry
+from infrastructure.sources.api_params import SUDOC_ISSN2PPN_BATCH
+from infrastructure.sources.http_retry import (
+    http_get_text_with_retry_async,
+    http_request_with_retry_async,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,9 @@ def _is_not_found(exc: httpx2.HTTPStatusError) -> bool:
     return exc.response.status_code == 404
 
 
-def fetch_ppns(issns: Sequence[str], *, base_url: str) -> dict[str, tuple[str, ...]]:
+async def fetch_ppns(
+    client: httpx2.AsyncClient, issns: Sequence[str], *, base_url: str
+) -> dict[str, tuple[str, ...]]:
     """PPN des notices Sudoc de chaque ISSN, par lots de `SUDOC_ISSN2PPN_BATCH`. Un ISSN sans notice est absent du résultat."""
     result: dict[str, tuple[str, ...]] = {}
     for i in range(0, len(issns), SUDOC_ISSN2PPN_BATCH):
@@ -34,7 +38,9 @@ def fetch_ppns(issns: Sequence[str], *, base_url: str) -> dict[str, tuple[str, .
         # Le format de réponse se donne dans le chemin : en paramètre de requête, il est ignoré.
         url = f"{base_url}/services/issn2ppn/{','.join(batch)}&format=text/json"
         try:
-            data = as_mapping(http_request_with_retry("GET", url, label="issn2ppn"))
+            data = as_mapping(
+                await http_request_with_retry_async(client, "GET", url, label="issn2ppn")
+            )
         except httpx2.HTTPStatusError as exc:
             if not _is_not_found(exc):
                 raise
@@ -51,7 +57,6 @@ def fetch_ppns(issns: Sequence[str], *, base_url: str) -> dict[str, tuple[str, .
             )
             if issn is not None and ppns:
                 result[str(issn)] = ppns
-        time.sleep(SUDOC_DELAY)
     return result
 
 
@@ -78,16 +83,18 @@ def marc_fields(xml: str) -> list[MarcField]:
     return fields
 
 
-def fetch_serial_record(ppn: str, *, base_url: str) -> SudocSerialRecord | None:
+async def fetch_serial_record(
+    client: httpx2.AsyncClient, ppn: str, *, base_url: str
+) -> SudocSerialRecord | None:
     """Notice Sudoc d'une publication en série, ou `None` si le PPN est inconnu ou la notice illisible."""
     try:
-        xml = http_get_text_with_retry(f"{base_url}/{ppn}.xml", label=f"notice {ppn}")
+        xml = await http_get_text_with_retry_async(
+            client, f"{base_url}/{ppn}.xml", label=f"notice {ppn}"
+        )
     except httpx2.HTTPStatusError as exc:
         if _is_not_found(exc):
             return None
         raise
-    finally:
-        time.sleep(SUDOC_DELAY)
     try:
         fields = marc_fields(xml)
     except (ET.ParseError, DefusedXmlException) as exc:

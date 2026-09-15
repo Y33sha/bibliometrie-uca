@@ -9,7 +9,10 @@ import httpx2
 import pytest
 
 from infrastructure.sources import http_retry
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import (
+    http_get_text_with_retry_async,
+    http_request_with_retry_async,
+)
 
 _API_KEY = "cle-secrete-de-test"
 
@@ -88,28 +91,32 @@ def test_success_returns_json():
         assert http_retry.http_request_with_retry("GET", "http://x", label="t") == {}
 
 
-def test_text_variant_returns_body():
-    resp = _resp(200)
-    resp.text = "<record/>"
-    with (
-        patch.object(http_retry.httpx2, "request", return_value=resp),
-        patch.object(http_retry.time, "sleep"),
-    ):
-        assert http_retry.http_get_text_with_retry("http://x", label="t") == "<record/>"
-
-
-def test_text_variant_retries_empty_body():
-    resp = _resp(200)
-    resp.text = ""
-    with (
-        patch.object(http_retry.httpx2, "request", return_value=resp) as req,
-        patch.object(http_retry.time, "sleep"),
-    ):
-        assert http_retry.http_get_text_with_retry("http://x", label="t", max_retries=3) == ""
-    assert req.call_count == 3  # corps vide retenté jusqu'au dernier essai
-
-
 # ── variante asynchrone (httpx2) ──────────────────────────────────
+
+
+class TestAsyncText:
+    @pytest.mark.asyncio
+    async def test_returns_body_as_text(self, http_mock):
+        http_mock.get("https://api.example/notice.xml").mock(
+            return_value=httpx2.Response(200, text="<record/>")
+        )
+        async with httpx2.AsyncClient() as client:
+            body = await http_get_text_with_retry_async(
+                client, "https://api.example/notice.xml", label="test"
+            )
+        assert body == "<record/>"
+
+    @pytest.mark.asyncio
+    async def test_retries_empty_body(self, http_mock):
+        route = http_mock.get("https://api.example/notice.xml").mock(
+            side_effect=[httpx2.Response(200, text=""), httpx2.Response(200, text="<record/>")]
+        )
+        async with httpx2.AsyncClient() as client:
+            body = await http_get_text_with_retry_async(
+                client, "https://api.example/notice.xml", initial_backoff=0.01, label="test"
+            )
+        assert body == "<record/>"
+        assert route.call_count == 2
 
 
 class TestAsync:
