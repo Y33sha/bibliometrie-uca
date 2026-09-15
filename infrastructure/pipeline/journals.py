@@ -114,15 +114,16 @@ class PgJournalGatewayQueries(
         ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
+        in_columns = or_(
+            journals.c.issn == issn_value,
+            journals.c.eissn == issn_value,
+            journals.c.issnl == issn_value,
+        )
         return self._conn.execute(
             select(journals.c.id)
-            .where(
-                or_(
-                    journals.c.issn == issn_value,
-                    journals.c.eissn == issn_value,
-                    journals.c.issnl == issn_value,
-                )
-            )
+            .where(or_(in_columns, journals.c.rejected_issns.any(issn_value)))
+            # Une revue qui porte l'ISSN dans ses colonnes passe avant une revue qui l'a rejeté.
+            .order_by(case((in_columns, 0), else_=1))
             .limit(1)
         ).scalar_one_or_none()
 
@@ -137,16 +138,16 @@ class PgJournalGatewayQueries(
         oa_model: OaModel | None = None,
     ) -> None:
         carried = self._conn.execute(
-            select(journals.c.issn, journals.c.eissn, journals.c.issnl).where(
+            select(journals.c.issn, journals.c.eissn, journals.c.rejected_issns).where(
                 journals.c.id == journal_id
             )
         ).one_or_none()
         new_issn = False
         if carried is not None:
-            # Un ISSN que la revue porte déjà dans `issn` ou `eissn` n'est pas réécrit dans
-            # l'autre : la vérification Sudoc range chaque ISSN dans la colonne de son support.
-            # `issnl` reste hors de la comparaison, l'ISSN-L étant lui-même l'ISSN d'un support.
-            known = {v for v in (carried.issn, carried.eissn) if v}
+            # Un ISSN que la revue porte déjà dans `issn` ou `eissn`, ou qu'elle a rejeté, n'est
+            # pas réécrit dans une colonne : la vérification Sudoc a rangé chaque ISSN. `issnl`
+            # reste hors de la comparaison, l'ISSN-L étant lui-même l'ISSN d'un support.
+            known = {v for v in (carried.issn, carried.eissn, *carried.rejected_issns) if v}
             issn = None if issn in known else issn
             eissn = None if eissn in known or eissn == issn else eissn
             new_issn = (issn is not None and carried.issn is None) or (

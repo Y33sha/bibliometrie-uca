@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
 
-Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté. Le Sudoc donne la notice de chacun de leurs ISSN et des corrections possibles de leurs ISSN rejetés. `domain.journals.issn_check` en tire les ISSN à retirer, à corriger et à ranger. La revue est ensuite marquée vérifiée.
+Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à retirer, à mettre parmi les rejetés, à corriger et à ranger. La revue est ensuite marquée vérifiée.
 
 Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue n'est pas marquée vérifiée : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
 """
@@ -24,7 +24,7 @@ from domain.journals.issn_check import (
     check_journal_issns,
     correction_candidates,
 )
-from domain.sources.sudoc import SudocSerialRecord
+from domain.sources.sudoc import SudocSerialRecord, Support
 
 COMMIT_EVERY = 50  # revues par commit
 
@@ -34,6 +34,8 @@ FetchPpns = Callable[[httpx2.AsyncClient, Sequence[str]], Awaitable[dict[str, tu
 FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | None]]
 """`(client, ppn) -> notice`, ou `None` si la notice est introuvable ou illisible."""
 
+_SUPPORT_LABELS = {Support.PRINT: "papier", Support.ELECTRONIC: "en ligne"}
+
 
 def _journal_issns(row: JournalSudocRow) -> JournalIssns:
     return JournalIssns(row.title, row.issn, row.eissn, row.issnl, row.rejected_issns)
@@ -42,13 +44,19 @@ def _journal_issns(row: JournalSudocRow) -> JournalIssns:
 def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) -> None:
     label = f"Revue {row.id} ({row.title!r})"
     if check.conflict:
-        logger.warning("%s : ISSN d'ISSN-L différents, à égalité — laissés en l'état", label)
+        logger.warning("%s : ISSN de deux publications à égalité — laissés en l'état", label)
     for issn in check.intruders:
-        logger.warning("%s : ISSN %s retiré, son ISSN-L diffère de celui de la revue", label, issn)
+        logger.warning("%s : ISSN %s retiré, il désigne une autre publication", label, issn)
+    for issn, reason in check.set_aside:
+        logger.info("%s : ISSN %s rangé parmi les ISSN rejetés (%s)", label, issn, reason)
     for raw, corrected in check.corrections:
         logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected)
-    if check.ambiguous_support:
-        logger.warning("%s : ISSN non rangés par support (plusieurs ISSN d'un même support)", label)
+    if check.ambiguous_support is not None:
+        logger.warning(
+            "%s : plusieurs ISSN %s — laissés dans leurs colonnes",
+            label,
+            _SUPPORT_LABELS.get(check.ambiguous_support, check.ambiguous_support),
+        )
 
 
 async def run_check_journals_in_sudoc(
@@ -78,24 +86,38 @@ async def run_check_journals_in_sudoc(
     record_by_ppn: dict[str, SudocSerialRecord | None] = {}
     pace = RequestPace(max_per_second)
 
+    async def _read(
+        client: httpx2.AsyncClient, issns: Sequence[str], records: dict[str, SudocSerialRecord]
+    ) -> None:
+        """Ajoute à `records` la notice de chaque ISSN connu du Sudoc. `record_by_ppn` garde les notices déjà lues."""
+        await pace.wait()
+        ppns_by_issn = await fetch_ppns(client, issns)
+        for issn in issns:
+            if not (ppns := ppns_by_issn.get(issn)):
+                continue
+            if ppns[0] not in record_by_ppn:
+                await pace.wait()
+                record_by_ppn[ppns[0]] = await fetch_record(client, ppns[0])
+            if (record := record_by_ppn[ppns[0]]) is not None:
+                records[issn] = record
+
     async def _fetch(
         client: httpx2.AsyncClient, row: JournalSudocRow
     ) -> dict[str, SudocSerialRecord] | None:
-        """Notices des ISSN de la revue et des corrections de ses ISSN rejetés, ou `None` si une requête a échoué."""
+        """Notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
         journal = _journal_issns(row)
         issns = (*journal.own(), *correction_candidates(journal.rejected))
         records: dict[str, SudocSerialRecord] = {}
         try:
-            await pace.wait()
-            ppns_by_issn = await fetch_ppns(client, issns)
-            for issn in issns:
-                if not (ppns := ppns_by_issn.get(issn)):
-                    continue
-                if ppns[0] not in record_by_ppn:
-                    await pace.wait()
-                    record_by_ppn[ppns[0]] = await fetch_record(client, ppns[0])
-                if (record := record_by_ppn[ppns[0]]) is not None:
-                    records[issn] = record
+            await _read(client, issns, records)
+            # L'ISSN d'autre support qu'une notice désigne complète une colonne vide : sa propre notice donne son support.
+            others = list(
+                dict.fromkeys(
+                    x for r in records.values() for x in r.other_support_issns if x not in issns
+                )
+            )
+            if others:
+                await _read(client, others, records)
         except (httpx2.HTTPError, SourceUnavailableError) as exc:
             logger.warning(
                 "Revue %d : requête Sudoc en échec, reprise au prochain run (%s)", row.id, exc
@@ -134,9 +156,10 @@ async def run_check_journals_in_sudoc(
                 unchanged=int(not changed),
                 sudoc_found=int(check.found),
                 issn_removed=len(check.intruders),
+                issn_set_aside=len(check.set_aside),
                 issn_corrected=len(check.corrections),
-                issnl_conflicts=int(check.conflict),
-                issn_unranged=int(check.ambiguous_support),
+                issn_conflicts=int(check.conflict),
+                issn_unranged=int(check.ambiguous_support is not None),
             )
             avancement.retient(int(check.found))
 

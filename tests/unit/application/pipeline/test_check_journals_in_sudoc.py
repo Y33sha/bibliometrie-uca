@@ -11,15 +11,29 @@ from application.ports.pipeline.journals import JournalSudocRow
 from domain.sources.sudoc import SudocSerialRecord, Support
 
 
-def _record(ppn: str, issn: str, issnl: str, support: Support) -> SudocSerialRecord:
-    return SudocSerialRecord(ppn, issn, issnl, (), support, (), "Nature")
+def _record(
+    ppn: str, issn: str, issnl: str, support: Support, other: tuple[str, ...] = ()
+) -> SudocSerialRecord:
+    return SudocSerialRecord(
+        ppn=ppn,
+        issn=issn,
+        issnl=issnl,
+        cancelled_issns=(),
+        support=support,
+        other_support_issns=other,
+        preceding_issns=(),
+        succeeding_issns=(),
+        title="Nature",
+    )
 
 
 _NATURE = JournalSudocRow(1, "Nature", "1476-4687", None, "0028-0836", ())
 _PPNS = {"1476-4687": ("068267983",), "0028-0836": ("038758717",)}
 _RECORDS = {
     "068267983": _record("068267983", "1476-4687", "0028-0836", Support.ELECTRONIC),
-    "038758717": _record("038758717", "0028-0836", "0028-0836", Support.PRINT),
+    "038758717": _record(
+        "038758717", "0028-0836", "0028-0836", Support.PRINT, other=("1476-4687",)
+    ),
 }
 
 
@@ -71,6 +85,16 @@ async def test_queries_correction_candidates_of_rejected_issns():
     row = JournalSudocRow(2, "Constructif", None, None, None, ("1950-2051",))
     _, _, _, calls = await _run([row])
     assert "1950-5051" in calls["ppns"][0]
+
+
+@pytest.mark.asyncio
+async def test_reads_the_other_support_named_by_a_record():
+    """La notice papier désigne l'ISSN en ligne (`452`) : sa notice est lue, et l'ISSN complète `eissn`."""
+    print_only = JournalSudocRow(4, "Nature", "0028-0836", None, None, ())
+    repo, _, _, calls = await _run([print_only])
+    assert calls["ppns"] == [["0028-0836"], ["1476-4687"]]
+    kwargs = repo.record_sudoc_check.call_args.kwargs
+    assert (kwargs["issn"], kwargs["eissn"]) == ("0028-0836", "1476-4687")
 
 
 @pytest.mark.asyncio

@@ -52,6 +52,17 @@ class TestSudocCheck:
         assert without_issn not in rows
         assert checked not in rows
 
+    def test_find_by_issn_reaches_rejected_issns(self, sa_sync_conn, repo):
+        """Un ISSN rejeté sert au rapprochement ; une revue qui le porte dans ses colonnes passe avant."""
+        rejecting = _create_journal(sa_sync_conn, issn="0305-1048")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET rejected_issns = '{1362-4954}' WHERE id = :id"),
+            {"id": rejecting},
+        )
+        assert repo.find_journal_by_issn_any("1362-4954") == rejecting
+        carrying = _create_journal(sa_sync_conn, eissn="1362-4954")
+        assert repo.find_journal_by_issn_any("1362-4954") == carrying
+
     def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
         at = datetime(2026, 9, 15, tzinfo=UTC)

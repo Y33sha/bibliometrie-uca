@@ -16,6 +16,7 @@ _NOTICE = """<?xml version="1.0" encoding="UTF-8"?>
     <subfield code="f">0028-0836</subfield>
   </datafield>
   <datafield tag="182" ind1="#" ind2="#"><subfield code="c">c</subfield></datafield>
+  <datafield tag="183" ind1="#" ind2="#"><subfield code="a">ceb</subfield></datafield>
   <datafield tag="200" ind1="1" ind2="#"><subfield code="a">Nature</subfield></datafield>
 </record>
 """
@@ -92,12 +93,12 @@ class TestFetchPpns:
 class TestMarcFields:
     def test_reads_datafields_in_order(self):
         fields = client.marc_fields(_NOTICE)
-        assert [f.tag for f in fields] == ["011", "182", "200"]
+        assert [f.tag for f in fields] == ["011", "182", "183", "200"]
         assert fields[0].subfields == (("a", "1476-4687"), ("f", "0028-0836"))
 
     def test_reads_namespaced_record(self):
         xml = _NOTICE.replace("<record>", '<record xmlns="http://www.loc.gov/MARC21/slim">')
-        assert [f.tag for f in client.marc_fields(xml)] == ["011", "182", "200"]
+        assert [f.tag for f in client.marc_fields(xml)] == ["011", "182", "183", "200"]
 
 
 class TestFetchSerialRecord:
