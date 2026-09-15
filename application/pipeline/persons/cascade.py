@@ -10,9 +10,8 @@ Deux populations de candidats traversent la même cascade :
 1. **ORCID** déposé par l'auteur (sources de `ORCID_MATCH_SOURCES`).
 2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
 3. **IdRef**.
-4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne. Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
+4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
 5. **Cross-source** — même publication × position, nom compatible ; inopérant au bootstrap.
-6. **Initiales compatibles** — forme inconnue, mais une seule personne de même nom de famille aux initiales compatibles (`compatible_namesakes`).
 
 Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une signature qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses signatures attestent seul.
 
@@ -58,14 +57,14 @@ from domain.persons.matching import (
     NameFormDecision,
     Namesake,
     PersonMatchDecision,
-    compatible_namesakes,
+    compatible_persons,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.name_matching import first_name_initials, initials_extend
+from domain.persons.name_matching import first_name_for, first_name_initials, initials_extend
 
 # ---------------------------------------------------------------------------
 # Passe de cascade
@@ -158,11 +157,7 @@ class _Cascade:
         """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
         norm = a.author_name_normalized
         person_ids = self._name_form_map.get(norm) if norm else None
-        compatible = (
-            compatible_namesakes(a.first_name, self._namesakes.get(a.last_norm, []))
-            if person_ids is None
-            else []
-        )
+        compatible = compatible_persons(a.full_name, self._namesakes) if person_ids is None else []
         return decide_name_form_outcome(
             person_ids,
             a.allow_create,
@@ -302,15 +297,16 @@ class _Cascade:
         if namesake is None or namesake.conflicting:
             return
         initials = first_name_initials(namesake.first_name)
+        first_name = first_name_for(a.full_name, namesake.last_name)
         if (
             initials is None
-            or normalize_name(namesake.last_name) != a.last_norm
-            or first_name_initials(a.first_name) is not None
-            or not initials_extend(initials, a.first_name)
+            or first_name is None
+            or first_name_initials(first_name) is not None
+            or not initials_extend(initials, first_name)
         ):
             return
-        update_name(pid, namesake.last_name, a.first_name, repo=self._person_repo)
-        self._index_namesake(namesake._replace(first_name=a.first_name))
+        update_name(pid, namesake.last_name, first_name, repo=self._person_repo)
+        self._index_namesake(namesake._replace(first_name=first_name))
         self.first_names_completed += 1
 
     def result(self) -> CascadeResult:

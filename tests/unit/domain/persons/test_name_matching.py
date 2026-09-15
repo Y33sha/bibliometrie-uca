@@ -7,6 +7,8 @@ import pytest
 
 from domain.persons.name_matching import (
     _edit_distance,
+    family_name_splits,
+    first_name_for,
     first_name_initials,
     initials_extend,
     names_compatible,
@@ -149,3 +151,26 @@ def test_initiales_d_un_prenom(first_name, initials):
 )
 def test_initiales_qui_commencent_un_prenom(initials, first_name, extend):
     assert initials_extend(initials, first_name) is extend
+
+
+@pytest.mark.parametrize(
+    ("raw", "splits"),
+    [
+        (
+            "Florence Caldefie Chezet",
+            [("Caldefie Chezet", "Florence"), ("Chezet", "Florence Caldefie")],
+        ),
+        ("Jean Martin", [("Martin", "Jean")]),
+        ("Caldefie-Chezet, F.", [("Caldefie-Chezet", "F.")]),
+        ("Martin", [("Martin", "")]),
+        ("", []),
+    ],
+)
+def test_decoupages_d_une_signature(raw, splits):
+    assert family_name_splits(raw) == splits
+
+
+def test_prenom_pour_un_nom_de_famille():
+    assert first_name_for("Florence Caldefie Chezet", "Caldefie-Chezet") == "Florence"
+    assert first_name_for("Florence Caldefie Chezet", "Chezet") == "Florence Caldefie"
+    assert first_name_for("Florence Caldefie Chezet", "Martin") is None

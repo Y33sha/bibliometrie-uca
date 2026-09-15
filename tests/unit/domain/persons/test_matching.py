@@ -7,6 +7,7 @@ from domain.persons.matching import (
     PersonMatchDecision,
     attested_full_first_names,
     compatible_namesakes,
+    compatible_persons,
     consensus_name,
     decide_cross_source_match,
     decide_match_by_identifier,
@@ -315,6 +316,24 @@ class TestCompatibleNamesakes:
         assert compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
 
 
+class TestCompatiblePersons:
+    def test_double_family_name_without_particle(self):
+        """« Florence Caldefie Chezet » : le découpage au dernier mot donne « Chezet », celui aux deux derniers mots trouve « Caldefie-Chezet F. »."""
+        index = {"caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")]}
+        assert compatible_persons("Florence Caldefie Chezet", index) == [1]
+
+    def test_candidates_of_every_split_add_up(self):
+        index = {
+            "caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")],
+            "chezet": [Namesake(2, "Chezet", "F.")],
+        }
+        assert compatible_persons("Florence Caldefie Chezet", index) == [1, 2]
+
+    def test_comma_format_keeps_its_single_split(self):
+        index = {"chezet": [Namesake(2, "Chezet", "F.")]}
+        assert compatible_persons("Caldefie Chezet, Florence", index) == []
+
+
 class TestFullNamesakes:
     def test_keeps_full_first_names_that_the_initials_open(self):
         namesakes = [
@@ -332,6 +351,12 @@ class TestAttestedFullFirstNames:
     def test_keeps_compatible_full_first_names_of_the_same_family_name(self):
         names = ["Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont"]
         assert attested_full_first_names("Tnourji", ("a",), names) == {"abdellah": "Abdellah"}
+
+    def test_double_family_name_without_comma(self):
+        names = ["Florence Caldefie Chezet"]
+        assert attested_full_first_names("Caldefie-Chezet", ("f",), names) == {
+            "florence": "Florence"
+        }
 
     def test_incompatible_first_name_is_ignored(self):
         assert attested_full_first_names("Tnourji", ("a",), ["Karim Tnourji"]) == {}
@@ -477,7 +502,8 @@ class TestDecidePersonMatch:
         )
         assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
 
-    def test_cross_source_wins_over_compatible_initials(self):
+    def test_compatible_initials_win_over_cross_source(self):
+        """Les initiales compatibles font partie du match par nom, placé avant le cross-source."""
         decision = decide_person_match(
             orcid_match=None,
             hal_match=None,
@@ -487,7 +513,9 @@ class TestDecidePersonMatch:
                 action="match", person_id=7, reason="compatible_name"
             ),
         )
-        assert decision == PersonMatchDecision(action="match", person_id=42, reason="cross_source")
+        assert decision == PersonMatchDecision(
+            action="match", person_id=7, reason="compatible_name"
+        )
 
     def test_compatible_initials_match_without_cross_source(self):
         decision = decide_person_match(

@@ -8,6 +8,8 @@ from typing import Literal, NamedTuple
 
 from domain.normalize import normalize_name
 from domain.persons.name_matching import (
+    family_name_splits,
+    first_name_for,
     first_name_initials,
     initials_extend,
     names_compatible,
@@ -109,18 +111,33 @@ def compatible_namesakes(signature_first_name: str, namesakes: Sequence[Namesake
     return candidates
 
 
+def compatible_persons(
+    signature: str, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
+) -> list[int]:
+    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`family_name_splits`).
+
+    `namesakes_by_last_name` indexe les personnes par nom de famille normalisé. Chaque personne figure une fois, dans l'ordre de découverte.
+    """
+    found: list[int] = []
+    for last, first in family_name_splits(signature):
+        namesakes = namesakes_by_last_name.get(normalize_name(last), ())
+        for person_id in compatible_namesakes(first, namesakes):
+            if person_id not in found:
+                found.append(person_id)
+    return found
+
+
 def attested_full_first_names(
     last_name: str, initials: tuple[str, ...], signature_names: Iterable[str]
 ) -> dict[str, str]:
     """Prénoms pleins que des signatures donnent à une personne au prénom réduit, indexés par leur forme normalisée.
 
-    Retient les signatures de même nom de famille dont le prénom plein prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
+    Retient les signatures dont un découpage donne le même nom de famille (`first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
     """
-    last_norm = normalize_name(last_name)
     spellings: dict[str, Counter[str]] = {}
     for raw in signature_names:
-        sig_last, sig_first = parse_raw_author_name(raw)
-        if normalize_name(sig_last) != last_norm or first_name_initials(sig_first) is not None:
+        sig_first = first_name_for(raw, last_name)
+        if sig_first is None or first_name_initials(sig_first) is not None:
             continue
         if not initials_extend(initials, sig_first):
             continue
@@ -324,10 +341,9 @@ def decide_person_match(
     1. **ORCID déposé par l'auteur** (`orcid_match`) — ORCID issu d'une source à dépôt auteur (`ORCID_MATCH_SOURCES`), borné côté caller.
     2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la signature dans le TEI HAL.
     3. **IdRef** (`idref_match`).
-    4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne. Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
+    4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne, ou, à forme inconnue, seule personne aux initiales compatibles (`reason="compatible_name"`). Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
     5. **Cross-source** (`cross_source_match`) — match par `(publication_id, author_position)` avec une authorship d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
-    6. **Initiales compatibles** (`name_form_outcome` d'action `match`, `reason="compatible_name"`) — forme exacte inconnue, mais une seule personne de même nom de famille aux initiales compatibles (« Abdellah Tnourji » pour « Tnourji A. »).
-    7. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
+    6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship (store `rejected_authorships`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse l'authorship orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
 
@@ -339,20 +355,15 @@ def decide_person_match(
         return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
     if idref_match is not None and idref_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
-    by_initials = name_form_outcome.reason == "compatible_name"
-    if name_form_outcome.action == "match" and not by_initials:
+    if name_form_outcome.action == "match":
         return PersonMatchDecision(
             action="match",
             person_id=name_form_outcome.person_id,
-            reason="single_name",
+            reason=name_form_outcome.reason or "single_name",
         )
     if cross_source_match is not None and cross_source_match not in rejected_person_ids:
         return PersonMatchDecision(
             action="match", person_id=cross_source_match, reason="cross_source"
-        )
-    if name_form_outcome.action == "match":
-        return PersonMatchDecision(
-            action="match", person_id=name_form_outcome.person_id, reason="compatible_name"
         )
     if name_form_outcome.action == "create":
         return PersonMatchDecision(action="create", reason="new")

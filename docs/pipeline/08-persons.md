@@ -21,13 +21,9 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 3. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-4. **Forme de nom** : le nom normalisé de la signature désigne une seule personne dans `person_name_forms`. Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — variantes prénom/nom, nom/prénom, initiales — et du nom porté par ses signatures. Un nom qui désigne plusieurs personnes laisse la signature orpheline, pour traitement manuel via `admin/orphan-authorships`.
+4. **Forme de nom** : le nom normalisé de la signature désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — variantes prénom/nom, nom/prénom, initiales — et du nom porté par ses signatures. Un nom qui désigne plusieurs personnes laisse la signature orpheline, pour traitement manuel via `admin/orphan-authorships`.
 
-5. **Même publication, même position, dans une autre source** : une autre source donne la même publication, avec à la même position d'auteur une signature déjà rattachée à une personne, dont le nom est compatible. Il s'appuie sur les rattachements que les critères précédents viennent de poser.
-
-6. **Initiales compatibles** : la forme de nom est inconnue, et une seule personne de même nom de famille a des initiales compatibles. Les initiales du prénom réduit commencent celles du prénom plein, dans l'ordre : « Abdellah Tnourji » rejoint « Tnourji A. », « Al-Izeri, A. » rejoint « Al-Izeri Abdul-Majeed ». Une personne au prénom réduit qu'un autre prénom plein revendique est écartée.
-
-> **Prénoms complétés.** Une personne au prénom réduit prend le prénom plein compatible que ses signatures attestent seul : « Tnourji A. » devient « Tnourji Abdellah ». Les signatures d'un autre prénom plein créent alors leur propre personne. Quand ses signatures attestent plusieurs prénoms pleins, elle garde ses initiales.
+5. **Même publication, même position, dans une autre source** : une autre source donne la même publication, avec à la même position d'auteur une signature déjà rattachée à une personne, dont le nom est compatible. Interrogé en dernier : il s'appuie sur les rattachements que les critères précédents viennent de poser.
 
 > **Corroboration par le nom.** Un match par identifiant (ORCID, `hal_person_id`, IdRef) n'est retenu que si le nom de la signature est compatible avec celui du propriétaire de la valeur : un identifiant recopié sur le mauvais co-auteur est refusé, la signature retombe sur les critères suivants.
 
@@ -38,7 +34,7 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 La phase fait deux passes sur ces critères.
 
 - La première rattache seulement, sans jamais créer de personne.
-- La seconde reprend les signatures restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom, sur la position dans une autre source et sur les initiales. Un nom inconnu donne alors une personne neuve. Cette seconde passe voit les rattachements posés par la première.
+- La seconde reprend les signatures restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom et sur la position dans une autre source. Un nom inconnu donne alors une personne neuve. Cette seconde passe voit les rattachements posés par la première.
 
 ### Signatures hors périmètre
 
