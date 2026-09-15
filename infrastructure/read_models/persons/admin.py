@@ -35,6 +35,7 @@ from domain.types import JsonValue
 from infrastructure.db.sql_fragments import (
     identifier_neutralized,
     in_clause,
+    name_form_holder,
     other_name_form_holders,
     usable_identifiers,
 )
@@ -99,42 +100,36 @@ def name_form_authorships(
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending` hors forme canonique : les liens tranchés et les formes dérivées du nom de la personne, confirmées d'office, sortent du travail à faire.
-_AMBIGUOUS_FORMS_HAVING = (
-    f"HAVING count(*) >= 2 AND bool_or(status = '{AttributionStatus.PENDING.value}' "
-    f"AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)))"
-)
+# Formes portées par ≥2 personnes au sens de `name_form_holder`, dont au moins une en attente. Les formes dérivées du nom de la personne, confirmées d'office, ne comptent pas comme en attente.
+_AMBIGUOUS_FORMS_SQL = f"""
+    SELECT pnf.name_form
+    FROM person_name_forms pnf
+    JOIN persons p ON p.id = pnf.person_id
+    WHERE {name_form_holder("pnf", "p")}
+    GROUP BY pnf.name_form
+    HAVING count(*) >= 2
+       AND bool_or(pnf.status = '{AttributionStatus.PENDING.value}'
+                   AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)))
+"""
 
 
 def ambiguous_name_forms_count(conn: Connection) -> int:
     """Nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
-    row = conn.execute(
-        text(f"""
-            SELECT count(*) AS total FROM (
-                SELECT name_form FROM person_name_forms
-                GROUP BY name_form {_AMBIGUOUS_FORMS_HAVING}
-            ) t
-        """)
-    ).one()
+    row = conn.execute(text(f"SELECT count(*) AS total FROM ({_AMBIGUOUS_FORMS_SQL}) t")).one()
     return int(row.total)
 
 
 def ambiguous_name_forms(
     conn: Connection, *, page: int, per_page: int
 ) -> AmbiguousNameFormsResponse:
-    """Formes de nom ambiguës paginées, avec les personnes qui les portent.
+    """Formes de nom ambiguës paginées, avec les personnes qui les portent au sens de `name_form_holder`.
 
-    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne porte le drapeau `canonical` et le statut `confirmed`.
+    Chaque personne porte son statut (pending/confirmed) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne porte le drapeau `canonical` et le statut `confirmed`.
     """
     total = ambiguous_name_forms_count(conn)
     offset = (page - 1) * per_page
     form_rows = conn.execute(
-        text(f"""
-            SELECT name_form FROM person_name_forms
-            GROUP BY name_form {_AMBIGUOUS_FORMS_HAVING}
-            ORDER BY name_form
-            LIMIT :lim OFFSET :off
-        """),
+        text(f"{_AMBIGUOUS_FORMS_SQL} ORDER BY name_form LIMIT :lim OFFSET :off"),
         {"lim": per_page, "off": offset},
     ).all()
     forms = [r.name_form for r in form_rows]
@@ -150,7 +145,7 @@ def ambiguous_name_forms(
                        EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
                 FROM person_name_forms pnf
                 JOIN persons p ON p.id = pnf.person_id
-                WHERE pnf.name_form = ANY(:forms)
+                WHERE pnf.name_form = ANY(:forms) AND {name_form_holder("pnf", "p")}
                 ORDER BY pnf.name_form, p.last_name, p.first_name
             """).bindparams(bindparam("forms")),
             {"forms": forms},

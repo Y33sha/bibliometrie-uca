@@ -378,13 +378,13 @@ class TestNameDuplicates:
 class TestAmbiguousNameForms:
     """Formes portées par plusieurs personnes, avec au moins un lien à trancher."""
 
-    def _form(self, conn, form, person_id, *, sources="{hal}"):
+    def _form(self, conn, form, person_id, *, sources="{hal}", status="pending"):
         conn.execute(
             text(
                 "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES (:f, :p, CAST(:src AS text[]), 'pending')"
+                "VALUES (:f, :p, CAST(:src AS text[]), CAST(:st AS identifier_status))"
             ),
-            {"f": form, "p": person_id, "src": sources},
+            {"f": form, "p": person_id, "src": sources, "st": status},
         )
 
     def _forms(self, conn):
@@ -407,3 +407,29 @@ class TestAmbiguousNameForms:
         persons = {p.person_id: p for p in self._forms(sa_sync_conn)["j martin"].persons}
         assert (persons[a].canonical, persons[a].status) == (True, "confirmed")
         assert (persons[b].canonical, persons[b].status) == (False, "pending")
+
+    def test_forme_rejetee_ne_compte_pas(self, sa_sync_conn):
+        """En attente chez une personne, rejetée chez l'autre : une seule personne porte la forme."""
+        a = _create_person(sa_sync_conn, last="Martin")
+        b = _create_person(sa_sync_conn, last="Durand")
+        self._form(sa_sync_conn, "j martin", a)
+        self._form(sa_sync_conn, "j martin", b, status="rejected")
+        assert "j martin" not in self._forms(sa_sync_conn)
+
+    def test_personne_rejetee_ne_compte_pas(self, sa_sync_conn):
+        a = _create_person(sa_sync_conn, last="Martin")
+        b = _create_person(sa_sync_conn, last="Durand", rejected=True)
+        self._form(sa_sync_conn, "j martin", a)
+        self._form(sa_sync_conn, "j martin", b)
+        assert "j martin" not in self._forms(sa_sync_conn)
+
+    def test_seuls_les_porteurs_sont_affiches(self, sa_sync_conn):
+        """Une forme ambiguë liste ses porteurs, sans les personnes chez qui la forme est rejetée."""
+        a = _create_person(sa_sync_conn, last="Martin")
+        b = _create_person(sa_sync_conn, last="Martin", first="Jacques")
+        c = _create_person(sa_sync_conn, last="Durand")
+        self._form(sa_sync_conn, "j martin", a)
+        self._form(sa_sync_conn, "j martin", b, status="confirmed")
+        self._form(sa_sync_conn, "j martin", c, status="rejected")
+        persons = self._forms(sa_sync_conn)["j martin"].persons
+        assert sorted(p.person_id for p in persons) == sorted([a, b])

@@ -45,8 +45,13 @@ def usable_identifiers(*, signature: str = "sa", identity: str = "aik") -> str:
     )
 
 
+def name_form_holder(form: str, person: str) -> str:
+    """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non rejetée."""
+    return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND NOT {person}.rejected"
+
+
 def other_name_form_holders(name_form: str, person_id: str) -> str:
-    """Sous-requête (`person_id`) des autres personnes qui portent la forme de nom : forme non rejetée, personne non rejetée, `person_id` exclu.
+    """Sous-requête (`person_id`) des autres personnes qui portent la forme de nom au sens de `name_form_holder`, `person_id` exclu.
 
     `name_form` et `person_id` sont des expressions SQL : paramètres (`:nf`) ou colonnes de la requête hôte.
     """
@@ -54,8 +59,7 @@ def other_name_form_holders(name_form: str, person_id: str) -> str:
         "SELECT holder.person_id FROM person_name_forms holder"
         " JOIN persons holder_person ON holder_person.id = holder.person_id"
         f" WHERE holder.name_form = {name_form} AND holder.person_id <> {person_id}"
-        f" AND holder.status <> '{AttributionStatus.REJECTED.value}'"
-        " AND NOT holder_person.rejected"
+        f" AND {name_form_holder('holder', 'holder_person')}"
     )
 
 
