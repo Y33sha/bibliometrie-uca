@@ -23,6 +23,8 @@ API_BASE_URLS: dict[str, str] = {
     "unpaywall": "https://api.unpaywall.org/v2",
     # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
     "doaj": "https://doaj.org/api",
+    # Sudoc : racine, l'adapter compose `/services/issn2ppn/<ISSN>` et `/<ppn>.xml`.
+    "sudoc": "https://www.sudoc.fr",
 }
 
 
@@ -57,3 +59,7 @@ UNPAYWALL_DELAY = 0.12
 
 # DOAJ — courtoisie
 DOAJ_DELAY = 0.15
+
+# Sudoc — aucune limite documentée, courtoisie
+SUDOC_DELAY = 0.2
+SUDOC_ISSN2PPN_BATCH = 20  # ISSN par requête `issn2ppn`

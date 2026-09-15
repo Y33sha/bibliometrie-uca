@@ -58,7 +58,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Choix de la source : le Sudoc.
 - [x] Migration : `journals.rejected_issns`, `journals.sudoc_checked_at`.
 - [x] `find_or_create_journal` conserve les ISSN invalides dans `rejected_issns`. Script oneshot : réinjection des 25 valeurs supprimées par `backfill_normalize_journal_issns`.
-- [ ] Lecture des notices Sudoc : ISSN, ISSN-L, support, ISSN annulés, ISSN de l'autre support.
+- [x] Lecture des notices Sudoc : ISSN, ISSN-L, support, ISSN annulés, ISSN de l'autre support.
 - [ ] Sous-étape de `publishers_journals`, pour les revues à vérifier : cohérence des ISSN de chaque revue, correction des ISSN rejetés, écriture de l'ISSN-L dans `issnl`, placement de chaque ISSN dans la colonne de son support.
 - [ ] Mesure : revues confirmées, ISSN inconnus de la source.
 - [ ] Audit des titres divergents : nombre et nature des différences.
