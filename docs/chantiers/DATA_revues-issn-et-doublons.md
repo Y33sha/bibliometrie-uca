@@ -53,13 +53,15 @@ Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide
 ### 2. Source de référence
 
 - [ ] Choix de la source.
-- [ ] Migration : PPN, ISSN-L de référence, titre de référence, date de vérification.
+- [ ] Migration : PPN, notice Sudoc brute, date de vérification.
+- [ ] ISSN et ISSN-L de référence écrits dans `issn`, `eissn`, `issnl`.
 - [ ] Sous-étape de `publishers_journals` : interrogation par lot des revues à vérifier, enregistrement des champs de référence.
 - [ ] Mesure : revues confirmées, ISSN inconnus de la source.
 - [ ] Audit des titres divergents : nombre et nature des différences.
 
 ### 3. Cohérence des ISSN
 
+- [ ] Placement des ISSN : chaque ISSN rangé dans la colonne de son support, `issnl` complété, ISSN manquants ajoutés. Détection des ISSN mal placés et des ISSN d'une autre revue.
 - [ ] Contrôle des ISSN des enregistrements face à ceux de leur revue vérifiée.
 - [ ] Traitement des discordances.
 
