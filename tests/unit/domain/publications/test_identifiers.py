@@ -18,6 +18,7 @@ from domain.publications.identifiers import (
     clean_doi_prefix,
     extract_doi_from_url,
     is_hal_host,
+    issn_typo_candidates,
     normalize_arxiv_id,
     normalize_pmcid,
     normalize_pmid,
@@ -381,6 +382,19 @@ class TestISSN:
     )
     def test_try_parse_rejects_invalid(self, raw):
         assert ISSN.try_parse(raw) is None
+
+
+class TestIssnTypoCandidates:
+    def test_substitution_and_transposition(self):
+        assert "1468-2494" in issn_typo_candidates("1467-2494")  # chiffre remplacé
+        assert "1365-4632" in issn_typo_candidates("1365-4362")  # voisins inversés
+
+    def test_candidates_are_valid_issns(self):
+        assert all(ISSN.try_parse(c) for c in issn_typo_candidates("1467-2494"))
+
+    def test_value_of_another_length(self):
+        assert issn_typo_candidates("(Internet)") == frozenset()
+        assert issn_typo_candidates("1950-629") == frozenset()
 
 
 class TestISBN:

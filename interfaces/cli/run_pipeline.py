@@ -368,7 +368,7 @@ def _vacuum_staging(full: bool = False) -> None:
 def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     """Enrichissement du référentiel `journals`.
 
-    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
+    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `check_journals_in_sudoc` vérifie dans le Sudoc les ISSN des revues jamais vérifiées, les corrige et les range par support. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
 
     La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 
@@ -379,6 +379,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     return run(
         resolve_publishers=_run_resolve_publishers,
         enrich_from_openalex=_run_enrich_journals_from_openalex,
+        check_in_sudoc=_run_check_journals_in_sudoc,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
         logger=log,
@@ -718,6 +719,43 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
         signal_source_unavailable(
             metrics, "openalex sources", logger=log, phase="publishers_journals"
         )
+    finally:
+        reset_current_breaker(token)
+        conn.close()
+    _signal_if_tripped(metrics, breaker)
+    return metrics
+
+
+def _run_check_journals_in_sudoc() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.check_journals_in_sudoc import (
+        run_check_journals_in_sudoc,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from infrastructure.sources.api_params import API_BASE_URLS
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
+    from infrastructure.sources.sudoc.client import fetch_ppns, fetch_serial_record
+
+    conn = get_sync_engine().connect()
+    breaker = SourceCircuitBreaker("sudoc", threshold=3)
+    token = set_current_breaker(breaker)
+    try:
+        base_url = API_BASE_URLS["sudoc"]
+        metrics = run_check_journals_in_sudoc(
+            conn,
+            log,
+            journal_repo=PgJournalGatewayQueries(conn),
+            fetch_ppns=lambda issns: fetch_ppns(issns, base_url=base_url),
+            fetch_record=lambda ppn: fetch_serial_record(ppn, base_url=base_url),
+            breaker=breaker,
+        )
+    except SourceUnavailableError:
+        metrics = PhaseMetrics()
+        signal_source_unavailable(metrics, "sudoc", logger=log, phase="publishers_journals")
     finally:
         reset_current_breaker(token)
         conn.close()

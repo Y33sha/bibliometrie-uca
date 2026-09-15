@@ -33,6 +33,46 @@ def _create_journal(conn, *, openalex_id=None, issn=None, eissn=None, issnl=None
     ).scalar_one()
 
 
+class TestSudocCheck:
+    def test_queue_holds_unchecked_journals_with_an_issn(self, sa_sync_conn, repo):
+        with_issn = _create_journal(sa_sync_conn, issn="0028-0836")
+        without_issn = _create_journal(sa_sync_conn)
+        rejected_only = _create_journal(sa_sync_conn)
+        checked = _create_journal(sa_sync_conn, issn="1476-4687")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET rejected_issns = '{1950-2051}' WHERE id = :id"),
+            {"id": rejected_only},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": checked}
+        )
+        rows = {r.id: r for r in repo.find_journals_to_check_in_sudoc()}
+        assert with_issn in rows
+        assert rows[rejected_only].rejected_issns == ("1950-2051",)
+        assert without_issn not in rows
+        assert checked not in rows
+
+    def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
+        at = datetime(2026, 9, 15, tzinfo=UTC)
+        repo.record_sudoc_check(
+            journal_id,
+            issn="0028-0836",
+            eissn="1476-4687",
+            issnl="0028-0836",
+            rejected_issns=(),
+            checked_at=at,
+        )
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT issn, eissn, issnl, rejected_issns, sudoc_checked_at "
+                "FROM journals WHERE id = :id"
+            ),
+            {"id": journal_id},
+        ).one()
+        assert tuple(row) == ("0028-0836", "1476-4687", "0028-0836", [], at)
+
+
 class TestFindJournalsOfUnknownType:
     def test_returns_id_and_openalex_id(self, sa_sync_conn, repo):
         _create_journal(sa_sync_conn, openalex_id="S1")  # journal_type 'unknown' par défaut

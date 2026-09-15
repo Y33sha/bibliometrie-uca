@@ -440,6 +440,16 @@ class ISSN:
         return self.value
 
 
+def issn_typo_candidates(raw: str) -> frozenset[str]:
+    """ISSN valides à une faute de frappe près d'une valeur : un caractère remplacé, ou deux caractères voisins inversés. Vide si la valeur n'a pas huit caractères hors tiret."""
+    s = raw.replace("-", "").strip().upper()
+    if len(s) != 8:
+        return frozenset()
+    variants = [s[:i] + c + s[i + 1 :] for i in range(8) for c in "0123456789X" if c != s[i]]
+    variants += [s[:i] + s[i + 1] + s[i] + s[i + 2 :] for i in range(7) if s[i] != s[i + 1]]
+    return frozenset(str(issn) for v in variants if (issn := ISSN.try_parse(v)))
+
+
 # ── ISBN ───────────────────────────────────────────────────────────
 
 _ISBN_PREFIX_RE = re.compile(r"ISBN(?:-1[03])?[:\s]*", re.IGNORECASE)

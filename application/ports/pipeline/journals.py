@@ -1,12 +1,13 @@
 """Ports d'accès pipeline à la table `journals`.
 
-Trois contrats étroits, un par consommateur du pipeline, tous servis par un même adapter `PgJournalGatewayQueries` (la table est mono-adapter, cf. `infrastructure/pipeline/journals.py`) :
+Des contrats étroits, un par consommateur du pipeline, tous servis par un même adapter `PgJournalGatewayQueries` (la table est mono-adapter, cf. `infrastructure/pipeline/journals.py`) :
 
 - `JournalFindOrCreateQueries` : lookup + création + enrichissement à la création, pour `find_or_create_journal` (appelé par les normaliseurs de sources) ;
 - `JournalOpenAlexEnrichmentQueries` : file des revues à typer + écriture APC / journal_type, pour l'enrichissement OpenAlex ;
+- `JournalSudocQueries` : file des revues à vérifier + écriture des ISSN vérifiés, pour la vérification dans le Sudoc ;
 - `JournalDoajQueries` : index ISSN + drapeau `is_in_doaj`, pour l'import du dump DOAJ.
 
-L'édition curée et la fusion (admin) vivent à part, dans `application/ports/repositories/journal_repository.py`.
+L'édition dans l'administration et la fusion ont leur propre port, `application/ports/repositories/journal_repository.py`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -62,11 +63,14 @@ class JournalFindOrCreateQueries(Protocol):
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
+        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée.
+
+        Un ISSN que la revue porte déjà, dans l'une des trois colonnes, n'est pas réécrit dans une autre. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
+        """
         ...
 
     def add_rejected_issns(self, journal_id: int, values: Sequence[str]) -> None:
-        """Ajoute des ISSN invalides à `rejected_issns` de la revue, sans doublon."""
+        """Ajoute des ISSN invalides à `rejected_issns` de la revue, sans doublon. Une valeur nouvelle remet la revue à vérifier dans le Sudoc."""
         ...
 
     def create_journal(
@@ -103,6 +107,38 @@ class JournalOpenAlexEnrichmentQueries(Protocol):
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
         """Pose le `journal_type` d'une revue. Écriture directe, sans requalification des publications — c'est l'édition admin, elle, qui rejoue les corrections de `doc_type`."""
+        ...
+
+
+class JournalSudocRow(NamedTuple):
+    """Une revue à vérifier dans le Sudoc : son titre, ses trois formes d'ISSN et ses ISSN rejetés."""
+
+    id: int
+    title: str
+    issn: str | None
+    eissn: str | None
+    issnl: str | None
+    rejected_issns: tuple[str, ...]
+
+
+class JournalSudocQueries(Protocol):
+    """Vérification des ISSN des revues dans le Sudoc."""
+
+    def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
+        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté."""
+        ...
+
+    def record_sudoc_check(
+        self,
+        journal_id: int,
+        *,
+        issn: str | None,
+        eissn: str | None,
+        issnl: str | None,
+        rejected_issns: Sequence[str],
+        checked_at: datetime,
+    ) -> None:
+        """Écrit les ISSN vérifiés d'une revue et la date de vérification."""
         ...
 
 
