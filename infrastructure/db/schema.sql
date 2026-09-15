@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Mhj4mvBA3uYnlmr8NJyIWsbnPVKFgnV7TM6N6zGkDhzTttFG13Lbgr5N0R9CxVW
+\restrict ED4QH7veg9CVsF3IVGEYF9dHrYxQArhWBxGvgYC5977KpXG9n9lqAcfd3Ng78ZU
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -968,8 +968,24 @@ CREATE TABLE public.journals (
     doi_prefix text,
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
-    pub_count integer DEFAULT 0 NOT NULL
+    pub_count integer DEFAULT 0 NOT NULL,
+    rejected_issns text[] DEFAULT '{}'::text[] NOT NULL,
+    sudoc_checked_at timestamp with time zone
 );
+
+
+--
+-- Name: COLUMN journals.rejected_issns; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN invalides reçus des sources pour cette revue, tels que reçus. La vérification dans le Sudoc tente leur correction.';
+
+
+--
+-- Name: COLUMN journals.sudoc_checked_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journals.sudoc_checked_at IS 'Date de la dernière vérification des ISSN de la revue dans le Sudoc. NULL : revue jamais vérifiée.';
 
 
 --
@@ -3438,5 +3454,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Mhj4mvBA3uYnlmr8NJyIWsbnPVKFgnV7TM6N6zGkDhzTttFG13Lbgr5N0R9CxVW
+\unrestrict ED4QH7veg9CVsF3IVGEYF9dHrYxQArhWBxGvgYC5977KpXG9n9lqAcfd3Ng78ZU
 
