@@ -38,9 +38,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - La cohérence entre les ISSN d'un enregistrement et ceux de sa revue est vérifiée.
 - Le Sudoc, interrogé dans la phase `publishers_journals`, sert de source de référence. Il confirme les ISSN d'une revue et fournit son titre, son ISSN-L et le support de chaque ISSN. Le périmètre se limite aux revues qui ont au moins un ISSN.
 - L'ISSN-L du Sudoc est écrit dans `issnl`. Deux revues de même ISSN-L sont fusionnées automatiquement.
-- Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est retiré et signalé.
+- Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est rangé parmi les ISSN rejetés et signalé.
 - Le sort du titre de référence est décidé après un audit des titres divergents.
-- Les ISSN rejetés (`journals.rejected_issns`) sont soit fautifs, tels que reçus des sources, soit périmés : autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant. Ils servent au rapprochement. La sous-étape Sudoc corrige les fautifs.
+- Les ISSN rejetés (`journals.rejected_issns`) sont soit fautifs, tels que reçus des sources, soit périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant), soit d'une autre publication. Ils servent au rapprochement. La sous-étape Sudoc corrige les fautifs.
 - La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
 - `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
@@ -62,7 +62,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Sous-étape de `publishers_journals`, pour les revues à vérifier : cohérence des ISSN de chaque revue, correction des ISSN rejetés, écriture de l'ISSN-L dans `issnl`, placement de chaque ISSN dans la colonne de son support. Une revue qui reçoit un ISSN nouveau redevient à vérifier.
 - [x] Premier passage : 8 219 revues vérifiées, 7 153 présentes dans le Sudoc, 6 712 modifiées. Son journal révèle trois défauts des règles : un CD-ROM codé comme électronique, un troisième ISSN sans colonne, des ISSN-L différents entre les notices papier et en ligne d'une même revue.
 - [x] Règles revues : support lu dans `183$a`, regroupement des ISSN par ISSN-L ou par `452`, ISSN périmés rangés parmi les rejetés, rapprochement sur les ISSN rejetés.
-- [ ] Second passage après `backfill_reset_sudoc_check`, puis mesure.
+- [x] Second passage sur les 255 revues signalées. Il révèle des retraits à tort (variantes de titre, CD-ROM, titres précédents) et des ISSN papier sans notice mis de côté faute de colonne.
+- [x] Règles revues : plus de retrait, un ISSN d'une autre publication rejoint les rejetés ; réunion du papier et de l'en ligne de titres emboîtés ; support indiqué par `452$t`.
+- [ ] Troisième passage après `backfill_reset_sudoc_check`, puis mesure.
 - [ ] Audit des titres divergents : nombre et nature des différences.
 
 ### 3. Cohérence des ISSN

@@ -21,6 +21,7 @@ def _record(
     preceding: tuple[str, ...] = (),
     succeeding: tuple[str, ...] = (),
     cancelled: tuple[str, ...] = (),
+    hints: tuple[tuple[str, Support], ...] = (),
 ) -> SudocSerialRecord:
     return SudocSerialRecord(
         ppn=f"ppn-{issn}",
@@ -32,6 +33,7 @@ def _record(
         preceding_issns=preceding,
         succeeding_issns=succeeding,
         title=title,
+        other_support_hints=hints,
     )
 
 
@@ -67,14 +69,62 @@ class TestPlacement:
         assert (check.issn, check.eissn) == ("0028-0836", "2049-3630")
 
     def test_issn_without_free_column_is_set_aside(self):
-        """Cas réel (Journal of High Energy Physics) : l'ISSN en ligne prend `eissn`, l'ISSN sans notice qui l'occupait rejoint les rejetés."""
+        """L'ISSN en ligne prend `eissn` ; l'ISSN sans notice ni mention de support qui l'occupait rejoint les rejetés."""
         check = check_journal_issns(
             _journal(issn="1126-6708", eissn="1127-2236", issnl="1029-8479"),
             {"1029-8479": _record("1029-8479", "1029-8479", ELECTRONIC)},
         )
         assert (check.issn, check.eissn, check.issnl) == ("1126-6708", "1029-8479", "1029-8479")
-        assert check.rejected == ("1127-2236",)
         assert check.set_aside == (("1127-2236", SetAsideReason.NO_FREE_COLUMN),)
+
+    def test_mentioned_cd_rom_is_set_aside(self):
+        """Cas réel (Journal of High Energy Physics) : la notice en ligne désigne l'ISSN papier « (Print) » et le CD-ROM « (CD-ROM) »."""
+        check = check_journal_issns(
+            _journal(issn="1126-6708", eissn="1127-2236", issnl="1029-8479"),
+            {
+                "1029-8479": _record(
+                    "1029-8479",
+                    "1029-8479",
+                    ELECTRONIC,
+                    other=("1126-6708", "1127-2236"),
+                    hints=(("1126-6708", PRINT), ("1127-2236", OTHER)),
+                )
+            },
+        )
+        assert (check.issn, check.eissn) == ("1126-6708", "1029-8479")
+        assert check.set_aside == (("1127-2236", SetAsideReason.OTHER_SUPPORT),)
+
+    def test_issn_goes_to_the_column_its_mention_names(self):
+        """Cas réel (Lithosphere) : l'ISSN papier sans notice, rangé dans `eissn`, passe dans `issn` libre."""
+        check = check_journal_issns(
+            _journal(issn="1947-4253", eissn="1941-8264"),
+            {
+                "1947-4253": _record(
+                    "1947-4253",
+                    "1947-4253",
+                    ELECTRONIC,
+                    other=("1941-8264",),
+                    hints=(("1941-8264", PRINT),),
+                )
+            },
+        )
+        assert (check.issn, check.eissn) == ("1941-8264", "1947-4253")
+        assert check.rejected == ()
+
+    def test_mention_completes_the_missing_column(self):
+        check = check_journal_issns(
+            _journal(eissn="1947-4253"),
+            {
+                "1947-4253": _record(
+                    "1947-4253",
+                    "1947-4253",
+                    ELECTRONIC,
+                    other=("1941-8264",),
+                    hints=(("1941-8264", PRINT),),
+                )
+            },
+        )
+        assert (check.issn, check.eissn) == ("1941-8264", "1947-4253")
 
     def test_other_support_completes_the_missing_column(self):
         check = check_journal_issns(
@@ -86,8 +136,8 @@ class TestPlacement:
         )
         assert (check.issn, check.eissn, check.issnl) == ("0767-9513", "1963-1006", "0767-9513")
 
-    def test_other_support_without_known_record_is_not_added(self):
-        """La zone `452` liste aussi les CD-ROM : sans notice, le support de l'ISSN désigné reste inconnu."""
+    def test_other_support_of_unknown_support_is_not_added(self):
+        """La zone `452` liste aussi les CD-ROM : sans notice ni mention, le support de l'ISSN désigné reste inconnu."""
         check = check_journal_issns(
             _journal(issn="0767-9513"),
             {"0767-9513": _record("0767-9513", "0767-9513", PRINT, other=("1963-1006",))},
@@ -144,7 +194,7 @@ class TestSetAside:
         assert check.set_aside == (("1634-5495", SetAsideReason.RELATED_TITLE),)
         assert check.ambiguous_support is None
 
-    def test_successor_of_another_group_is_set_aside_not_removed(self):
+    def test_successor_of_another_group_is_set_aside(self):
         check = check_journal_issns(
             _journal(issn="0028-0836", eissn="0036-8075"),
             {
@@ -152,7 +202,6 @@ class TestSetAside:
                 "0036-8075": _record("0036-8075", "0036-8075", PRINT, title="Revue nouvelle série"),
             },
         )
-        assert check.intruders == ()
         assert check.set_aside == (("0036-8075", SetAsideReason.RELATED_TITLE),)
         assert check.rejected == ("0036-8075",)
 
@@ -166,17 +215,29 @@ class TestSetAside:
 
 
 class TestCoherence:
-    def test_issn_of_another_publication_is_removed(self):
-        """Cas réel : HAL donne à Neuropsychopharmacology l'ISSN de British Journal of Cancer."""
+    def test_issn_of_another_publication_is_set_aside(self):
+        """Cas réel : HAL donne à Neuropsychopharmacology l'ISSN de British Journal of Cancer. Il rejoint les rejetés : une revue qui le porte dans ses colonnes l'emporte au rapprochement."""
         check = check_journal_issns(
-            _journal(issn="1740-634X", eissn="0007-0920", issnl="0893-133X"),
+            _journal(
+                issn="1740-634X",
+                eissn="0007-0920",
+                issnl="0893-133X",
+                title="Neuropsychopharmacology",
+            ),
             {
-                "1740-634X": _record("1740-634X", "0893-133X", ELECTRONIC),
-                "0007-0920": _record("0007-0920", "0007-0920", PRINT),
-                "0893-133X": _record("0893-133X", "0893-133X", PRINT),
+                "1740-634X": _record(
+                    "1740-634X", "0893-133X", ELECTRONIC, title="Neuropsychopharmacology"
+                ),
+                "0007-0920": _record(
+                    "0007-0920", "0007-0920", PRINT, title="British journal of cancer"
+                ),
+                "0893-133X": _record(
+                    "0893-133X", "0893-133X", PRINT, title="Neuropsychopharmacology"
+                ),
             },
         )
-        assert check.intruders == ("0007-0920",)
+        assert check.set_aside == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ("0007-0920",)
         assert (check.issn, check.eissn, check.issnl) == ("0893-133X", "1740-634X", "0893-133X")
 
     def test_other_supports_form_one_group_despite_different_issnls(self):
@@ -188,8 +249,47 @@ class TestCoherence:
                 "1522-1601": _record("1522-1601", "1522-1601", ELECTRONIC, other=("8750-7587",)),
             },
         )
-        assert check.intruders == ()
+        assert check.set_aside == ()
         assert (check.issn, check.eissn, check.issnl) == ("8750-7587", "1522-1601", "1522-1601")
+
+    def test_print_and_online_with_nested_titles_form_one_group(self):
+        """Cas réel : la notice en ligne de European Archives of Oto-Rhino-Laryngology ajoute « and head & neck » au titre."""
+        check = check_journal_issns(
+            _journal(
+                issn="0937-4477",
+                eissn="1434-4726",
+                title="European Archives of Oto-Rhino-Laryngology",
+            ),
+            {
+                "0937-4477": _record(
+                    "0937-4477",
+                    "0937-4477",
+                    PRINT,
+                    title="European archives of oto-rhino-laryngology",
+                ),
+                "1434-4726": _record(
+                    "1434-4726",
+                    "1434-4726",
+                    ELECTRONIC,
+                    title="European archives of oto-rhino-laryngology and head & neck",
+                ),
+            },
+        )
+        assert check.set_aside == ()
+        assert (check.issn, check.eissn, check.issnl) == ("0937-4477", "1434-4726", "0937-4477")
+
+    def test_different_series_are_not_joined(self):
+        """« Physical review C » et « Physical review D » : les mots de l'un ne sont pas tous dans l'autre."""
+        check = check_journal_issns(
+            _journal(issn="2469-9985", eissn="2470-0029", title="Physical review C"),
+            {
+                "2469-9985": _record("2469-9985", "2469-9985", PRINT, title="Physical review C"),
+                "2470-0029": _record(
+                    "2470-0029", "2470-0010", ELECTRONIC, title="Physical review D"
+                ),
+            },
+        )
+        assert check.conflict
 
     def test_title_breaks_a_tie_between_groups(self):
         check = check_journal_issns(
@@ -201,7 +301,7 @@ class TestCoherence:
                 ),
             },
         )
-        assert check.intruders == ("0007-0920",)
+        assert check.set_aside == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
         assert check.issn == "0028-0836"
 
     def test_tie_between_groups_changes_nothing(self):
@@ -214,7 +314,7 @@ class TestCoherence:
         )
         assert check.conflict
         assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "0007-0920", None)
-        assert check.intruders == ()
+        assert check.set_aside == ()
 
 
 class TestCorrection:
@@ -248,7 +348,7 @@ class TestCorrection:
         assert check.corrections == ()
 
     def test_valid_rejected_issn_is_kept_as_is(self):
-        """Un ISSN rejeté valide est périmé, pas fautif : il n'est pas corrigé."""
+        """Un ISSN rejeté valide n'est pas fautif : il n'est pas corrigé."""
         check = check_journal_issns(
             _journal(issn="0305-1048", rejected=("1362-4954",)),
             {"0305-1048": _record("0305-1048", "0305-1048", PRINT)},

@@ -4,13 +4,14 @@ Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en lig
 
 - `011$a` : ISSN de la notice ; `011$f` : ISSN-L ; `011$y` : ISSN annulé ;
 - `183$a` : type de support, `n…` pour le papier, `ceb` pour une ressource en ligne, un autre code pour un autre support (`cde` : CD-ROM). À défaut, `182$c` (`n` papier, `c` électronique) et `135$a`, dont le deuxième caractère `r` désigne une ressource en ligne ;
-- `452$x` : ISSN de la même publication sur un autre support ;
+- `452$x` : ISSN de la même publication sur un autre support ; `452$t` : son titre, dont la mention entre parenthèses indique souvent le support (« (Print) », « (CD-ROM) »…) ;
 - `430$x` à `437$x` : ISSN des titres précédents ; `440$x` à `448$x` : ISSN des titres suivants ;
-- `200$a` : titre.
+- `200$a`, `200$h`, `200$i` : titre, numéro et nom de la partie (« Physical review » « D »).
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -45,6 +46,11 @@ class Support(StrEnum):
 _PRECEDING_TAGS = frozenset(str(t) for t in range(430, 438))
 _SUCCEEDING_TAGS = frozenset(str(t) for t in range(440, 449))
 
+# Mentions de support dans le titre d'une zone `452`, entre parenthèses.
+_OTHER_SUPPORT_WORDS = ("cd-rom", "cdrom", "cédérom")
+_ONLINE_WORDS = ("en ligne", "online", "internet")
+_PRINT_WORDS = ("print", "imprimé", "impresso", "papier")
+
 
 @dataclass(frozen=True, slots=True)
 class SudocSerialRecord:
@@ -59,6 +65,8 @@ class SudocSerialRecord:
     preceding_issns: tuple[str, ...]
     succeeding_issns: tuple[str, ...]
     title: str | None
+    other_support_hints: tuple[tuple[str, Support], ...] = ()
+    """ISSN d'autre support (`452`) dont le titre mentionne le support."""
 
 
 def _issns(values: Sequence[str]) -> tuple[str, ...]:
@@ -89,11 +97,42 @@ def _support(fields: Sequence[MarcField]) -> Support | None:
     return Support.OTHER
 
 
+def support_mentioned(title: str) -> Support | None:
+    """Support qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
+    mentions = " ".join(re.findall(r"\(([^)]*)\)", title)).lower()
+    if any(word in mentions for word in _OTHER_SUPPORT_WORDS):
+        return Support.OTHER
+    if any(word in mentions for word in _ONLINE_WORDS):
+        return Support.ELECTRONIC
+    if any(word in mentions for word in _PRINT_WORDS):
+        return Support.PRINT
+    return None
+
+
+def _other_support_hints(fields: Sequence[MarcField]) -> tuple[tuple[str, Support], ...]:
+    hints: dict[str, Support] = {}
+    for field in fields:
+        if field.tag != "452":
+            continue
+        issns = _issns(field.values("x"))
+        support = next((s for t in field.values("t") if (s := support_mentioned(t))), None)
+        if issns and support is not None:
+            hints.setdefault(issns[0], support)
+    return tuple(hints.items())
+
+
+def _title(fields: Sequence[MarcField]) -> str | None:
+    first = next((f for f in fields if f.tag == "200"), None)
+    if first is None:
+        return None
+    parts = first.values("a")[:1] + first.values("h") + first.values("i")
+    return " ".join(p for p in parts if p) or None
+
+
 def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSerialRecord:
     """Lit une notice Sudoc de publication en série. Une zone absente donne `None` ou un tuple vide."""
     issns = _issns(_subfield_values(fields, "011", "a"))
     issnls = _issns(_subfield_values(fields, "011", "f"))
-    titles = _subfield_values(fields, "200", "a")
     return SudocSerialRecord(
         ppn=ppn,
         issn=issns[0] if issns else None,
@@ -103,5 +142,6 @@ def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSer
         other_support_issns=_issns(_subfield_values(fields, "452", "x")),
         preceding_issns=_issns(_subfield_values(fields, _PRECEDING_TAGS, "x")),
         succeeding_issns=_issns(_subfield_values(fields, _SUCCEEDING_TAGS, "x")),
-        title=titles[0] if titles else None,
+        title=_title(fields),
+        other_support_hints=_other_support_hints(fields),
     )
