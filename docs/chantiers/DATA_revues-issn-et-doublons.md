@@ -30,14 +30,17 @@ La phase `publishers_journals` interroge l'API OpenAlex Sources par `openalex_id
 
 Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide : 174 sont présentes dans le Sudoc, 106 dans Mir@bel. Une seule revue est présente dans Mir@bel et absente du Sudoc. 24 sont absentes des deux.
 
+Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Sudoc, et chacun renvoie une seule notice. 826 notices donnent l'ISSN-L (`011$f`), 831 le support (`182$c` : `n` papier, `c` électronique). La zone `452` (ISSN de l'autre support) figure dans 186 notices, `011$y` (ISSN annulé) dans 16. Face au support Sudoc, la colonne `issn` contient 206 ISSN papier et 279 électroniques, `eissn` 11 papier et 451 électroniques. `issnl` diffère de l'ISSN-L du Sudoc pour 21 revues sur 511.
+
 ## Décisions
 
 - Chaque écriture d'un ISSN de revue passe par le value object `ISSN`.
 - La cohérence entre les ISSN d'un enregistrement et ceux de sa revue est vérifiée.
-- Une source de référence, interrogée dans la phase `publishers_journals`, confirme les ISSN d'une revue. Elle fournit son titre de référence, son ISSN-L et ses ISSN par support. Le périmètre se limite aux revues qui ont au moins un ISSN.
-- Deux revues de même ISSN-L de référence sont fusionnées automatiquement.
+- Le Sudoc, interrogé dans la phase `publishers_journals`, sert de source de référence. Il confirme les ISSN d'une revue et fournit son titre, son ISSN-L et le support de chaque ISSN. Le périmètre se limite aux revues qui ont au moins un ISSN.
+- L'ISSN-L du Sudoc est écrit dans `issnl`. Deux revues de même ISSN-L sont fusionnées automatiquement.
+- Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN dont l'ISSN-L diffère de celui de la revue est retiré et signalé.
 - Le sort du titre de référence est décidé après un audit des titres divergents.
-- Le PPN Sudoc de la revue est stocké.
+- Les ISSN invalides reçus des sources sont conservés dans `journals.rejected_issns`. La sous-étape Sudoc tente leur correction.
 - La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
 - `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
@@ -52,16 +55,16 @@ Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide
 
 ### 2. Source de référence
 
-- [ ] Choix de la source.
-- [ ] Migration : PPN, notice Sudoc brute, date de vérification.
-- [ ] ISSN et ISSN-L de référence écrits dans `issn`, `eissn`, `issnl`.
-- [ ] Sous-étape de `publishers_journals` : interrogation par lot des revues à vérifier, enregistrement des champs de référence.
+- [x] Choix de la source : le Sudoc.
+- [x] Migration : `journals.rejected_issns`, `journals.sudoc_checked_at`.
+- [x] `find_or_create_journal` conserve les ISSN invalides dans `rejected_issns`. Script oneshot : réinjection des 25 valeurs supprimées par `backfill_normalize_journal_issns`.
+- [ ] Lecture des notices Sudoc : ISSN, ISSN-L, support, ISSN annulés, ISSN de l'autre support.
+- [ ] Sous-étape de `publishers_journals`, pour les revues à vérifier : cohérence des ISSN de chaque revue, correction des ISSN rejetés, écriture de l'ISSN-L dans `issnl`, placement de chaque ISSN dans la colonne de son support.
 - [ ] Mesure : revues confirmées, ISSN inconnus de la source.
 - [ ] Audit des titres divergents : nombre et nature des différences.
 
 ### 3. Cohérence des ISSN
 
-- [ ] Placement des ISSN : chaque ISSN rangé dans la colonne de son support, `issnl` complété, ISSN manquants ajoutés. Détection des ISSN mal placés et des ISSN d'une autre revue.
 - [ ] Contrôle des ISSN des enregistrements face à ceux de leur revue vérifiée.
 - [ ] Traitement des discordances.
 
@@ -80,6 +83,6 @@ Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide
 
 ## Questions ouvertes
 
-- **Source.** Le Sudoc est pressenti, comme source la plus étendue. Faut-il une seconde source pour les revues absentes du Sudoc (12 % de l'échantillon) : OpenAlex, déjà interrogée, ou Crossref ?
+- **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
 - **Titre.** Hypothèse à tester sur l'audit : le titre actuel rejoint les formes de nom, le titre de référence remplace `title`.
 - **Discordances.** Un enregistrement dont l'ISSN désigne une autre revue est-il rattaché à cette revue automatiquement, ou signalé ?

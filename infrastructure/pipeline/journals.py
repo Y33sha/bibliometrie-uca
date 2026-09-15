@@ -3,10 +3,10 @@
 Sert les trois contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-ou-crée d'une revue à partir des sources, enrichissement OpenAlex (typage + APC) et import du dump DOAJ. La table étant mono-adapter, une seule classe implémente les trois Protocols. L'édition curée et la fusion (admin) vivent dans `infrastructure/repositories/journal_repository.py`.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 
-from sqlalchemy import Connection, case, func, literal, or_, select, update
+from sqlalchemy import Connection, case, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.journals import (
@@ -158,6 +158,19 @@ class PgJournalGatewayQueries(
             )
         )
         self._conn.execute(stmt)
+
+    def add_rejected_issns(self, journal_id: int, values: Sequence[str]) -> None:
+        if not values:
+            return
+        self._conn.execute(
+            text(
+                "UPDATE journals SET rejected_issns = ARRAY("
+                "SELECT v FROM (SELECT DISTINCT unnest(rejected_issns || CAST(:values AS text[])) AS v) d "
+                'ORDER BY v COLLATE "C"'
+                ") WHERE id = :id"
+            ),
+            {"id": journal_id, "values": list(values)},
+        )
 
     def create_journal(
         self,

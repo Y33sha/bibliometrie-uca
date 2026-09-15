@@ -9,7 +9,7 @@ Trois contrats étroits, un par consommateur du pipeline, tous servis par un mê
 L'édition curée et la fusion (admin) vivent à part, dans `application/ports/repositories/journal_repository.py`.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import NamedTuple, Protocol
 
@@ -63,6 +63,10 @@ class JournalFindOrCreateQueries(Protocol):
         oa_model: OaModel | None = None,
     ) -> None:
         """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
+        ...
+
+    def add_rejected_issns(self, journal_id: int, values: Sequence[str]) -> None:
+        """Ajoute des ISSN invalides à `rejected_issns` de la revue, sans doublon."""
         ...
 
     def create_journal(
