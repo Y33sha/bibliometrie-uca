@@ -115,7 +115,7 @@ def reconcile(
             accord(len(dirty_ids), "document"),
             forme(len(dirty_ids), "examiné"),
         )
-    with attente(f"{BRANCHE}résolution en cours", logger) as ligne:
+    with attente(BRANCHE, logger) as ligne:
         rows = queries.fetch_reconciliation_universe(conn)
         rows_by_sp = {row.id: row for row in rows}
         existing_pub_by_doi = queries.fetch_publication_ids_by_doi(conn)
