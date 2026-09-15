@@ -74,7 +74,6 @@ Mir@bel couvre environ 20 000 revues, surtout françaises. Le Sudoc couvre davan
 ## Questions ouvertes
 
 - **Source.** OpenAlex est déjà interrogée et couvre tout le stock, sans le support. Mir@bel et le Sudoc donnent le support et le PPN, surtout pour les revues françaises. Crossref donne le support des revues à DOI. Faut-il une source ou une combinaison ?
-- **Licence Sudoc.** Les mentions légales du Sudoc citent une clause non commerciale en plus de la licence Etalab. Laquelle s'applique aux notices ?
 - **Titre.** Le titre de référence remplace-t-il `title`, ou s'ajoute-t-il aux formes de nom ?
 - **Fusion.** Un ISSN-L commun suffit-il pour fusionner automatiquement ?
 - **Discordances.** Un enregistrement dont l'ISSN désigne une autre revue est-il rattaché à cette revue automatiquement, ou signalé ?
