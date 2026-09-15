@@ -158,12 +158,12 @@ class TestChangementsJournalises:
     def test_un_type_et_son_inverse_comptent_pour_un_meme_lien(self):
         compte = _count_by_pair_label([("is_preprint_of", 6), ("has_preprint", 2)])
 
-        assert compte == {"préprint – article": 8}
+        assert compte == {"préprint/article": 8}
 
     def test_les_liens_les_plus_nombreux_viennent_en_tete(self):
         compte = _count_by_pair_label([("is_correction_of", 1), ("is_supplement_to", 3)])
 
-        assert list(compte) == ["article – données supplémentaires", "article – erratum"]
+        assert list(compte) == ["article/données supplémentaires", "article/erratum"]
 
     def test_le_journal_nomme_les_liens_et_non_les_types(self, caplog):
         logger = logging.getLogger("test_relations")
@@ -171,7 +171,7 @@ class TestChangementsJournalises:
             _log_changes(RelationsRebuild(4569, [("is_preprint_of", 8)], removed=4), logger)
 
         assert "8 nouvelles relations entre publications" in caplog.text
-        assert "préprint – article" in caplog.text
+        assert "préprint/article" in caplog.text
         assert "4 relations retirées" in caplog.text
         assert "is_preprint_of" not in caplog.text
 
