@@ -6,7 +6,7 @@ La table `journals` compte 13 815 revues. Leurs ISSN sont stockés dans trois co
 
 `find_or_create_journal` (`application/services/journals/core.py`) rapproche une revue par `openalex_id`, puis par ses ISSN cherchés dans les trois colonnes, puis par titre normalisé. Des doublons subsistent :
 
-- 229 ISSN sont portés par plusieurs revues, soit 458 revues ;
+- 229 ISSN sont portés par plusieurs revues, soit 288 revues ;
 - 1 491 revues partagent leur titre normalisé avec une autre.
 
 La fusion de deux revues se fait à la main, dans l'administration des revues (`merge_journals`).
@@ -46,9 +46,9 @@ Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide
 
 ### 1. Normalisation des ISSN des revues
 
-- [ ] Les écritures d'ISSN (`find_or_create_journal`, import DOAJ, édition dans l'administration) passent par le value object `ISSN`. Une valeur invalide est écartée et journalisée.
-- [ ] La recherche par ISSN (`find_journal_by_issn_any`) porte sur la valeur normalisée.
-- [ ] Script oneshot : normalisation du stock, liste des valeurs écartées.
+- [x] Les écritures d'ISSN (`find_or_create_journal`, édition dans l'administration) passent par le value object `ISSN`. Dans le pipeline, une valeur invalide est écartée et journalisée. Dans l'administration, elle est refusée.
+- [x] La recherche par ISSN (`find_journal_by_issn_any`, import DOAJ) porte sur la valeur normalisée.
+- [x] Script oneshot `backfill_normalize_journal_issns` : normalisation du stock, liste des valeurs écartées.
 
 ### 2. Source de référence
 

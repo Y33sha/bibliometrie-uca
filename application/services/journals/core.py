@@ -7,6 +7,8 @@ Les opérations sur l'agrégat Publisher vivent dans `application/services/publi
 Un champ éditable d'une revue commande le `doc_type` de ses publications : le `journal_type` alimente des règles de correction. D'où `requalify_publications_for_journal` et le volet requalification de `merge_journals`, qui rejouent ces corrections sur le stock après une édition.
 """
 
+import logging
+
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
@@ -24,6 +26,23 @@ from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text, to_plain_text
+from domain.publications.identifiers import ISSN
+
+logger = logging.getLogger(__name__)
+
+# Champs ISSN d'une revue.
+_ISSN_FIELDS = frozenset({"issn", "eissn", "issnl"})
+
+
+def _valid_issn(value: str | None, field: str, title: str) -> str | None:
+    """ISSN normalisé, ou `None` pour une valeur vide ou invalide. Une valeur invalide est journalisée."""
+    if not value:
+        return None
+    issn = ISSN.try_parse(value)
+    if issn is None:
+        logger.warning("ISSN écarté (revue %r) : %s = %r", title, field, value)
+        return None
+    return str(issn)
 
 
 def find_or_create_journal(
@@ -39,6 +58,8 @@ def find_or_create_journal(
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
+    Les ISSN passent par le value object `ISSN`. Une valeur invalide est écartée et journalisée.
+
     Cascade de recherche : `openalex_id`, puis chacun des identifiants ISSN fournis (`issn`, `eissn`, `issnl`) cherché indifféremment dans les trois colonnes, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
     Un journal trouvé voit ses métadonnées manquantes enrichies, et le titre reçu enregistré comme forme de nom — les variantes s'accumulent pour les matchs par titre suivants.
@@ -51,6 +72,9 @@ def find_or_create_journal(
     # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
     title = to_plain_text(title)
     title_normalized = normalize_text(title)
+    issn = _valid_issn(issn, "issn", title)
+    eissn = _valid_issn(eissn, "eissn", title)
+    issnl = _valid_issn(issnl, "issnl", title)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
@@ -121,7 +145,9 @@ def update_journal(
 
     L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si la revue n'existe pas.
+    Les ISSN fournis sont normalisés par le value object `ISSN`.
+
+    Lève `ValidationError` si aucun champ n'est fourni ou si un ISSN est invalide, `NotFoundError` si la revue n'existe pas.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
@@ -134,6 +160,8 @@ def update_journal(
     champs = update.model_dump(exclude_unset=True, mode="json")
     # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
     for field_name, value in update.model_dump(exclude_unset=True).items():
+        if field_name in _ISSN_FIELDS and value is not None:
+            value = str(ISSN(value))
         setattr(journal, field_name, value)
     repo.save(journal)
     emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)

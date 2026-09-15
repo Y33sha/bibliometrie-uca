@@ -15,6 +15,7 @@ from sqlalchemy import Connection
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.normalize import sanitize_optional_text
+from domain.publications.identifiers import ISSN
 
 # Colonnes ISSN du dump CSV DOAJ.
 ISSN_KEYS = (
@@ -28,7 +29,7 @@ COMMIT_EVERY = 1000
 @dataclass
 class DoajImportStats:
     total_rows: int = 0
-    no_issn_rows: int = 0  # rows du dump sans aucun ISSN
+    no_issn_rows: int = 0  # rows du dump sans aucun ISSN valide
     orphan_rows: int = 0  # rows du dump dont l'ISSN est inconnu côté UCA
     matched: int = 0  # journaux UCA mis à is_in_doaj = TRUE
 
@@ -47,13 +48,12 @@ def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
 
 
 def _extract_issns(row: dict[str, str]) -> list[str]:
-    """ISSN print + electronic non-vides de la row CSV."""
-    issns: list[str] = []
-    for key in ISSN_KEYS:
-        v = sanitize_optional_text(row.get(key))
-        if v:
-            issns.append(v)
-    return issns
+    """ISSN papier et électronique valides de la row CSV, normalisés."""
+    return [
+        str(issn)
+        for key in ISSN_KEYS
+        if (issn := ISSN.try_parse(sanitize_optional_text(row.get(key))))
+    ]
 
 
 def run_import_doaj_dump(
@@ -68,12 +68,12 @@ def run_import_doaj_dump(
     """Importe les rows du dump DOAJ. L'orchestrateur gère la transaction
     (commits par batch) sauf si `commit=False` (tests sous transaction
     rollbackée). Retourne les stats."""
-    # Index ISSN → journal_id (premier gagnant) pour matcher en O(1).
+    # Index ISSN normalisé → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
     for indexed_journal_id, issn, eissn, issnl in journal_repo.find_journal_issn_index():
         for issn_value in (issn, eissn, issnl):
-            if issn_value:
-                issn_to_journal_id.setdefault(issn_value, indexed_journal_id)
+            if parsed := ISSN.try_parse(issn_value):
+                issn_to_journal_id.setdefault(str(parsed), indexed_journal_id)
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
     if not dry_run:
         journal_repo.reset_is_in_doaj()
