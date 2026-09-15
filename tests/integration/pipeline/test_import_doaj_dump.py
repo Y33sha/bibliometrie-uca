@@ -49,8 +49,8 @@ def _is_in_doaj(conn, jid):
 
 class TestImportDoajDump:
     def test_matches_by_issn_and_writes_payload(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, issn="1234-5678")
-        stats = _run(sa_sync_conn, [_row(issn="1234-5678", **{"Journal title": "Foo"})])
+        jid = _create_journal(sa_sync_conn, issn="0028-0836")
+        stats = _run(sa_sync_conn, [_row(issn="0028-0836", **{"Journal title": "Foo"})])
         assert stats.matched == 1
         row = sa_sync_conn.execute(
             text("SELECT is_in_doaj, doaj_payload FROM journals WHERE id = :id"), {"id": jid}
@@ -59,27 +59,38 @@ class TestImportDoajDump:
         assert row.doaj_payload["Journal title"] == "Foo"
 
     def test_matches_on_eissn_when_print_absent(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, eissn="2222-3333")
-        stats = _run(sa_sync_conn, [_row(eissn="2222-3333")])
+        jid = _create_journal(sa_sync_conn, eissn="1476-4687")
+        stats = _run(sa_sync_conn, [_row(eissn="1476-4687")])
         assert stats.matched == 1
         assert _is_in_doaj(sa_sync_conn, jid) is True
 
+    def test_matches_on_normalized_issn(self, sa_sync_conn):
+        """Les ISSN du dump et ceux des revues sont comparés sous leur forme normalisée."""
+        jid = _create_journal(sa_sync_conn, issn="0071-190x")
+        stats = _run(sa_sync_conn, [_row(issn="0071190X")])
+        assert stats.matched == 1
+        assert _is_in_doaj(sa_sync_conn, jid) is True
+
+    def test_invalid_issn_counted_as_absent(self, sa_sync_conn):
+        stats = _run(sa_sync_conn, [_row(issn="1234-5678")])  # clé de contrôle fausse
+        assert stats.no_issn_rows == 1
+
     def test_reset_clears_journals_absent_from_dump(self, sa_sync_conn):
         # Un journal marqué is_in_doaj mais absent du dump repasse à FALSE.
-        jid = _create_journal(sa_sync_conn, issn="9999-9999")
+        jid = _create_journal(sa_sync_conn, issn="0036-8075")
         sa_sync_conn.execute(
             text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
-        _run(sa_sync_conn, [_row(issn="0000-0000")])  # dump sans notre ISSN
+        _run(sa_sync_conn, [_row(issn="1095-9203")])  # dump sans notre ISSN
         assert _is_in_doaj(sa_sync_conn, jid) is False
 
     def test_orphan_rows_counted_not_matched(self, sa_sync_conn):
-        stats = _run(sa_sync_conn, [_row(issn="5555-5555")])  # ISSN inconnu en local
+        stats = _run(sa_sync_conn, [_row(issn="2049-3630")])  # ISSN inconnu en local
         assert stats.orphan_rows == 1
         assert stats.matched == 0
 
     def test_dry_run_counts_but_writes_nothing(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, issn="1234-5678")
-        stats = _run(sa_sync_conn, [_row(issn="1234-5678")], dry_run=True)
+        jid = _create_journal(sa_sync_conn, issn="0028-0836")
+        stats = _run(sa_sync_conn, [_row(issn="0028-0836")], dry_run=True)
         assert stats.matched == 1  # compté
         assert _is_in_doaj(sa_sync_conn, jid) is False  # mais rien écrit

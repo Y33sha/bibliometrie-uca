@@ -299,6 +299,24 @@ class TestFindOrCreateJournal:
         assert row.eissn == "1476-4687"
         assert row.publisher_id == pub_id
 
+    def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
+        j_id = find_or_create_journal("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
+        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j_id)
+        assert row.issn == "0028-0836"
+        assert row.eissn == "1476-4687"
+
+    def test_finds_by_issn_under_another_form(self, sa_sync_conn, gateway):
+        existing = find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
+        found = find_or_create_journal("Nature Variant", issn="ISSN 00280836", repo=gateway)
+        assert found == existing
+
+    def test_invalid_issn_is_dropped_and_logged(self, sa_sync_conn, gateway, caplog):
+        j_id = find_or_create_journal("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
+        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j_id)
+        assert row.issn is None
+        assert row.eissn == "1476-4687"
+        assert "ISSN écarté (revue 'Nature') : issn = '(Internet)'" in caplog.text
+
 
 # ── update_journal_apc ─────────────────────────────────────────────
 
@@ -357,6 +375,19 @@ class TestUpdateJournal:
         row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
+
+    def test_normalizes_issn(self, sa_sync_conn, repo):
+        j = _insert_journal(sa_sync_conn, "Nature")
+        update_journal(j, update=JournalUpdate(eissn="14764687"), repo=repo)
+        row = _fetch_one(sa_sync_conn, "SELECT eissn FROM journals WHERE id = :id", id=j)
+        assert row.eissn == "1476-4687"
+
+    def test_rejects_invalid_issn(self, sa_sync_conn, repo):
+        j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        with pytest.raises(ValidationError):
+            update_journal(j, update=JournalUpdate(issn="1234-5678"), repo=repo)
+        row = _fetch_one(sa_sync_conn, "SELECT issn FROM journals WHERE id = :id", id=j)
+        assert row.issn == "0028-0836"
 
 
 class TestUpdatePublisher:
