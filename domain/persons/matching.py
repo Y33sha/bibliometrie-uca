@@ -1,11 +1,18 @@
 """Règles pures de matching d'authorships à des personnes."""
 
-from collections.abc import Iterable, Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, NamedTuple
 
-from domain.persons.name_matching import names_compatible, parse_raw_author_name
+from domain.normalize import normalize_name
+from domain.persons.name_matching import (
+    first_name_initials,
+    initials_extend,
+    names_compatible,
+    parse_raw_author_name,
+)
 
 
 class IdentifiedPerson(NamedTuple):
@@ -55,7 +62,72 @@ RESOLUTION_MODE_BY_REASON: dict[str, ResolutionMode] = {
     "idref": ResolutionMode.IDENTIFIER,
     "cross_source": ResolutionMode.CROSS_SOURCE,
     "single_name": ResolutionMode.NAME,
+    "compatible_name": ResolutionMode.NAME,
 }
+
+
+class Namesake(NamedTuple):
+    """Personne portant un nom de famille donné, telle que la voit le rattachement par initiales.
+
+    `conflicting` marque une personne au prénom réduit dont les signatures donnent plusieurs prénoms pleins distincts : elle ne peut recevoir aucun prénom plein de plus.
+    """
+
+    person_id: int
+    last_name: str
+    first_name: str
+    conflicting: bool = False
+
+
+def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
+    """Personnes au prénom plein dont les initiales commencent par `initials`."""
+    return [
+        n.person_id
+        for n in namesakes
+        if first_name_initials(n.first_name) is None and initials_extend(initials, n.first_name)
+    ]
+
+
+def compatible_namesakes(signature_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
+    """Personnes de même nom de famille qu'une signature désigne par la compatibilité des initiales, quand sa forme de nom exacte est inconnue.
+
+    - Signature au prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la signature (« Abdul-Majeed », « A. M. »).
+    - Signature au prénom plein (« Abdellah ») : toute personne au prénom réduit dont les initiales commencent celles de la signature (« A. »), et qu'aucun autre prénom ne revendique : ni une personne de même nom au prénom plein compatible, ni plusieurs prénoms pleins distincts donnés par ses signatures (`conflicting`).
+    - Signature sans prénom : aucune.
+    """
+    signature_initials = first_name_initials(signature_first_name)
+    if signature_initials is not None:
+        return [n.person_id for n in namesakes if initials_extend(signature_initials, n.first_name)]
+    if not normalize_name(signature_first_name):
+        return []
+    candidates = []
+    for n in namesakes:
+        initials = first_name_initials(n.first_name)
+        if initials is None or n.conflicting or not initials_extend(initials, signature_first_name):
+            continue
+        if not full_namesakes(initials, namesakes):
+            candidates.append(n.person_id)
+    return candidates
+
+
+def attested_full_first_names(
+    last_name: str, initials: tuple[str, ...], signature_names: Iterable[str]
+) -> dict[str, str]:
+    """Prénoms pleins que des signatures donnent à une personne au prénom réduit, indexés par leur forme normalisée.
+
+    Retient les signatures de même nom de famille dont le prénom plein prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
+    """
+    last_norm = normalize_name(last_name)
+    spellings: dict[str, Counter[str]] = {}
+    for raw in signature_names:
+        sig_last, sig_first = parse_raw_author_name(raw)
+        if normalize_name(sig_last) != last_norm or first_name_initials(sig_first) is not None:
+            continue
+        if not initials_extend(initials, sig_first):
+            continue
+        spellings.setdefault(normalize_name(sig_first), Counter())[sig_first] += 1
+    return {
+        norm: min(counter, key=lambda s: (-counter[s], s)) for norm, counter in spellings.items()
+    }
 
 
 def decide_cross_source_match(
@@ -95,7 +167,7 @@ def decide_cross_source_match(
 class NameFormDecision:
     """Décision résultant du lookup d'une authorship dans `person_name_forms`.
 
-    Trois actions possibles : `match` (rattacher à une personne existante), `create` (créer une personne), `skip` (ne rien faire — soit ambiguïté de nom, soit création interdite par `allow_create`). Le `reason` n'est rempli que pour `skip` à des fins de logs/stats.
+    Trois actions possibles : `match` (rattacher à une personne existante), `create` (créer une personne), `skip` (ne rien faire — soit ambiguïté de nom, soit création interdite par `allow_create`). Le `reason` dit pourquoi un `skip`, et distingue le `match` par initiales compatibles (`compatible_name`) du `match` par forme exacte.
     """
 
     action: Literal["match", "create", "skip"]
@@ -107,27 +179,34 @@ def decide_name_form_outcome(
     person_ids: list[int] | None,
     allow_create: bool,
     rejected_person_ids: frozenset[int] = frozenset(),
+    compatible_person_ids: Sequence[int] = (),
 ) -> NameFormDecision:
-    """Arbitre la décision de matching après lookup dans
-    `person_name_forms`.
+    """Arbitre la décision de matching après lookup dans `person_name_forms`.
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship traitée (store `rejected_authorships`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
 
+    `compatible_person_ids` : personnes de même nom de famille que la signature désigne par ses initiales (`compatible_namesakes`). Consultées seulement quand la forme exacte est inconnue.
+
     Cascade (sur les candidats restants après élimination) :
 
-    - 1 candidat → `match` (rattachement direct).
-    - N candidats → `skip` avec `reason="ambiguous_name_form"` (homonymes en BDD, on laisse le traitement manuel trancher).
-    - 0 candidat alors que la forme était connue (tous rejetés) → `skip` `ambiguous_name_form` : on laisse orphelin, on ne crée pas.
-    - 0 `person_ids` en entrée (forme inconnue) + `allow_create` → `create`.
-    - Forme inconnue + pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
+    - Forme connue, 1 candidat → `match`.
+    - Forme connue, N candidats → `skip` avec `reason="ambiguous_name_form"` (homonymes en BDD, on laisse le traitement manuel trancher).
+    - Forme connue, 0 candidat (tous rejetés) → `skip` `ambiguous_name_form` : on laisse orphelin, on ne crée pas.
+    - Forme inconnue, personnes compatibles : mêmes règles sur elles, le `match` portant `reason="compatible_name"`.
+    - Forme inconnue, aucune personne compatible, `allow_create` → `create`.
+    - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
     """
+    match_reason = ""
     if person_ids is None:
-        if allow_create:
-            return NameFormDecision(action="create")
-        return NameFormDecision(action="skip", reason="creation_not_allowed")
+        if not compatible_person_ids:
+            if allow_create:
+                return NameFormDecision(action="create")
+            return NameFormDecision(action="skip", reason="creation_not_allowed")
+        person_ids = list(compatible_person_ids)
+        match_reason = "compatible_name"
     candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
     if len(candidates) == 1:
-        return NameFormDecision(action="match", person_id=candidates[0])
+        return NameFormDecision(action="match", person_id=candidates[0], reason=match_reason)
     return NameFormDecision(action="skip", reason="ambiguous_name_form")
 
 
@@ -221,7 +300,7 @@ def identifier_misplaced(signature_form: str, consensus: str | None) -> bool:
 class PersonMatchDecision:
     """Décision de la cascade de matching unifiée.
 
-    `reason` identifie le signal qui a tranché (`"orcid"` / `"hal_person_id"` / `"idref"` / `"cross_source"` / `"single_name"` pour les `match` ; `"new"` pour `create` ; `"ambiguous_name_form"` / `"creation_not_allowed"` pour `skip`). Utilisable côté logs et stats par le caller.
+    `reason` identifie le signal qui a tranché (`"orcid"` / `"hal_person_id"` / `"idref"` / `"cross_source"` / `"single_name"` / `"compatible_name"` pour les `match` ; `"new"` pour `create` ; `"ambiguous_name_form"` / `"creation_not_allowed"` pour `skip`). Utilisable côté logs et stats par le caller.
     """
 
     action: Literal["match", "create", "skip"]
@@ -247,7 +326,8 @@ def decide_person_match(
     3. **IdRef** (`idref_match`).
     4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne. Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
     5. **Cross-source** (`cross_source_match`) — match par `(publication_id, author_position)` avec une authorship d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
-    6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
+    6. **Initiales compatibles** (`name_form_outcome` d'action `match`, `reason="compatible_name"`) — forme exacte inconnue, mais une seule personne de même nom de famille aux initiales compatibles (« Abdellah Tnourji » pour « Tnourji A. »).
+    7. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship (store `rejected_authorships`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse l'authorship orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
 
@@ -259,7 +339,8 @@ def decide_person_match(
         return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
     if idref_match is not None and idref_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
-    if name_form_outcome.action == "match":
+    by_initials = name_form_outcome.reason == "compatible_name"
+    if name_form_outcome.action == "match" and not by_initials:
         return PersonMatchDecision(
             action="match",
             person_id=name_form_outcome.person_id,
@@ -268,6 +349,10 @@ def decide_person_match(
     if cross_source_match is not None and cross_source_match not in rejected_person_ids:
         return PersonMatchDecision(
             action="match", person_id=cross_source_match, reason="cross_source"
+        )
+    if name_form_outcome.action == "match":
+        return PersonMatchDecision(
+            action="match", person_id=name_form_outcome.person_id, reason="compatible_name"
         )
     if name_form_outcome.action == "create":
         return PersonMatchDecision(action="create", reason="new")

@@ -29,6 +29,30 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     return raw, ""
 
 
+def first_name_initials(first_name: str) -> tuple[str, ...] | None:
+    """Initiales d'un prénom réduit à des initiales, `None` pour un prénom plein ou vide.
+
+    Un prénom est réduit quand chacun de ses mots normalisés tient en une lettre (« A. », « J.-P. »), ou quand il s'écrit en deux ou trois capitales accolées (« JP »).
+    """
+    words = normalize_name(first_name).split()
+    if not words:
+        return None
+    if all(len(word) == 1 for word in words):
+        return tuple(words)
+    compact = re.sub(r"[\s.\-]", "", first_name)
+    if 2 <= len(compact) <= 3 and compact.isalpha() and compact.isupper():
+        return tuple(normalize_name(compact))
+    return None
+
+
+def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
+    """Vrai si `initials` commencent la suite des initiales de `first_name`, dans l'ordre : (« a »,) s'étend à « Abdul-Majeed », (« d »,) à « Denis M. », mais (« h »,) pas à « Bo-Hyung »."""
+    own = first_name_initials(first_name) or tuple(
+        word[0] for word in normalize_name(first_name).split()
+    )
+    return bool(initials) and own[: len(initials)] == initials
+
+
 def _name_words(*parts: str) -> list[str]:
     """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 
