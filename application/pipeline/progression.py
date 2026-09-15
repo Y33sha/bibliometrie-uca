@@ -332,6 +332,7 @@ class Attente:
         self._libelle = libelle
         self._logger = logger
         self._conclusion = ""
+        self._efface = False
         self._fini = threading.Event()
         self._flux = _flux_barres if _terminal_interactif() else None
         if self._flux is None:
@@ -362,16 +363,23 @@ class Attente:
         """Donne à la ligne le texte qu'elle gardera une fois le travail fini."""
         self._conclusion = texte
 
+    def efface(self) -> None:
+        """Retire la ligne une fois le travail fini, quand il n'y a rien à en dire."""
+        self._efface = True
+
     def ferme(self) -> None:
-        """Arrête les points en laissant sur la ligne le libellé, ou la conclusion posée."""
+        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne."""
         self._fini.set()
         if self._flux is not None:
-            self._libelle = self._conclusion or self._libelle
-            self._ecrire("")
-            self._flux.write("\n")
+            if self._efface:
+                self._flux.write(f"\r{EFFACE_FIN_DE_LIGNE}")
+            else:
+                self._libelle = self._conclusion or self._libelle
+                self._ecrire("")
+                self._flux.write("\n")
             self._flux.flush()
             self._flux = None
-        elif self._conclusion and self._logger is not None:
+        elif self._conclusion and not self._efface and self._logger is not None:
             self._logger.info("%s", self._conclusion)
 
 
