@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-09-15)
 """Reprend les revues que les passages précédents de la vérification Sudoc ont signalées.
 
-Les règles de la vérification changent au fil des passages : support lu dans `183$a`, ISSN périmés rangés parmi les ISSN rejetés, ISSN d'une autre publication rangés parmi eux au lieu d'être retirés, réunion du papier et de l'en ligne de titres emboîtés. Le script relève dans le journal du pipeline :
+Les règles de la vérification changent au fil des passages : support lu dans `183$a`, ISSN périmés rangés parmi les ISSN rejetés, ISSN d'une autre publication rangés parmi eux au lieu d'être retirés, réunion du papier et de l'en ligne de titres emboîtés, changement de support distingué d'un changement de titre. Le script relève dans le journal du pipeline :
 
 1. les ISSN retirés par un passage précédent, qu'il range parmi les ISSN rejetés de leur revue ;
 2. les revues signalées par un message de la vérification, qu'il remet à vérifier.

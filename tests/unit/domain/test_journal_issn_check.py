@@ -144,16 +144,69 @@ class TestPlacement:
         )
         assert check.eissn is None
 
-    def test_two_issns_of_the_same_support_stay_in_place(self):
+    def test_several_issns_of_one_support_stay_in_place(self):
+        """Cas réel (Review of Economic Dynamics) : la notice de Toxicological Sciences porte l'ISSN-L de la revue."""
         check = check_journal_issns(
-            _journal(issn="0028-0836", eissn="0036-8075"),
+            _journal(issn="1096-6099", eissn="1096-0929", issnl="1094-2025"),
             {
-                "0028-0836": _record("0028-0836", "0028-0836", PRINT),
-                "0036-8075": _record("0036-8075", "0028-0836", PRINT),
+                "1096-6099": _record("1096-6099", "1094-2025", ELECTRONIC),
+                "1096-0929": _record(
+                    "1096-0929", "1094-2025", ELECTRONIC, title="Toxicological sciences"
+                ),
+                "1094-2025": _record("1094-2025", "1094-2025", PRINT),
             },
         )
-        assert check.ambiguous_support is PRINT
-        assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "0036-8075", "0028-0836")
+        assert check.ambiguous_support is ELECTRONIC
+        assert (check.issn, check.eissn, check.issnl) == ("1096-6099", "1096-0929", "1094-2025")
+
+    def test_issnl_leaves_the_column_to_the_other_issn_of_its_support(self):
+        """Cas réel (Biological Reviews) : l'ISSN papier de l'ancien titre est l'ISSN-L ; l'ISSN papier du titre actuel prend `issn`."""
+        check = check_journal_issns(
+            _journal(issn="1464-7931", eissn="1469-185X", issnl="0006-3231"),
+            {
+                "1464-7931": _record("1464-7931", "0006-3231", PRINT),
+                "1469-185X": _record("1469-185X", "0006-3231", ELECTRONIC),
+                "0006-3231": _record("0006-3231", "0006-3231", PRINT),
+            },
+        )
+        assert check.ambiguous_support is None
+        assert (check.issn, check.eissn, check.issnl) == ("1464-7931", "1469-185X", "0006-3231")
+        assert check.set_aside == ()
+
+    def test_issn_of_another_issnl_leaves_an_occupied_support(self):
+        """Cas réel : la notice en ligne de Marianne désigne comme autre support « Marianne Hors-série collection », d'un autre ISSN-L."""
+        check = check_journal_issns(
+            _journal(issn="2802-3315", eissn="2491-5769", issnl="1275-7500", title="Marianne"),
+            {
+                "2802-3315": _record(
+                    "2802-3315",
+                    "2802-3315",
+                    PRINT,
+                    title="Marianne Hors-série collection",
+                    other=("2491-5769",),
+                ),
+                "2491-5769": _record(
+                    "2491-5769",
+                    "1275-7500",
+                    ELECTRONIC,
+                    title="Marianne",
+                    other=("2802-3315", "1275-7500"),
+                ),
+                "1275-7500": _record(
+                    "1275-7500", "1275-7500", PRINT, title="Marianne", other=("2491-5769",)
+                ),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("1275-7500", "2491-5769", "1275-7500")
+        assert check.set_aside == (("2802-3315", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ("2802-3315",)
+
+    def test_same_value_in_both_columns_keeps_the_column_of_its_support(self):
+        check = check_journal_issns(
+            _journal(issn="2286-0290", eissn="2286-0290"),
+            {"2286-0290": _record("2286-0290", "2286-0290", ELECTRONIC)},
+        )
+        assert (check.issn, check.eissn) == (None, "2286-0290")
 
     def test_journal_absent_from_sudoc_is_unchanged(self):
         check = check_journal_issns(_journal(issn="0028-0836", eissn="1476-4687"), {})
@@ -178,8 +231,8 @@ class TestSetAside:
         assert check.rejected == ("1362-4954",)
         assert check.set_aside == (("1362-4954", SetAsideReason.OTHER_SUPPORT),)
 
-    def test_preceding_title_is_set_aside(self):
-        """Cas réel (Volume !) : l'ISSN de l'ancien titre « Copyright volume ! » partage l'ISSN-L du titre actuel."""
+    def test_preceding_title_that_is_the_issnl_stays_in_issnl(self):
+        """Cas réel (Volume !) : l'ISSN de l'ancien titre « Copyright volume ! » est l'ISSN-L du titre actuel."""
         check = check_journal_issns(
             _journal(issn="1950-568X", eissn="2117-4148", issnl="1634-5495"),
             {
@@ -191,8 +244,93 @@ class TestSetAside:
             },
         )
         assert (check.issn, check.eissn, check.issnl) == ("2117-4148", "1950-568X", "1634-5495")
-        assert check.set_aside == (("1634-5495", SetAsideReason.RELATED_TITLE),)
+        assert check.set_aside == ()
+        assert check.rejected == ()
         assert check.ambiguous_support is None
+
+    def test_title_change_with_support_change_is_set_aside(self):
+        """Cas réel : la revue en ligne ILCEA suit « Les Cahiers de l'ILCEA », sur papier."""
+        check = check_journal_issns(
+            _journal(issn="1639-6073", eissn="2101-0609", issnl="2101-0609", title="ILCEA"),
+            {
+                "2101-0609": _record(
+                    "2101-0609", "2101-0609", ELECTRONIC, title="ILCEA", preceding=("1639-6073",)
+                ),
+                "1639-6073": _record(
+                    "1639-6073",
+                    "1639-6073",
+                    PRINT,
+                    title="Les Cahiers de l'ILCEA",
+                    other=("2101-0609",),
+                    succeeding=("2101-0609",),
+                ),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == (None, "2101-0609", "2101-0609")
+        assert check.set_aside == (("1639-6073", SetAsideReason.RELATED_TITLE),)
+
+    def test_preceding_title_on_the_other_support_is_a_support_change(self):
+        """Cas réel (Mappemonde) : la notice en ligne désigne la notice papier de même titre comme titre précédent."""
+        check = check_journal_issns(
+            _journal(eissn="1769-7298", issnl="0764-3470", title="Mappemonde"),
+            {
+                "1769-7298": _record(
+                    "1769-7298",
+                    "1769-7298",
+                    ELECTRONIC,
+                    title="Mappemonde",
+                    other=("0764-3470",),
+                    preceding=("0764-3470",),
+                ),
+                "0764-3470": _record(
+                    "0764-3470",
+                    "0764-3470",
+                    PRINT,
+                    title="Mappemonde",
+                    other=("1769-7298",),
+                    succeeding=("1769-7298",),
+                ),
+            },
+        )
+        assert (check.issn, check.eissn) == ("0764-3470", "1769-7298")
+        assert check.set_aside == ()
+
+    def test_preceding_title_with_the_same_issnl_is_a_support_change(self):
+        """Cas réel (Actualité et dossier en santé publique) : la notice en ligne s'intitule « ADSP »."""
+        check = check_journal_issns(
+            _journal(eissn="2804-0163", issnl="1243-275X"),
+            {
+                "2804-0163": _record(
+                    "2804-0163", "1243-275X", ELECTRONIC, title="ADSP", preceding=("1243-275X",)
+                ),
+                "1243-275X": _record(
+                    "1243-275X", "1243-275X", PRINT, title="Actualité et dossier en santé publique"
+                ),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("1243-275X", "2804-0163", "1243-275X")
+        assert check.set_aside == ()
+
+    def test_rejected_issn_returns_as_other_support(self):
+        """Cas réel (Études mongoles et sibériennes) : l'ISSN papier, rejeté comme titre précédent, a le même ISSN-L que la notice en ligne."""
+        check = check_journal_issns(
+            _journal(eissn="2101-0013", issnl="2101-0013", rejected=("0766-5075", "2551-9603")),
+            {
+                "2101-0013": _record(
+                    "2101-0013",
+                    "2101-0013",
+                    ELECTRONIC,
+                    other=("2551-9603",),
+                    preceding=("2551-9603",),
+                    hints=(("2551-9603", PRINT),),
+                ),
+                "2551-9603": _record(
+                    "2551-9603", "2101-0013", PRINT, other=("2101-0013",), preceding=("0766-5075",)
+                ),
+            },
+        )
+        assert (check.issn, check.eissn) == ("2551-9603", "2101-0013")
+        assert check.rejected == ("0766-5075",)
 
     def test_successor_of_another_group_is_set_aside(self):
         check = check_journal_issns(
@@ -315,6 +453,36 @@ class TestCoherence:
         assert check.conflict
         assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "0007-0920", None)
         assert check.set_aside == ()
+
+    def test_succeeding_title_breaks_a_tie(self):
+        """Cas réel : « INRA productions animales » devient « INRAE productions animales »."""
+        check = check_journal_issns(
+            _journal(
+                issn="2273-7766",
+                eissn="2824-3633",
+                issnl="2824-3633",
+                title="INRAE productions animales",
+            ),
+            {
+                "2273-7766": _record(
+                    "2273-7766",
+                    "2273-774X",
+                    ELECTRONIC,
+                    title="INRA productions animales",
+                    succeeding=("2824-3633",),
+                ),
+                "2824-3633": _record(
+                    "2824-3633",
+                    "2824-3633",
+                    ELECTRONIC,
+                    title="INRAE productions animales",
+                    preceding=("2273-7766",),
+                ),
+            },
+        )
+        assert not check.conflict
+        assert (check.issn, check.eissn, check.issnl) == (None, "2824-3633", "2824-3633")
+        assert check.set_aside == (("2273-7766", SetAsideReason.RELATED_TITLE),)
 
 
 class TestCorrection:
