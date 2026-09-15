@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
+from domain.publications.identifiers import DOI, ISBN, ISSN, NNT, PMCID, PMID, ArxivId, HALId
 from domain.types import JsonValue
 
 
@@ -28,10 +28,6 @@ MULTIVALUED_ID_TYPES = frozenset(
 )
 
 
-def _keep(raw: str) -> str | None:
-    return raw.strip() or None
-
-
 def _via[VO](try_parse: Callable[[str], VO | None]) -> Callable[[str], str | None]:
     def normalize(raw: str) -> str | None:
         vo = try_parse(raw)
@@ -40,7 +36,7 @@ def _via[VO](try_parse: Callable[[str], VO | None]) -> Callable[[str], str | Non
     return normalize
 
 
-# Normalisation d'une valeur par type ; `None` signale une valeur invalide. L'ISSN et l'ISBN sont conservés tels quels.
+# Normalisation d'une valeur par type ; `None` signale une valeur invalide.
 _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
     ExternalIdType.HAL_ID: _via(HALId.try_parse),
     ExternalIdType.NNT: _via(NNT.try_parse),
@@ -48,8 +44,8 @@ _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
     ExternalIdType.PMCID: _via(PMCID.try_parse),
     ExternalIdType.ARXIV_ID: _via(ArxivId.try_parse),
     ExternalIdType.RELATED_DOIS: _via(DOI.try_parse),
-    ExternalIdType.ISSN: _keep,
-    ExternalIdType.ISBN: _keep,
+    ExternalIdType.ISSN: _via(ISSN.try_parse),
+    ExternalIdType.ISBN: _via(ISBN.try_parse),
 }
 
 
