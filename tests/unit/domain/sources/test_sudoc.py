@@ -58,6 +58,18 @@ class TestParseSudocSerialRecord:
         )
         assert record.support is Support.OTHER
 
+    def test_cd_rom_named_in_title(self):
+        """Cas réel : la notice « The L & O on CD-ROM » est codée comme une ressource en ligne."""
+        record = parse_sudoc_serial_record(
+            "118354507",
+            [
+                _field("182", ("c", "c")),
+                _field("135", ("a", "dr|||||||||||"), ind1=" ", ind2=" "),
+                _field("200", ("a", "The l & o on cd-rom")),
+            ],
+        )
+        assert record.support is Support.OTHER
+
     def test_support_without_carrier_type(self):
         online = [_field("182", ("c", "c")), _field("135", ("a", "|r|||||||||||"))]
         assert parse_sudoc_serial_record("1", online).support is Support.ELECTRONIC

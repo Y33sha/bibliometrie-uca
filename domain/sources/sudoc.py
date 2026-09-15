@@ -7,6 +7,8 @@ Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en lig
 - `452$x` : ISSN de la même publication sur un autre support ; `452$t` : son titre, dont la mention entre parenthèses indique souvent le support (« (Print) », « (CD-ROM) »…) ;
 - `430$x` à `437$x` : ISSN des titres précédents ; `440$x` à `448$x` : ISSN des titres suivants ;
 - `200$a`, `200$h`, `200$i` : titre, numéro et nom de la partie (« Physical review » « D »).
+
+Une notice dont le titre nomme le CD-ROM (« The L & O on CD-ROM ») décrit un autre support, quel que soit son codage.
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ class Support(StrEnum):
 _PRECEDING_TAGS = frozenset(str(t) for t in range(430, 438))
 _SUCCEEDING_TAGS = frozenset(str(t) for t in range(440, 449))
 
-# Mentions de support dans le titre d'une zone `452`, entre parenthèses.
+# Mentions de support dans le titre d'une zone `452`, entre parenthèses. Le CD-ROM se reconnaît aussi dans le titre de la notice.
 _OTHER_SUPPORT_WORDS = ("cd-rom", "cdrom", "cédérom")
 _ONLINE_WORDS = ("en ligne", "online", "internet")
 _PRINT_WORDS = ("print", "imprimé", "impresso", "papier")
@@ -97,10 +99,15 @@ def _support(fields: Sequence[MarcField]) -> Support | None:
     return Support.OTHER
 
 
+def _names_other_support(text: str) -> bool:
+    lowered = text.lower()
+    return any(word in lowered for word in _OTHER_SUPPORT_WORDS)
+
+
 def support_mentioned(title: str) -> Support | None:
     """Support qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
     mentions = " ".join(re.findall(r"\(([^)]*)\)", title)).lower()
-    if any(word in mentions for word in _OTHER_SUPPORT_WORDS):
+    if _names_other_support(mentions):
         return Support.OTHER
     if any(word in mentions for word in _ONLINE_WORDS):
         return Support.ELECTRONIC
@@ -133,15 +140,16 @@ def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSer
     """Lit une notice Sudoc de publication en série. Une zone absente donne `None` ou un tuple vide."""
     issns = _issns(_subfield_values(fields, "011", "a"))
     issnls = _issns(_subfield_values(fields, "011", "f"))
+    title = _title(fields)
     return SudocSerialRecord(
         ppn=ppn,
         issn=issns[0] if issns else None,
         issnl=issnls[0] if issnls else None,
         cancelled_issns=_issns(_subfield_values(fields, "011", "y")),
-        support=_support(fields),
+        support=Support.OTHER if title and _names_other_support(title) else _support(fields),
         other_support_issns=_issns(_subfield_values(fields, "452", "x")),
         preceding_issns=_issns(_subfield_values(fields, _PRECEDING_TAGS, "x")),
         succeeding_issns=_issns(_subfield_values(fields, _SUCCEEDING_TAGS, "x")),
-        title=_title(fields),
+        title=title,
         other_support_hints=_other_support_hints(fields),
     )
