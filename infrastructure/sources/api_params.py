@@ -60,6 +60,7 @@ UNPAYWALL_DELAY = 0.12
 # DOAJ — courtoisie
 DOAJ_DELAY = 0.15
 
-# Sudoc — aucune limite documentée, courtoisie
-SUDOC_DELAY = 0.2
+# Sudoc — aucune limite documentée : 5 req/s au plus, toutes requêtes simultanées confondues
+SUDOC_MAX_PER_SECOND = 5
+SUDOC_MAX_CONCURRENT = 4
 SUDOC_ISSN2PPN_BATCH = 20  # ISSN par requête `issn2ppn`

@@ -732,7 +732,11 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
-    from infrastructure.sources.api_params import API_BASE_URLS
+    from infrastructure.sources.api_params import (
+        API_BASE_URLS,
+        SUDOC_MAX_CONCURRENT,
+        SUDOC_MAX_PER_SECOND,
+    )
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
@@ -741,17 +745,25 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
     from infrastructure.sources.sudoc.client import fetch_ppns, fetch_serial_record
 
     conn = get_sync_engine().connect()
+    # Circuit-breaker de la source : le client HTTP lit la ContextVar, que `asyncio.run` transmet
+    # aux coroutines ; l'orchestrateur consulte `breaker.tripped`.
     breaker = SourceCircuitBreaker("sudoc", threshold=3)
     token = set_current_breaker(breaker)
     try:
         base_url = API_BASE_URLS["sudoc"]
-        metrics = run_check_journals_in_sudoc(
-            conn,
-            log,
-            journal_repo=PgJournalGatewayQueries(conn),
-            fetch_ppns=lambda issns: fetch_ppns(issns, base_url=base_url),
-            fetch_record=lambda ppn: fetch_serial_record(ppn, base_url=base_url),
-            breaker=breaker,
+        metrics = asyncio.run(
+            run_check_journals_in_sudoc(
+                conn,
+                log,
+                journal_repo=PgJournalGatewayQueries(conn),
+                fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
+                fetch_record=lambda client, ppn: fetch_serial_record(
+                    client, ppn, base_url=base_url
+                ),
+                breaker=breaker,
+                max_concurrent=SUDOC_MAX_CONCURRENT,
+                max_per_second=SUDOC_MAX_PER_SECOND,
+            )
         )
     except SourceUnavailableError:
         metrics = PhaseMetrics()

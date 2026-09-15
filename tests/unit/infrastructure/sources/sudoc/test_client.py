@@ -27,16 +27,19 @@ def _not_found(url: str) -> httpx2.HTTPStatusError:
     )
 
 
-@pytest.fixture(autouse=True)
-def _no_sleep(monkeypatch):
-    monkeypatch.setattr(client.time, "sleep", lambda _: None)
+def _answer(value):
+    async def fake(*args, **kwargs):
+        return value(*args) if callable(value) else value
+
+    return fake
 
 
 class TestFetchPpns:
-    def test_reads_every_query_of_the_batch(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_reads_every_query_of_the_batch(self, monkeypatch):
         urls = []
 
-        def fake(method, url, **kwargs):
+        async def fake(http_client, method, url, **kwargs):
             urls.append(url)
             return {
                 "sudoc": [
@@ -45,41 +48,44 @@ class TestFetchPpns:
                 ]
             }
 
-        monkeypatch.setattr(client, "http_request_with_retry", fake)
-        assert client.fetch_ppns(["0028-0836", "1476-4687"], base_url=_BASE) == {
+        monkeypatch.setattr(client, "http_request_with_retry_async", fake)
+        assert await client.fetch_ppns(None, ["0028-0836", "1476-4687"], base_url=_BASE) == {
             "0028-0836": ("038758717",),
             "1476-4687": ("068267983",),
         }
         # Le format de réponse se donne dans le chemin.
         assert urls == [f"{_BASE}/services/issn2ppn/0028-0836,1476-4687&format=text/json"]
 
-    def test_single_query_answer(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_single_query_answer(self, monkeypatch):
         monkeypatch.setattr(
             client,
-            "http_request_with_retry",
-            lambda method, url, **kwargs: {
-                "sudoc": {"query": {"issn": "0028-0836", "result": {"ppn": "038758717"}}}
-            },
+            "http_request_with_retry_async",
+            _answer({"sudoc": {"query": {"issn": "0028-0836", "result": {"ppn": "038758717"}}}}),
         )
-        assert client.fetch_ppns(["0028-0836"], base_url=_BASE) == {"0028-0836": ("038758717",)}
+        assert await client.fetch_ppns(None, ["0028-0836"], base_url=_BASE) == {
+            "0028-0836": ("038758717",)
+        }
 
-    def test_batch_without_any_record(self, monkeypatch):
-        def fake(method, url, **kwargs):
+    @pytest.mark.asyncio
+    async def test_batch_without_any_record(self, monkeypatch):
+        async def fake(http_client, method, url, **kwargs):
             raise _not_found(url)
 
-        monkeypatch.setattr(client, "http_request_with_retry", fake)
-        assert client.fetch_ppns(["2710-1309"], base_url=_BASE) == {}
+        monkeypatch.setattr(client, "http_request_with_retry_async", fake)
+        assert await client.fetch_ppns(None, ["2710-1309"], base_url=_BASE) == {}
 
-    def test_splits_into_batches(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_splits_into_batches(self, monkeypatch):
         urls = []
 
-        def fake(method, url, **kwargs):
+        async def fake(http_client, method, url, **kwargs):
             urls.append(url)
             return {"sudoc": []}
 
-        monkeypatch.setattr(client, "http_request_with_retry", fake)
+        monkeypatch.setattr(client, "http_request_with_retry_async", fake)
         monkeypatch.setattr(client, "SUDOC_ISSN2PPN_BATCH", 2)
-        client.fetch_ppns(["0028-0836", "1476-4687", "0036-8075"], base_url=_BASE)
+        await client.fetch_ppns(None, ["0028-0836", "1476-4687", "0036-8075"], base_url=_BASE)
         assert len(urls) == 2
 
 
@@ -95,23 +101,26 @@ class TestMarcFields:
 
 
 class TestFetchSerialRecord:
-    def test_parses_the_record(self, monkeypatch):
-        monkeypatch.setattr(client, "http_get_text_with_retry", lambda url, **kwargs: _NOTICE)
-        record = client.fetch_serial_record("068267983", base_url=_BASE)
+    @pytest.mark.asyncio
+    async def test_parses_the_record(self, monkeypatch):
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(_NOTICE))
+        record = await client.fetch_serial_record(None, "068267983", base_url=_BASE)
         assert record is not None
         assert record.issn == "1476-4687"
         assert record.issnl == "0028-0836"
         assert record.support is Support.ELECTRONIC
 
-    def test_unknown_ppn(self, monkeypatch):
-        def fake(url, **kwargs):
+    @pytest.mark.asyncio
+    async def test_unknown_ppn(self, monkeypatch):
+        async def fake(http_client, url, **kwargs):
             raise _not_found(url)
 
-        monkeypatch.setattr(client, "http_get_text_with_retry", fake)
-        assert client.fetch_serial_record("000000000", base_url=_BASE) is None
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", fake)
+        assert await client.fetch_serial_record(None, "000000000", base_url=_BASE) is None
 
-    def test_entity_declaration_is_refused(self, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_entity_declaration_is_refused(self, monkeypatch):
         """`defusedxml` refuse les déclarations d'entités : la notice est tenue pour illisible."""
         xml = '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY e "x">]><record>&e;</record>'
-        monkeypatch.setattr(client, "http_get_text_with_retry", lambda url, **kwargs: xml)
-        assert client.fetch_serial_record("1", base_url=_BASE) is None
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(xml))
+        assert await client.fetch_serial_record(None, "1", base_url=_BASE) is None

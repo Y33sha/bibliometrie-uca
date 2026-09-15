@@ -40,10 +40,10 @@ Source de référence des ISSN des revues. Consommée par `check_journals_in_sud
 
 ### Services utilisés
 
-- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN, par lots de 20. Le format de réponse se donne dans le chemin. Un lot sans aucune notice répond 404.
+- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN d'une revue, en une requête. Le format de réponse se donne dans le chemin. Une requête dont aucun ISSN n'a de notice répond 404.
 - `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML, lue avec `defusedxml`.
 
-Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée. Licence ouverte Etalab.
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 revues à la fois (`SUDOC_MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`). Licence ouverte Etalab.
 
 ### Données récupérées
 
