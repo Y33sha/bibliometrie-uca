@@ -332,6 +332,48 @@ class TestFindOrCreateJournal:
         )
         assert row.rejected_issns == ["1234-5678", "1476-4688"]
 
+    def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
+        """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
+        j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
+        _mark_checked_in_sudoc(sa_sync_conn, j_id)
+        find_or_create_journal("Nature", issn="1476-4687", repo=gateway)
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT issn, eissn, sudoc_checked_at FROM journals WHERE id = :id",
+            id=j_id,
+        )
+        assert row.issn is None
+        assert row.eissn == "1476-4687"
+        assert row.sudoc_checked_at is not None
+
+    def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
+        j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
+        _mark_checked_in_sudoc(sa_sync_conn, j_id)
+        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
+        row = _fetch_one(
+            sa_sync_conn, "SELECT issn, sudoc_checked_at FROM journals WHERE id = :id", id=j_id
+        )
+        assert row.issn == "0028-0836"
+        assert row.sudoc_checked_at is None
+
+    def test_new_rejected_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
+        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        _mark_checked_in_sudoc(sa_sync_conn, j_id)
+        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT rejected_issns, sudoc_checked_at FROM journals WHERE id = :id",
+            id=j_id,
+        )
+        assert row.rejected_issns == ["1476-4688"]
+        assert row.sudoc_checked_at is None
+
+
+def _mark_checked_in_sudoc(conn, journal_id: int) -> None:
+    conn.execute(
+        text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
+    )
+
 
 # ── update_journal_apc ─────────────────────────────────────────────
 

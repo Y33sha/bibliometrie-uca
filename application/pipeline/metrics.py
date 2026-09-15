@@ -15,6 +15,10 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "conflicts": "conflit",
     "disappeared": "disparu",
     "fetched": "récupéré",
+    "issn_corrected": ("ISSN corrigé", "ISSN corrigés"),
+    "issn_removed": ("ISSN retiré", "ISSN retirés"),
+    "issn_unranged": ("revue non rangée par support", "revues non rangées par support"),
+    "issnl_conflicts": ("conflit d'ISSN-L", "conflits d'ISSN-L"),
     "matched": "rapproché",
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",
@@ -23,6 +27,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "resolved": "résolu",
     "skipped": "sauté",
     "stale": ("à rafraîchir", "à rafraîchir"),
+    "sudoc_found": ("présente dans le Sudoc", "présentes dans le Sudoc"),
     "unmatched": "non rapproché",
     "unresolved": "non résolu",
 }

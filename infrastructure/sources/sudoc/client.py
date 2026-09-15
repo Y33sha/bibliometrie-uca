@@ -86,6 +86,8 @@ def fetch_serial_record(ppn: str, *, base_url: str) -> SudocSerialRecord | None:
         if _is_not_found(exc):
             return None
         raise
+    finally:
+        time.sleep(SUDOC_DELAY)
     try:
         fields = marc_fields(xml)
     except (ET.ParseError, DefusedXmlException) as exc:

@@ -32,6 +32,25 @@ Consommée par la phase pipeline [`oa_status`](../pipeline/10-enrichissements.md
 
 <!--TODO: récupérer un lien OA pour chaque publi?-->
 
+## Sudoc
+
+https://www.sudoc.fr/ — catalogue collectif des bibliothèques de l'enseignement supérieur (ABES)
+
+Source de référence des ISSN des revues. Consommée par `check_journals_in_sudoc`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
+
+### Services utilisés
+
+- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN, par lots de 20. Le format de réponse se donne dans le chemin. Un lot sans aucune notice répond 404.
+- `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML, lue avec `defusedxml`.
+
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée. Licence ouverte Etalab.
+
+### Données récupérées
+
+Une notice décrit une publication sur un support : l'ISSN papier et l'ISSN électronique d'une revue ont chacun leur notice. Zones lues : `011$a` (ISSN), `011$f` (ISSN-L), `011$y` (ISSN annulé), `182$c` (support : `n` papier, `c` électronique), `452$x` (ISSN de l'autre support), `200$a` (titre).
+
+La notice elle-même n'est pas conservée. Ses informations sont écrites dans `journals.issn`, `eissn` et `issnl`, et la date de vérification dans `journals.sudoc_checked_at`.
+
 ## DOAJ
 
 https://doaj.org/ — Directory of Open Access Journals

@@ -1,12 +1,13 @@
 """Orchestrateur de la phase `publishers_journals` : enrichissement du référentiel `journals`.
 
-Trois sous-étapes incrémentales, dans l'ordre :
+Sous-étapes incrémentales, dans l'ordre :
 
 1. **resolve_publishers** — préfixe DOI → Registration Agency + éditeur Crossref / repository DataCite (interroge Crossref et DataCite, email polite pool requis).
 2. **enrich_journals_from_openalex** — OpenAlex Sources → APC + journal_type (clé ou email OpenAlex).
-3. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
+3. **check_journals_in_sudoc** — Sudoc (public) → ISSN des revues vérifiés, corrigés et rangés par support.
+4. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
 
-Chaque accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de config sont injectés par le composition-root ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
+La vérification Sudoc précède l'import DOAJ, qui apparie les revues par ISSN. Chaque accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de config sont injectés par le composition-root ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
 """
 
 import logging
@@ -23,11 +24,12 @@ def run(
     *,
     resolve_publishers: RunSubstep,
     enrich_from_openalex: RunSubstep,
+    check_in_sudoc: RunSubstep,
     enrich_from_doaj: RunSubstep,
     credentials_missing: CredentialsMissing,
     logger: logging.Logger,
 ) -> PhaseMetrics:
-    """Enchaîne les trois sous-étapes (les deux premières sous garde de config) et assemble les métriques de la phase."""
+    """Enchaîne les sous-étapes (les deux premières sous garde de config) et assemble les métriques de la phase."""
     metrics = PhaseMetrics()
 
     publishers = PhaseMetrics()
@@ -50,10 +52,11 @@ def run(
     ):
         openalex = enrich_from_openalex()
 
+    sudoc = check_in_sudoc()
     doaj = enrich_from_doaj()
 
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
-    for sub in (publishers, openalex, doaj):
+    for sub in (publishers, openalex, sudoc, doaj):
         metrics.merge(sub)
 
     metrics.details["table"] = {
@@ -68,6 +71,12 @@ def run(
                 "key": "revues OpenAlex",
                 "traités": openalex.total,
                 "identifiés": openalex.updated,
+                "créés": 0,
+            },
+            {
+                "key": "revues vérifiées dans le Sudoc",
+                "traités": sudoc.total,
+                "identifiés": sudoc.extras.get("sudoc_found", 0),
                 "créés": 0,
             },
         ]

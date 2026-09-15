@@ -1,6 +1,6 @@
 """Adapter PostgreSQL de la table `journals` pour le pipeline.
 
-Sert les trois contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-ou-crée d'une revue à partir des sources, enrichissement OpenAlex (typage + APC) et import du dump DOAJ. La table étant mono-adapter, une seule classe implémente les trois Protocols. L'édition curée et la fusion (admin) vivent dans `infrastructure/repositories/journal_repository.py`.
+Sert les contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-ou-crée d'une revue à partir des sources, enrichissement OpenAlex (typage + APC), vérification des ISSN dans le Sudoc et import du dump DOAJ. La table étant mono-adapter, une seule classe implémente tous les Protocols. L'édition dans l'administration et la fusion passent par `infrastructure/repositories/journal_repository.py`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -14,6 +14,8 @@ from application.ports.pipeline.journals import (
     JournalFindOrCreateQueries,
     JournalIssnRow,
     JournalOpenAlexEnrichmentQueries,
+    JournalSudocQueries,
+    JournalSudocRow,
 )
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
@@ -23,7 +25,10 @@ from infrastructure.db.tables import journal_name_forms, journals
 
 
 class PgJournalGatewayQueries(
-    JournalFindOrCreateQueries, JournalOpenAlexEnrichmentQueries, JournalDoajQueries
+    JournalFindOrCreateQueries,
+    JournalOpenAlexEnrichmentQueries,
+    JournalSudocQueries,
+    JournalDoajQueries,
 ):
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
 
@@ -131,6 +136,21 @@ class PgJournalGatewayQueries(
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
+        carried = self._conn.execute(
+            select(journals.c.issn, journals.c.eissn, journals.c.issnl).where(
+                journals.c.id == journal_id
+            )
+        ).one_or_none()
+        new_issn = False
+        if carried is not None:
+            # Un ISSN que la revue porte déjà n'est pas réécrit dans une autre colonne : la
+            # vérification Sudoc range chaque ISSN dans la colonne de son support.
+            known = {v for v in carried if v}
+            issn = None if issn in known else issn
+            eissn = None if eissn in known or eissn == issn else eissn
+            new_issn = (issn is not None and carried.issn is None) or (
+                eissn is not None and carried.eissn is None
+            )
         # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
         fillable = (
             (journals.c.issn, issn),
@@ -155,6 +175,8 @@ class PgJournalGatewayQueries(
                 oa_model=func.coalesce(
                     journals.c.oa_model, literal(oa_model, journals.c.oa_model.type)
                 ),
+                # Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
+                **({"sudoc_checked_at": None} if new_issn else {}),
             )
         )
         self._conn.execute(stmt)
@@ -167,9 +189,61 @@ class PgJournalGatewayQueries(
                 "UPDATE journals SET rejected_issns = ARRAY("
                 "SELECT v FROM (SELECT DISTINCT unnest(rejected_issns || CAST(:values AS text[])) AS v) d "
                 'ORDER BY v COLLATE "C"'
-                ") WHERE id = :id"
+                "), "
+                # Une valeur nouvelle remet la revue à vérifier dans le Sudoc.
+                "sudoc_checked_at = CASE WHEN CAST(:values AS text[]) <@ rejected_issns "
+                "THEN sudoc_checked_at END "
+                "WHERE id = :id"
             ),
             {"id": journal_id, "values": list(values)},
+        )
+
+    def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
+        rows = self._conn.execute(
+            select(
+                journals.c.id,
+                journals.c.title,
+                journals.c.issn,
+                journals.c.eissn,
+                journals.c.issnl,
+                journals.c.rejected_issns,
+            )
+            .where(
+                journals.c.sudoc_checked_at.is_(None),
+                or_(
+                    journals.c.issn.is_not(None),
+                    journals.c.eissn.is_not(None),
+                    journals.c.issnl.is_not(None),
+                    func.cardinality(journals.c.rejected_issns) > 0,
+                ),
+            )
+            .order_by(journals.c.id)
+        ).all()
+        return [
+            JournalSudocRow(r.id, r.title, r.issn, r.eissn, r.issnl, tuple(r.rejected_issns))
+            for r in rows
+        ]
+
+    def record_sudoc_check(
+        self,
+        journal_id: int,
+        *,
+        issn: str | None,
+        eissn: str | None,
+        issnl: str | None,
+        rejected_issns: Sequence[str],
+        checked_at: datetime,
+    ) -> None:
+        self._conn.execute(
+            update(journals)
+            .where(journals.c.id == journal_id)
+            .values(
+                issn=issn,
+                eissn=eissn,
+                issnl=issnl,
+                rejected_issns=list(rejected_issns),
+                sudoc_checked_at=checked_at,
+            )
         )
 
     def create_journal(

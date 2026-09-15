@@ -1,9 +1,6 @@
 """Agrégation des métriques de la phase `publishers_journals`.
 
-La phase enchaîne trois sous-étapes (résolution des préfixes → éditeurs,
-enrichissement des revues via OpenAlex, import DOAJ). Leurs compteurs et signaux
-doivent remonter à la phase : sinon le log de fin et l'observabilité rapportent
-« no-op » alors que du travail a été effectué.
+La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, enrichissement des revues via OpenAlex, vérification des ISSN dans le Sudoc, import DOAJ). Leurs compteurs et signaux doivent remonter à la phase : sinon le log de fin et l'observabilité rapportent « no-op » alors que du travail a été effectué.
 """
 
 from unittest.mock import patch
@@ -30,6 +27,7 @@ def test_phase_aggregates_substep_counters():
         _patch_credentials_present(),
         patch.object(run_pipeline, "_run_resolve_publishers", return_value=publishers),
         patch.object(run_pipeline, "_run_enrich_journals_from_openalex", return_value=openalex),
+        patch.object(run_pipeline, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()),
         patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=doaj),
     ):
         metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
@@ -56,6 +54,7 @@ def test_phase_propagates_substep_signals():
             "_run_enrich_journals_from_openalex",
             return_value=PhaseMetrics(),
         ),
+        patch.object(run_pipeline, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()),
         patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()),
     ):
         metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
