@@ -329,6 +329,7 @@ combine-as-imports = true
 "infrastructure/read_models/*" = ["S608"]
 "infrastructure/pipeline/*" = ["S608"]
 "infrastructure/repositories/*" = ["S608"]
+"infrastructure/db/sql_fragments.py" = ["S608"]
 "alembic/versions/*" = ["S608"]
 # Scripts de développement : `dump_schema` lance `pg_dump`, dont il compose lui-même les
 # arguments.

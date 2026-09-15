@@ -32,7 +32,12 @@ from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
-from infrastructure.db.sql_fragments import identifier_neutralized, in_clause, usable_identifiers
+from infrastructure.db.sql_fragments import (
+    identifier_neutralized,
+    in_clause,
+    other_name_form_holders,
+    usable_identifiers,
+)
 
 # ── Name-form authorships ────────────────────────────────────────
 
@@ -56,17 +61,13 @@ def name_form_authorships(
     ).all()
 
     other_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p.id AS person_id, p.first_name, p.last_name,
                    pr.department_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
-            FROM person_name_forms pnf
-            JOIN persons p ON p.id = pnf.person_id
+            FROM persons p
             LEFT JOIN persons_rh pr ON pr.person_id = p.id
-            WHERE pnf.name_form = :nf
-              AND pnf.person_id <> :pid
-              AND pnf.status <> 'rejected'
-              AND p.rejected = FALSE
+            WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
             ORDER BY p.last_name, p.first_name
         """),
         {"nf": name_form, "pid": person_id},
@@ -615,20 +616,18 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplic
 
 
 def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingPersonOut]:
-    """Autres personnes (non rejetées) partageant ≥1 forme de nom avec `person_id`.
+    """Autres personnes qui portent au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
 
     Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p2.id AS person_id, p2.first_name, p2.last_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p2.id) AS has_rh,
                    array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
             FROM person_name_forms pnf1
-            JOIN person_name_forms pnf2
-              ON pnf2.name_form = pnf1.name_form AND pnf2.person_id <> pnf1.person_id
-            JOIN persons p2 ON p2.id = pnf2.person_id
-            WHERE pnf1.person_id = :id AND p2.rejected = FALSE
-              AND pnf1.status <> 'rejected' AND pnf2.status <> 'rejected'
+            JOIN LATERAL ({other_name_form_holders("pnf1.name_form", "pnf1.person_id")}) holders ON TRUE
+            JOIN persons p2 ON p2.id = holders.person_id
+            WHERE pnf1.person_id = :id AND pnf1.status <> 'rejected'
             GROUP BY p2.id, p2.first_name, p2.last_name
             ORDER BY p2.last_name, p2.first_name
         """),

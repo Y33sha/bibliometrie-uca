@@ -14,7 +14,9 @@ from infrastructure.read_models.persons.admin import (
     name_duplicates,
     name_duplicates_count,
     name_form_authorships,
+    persons_sharing_name_form,
 )
+from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.authorships import upsert_identity
 
 
@@ -135,6 +137,37 @@ class TestNameFormAuthorships:
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")
 
         assert res.other_persons == []
+
+
+def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_conn):
+    """Le compteur d'une forme, la modale de détachement et le panneau des personnes partageant une forme comptent les mêmes personnes."""
+    pid = _create_person(sa_sync_conn, last="Dupond")
+    porteur = _create_person(sa_sync_conn, last="Martin")
+    forme_rejetee = _create_person(sa_sync_conn, last="Durand")
+    personne_rejetee = _create_person(sa_sync_conn, last="Bernard", rejected=True)
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+            "VALUES ('dupond j', :pid, ARRAY['hal'], 'pending'), "
+            "       ('dupond j', :porteur, ARRAY['hal'], 'pending'), "
+            "       ('dupond j', :forme_rejetee, ARRAY['hal'], 'rejected'), "
+            "       ('dupond j', :personne_rejetee, ARRAY['hal'], 'pending')"
+        ),
+        {
+            "pid": pid,
+            "porteur": porteur,
+            "forme_rejetee": forme_rejetee,
+            "personne_rejetee": personne_rejetee,
+        },
+    )
+
+    (forme,) = person_name_forms(sa_sync_conn, pid)
+    modale = name_form_authorships(sa_sync_conn, pid, "dupond j").other_persons
+    panneau = persons_sharing_name_form(sa_sync_conn, pid)
+
+    assert forme.shared_count == 1
+    assert [p.person_id for p in modale] == [porteur]
+    assert [p.person_id for p in panneau] == [porteur]
 
 
 # Tests pour `hal_duplicate_accounts` déplacés vers
