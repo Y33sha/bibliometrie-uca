@@ -12,6 +12,9 @@ Deux populations de candidats traversent la même cascade :
 3. **IdRef**.
 4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne. Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
 5. **Cross-source** — même publication × position, nom compatible ; inopérant au bootstrap.
+6. **Initiales compatibles** — forme inconnue, mais une seule personne de même nom de famille aux initiales compatibles (`compatible_namesakes`).
+
+Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une signature qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses signatures attestent seul.
 
 Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
@@ -28,6 +31,7 @@ from collections import defaultdict
 from sqlalchemy import Connection
 
 from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.persons.first_names import complete_reduced_first_names
 from application.pipeline.persons.loading import (
     EnrichedAuthorship,
     get_all_unlinked_authorships,
@@ -45,18 +49,23 @@ from application.services.persons.core import (
     add_name_form,
     create_person,
     link_authorship,
+    update_name,
 )
+from domain.normalize import normalize_name
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
     NameFormDecision,
+    Namesake,
     PersonMatchDecision,
+    compatible_namesakes,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
 )
 from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.name_matching import first_name_initials, initials_extend
 
 # ---------------------------------------------------------------------------
 # Passe de cascade
@@ -76,6 +85,7 @@ class _Cascade:
         *,
         person_repo: PersonRepository,
         authorship_repo: AuthorshipRepository,
+        conflicting: frozenset[int] = frozenset(),
     ) -> None:
         self._person_repo = person_repo
         self._authorship_repo = authorship_repo
@@ -97,6 +107,12 @@ class _Cascade:
         self._name_form_map = queries.fetch_name_form_map(conn)
         self._name_form_status = queries.fetch_name_form_status_map(conn)
         self._rejected_by_pub = queries.fetch_rejected_person_ids_by_pub(conn)
+        # Personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
+        self._namesakes: dict[str, list[Namesake]] = defaultdict(list)
+        self._namesake_of: dict[int, Namesake] = {}
+        for namesake in queries.fetch_namesakes(conn):
+            self._index_namesake(namesake._replace(conflicting=namesake.person_id in conflicting))
+        self.first_names_completed = 0
 
         self.matched_counts: dict[str, int] = defaultdict(int)
         self.skipped_counts: dict[str, int] = defaultdict(int)
@@ -139,12 +155,19 @@ class _Cascade:
     def _name_form_outcome(
         self, a: EnrichedAuthorship, rejected_for_pub: frozenset[int]
     ) -> NameFormDecision:
-        """Décision par la forme du nom, contre l'index vivant des formes."""
+        """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
         norm = a.author_name_normalized
+        person_ids = self._name_form_map.get(norm) if norm else None
+        compatible = (
+            compatible_namesakes(a.first_name, self._namesakes.get(a.last_norm, []))
+            if person_ids is None
+            else []
+        )
         return decide_name_form_outcome(
-            self._name_form_map.get(norm) if norm else None,
+            person_ids,
             a.allow_create,
             rejected_person_ids=rejected_for_pub,
+            compatible_person_ids=compatible,
         )
 
     def name_form_ambiguous(self, a: EnrichedAuthorship) -> bool:
@@ -226,6 +249,7 @@ class _Cascade:
         add_name_form(pid, a.full_name, repo=self._person_repo)
         # `add_identifiers` reste une API batch (dict) partagée avec les CLI de maintenance ; conversion via `_asdict()` au boundary. Identifiants ajoutés en `pending` quelle que soit la source du match.
         add_identifiers(pid, [a._asdict()], repo=self._person_repo)
+        self._complete_first_name(pid, a)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
@@ -248,18 +272,46 @@ class _Cascade:
         )
         add_identifiers(marker, [a._asdict()], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
-        # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
-        # On fusionne dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière créée.
-        for f in compute_person_name_forms(last, first):
-            form_person_ids = self._name_form_map.setdefault(f, [])
-            if marker not in form_person_ids:
-                form_person_ids.append(marker)
+        self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
         if a.publication_id is not None:
             self._linked_index[(a.publication_id, a.author_position)].append(
                 (marker, a.last_norm, a.first_norm, a.source)
             )
         self.created += 1
+
+    def _index_namesake(self, namesake: Namesake) -> None:
+        """Rend la personne matchable dans la même passe par son nom de famille, et par toutes les formes de son nom — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
+
+        Les formes fusionnent dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière personne indexée.
+        """
+        previous = self._namesake_of.get(namesake.person_id)
+        same_last_name = self._namesakes[normalize_name(namesake.last_name)]
+        if previous is not None:
+            same_last_name.remove(previous)
+        same_last_name.append(namesake)
+        self._namesake_of[namesake.person_id] = namesake
+        for f in compute_person_name_forms(namesake.last_name, namesake.first_name):
+            form_person_ids = self._name_form_map.setdefault(f, [])
+            if namesake.person_id not in form_person_ids:
+                form_person_ids.append(namesake.person_id)
+
+    def _complete_first_name(self, pid: int, a: EnrichedAuthorship) -> None:
+        """Donne à une personne au prénom réduit le prénom plein compatible de la signature qui la rejoint (« Tnourji A. » → « Tnourji Abdellah ») : une signature d'un autre prénom plein ne s'y rattache plus par ses initiales."""
+        namesake = self._namesake_of.get(pid)
+        if namesake is None or namesake.conflicting:
+            return
+        initials = first_name_initials(namesake.first_name)
+        if (
+            initials is None
+            or normalize_name(namesake.last_name) != a.last_norm
+            or first_name_initials(a.first_name) is not None
+            or not initials_extend(initials, a.first_name)
+        ):
+            return
+        update_name(pid, namesake.last_name, a.first_name, repo=self._person_repo)
+        self._index_namesake(namesake._replace(first_name=a.first_name))
+        self.first_names_completed += 1
 
     def result(self) -> CascadeResult:
         return CascadeResult(
@@ -273,6 +325,7 @@ class _Cascade:
             out_of_perimeter_total=self.out_of_perimeter_total,
             cross_source_candidate_ids=self.cross_source_candidate_ids,
             resolved_cross_source_ids=self.resolved_cross_source_ids,
+            first_names_completed=self.first_names_completed,
         )
 
 
@@ -291,10 +344,23 @@ def run_cascade(
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
     etape(logger, "Identification des personnes")
+    completion = complete_reduced_first_names(conn, queries, person_repo=person_repo)
+    logger.info(
+        "%s%s d'après les signatures",
+        BRANCHE,
+        accord(completion.completed, "prénom complété", "prénoms complétés"),
+    )
     # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
     # muette jusqu'à ce qu'il rende la main.
     with attente(f"{BRANCHE}chargement des signatures", logger) as ligne:
-        c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
+        c = _Cascade(
+            conn,
+            queries,
+            person_repo=person_repo,
+            authorship_repo=authorship_repo,
+            conflicting=completion.conflicting,
+        )
+        c.first_names_completed = completion.completed
         total = len(c.authorships)
         ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} à examiner")
 

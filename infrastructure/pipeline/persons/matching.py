@@ -23,6 +23,7 @@ from domain.persons.identifiers import (
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     IdentifiedPerson,
+    Namesake,
     PersonNameForms,
     ResolutionMode,
 )
@@ -294,6 +295,35 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
             """)
         ).all()
         return {r.publication_id: frozenset(r.person_ids) for r in rows}
+
+    def fetch_namesakes(self, conn: Connection) -> list[Namesake]:
+        rows = conn.execute(
+            text("""
+                SELECT id, last_name, COALESCE(first_name, '') AS first_name
+                FROM persons
+                WHERE NOT rejected
+                ORDER BY id
+            """)
+        ).all()
+        return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
+
+    def fetch_linked_signature_names(
+        self, conn: Connection, person_ids: list[int]
+    ) -> dict[int, list[str]]:
+        if not person_ids:
+            return {}
+        rows = conn.execute(
+            text("""
+                SELECT person_id, raw_author_name
+                FROM source_authorships
+                WHERE person_id = ANY(:ids) AND raw_author_name IS NOT NULL
+            """),
+            {"ids": person_ids},
+        ).all()
+        names: dict[int, list[str]] = {}
+        for r in rows:
+            names.setdefault(r.person_id, []).append(r.raw_author_name)
+        return names
 
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
         """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
