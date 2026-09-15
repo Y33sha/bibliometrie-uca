@@ -50,7 +50,7 @@ class JournalFindOrCreateQueries(Protocol):
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
-        """Cherche une revue dont l'un des trois champs ISSN (`issn`, `eissn`, `issnl`) vaut `issn_value`."""
+        """Cherche une revue dont l'un des trois champs ISSN (`issn`, `eissn`, `issnl`) ou l'un des ISSN rejetés vaut `issn_value`. Une revue qui porte l'ISSN dans ses trois champs passe en premier."""
         ...
 
     def enrich_journal(
@@ -65,7 +65,7 @@ class JournalFindOrCreateQueries(Protocol):
     ) -> None:
         """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée.
 
-        Un ISSN que la revue porte déjà dans `issn` ou `eissn` n'est pas réécrit dans l'autre. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
+        Un ISSN que la revue porte déjà dans `issn` ou `eissn`, ou qu'elle a rejeté, n'est pas réécrit dans une colonne. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
         """
         ...
 

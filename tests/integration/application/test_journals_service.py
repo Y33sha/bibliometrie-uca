@@ -353,6 +353,24 @@ class TestFindOrCreateJournal:
         row = _fetch_one(sa_sync_conn, "SELECT issn, issnl FROM journals WHERE id = :id", id=j_id)
         assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
 
+    def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
+        """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
+        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0305-1048")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE journals SET rejected_issns = '{1362-4954}', sudoc_checked_at = now() "
+                "WHERE id = :id"
+            ),
+            {"id": j_id},
+        )
+        found = find_or_create_journal("Other title", eissn="1362-4954", repo=gateway)
+        row = _fetch_one(
+            sa_sync_conn, "SELECT eissn, sudoc_checked_at FROM journals WHERE id = :id", id=j_id
+        )
+        assert found == j_id
+        assert row.eissn is None
+        assert row.sudoc_checked_at is not None
+
     def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)

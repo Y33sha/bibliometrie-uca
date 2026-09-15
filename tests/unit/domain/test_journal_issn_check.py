@@ -1,26 +1,36 @@
 """Tests de la vérification des ISSN d'une revue par les notices Sudoc (`domain.journals.issn_check`)."""
 
-from domain.journals.issn_check import JournalIssns, check_journal_issns, correction_candidates
+from domain.journals.issn_check import (
+    JournalIssns,
+    SetAsideReason,
+    check_journal_issns,
+    correction_candidates,
+)
 from domain.sources.sudoc import SudocSerialRecord, Support
 
-PRINT, ELECTRONIC = Support.PRINT, Support.ELECTRONIC
+PRINT, ELECTRONIC, OTHER = Support.PRINT, Support.ELECTRONIC, Support.OTHER
 
 
 def _record(
     issn: str,
-    issnl: str,
+    issnl: str | None,
     support: Support | None,
     *,
     title: str = "Revue",
     other: tuple[str, ...] = (),
+    preceding: tuple[str, ...] = (),
+    succeeding: tuple[str, ...] = (),
+    cancelled: tuple[str, ...] = (),
 ) -> SudocSerialRecord:
     return SudocSerialRecord(
         ppn=f"ppn-{issn}",
         issn=issn,
         issnl=issnl,
-        cancelled_issns=(),
+        cancelled_issns=cancelled,
         support=support,
         other_support_issns=other,
+        preceding_issns=preceding,
+        succeeding_issns=succeeding,
         title=title,
     )
 
@@ -37,7 +47,7 @@ def _journal(
 
 class TestPlacement:
     def test_each_issn_goes_to_its_support_column(self):
-        """L'ISSN électronique rangé dans `issn` passe dans `eissn`."""
+        """L'ISSN en ligne rangé dans `issn` passe dans `eissn`."""
         check = check_journal_issns(
             _journal(issn="1476-4687", issnl="0028-0836"),
             {
@@ -47,7 +57,7 @@ class TestPlacement:
         )
         assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "1476-4687", "0028-0836")
         assert check.found
-        assert not check.ambiguous_support
+        assert check.ambiguous_support is None
 
     def test_issn_absent_from_sudoc_stays_in_its_column(self):
         check = check_journal_issns(
@@ -56,12 +66,33 @@ class TestPlacement:
         )
         assert (check.issn, check.eissn) == ("0028-0836", "2049-3630")
 
+    def test_issn_without_free_column_is_set_aside(self):
+        """Cas réel (Journal of High Energy Physics) : l'ISSN en ligne prend `eissn`, l'ISSN sans notice qui l'occupait rejoint les rejetés."""
+        check = check_journal_issns(
+            _journal(issn="1126-6708", eissn="1127-2236", issnl="1029-8479"),
+            {"1029-8479": _record("1029-8479", "1029-8479", ELECTRONIC)},
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("1126-6708", "1029-8479", "1029-8479")
+        assert check.rejected == ("1127-2236",)
+        assert check.set_aside == (("1127-2236", SetAsideReason.NO_FREE_COLUMN),)
+
     def test_other_support_completes_the_missing_column(self):
+        check = check_journal_issns(
+            _journal(issn="0767-9513"),
+            {
+                "0767-9513": _record("0767-9513", "0767-9513", PRINT, other=("1963-1006",)),
+                "1963-1006": _record("1963-1006", "0767-9513", ELECTRONIC),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("0767-9513", "1963-1006", "0767-9513")
+
+    def test_other_support_without_known_record_is_not_added(self):
+        """La zone `452` liste aussi les CD-ROM : sans notice, le support de l'ISSN désigné reste inconnu."""
         check = check_journal_issns(
             _journal(issn="0767-9513"),
             {"0767-9513": _record("0767-9513", "0767-9513", PRINT, other=("1963-1006",))},
         )
-        assert (check.issn, check.eissn, check.issnl) == ("0767-9513", "1963-1006", "0767-9513")
+        assert check.eissn is None
 
     def test_two_issns_of_the_same_support_stay_in_place(self):
         check = check_journal_issns(
@@ -71,18 +102,71 @@ class TestPlacement:
                 "0036-8075": _record("0036-8075", "0028-0836", PRINT),
             },
         )
-        assert check.ambiguous_support
+        assert check.ambiguous_support is PRINT
         assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "0036-8075", "0028-0836")
 
     def test_journal_absent_from_sudoc_is_unchanged(self):
-        journal = _journal(issn="0028-0836", eissn="1476-4687")
-        check = check_journal_issns(journal, {})
+        check = check_journal_issns(_journal(issn="0028-0836", eissn="1476-4687"), {})
         assert not check.found
         assert (check.issn, check.eissn, check.issnl) == ("0028-0836", "1476-4687", None)
 
 
+class TestSetAside:
+    def test_cd_rom_is_set_aside(self):
+        """Cas réel (Nucleic Acids Research) : le CD-ROM rangé dans `eissn` cède la place à l'ISSN en ligne."""
+        check = check_journal_issns(
+            _journal(issn="0305-1048", eissn="1362-4954", issnl="0305-1048"),
+            {
+                "0305-1048": _record(
+                    "0305-1048", "0305-1048", PRINT, other=("1362-4962", "1362-4954")
+                ),
+                "1362-4954": _record("1362-4954", "0305-1048", OTHER),
+                "1362-4962": _record("1362-4962", "0305-1048", ELECTRONIC),
+            },
+        )
+        assert (check.issn, check.eissn) == ("0305-1048", "1362-4962")
+        assert check.rejected == ("1362-4954",)
+        assert check.set_aside == (("1362-4954", SetAsideReason.OTHER_SUPPORT),)
+
+    def test_preceding_title_is_set_aside(self):
+        """Cas réel (Volume !) : l'ISSN de l'ancien titre « Copyright volume ! » partage l'ISSN-L du titre actuel."""
+        check = check_journal_issns(
+            _journal(issn="1950-568X", eissn="2117-4148", issnl="1634-5495"),
+            {
+                "1950-568X": _record("1950-568X", "1634-5495", ELECTRONIC, other=("2117-4148",)),
+                "2117-4148": _record(
+                    "2117-4148", "1634-5495", PRINT, other=("1950-568X",), preceding=("1634-5495",)
+                ),
+                "1634-5495": _record("1634-5495", "1634-5495", PRINT, succeeding=("2117-4148",)),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == ("2117-4148", "1950-568X", "1634-5495")
+        assert check.set_aside == (("1634-5495", SetAsideReason.RELATED_TITLE),)
+        assert check.ambiguous_support is None
+
+    def test_successor_of_another_group_is_set_aside_not_removed(self):
+        check = check_journal_issns(
+            _journal(issn="0028-0836", eissn="0036-8075"),
+            {
+                "0028-0836": _record("0028-0836", "0028-0836", PRINT, succeeding=("0036-8075",)),
+                "0036-8075": _record("0036-8075", "0036-8075", PRINT, title="Revue nouvelle série"),
+            },
+        )
+        assert check.intruders == ()
+        assert check.set_aside == (("0036-8075", SetAsideReason.RELATED_TITLE),)
+        assert check.rejected == ("0036-8075",)
+
+    def test_cancelled_issn_is_set_aside(self):
+        check = check_journal_issns(
+            _journal(issn="0028-0836", eissn="0302-2889"),
+            {"0028-0836": _record("0028-0836", "0028-0836", PRINT, cancelled=("0302-2889",))},
+        )
+        assert check.eissn is None
+        assert check.set_aside == (("0302-2889", SetAsideReason.CANCELLED),)
+
+
 class TestCoherence:
-    def test_issn_of_another_issnl_is_removed(self):
+    def test_issn_of_another_publication_is_removed(self):
         """Cas réel : HAL donne à Neuropsychopharmacology l'ISSN de British Journal of Cancer."""
         check = check_journal_issns(
             _journal(issn="1740-634X", eissn="0007-0920", issnl="0893-133X"),
@@ -95,10 +179,34 @@ class TestCoherence:
         assert check.intruders == ("0007-0920",)
         assert (check.issn, check.eissn, check.issnl) == ("0893-133X", "1740-634X", "0893-133X")
 
-    def test_tie_between_issnls_changes_nothing(self):
-        journal = _journal(issn="0028-0836", eissn="0007-0920")
+    def test_other_supports_form_one_group_despite_different_issnls(self):
+        """Cas réel (Journal of Applied Physiology) : la notice papier porte l'ISSN-L de l'ancien titre ; la zone `452` relie les deux supports."""
         check = check_journal_issns(
-            journal,
+            _journal(issn="8750-7587", eissn="1522-1601", issnl="1522-1601"),
+            {
+                "8750-7587": _record("8750-7587", "0161-7567", PRINT, other=("1522-1601",)),
+                "1522-1601": _record("1522-1601", "1522-1601", ELECTRONIC, other=("8750-7587",)),
+            },
+        )
+        assert check.intruders == ()
+        assert (check.issn, check.eissn, check.issnl) == ("8750-7587", "1522-1601", "1522-1601")
+
+    def test_title_breaks_a_tie_between_groups(self):
+        check = check_journal_issns(
+            _journal(issn="0028-0836", eissn="0007-0920", title="Nature"),
+            {
+                "0028-0836": _record("0028-0836", "0028-0836", PRINT, title="Nature"),
+                "0007-0920": _record(
+                    "0007-0920", "0007-0920", PRINT, title="British journal of cancer"
+                ),
+            },
+        )
+        assert check.intruders == ("0007-0920",)
+        assert check.issn == "0028-0836"
+
+    def test_tie_between_groups_changes_nothing(self):
+        check = check_journal_issns(
+            _journal(issn="0028-0836", eissn="0007-0920"),
             {
                 "0028-0836": _record("0028-0836", "0028-0836", PRINT),
                 "0007-0920": _record("0007-0920", "0007-0920", PRINT),
@@ -139,5 +247,16 @@ class TestCorrection:
         )
         assert check.corrections == ()
 
+    def test_valid_rejected_issn_is_kept_as_is(self):
+        """Un ISSN rejeté valide est périmé, pas fautif : il n'est pas corrigé."""
+        check = check_journal_issns(
+            _journal(issn="0305-1048", rejected=("1362-4954",)),
+            {"0305-1048": _record("0305-1048", "0305-1048", PRINT)},
+        )
+        assert check.corrections == ()
+        assert check.rejected == ("1362-4954",)
+
     def test_correction_candidates(self):
-        assert "1950-5051" in correction_candidates(("1950-2051", "(Internet)"))
+        candidates = correction_candidates(("1950-2051", "(Internet)", "1362-4954"))
+        assert "1950-5051" in candidates
+        assert correction_candidates(("1362-4954",)) == frozenset()
