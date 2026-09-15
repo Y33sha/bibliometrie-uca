@@ -36,21 +36,18 @@ def build(
     etape(logger, "Liens publication-personne")
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.
-    inserted = queries.insert_missing_authorships(conn)
-    logger.info(
-        "%s%s %s",
-        BRANCHE,
-        accord(inserted, "nouveau lien", "nouveaux liens"),
-        forme(inserted, "créé"),
-    )
-    pruned = queries.prune_orphan_authorships(conn)
-    logger.info(
-        "%s%s %s %s",
-        DERNIERE_BRANCHE,
-        accord(pruned, "lien"),
-        forme(pruned, "obsolète"),
-        forme(pruned, "supprimé"),
-    )
+    with attente(f"{BRANCHE}création des liens en cours", logger) as ligne:
+        # Stats fraîches sur person_id, que les phases précédentes (normalize, persons) réécrivent en masse.
+        queries.analyze_source_authorships(conn)
+        inserted = queries.insert_missing_authorships(conn)
+        ligne.conclut(
+            f"{BRANCHE}{accord(inserted, 'nouveau lien', 'nouveaux liens')} {forme(inserted, 'créé')}"
+        )
+    with attente(f"{DERNIERE_BRANCHE}suppression des liens obsolètes en cours", logger) as ligne:
+        pruned = queries.prune_orphan_authorships(conn)
+        ligne.conclut(
+            f"{DERNIERE_BRANCHE}{accord(pruned, 'lien')} {forme(pruned, 'obsolète')} {forme(pruned, 'supprimé')}"
+        )
 
     etape(logger, "Synchronisation des tables")
     t0 = time.perf_counter()
