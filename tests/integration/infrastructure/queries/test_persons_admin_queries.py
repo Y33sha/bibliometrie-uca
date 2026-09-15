@@ -120,6 +120,22 @@ class TestNameFormAuthorships:
         other_ids = [p.person_id for p in res.other_persons]
         assert other in other_ids
 
+    def test_exclut_les_personnes_chez_qui_la_forme_est_rejetee(self, sa_sync_conn):
+        pid = _create_person(sa_sync_conn, last="Dupond")
+        rejetee = _create_person(sa_sync_conn, last="Martin")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('dupond j', :pid, ARRAY['hal'], 'pending'), "
+                "       ('dupond j', :rejetee, ARRAY['hal'], 'rejected')"
+            ),
+            {"pid": pid, "rejetee": rejetee},
+        )
+
+        res = name_form_authorships(sa_sync_conn, pid, "dupond j")
+
+        assert res.other_persons == []
+
 
 # Tests pour `hal_duplicate_accounts` déplacés vers
 # `tests/integration/infrastructure/queries/test_hal_problems.py` —

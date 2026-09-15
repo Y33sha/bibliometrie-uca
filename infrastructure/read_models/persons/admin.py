@@ -40,7 +40,7 @@ from infrastructure.db.sql_fragments import identifier_neutralized, in_clause, u
 def name_form_authorships(
     conn: Connection, person_id: int, name_form: str
 ) -> NameFormAuthorshipsResponse:
-    """Authorships sources liées à une personne pour une forme de nom donnée, + autres personnes partageant cette forme."""
+    """Authorships sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
         text(f"""
             SELECT sa.source, sa.id AS source_authorship_id,
@@ -65,6 +65,7 @@ def name_form_authorships(
             LEFT JOIN persons_rh pr ON pr.person_id = p.id
             WHERE pnf.name_form = :nf
               AND pnf.person_id <> :pid
+              AND pnf.status <> 'rejected'
               AND p.rejected = FALSE
             ORDER BY p.last_name, p.first_name
         """),
