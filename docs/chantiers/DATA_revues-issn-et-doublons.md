@@ -28,16 +28,19 @@ La phase `publishers_journals` interroge l'API OpenAlex Sources par `openalex_id
 | Portail ISSN | Payant (web service dès 8 976 € en 2024) | API | Tout, dont le statut « annulé » ou « erroné » | Commerciale |
 | Journal Checker Tool | Gratuit | Un ISSN par requête | Titre, ISSN, éditeur, conformité au Plan S | CC BY 4.0 |
 
-Mir@bel couvre environ 20 000 revues, surtout françaises. Le Sudoc couvre davantage.
+Couverture mesurée sur 199 revues tirées au hasard parmi celles à ISSN valide : 174 sont présentes dans le Sudoc, 106 dans Mir@bel. Une seule revue est présente dans Mir@bel et absente du Sudoc. 24 sont absentes des deux.
 
 ## Décisions
 
 - Chaque écriture d'un ISSN de revue passe par le value object `ISSN`.
 - La cohérence entre les ISSN d'un enregistrement et ceux de sa revue est vérifiée.
-- Une source de référence, interrogée dans la phase `publishers_journals`, confirme les ISSN d'une revue. Elle fournit son titre de référence, son ISSN-L et ses ISSN par support. Les revues séparées à tort sont fusionnées sur cette base.
+- Une source de référence, interrogée dans la phase `publishers_journals`, confirme les ISSN d'une revue. Elle fournit son titre de référence, son ISSN-L et ses ISSN par support. Le périmètre se limite aux revues qui ont au moins un ISSN.
+- Deux revues de même ISSN-L de référence sont fusionnées automatiquement.
+- Le sort du titre de référence est décidé après un audit des titres divergents.
 - Le PPN Sudoc de la revue est stocké.
-- La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues. Chaque `doi_prefix` est unique et aussi précis que possible.
-- `resolve_journal_by_doi` est réécrit.
+- La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
+- Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
+- `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
 
 ## Phasage
 
@@ -52,7 +55,8 @@ Mir@bel couvre environ 20 000 revues, surtout françaises. Le Sudoc couvre davan
 - [ ] Choix de la source.
 - [ ] Migration : PPN, ISSN-L de référence, titre de référence, date de vérification.
 - [ ] Sous-étape de `publishers_journals` : interrogation par lot des revues à vérifier, enregistrement des champs de référence.
-- [ ] Mesure : revues confirmées, ISSN inconnus de la source, titres divergents.
+- [ ] Mesure : revues confirmées, ISSN inconnus de la source.
+- [ ] Audit des titres divergents : nombre et nature des différences.
 
 ### 3. Cohérence des ISSN
 
@@ -61,21 +65,19 @@ Mir@bel couvre environ 20 000 revues, surtout françaises. Le Sudoc couvre davan
 
 ### 4. Fusion des revues séparées à tort
 
-- [ ] Revues partageant un ISSN-L de référence : fusion par `merge_journals`.
+- [ ] Revues partageant un ISSN-L de référence : fusion automatique par `merge_journals`.
 - [ ] Revues de même titre sans ISSN commun : proposées dans l'administration des revues.
 
 ### 5. Préfixes DOI des revues
 
-- [ ] Sous-étape de `publishers_journals` qui calcule `doi_prefix` pour toutes les revues, avec l'algorithme du script de maintenance.
+- [ ] Sous-étape de `publishers_journals` qui calcule `doi_prefix` pour toutes les revues : plus long préfixe commun des DOI de la revue, retenu s'il identifie la revue.
 - [ ] Contrainte d'unicité sur `doi_prefix`.
+- [ ] Recalcul du stock, dont les 25 revues à préfixe identique ou emboîté.
 - [ ] Réécriture de `resolve_journal_by_doi`.
 - [ ] Retrait de `seed_journals_doi_prefix` et de ses tests.
 
 ## Questions ouvertes
 
-- **Source.** OpenAlex est déjà interrogée et couvre tout le stock, sans le support. Mir@bel et le Sudoc donnent le support et le PPN, surtout pour les revues françaises. Crossref donne le support des revues à DOI. Faut-il une source ou une combinaison ?
-- **Titre.** Le titre de référence remplace-t-il `title`, ou s'ajoute-t-il aux formes de nom ?
-- **Fusion.** Un ISSN-L commun suffit-il pour fusionner automatiquement ?
+- **Source.** Le Sudoc est pressenti, comme source la plus étendue. Faut-il une seconde source pour les revues absentes du Sudoc (12 % de l'échantillon) : OpenAlex, déjà interrogée, ou Crossref ?
+- **Titre.** Hypothèse à tester sur l'audit : le titre actuel rejoint les formes de nom, le titre de référence remplace `title`.
 - **Discordances.** Un enregistrement dont l'ISSN désigne une autre revue est-il rattaché à cette revue automatiquement, ou signalé ?
-- **Revues sans ISSN.** Les 3 946 revues sans ISSN sont-elles cherchées par titre dans la source de référence ?
-- **Préfixes emboîtés.** Deux revues peuvent-elles porter `10.5194` et `10.5194/acp`, départagées par le plus long ?
