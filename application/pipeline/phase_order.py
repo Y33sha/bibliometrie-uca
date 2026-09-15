@@ -29,7 +29,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "extract": "Moissonnage des sources",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
     "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
-    "fetch_stale": "Recherche des documents non revus depuis le délai configuré",
+    "fetch_stale": "Recherche des documents non revus depuis {delai}",
     "fetch_truncated": "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
     "normalize": "Normalisation des données brutes",
     "affiliations": "Résolution des affiliations par signature",
@@ -43,7 +43,10 @@ PHASE_LIBELLES: dict[str, str] = {
     "countries": "Pays associés aux signatures",
     "oa_status": "Statut open access des publications",
 }
-"""Ce que chaque phase produit, en une ligne lisible sans connaître le schéma."""
+"""Ce que chaque phase produit, en une ligne lisible sans connaître le schéma.
+
+Les champs entre accolades reçoivent une valeur de configuration au lancement de la phase.
+"""
 
 
 EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
