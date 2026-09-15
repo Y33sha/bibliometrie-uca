@@ -47,7 +47,7 @@ Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est document�
 
 ### Données récupérées
 
-Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en ligne et l'ISSN d'un CD-ROM d'une revue ont chacun leur notice. Zones lues : `011$a` (ISSN), `011$f` (ISSN-L), `011$y` (ISSN annulé), `183$a` (support : `n…` papier, `ceb` en ligne, `cde` CD-ROM ; à défaut `182$c` et `135$a`), `452$x` (ISSN d'un autre support), `430$x` à `448$x` (titres précédents et suivants), `200$a` (titre).
+Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en ligne et l'ISSN d'un CD-ROM d'une revue ont chacun leur notice. Zones lues : `011$a` (ISSN), `011$f` (ISSN-L), `011$y` (ISSN annulé), `183$a` (support : `n…` papier, `ceb` en ligne, `cde` CD-ROM ; à défaut `182$c` et `135$a`), `452$x` et `452$t` (ISSN d'un autre support et son titre, dont la mention entre parenthèses indique souvent le support), `430$x` à `448$x` (titres précédents et suivants), `200$a`, `200$h`, `200$i` (titre, numéro et nom de la partie).
 
 Le Sudoc code « électronique » (`182$c = c`) aussi bien une ressource en ligne qu'un CD-ROM : seul `183$a` les distingue. L'ISSN-L des notices papier et en ligne d'une même revue diffère parfois ; la notice porte alors l'ISSN-L d'un titre précédent.
 

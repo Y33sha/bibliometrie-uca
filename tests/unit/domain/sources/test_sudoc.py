@@ -78,6 +78,31 @@ class TestParseSudocSerialRecord:
             title=None,
         )
 
+    def test_title_includes_part_number(self):
+        """La notice de Physical review D porte « D » en `200$h`."""
+        record = parse_sudoc_serial_record(
+            "1", [_field("200", ("a", "Physical review"), ("h", "D"))]
+        )
+        assert record.title == "Physical review D"
+
+    def test_support_mentioned_by_other_support_title(self):
+        record = parse_sudoc_serial_record(
+            "1",
+            [
+                _field(
+                    "452", ("t", "The Journal of high energy physics (Print)"), ("x", "1126-6708")
+                ),
+                _field(
+                    "452", ("t", "The Journal of high energy physics (CD-ROM)"), ("x", "1127-2236")
+                ),
+                _field("452", ("t", "Hermès (Paris. 1988)"), ("x", "0767-9513")),
+            ],
+        )
+        assert record.other_support_hints == (
+            ("1126-6708", Support.PRINT),
+            ("1127-2236", Support.OTHER),
+        )
+
     def test_invalid_issn_is_ignored(self):
         record = parse_sudoc_serial_record("1", [_field("011", ("a", "1234-5678"))])
         assert record.issn is None

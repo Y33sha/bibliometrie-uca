@@ -1,8 +1,8 @@
 """Vérification des ISSN d'une revue par les notices Sudoc.
 
-Les ISSN de la revue connus du Sudoc sont regroupés : deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, ou quand l'une désigne l'autre comme la même publication sur un autre support (`452`). Le groupe principal est le plus nombreux, départagé par la proximité des titres. Un ISSN hors du groupe principal est retiré, sauf s'il désigne un titre précédent ou suivant de la revue.
+Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres ; ses ISSN restent à la revue.
 
-Les ISSN rejetés sont soit fautifs, soit périmés : autre support que le papier et l'en ligne (CD-ROM), ISSN annulé, titre précédent ou suivant. La vérification range les ISSN périmés parmi eux et corrige les fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
+Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Elle corrige les fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ TITLE_TIE_MARGIN = 0.1
 class SetAsideReason(StrEnum):
     """Motif pour lequel un ISSN rejoint les ISSN rejetés."""
 
+    OTHER_PUBLICATION = "autre publication"
     OTHER_SUPPORT = "autre support"
     CANCELLED = "ISSN annulé"
     RELATED_TITLE = "titre précédent ou suivant"
@@ -60,8 +61,6 @@ class SudocCheck:
     """Au moins un ISSN de la revue, ou une correction, a une notice dans le Sudoc."""
     conflict: bool
     """Deux groupes d'ISSN de même taille et de titres aussi proches : rien n'est modifié."""
-    intruders: tuple[str, ...]
-    """ISSN retirés : ils désignent une autre publication."""
     set_aside: tuple[tuple[str, SetAsideReason], ...]
     """ISSN rangés parmi les ISSN rejetés, avec leur motif."""
     corrections: tuple[tuple[str, str], ...]
@@ -71,7 +70,7 @@ class SudocCheck:
 
 
 def correction_candidates(rejected: Sequence[str]) -> frozenset[str]:
-    """ISSN à chercher dans le Sudoc pour corriger les valeurs rejetées fautives. Une valeur valide, périmée, n'est pas corrigée."""
+    """ISSN à chercher dans le Sudoc pour corriger les valeurs rejetées fautives. Une valeur valide n'est pas corrigée."""
     return frozenset(
         c for raw in rejected if ISSN.try_parse(raw) is None for c in issn_typo_candidates(raw)
     )
@@ -83,8 +82,25 @@ def _title_ratio(title: str, other: str | None) -> float:
     return SequenceMatcher(None, normalize_text(title), normalize_text(other)).ratio()
 
 
+def _nested_titles(a: str | None, b: str | None) -> bool:
+    """Les mots d'un titre sont tous dans l'autre : « European archives » et « European archives and head & neck », pas « Physical review C » et « Physical review D »."""
+    if not a or not b:
+        return False
+    words_a, words_b = set(normalize_text(a).split()), set(normalize_text(b).split())
+    return bool(words_a and words_b) and (words_a <= words_b or words_b <= words_a)
+
+
+def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
+    if a.issnl is not None and a.issnl == b.issnl:
+        return True
+    if (b.issn in a.other_support_issns) or (a.issn in b.other_support_issns):
+        return True
+    complementary = {a.support, b.support} == {Support.PRINT, Support.ELECTRONIC}
+    return complementary and _nested_titles(a.title, b.title)
+
+
 def _groups(known: Sequence[str], records: Mapping[str, SudocSerialRecord]) -> list[list[str]]:
-    """ISSN regroupés par ISSN-L commun ou par lien d'autre support (`452`)."""
+    """ISSN regroupés par publication (`_same_publication`)."""
     parent = {i: i for i in known}
 
     def root(i: str) -> str:
@@ -93,9 +109,7 @@ def _groups(known: Sequence[str], records: Mapping[str, SudocSerialRecord]) -> l
         return i
 
     for a, b in combinations(known, 2):
-        ra, rb = records[a], records[b]
-        same_issnl = ra.issnl is not None and ra.issnl == rb.issnl
-        if same_issnl or b in ra.other_support_issns or a in rb.other_support_issns:
+        if _same_publication(records[a], records[b]):
             parent[root(b)] = root(a)
     groups: dict[str, list[str]] = {}
     for i in known:
@@ -148,7 +162,6 @@ def check_journal_issns(
                 journal.rejected,
                 found=True,
                 conflict=True,
-                intruders=(),
                 set_aside=(),
                 corrections=(),
                 ambiguous_support=None,
@@ -163,27 +176,28 @@ def check_journal_issns(
         preceding -= set(main)
     related = preceding | {x for r in main_records for x in r.succeeding_issns}
     cancelled = {x for r in main_records for x in r.cancelled_issns}
+    hints = {x: support for r in main_records for x, support in r.other_support_hints}
 
     set_aside: list[tuple[str, SetAsideReason]] = []
-    intruders: list[str] = []
     kept: list[str] = []
     for i in own:
         record = records.get(i)
+        support = record.support if record is not None else hints.get(i)
         if i in cancelled:
             set_aside.append((i, SetAsideReason.CANCELLED))
-        elif i in main and record is not None and record.support is Support.OTHER:
+        elif (i in main or record is None) and support is Support.OTHER:
             set_aside.append((i, SetAsideReason.OTHER_SUPPORT))
         elif i in preceding or (record is not None and i not in main and i in related):
             set_aside.append((i, SetAsideReason.RELATED_TITLE))
         elif record is not None and i not in main:
-            intruders.append(i)
+            set_aside.append((i, SetAsideReason.OTHER_PUBLICATION))
         else:
             kept.append(i)
 
     corrections: list[tuple[str, str]] = []
     for raw in journal.rejected:
         if ISSN.try_parse(raw) is not None:
-            continue  # valeur valide, périmée : conservée telle quelle
+            continue  # valeur valide, déjà classée : conservée telle quelle
         matches = sorted(
             c
             for c in issn_typo_candidates(raw)
@@ -198,7 +212,8 @@ def check_journal_issns(
                 kept.append(matches[0])
 
     issnl = reference or (journal.issnl if journal.issnl in kept else None)
-    issn, eissn, ambiguous = _place(journal, kept, intruders, records)
+    excluded = {i for i, _ in set_aside}
+    issn, eissn, ambiguous = _place(journal, kept, excluded, records, hints)
 
     placed = {issn, eissn, issnl}
     set_aside += [(i, SetAsideReason.NO_FREE_COLUMN) for i in kept if i not in placed]
@@ -216,7 +231,6 @@ def check_journal_issns(
         rejected,
         found=bool(known) or bool(corrections),
         conflict=False,
-        intruders=tuple(intruders),
         set_aside=tuple(set_aside),
         corrections=tuple(corrections),
         ambiguous_support=ambiguous,
@@ -226,23 +240,28 @@ def check_journal_issns(
 def _place(
     journal: JournalIssns,
     kept: Sequence[str],
-    intruders: Sequence[str],
+    excluded: set[str],
     records: Mapping[str, SudocSerialRecord],
+    hints: Mapping[str, Support],
 ) -> tuple[str | None, str | None, Support | None]:
     """`(issn, eissn, support ambigu)`. Chaque ISSN va dans la colonne de son support.
 
-    Une notice complète le support manquant par l'ISSN d'autre support (`452`) dont la notice est connue. Un ISSN sans notice reste dans sa colonne si elle est libre. Plusieurs ISSN d'un même support laissent les ISSN dans leurs colonnes.
+    Le support d'un ISSN vient de sa notice, ou à défaut de la mention de support que lui donne une notice de la revue (`452$t`). Un support manquant se complète par un ISSN d'autre support d'une notice de la revue. Un ISSN de support inconnu reste dans sa colonne si elle est libre. Plusieurs ISSN d'un même support laissent les ISSN dans leurs colonnes.
     """
-    prints = [i for i in kept if (r := records.get(i)) and r.support is Support.PRINT]
-    electronics = [i for i in kept if (r := records.get(i)) and r.support is Support.ELECTRONIC]
+
+    def support_of(i: str) -> Support | None:
+        return records[i].support if i in records else hints.get(i)
+
+    prints = [i for i in kept if support_of(i) is Support.PRINT]
+    electronics = [i for i in kept if support_of(i) is Support.ELECTRONIC]
     unknown = [i for i in kept if i not in prints and i not in electronics]
-    for i in (*prints, *electronics):
+    for i in [x for x in (*prints, *electronics) if x in records]:
         for other in records[i].other_support_issns:
-            if other in kept or other in intruders or other not in records:
+            if other in kept or other in excluded:
                 continue
-            if records[other].support is Support.PRINT and not prints:
+            if support_of(other) is Support.PRINT and not prints:
                 prints.append(other)
-            elif records[other].support is Support.ELECTRONIC and not electronics:
+            elif support_of(other) is Support.ELECTRONIC and not electronics:
                 electronics.append(other)
 
     ambiguous = (
