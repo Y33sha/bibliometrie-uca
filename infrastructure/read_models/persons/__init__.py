@@ -26,7 +26,6 @@ from sqlalchemy import Connection
 
 from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
-    DetachableIntrudersResponse,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
@@ -47,8 +46,6 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from infrastructure.read_models.persons.admin import (
     ambiguous_name_forms as _ambiguous_name_forms,
     ambiguous_name_forms_count as _ambiguous_name_forms_count,
-    detachable_intruders as _detachable_intruders,
-    detachable_intruders_count as _detachable_intruders_count,
     identifier_conflicts as _identifier_conflicts,
     identifier_conflicts_count as _identifier_conflicts_count,
     name_duplicates as _name_duplicates,
@@ -136,12 +133,6 @@ class PgPersonsQueries(PersonsQueries):
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
         return _identifier_conflicts(self._conn, page=page, per_page=per_page)
-
-    def detachable_intruders_count(self) -> int:
-        return _detachable_intruders_count(self._conn)
-
-    def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse:
-        return _detachable_intruders(self._conn, page=page, per_page=per_page)
 
     def name_duplicates_count(self) -> int:
         return _name_duplicates_count(self._conn)

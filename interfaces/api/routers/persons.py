@@ -2,7 +2,7 @@
 
 Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `authorships.py`.
 
-L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les quatre files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
+L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,7 +10,6 @@ from sqlalchemy import Connection
 
 from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
-    DetachableIntrudersResponse,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
@@ -181,27 +180,6 @@ def identifier_conflicts(
     Ce sont des doublons probables ou des erreurs d'attribution, que la curation tranche à l'œil.
     """
     return queries.identifier_conflicts(page=page, per_page=per_page)
-
-
-@router.get("/detachable-intruders/count", response_model=TotalCountResponse)
-def detachable_intruders_count(
-    queries: PersonsQueries = Depends(persons_queries),
-) -> TotalCountResponse:
-    """Compteur de l'onglet « Intrus détachables » (badge)."""
-    return TotalCountResponse(total=queries.detachable_intruders_count())
-
-
-@router.get("/detachable-intruders", response_model=DetachableIntrudersResponse)
-def detachable_intruders(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries),
-) -> DetachableIntrudersResponse:
-    """Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
-
-    L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
-    """
-    return queries.detachable_intruders(page=page, per_page=per_page)
 
 
 @router.get("/name-duplicates/count", response_model=TotalCountResponse)

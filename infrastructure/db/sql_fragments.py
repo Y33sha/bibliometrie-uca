@@ -37,14 +37,6 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
     )
 
 
-def usable_identifiers(*, signature: str = "sa", identity: str = "aik") -> str:
-    """Identifiants de l'identité d'une signature, sans ceux que la signature neutralise (jsonb)."""
-    return (
-        f"({identity}.person_identifiers - ARRAY(SELECT jsonb_object_keys("
-        f"coalesce({signature}.neutralized_identifiers, '{{}}'::jsonb))))"
-    )
-
-
 def name_form_holder(form: str, person: str) -> str:
     """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non rejetée."""
     return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND NOT {person}.rejected"

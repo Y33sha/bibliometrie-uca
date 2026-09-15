@@ -950,48 +950,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/detachable-intruders/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detachable Intruders Count
-         * @description Compteur de l'onglet « Intrus détachables » (badge).
-         */
-        get: operations["detachable_intruders_count_api_persons_detachable_intruders_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/detachable-intruders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detachable Intruders
-         * @description Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
-         *
-         *     L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
-         */
-        get: operations["detachable_intruders_api_persons_detachable_intruders_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/persons/name-duplicates/count": {
         parameters: {
             query?: never;
@@ -2454,16 +2412,6 @@ export interface components {
             readonly pages: number;
         };
         /**
-         * AnchorOccurrenceOut
-         * @description Signature légitime (nom compatible avec une forme confirmée) de la personne.
-         */
-        AnchorOccurrenceOut: {
-            /** Source */
-            source: string;
-            /** Raw Author Name */
-            raw_author_name: string;
-        };
-        /**
          * AssignOrphanAuthorship
          * @description Attribution unitaire, seule à savoir créer la personne au passage.
          *
@@ -2690,7 +2638,7 @@ export interface components {
         };
         /**
          * CurationPersonOut
-         * @description Fiche personne allégée, commune aux files de curation (conflits d'identifiant, intrus détachables, doublons par nom) ; le détail complet est dans le drawer.
+         * @description Fiche personne allégée, commune aux files de curation (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
          */
         CurationPersonOut: {
             /** Person Id */
@@ -2746,38 +2694,6 @@ export interface components {
             deleted_authorships: number;
             /** Cleaned Forms */
             cleaned_forms: number;
-        };
-        /**
-         * DetachableIntruderGroupOut
-         * @description Une personne rattachée à ≥2 signatures d'une même publication, avec ancre(s) et intrus.
-         */
-        DetachableIntruderGroupOut: {
-            /** Source Publication Id */
-            source_publication_id: number;
-            /** Publication Id */
-            publication_id: number | null;
-            /** Title */
-            title: string | null;
-            /** Pub Year */
-            pub_year: number | null;
-            person: components["schemas"]["CurationPersonOut"];
-            /** Anchors */
-            anchors: components["schemas"]["AnchorOccurrenceOut"][];
-            /** Intruders */
-            intruders: components["schemas"]["IntruderOccurrenceOut"][];
-        };
-        /** DetachableIntrudersResponse */
-        DetachableIntrudersResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Groups */
-            groups: components["schemas"]["DetachableIntruderGroupOut"][];
-            /** Pages */
-            readonly pages: number;
         };
         /**
          * DoiPrefixInfo
@@ -3192,20 +3108,6 @@ export interface components {
             name: string;
             /** Root Structure Ids */
             root_structure_ids: number[];
-        };
-        /**
-         * IntruderOccurrenceOut
-         * @description Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form` est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif.
-         */
-        IntruderOccurrenceOut: {
-            /** Source */
-            source: string;
-            /** Raw Author Name */
-            raw_author_name: string;
-            /** Name Form */
-            name_form: string;
-            /** Identifiers */
-            identifiers: components["schemas"]["IdentifierRef"][];
         };
         /**
          * JournalDashboardResponse
@@ -6755,58 +6657,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdentifierConflictsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detachable_intruders_count_api_persons_detachable_intruders_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    detachable_intruders_api_persons_detachable_intruders_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetachableIntrudersResponse"];
                 };
             };
             /** @description Validation Error */

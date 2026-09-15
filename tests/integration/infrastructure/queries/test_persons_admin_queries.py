@@ -7,8 +7,6 @@ from sqlalchemy import text
 
 from infrastructure.read_models.persons.admin import (
     ambiguous_name_forms,
-    detachable_intruders,
-    detachable_intruders_count,
     identifier_conflicts,
     identifier_conflicts_count,
     name_duplicates,
@@ -270,76 +268,6 @@ class TestIdentifierConflicts:
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
-
-
-def _confirm_name_form(conn, person_id, name_form):
-    conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-            "VALUES (:nf, :pid, ARRAY['hal'], 'confirmed')"
-        ),
-        {"nf": name_form, "pid": person_id},
-    )
-
-
-class TestDetachableIntruders:
-    """Une même personne sur ≥2 signatures d'une même `source_publication` : départage ancre
-    (nom compatible avec une forme confirmée) / intrus (incompatible) — cf.
-    `audit_repeated_person_in_publication`."""
-
-    def test_anchor_plus_intruder_is_detachable(self, sa_sync_conn):
-        person = _create_person(sa_sync_conn, last="Ravoux", first="Corentin")
-        _confirm_name_form(sa_sync_conn, person, "ravoux c")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
-        _create_sa(
-            sa_sync_conn, sd, author_position=0, person_id=person, author_name_normalized="ravoux c"
-        )
-        _create_sa(
-            sa_sync_conn,
-            sd,
-            author_position=1,
-            person_id=person,
-            author_name_normalized="perez rafols i",
-        )
-
-        assert detachable_intruders_count(sa_sync_conn) == 1
-        res = detachable_intruders(sa_sync_conn, page=1, per_page=50)
-        assert res.total == 1
-        group = res.groups[0]
-        assert group.person.person_id == person
-        assert [a.raw_author_name for a in group.anchors] == ["X"]
-        assert [i.name_form for i in group.intruders] == ["perez rafols i"]
-
-    def test_all_compatible_not_detachable(self, sa_sync_conn):
-        """Toutes les occurrences légitimes → doublon de signature, pas un détachement."""
-        person = _create_person(sa_sync_conn, last="Martin", first="Paul")
-        _confirm_name_form(sa_sync_conn, person, "martin p")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
-        _create_sa(
-            sa_sync_conn, sd, author_position=0, person_id=person, author_name_normalized="martin p"
-        )
-        _create_sa(
-            sa_sync_conn,
-            sd,
-            author_position=1,
-            person_id=person,
-            author_name_normalized="martin paul",
-        )
-
-        assert detachable_intruders_count(sa_sync_conn) == 0
-
-    def test_no_confirmed_anchor_not_detachable(self, sa_sync_conn):
-        """Aucune forme confirmée compatible → bucket « sans ancre », pas détachable."""
-        person = _create_person(sa_sync_conn, last="Durand", first="Jean")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
-        _create_sa(
-            sa_sync_conn, sd, author_position=0, person_id=person, author_name_normalized="durand j"
-        )
-        _create_sa(
-            sa_sync_conn, sd, author_position=1, person_id=person, author_name_normalized="autre x"
-        )
-
-        assert detachable_intruders_count(sa_sync_conn) == 0
 
 
 class TestNameDuplicates:
