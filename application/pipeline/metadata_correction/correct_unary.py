@@ -157,8 +157,8 @@ def run(
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
     updates = [u for row in rows if (u := compute_update(row, language_forms)) is not None]
-    logger.info("%s%s à appliquer", BRANCHE, accord(len(updates), "correction"))
     corrected, rule_counts = tally_corrections(updates)
+    logger.info("%s%s %s", BRANCHE, accord(corrected, "document"), forme(corrected, "corrigé"))
 
     persist_in_batches(conn, updates, queries.persist_corrections)
     logger.info("%sTerminé en %.1fs", DERNIERE_BRANCHE, time.perf_counter() - t0)
