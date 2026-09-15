@@ -208,6 +208,24 @@ class TestEndToEnd:
 
         assert "résolus en 1 publication (1 déjà existante, 0 nouvelle ; 1 doublon" in caplog.text
 
+    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, monkeypatch, caplog):
+        """Sous `rebuild`, l'étape annonce une reconstruction complète."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        _seed_sp(conn, source_id="a", publication_id=_seed_pub(conn), doi="10.1/x")
+
+        with caplog.at_level(logging.INFO, logger=logger.name):
+            run(
+                conn,
+                PgPublicationsReconciliationQueries(),
+                logger,
+                publication_repo=publication_repository(conn),
+                rebuild=True,
+            )
+
+        assert "(reconstruction complète)" in caplog.text
+        assert "nouveaux ou mis à jour" not in caplog.text
+
     def test_pub_with_two_dois_splits(self, sa_sync_conn, monkeypatch):
         """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
         Y part sur un nouveau pub."""

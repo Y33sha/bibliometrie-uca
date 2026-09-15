@@ -31,7 +31,10 @@ def build(
     """
     # Reset optionnel : repart d'une table vide.
     if rebuild_full:
-        queries.purge_authorships(conn)
+        etape(logger, "Reconstruction complète")
+        with attente(DERNIERE_BRANCHE, logger) as ligne:
+            purged = queries.purge_authorships(conn)
+            ligne.conclut(f"{DERNIERE_BRANCHE}{accord(purged, 'lien')} {forme(purged, 'supprimé')}")
 
     etape(logger, "Liens publication-personne")
 

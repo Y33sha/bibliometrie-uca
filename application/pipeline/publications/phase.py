@@ -2,11 +2,11 @@
 
 `reconcile_components` clusterise le voisinage des SP dirty par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation (match/create/skip d'un orphelin) et réconciliation (merge/split de publications matérialisées) sont des facettes du même primitif.
 
-`--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
+`--rebuild-publications` re-dirtie tout le stock au début de la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
 
 La réconciliation est suivie de la suppression des publications restées sans source : celles que la réconciliation a vidées, et celles dont la phase `normalize` a retiré les derniers documents disparus.
 
-Les trois étapes — redirty optionnel, réconciliation, suppression — sont idempotentes ; chacune tourne dans sa propre transaction.
+Les deux étapes — réconciliation, suppression — sont idempotentes ; chacune tourne dans sa propre transaction.
 """
 
 import logging
@@ -32,10 +32,14 @@ def run(
     publication_repo_factory: Callable[[Connection], PublicationRepository],
     rebuild_publications: bool = False,
 ) -> PhaseMetrics:
-    """Redirty optionnel, réconciliation, puis suppression des publications restées sans source."""
-    if rebuild_publications:
-        _redirty_all(open_tx, reconciliation_queries, logger)
-    metrics = _reconcile(open_tx, reconciliation_queries, logger, publication_repo_factory)
+    """Réconciliation, puis suppression des publications restées sans source."""
+    metrics = _reconcile(
+        open_tx,
+        reconciliation_queries,
+        logger,
+        publication_repo_factory,
+        rebuild=rebuild_publications,
+    )
     _delete_publications_without_sources(open_tx, reconciliation_queries, logger)
     with open_tx() as conn:
         pub_total = reconciliation_queries.count_publications(conn)
@@ -60,21 +64,13 @@ def _delete_publications_without_sources(
     return n
 
 
-def _redirty_all(
-    open_tx: OpenTransaction,
-    reconciliation_queries: PublicationsReconciliationQueries,
-    logger: logging.Logger,
-) -> None:
-    with open_tx() as conn:
-        n = reconciliation_queries.mark_keys_dirty(conn)
-    logger.info("✓ %d source_publications marquées keys_dirty (rebuild complet)", n)
-
-
 def _reconcile(
     open_tx: OpenTransaction,
     reconciliation_queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
     publication_repo_factory: Callable[[Connection], PublicationRepository],
+    *,
+    rebuild: bool,
 ) -> PhaseMetrics:
     with open_tx() as conn:
         stats = reconcile_run(
@@ -82,6 +78,7 @@ def _reconcile(
             reconciliation_queries,
             logger,
             publication_repo=publication_repo_factory(conn),
+            rebuild=rebuild,
         )
 
     metrics = PhaseMetrics()
