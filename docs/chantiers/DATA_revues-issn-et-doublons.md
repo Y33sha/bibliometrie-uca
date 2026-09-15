@@ -66,7 +66,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Règles revues : plus de retrait, un ISSN d'une autre publication rejoint les rejetés ; réunion du papier et de l'en ligne de titres emboîtés ; support indiqué par `452$t`.
 - [x] Troisième passage : 38 revues signalées. Il révèle l'arrêt du papier au profit de l'en ligne codé comme un changement de titre, et des ISSN d'un même support laissés en place.
 - [x] Règles revues : changement de support distingué d'un changement de titre, égalité départagée par la succession des titres, ISSN d'un même support départagés par l'ISSN-L, CD-ROM reconnu à son titre.
-- [ ] Quatrième passage après `backfill_reset_sudoc_check`, puis mesure.
+- [x] Quatrième passage : 14 revues signalées, dont 8 égalités ou ambiguïtés propres au Sudoc. Il révèle des ISSN de la revue bloqués parmi les rejetés par les passages précédents.
+- [x] Règles revues : ISSN rejetés valides réexaminés, CD-ROM hors des groupes, changement de support reconnu sans notice par la mention de support.
+- [ ] Cinquième passage après `backfill_recheck_rejected_issns`, puis mesure.
 - [ ] Audit des titres divergents : nombre et nature des différences.
 
 ### 3. Cohérence des ISSN
