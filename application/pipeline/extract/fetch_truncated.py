@@ -23,6 +23,7 @@ from application.ports.pipeline.extract.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )
+from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.types import JsonValue, as_sequence
 
 COMMIT_EVERY = 50
@@ -48,8 +49,9 @@ async def refetch(
 
     etape(
         log,
-        "%s de 100 auteurs, potentiellement %s",
+        "%s de %d auteurs, potentiellement %s",
         accord(total, "document"),
+        BULK_AUTHORSHIPS_CAP,
         forme(total, "tronqué"),
     )
 
@@ -66,7 +68,7 @@ async def refetch(
             if not work:
                 # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
                 metrics.add(errors=1)
-            elif len(as_sequence(work.get("authorships"))) <= 100:
+            elif len(as_sequence(work.get("authorships"))) <= BULK_AUTHORSHIPS_CAP:
                 # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
                 adapter.clear_truncated(conn, ref.staging_id)
                 metrics.add(already_complete=1)
