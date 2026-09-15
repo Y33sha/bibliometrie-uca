@@ -7,7 +7,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, accord, etape, forme
+from application.pipeline.libelles import BRANCHE, accord, etape
 from application.pipeline.persons.requalify_identifiers import (
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
@@ -36,16 +36,16 @@ def arbitrate_identifier_conflicts(
     with attente(BRANCHE, logger) as ligne:
         consensus = compute_identifier_consensus(conn, queries)
         requalified = requalify_misplaced_identifiers(conn, consensus, queries)
-        ligne.conclut(
-            f"{BRANCHE}Identifiants mal placés neutralisés sur "
-            f"{accord(requalified['neutralized'], 'signature')}"
-        )
+        if requalified["neutralized"]:
+            ligne.conclut(
+                f"{BRANCHE}Identifiants mal placés neutralisés sur "
+                f"{accord(requalified['neutralized'], 'signature')}"
+            )
+        else:
+            ligne.efface()
     with attente(BRANCHE, logger) as ligne:
         conflicts = detect_identifier_conflicts(conn, queries)
-        ligne.conclut(
-            f"{BRANCHE}{accord(len(conflicts), 'conflit')} d'attribution "
-            f"{forme(len(conflicts), 'détecté')}"
-        )
+        ligne.efface()
     transferred = resolve_identifier_transfers(
         conn, conflicts, consensus=consensus, queries=queries, repo=person_repo, logger=logger
     )["transferred"]

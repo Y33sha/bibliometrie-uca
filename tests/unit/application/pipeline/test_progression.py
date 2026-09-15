@@ -298,6 +298,19 @@ class TestAttente:
             pass
         assert "maintenance des tables…" in caplog.text
 
+    def test_une_ligne_effacee_ne_laisse_rien_au_terminal(self, avec_terminal, monkeypatch):
+        flux = io.StringIO()
+        monkeypatch.setattr(module, "_flux_barres", flux)
+        with module.attente("  ├─ ", None) as ligne:
+            ligne.efface()
+        assert flux.getvalue().endswith(f"\r{module.EFFACE_FIN_DE_LIGNE}")
+
+    def test_une_ligne_effacee_tait_sa_conclusion_au_journal(self, sans_terminal, caplog):
+        with caplog.at_level(logging.INFO), module.attente("  ├─ ", _log()) as ligne:
+            ligne.conclut("  ├─ 0 signature")
+            ligne.efface()
+        assert "0 signature" not in caplog.text
+
     def test_une_exception_arrete_les_points(self, avec_terminal, monkeypatch):
         flux = io.StringIO()
         monkeypatch.setattr(module, "_flux_barres", flux)
