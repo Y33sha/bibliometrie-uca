@@ -47,7 +47,7 @@
 
 - Pose tes questions en **texte libre**. Pas de QCM à choix limités.
 - Gère les **commits** git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
-- Ne fais pas tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
+- **Ne fais PAS tourner toute la suite de tests** avant chaque commit (sauf les tests directement concernés par tes modifs). Les hooks et la CI sont là pour ça.
 
 ## Phases du pipeline
 
