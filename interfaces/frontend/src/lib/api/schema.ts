@@ -1959,7 +1959,7 @@ export interface paths {
          * Journals Entity Facet
          * @description Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
          *
-         *     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre.
+         *     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
          *
          *     `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
          */
