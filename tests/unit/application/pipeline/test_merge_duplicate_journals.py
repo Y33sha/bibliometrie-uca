@@ -8,6 +8,7 @@ from application.pipeline.publishers_journals.merge_duplicate_journals import (
 from application.ports.pipeline.journals import (
     JournalIssnGroup,
     JournalMergeGroup,
+    JournalSummary,
     JournalTitleRow,
 )
 
@@ -31,6 +32,9 @@ class _Repo:
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
         return self._title_groups
+
+    def describe_journals(self, journal_ids) -> dict[int, JournalSummary]:
+        return {i: JournalSummary(i, f"Revue {i}", None, None, None) for i in journal_ids}
 
 
 def _run(repo: _Repo):
