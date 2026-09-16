@@ -29,7 +29,7 @@ Le schéma repose sur la séparation stricte entre les tables **sources** et le 
 
 Légende:
 - **vert** : table peuplée manuellement
-- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
+- **bleu** : tables peuplées automatiquement par le pipeline
 
 ```mermaid
 flowchart LR
