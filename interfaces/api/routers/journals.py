@@ -3,10 +3,13 @@
 Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{journal_id}`, qui les accepterait sinon comme identifiant.
 """
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
@@ -101,6 +104,22 @@ def journals_facets(
     Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
     """
     return queries.journals_facets(filters=filters)
+
+
+@router.get("/facets/entities", response_model=EntityFacetResponse)
+def journals_entity_facet(
+    kind: Literal["publisher"] = Query(...),
+    entity_search: SearchTerm = "",
+    filters: JournalFilters = Depends(journal_filters),
+    queries: JournalQueries = Depends(journal_queries),
+) -> EntityFacetResponse:
+    """Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
+
+    Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre.
+
+    `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
+    """
+    return queries.journals_publisher_facet(search=entity_search, filters=filters)
 
 
 @router.get("", response_model=JournalListResponse)

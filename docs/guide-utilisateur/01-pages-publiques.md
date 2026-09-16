@@ -112,7 +112,7 @@ Onglets:
 
 ### Liste `/journals`
 
-Liste des revues avec filtres : recherche par nom, type de revue, présence dans le DOAJ, modèle d'accès ouvert. Triable par nombre de publications.
+Liste des revues avec filtres : recherche par nom, éditeur, type de revue, présence dans le DOAJ, modèle d'accès ouvert. Le filtre éditeur propose les éditeurs les plus représentés sous les filtres actifs, avec leur nombre de revues, et se cherche par nom. Triable par nombre de publications.
 
 ### Détails `/journals/{id}`
 

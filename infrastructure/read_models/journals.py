@@ -2,7 +2,11 @@
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models._common import FacetOption
+from application.ports.read_models._common import (
+    EntityFacetItem,
+    EntityFacetResponse,
+    FacetOption,
+)
 from application.ports.read_models.journals_queries import (
     DocTypeCount,
     JournalDashboardResponse,
@@ -29,6 +33,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
+from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.sources.doaj.urls import resolve_doaj_url
 
@@ -68,6 +73,7 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
 def _build_journal_where(
     filters: JournalFilters,
     *,
+    skip_publisher: bool = False,
     skip_journal_types: bool = False,
     skip_doaj: bool = False,
     skip_oa_models: bool = False,
@@ -84,7 +90,7 @@ def _build_journal_where(
         if normalized:
             parts.append("j.title_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
-    if filters.publisher_id:
+    if filters.publisher_id and not skip_publisher:
         parts.append("j.publisher_id = :publisher_id")
         binds["publisher_id"] = filters.publisher_id
     if filters.journal_types and not skip_journal_types:
@@ -211,6 +217,27 @@ class PgJournalQueries(JournalQueries):
             journal_types=journal_types_facet,
             oa_models=oa_models_facet,
             doaj=doaj_facet,
+        )
+
+    def journals_publisher_facet(
+        self, *, search: str, filters: JournalFilters, limit: int = 20
+    ) -> EntityFacetResponse:
+        where, binds = _build_journal_where(filters, skip_publisher=True)
+        name_filter, name_binds = entity_name_clause("p.name", search)
+        rows = self._conn.execute(
+            text(f"""
+                SELECT p.id AS id, p.name AS label, COUNT(*) AS n
+                FROM journals j
+                JOIN publishers p ON p.id = j.publisher_id
+                WHERE {where}{name_filter}
+                GROUP BY p.id, p.name
+                ORDER BY n DESC, label
+                LIMIT :lim
+            """),
+            {**binds, **name_binds, "lim": limit},
+        ).all()
+        return EntityFacetResponse(
+            entities=[EntityFacetItem(id=r.id, label=r.label, count=r.n) for r in rows]
         )
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:

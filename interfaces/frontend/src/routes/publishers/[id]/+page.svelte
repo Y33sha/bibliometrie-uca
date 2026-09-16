@@ -196,7 +196,6 @@
 			<JournalsListView
 				apiKey={`publisher-${publisherId}-journals`}
 				externalFilters={{ publisherId }}
-				hidePublisherColumn
 				withPubs
 			/>
 		</div>
