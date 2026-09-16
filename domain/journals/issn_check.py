@@ -110,10 +110,13 @@ def _complementary(a: Support | None, b: Support | None) -> bool:
 
 
 def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
+    """Même ISSN-L, désignation en `452`, ou supports complémentaires et titres emboîtés. Une notice qui désigne son autre support en `452` ne se réunit qu'à celui-là."""
     if a.issnl is not None and a.issnl == b.issnl:
         return True
     if (b.issn in a.other_support_issns) or (a.issn in b.other_support_issns):
         return True
+    if a.other_support_issns or b.other_support_issns:
+        return False
     return _complementary(a.support, b.support) and _nested_titles(a.title, b.title)
 
 
