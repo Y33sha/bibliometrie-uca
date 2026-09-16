@@ -14,6 +14,7 @@ La vérification Sudoc précède la fusion, qui lui prend l'ISSN-L, et l'import 
 import logging
 from collections.abc import Callable
 
+from application.pipeline.libelles import rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
 
@@ -61,6 +62,10 @@ def run(
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
     for sub in (publishers, openalex, sudoc, merges, doaj):
         metrics.merge(sub)
+
+    # Chaque sous-étape se tait quand elle n'a rien à traiter : la phase le dit pour elles.
+    if metrics.total == 0 and not metrics.extras:
+        rien_a_faire(logger)
 
     metrics.details["table"] = {
         "rows": [
