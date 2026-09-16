@@ -417,6 +417,27 @@ class TestCoherence:
         assert check.set_aside == ()
         assert (check.issn, check.eissn, check.issnl) == ("0937-4477", "1434-4726", "0937-4477")
 
+    def test_nested_titles_do_not_join_a_declared_other_support(self):
+        """Cas réel : la notice en ligne d'Hermès désigne son support papier ; « Les Essentiels d'Hermès » est une autre publication."""
+        check = check_journal_issns(
+            _journal(
+                issn="1967-3566",
+                eissn="1963-1006",
+                issnl="1967-3566",
+                title="Les Essentiels d'Hermès",
+            ),
+            {
+                "1967-3566": _record(
+                    "1967-3566", "1967-3566", PRINT, title="Les Essentiels d'Hermès"
+                ),
+                "1963-1006": _record(
+                    "1963-1006", "0767-9513", ELECTRONIC, title="Hermès", other=("0767-9513",)
+                ),
+            },
+        )
+        assert (check.issn, check.eissn) == ("1967-3566", None)
+        assert check.set_aside == (("1963-1006", SetAsideReason.OTHER_PUBLICATION),)
+
     def test_different_series_are_not_joined(self):
         """« Physical review C » et « Physical review D » : les mots de l'un ne sont pas tous dans l'autre."""
         check = check_journal_issns(
