@@ -80,7 +80,7 @@ def journal_filters(
 ) -> JournalFilters:
     """Filtres communs à la liste des revues et à ses facettes.
 
-    `journal_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue rend 422. `search` est ignoré en deçà de deux caractères.
+    `journal_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue rend 422. `search` porte sur le titre et sur les ISSN de la revue, et est ignoré en deçà de deux caractères.
     """
     return JournalFilters(
         search=search,
@@ -115,7 +115,7 @@ def journals_entity_facet(
 ) -> EntityFacetResponse:
     """Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
 
-    Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre.
+    Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
 
     `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
     """

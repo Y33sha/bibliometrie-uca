@@ -190,7 +190,7 @@
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
 		type="search"
-		placeholder="Rechercher dans les titres…"
+		placeholder="Rechercher par titre ou ISSN"
 		bind:value={search}
 		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
@@ -294,6 +294,11 @@
 />
 
 <style>
+	/* Assez large pour que le texte indicatif du champ tienne en entier. */
+	.toolbar input[type='search'] {
+		width: 280px;
+	}
+
 	.journals-table {
 		width: 100%;
 		min-width: 660px;

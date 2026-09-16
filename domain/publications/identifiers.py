@@ -39,6 +39,8 @@ _DOI_URL_PREFIXES = (
 # variantes small/fullwidth) ramenés sur le `-` ASCII : un DOI saisi/copié avec un
 # de ces caractères ne s'apparierait pas à sa forme ASCII (faux doublon).
 _DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
+# Séparateurs des identifiants qui s'écrivent par groupes de chiffres (ISSN, ISBN), retirés pour les comparer.
+_SEPARATORS_RE = re.compile(r"[\s-]")
 
 
 def _normalize_doi(raw: str | None) -> str | None:
@@ -440,6 +442,18 @@ class ISSN:
         return self.value
 
 
+_ISSN_SEARCH_RE = re.compile(r"\d{1,8}|\d{7}X", re.ASCII)
+
+
+def issn_search_prefix(raw: str) -> str | None:
+    """Début d'ISSN que porte un terme de recherche, sans séparateur et `X` en majuscule, ou None quand le terme n'en porte pas.
+
+    Un ISSN s'écrit `NNNN-NNNC`, la clé `C` valant un chiffre ou `X` ; le terme est reconnu sur cette forme, tronquée à droite. La clé de contrôle n'est pas vérifiée : les ISSN rejetés d'une revue sont fautifs pour certains, et restent ainsi cherchables.
+    """
+    cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION)).upper()
+    return cleaned if _ISSN_SEARCH_RE.fullmatch(cleaned) else None
+
+
 def issn_typo_candidates(raw: str) -> frozenset[str]:
     """ISSN valides à une faute de frappe près d'une valeur : un caractère remplacé, ou deux caractères voisins inversés. Vide si la valeur n'a pas huit caractères hors tiret."""
     s = raw.replace("-", "").strip().upper()
@@ -453,7 +467,6 @@ def issn_typo_candidates(raw: str) -> frozenset[str]:
 # ── ISBN ───────────────────────────────────────────────────────────
 
 _ISBN_PREFIX_RE = re.compile(r"ISBN(?:-1[03])?[:\s]*", re.IGNORECASE)
-_ISBN_SEPARATORS_RE = re.compile(r"[\s-]")
 _ISBN13_RE = re.compile(r"97[89]\d{10}", re.ASCII)
 _ISBN10_RE = re.compile(r"\d{9}[\dX]", re.ASCII)
 
@@ -469,7 +482,7 @@ def _normalize_isbn(raw: str | None) -> str | None:
     if not raw:
         return None
     s = _ISBN_PREFIX_RE.sub("", raw.strip().translate(_DASH_TRANSLATION), count=1)
-    s = _ISBN_SEPARATORS_RE.sub("", s).upper()
+    s = _SEPARATORS_RE.sub("", s).upper()
     if _ISBN13_RE.fullmatch(s):
         return s if _isbn13_check_digit(s[:12]) == s[12] else None
     if _ISBN10_RE.fullmatch(s) and _mod11_check_digit(s[:9]) == s[9]:

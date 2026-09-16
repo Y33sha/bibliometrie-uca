@@ -1,7 +1,7 @@
 """Tests d'intégration pour le router `interfaces.api.routers.journals`.
 
 Couvre :
-- GET /api/journals (liste, search, publisher filter, sort variants)
+- GET /api/journals (liste, recherche titre et ISSN, publisher filter, sort variants)
 - GET /api/journals/facets/entities (facette éditeur contextuelle)
 - GET /api/journals/{id} (detail enrichi avec DOAJ, 404)
 - GET /api/journals/{id}/dashboard (distributions doc_type + oa_status, 404)
@@ -137,6 +137,38 @@ class TestListJournals:
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
         assert title in titles
+
+    def test_search_finds_an_issn_in_every_column(self, client):
+        journal_id = _seed_journal()
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE journals SET issn = '9990-0018', eissn = '9990-0026', "
+                "issnl = '9990-0034', rejected_issns = ARRAY['9990-0042'] WHERE id = %s",
+                (journal_id,),
+            )
+        for term in ("9990-0018", "9990-0026", "9990-0034", "9990-0042"):
+            r = client.get("/api/journals", params={"search": term, "per_page": 200})
+            assert r.status_code == 200
+            ids = [j["id"] for j in r.json()["journals"]]
+            assert ids == [journal_id], term
+
+    def test_search_tolerates_a_missing_hyphen_and_the_case(self, client):
+        journal_id = _seed_journal()
+        with owner_pool() as cur:
+            cur.execute("UPDATE journals SET issn = '9990-005x' WHERE id = %s", (journal_id,))
+        for term in ("9990005X", "9990-005x", "9990-005X"):
+            r = client.get("/api/journals", params={"search": term, "per_page": 200})
+            assert r.status_code == 200
+            ids = [j["id"] for j in r.json()["journals"]]
+            assert ids == [journal_id], term
+
+    def test_search_keeps_matching_titles(self, client):
+        # Un terme qui n'a pas la forme d'un ISSN ne cherche que dans les titres.
+        title = _uniq("TitleOnlyJournal")
+        journal_id = _seed_journal(title)
+        r = client.get("/api/journals", params={"search": title, "per_page": 200})
+        assert r.status_code == 200
+        assert [j["id"] for j in r.json()["journals"]] == [journal_id]
 
     def test_filter_by_publisher(self, client):
         pub = _seed_publisher()
