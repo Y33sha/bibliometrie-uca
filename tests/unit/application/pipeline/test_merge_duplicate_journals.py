@@ -69,6 +69,27 @@ def test_shared_issn_spares_another_title():
     assert metrics.total == 0
 
 
+def test_journal_in_two_groups_is_merged_once():
+    """Cas réel : Raison publique partage ses deux ISSN avec son double ; le second groupe désignait une revue déjà absorbée."""
+    pair = (
+        JournalTitleRow(20340, "Raison-publique.fr : arts, politique, société"),
+        JournalTitleRow(100276, "Raison publique"),
+    )
+    groups = [JournalIssnGroup("1767-0543", pair), JournalIssnGroup("2268-5944", pair)]
+    metrics, merges = _run(_Repo(issn_groups=groups))
+    assert merges == [(20340, 100276)]
+    assert metrics.extras["journals_merged"] == 1
+
+
+def test_absorbed_target_gives_way_to_its_absorber():
+    groups = [
+        JournalIssnGroup("0000-0001", (JournalTitleRow(1, "Revue"), JournalTitleRow(2, "Revue"))),
+        JournalIssnGroup("0000-0002", (JournalTitleRow(2, "Revue"), JournalTitleRow(3, "Revue"))),
+    ]
+    _, merges = _run(_Repo(issn_groups=groups))
+    assert merges == [(1, 2), (1, 3)]
+
+
 def test_without_group_nothing_is_merged():
     metrics, merges = _run(_Repo())
     assert merges == []
