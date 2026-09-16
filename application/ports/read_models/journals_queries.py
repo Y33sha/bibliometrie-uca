@@ -27,7 +27,7 @@ JournalSort = Literal[
 class JournalFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `journal_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_pubs` restreint aux revues portant au moins une publication.
+    `search` porte sur le titre et sur les ISSN — les trois colonnes de support et les ISSN rejetés. `journal_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_pubs` restreint aux revues portant au moins une publication.
     """
 
     search: str = ""

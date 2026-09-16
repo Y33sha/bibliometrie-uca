@@ -33,6 +33,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
+from domain.publications.identifiers import issn_search_prefix
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.sources.doaj.urls import resolve_doaj_url
@@ -70,6 +71,18 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
     )
 
 
+# Recherche d'un ISSN dans les quatre porteurs d'une revue : les trois colonnes de support et les ISSN rejetés. Les séparateurs sont retirés de part et d'autre, et la casse alignée : les valeurs reçues des sources ne portent pas toutes la forme `NNNN-NNNC`.
+_ISSN_SEARCH_SQL = """(
+        replace(upper(j.issn), '-', '') LIKE :issn_prefix || '%'
+        OR replace(upper(j.eissn), '-', '') LIKE :issn_prefix || '%'
+        OR replace(upper(j.issnl), '-', '') LIKE :issn_prefix || '%'
+        OR EXISTS (
+            SELECT 1 FROM unnest(j.rejected_issns) AS rejected
+            WHERE replace(upper(rejected), '-', '') LIKE :issn_prefix || '%'
+        )
+    )"""
+
+
 def _build_journal_where(
     filters: JournalFilters,
     *,
@@ -80,16 +93,25 @@ def _build_journal_where(
 ) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_journals` et `journals_facets`.
 
+    Le terme de recherche porte sur le titre et, quand il a la forme d'un ISSN, sur les ISSN de la revue.
+
     Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes publications.
     """
     binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
+        searched: list[str] = []
         # title_normalized passe par `normalize_text` à l'ingestion ; la query doit subir la même normalisation pour matcher les titres contenant ponctuation ou accents.
         normalized = normalize_text(filters.search)
         if normalized:
-            parts.append("j.title_normalized LIKE '%' || :search || '%'")
+            searched.append("j.title_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
+        issn_prefix = issn_search_prefix(filters.search)
+        if issn_prefix:
+            searched.append(_ISSN_SEARCH_SQL)
+            binds["issn_prefix"] = issn_prefix
+        if searched:
+            parts.append(f"({' OR '.join(searched)})")
     if filters.publisher_id and not skip_publisher:
         parts.append("j.publisher_id = :publisher_id")
         binds["publisher_id"] = filters.publisher_id

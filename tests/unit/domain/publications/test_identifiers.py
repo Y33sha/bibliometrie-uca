@@ -18,6 +18,7 @@ from domain.publications.identifiers import (
     clean_doi_prefix,
     extract_doi_from_url,
     is_hal_host,
+    issn_search_prefix,
     issn_typo_candidates,
     normalize_arxiv_id,
     normalize_pmcid,
@@ -382,6 +383,33 @@ class TestISSN:
     )
     def test_try_parse_rejects_invalid(self, raw):
         assert ISSN.try_parse(raw) is None
+
+
+class TestIssnSearchPrefix:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("0028-0836", "00280836"),
+            ("00280836", "00280836"),  # sans tiret
+            ("0028–0836", "00280836"),  # tiret typographique
+            ("0071-190x", "0071190X"),  # clé de contrôle 10, en majuscule
+            ("0028", "0028"),  # début d'ISSN
+            (" 0028-0836 ", "00280836"),
+        ],
+    )
+    def test_reconnait_un_issn(self, raw, expected):
+        assert issn_search_prefix(raw) == expected
+
+    def test_accepte_une_cle_de_controle_fausse(self):
+        # Les ISSN rejetés d'une revue sont fautifs pour certains, et restent cherchables.
+        assert issn_search_prefix("1789-1504") == "17891504"
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["Nature", "", "0028-0836-1", "X0280836", "10.1038/nature"],
+    )
+    def test_ecarte_ce_qui_n_est_pas_un_issn(self, raw):
+        assert issn_search_prefix(raw) is None
 
 
 class TestIssnTypoCandidates:
