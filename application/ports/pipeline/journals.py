@@ -144,9 +144,10 @@ class JournalSudocQueries(Protocol):
 
 
 class JournalMergeGroup(NamedTuple):
-    """Revues qui partagent un ISSN-L. La cible de la fusion vient en premier."""
+    """Revues en double. La cible de la fusion vient en premier."""
 
-    issnl: str
+    key: str
+    """Ce que les revues partagent : ISSN-L ou titre normalisé."""
     journal_ids: tuple[int, ...]
 
 
@@ -173,6 +174,13 @@ class JournalMergeQueries(Protocol):
 
     def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
         """Groupes de revues vérifiées dans le Sudoc qui portent le même ISSN dans `issn` ou `eissn`, dans le même ordre."""
+        ...
+
+    def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
+        """Paires de revues seules à porter leur titre normalisé, dont au moins une sans ISSN. L'une est vide, sans enregistrement ni paiement APC, ou leurs enregistrements partagent un préfixe DOI.
+
+        La revue qui a des enregistrements vient en premier, puis celle qui porte le plus de publications, puis celle qui a un ISSN.
+        """
         ...
 
 
