@@ -39,7 +39,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - Le Sudoc, interrogé dans la phase `publishers_journals`, sert de source de référence. Il confirme les ISSN d'une revue et fournit son titre, son ISSN-L et le support de chaque ISSN. Le périmètre se limite aux revues qui ont au moins un ISSN.
 - L'ISSN-L du Sudoc est écrit dans `issnl`. Deux revues de même ISSN-L sont fusionnées automatiquement.
 - Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est rangé parmi les ISSN rejetés et signalé.
-- Le sort du titre de référence est décidé après un audit des titres divergents.
+- Le titre en base reste la référence. La notice Sudoc porte le titre propre, sans le sous-titre, donc elle donne souvent un titre plus court.
 - Les ISSN rejetés (`journals.rejected_issns`) sont soit fautifs, tels que reçus des sources, soit périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant), soit d'une autre publication. Ils servent au rapprochement. La sous-étape Sudoc corrige les fautifs.
 - La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
@@ -69,7 +69,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Quatrième passage : 14 revues signalées, dont 8 égalités ou ambiguïtés propres au Sudoc. Il révèle des ISSN de la revue bloqués parmi les rejetés par les passages précédents.
 - [x] Règles revues : ISSN rejetés valides réexaminés, CD-ROM hors des groupes, changement de support reconnu sans notice par la mention de support.
 - [x] Cinquième passage : 2 revues signalées, toutes deux sur un titre précédent réel. Les ISSN retirés par les premiers passages ont retrouvé leurs colonnes. 161 revues gardent un ISSN rejeté valide : supplément, titre parallèle, notice en double ou publication distincte.
-- [ ] Audit des titres divergents : nombre et nature des différences.
+- [x] Audit des titres divergents sur 300 revues, dont 270 présentes dans le Sudoc : 223 titres identiques, 23 plus complets en base, 9 plus complets dans la notice, 8 divergents, 7 proches. Les divergences sont des titres abrégés en base (« EPL », « Can J Cardiol »), des titres précédents et des traductions.
 
 ### 3. Cohérence des ISSN
 
@@ -92,5 +92,4 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 ## Questions ouvertes
 
 - **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
-- **Titre.** Hypothèse à tester sur l'audit : le titre actuel rejoint les formes de nom, le titre de référence remplace `title`.
 - **Discordances.** Un enregistrement dont l'ISSN désigne une autre revue est-il rattaché à cette revue automatiquement, ou signalé ?
