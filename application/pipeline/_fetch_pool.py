@@ -18,9 +18,11 @@ from sqlalchemy import Connection
 
 
 class RequestPace:
-    """Plafond de débit commun à des requêtes simultanées : deux départs de requête sont espacés d'au moins `1 / max_per_second` seconde.
+    """Plafond de débit commun à des requêtes simultanées : les départs sont réservés l'un après l'autre, espacés de `1 / max_per_second` seconde.
 
     Une pause propre à chaque worker donne un débit qui dépend du temps de réponse de la source ; ce rythme partagé le borne quelle que soit la concurrence.
+
+    Un worker que l'ordonnancement retarde part après sa réservation, jamais avant : le nombre de départs sur une durée reste borné, même quand deux d'entre eux se suivent de près après une pause de la boucle d'événements.
     """
 
     def __init__(self, max_per_second: float) -> None:

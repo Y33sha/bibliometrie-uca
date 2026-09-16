@@ -9,21 +9,25 @@ from application.pipeline._fetch_pool import RequestPace
 
 
 @pytest.mark.asyncio
-async def test_spaces_request_starts_across_concurrent_workers():
-    pace = RequestPace(max_per_second=50)  # un départ toutes les 20 ms
+async def test_caps_the_start_rate_across_concurrent_workers():
+    interval_s = 0.02
+    pace = RequestPace(max_per_second=1 / interval_s)
+    began_at = time.monotonic()
     starts: list[float] = []
 
     async def worker():
         for _ in range(5):
             await pace.wait()
-            starts.append(time.monotonic())
+            starts.append(time.monotonic() - began_at)
 
     await asyncio.gather(*(worker() for _ in range(4)))
     starts.sort()
-    gaps = [b - a for a, b in zip(starts, starts[1:], strict=False)]
-    # Tolérance d'ordonnancement : les départs restent espacés d'environ 20 ms.
-    assert min(gaps) >= 0.015
-    assert starts[-1] - starts[0] >= 19 * 0.02 * 0.9
+    # Le k-ième départ vient au plus tôt k intervalles après le début : l'ordonnancement peut
+    # retarder un worker, jamais avancer son départ. L'écart entre deux départs consécutifs, lui,
+    # dépend de la boucle d'événements : une pause de celle-ci en rapproche deux qui rattrapent
+    # leur retard, sans que le débit dépasse son plafond.
+    for rank, start in enumerate(starts):
+        assert start >= rank * interval_s
 
 
 @pytest.mark.asyncio
