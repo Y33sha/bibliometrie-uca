@@ -17,15 +17,20 @@ class _Repo:
         self,
         issnl_groups: list[JournalMergeGroup] | None = None,
         issn_groups: list[JournalIssnGroup] | None = None,
+        title_groups: list[JournalMergeGroup] | None = None,
     ) -> None:
         self._issnl_groups = issnl_groups or []
         self._issn_groups = issn_groups or []
+        self._title_groups = title_groups or []
 
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
         return self._issnl_groups
 
     def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
         return self._issn_groups
+
+    def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
+        return self._title_groups
 
 
 def _run(repo: _Repo):
@@ -88,6 +93,20 @@ def test_absorbed_target_gives_way_to_its_absorber():
     ]
     _, merges = _run(_Repo(issn_groups=groups))
     assert merges == [(1, 2), (1, 3)]
+
+
+def test_same_title_pair_is_merged_after_the_issn_rules():
+    """Une paire de même titre déjà réunie par une règle d'ISSN n'est pas fusionnée deux fois."""
+    repo = _Repo(
+        issnl_groups=[JournalMergeGroup("0028-0836", (7, 9))],
+        title_groups=[
+            JournalMergeGroup("the astrophysical journal", (2, 86095)),
+            JournalMergeGroup("nature", (7, 9)),
+        ],
+    )
+    metrics, merges = _run(repo)
+    assert merges == [(7, 9), (2, 86095)]
+    assert metrics.extras["journals_merged"] == 2
 
 
 def test_without_group_nothing_is_merged():

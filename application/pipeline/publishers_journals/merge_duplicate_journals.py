@@ -1,8 +1,12 @@
 """Sous-étape de la phase `publishers_journals` — fusionne les revues en double.
 
-Deux revues vérifiées dans le Sudoc qui partagent leur ISSN-L décrivent la même publication. De même quand elles portent le même ISSN dans une colonne et que les mots d'un titre sont tous dans l'autre, « BMJ » et « BMJ-BRITISH MEDICAL JOURNAL » par exemple. L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison.
+Trois règles désignent la même publication :
 
-Dans un groupe, la revue qui porte le plus de publications absorbe les autres ; à égalité, celle dont l'identifiant est le plus petit. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications et métadonnées passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée.
+1. deux revues vérifiées dans le Sudoc partagent leur ISSN-L ;
+2. elles portent le même ISSN dans une colonne, et les mots d'un titre sont tous dans l'autre (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
+3. elles sont seules à porter leur titre normalisé, au moins une est sans ISSN, et l'une est vide ou leurs enregistrements partagent un préfixe DOI. Une revue vide n'a ni enregistrement ni paiement APC.
+
+L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications et métadonnées passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée.
 """
 
 import logging
@@ -17,6 +21,9 @@ from domain.journals.titles import nested_titles
 MergeJournals = Callable[[int, int], None]
 """`(cible, source)` : fusionne la revue source dans la cible et valide la transaction."""
 
+MergeGroup = tuple[str, tuple[int, ...]]
+"""`(libellé, revues)` : ce que les revues partagent, puis les revues, la cible en tête."""
+
 
 def run_merge_duplicate_journals(
     logger: logging.Logger,
@@ -24,35 +31,38 @@ def run_merge_duplicate_journals(
     journal_repo: JournalMergeQueries,
     merge: MergeJournals,
 ) -> PhaseMetrics:
-    """Fusionne les revues de même ISSN-L, puis celles qui partagent un ISSN de colonne sous un titre emboîté."""
+    """Applique les trois règles dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
     metrics = PhaseMetrics()
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
-    issnl_groups = journal_repo.find_journals_sharing_issnl()
-    if issnl_groups:
-        _merge_groups(
-            logger,
-            metrics,
-            merge,
-            absorbed,
-            [(g.issnl, g.journal_ids) for g in issnl_groups],
-            "%s : fusion des revues de même ISSN-L",
-        )
-    # Lecture après les fusions précédentes : elles ont retiré des revues.
+    _merge_groups(
+        logger,
+        metrics,
+        merge,
+        absorbed,
+        [(f"ISSN-L {g.key}", g.journal_ids) for g in journal_repo.find_journals_sharing_issnl()],
+        "%s : fusion des revues de même ISSN-L",
+    )
     shared = [
-        (group.issn, tuple(j.id for j in group.journals if _same_journal(group.journals[0], j)))
-        for group in journal_repo.find_journals_sharing_column_issn()
+        (f"ISSN {g.issn}", tuple(j.id for j in g.journals if _nested(g.journals[0], j)))
+        for g in journal_repo.find_journals_sharing_column_issn()
     ]
-    shared = [(issn, ids) for issn, ids in shared if len(ids) > 1]
-    if shared:
-        _merge_groups(
-            logger,
-            metrics,
-            merge,
-            absorbed,
-            shared,
-            "%s : fusion des revues de même ISSN et de titre emboîté",
-        )
+    _merge_groups(
+        logger,
+        metrics,
+        merge,
+        absorbed,
+        [(label, ids) for label, ids in shared if len(ids) > 1],
+        "%s : fusion des revues de même ISSN et de titre emboîté",
+    )
+    _merge_groups(
+        logger,
+        metrics,
+        merge,
+        absorbed,
+        [(f"titre {g.key!r}", g.journal_ids) for g in journal_repo.find_same_title_duplicates()],
+        "%s : fusion des revues de même titre",
+    )
     if metrics.total:
         logger.info(
             "%sTerminé : %s",
@@ -64,7 +74,7 @@ def run_merge_duplicate_journals(
     return metrics
 
 
-def _same_journal(target: JournalTitleRow, other: JournalTitleRow) -> bool:
+def _nested(target: JournalTitleRow, other: JournalTitleRow) -> bool:
     """La cible et la revue candidate portent le même titre, aux mots près."""
     return other.id == target.id or nested_titles(target.title, other.title)
 
@@ -74,14 +84,16 @@ def _merge_groups(
     metrics: PhaseMetrics,
     merge: MergeJournals,
     absorbed: dict[int, int],
-    groups: list[tuple[str, tuple[int, ...]]],
+    groups: list[MergeGroup],
     titre: str,
 ) -> None:
-    """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée par un groupe précédent est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
+    """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
+    if not groups:
+        return
     etape(logger, titre, accord(len(groups), "groupe de revues", "groupes de revues"))
     metrics.add(total=len(groups))
     with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
-        for issn, journal_ids in groups:
+        for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             for source in journal_ids[1:]:
                 if source in absorbed or source == target:
@@ -91,8 +103,8 @@ def _merge_groups(
                 metrics.add(journals_merged=1)
                 # Ligne de détail : le terminal la masque, le journal la garde.
                 logger.info(
-                    "ISSN %s : la revue %d absorbe la revue %d",
-                    issn,
+                    "%s : la revue %d absorbe la revue %d",
+                    label,
                     target,
                     source,
                     extra={"detail": True},
