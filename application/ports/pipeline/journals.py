@@ -143,6 +143,21 @@ class JournalSudocQueries(Protocol):
         ...
 
 
+class JournalMergeGroup(NamedTuple):
+    """Revues qui partagent un ISSN-L. La cible de la fusion vient en premier."""
+
+    issnl: str
+    journal_ids: tuple[int, ...]
+
+
+class JournalMergeQueries(Protocol):
+    """Fusion des revues séparées à tort."""
+
+    def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
+        """Groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui porte le plus de publications vient en premier, puis la plus petite par identifiant."""
+        ...
+
+
 class JournalDoajQueries(Protocol):
     """Import du dump DOAJ : index ISSN des revues et pose du drapeau `is_in_doaj`."""
 

@@ -5,9 +5,10 @@ Sous-étapes incrémentales, dans l'ordre :
 1. **resolve_publishers** — préfixe DOI → Registration Agency + éditeur Crossref / repository DataCite (interroge Crossref et DataCite, email polite pool requis).
 2. **enrich_journals_from_openalex** — OpenAlex Sources → APC + journal_type (clé ou email OpenAlex).
 3. **check_journals_in_sudoc** — Sudoc (public) → ISSN des revues vérifiés, corrigés et rangés par support.
-4. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
+4. **merge_journals_by_issnl** — fusion des revues qui partagent leur ISSN-L.
+5. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
 
-La vérification Sudoc précède l'import DOAJ, qui apparie les revues par ISSN. Chaque accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de config sont injectés par le composition-root ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
+La vérification Sudoc précède la fusion, qui lui prend l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN. Chaque accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de config sont injectés par le composition-root ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
 """
 
 import logging
@@ -25,6 +26,7 @@ def run(
     resolve_publishers: RunSubstep,
     enrich_from_openalex: RunSubstep,
     check_in_sudoc: RunSubstep,
+    merge_by_issnl: RunSubstep,
     enrich_from_doaj: RunSubstep,
     credentials_missing: CredentialsMissing,
     logger: logging.Logger,
@@ -53,10 +55,11 @@ def run(
         openalex = enrich_from_openalex()
 
     sudoc = check_in_sudoc()
+    merges = merge_by_issnl()
     doaj = enrich_from_doaj()
 
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
-    for sub in (publishers, openalex, sudoc, doaj):
+    for sub in (publishers, openalex, sudoc, merges, doaj):
         metrics.merge(sub)
 
     metrics.details["table"] = {
@@ -77,6 +80,12 @@ def run(
                 "key": "revues vérifiées dans le Sudoc",
                 "traités": sudoc.total,
                 "identifiés": sudoc.extras.get("sudoc_found", 0),
+                "créés": 0,
+            },
+            {
+                "key": "revues de même ISSN-L",
+                "traités": merges.total,
+                "identifiés": merges.extras.get("journals_merged", 0),
                 "créés": 0,
             },
         ]
