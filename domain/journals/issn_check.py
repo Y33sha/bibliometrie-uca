@@ -2,7 +2,7 @@
 
 Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent à la revue.
 
-Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides sont réexaminés avec les mêmes règles ; un groupe fait seulement d'ISSN rejetés devient principal si son titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
+Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides et les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN d'une colonne ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
 """
 
 from __future__ import annotations
@@ -44,14 +44,16 @@ class JournalIssns:
     eissn: str | None
     issnl: str | None
     rejected: tuple[str, ...]
+    candidates: tuple[str, ...] = ()
+    """ISSN portés par les enregistrements de la revue, absents de ses colonnes et de ses ISSN rejetés."""
 
     def columns(self) -> tuple[str, ...]:
         """ISSN des trois colonnes de la revue, sans doublon, dans l'ordre des colonnes."""
         return tuple(dict.fromkeys(v for v in (self.issn, self.eissn, self.issnl) if v))
 
     def examined(self) -> tuple[str, ...]:
-        """ISSN des trois colonnes, puis ISSN rejetés valides, sans doublon."""
-        valid = (r for r in self.rejected if ISSN.try_parse(r) is not None)
+        """ISSN des trois colonnes, puis ISSN rejetés et ISSN des enregistrements valides, sans doublon."""
+        valid = (r for r in (*self.rejected, *self.candidates) if ISSN.try_parse(r) is not None)
         return tuple(dict.fromkeys((*self.columns(), *valid)))
 
 
@@ -202,10 +204,9 @@ def check_journal_issns(
     known = [i for i in own if i in records and records[i].support is not Support.OTHER]
     main: list[str] = []
     if groups := _groups(known, records):
-        eligible = [
-            g
-            for g in groups
-            if any(i in columns or _nested_titles(journal.title, records[i].title) for i in g)
+        # Un ISSN d'une colonne tient la revue. Sans notice pour aucun d'eux, le titre décide.
+        eligible = [g for g in groups if any(i in columns for i in g)] or [
+            g for g in groups if any(_nested_titles(journal.title, records[i].title) for i in g)
         ]
         chosen = _main_group(eligible, records, journal.title) if eligible else []
         if chosen is None:

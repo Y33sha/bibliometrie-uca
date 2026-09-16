@@ -23,6 +23,34 @@ from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
 from infrastructure.db.tables import journal_name_forms, journals
 
+# Revues à vérifier dans le Sudoc, avec les ISSN de leurs enregistrements absents de leurs ISSN.
+_JOURNALS_TO_CHECK_IN_SUDOC = text("""
+    WITH paires AS (
+        SELECT DISTINCT s.journal_id, v.issn
+        FROM source_publications s
+        CROSS JOIN LATERAL jsonb_array_elements_text(s.external_ids->'issn') AS v(issn)
+        WHERE s.journal_id IS NOT NULL
+    ), documents AS (
+        SELECT p.journal_id, array_agg(p.issn ORDER BY p.issn) AS issns
+        FROM paires p
+        JOIN journals j ON j.id = p.journal_id
+        WHERE p.issn <> coalesce(j.issn, '')
+          AND p.issn <> coalesce(j.eissn, '')
+          AND p.issn <> coalesce(j.issnl, '')
+          AND NOT (p.issn = ANY(j.rejected_issns))
+        GROUP BY p.journal_id
+    )
+    SELECT j.id, j.title, j.issn, j.eissn, j.issnl, j.rejected_issns,
+           coalesce(d.issns, ARRAY[]::text[]) AS document_issns
+    FROM journals j
+    LEFT JOIN documents d ON d.journal_id = j.id
+    WHERE d.issns IS NOT NULL
+       OR (j.sudoc_checked_at IS NULL
+           AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
+                OR cardinality(j.rejected_issns) > 0))
+    ORDER BY j.id
+""")
+
 
 class PgJournalGatewayQueries(
     JournalFindOrCreateQueries,
@@ -201,28 +229,17 @@ class PgJournalGatewayQueries(
         )
 
     def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
-        rows = self._conn.execute(
-            select(
-                journals.c.id,
-                journals.c.title,
-                journals.c.issn,
-                journals.c.eissn,
-                journals.c.issnl,
-                journals.c.rejected_issns,
-            )
-            .where(
-                journals.c.sudoc_checked_at.is_(None),
-                or_(
-                    journals.c.issn.is_not(None),
-                    journals.c.eissn.is_not(None),
-                    journals.c.issnl.is_not(None),
-                    func.cardinality(journals.c.rejected_issns) > 0,
-                ),
-            )
-            .order_by(journals.c.id)
-        ).all()
+        rows = self._conn.execute(_JOURNALS_TO_CHECK_IN_SUDOC).all()
         return [
-            JournalSudocRow(r.id, r.title, r.issn, r.eissn, r.issnl, tuple(r.rejected_issns))
+            JournalSudocRow(
+                r.id,
+                r.title,
+                r.issn,
+                r.eissn,
+                r.issnl,
+                tuple(r.rejected_issns),
+                tuple(r.document_issns),
+            )
             for r in rows
         ]
 

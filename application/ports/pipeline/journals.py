@@ -111,7 +111,7 @@ class JournalOpenAlexEnrichmentQueries(Protocol):
 
 
 class JournalSudocRow(NamedTuple):
-    """Une revue à vérifier dans le Sudoc : son titre, ses trois formes d'ISSN et ses ISSN rejetés."""
+    """Une revue à vérifier dans le Sudoc : son titre, ses trois formes d'ISSN, ses ISSN rejetés et les ISSN que portent ses enregistrements sans figurer parmi les précédents."""
 
     id: int
     title: str
@@ -119,13 +119,14 @@ class JournalSudocRow(NamedTuple):
     eissn: str | None
     issnl: str | None
     rejected_issns: tuple[str, ...]
+    document_issns: tuple[str, ...] = ()
 
 
 class JournalSudocQueries(Protocol):
     """Vérification des ISSN des revues dans le Sudoc."""
 
     def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
-        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté."""
+        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté, et revues dont un enregistrement porte un ISSN absent de leurs ISSN."""
         ...
 
     def record_sudoc_check(
