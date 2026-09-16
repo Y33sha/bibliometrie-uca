@@ -5,6 +5,7 @@ import uuid
 
 from infrastructure.observability.log import (
     _PROJECT_ROOT,
+    _FiltreDetail,
     _PhaseNameFilter,
     _rebase_log_dir,
     reset_log_phase,
@@ -16,6 +17,18 @@ def _record(name: str = "pipeline") -> logging.LogRecord:
     return logging.LogRecord(
         name=name, level=logging.INFO, pathname="", lineno=0, msg="m", args=None, exc_info=None
     )
+
+
+class TestFiltreDetail:
+    """Le terminal masque les lignes de détail ; le journal, qui n'a pas ce filtre, les garde."""
+
+    def test_detail_line_is_dropped(self):
+        record = _record()
+        record.detail = True
+        assert not _FiltreDetail().filter(record)
+
+    def test_other_lines_pass(self):
+        assert _FiltreDetail().filter(_record())
 
 
 class TestPhaseNameFilter:
