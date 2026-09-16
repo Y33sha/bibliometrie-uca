@@ -1,6 +1,6 @@
-"""Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet), commune à la liste des publications et au tableau de bord.
+"""Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
-Rend les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte. Une recherche par nom borne la requête.
+`entity_facet_rows` rend les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte : la liste des publications et le tableau de bord s'en servent. `entity_name_clause` borne les options au terme cherché, quelle que soit la population décomptée.
 """
 
 from collections.abc import Mapping
@@ -57,6 +57,17 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
 }
 
 
+def entity_name_clause(label_sql: str, search: str) -> tuple[str, dict[str, object]]:
+    """Condition qui restreint une facette d'entité aux noms portant le terme cherché, à ajouter au WHERE.
+
+    Le fragment rendu est vide en deçà de deux caractères : le terme ne discrimine alors rien.
+    """
+    term = search.strip()
+    if len(term) < 2:
+        return "", {}
+    return f" AND unaccent({label_sql}) ILIKE unaccent(:q)", {"q": f"%{term}%"}
+
+
 def entity_facet_rows(
     conn: Connection,
     *,
@@ -71,12 +82,8 @@ def entity_facet_rows(
     Le décompte porte sur les publications distinctes : la jointure d'un sujet rend une ligne par source. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
     """
     sql = ENTITY_SQL[kind]
-    params = dict(binds)
-    name_filter = ""
-    if len(search.strip()) >= 2:
-        name_filter = f" AND unaccent({sql.label}) ILIKE unaccent(:q)"
-        params["q"] = f"%{search.strip()}%"
-    params["lim"] = limit
+    name_filter, name_binds = entity_name_clause(sql.label, search)
+    params: dict[str, object] = {**binds, **name_binds, "lim": limit}
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""

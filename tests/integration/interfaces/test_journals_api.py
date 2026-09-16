@@ -2,6 +2,7 @@
 
 Couvre :
 - GET /api/journals (liste, search, publisher filter, sort variants)
+- GET /api/journals/facets/entities (facette éditeur contextuelle)
 - GET /api/journals/{id} (detail enrichi avec DOAJ, 404)
 - GET /api/journals/{id}/dashboard (distributions doc_type + oa_status, 404)
 - GET /api/journals/{id}/subjects (top sujets, exclusion sujets génériques)
@@ -604,6 +605,60 @@ class TestJournalsFacets:
             },
         )
         assert r.status_code == 200
+
+
+class TestJournalsPublisherFacet:
+    """GET /api/journals/facets/entities : facette éditeur, décomptée en revues."""
+
+    def test_counts_journals_per_publisher(self, client):
+        name = _uniq("FacetPublisher")
+        publisher_id = _seed_publisher(name)
+        _seed_journal(publisher_id=publisher_id)
+        _seed_journal(publisher_id=publisher_id)
+        r = client.get(
+            "/api/journals/facets/entities",
+            params={"kind": "publisher", "entity_search": name},
+        )
+        assert r.status_code == 200
+        counts = {e["id"]: e["count"] for e in r.json()["entities"]}
+        assert counts == {publisher_id: 2}
+
+    def test_entity_search_filters_on_the_publisher_name(self, client):
+        name = _uniq("Searchable")
+        wanted = _seed_publisher(name)
+        other = _seed_publisher(_uniq("Autre"))
+        _seed_journal(publisher_id=wanted)
+        _seed_journal(publisher_id=other)
+        r = client.get(
+            "/api/journals/facets/entities",
+            params={"kind": "publisher", "entity_search": name},
+        )
+        assert r.status_code == 200
+        ids = {e["id"] for e in r.json()["entities"]}
+        assert ids == {wanted}
+
+    def test_ignores_the_publisher_filter_but_honours_the_others(self, client):
+        # La facette écarte sa propre dimension : un éditeur sélectionné ne réduit pas les options.
+        selected = _seed_publisher(_uniq("Selected"))
+        other = _seed_publisher(_uniq("Other"))
+        _seed_journal(publisher_id=selected)
+        proceedings = _seed_journal(publisher_id=other)
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (proceedings,)
+            )
+        r = client.get(
+            "/api/journals/facets/entities",
+            params={"kind": "publisher", "publisher_id": selected, "journal_type": "proceedings"},
+        )
+        assert r.status_code == 200
+        ids = {e["id"] for e in r.json()["entities"]}
+        assert other in ids
+        assert selected not in ids
+
+    def test_rejects_an_unsupported_kind(self, client):
+        r = client.get("/api/journals/facets/entities", params={"kind": "journal"})
+        assert r.status_code == 422
 
 
 # ── Traçabilité des écritures sur les revues ─────────────────

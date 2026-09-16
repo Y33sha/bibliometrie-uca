@@ -1948,6 +1948,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/facets/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journals Entity Facet
+         * @description Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
+         *
+         *     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre.
+         *
+         *     `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
+         */
+        get: operations["journals_entity_facet_api_journals_facets_entities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journals": {
         parameters: {
             query?: never;
@@ -8192,6 +8216,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JournalsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    journals_entity_facet_api_journals_facets_entities_get: {
+        parameters: {
+            query: {
+                kind: "publisher";
+                entity_search?: string;
+                search?: string;
+                publisher_id?: number | null;
+                journal_type?: string;
+                is_in_doaj?: boolean | null;
+                oa_model?: string;
+                with_pubs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFacetResponse"];
                 };
             };
             /** @description Validation Error */

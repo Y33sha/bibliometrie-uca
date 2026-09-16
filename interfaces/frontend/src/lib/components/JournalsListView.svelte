@@ -5,6 +5,7 @@
 	import { base } from '$app/paths';
 	import type { Snippet } from 'svelte';
 
+	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
@@ -18,7 +19,7 @@
 	// Composant de liste de revues réutilisable. Utilisé par :
 	// - `/journals` (mode autonome avec sync URL)
 	// - `/admin/journals` (snippet `actionCell` pour Modifier/Fusionner)
-	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe, colonne Éditeur masquée)
+	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
 	interface ExternalFilters {
 		publisherId?: number;
 	}
@@ -30,7 +31,6 @@
 		basePath = '/journals',
 		perPage = 50,
 		withPubs = false,
-		hidePublisherColumn = false,
 		actionCell,
 		actionColumnHeader = '',
 	}: {
@@ -41,32 +41,38 @@
 		perPage?: number;
 		/** Si true, n'expose que les revues avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
 		withPubs?: boolean;
-		/** Masque la colonne Éditeur (utile sur `publishers/[id]?tab=journals` où toutes les lignes ont le même éditeur). */
-		hidePublisherColumn?: boolean;
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni, une colonne Actions est ajoutée à droite du tableau. */
 		actionCell?: Snippet<[Journal]>;
 		/** En-tête de la colonne actions (vide par défaut, comme admin). */
 		actionColumnHeader?: string;
 	} = $props();
 
+	// Éditeur imposé par le contexte : la facette et la colonne Éditeur portent alors la même valeur sur toutes les lignes, et sont masquées.
+	const publisherFixed = $derived(externalFilters?.publisherId != null);
+
 	// --- Filter state ---
 	let search = $state('');
 	let currentSort = $state('pubs_desc');
+	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
 	let selectedJournalTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
 	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
 
-	// --- Params builder partagé entre liste + facettes ---
+	// --- Params builder partagé entre la liste et ses facettes ---
+	// Le terme de recherche en fait partie : les décomptes des facettes suivent ainsi le champ de recherche, comme la liste.
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
-		if (externalFilters?.publisherId != null) {
-			params.set('publisher_id', String(externalFilters.publisherId));
-		}
+		const publisherId = externalFilters?.publisherId != null
+			? String(externalFilters.publisherId)
+			: selectedPublisher[0];
+		if (publisherId) params.set('publisher_id', publisherId);
 		if (selectedJournalTypes.length) params.set('journal_type', selectedJournalTypes.join(','));
 		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
 		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
 		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
 		if (withPubs) params.set('with_pubs', 'true');
+		const q = search.trim();
+		if (q) params.set('search', q);
 		return params;
 	}
 
@@ -79,8 +85,6 @@
 		buildParams() {
 			const params = buildFilterParams();
 			params.set('sort', currentSort);
-			const q = search.trim();
-			if (q) params.set('search', q);
 			return params;
 		},
 	});
@@ -88,13 +92,7 @@
 	const facets = useFacets({
 		endpoint: '/api/journals/facets',
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste).
-		buildParams() {
-			const params = buildFilterParams();
-			const q = search.trim();
-			if (q) params.set('search', q);
-			return params;
-		},
+		buildParams: buildFilterParams,
 		facets: {
 			journalTypes: { type: 'labeled', apiKey: 'journal_types' },
 			oaModels: { type: 'labeled', apiKey: 'oa_models' },
@@ -105,6 +103,7 @@
 	const url = useUrlFilters({
 		basePath: () => basePath,
 		filters: {
+			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
 			selectedJournalTypes: { type: 'string_array', urlKey: 'journal_type' },
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
 			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
@@ -118,6 +117,7 @@
 	function syncUrl() {
 		if (!urlSync) return;
 		url.syncUrl(() => ({
+			selectedPublisher,
 			selectedJournalTypes,
 			selectedOaModels,
 			selectedDoaj,
@@ -174,6 +174,7 @@
 	onMount(async () => {
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
+			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
 			if (restored.selectedJournalTypes) selectedJournalTypes = restored.selectedJournalTypes as string[];
 			if (restored.selectedOaModels) selectedOaModels = restored.selectedOaModels as string[];
 			if (restored.selectedDoaj) selectedDoaj = restored.selectedDoaj as string[];
@@ -195,6 +196,16 @@
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
+	{#if !publisherFixed}
+		<EntityFilter
+			label="Éditeur"
+			endpoint="/api/journals/facets"
+			kind="publisher"
+			buildParams={buildFilterParams}
+			selected={selectedPublisher}
+			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+		/>
+	{/if}
 	<FacetDropdown
 		label="Types"
 		options={facets.options.journalTypes}
@@ -224,7 +235,7 @@
 				Titre {sortArrow('title')}
 			</th>
 			<th>ISSN</th>
-			{#if !hidePublisherColumn}
+			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
 					Éditeur {sortArrow('publisher')}
 				</th>
@@ -249,7 +260,7 @@
 						{/if}
 					{/if}				</td>
 				<td class="issn-cell">{formatIssns(j)}</td>
-				{#if !hidePublisherColumn}
+				{#if !publisherFixed}
 					<td class="muted">
 						{#if j.pub_name}
 							{#if j.publisher_id}
@@ -266,7 +277,7 @@
 			</tr>
 		{/each}
 		{#if journals.items.length === 0}
-			<TableStatusRow loading={journals.loading} colspan={hidePublisherColumn ? 4 : 5} emptyText="Aucune revue ne correspond aux filtres." />
+			<TableStatusRow loading={journals.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune revue ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>

@@ -9,7 +9,11 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.read_models._common import FacetOption, PaginatedResponse
+from application.ports.read_models._common import (
+    EntityFacetResponse,
+    FacetOption,
+    PaginatedResponse,
+)
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.journals.journal import JournalType, OaModel
 
@@ -129,6 +133,10 @@ class JournalQueries(Protocol):
     ) -> JournalListResponse: ...
 
     def journals_facets(self, *, filters: JournalFilters) -> JournalsFacetsResponse: ...
+
+    def journals_publisher_facet(
+        self, *, search: str, filters: JournalFilters
+    ) -> EntityFacetResponse: ...
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None: ...
 

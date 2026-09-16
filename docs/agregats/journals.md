@@ -44,5 +44,6 @@ Port `application/ports/read_models/journals_queries.py`, adaptateur `PgJournalQ
 | Point d'entrée | Ce qu'il sert |
 |---|---|
 | `GET /api/journals`, `/facets` | Liste filtrable et facettes ; le filtre « avec publications » s'appuie sur le compteur `pub_count` |
+| `GET /api/journals/facets/entities` | Facette éditeur : les premiers éditeurs sous les filtres actifs, décomptés en revues, cherchables par nom — ils sont trop nombreux pour être tous proposés |
 | `GET /api/journals/{id}`, `/{id}/dashboard` | Détail de la revue ; le tableau de bord signale les publications hors du cadre annoncé par la revue (`domain/journals/expected.py`) et recompte l'appartenance au périmètre en direct |
 | `GET /api/journals/types`, `/oa-models` | Libellés des vocabulaires de type de revue et de modèle *open access*, définis dans `domain/journals/journal.py` |
