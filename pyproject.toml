@@ -56,8 +56,9 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*"]
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces"]
 # `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
-# développement, pas des dépendances de l'application.
-extend_exclude = ["frontend", ".venv", "venv", "scripts"]
+# développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
+# hors du dépôt.
+extend_exclude = ["frontend", ".venv", "venv", "scripts", "data"]
 # Le groupe `dev` de [project.optional-dependencies] est pour les outils
 # de dev/test — deptry ne doit pas exiger qu'ils soient importés.
 optional_dependencies_dev_groups = ["dev"]
@@ -228,6 +229,7 @@ extend-exclude = [
     # à maintenir, et les fiches archivées sont un compte rendu qu'on ne réécrit pas.
     "*.md",
     ".claude",                   # hooks du harnais de développement, hors code applicatif
+    "data",                      # répertoire de travail local, hors du dépôt
     "interfaces/frontend",
     "bibliometrie_uca.egg-info",
     ".venv",
@@ -451,6 +453,8 @@ exclude = [
     "^alembic/",
     # Copie de travail de mutmut : double les paquets du projet.
     "^mutants/",
+    # Répertoire de travail local : données brutes et scripts jetables, hors du dépôt.
+    "^data/",
 ]
 
 # Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
@@ -488,7 +492,8 @@ python-version = "3.14.0"
 # Système des images de production, comme pour mypy : depuis un autre système, les appels POSIX
 # que le code exécute en production seraient rejetés.
 python-platform = "linux"
-# Le code des tests, du frontend et d'Alembic reste hors du champ, comme pour mypy.
+# Le code des tests, du frontend, d'Alembic et du répertoire de travail local reste hors du champ,
+# comme pour mypy.
 project-excludes = [
     "**/tests/",
     "**/frontend/",
@@ -496,6 +501,7 @@ project-excludes = [
     "**/.venv/",
     "**/build/",
     "**/alembic/",
+    "**/data/",
 ]
 # Libs tierces non typées : ignorées plutôt que déclarées une à une.
 ignore-missing-imports = ["*"]
