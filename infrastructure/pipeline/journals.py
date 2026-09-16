@@ -13,6 +13,8 @@ from application.ports.pipeline.journals import (
     JournalDoajQueries,
     JournalFindOrCreateQueries,
     JournalIssnRow,
+    JournalMergeGroup,
+    JournalMergeQueries,
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
     JournalSudocRow,
@@ -52,10 +54,22 @@ _JOURNALS_TO_CHECK_IN_SUDOC = text("""
 """)
 
 
+# Revues vérifiées qui partagent leur ISSN-L, la cible de la fusion en tête de chaque groupe.
+_JOURNALS_SHARING_ISSNL = text("""
+    SELECT issnl, array_agg(id ORDER BY pub_count DESC, id) AS ids
+    FROM journals
+    WHERE issnl IS NOT NULL AND sudoc_checked_at IS NOT NULL
+    GROUP BY issnl
+    HAVING count(*) > 1
+    ORDER BY issnl
+""")
+
+
 class PgJournalGatewayQueries(
     JournalFindOrCreateQueries,
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
+    JournalMergeQueries,
     JournalDoajQueries,
 ):
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
@@ -264,6 +278,14 @@ class PgJournalGatewayQueries(
                 sudoc_checked_at=checked_at,
             )
         )
+
+    # ── fusion ─────────────────────────────────────────────────────
+
+    def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
+        return [
+            JournalMergeGroup(r.issnl, tuple(r.ids))
+            for r in self._conn.execute(_JOURNALS_SHARING_ISSNL).all()
+        ]
 
     def create_journal(
         self,

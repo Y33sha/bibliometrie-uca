@@ -380,6 +380,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         resolve_publishers=_run_resolve_publishers,
         enrich_from_openalex=_run_enrich_journals_from_openalex,
         check_in_sudoc=_run_check_journals_in_sudoc,
+        merge_by_issnl=_run_merge_journals_by_issnl,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
         logger=log,
@@ -773,6 +774,37 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
         conn.close()
     _signal_if_tripped(metrics, breaker)
     return metrics
+
+
+def _run_merge_journals_by_issnl() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.merge_journals_by_issnl import (
+        run_merge_journals_by_issnl,
+    )
+    from application.services.journals.commands import merge_journals
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+    from infrastructure.repositories.journal_repository import PgJournalRepository
+    from infrastructure.repositories.publication_repository import PgPublicationRepository
+
+    with get_sync_engine().connect() as conn:
+        corrections = PgMetadataCorrectionQueries()
+        journal_repository = PgJournalRepository(conn)
+        publication_repository = PgPublicationRepository(conn)
+
+        def merge(target_id: int, source_id: int) -> None:
+            merge_journals(
+                conn,
+                target_id,
+                source_id,
+                correction_queries=corrections,
+                repo=journal_repository,
+                publication_repo=publication_repository,
+            )
+
+        return run_merge_journals_by_issnl(
+            log, journal_repo=PgJournalGatewayQueries(conn), merge=merge
+        )
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:

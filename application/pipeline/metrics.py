@@ -20,6 +20,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "issn_from_documents": ("ISSN repris d'un enregistrement", "ISSN repris d'enregistrements"),
     "issn_set_aside": ("ISSN rangé parmi les rejetés", "ISSN rangés parmi les rejetés"),
     "issn_unranged": ("revue non rangée par support", "revues non rangées par support"),
+    "journals_merged": ("revue fusionnée", "revues fusionnées"),
     "matched": "rapproché",
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",

@@ -83,6 +83,22 @@ class TestSudocCheck:
         carrying = _create_journal(sa_sync_conn, eissn="1362-4954")
         assert repo.find_journal_by_issn_any("1362-4954") == carrying
 
+    def test_merge_groups_hold_checked_journals_sharing_an_issnl(self, sa_sync_conn, repo):
+        """La revue qui porte le plus de publications vient en tête du groupe ; une revue non vérifiée en est exclue."""
+        keeper = _create_journal(sa_sync_conn, issnl="2999-0001")
+        absorbed = _create_journal(sa_sync_conn, issnl="2999-0001")
+        unchecked = _create_journal(sa_sync_conn, issnl="2999-0001")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
+            {"ids": [keeper, absorbed]},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET pub_count = 3 WHERE id = :id"), {"id": keeper}
+        )
+        groups = {g.issnl: g.journal_ids for g in repo.find_journals_sharing_issnl()}
+        assert groups["2999-0001"] == (keeper, absorbed)
+        assert unchecked not in groups["2999-0001"]
+
     def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
         at = datetime(2026, 9, 15, tzinfo=UTC)
