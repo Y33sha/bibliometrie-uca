@@ -380,7 +380,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         resolve_publishers=_run_resolve_publishers,
         enrich_from_openalex=_run_enrich_journals_from_openalex,
         check_in_sudoc=_run_check_journals_in_sudoc,
-        merge_by_issnl=_run_merge_journals_by_issnl,
+        merge_duplicates=_run_merge_duplicate_journals,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
         logger=log,
@@ -776,9 +776,9 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
     return metrics
 
 
-def _run_merge_journals_by_issnl() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.merge_journals_by_issnl import (
-        run_merge_journals_by_issnl,
+def _run_merge_duplicate_journals() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.merge_duplicate_journals import (
+        run_merge_duplicate_journals,
     )
     from application.services.journals.commands import merge_journals
     from infrastructure.db.engine import get_sync_engine
@@ -802,7 +802,7 @@ def _run_merge_journals_by_issnl() -> PhaseMetrics:
                 publication_repo=publication_repository,
             )
 
-        return run_merge_journals_by_issnl(
+        return run_merge_duplicate_journals(
             log, journal_repo=PgJournalGatewayQueries(conn), merge=merge
         )
 

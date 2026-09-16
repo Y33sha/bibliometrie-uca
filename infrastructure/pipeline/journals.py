@@ -12,12 +12,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from application.ports.pipeline.journals import (
     JournalDoajQueries,
     JournalFindOrCreateQueries,
+    JournalIssnGroup,
     JournalIssnRow,
     JournalMergeGroup,
     JournalMergeQueries,
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
     JournalSudocRow,
+    JournalTitleRow,
 )
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
@@ -62,6 +64,23 @@ _JOURNALS_SHARING_ISSNL = text("""
     GROUP BY issnl
     HAVING count(*) > 1
     ORDER BY issnl
+""")
+
+
+# Revues vérifiées qui portent le même ISSN dans `issn` ou `eissn`, la cible de la fusion en tête.
+_JOURNALS_SHARING_COLUMN_ISSN = text("""
+    WITH colonnes AS (
+        SELECT DISTINCT id, title, pub_count, v AS issn
+        FROM journals, LATERAL (VALUES (issn), (eissn)) AS colonne(v)
+        WHERE v IS NOT NULL AND sudoc_checked_at IS NOT NULL
+    )
+    SELECT issn,
+           array_agg(id ORDER BY pub_count DESC, id) AS ids,
+           array_agg(title ORDER BY pub_count DESC, id) AS titles
+    FROM colonnes
+    GROUP BY issn
+    HAVING count(*) > 1
+    ORDER BY issn
 """)
 
 
@@ -285,6 +304,14 @@ class PgJournalGatewayQueries(
         return [
             JournalMergeGroup(r.issnl, tuple(r.ids))
             for r in self._conn.execute(_JOURNALS_SHARING_ISSNL).all()
+        ]
+
+    def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
+        return [
+            JournalIssnGroup(
+                r.issn, tuple(JournalTitleRow(i, t) for i, t in zip(r.ids, r.titles, strict=True))
+            )
+            for r in self._conn.execute(_JOURNALS_SHARING_COLUMN_ISSN).all()
         ]
 
     def create_journal(

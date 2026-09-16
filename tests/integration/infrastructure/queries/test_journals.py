@@ -15,15 +15,18 @@ def repo(sa_sync_conn):
     return PgJournalGatewayQueries(sa_sync_conn)
 
 
-def _create_journal(conn, *, openalex_id=None, issn=None, eissn=None, issnl=None, imported_at=None):
+def _create_journal(
+    conn, *, title="J", openalex_id=None, issn=None, eissn=None, issnl=None, imported_at=None
+):
     return conn.execute(
         text("""
             INSERT INTO journals (title, title_normalized, openalex_id,
                                   issn, eissn, issnl, doaj_imported_at)
-            VALUES ('J', 'j', :openalex_id, :issn, :eissn, :issnl, :imported_at)
+            VALUES (:title, lower(:title), :openalex_id, :issn, :eissn, :issnl, :imported_at)
             RETURNING id
         """),
         {
+            "title": title,
             "openalex_id": openalex_id,
             "issn": issn,
             "eissn": eissn,
@@ -98,6 +101,20 @@ class TestSudocCheck:
         groups = {g.issnl: g.journal_ids for g in repo.find_journals_sharing_issnl()}
         assert groups["2999-0001"] == (keeper, absorbed)
         assert unchecked not in groups["2999-0001"]
+
+    def test_shared_column_issn_groups_hold_titles(self, sa_sync_conn, repo):
+        keeper = _create_journal(sa_sync_conn, title="BMJ", eissn="2999-0002")
+        other = _create_journal(sa_sync_conn, title="BMJ British Medical Journal", issn="2999-0002")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
+            {"ids": [keeper, other]},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET pub_count = 4 WHERE id = :id"), {"id": keeper}
+        )
+        groups = {g.issn: g.journals for g in repo.find_journals_sharing_column_issn()}
+        assert [j.id for j in groups["2999-0002"]] == [keeper, other]
+        assert [j.title for j in groups["2999-0002"]] == ["BMJ", "BMJ British Medical Journal"]
 
     def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
