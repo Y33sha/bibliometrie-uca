@@ -6,8 +6,9 @@ L'ISSN-L vient des notices Sudoc : deux revues vérifiées qui le partagent déc
 import logging
 from collections.abc import Callable
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.journals import JournalMergeQueries
 
 MergeJournals = Callable[[int, int], None]
@@ -31,12 +32,21 @@ def run_merge_journals_by_issnl(
         "%s : fusion des revues de même ISSN-L",
         accord(len(groups), "groupe de revues", "groupes de revues"),
     )
-    for group in groups:
-        target, sources = group.journal_ids[0], group.journal_ids[1:]
-        for source in sources:
-            merge(target, source)
-            logger.info("ISSN-L %s : la revue %d absorbe la revue %d", group.issnl, target, source)
-        metrics.add(journals_merged=len(sources))
+    with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
+        for group in groups:
+            target, sources = group.journal_ids[0], group.journal_ids[1:]
+            for source in sources:
+                merge(target, source)
+                # Ligne de détail : le terminal la masque, le journal la garde.
+                logger.info(
+                    "ISSN-L %s : la revue %d absorbe la revue %d",
+                    group.issnl,
+                    target,
+                    source,
+                    extra={"detail": True},
+                )
+            metrics.add(journals_merged=len(sources))
+            avancement.avance()
     logger.info(
         "%sTerminé : %s",
         DERNIERE_BRANCHE,
