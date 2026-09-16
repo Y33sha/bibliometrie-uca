@@ -45,7 +45,6 @@
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
-* [ ] Facette éditeur dans la page Revues
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
@@ -71,5 +70,5 @@
 * OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Détails techniques
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
-* mettre en place des slugs pour les URL?
+* mettre en place des slugs pour les URL (au moins pour labos et personnes)?
 * passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — "suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps"
