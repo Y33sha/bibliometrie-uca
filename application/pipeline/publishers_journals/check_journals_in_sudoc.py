@@ -20,7 +20,6 @@ from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUna
 from application.ports.pipeline.journals import JournalSudocQueries, JournalSudocRow
 from domain.journals.issn_check import (
     JournalIssns,
-    SetAsideReason,
     SudocCheck,
     check_journal_issns,
     correction_candidates,
@@ -59,24 +58,17 @@ def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) 
             "%s : ISSN %s d'un enregistrement ajouté à la revue", label, issn, extra=_DETAIL
         )
     if check.conflict:
-        logger.warning(
+        logger.info(
             "%s : ISSN de deux publications à égalité — laissés en l'état", label, extra=_DETAIL
         )
     for issn, reason in check.set_aside:
-        # Un ISSN d'une autre publication trahit une erreur de source : il est signalé en avertissement.
-        level = logging.WARNING if reason is SetAsideReason.OTHER_PUBLICATION else logging.INFO
-        logger.log(
-            level,
-            "%s : ISSN %s rangé parmi les ISSN rejetés (%s)",
-            label,
-            issn,
-            reason,
-            extra=_DETAIL,
+        logger.info(
+            "%s : ISSN %s rangé parmi les ISSN rejetés (%s)", label, issn, reason, extra=_DETAIL
         )
     for raw, corrected in check.corrections:
         logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
     if check.ambiguous_support is not None:
-        logger.warning(
+        logger.info(
             "%s : plusieurs ISSN %s — laissés dans leurs colonnes",
             label,
             _SUPPORT_LABELS.get(check.ambiguous_support, check.ambiguous_support),
