@@ -73,8 +73,8 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 
 ### 3. Cohérence des ISSN
 
-- [ ] Contrôle des ISSN des enregistrements face à ceux de leur revue vérifiée.
-- [ ] Traitement des discordances.
+- [x] Mesure : 49 couples (revue, ISSN d'un enregistrement) discordants, sur 156 documents. 25 ISSN sont ceux de la revue elle-même, 19 sont absents du Sudoc, 5 désignent une autre revue de la base, dont deux doublons à fusionner.
+- [x] Les ISSN des enregistrements d'une revue, absents de ses ISSN, entrent dans la vérification Sudoc : ils complètent la revue quand la notice l'y rattache, et rejoignent les ISSN rejetés sinon. L'enregistrement reste rattaché à sa revue.
 
 ### 4. Fusion des revues séparées à tort
 
@@ -92,4 +92,3 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 ## Questions ouvertes
 
 - **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
-- **Discordances.** Un enregistrement dont l'ISSN désigne une autre revue est-il rattaché à cette revue automatiquement, ou signalé ?

@@ -43,8 +43,9 @@ def _journal(
     issnl: str | None = None,
     rejected: tuple[str, ...] = (),
     title: str = "Revue",
+    candidates: tuple[str, ...] = (),
 ) -> JournalIssns:
-    return JournalIssns(title, issn, eissn, issnl, rejected)
+    return JournalIssns(title, issn, eissn, issnl, rejected, candidates)
 
 
 class TestPlacement:
@@ -584,6 +585,78 @@ class TestRejectedReexamined:
         )
         assert (check.issn, check.eissn, check.issnl) == ("0076-6879", "1557-7988", "0076-6879")
         assert check.rejected == ("1079-2376",)
+
+
+class TestDocumentIssns:
+    def test_document_issn_of_the_journal_completes_a_column(self):
+        """Cas réel (Diabetes Care) : les enregistrements portent l'ISSN en ligne, absent de la revue."""
+        check = check_journal_issns(
+            _journal(issn="0149-5992", issnl="0149-5992", candidates=("1935-5548",)),
+            {
+                "0149-5992": _record("0149-5992", "0149-5992", PRINT, title="Diabetes care"),
+                "1935-5548": _record("1935-5548", "0149-5992", ELECTRONIC, title="Diabetes care"),
+            },
+        )
+        assert (check.issn, check.eissn) == ("0149-5992", "1935-5548")
+        assert check.rejected == ()
+
+    def test_document_issn_of_another_publication_is_rejected(self):
+        """Cas réel : des enregistrements de Technè portent l'ISSN de la revue « Spotlight »."""
+        check = check_journal_issns(
+            _journal(
+                issn="1254-7867",
+                eissn="2534-5168",
+                issnl="1254-7867",
+                title="Technè",
+                candidates=("2750-6185",),
+            ),
+            {
+                "1254-7867": _record("1254-7867", "1254-7867", PRINT, title="Technè"),
+                "2534-5168": _record("2534-5168", "1254-7867", ELECTRONIC, title="Technè"),
+                "2750-6185": _record("2750-6185", "2750-6185", ELECTRONIC, title="Spotlight"),
+            },
+        )
+        assert (check.issn, check.eissn) == ("1254-7867", "2534-5168")
+        assert check.set_aside == (("2750-6185", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ("2750-6185",)
+
+    def test_document_issns_do_not_take_over_the_journal(self):
+        """Cas réel (INRAE productions animales) : les enregistrements portent les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""
+        check = check_journal_issns(
+            _journal(
+                eissn="2824-3633",
+                issnl="2824-3633",
+                rejected=("2273-7766",),
+                title="INRAE productions animales",
+                candidates=("2273-774X",),
+            ),
+            {
+                "2824-3633": _record(
+                    "2824-3633",
+                    "2824-3633",
+                    ELECTRONIC,
+                    title="INRAE productions animales",
+                    preceding=("2273-774X", "2273-7766"),
+                ),
+                "2273-774X": _record(
+                    "2273-774X",
+                    "2273-774X",
+                    PRINT,
+                    title="INRA productions animales",
+                    other=("2273-7766",),
+                ),
+                "2273-7766": _record(
+                    "2273-7766",
+                    "2273-774X",
+                    ELECTRONIC,
+                    title="INRA productions animales",
+                    other=("2273-774X",),
+                ),
+            },
+        )
+        assert (check.issn, check.eissn, check.issnl) == (None, "2824-3633", "2824-3633")
+        assert check.rejected == ("2273-7766", "2273-774X")
+        assert check.set_aside == (("2273-774X", SetAsideReason.RELATED_TITLE),)
 
 
 class TestCorrection:
