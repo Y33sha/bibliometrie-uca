@@ -151,6 +151,16 @@ class JournalMergeGroup(NamedTuple):
     journal_ids: tuple[int, ...]
 
 
+class JournalSummary(NamedTuple):
+    """Ce que le journal du pipeline dit d'une revue."""
+
+    id: int
+    title: str
+    publisher: str | None
+    issn: str | None
+    eissn: str | None
+
+
 class JournalTitleRow(NamedTuple):
     """Une revue candidate à une fusion."""
 
@@ -177,10 +187,19 @@ class JournalMergeQueries(Protocol):
         ...
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
-        """Paires de revues seules à porter leur titre normalisé, dont au moins une sans ISSN. L'une est vide, sans enregistrement ni paiement APC, ou leurs enregistrements partagent un préfixe DOI.
+        """Paires de revues seules à porter leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements partagent un préfixe DOI. La revue qui porte le plus de publications vient en premier, puis celle qui a un ISSN."""
+        ...
 
-        La revue qui a des enregistrements vient en premier, puis celle qui porte le plus de publications, puis celle qui a un ISSN.
-        """
+    def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
+        """Titre, éditeur et ISSN de chaque revue, pour la journalisation des fusions."""
+        ...
+
+
+class JournalCleanupQueries(Protocol):
+    """Suppression des revues vides."""
+
+    def delete_empty_journals(self) -> list[JournalSummary]:
+        """Supprime les revues sans enregistrement, sans publication et sans paiement APC, et les rend."""
         ...
 
 

@@ -13,11 +13,13 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 4. **`merge_duplicate_journals`** — fusionne les revues en double, selon trois règles appliquées dans l'ordre :
     - revues vérifiées qui partagent leur ISSN-L ;
     - revues qui portent le même ISSN dans une colonne, sous des titres emboîtés (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
-    - paires de même titre dont au moins une revue est sans ISSN, quand l'une est vide ou que leurs enregistrements partagent un préfixe DOI.
+    - paires de même titre dont au moins une revue est sans ISSN, et dont les enregistrements partagent un préfixe DOI.
 
-    La revue qui porte le plus de publications absorbe les autres. La fusion est celle de l'administration des revues : publications et métadonnées passent à la cible, dont le `journal_type` requalifie les publications absorbées, puis la source est supprimée.
+    La revue qui porte le plus de publications absorbe les autres. La fusion est celle de l'administration des revues : publications et métadonnées passent à la cible, dont le `journal_type` requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 
-5. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
+5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
+
+6. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
 
 ## Import manuel d'un export DOAJ
 

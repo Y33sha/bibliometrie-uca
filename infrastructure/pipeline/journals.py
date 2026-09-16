@@ -10,6 +10,7 @@ from sqlalchemy import Connection, case, func, literal, or_, select, text, updat
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.journals import (
+    JournalCleanupQueries,
     JournalDoajQueries,
     JournalFindOrCreateQueries,
     JournalIssnGroup,
@@ -19,6 +20,7 @@ from application.ports.pipeline.journals import (
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
     JournalSudocRow,
+    JournalSummary,
     JournalTitleRow,
 )
 from domain.journals.journal import JournalType, OaModel
@@ -84,14 +86,10 @@ _JOURNALS_SHARING_COLUMN_ISSN = text("""
 """)
 
 
-# Paires de revues seules à porter leur titre, dont au moins une sans ISSN : l'une est vide, ou leurs
+# Paires de revues seules à porter leur titre, dont au moins une sans ISSN, et dont les
 # enregistrements partagent un préfixe DOI. La cible de la fusion en tête.
 _SAME_TITLE_DUPLICATES = text("""
-    WITH enregistrements AS (
-        SELECT DISTINCT journal_id AS id FROM source_publications WHERE journal_id IS NOT NULL
-    ), paiements AS (
-        SELECT DISTINCT journal_id AS id FROM apc_payments WHERE journal_id IS NOT NULL
-    ), prefixes AS (
+    WITH prefixes AS (
         SELECT journal_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
         FROM source_publications
         WHERE journal_id IS NOT NULL AND doi IS NOT NULL
@@ -101,25 +99,39 @@ _SAME_TITLE_DUPLICATES = text("""
     ), revues AS (
         SELECT j.id, j.title_normalized, j.pub_count,
                (j.issn IS NOT NULL OR j.eissn IS NOT NULL) AS a_issn,
-               e.id IS NOT NULL AS a_enregistrements,
-               pa.id IS NOT NULL AS a_paiements,
                p.pfx
         FROM journals j
         JOIN paires_de_titre USING (title_normalized)
-        LEFT JOIN enregistrements e ON e.id = j.id
-        LEFT JOIN paiements pa ON pa.id = j.id
-        LEFT JOIN prefixes p ON p.id = j.id
+        JOIN prefixes p ON p.id = j.id
     )
     SELECT x.title_normalized,
-           (SELECT array_agg(r.id ORDER BY r.a_enregistrements DESC, r.pub_count DESC, r.a_issn DESC, r.id)
+           (SELECT array_agg(r.id ORDER BY r.pub_count DESC, r.a_issn DESC, r.id)
             FROM revues r WHERE r.id IN (x.id, y.id)) AS ids
     FROM revues x
     JOIN revues y ON y.title_normalized = x.title_normalized AND x.id < y.id
-    WHERE NOT (x.a_issn AND y.a_issn)
-      AND ((NOT x.a_enregistrements AND NOT x.a_paiements)
-           OR (NOT y.a_enregistrements AND NOT y.a_paiements)
-           OR x.pfx && y.pfx)
+    WHERE NOT (x.a_issn AND y.a_issn) AND x.pfx && y.pfx
     ORDER BY x.title_normalized
+""")
+
+_JOURNAL_SUMMARIES = text("""
+    SELECT j.id, j.title, p.name AS publisher, j.issn, j.eissn
+    FROM journals j LEFT JOIN publishers p ON p.id = j.publisher_id
+    WHERE j.id = ANY(:ids)
+""")
+
+# Revues sans enregistrement, sans publication et sans paiement APC ; leurs formes de nom partent avec
+# elles (`ON DELETE CASCADE`).
+_DELETE_EMPTY_JOURNALS = text("""
+    WITH supprimees AS (
+        DELETE FROM journals j
+        WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.journal_id = j.id)
+          AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.journal_id = j.id)
+          AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.journal_id = j.id)
+        RETURNING j.id, j.title, j.publisher_id, j.issn, j.eissn
+    )
+    SELECT s.id, s.title, p.name AS publisher, s.issn, s.eissn
+    FROM supprimees s LEFT JOIN publishers p ON p.id = s.publisher_id
+    ORDER BY s.id
 """)
 
 
@@ -128,6 +140,7 @@ class PgJournalGatewayQueries(
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
     JournalMergeQueries,
+    JournalCleanupQueries,
     JournalDoajQueries,
 ):
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
@@ -349,6 +362,18 @@ class PgJournalGatewayQueries(
         return [
             JournalMergeGroup(r.title_normalized, tuple(r.ids))
             for r in self._conn.execute(_SAME_TITLE_DUPLICATES).all()
+        ]
+
+    def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
+        rows = self._conn.execute(_JOURNAL_SUMMARIES, {"ids": list(journal_ids)}).all()
+        return {r.id: JournalSummary(r.id, r.title, r.publisher, r.issn, r.eissn) for r in rows}
+
+    # ── nettoyage ──────────────────────────────────────────────────
+
+    def delete_empty_journals(self) -> list[JournalSummary]:
+        return [
+            JournalSummary(r.id, r.title, r.publisher, r.issn, r.eissn)
+            for r in self._conn.execute(_DELETE_EMPTY_JOURNALS).all()
         ]
 
     def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:

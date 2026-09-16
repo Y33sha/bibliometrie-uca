@@ -127,10 +127,14 @@ class TestSudocCheck:
         assert [j.title for j in groups["2999-0002"]] == ["BMJ", "BMJ British Medical Journal"]
 
     def test_same_title_duplicates(self, sa_sync_conn, repo):
-        """Une revue vide rejoint son homonyme ; deux revues à ISSN, ou deux revues actives sans préfixe DOI commun, restent séparées."""
-        full = _create_journal(sa_sync_conn, title="Revue test doublon vide", issn="2999-0003")
-        empty = _create_journal(sa_sync_conn, title="Revue test doublon vide")
-        _create_record(sa_sync_conn, full, doi="10.9999/a")
+        """Seules les paires dont les enregistrements partagent un préfixe DOI sont retenues ; une revue vide ou deux revues à ISSN restent hors de la règle."""
+        with_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe", issn="2999-0003")
+        without_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe")
+        _create_record(sa_sync_conn, with_issn, doi="10.9999/a")
+        _create_record(sa_sync_conn, without_issn, doi="10.9999/b")
+        full = _create_journal(sa_sync_conn, title="Revue test doublon vide", issn="2999-0006")
+        _create_journal(sa_sync_conn, title="Revue test doublon vide")
+        _create_record(sa_sync_conn, full, doi="10.9999/c")
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0004")
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0005")
         active_a = _create_journal(sa_sync_conn, title="Revue test actives distinctes")
@@ -138,9 +142,34 @@ class TestSudocCheck:
         _create_record(sa_sync_conn, active_a, doi="10.1111/x")
         _create_record(sa_sync_conn, active_b, doi="10.2222/y")
         groups = {g.key: g.journal_ids for g in repo.find_same_title_duplicates()}
-        assert groups["revue test doublon vide"] == (full, empty)
+        assert set(groups["revue test même préfixe"]) == {with_issn, without_issn}
+        assert "revue test doublon vide" not in groups
         assert "revue test homonymes à issn" not in groups
         assert "revue test actives distinctes" not in groups
+
+    def test_delete_empty_journals_spares_records_and_apc_payments(self, sa_sync_conn, repo):
+        empty = _create_journal(sa_sync_conn, title="Revue test vide", issn="2999-0007")
+        with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")
+        _create_record(sa_sync_conn, with_record, doi="10.9999/d")
+        with_payment = _create_journal(sa_sync_conn, title="Revue test avec paiement")
+        sa_sync_conn.execute(
+            text("INSERT INTO apc_payments (journal_id) VALUES (:jid)"), {"jid": with_payment}
+        )
+        deleted = {j.id: j for j in repo.delete_empty_journals()}
+        assert deleted[empty].title == "Revue test vide"
+        assert deleted[empty].issn == "2999-0007"
+        assert with_record not in deleted
+        assert with_payment not in deleted
+
+    def test_describe_journals(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, title="Revue test décrite", eissn="2999-0008")
+        summary = repo.describe_journals([journal_id])[journal_id]
+        assert (summary.title, summary.publisher, summary.issn, summary.eissn) == (
+            "Revue test décrite",
+            None,
+            None,
+            "2999-0008",
+        )
 
     def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")

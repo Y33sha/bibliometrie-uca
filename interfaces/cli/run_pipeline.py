@@ -381,6 +381,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         enrich_from_openalex=_run_enrich_journals_from_openalex,
         check_in_sudoc=_run_check_journals_in_sudoc,
         merge_duplicates=_run_merge_duplicate_journals,
+        delete_empty=_run_delete_empty_journals,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
         logger=log,
@@ -805,6 +806,19 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
         return run_merge_duplicate_journals(
             log, journal_repo=PgJournalGatewayQueries(conn), merge=merge
         )
+
+
+def _run_delete_empty_journals() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.delete_empty_journals import (
+        run_delete_empty_journals,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+
+    with get_sync_engine().connect() as conn:
+        metrics = run_delete_empty_journals(log, journal_repo=PgJournalGatewayQueries(conn))
+        conn.commit()
+    return metrics
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:

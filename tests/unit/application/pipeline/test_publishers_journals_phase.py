@@ -12,6 +12,7 @@ def _run(substep_metrics: PhaseMetrics, logger: logging.Logger) -> PhaseMetrics:
         enrich_from_openalex=lambda: PhaseMetrics(),
         check_in_sudoc=lambda: PhaseMetrics(),
         merge_duplicates=lambda: PhaseMetrics(),
+        delete_empty=lambda: PhaseMetrics(),
         enrich_from_doaj=lambda: PhaseMetrics(),
         credentials_missing=lambda source: None,
         logger=logger,
