@@ -37,6 +37,9 @@ FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | 
 
 _SUPPORT_LABELS = {Support.PRINT: "papier", Support.ELECTRONIC: "en ligne"}
 
+# Le sort des ISSN d'une revue tient du détail : le terminal le masque, le journal le garde.
+_DETAIL = {"detail": True}
+
 
 def _journal_issns(row: JournalSudocRow) -> JournalIssns:
     return JournalIssns(
@@ -52,20 +55,32 @@ def _adopted(row: JournalSudocRow, check: SudocCheck) -> tuple[str, ...]:
 def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) -> None:
     label = f"Revue {row.id} ({row.title!r})"
     for issn in _adopted(row, check):
-        logger.info("%s : ISSN %s d'un enregistrement ajouté à la revue", label, issn)
+        logger.info(
+            "%s : ISSN %s d'un enregistrement ajouté à la revue", label, issn, extra=_DETAIL
+        )
     if check.conflict:
-        logger.warning("%s : ISSN de deux publications à égalité — laissés en l'état", label)
+        logger.warning(
+            "%s : ISSN de deux publications à égalité — laissés en l'état", label, extra=_DETAIL
+        )
     for issn, reason in check.set_aside:
         # Un ISSN d'une autre publication trahit une erreur de source : il est signalé en avertissement.
         level = logging.WARNING if reason is SetAsideReason.OTHER_PUBLICATION else logging.INFO
-        logger.log(level, "%s : ISSN %s rangé parmi les ISSN rejetés (%s)", label, issn, reason)
+        logger.log(
+            level,
+            "%s : ISSN %s rangé parmi les ISSN rejetés (%s)",
+            label,
+            issn,
+            reason,
+            extra=_DETAIL,
+        )
     for raw, corrected in check.corrections:
-        logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected)
+        logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
     if check.ambiguous_support is not None:
         logger.warning(
             "%s : plusieurs ISSN %s — laissés dans leurs colonnes",
             label,
             _SUPPORT_LABELS.get(check.ambiguous_support, check.ambiguous_support),
+            extra=_DETAIL,
         )
 
 
