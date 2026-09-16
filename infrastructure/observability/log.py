@@ -3,6 +3,8 @@
 Par défaut, les logs sont émis au format JSON (une ligne = un record) pour permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd). Pour le format texte lisible en dev : `export LOG_FORMAT=text`.
 
 Tous les fichiers .log sont consolidés sous `PROJECT_ROOT/logs/`, en reproduisant l'arborescence du caller (voir `_rebase_log_dir`).
+
+Une ligne émise avec `extra={"detail": True}` porte le cas d'une donnée : un terminal la masque, le journal la garde (voir `_FiltreDetail`).
 """
 
 import contextvars
@@ -180,14 +182,35 @@ class _FormatConsole(logging.Formatter):
         return ligne
 
 
+def _console_lisible() -> bool:
+    """La console s'adresse à quelqu'un qui la lit : format texte et terminal."""
+    return os.environ.get("LOG_FORMAT", "json").lower() == "text" and sys.stdout.isatty()
+
+
 def _make_console_formatter() -> logging.Formatter:
     """Retourne le formatter des lignes de console.
 
     Devant un terminal, le format texte se réduit au message. Une sortie redirigée ou capturée porte l'horodatage, le niveau et la phase.
     """
-    if os.environ.get("LOG_FORMAT", "json").lower() == "text" and sys.stdout.isatty():
+    if _console_lisible():
         return _FormatConsole()
     return _make_formatter()
+
+
+class _FiltreDetail(logging.Filter):
+    """Écarte les lignes de détail, émises avec `extra={"detail": True}`.
+
+    Une telle ligne rapporte le cas d'une donnée parmi des milliers, par exemple un identifiant écarté à l'écriture. Elle vaut pour qui relit le journal, et encombre le terminal pendant un run.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not getattr(record, "detail", False)
+
+
+def _add_console_filters(handler: logging.Handler) -> None:
+    handler.addFilter(_PhaseNameFilter())
+    if _console_lisible():
+        handler.addFilter(_FiltreDetail())
 
 
 def _rebase_log_dir(log_dir: str) -> Path:
@@ -229,7 +252,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
 
     console = logging.StreamHandler(stream=_FluxConsole(console_stream()))
     console.setFormatter(_make_console_formatter())
-    console.addFilter(_PhaseNameFilter())
+    _add_console_filters(console)
     logger.addHandler(console)
 
     if os.environ.get("LOG_TO_FILE", "").lower() == "true":
@@ -280,5 +303,5 @@ def configure_root_logging(level: int = logging.INFO) -> None:
         return
     handler = logging.StreamHandler(stream=_FluxConsole(console_stream()))
     handler.setFormatter(_make_console_formatter())
-    handler.addFilter(_PhaseNameFilter())
+    _add_console_filters(handler)
     root.addHandler(handler)

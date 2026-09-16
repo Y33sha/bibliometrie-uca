@@ -26,7 +26,7 @@ from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import ISSN
+from domain.publications.identifiers import ISSN, issn_rejection_reason
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,15 @@ def _valid_issn(value: str | None, field: str, title: str, rejected: list[str]) 
         return None
     issn = ISSN.try_parse(value)
     if issn is None:
-        logger.warning("ISSN écarté (revue %r) : %s = %r", title, field, value)
+        # Ligne de détail : le terminal la masque, le journal la garde.
+        logger.warning(
+            "ISSN écarté (revue %r) : %s = %r — %s, valeur rangée parmi les ISSN rejetés",
+            title,
+            field,
+            value,
+            issn_rejection_reason(value),
+            extra={"detail": True},
+        )
         rejected.append(value.strip())
         return None
     return str(issn)

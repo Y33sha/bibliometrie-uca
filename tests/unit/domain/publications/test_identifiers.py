@@ -18,6 +18,7 @@ from domain.publications.identifiers import (
     clean_doi_prefix,
     extract_doi_from_url,
     is_hal_host,
+    issn_rejection_reason,
     issn_search_prefix,
     issn_typo_candidates,
     normalize_arxiv_id,
@@ -410,6 +411,15 @@ class TestIssnSearchPrefix:
     )
     def test_ecarte_ce_qui_n_est_pas_un_issn(self, raw):
         assert issn_search_prefix(raw) is None
+
+
+class TestIssnRejectionReason:
+    def test_wrong_check_digit(self):
+        """Cas réel : les sources donnent `1365-8711` à Monthly Notices of the Royal Astronomical Society."""
+        assert issn_rejection_reason("1365-8711") == "clé de contrôle fausse"
+
+    def test_invalid_form(self):
+        assert issn_rejection_reason("(Internet)") == "forme invalide"
 
 
 class TestIssnTypoCandidates:

@@ -68,11 +68,13 @@ def _external_ids(row: SourcePublicationUpsert) -> dict[str, JsonValue]:
     if row.external_ids is None:
         return {}
     if not isinstance(row.external_ids, Mapping):
+        # Lignes de détail : le terminal les masque, le journal les garde.
         logger.warning(
             "external_ids écarté (%s %s) : objet attendu, reçu %r",
             row.source,
             row.source_id,
             row.external_ids,
+            extra={"detail": True},
         )
         return {}
     clean, rejected = normalize_external_ids(row.external_ids)
@@ -83,5 +85,6 @@ def _external_ids(row: SourcePublicationUpsert) -> dict[str, JsonValue]:
             row.source_id,
             entry.key,
             entry.value,
+            extra={"detail": True},
         )
     return clean

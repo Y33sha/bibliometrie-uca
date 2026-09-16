@@ -417,6 +417,13 @@ def _normalize_issn(raw: str | None) -> str | None:
     return f"{first}-{middle}{check}"
 
 
+def issn_rejection_reason(raw: str) -> str:
+    """Motif du rejet d'une valeur d'ISSN : clé de contrôle fausse quand la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
+    if _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION)):
+        return "clé de contrôle fausse"
+    return "forme invalide"
+
+
 @dataclass(frozen=True)
 class ISSN:
     """International Standard Serial Number (`NNNN-NNNC`), clé de contrôle vérifiée."""
