@@ -26,12 +26,15 @@ def run_merge_duplicate_journals(
 ) -> PhaseMetrics:
     """Fusionne les revues de même ISSN-L, puis celles qui partagent un ISSN de colonne sous un titre emboîté."""
     metrics = PhaseMetrics()
+    # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
+    absorbed: dict[int, int] = {}
     issnl_groups = journal_repo.find_journals_sharing_issnl()
     if issnl_groups:
         _merge_groups(
             logger,
             metrics,
             merge,
+            absorbed,
             [(g.issnl, g.journal_ids) for g in issnl_groups],
             "%s : fusion des revues de même ISSN-L",
         )
@@ -46,6 +49,7 @@ def run_merge_duplicate_journals(
             logger,
             metrics,
             merge,
+            absorbed,
             shared,
             "%s : fusion des revues de même ISSN et de titre emboîté",
         )
@@ -69,16 +73,22 @@ def _merge_groups(
     logger: logging.Logger,
     metrics: PhaseMetrics,
     merge: MergeJournals,
+    absorbed: dict[int, int],
     groups: list[tuple[str, tuple[int, ...]]],
     titre: str,
 ) -> None:
+    """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée par un groupe précédent est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
     etape(logger, titre, accord(len(groups), "groupe de revues", "groupes de revues"))
     metrics.add(total=len(groups))
     with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
         for issn, journal_ids in groups:
-            target, sources = journal_ids[0], journal_ids[1:]
-            for source in sources:
+            target = _survivor(journal_ids[0], absorbed)
+            for source in journal_ids[1:]:
+                if source in absorbed or source == target:
+                    continue
                 merge(target, source)
+                absorbed[source] = target
+                metrics.add(journals_merged=1)
                 # Ligne de détail : le terminal la masque, le journal la garde.
                 logger.info(
                     "ISSN %s : la revue %d absorbe la revue %d",
@@ -87,5 +97,11 @@ def _merge_groups(
                     source,
                     extra={"detail": True},
                 )
-            metrics.add(journals_merged=len(sources))
             avancement.avance()
+
+
+def _survivor(journal_id: int, absorbed: dict[int, int]) -> int:
+    """Revue qui subsiste de `journal_id` après les fusions déjà faites."""
+    while journal_id in absorbed:
+        journal_id = absorbed[journal_id]
+    return journal_id
