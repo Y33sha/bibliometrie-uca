@@ -150,11 +150,29 @@ class JournalMergeGroup(NamedTuple):
     journal_ids: tuple[int, ...]
 
 
+class JournalTitleRow(NamedTuple):
+    """Une revue candidate à une fusion."""
+
+    id: int
+    title: str
+
+
+class JournalIssnGroup(NamedTuple):
+    """Revues qui portent le même ISSN dans `issn` ou `eissn`. La cible de la fusion vient en premier."""
+
+    issn: str
+    journals: tuple[JournalTitleRow, ...]
+
+
 class JournalMergeQueries(Protocol):
     """Fusion des revues séparées à tort."""
 
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
         """Groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui porte le plus de publications vient en premier, puis la plus petite par identifiant."""
+        ...
+
+    def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
+        """Groupes de revues vérifiées dans le Sudoc qui portent le même ISSN dans `issn` ou `eissn`, dans le même ordre."""
         ...
 
 

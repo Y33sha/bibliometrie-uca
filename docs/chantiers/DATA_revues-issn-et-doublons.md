@@ -80,7 +80,8 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 
 - [x] Audit : 140 groupes de revues partagent un ISSN-L vérifié, toutes des paires, pour 522 publications. Les cinq groupes à titres différents sont bien la même revue : abréviation, graphie, titre de volume WoS. 14 valeurs d'ISSN sont partagées par des revues d'ISSN-L différents, dont treize sont la même revue en double et une désigne deux publications distinctes.
 - [x] Revues partageant un ISSN-L de référence : fusion automatique par `merge_journals`, sous-étape de `publishers_journals`.
-- [ ] Revues de même titre sans ISSN commun : proposées dans l'administration des revues. Y traiter les treize doublons à ISSN-L différents.
+- [x] Revues partageant un ISSN de colonne sous un titre emboîté : même fusion automatique. Elle couvre dix des treize doublons à ISSN-L différents. L'éditeur ne sert pas de contrôle : deux revues sur treize seulement partagent la même fiche d'éditeur, le référentiel des éditeurs ayant lui-même ses doublons.
+- [ ] Revues de même titre sans ISSN commun : proposées dans l'administration des revues. Y traiter les deux doublons restants, un volume de congrès et un volume de collection, dont le titre ne ressemble pas à celui de leur série.
 - [ ] Contrainte d'unicité sur `issn` et `eissn`, une fois ces doublons traités. `issnl` reste sans contrainte : un titre et son supplément le partagent.
 
 ### 5. Préfixes DOI des revues

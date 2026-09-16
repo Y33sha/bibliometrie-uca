@@ -11,7 +11,7 @@ def _run(substep_metrics: PhaseMetrics, logger: logging.Logger) -> PhaseMetrics:
         resolve_publishers=lambda: substep_metrics,
         enrich_from_openalex=lambda: PhaseMetrics(),
         check_in_sudoc=lambda: PhaseMetrics(),
-        merge_by_issnl=lambda: PhaseMetrics(),
+        merge_duplicates=lambda: PhaseMetrics(),
         enrich_from_doaj=lambda: PhaseMetrics(),
         credentials_missing=lambda source: None,
         logger=logger,

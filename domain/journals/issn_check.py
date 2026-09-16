@@ -15,6 +15,7 @@ from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
+from domain.journals.titles import nested_titles
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN, issn_typo_candidates
 from domain.sources.sudoc import SudocSerialRecord, Support
@@ -90,14 +91,6 @@ def _title_ratio(title: str, other: str | None) -> float:
     return SequenceMatcher(None, normalize_text(title), normalize_text(other)).ratio()
 
 
-def _nested_titles(a: str | None, b: str | None) -> bool:
-    """Les mots d'un titre sont tous dans l'autre : « European archives » et « European archives and head & neck », pas « Physical review C » et « Physical review D »."""
-    if not a or not b:
-        return False
-    words_a, words_b = set(normalize_text(a).split()), set(normalize_text(b).split())
-    return bool(words_a and words_b) and (words_a <= words_b or words_b <= words_a)
-
-
 def _same_title(a: str | None, b: str | None) -> bool:
     if not a or not b:
         return False
@@ -117,7 +110,7 @@ def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
         return True
     if a.other_support_issns or b.other_support_issns:
         return False
-    return _complementary(a.support, b.support) and _nested_titles(a.title, b.title)
+    return _complementary(a.support, b.support) and nested_titles(a.title, b.title)
 
 
 def _support_change(
@@ -209,7 +202,7 @@ def check_journal_issns(
     if groups := _groups(known, records):
         # Un ISSN d'une colonne tient la revue. Sans notice pour aucun d'eux, le titre décide.
         eligible = [g for g in groups if any(i in columns for i in g)] or [
-            g for g in groups if any(_nested_titles(journal.title, records[i].title) for i in g)
+            g for g in groups if any(nested_titles(journal.title, records[i].title) for i in g)
         ]
         chosen = _main_group(eligible, records, journal.title) if eligible else []
         if chosen is None:
