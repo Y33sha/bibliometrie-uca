@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0NkVW4LUgsbmV6G99AUTJFMbuOgEBCf0J3kH3STEfk95U9EW33yJXJYZU3gIUSc
+\restrict ds6oSWDw5kcN5eCcIbt12BtSMQUFcBrDMJhPkc6ZqwK2bbxmn6n4VJ4ruLhytye
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2908,6 +2908,13 @@ CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING gin (((e
 
 
 --
+-- Name: idx_source_pubs_journal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_journal ON public.source_publications USING btree (journal_id) WHERE (journal_id IS NOT NULL);
+
+
+--
 -- Name: idx_source_pubs_keys_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3454,5 +3461,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0NkVW4LUgsbmV6G99AUTJFMbuOgEBCf0J3kH3STEfk95U9EW33yJXJYZU3gIUSc
+\unrestrict ds6oSWDw5kcN5eCcIbt12BtSMQUFcBrDMJhPkc6ZqwK2bbxmn6n4VJ4ruLhytye
 
