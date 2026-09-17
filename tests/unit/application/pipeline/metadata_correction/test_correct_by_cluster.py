@@ -18,12 +18,12 @@ from domain.source_publications.raw_metadata import stash_entry
 def test_tally_doi_corrections_par_cas():
     updates = [
         DoiCorrectionUpdate(
-            1, "10.x/c", {"doi": stash_entry("10.x/v1", "DATACITE_VERSION_TO_CONCEPT")}
+            1, "10.9005/c", {"doi": stash_entry("10.9005/v1", "DATACITE_VERSION_TO_CONCEPT")}
         ),
         DoiCorrectionUpdate(
-            2, "10.x/d", {"doi": stash_entry("10.x/v2", "DATACITE_VERSION_TO_CONCEPT")}
+            2, "10.9005/d", {"doi": stash_entry("10.9005/v2", "DATACITE_VERSION_TO_CONCEPT")}
         ),
-        DoiCorrectionUpdate(3, None, {"doi": stash_entry("10.y/book", "OUVRAGE_VS_CHAPITRE")}),
+        DoiCorrectionUpdate(3, None, {"doi": stash_entry("10.9006/book", "OUVRAGE_VS_CHAPITRE")}),
     ]
     assert tally_doi_corrections(updates) == {
         "DATACITE_VERSION_TO_CONCEPT": 2,

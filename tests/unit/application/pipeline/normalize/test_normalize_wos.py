@@ -454,7 +454,7 @@ def _make_api_record(  # noqa: C901
 class TestExtractFromApi:
     def test_full_extraction(self):
         raw = _make_api_record()
-        rec = extract_from_api(raw, "10.fallback/x")
+        rec = extract_from_api(raw, "10.9007/x")
 
         assert rec["ut"] == "WOS:000123"
         assert rec["doi"] == "10.1/abc"
@@ -487,8 +487,8 @@ class TestExtractFromApi:
         raw["dynamic_data"]["cluster_related"]["identifiers"]["identifier"] = [
             {"type": "issn", "value": "0000-1111"}
         ]
-        rec = extract_from_api(raw, "10.fallback/doi")
-        assert rec["doi"] == "10.fallback/doi"
+        rec = extract_from_api(raw, "10.9007/doi")
+        assert rec["doi"] == "10.9007/doi"
 
     def test_default_title_when_missing(self):
         raw = _make_api_record()

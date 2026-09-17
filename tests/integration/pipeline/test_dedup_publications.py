@@ -108,15 +108,15 @@ class TestRefreshFromSources:
         """Pièce convergée (`corrected_by = DATACITE_PACKAGE_PIECE`) : le titre vient du parent
         dataset, pas de la pièce — même quand la pièce précède le parent et partage sa source."""
         conn = sa_sync_conn
-        pub = _insert_pub(conn, doi="10.parent/set", doc_type="dataset", title="obsolète")
+        pub = _insert_pub(conn, doi="10.9001/set", doc_type="dataset", title="obsolète")
         # Pièce convergée, insérée en premier : sans dépriorisation son titre gagnerait.
         conn.execute(
             text(
                 "INSERT INTO source_publications "
                 "(source, source_id, title, pub_year, publication_id, doc_type, doi, raw_metadata) "
                 "VALUES ('datacite', 'dc-piece', 'README_data.txt', 2024, :pid, 'dataset', "
-                "'10.parent/set', "
-                '\'{"doi": {"raw": "10.piece/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}}\'::jsonb)'
+                "'10.9001/set', "
+                '\'{"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}}\'::jsonb)'
             ),
             {"pid": pub},
         )
@@ -126,7 +126,7 @@ class TestRefreshFromSources:
                 "INSERT INTO source_publications "
                 "(source, source_id, title, pub_year, publication_id, doc_type, doi) "
                 "VALUES ('datacite', 'dc-parent', 'Jeu de données phénotypiques', 2024, :pid, "
-                "'dataset', '10.parent/set')"
+                "'dataset', '10.9001/set')"
             ),
             {"pid": pub},
         )

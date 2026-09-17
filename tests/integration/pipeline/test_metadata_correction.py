@@ -517,23 +517,23 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
     # Le parent dataset est moissonné ; la pièce (DOI frère, non suffixé) et son doublon
     # cross-source basculent tous deux sur le DOI parent.
     conn = sa_sync_conn
-    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.parent/set")
+    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.9001/set")
     piece = _seed_datacite_piece(
-        conn, source_id="d-piece", doi="10.piece/file1", parent_doi="10.parent/set"
+        conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set"
     )
     # Doublon OpenAlex de la pièce : même DOI, sans la relation ; il doit converger aussi.
-    sibling = _seed_typed_sp(conn, source_id="oa-piece", doc_type="dataset", doi="10.piece/file1")
+    sibling = _seed_typed_sp(conn, source_id="oa-piece", doc_type="dataset", doi="10.9002/file1")
 
     assert _apply_cluster(conn) == 2  # la pièce DataCite + son doublon OpenAlex
 
-    assert _doi(conn, parent) == "10.parent/set"  # le parent garde son DOI
+    assert _doi(conn, parent) == "10.9001/set"  # le parent garde son DOI
     for sp in (piece, sibling):
         row = conn.execute(
             text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": sp}
         ).one()
-        assert row.doi == "10.parent/set"
+        assert row.doi == "10.9001/set"
         assert row.raw_metadata["doi"] == {
-            "raw": "10.piece/file1",
+            "raw": "10.9002/file1",
             "corrected_by": "DATACITE_PACKAGE_PIECE",
         }
 
@@ -541,29 +541,29 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
 def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):
     # Parent moissonné mais typé `article` (dataset supplémentaire d'un article) : pas de fusion.
     conn = sa_sync_conn
-    _seed_typed_sp(conn, source_id="art", doc_type="article", doi="10.art/paper")
+    _seed_typed_sp(conn, source_id="art", doc_type="article", doi="10.9004/paper")
     piece = _seed_datacite_piece(
-        conn, source_id="d-piece", doi="10.piece/data", parent_doi="10.art/paper"
+        conn, source_id="d-piece", doi="10.9002/data", parent_doi="10.9004/paper"
     )
     assert _apply_cluster(conn) == 0
-    assert _doi(conn, piece) == "10.piece/data"
+    assert _doi(conn, piece) == "10.9002/data"
 
 
 def test_dataset_piece_not_merged_when_parent_absent(sa_sync_conn):
     # Parent non moissonné : rien à absorber, la pièce attend un run ultérieur.
     conn = sa_sync_conn
     piece = _seed_datacite_piece(
-        conn, source_id="d-piece", doi="10.piece/data", parent_doi="10.absent/set"
+        conn, source_id="d-piece", doi="10.9002/data", parent_doi="10.9003/set"
     )
     assert _apply_cluster(conn) == 0
-    assert _doi(conn, piece) == "10.piece/data"
+    assert _doi(conn, piece) == "10.9002/data"
 
 
 def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_conn):
     conn = sa_sync_conn
-    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.parent/set")
+    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.9001/set")
     piece = _seed_datacite_piece(
-        conn, source_id="d-piece", doi="10.piece/file1", parent_doi="10.parent/set"
+        conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set"
     )
     assert _apply_cluster(conn) == 1
     assert _apply_cluster(conn) == 0  # idempotent
@@ -576,7 +576,7 @@ def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_con
     row = conn.execute(
         text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": piece}
     ).one()
-    assert row.doi == "10.piece/file1"
+    assert row.doi == "10.9002/file1"
     assert row.raw_metadata == {}
 
 

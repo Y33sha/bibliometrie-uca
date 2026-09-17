@@ -14,8 +14,8 @@ from domain.publications.identifiers import (
     PMCID,
     PMID,
     ArxivId,
+    DoiPrefix,
     HALId,
-    clean_doi_prefix,
     extract_doi_from_url,
     is_hal_host,
     issn_rejection_reason,
@@ -38,6 +38,7 @@ class TestDOIConstruction:
             ("http://doi.org/10.1234/test", "10.1234/test"),  # strip http
             ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # strip dx.doi.org
             ("http://dx.doi.org/10.1234/test", "10.1234/test"),  # strip http dx.doi.org
+            ("http://www.doi.org/10.1016/j.bja.2018.02.007", "10.1016/j.bja.2018.02.007"),
             ("doi:10.1234/test", "10.1234/test"),  # préfixe de schéma doi:
             ("DOI:10.1234/TEST", "10.1234/test"),  # schéma doi: + lowercase
             (
@@ -137,6 +138,19 @@ class TestDOITryParse:
     def test_normalizes_on_parse(self):
         d = DOI.try_parse("https://doi.org/10.1234/TEST.v3")
         assert d.value == "10.1234/test"
+
+    # Cas réels des related_dois d'OpenAlex et des DOI WoS.
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "2119303118",
+            "https://jssidoi.org/ird/article/116",
+            "10.101621gloenvcha.2020.102168",
+            "10.1234/",
+        ],
+    )
+    def test_returns_none_without_doi_shape(self, raw):
+        assert DOI.try_parse(raw) is None
 
 
 class TestDOIImmutable:
@@ -457,10 +471,10 @@ class TestISBN:
         assert ISBN.try_parse(raw) is None
 
 
-# ── clean_doi_prefix ───────────────────────────────────────────────
+# ── DoiPrefix ──────────────────────────────────────────────────────
 
 
-class TestCleanDoiPrefix:
+class TestDoiPrefix:
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
@@ -473,7 +487,16 @@ class TestCleanDoiPrefix:
             ("", None),
             ("pas-un-prefixe", None),  # ne commence pas par 10.<chiffres>
             ("https://doi.org/10.1016/x", None),  # URL : pas un préfixe en tête
+            # Cas réels de la table doi_prefixes.
+            ("doi:10.5194", None),  # schéma resté collé
+            ("https:", None),
+            ("2119303118", None),  # identifiant numérique pris pour un DOI
+            ("10.101621gloenvcha.2020.102168", None),  # DOI WoS privé de sa barre oblique
         ],
     )
-    def test_clean_doi_prefix(self, raw, expected):
-        assert clean_doi_prefix(raw) == expected
+    def test_try_parse(self, raw, expected):
+        parsed = DoiPrefix.try_parse(raw)
+        assert (str(parsed) if parsed else None) == expected
+
+    def test_prefixe_d_un_doi(self):
+        assert DOI("10.5194/acp-21-1").prefix == DoiPrefix("10.5194")

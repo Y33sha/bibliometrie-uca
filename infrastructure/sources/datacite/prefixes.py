@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-from domain.publications.identifiers import clean_doi_prefix
+from domain.publications.identifiers import DoiPrefix
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import http_request_with_retry
 
@@ -25,7 +25,8 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
 
     Renvoie `(provider_name, client_name, client_symbol)` ou `None` si l'appel échoue ou si la structure attendue est incomplète.
     """
-    cleaned = clean_doi_prefix(prefix)
+    parsed = DoiPrefix.try_parse(prefix)
+    cleaned = str(parsed) if parsed else None
     if not cleaned:
         return None
     url = f"{API_BASE_URLS['datacite']}/prefixes/{cleaned}"

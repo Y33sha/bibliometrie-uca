@@ -53,9 +53,9 @@ def test_resolve_ra_doi_not_found_returns_none(monkeypatch):
     monkeypatch.setattr(
         httpx2,
         "request",
-        lambda *a, **kw: _mock_response(200, [{"DOI": "10.x/foo", "RA": "DOI Not Found"}]),
+        lambda *a, **kw: _mock_response(200, [{"DOI": "10.9005/foo", "RA": "DOI Not Found"}]),
     )
-    assert resolve_ra("10.x/foo", user_agent="ua") is None
+    assert resolve_ra("10.9005/foo", user_agent="ua") is None
 
 
 def test_resolve_ra_http_error_returns_none(monkeypatch):

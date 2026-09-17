@@ -83,7 +83,7 @@ class TestGetPublicationDetail:
     def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
         # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
-        pub = _create_pub(sa_sync_conn, doi="10.parent/set")
+        pub = _create_pub(sa_sync_conn, doi="10.9001/set")
         _create_sd(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
         for source_id, corrected_by in (
             ("oa-piece", "DATACITE_PACKAGE_PIECE"),
@@ -98,7 +98,9 @@ class TestGetPublicationDetail:
                 {
                     "sid": source_id,
                     "pub": pub,
-                    "rm": json.dumps({"doi": {"raw": "10.x/orig", "corrected_by": corrected_by}}),
+                    "rm": json.dumps(
+                        {"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}}
+                    ),
                 },
             )
         detail = get_publication_detail(sa_sync_conn, pub)
