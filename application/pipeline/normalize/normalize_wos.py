@@ -23,6 +23,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
@@ -337,10 +338,14 @@ def upsert_journal(
     title = as_str(rec.get("journal_title"))
     if not title:
         return None
+    issn = as_str(rec.get("issn"))
+    eissn = as_str(rec.get("eissn"))
+    if not container_is_journal(as_str(rec.get("doc_type")), "wos", has_issn=bool(issn or eissn)):
+        return None
     return find_or_create_journal(
         title,
-        issn=as_str(rec.get("issn")),
-        eissn=as_str(rec.get("eissn")),
+        issn=issn,
+        eissn=eissn,
         publisher_id=publisher_id,
         repo=journal_repo,
     )

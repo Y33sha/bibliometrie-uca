@@ -23,6 +23,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -90,6 +91,8 @@ def upsert_journal(
     if not title:
         return None
     issn, eissn = _extract_journal_issns(source)
+    if not container_is_journal(as_str(doc.get("type")), "scanr", has_issn=bool(issn or eissn)):
+        return None
     return find_or_create_journal(
         title,
         issn=issn,

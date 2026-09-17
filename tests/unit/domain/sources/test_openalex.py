@@ -255,6 +255,9 @@ class TestShouldSkipPublisherJournal:
     def test_repository_skips(self):
         assert should_skip_publisher_journal(_loc(source_type="repository"))
 
+    def test_ebook_platform_skips(self):
+        assert should_skip_publisher_journal(_loc(source_type="ebook platform"))
+
     def test_journal_does_not_skip(self):
         assert not should_skip_publisher_journal(
             _loc(source_type="journal", source_display_name="Nature")

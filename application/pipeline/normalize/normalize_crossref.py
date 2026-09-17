@@ -30,6 +30,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
+from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -186,11 +187,13 @@ def upsert_journal(
     *,
     journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
-    """Crée le journal seulement si la publi a un container-title (= revue, série, etc.)."""
+    """Trouve ou crée la revue désignée par le container-title (revue, série, recueil d'actes)."""
     title = get_container_title(msg)
     if not title:
         return None
     issn, eissn = get_issns(msg)
+    if not container_is_journal(as_str(msg.get("type")), "crossref", has_issn=bool(issn or eissn)):
+        return None
     return find_or_create_journal(
         title,
         issn=issn,

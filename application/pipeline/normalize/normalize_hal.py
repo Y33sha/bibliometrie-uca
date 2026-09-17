@@ -29,6 +29,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
+from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -78,10 +79,15 @@ def upsert_journal(
     title = hal_text_field(doc.get("journalTitle_s"))
     if not title:
         return None
+    issn = hal_text_field(doc.get("journalIssn_s"))
+    eissn = hal_text_field(doc.get("journalEissn_s"))
+    raw_type = hal_text_field(doc.get("docType_s"))
+    if not container_is_journal(raw_type, "hal", has_issn=bool(issn or eissn)):
+        return None
     return find_or_create_journal(
         title,
-        issn=hal_text_field(doc.get("journalIssn_s")),
-        eissn=hal_text_field(doc.get("journalEissn_s")),
+        issn=issn,
+        eissn=eissn,
         publisher_id=publisher_id,
         repo=journal_repo,
     )

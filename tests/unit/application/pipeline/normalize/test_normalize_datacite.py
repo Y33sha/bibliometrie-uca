@@ -308,6 +308,16 @@ class TestUpsertJournal:
         """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
+    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        monkeypatch.setattr(normalize_datacite, "find_or_create_journal", MagicMock())
+        attrs = {
+            "types": {"resourceTypeGeneral": "BookChapter"},
+            "container": {"title": "Handbook of Things"},
+        }
+
+        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) is None
+        normalize_datacite.find_or_create_journal.assert_not_called()
+
     def test_contenant_titre_cree_la_revue(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
