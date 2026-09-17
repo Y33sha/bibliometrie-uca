@@ -44,6 +44,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
 - `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
+- Un chapitre ou un livre crée ou retrouve une revue seulement s'il porte un ISSN, celui de sa collection. Sans ISSN, son conteneur est le livre lui-même, dont le titre va dans `container_title`. Un article de congrès garde son recueil d'actes, avec ou sans ISSN.
+- Le titre seul (« Proceedings », « Conference ») ne type pas un conteneur : *PNAS* et *Proceedings of the Royal Society B* sont des revues.
+- Le typage automatique d'un conteneur ne remplace jamais un type posé dans l'administration.
 
 ## Phasage
 
@@ -102,6 +105,19 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [ ] Réécriture de `resolve_journal_by_doi`.
 - [ ] Retrait de `seed_journals_doi_prefix` et de ses tests.
 
+### 6. Livres, chapitres et recueils d'actes
+
+- [x] Mesure : aucun normaliseur ne filtre sur le type de document avant `find_or_create_journal`. Crossref rattache à une « revue » ses 1 983 chapitres et ses 1 437 articles de congrès, le plus souvent sans ISSN. Les faux conteneurs de livres comptent 141 `ebook_platform` (pseudo-sources OpenAlex « … eBooks »), 530 `unknown` et 199 `journal` sans ISSN.
+- [x] Mesure : chez Crossref, l'ISSN départage les chapitres. Sans ISSN, le conteneur est le livre ; avec ISSN, une collection de livres ou d'actes. 95 % des articles de congrès n'ont pas d'ISSN : leur type `proceedings-article` suffit.
+- [ ] Normalisation, toutes sources, sur le type brut : un chapitre ou un livre crée ou retrouve une revue seulement s'il porte un ISSN. Un article de congrès garde son recueil, avec ou sans ISSN.
+- [ ] Normalisation OpenAlex : une source `ebook platform` ne crée pas de revue, comme un dépôt.
+- [ ] Oneshot : détacher de leur « revue » les chapitres et livres qui tombent sous ces règles. La suppression des revues vides emporte ensuite les fausses revues. Volume à chiffrer (de l'ordre de 870 revues).
+- [ ] Crossref : Springer décrit le congrès dans `assertion` (`conference_name`, `conference_acronym`…) sur 463 chapitres, dont 226 dans des collections typées `book_series`. Garder ce signal à la normalisation ; une règle de `metadata_correction` type ces chapitres en articles de congrès. Un chapitre sans ISSN qui porte ce signal garde son recueil. `event` figure sur 98 % des `proceedings-article`, jamais sur un `book-chapter`.
+- [ ] Typage automatique des conteneurs dans `publishers_journals` : un conteneur `unknown` dont la majorité des enregistrements sont des articles de congrès, toutes sources confondues, devient `proceedings`. Ce signal retrouve 263 des 288 conteneurs `proceedings` existants, et en propose 327 parmi les `unknown`.
+- [ ] File de l'administration pour les 232 conteneurs typés `journal` que ce signal désigne comme recueils d'actes : rien ne distingue un type posé à la main d'un type venu d'OpenAlex.
+- [ ] ISBN : seul Crossref est lu (`external_ids.isbn`). HAL (TEI `idno type="isbn"`) et WoS (identifiants `isbn`, `eisbn`) le fournissent aussi, DataCite surtout en texte libre. Le DOI contient un ISBN pour 3 464 chapitres, 465 livres et 1 287 articles de congrès (`10.1007/978-3-030-58080-3_309-1`).
+
 ## Questions ouvertes
 
 - **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
+- **Recueils et collections.** La table `journals` range au même niveau les recueils d'actes et la collection qui les réunit (*Communications in Computer and Information Science*, *IFIP AICT*). Faut-il une table des monographies, identifiées par leur ISBN et rattachées à leur collection ?
