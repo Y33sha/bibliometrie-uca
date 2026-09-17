@@ -19,10 +19,7 @@ def run_delete_empty_journals(
     metrics = PhaseMetrics()
     if not deleted:
         return metrics
-    if len(deleted) == 1:
-        etape(logger, "Suppression d'une revue vide")
-    else:
-        etape(logger, "Suppression des %d revues vides", len(deleted))
+    etape(logger, "Suppression des revues vides")
     for journal in deleted:
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Revue vide supprimée : %s", journal_label(journal), extra={"detail": True})
