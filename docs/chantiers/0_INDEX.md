@@ -20,6 +20,7 @@
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Revues : ISSN vérifiés, doublons et préfixes DOI](DATA_revues-issn-et-doublons.md)
+- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
