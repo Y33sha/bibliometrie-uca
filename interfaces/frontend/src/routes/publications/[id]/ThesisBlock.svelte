@@ -135,11 +135,4 @@
     background: var(--surface-hover);
     font-size: 0.85rem;
   }
-  .thesis-dl a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .thesis-dl a:hover {
-    text-decoration: underline;
-  }
 </style>

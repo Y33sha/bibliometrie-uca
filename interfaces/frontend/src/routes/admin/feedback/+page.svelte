@@ -493,13 +493,6 @@
     margin: 0 0 4px;
     font-size: 0.85rem;
   }
-  .back-link a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .back-link a:hover {
-    text-decoration: underline;
-  }
   .help-text {
     background: var(--accent-light);
     border: 1px solid #c4d8ed;

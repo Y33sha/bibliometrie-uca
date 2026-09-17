@@ -239,6 +239,4 @@
 	}
 	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid #f0d9b0; vertical-align: top; }
 	.blocking-table tr:last-child td { border-bottom: none; }
-	.blocking-table a { color: var(--accent); text-decoration: none; }
-	.blocking-table a:hover { text-decoration: underline; }
 </style>

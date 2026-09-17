@@ -232,8 +232,6 @@
 	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }
 	.hal-row { display: flex; gap: 6px; align-items: center; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); margin-left: 8px; }
-	.doi-ref a { color: var(--accent); text-decoration: none; }
-	.doi-ref a:hover { text-decoration: underline; }
 	.pub-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.pub-link:hover { text-decoration: underline; }
 	.pub-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }

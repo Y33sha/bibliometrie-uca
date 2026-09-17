@@ -67,13 +67,6 @@
     flex-direction: column;
     gap: 4px;
   }
-  .relations-list a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .relations-list a:hover {
-    text-decoration: underline;
-  }
   .meta {
     color: var(--muted);
     font-size: 0.85rem;

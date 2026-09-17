@@ -118,6 +118,4 @@
 	}
 	.hal-badge:hover { background: #145a94; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); }
-	.doi-ref a { color: var(--accent); text-decoration: none; }
-	.doi-ref a:hover { text-decoration: underline; }
 </style>
