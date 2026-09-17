@@ -210,11 +210,23 @@ class JournalRecordTypes(NamedTuple):
     records: tuple[tuple[str, str | None], ...]
 
 
+class JournalTitleIssnRow(NamedTuple):
+    """Titre d'une revue, et présence d'un ISSN dans `issn`, `eissn` ou `issnl`."""
+
+    id: int
+    title: str
+    has_issn: bool
+
+
 class JournalProceedingsTypingQueries(Protocol):
-    """Typage en recueil d'actes des revues de type inconnu."""
+    """Typage en recueil d'actes."""
 
     def find_record_types_of_unknown_journals(self) -> list[JournalRecordTypes]:
         """Les revues de type `unknown` qui ont au moins un document, avec le type brut de chaque document."""
+        ...
+
+    def find_titles_of_non_proceedings_journals(self) -> list[JournalTitleIssnRow]:
+        """Les revues d'un autre type que `proceedings`, avec leur titre et la présence d'un ISSN."""
         ...
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:

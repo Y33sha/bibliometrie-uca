@@ -23,6 +23,7 @@ from application.ports.pipeline.journals import (
     JournalSudocQueries,
     JournalSudocRow,
     JournalSummary,
+    JournalTitleIssnRow,
     JournalTitleRow,
 )
 from domain.journals.journal import JournalType, OaModel
@@ -404,6 +405,22 @@ class PgJournalGatewayQueries(
             JournalRecordTypes(r.id, tuple(zip(r.sources, r.raw_types, strict=True)))
             for r in self._conn.execute(_RECORD_TYPES_OF_UNKNOWN_JOURNALS)
         ]
+
+    def find_titles_of_non_proceedings_journals(self) -> list[JournalTitleIssnRow]:
+        rows = self._conn.execute(
+            select(
+                journals.c.id,
+                journals.c.title,
+                or_(
+                    journals.c.issn.is_not(None),
+                    journals.c.eissn.is_not(None),
+                    journals.c.issnl.is_not(None),
+                ).label("has_issn"),
+            )
+            .where(journals.c.journal_type != JournalType.PROCEEDINGS)
+            .order_by(journals.c.id)
+        )
+        return [JournalTitleIssnRow(r.id, r.title, r.has_issn) for r in rows]
 
     # ── fusion ─────────────────────────────────────────────────────
 

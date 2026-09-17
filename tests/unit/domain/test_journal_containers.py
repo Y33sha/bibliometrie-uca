@@ -6,6 +6,7 @@ from domain.journals.containers import (
     conference_paper_share,
     container_is_journal,
     holds_mostly_conference_papers,
+    is_dated_event_without_issn,
 )
 
 
@@ -66,6 +67,15 @@ def test_type_composite_compte_comme_article_de_congres():
 def test_part_d_articles_de_congres():
     records = [("crossref", "proceedings-article"), ("hal", "COMM"), ("hal", "ART")]
     assert conference_paper_share(records) == (2, 3)
+
+
+def test_titre_date_sans_issn():
+    assert is_dated_event_without_issn("ESAFORM 2021", has_issn=False)
+
+
+def test_titre_date_avec_issn():
+    """Cas réel : Periodontology 2000 est une revue."""
+    assert not is_dated_event_without_issn("Periodontology 2000", has_issn=True)
 
 
 def test_revue_sans_document():

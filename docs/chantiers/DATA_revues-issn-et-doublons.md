@@ -45,8 +45,8 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
 - `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
 - Un chapitre ou un livre crée ou retrouve une revue seulement s'il porte un ISSN, celui de sa collection. Sans ISSN, son conteneur est le livre lui-même, dont le titre va dans `container_title`, sauf si un recueil d'actes existant porte ce titre. Un article de congrès garde son recueil d'actes, avec ou sans ISSN.
-- Le titre seul (« Proceedings », « Conference ») ne type pas un conteneur : *PNAS* et *Proceedings of the Royal Society B* sont des revues.
-- Le typage automatique d'un conteneur ne remplace jamais un type posé dans l'administration.
+- Un mot du titre (« Proceedings », « Conference ») ne type pas un conteneur : *PNAS* et *Proceedings of the Royal Society B* sont des revues. Une édition datée dans le titre d'une revue sans ISSN type le conteneur en recueil d'actes, quel que soit son type.
+- Le typage par les documents s'applique aux seuls conteneurs `unknown`.
 
 ## Phasage
 
@@ -117,6 +117,8 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Stock Crossref : réhydrater le staging depuis le raw store, puis renormaliser Crossref.
 - [x] Typage automatique des conteneurs dans `publishers_journals` (`type_proceedings_journals`) : un conteneur `unknown` dont la majorité stricte des enregistrements sont des articles de congrès, d'après leur type brut, devient `proceedings`. Ce signal retrouve 263 des 288 conteneurs `proceedings` existants, et en propose 325 parmi les `unknown`.
 - [x] File de l'administration pour les 232 conteneurs typés `journal` que ce signal désigne comme recueils d'actes : onglet « Recueils d'actes probables » de `admin/journals`. Les vraies revues qui publient les résumés d'un congrès (*Value in Health*, *Diabetologia*) y restent : une colonne qui retiendrait leur vérification attend de savoir si ce résidu gêne.
+- [x] Typage par le titre dans `type_proceedings_journals` : une revue sans ISSN dont le titre nomme une édition datée devient `proceedings` (`names_a_dated_event`). Ne comptent ni une période (« 1960–2015 »), ni une année seule entre parenthèses, ni un titre qui contient « journal ». Mesure : 95 revues typées `journal` et 3 `unknown`, toutes des actes ; 447 des recueils sans ISSN déjà typés sont retrouvés.
+- [ ] Titres de revue parasites, surtout `unknown` : « 22 Seiten (2023). », « 1-26 (2021). », « Journal of high energy physics 2018(7) ». Source et nettoyage à établir.
 - [ ] ISBN : seul Crossref est lu (`external_ids.isbn`). HAL (TEI `idno type="isbn"`) et WoS (identifiants `isbn`, `eisbn`) le fournissent aussi, DataCite surtout en texte libre. Le DOI contient un ISBN pour 3 464 chapitres, 465 livres et 1 287 articles de congrès (`10.1007/978-3-030-58080-3_309-1`).
 
 ## Questions ouvertes
