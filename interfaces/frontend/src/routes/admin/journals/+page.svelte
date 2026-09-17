@@ -65,7 +65,8 @@
 	const mergeSearch = useDebouncedSearch<Journal>({
 		search: async (q) => {
 			const data = await api<JournalListResponse>(
-				`/api/journals?search=${encodeURIComponent(q)}&per_page=10`,
+				// Les revues les plus fournies en publications d'abord, comme pour la fusion d'éditeurs.
+				`/api/journals?search=${encodeURIComponent(q)}&sort=pubs_desc&per_page=10`,
 			);
 			return data.journals;
 		},
