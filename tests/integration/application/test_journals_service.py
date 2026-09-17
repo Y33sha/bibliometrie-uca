@@ -428,6 +428,16 @@ class TestFindOrCreateContainerJournal:
         )
         assert found == proceedings
 
+    def test_chapitre_sans_issn_issu_d_un_congres_cree_son_recueil(self, sa_sync_conn, gateway):
+        found = find_or_create_container_journal(
+            "Graph-Theoretic Concepts in Computer Science",
+            raw_doc_type="book-chapter",
+            source="crossref",
+            declares_conference=True,
+            repo=gateway,
+        )
+        assert found is not None
+
     def test_chapitre_avec_issn_cree_sa_collection(self, sa_sync_conn, gateway):
         found = find_or_create_container_journal(
             "Lecture Notes in Things",

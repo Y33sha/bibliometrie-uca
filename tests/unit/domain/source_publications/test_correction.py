@@ -52,6 +52,7 @@ def _view(**overrides: object) -> MetadataForCorrection:
         "oa_model": None,
         "embargo_expired": False,
         "self_declared_preprint": False,
+        "declares_conference": False,
     }
     defaults.update(overrides)
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
@@ -348,6 +349,27 @@ class TestTitleSupplementaryContentRule:
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "thesis"
+
+
+class TestConferenceDeclaredRule:
+    def test_chapitre_issu_d_un_congres_devient_article_de_congres(self):
+        corrected = effective_metadata(
+            _view(doc_type="book_chapter", declares_conference=True)
+        ).doc_type
+        assert corrected is not None
+        assert corrected.value == "conference_paper"
+        assert corrected.rule == MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER
+
+    def test_livre_issu_d_un_congres_reste_livre(self):
+        view = _view(doc_type="book", declares_conference=True)
+        assert effective_metadata(view).doc_type is None
+
+    def test_chapitre_sans_congres_reste_chapitre(self):
+        assert effective_metadata(_view(doc_type="book_chapter")).doc_type is None
+
+    def test_regle_ecartee_du_rejeu_canonique(self):
+        view = _view(doc_type="book_chapter", declares_conference=True)
+        assert effective_doc_type_for_publication(view) is None
 
 
 class TestJournalTypeProceedingsRule:

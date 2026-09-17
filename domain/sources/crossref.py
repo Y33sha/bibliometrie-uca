@@ -71,10 +71,38 @@ def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str 
     return None, None
 
 
+def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
+    """Nom et acronyme du congrès dont le document est issu, ou `None`.
+
+    Crossref décrit le congrès dans `event` pour un `proceedings-article`. Springer le décrit dans les `assertion` du groupe `ConferenceInfo` pour un `book-chapter`.
+    """
+
+    def text(value: JsonValue) -> str | None:
+        return (as_str(value) or "").strip() or None
+
+    event = as_mapping(msg.get("event"))
+    name = text(event.get("name"))
+    acronym = text(event.get("acronym"))
+    for entry in as_sequence(msg.get("assertion")):
+        assertion = as_mapping(entry)
+        if as_mapping(assertion.get("group")).get("name") != "ConferenceInfo":
+            continue
+        if assertion.get("name") == "conference_name":
+            name = name or text(assertion.get("value"))
+        elif assertion.get("name") == "conference_acronym":
+            acronym = acronym or text(assertion.get("value"))
+    if not name:
+        return None
+    conference: dict[str, JsonValue] = {"name": name}
+    if acronym:
+        conference["acronym"] = acronym
+    return conference
+
+
 def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
-    Whitelist explicite : `license`, `funder`, `relation`, `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_publications.meta`.
+    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_publications.meta`.
 
     Le sous-objet `meta->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
     """
@@ -83,6 +111,9 @@ def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValu
         val = msg.get(key)
         if val:
             meta[key] = val
+    conference = extract_crossref_conference(msg)
+    if conference:
+        meta["conference"] = conference
     refs_count = msg.get("references-count")
     if isinstance(refs_count, int) and refs_count > 0:
         meta["references_count"] = refs_count

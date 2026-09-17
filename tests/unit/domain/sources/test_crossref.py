@@ -2,6 +2,7 @@
 
 from domain.dates import today
 from domain.sources.crossref import (
+    extract_crossref_conference,
     extract_crossref_meta,
     extract_crossref_pub_year,
     parse_crossref_issns,
@@ -204,3 +205,43 @@ class TestExtractCrossrefMeta:
 
     def test_returns_none_when_empty(self):
         assert extract_crossref_meta({}) is None
+
+    def test_keeps_conference(self):
+        meta = extract_crossref_meta({"event": {"name": "EUROCALL 2022"}})
+        assert meta == {"conference": {"name": "EUROCALL 2022"}}
+
+
+def _conference_assertion(name: str, value: str) -> dict:
+    return {"group": {"name": "ConferenceInfo"}, "name": name, "value": value}
+
+
+class TestExtractCrossrefConference:
+    def test_event_of_proceedings_article(self):
+        msg = {"type": "proceedings-article", "event": {"name": "SODA", "acronym": "SODA25"}}
+        assert extract_crossref_conference(msg) == {"name": "SODA", "acronym": "SODA25"}
+
+    def test_springer_assertions_of_book_chapter(self):
+        """Cas réel : chapitre de Lecture Notes in Computer Science issu du congrès WG 2018."""
+        msg = {
+            "type": "book-chapter",
+            "assertion": [
+                _conference_assertion("conference_acronym", "WG"),
+                _conference_assertion(
+                    "conference_name",
+                    "International Workshop on Graph-Theoretic Concepts in Computer Science",
+                ),
+                _conference_assertion("conference_city", "Cottbus"),
+                {"group": {"name": "ArticleHistory"}, "name": "first_online", "value": "2018"},
+            ],
+        }
+        assert extract_crossref_conference(msg) == {
+            "name": "International Workshop on Graph-Theoretic Concepts in Computer Science",
+            "acronym": "WG",
+        }
+
+    def test_acronym_without_name_is_ignored(self):
+        msg = {"assertion": [_conference_assertion("conference_acronym", "WG")]}
+        assert extract_crossref_conference(msg) is None
+
+    def test_blank_name_is_ignored(self):
+        assert extract_crossref_conference({"event": {"name": "  "}}) is None
