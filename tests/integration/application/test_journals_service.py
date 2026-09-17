@@ -211,6 +211,18 @@ class TestFindOrCreatePublisher:
         found = find_or_create_publisher("elsevier", repo=publisher_gateway)
         assert found == existing
 
+    def test_variantes_de_nom_rejoignent_le_meme_editeur(self, sa_sync_conn, publisher_gateway):
+        """Cas réels : formes juridiques, dates et « on behalf of » ajoutés par les sources."""
+        elsevier = find_or_create_publisher("Elsevier BV", repo=publisher_gateway)
+        for variant in (
+            "Elsevier [1977-....]",
+            "Elsevier Ltd.",
+            "Elsevier on behalf of the American College of Cardiology Foundation",
+        ):
+            assert find_or_create_publisher(variant, repo=publisher_gateway) == elsevier
+        row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=elsevier)
+        assert row.name == "Elsevier BV"
+
     def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_gateway):
         existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
         find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_gateway)

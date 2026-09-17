@@ -30,6 +30,7 @@ from domain.errors import (
     ValidationError,
 )
 from domain.normalize import normalize_text, to_plain_text
+from domain.publishers.names import publisher_name_key
 
 
 def find_or_create_publisher(
@@ -42,7 +43,7 @@ def find_or_create_publisher(
 
     Cascade de recherche :
     1. openalex_id (si fourni)
-    2. publisher_name_forms (par nom normalisé)
+    2. publisher_name_forms, par la clé de nom (`publisher_name_key`)
     3. Création + enregistrement de la forme de nom
 
     Retourne publisher.id ou None si name est vide.
@@ -50,26 +51,39 @@ def find_or_create_publisher(
     if not name:
         return None
 
-    # Mise à plat d'abord : la clé de rapprochement et le nom affiché en dérivent tous deux
-    # (cf. `find_or_create_journal`).
-    name = to_plain_text(name)
-    name_normalized = normalize_text(name)
-    if not name_normalized:
-        return None
-
     # 1. Par openalex_id
     if openalex_id:
         pub_id = repo.find_publisher_by_openalex_id(openalex_id)
         if pub_id:
-            repo.add_publisher_name_form(pub_id, name_normalized)
+            name_key = publisher_name_key(to_plain_text(name))
+            if name_key:
+                repo.add_publisher_name_form(pub_id, name_key)
             return pub_id
 
     # 2-3. Match ou création par forme de nom, puis rattachement de l'openalex_id
     # (sur l'éditeur trouvé comme sur celui créé).
-    pub_id, _ = repo.match_or_create_by_name_form(name, name_normalized)
+    matched = match_or_create_publisher(name, repo=repo)
+    if matched is None:
+        return None
+    pub_id, _ = matched
     if openalex_id:
         repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
     return pub_id
+
+
+def match_or_create_publisher(
+    name: str, *, repo: PublisherFindOrCreateQueries
+) -> tuple[int, bool] | None:
+    """`(id, created)` de l'éditeur que désigne `name`, retrouvé par sa clé de nom ou créé. `None` si le nom ne garde rien à la normalisation.
+
+    Le nom est mis à plat d'abord : le nom affiché, le nom normalisé et la clé en dérivent tous (cf. `find_or_create_journal`).
+    """
+    name = to_plain_text(name)
+    name_normalized = normalize_text(name)
+    name_key = publisher_name_key(name)
+    if not name_normalized or not name_key:
+        return None
+    return repo.match_or_create_by_name_form(name, name_normalized, name_key)
 
 
 def update_publisher(
