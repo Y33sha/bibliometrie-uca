@@ -78,3 +78,23 @@ def test_revue_au_titre_date_typee_quel_que_soit_son_type(caplog):
 
     assert repo.types == {83215: JournalType.PROCEEDINGS}
     assert "(titre daté)" in caplog.text
+
+
+def test_revue_au_titre_d_actes_typee():
+    """Cas réel : actes IJCAI typés journal, sans ISSN ; la Wesley Historical Society est une revue."""
+    repo = _Repo(
+        [],
+        [
+            JournalTitleIssnRow(
+                83470,
+                "Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence",
+                has_issn=False,
+            ),
+            JournalTitleIssnRow(
+                97577, "Proceedings of the Wesley Historical Society", has_issn=False
+            ),
+        ],
+    )
+    run_type_proceedings_journals(logging.getLogger("test_recueils_actes"), journal_repo=repo)
+
+    assert repo.types == {83470: JournalType.PROCEEDINGS}

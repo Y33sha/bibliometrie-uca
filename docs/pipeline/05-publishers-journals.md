@@ -19,9 +19,10 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 
 5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 
-6. **`type_proceedings_journals`** — type en recueil d'actes (`proceedings`) deux sortes de revues :
+6. **`type_proceedings_journals`** — type en recueil d'actes (`proceedings`) trois sortes de revues :
     - les revues de type inconnu dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source ;
-    - les revues sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS »).
+    - les revues sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS ») ;
+    - les revues sans ISSN, de n'importe quel type, dont le titre contient « proceedings » sans nommer une société savante, une académie ou une institution.
 
 7. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
 

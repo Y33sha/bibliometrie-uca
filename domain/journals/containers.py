@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 
-from domain.journals.titles import names_a_dated_event
+from domain.journals.titles import names_a_dated_event, names_proceedings
 from domain.source_publications.doc_types import map_doc_type
 
 _BOOK_TYPES = frozenset({"book", "book_chapter"})
@@ -42,6 +42,11 @@ def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[i
 def is_dated_event_without_issn(title: str, *, has_issn: bool) -> bool:
     """Indique si une revue sans ISSN porte le titre d'une édition datée de congrès (`names_a_dated_event`). Une revue avec ISSN peut porter une année dans son titre (« Periodontology 2000 »)."""
     return not has_issn and names_a_dated_event(title)
+
+
+def is_proceedings_title_without_issn(title: str, *, has_issn: bool) -> bool:
+    """Indique si une revue sans ISSN porte un titre d'actes (`names_proceedings`)."""
+    return not has_issn and names_proceedings(title)
 
 
 def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) -> bool:
