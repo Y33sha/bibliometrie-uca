@@ -1,8 +1,16 @@
-"""Règle de rattachement d'un document à une revue selon son type."""
+"""Règles de rattachement d'un document à une revue et de typage d'une revue selon ses documents."""
+
+from collections.abc import Iterable
 
 from domain.source_publications.doc_types import map_doc_type
 
 _BOOK_TYPES = frozenset({"book", "book_chapter"})
+_CONFERENCE_PAPER = "conference_paper"
+
+
+def _doc_types(raw_doc_type: str | None, source: str) -> set[str]:
+    """Valeurs `doc_type` d'un type brut, composite ou non (WoS « Book Chapter; Proceedings Paper »)."""
+    return {map_doc_type(part, source) for part in (raw_doc_type or "").split(";")}
 
 
 def container_is_journal(
@@ -10,9 +18,21 @@ def container_is_journal(
 ) -> bool:
     """Indique si le conteneur d'un document désigne une revue.
 
-    Sans ISSN, le conteneur d'un livre ou d'un chapitre est le livre lui-même. Avec un ISSN, c'est sa collection. Un document issu d'un congrès garde son conteneur, le recueil d'actes : il déclare le congrès (`declares_conference`), ou son type composite (WoS « Book Chapter; Proceedings Paper ») mentionne un article de congrès.
+    Sans ISSN, le conteneur d'un livre ou d'un chapitre est le livre lui-même. Avec un ISSN, c'est sa collection. Un document issu d'un congrès garde son conteneur, le recueil d'actes : il déclare le congrès (`declares_conference`), ou son type composite mentionne un article de congrès.
     """
     if has_issn or declares_conference:
         return True
-    types = {map_doc_type(part, source) for part in (raw_doc_type or "").split(";")}
-    return "conference_paper" in types or not types & _BOOK_TYPES
+    types = _doc_types(raw_doc_type, source)
+    return _CONFERENCE_PAPER in types or not types & _BOOK_TYPES
+
+
+def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) -> bool:
+    """Indique si la majorité stricte des documents d'une revue sont des articles de congrès.
+
+    `records` : `(source, type brut)` de chaque document. Le type brut évite de compter les documents que la correction a retypés d'après le type de la revue.
+    """
+    total = conference = 0
+    for source, raw_doc_type in records:
+        total += 1
+        conference += _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
+    return conference * 2 > total

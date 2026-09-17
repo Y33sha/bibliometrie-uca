@@ -203,6 +203,29 @@ class JournalMergeQueries(Protocol):
         ...
 
 
+class JournalRecordTypes(NamedTuple):
+    """Les documents d'une revue : `(source, type brut)` de chacun."""
+
+    journal_id: int
+    records: tuple[tuple[str, str | None], ...]
+
+
+class JournalProceedingsTypingQueries(Protocol):
+    """Typage en recueil d'actes des revues de type inconnu."""
+
+    def find_record_types_of_unknown_journals(self) -> list[JournalRecordTypes]:
+        """Les revues de type `unknown` qui ont au moins un document, avec le type brut de chaque document."""
+        ...
+
+    def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
+        """Titre, éditeur et ISSN de chaque revue, pour la journalisation."""
+        ...
+
+    def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
+        """Pose le `journal_type` d'une revue."""
+        ...
+
+
 class JournalCleanupQueries(Protocol):
     """Suppression des revues vides."""
 

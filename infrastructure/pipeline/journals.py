@@ -18,6 +18,8 @@ from application.ports.pipeline.journals import (
     JournalMergeGroup,
     JournalMergeQueries,
     JournalOpenAlexEnrichmentQueries,
+    JournalProceedingsTypingQueries,
+    JournalRecordTypes,
     JournalSudocQueries,
     JournalSudocRow,
     JournalSummary,
@@ -139,12 +141,27 @@ _DELETE_EMPTY_JOURNALS = text("""
 """)
 
 
+# Type brut de chaque document des revues de type inconnu : celui de la source, avant correction.
+_RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
+    SELECT j.id,
+           array_agg(s.source::text ORDER BY s.id) AS sources,
+           array_agg(coalesce(s.raw_metadata->'doc_type'->>'raw', s.doc_type) ORDER BY s.id)
+               AS raw_types
+    FROM journals j
+    JOIN source_publications s ON s.journal_id = j.id
+    WHERE j.journal_type = 'unknown'
+    GROUP BY j.id
+    ORDER BY j.id
+""")
+
+
 class PgJournalGatewayQueries(
     JournalFindOrCreateQueries,
     JournalOpenAlexEnrichmentQueries,
     JournalSudocQueries,
     JournalMergeQueries,
     JournalCleanupQueries,
+    JournalProceedingsTypingQueries,
     JournalDoajQueries,
 ):
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
@@ -379,6 +396,14 @@ class PgJournalGatewayQueries(
                 sudoc_checked_at=checked_at,
             )
         )
+
+    # ── typage en recueil d'actes ──────────────────────────────────
+
+    def find_record_types_of_unknown_journals(self) -> list[JournalRecordTypes]:
+        return [
+            JournalRecordTypes(r.id, tuple(zip(r.sources, r.raw_types, strict=True)))
+            for r in self._conn.execute(_RECORD_TYPES_OF_UNKNOWN_JOURNALS)
+        ]
 
     # ── fusion ─────────────────────────────────────────────────────
 

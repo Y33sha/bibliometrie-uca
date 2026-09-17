@@ -1,6 +1,6 @@
 # Enrichissement des référentiels publishers et journals
 
-*À jour le 2026-09-15.*
+*À jour le 2026-09-17.*
 
 La phase `publishers_journals` complète deux référentiels que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, et va chercher auprès de sources externes le type des revues et leurs frais de publication. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
@@ -19,7 +19,9 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 
 5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 
-6. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
+6. **`type_proceedings_journals`** — type en recueil d'actes (`proceedings`) les revues de type inconnu dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source.
+
+7. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
 
 ## Import manuel d'un export DOAJ
 
