@@ -2,7 +2,28 @@
 
 import pytest
 
-from domain.journals.titles import names_a_dated_event, nested_titles
+from domain.journals.titles import names_a_dated_event, names_proceedings, nested_titles
+
+
+# Cas réels de la table journals.
+def test_titre_d_actes():
+    assert names_proceedings("Proceedings of the Samahang Pisika ng Pilipinas")
+    assert names_proceedings(
+        "Proceedings of the 36th Annual Conference of the European Association of Cognitive Ergonomics"
+    )
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Proceedings of the Wesley Historical Society",
+        "Proceedings of the National Academy of Sciences",
+        "Proceedings of the Institution of Civil Engineers - Structures and Buildings",
+        "Physical Review Letters",
+    ],
+)
+def test_revue_d_une_societe_savante(title):
+    assert not names_proceedings(title)
 
 
 # Cas réels de la table journals.

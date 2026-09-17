@@ -1,9 +1,10 @@
 """Sous-étape de la phase `publishers_journals` — type en recueil d'actes les revues qui en sont.
 
-Deux règles de `domain/journals/containers.py` désignent un recueil d'actes :
+Trois règles de `domain/journals/containers.py` désignent un recueil d'actes :
 
 - une revue de type `unknown` dont la majorité stricte des documents sont des articles de congrès, d'après le type brut de chaque document, toutes sources confondues ;
-- une revue sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS »).
+- une revue sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS ») ;
+- une revue sans ISSN, de n'importe quel type, dont le titre annonce des actes, hors société savante, académie et institution.
 """
 
 import logging
@@ -12,17 +13,22 @@ from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals._journal_label import journal_label
 from application.ports.pipeline.journals import JournalProceedingsTypingQueries
-from domain.journals.containers import holds_mostly_conference_papers, is_dated_event_without_issn
+from domain.journals.containers import (
+    holds_mostly_conference_papers,
+    is_dated_event_without_issn,
+    is_proceedings_title_without_issn,
+)
 from domain.journals.journal import JournalType
 
 _BY_RECORDS = "articles de congrès"
-_BY_TITLE = "titre daté"
+_BY_DATED_TITLE = "titre daté"
+_BY_PROCEEDINGS_TITLE = "titre d'actes"
 
 
 def run_type_proceedings_journals(
     logger: logging.Logger, *, journal_repo: JournalProceedingsTypingQueries
 ) -> PhaseMetrics:
-    """Type en recueil d'actes les revues que désigne l'une des deux règles, et journalise chacune avec la règle qui la désigne."""
+    """Type en recueil d'actes les revues que désigne l'une des trois règles, et journalise chacune avec la règle qui la désigne."""
     metrics = PhaseMetrics()
     reasons: dict[int, str] = {
         journal.journal_id: _BY_RECORDS
@@ -30,10 +36,12 @@ def run_type_proceedings_journals(
         if holds_mostly_conference_papers(journal.records)
     }
     for journal in journal_repo.find_titles_of_non_proceedings_journals():
-        if journal.id not in reasons and is_dated_event_without_issn(
-            journal.title, has_issn=journal.has_issn
-        ):
-            reasons[journal.id] = _BY_TITLE
+        if journal.id in reasons:
+            continue
+        if is_dated_event_without_issn(journal.title, has_issn=journal.has_issn):
+            reasons[journal.id] = _BY_DATED_TITLE
+        elif is_proceedings_title_without_issn(journal.title, has_issn=journal.has_issn):
+            reasons[journal.id] = _BY_PROCEEDINGS_TITLE
     if not reasons:
         return metrics
     if len(reasons) == 1:

@@ -10,6 +10,16 @@ from domain.normalize import normalize_text
 _YEAR = re.compile(r"(?<![\d\-–/])(?:1[89]\d\d|20\d\d)(?![\w\-–/(])")
 _YEAR_RANGE = re.compile(r"(\d{4})\s*[-–]\s*(\d{4})")
 _JOURNAL = re.compile(r"\bjournal\b", re.IGNORECASE)
+_PROCEEDINGS = re.compile(r"\bproceedings\b", re.IGNORECASE)
+_LEARNED_BODY = re.compile(r"\b(?:societ(?:y|ies)|academ(?:y|ies)|institutions?)\b", re.IGNORECASE)
+
+
+def names_proceedings(title: str) -> bool:
+    """Indique si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
+
+    Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas.
+    """
+    return bool(_PROCEEDINGS.search(title)) and not _LEARNED_BODY.search(title)
 
 
 def names_a_dated_event(title: str) -> bool:
