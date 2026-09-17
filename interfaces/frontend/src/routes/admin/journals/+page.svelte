@@ -139,6 +139,8 @@
 			await journalsApi.update(editModal.id, body);
 			editModal = null;
 			reload();
+			// Une modification d'ISSN, de titre ou de type fait entrer ou sortir la revue des files.
+			loadQueueCounts();
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
 			toast('Erreur : ' + msg, 'error');
