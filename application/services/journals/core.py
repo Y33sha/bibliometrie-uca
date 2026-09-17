@@ -167,13 +167,19 @@ def find_or_create_container_journal(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: OaModel | None = None,
+    declares_conference: bool = False,
     repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Revue du conteneur d'un document, selon son type brut `raw_doc_type` dans la source `source`.
 
-    Un livre ou un chapitre sans ISSN a pour conteneur le livre : il est rattaché seulement à un recueil d'actes existant de même titre. Les autres documents passent par `find_or_create_journal`.
+    Un livre ou un chapitre sans ISSN, qui ne déclare pas de congrès, a pour conteneur le livre : il est rattaché seulement à un recueil d'actes existant de même titre. Les autres documents passent par `find_or_create_journal`.
     """
-    if container_is_journal(raw_doc_type, source, has_issn=bool(issn or eissn or issnl)):
+    if container_is_journal(
+        raw_doc_type,
+        source,
+        has_issn=bool(issn or eissn or issnl),
+        declares_conference=declares_conference,
+    ):
         return find_or_create_journal(
             title,
             issn=issn,

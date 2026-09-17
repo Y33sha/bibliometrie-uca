@@ -84,6 +84,7 @@ def _sp(**overrides: object) -> UnaryCorrectionRow:
         "raw_metadata": {},
         "embargo_expired": False,
         "self_declared_preprint": False,
+        "declares_conference": False,
     }
     base.update(overrides)
     return UnaryCorrectionRow(**base)  # type: ignore[arg-type]

@@ -29,7 +29,7 @@ class MetadataForCorrection:
 
     Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
-    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint` et `declares_conference` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
@@ -49,6 +49,9 @@ class MetadataForCorrection:
     # « je suis le preprint d'une autre œuvre ». Le sens inverse porte la clé `has-preprint`.
     # Booléen pour garder `effective_metadata` pure (pas de lecture de `meta` dans le domaine).
     self_declared_preprint: bool
+    # Calculé à la lecture : l'enregistrement nomme le congrès dont il est issu (Crossref `event`,
+    # ou `assertion` Springer).
+    declares_conference: bool
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -62,6 +65,7 @@ class MetadataCorrectionRule(StrEnum):
     THESIS_WITH_JOURNAL_TO_ARTICLE = "THESIS_WITH_JOURNAL_TO_ARTICLE"
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
+    CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
@@ -175,6 +179,7 @@ class _AppliesTo(TypedDict, total=False):
     - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
     - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
     - `self_declared_preprint` : `bool` — `sp.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
+    - `declares_conference` : `bool` — `sp.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -191,6 +196,7 @@ class _AppliesTo(TypedDict, total=False):
     oa_status: str
     embargo_expired: bool
     self_declared_preprint: bool
+    declares_conference: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -250,6 +256,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {
             "journal_type": JournalType.PROCEEDINGS,
             "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
+        },
+        "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
+    },
+    # Chapitre qui nomme le congrès dont il est issu ⇒ `conference_paper`. Springer décrit ainsi les actes publiés en livre.
+    MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER: {
+        "applies_to": {
+            "declares_conference": True,
+            "doc_type": DocType.BOOK_CHAPTER,
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
@@ -399,7 +413,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 # écartée du rejeu canonique (`effective_doc_type_for_publication`). Décrit la forme du contrat,
 # pas la table des règles : un champ propre aux sources ajouté à `MetadataForCorrection` s'inscrit
 # ici, et les règles qui le liront seront écartées d'elles-mêmes.
-_SOURCE_ONLY_PREDICATES = frozenset({"url_contains", "embargo_expired", "self_declared_preprint"})
+_SOURCE_ONLY_PREDICATES = frozenset(
+    {"url_contains", "embargo_expired", "self_declared_preprint", "declares_conference"}
+)
 
 
 # ── Moteur ──────────────────────────────────────────────────────────────
@@ -444,6 +460,9 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
     if key == "self_declared_preprint":
         assert isinstance(value, bool)
         return sp.self_declared_preprint == value
+    if key == "declares_conference":
+        assert isinstance(value, bool)
+        return sp.declares_conference == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 

@@ -38,6 +38,7 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
+    extract_crossref_conference,
     extract_crossref_meta,
     extract_crossref_pub_year,
     parse_crossref_issns,
@@ -198,6 +199,7 @@ def upsert_journal(
         issn=issn,
         eissn=eissn,
         publisher_id=publisher_id,
+        declares_conference=extract_crossref_conference(msg) is not None,
         repo=journal_repo,
     )
 

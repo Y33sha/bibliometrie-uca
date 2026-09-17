@@ -99,6 +99,7 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
             oa_model=None,
             embargo_expired=False,
             self_declared_preprint=False,
+            declares_conference=False,
         )
     )
     if corrected is not None and corrected.value != pub.doc_type:

@@ -37,6 +37,7 @@ class UnaryCorrectionRow(NamedTuple):
     raw_metadata: dict[str, JsonValue]
     embargo_expired: bool
     self_declared_preprint: bool
+    declares_conference: bool
 
     def for_correction(self) -> MetadataForCorrection:
         """Projette la ligne vers le contrat d'entrée des règles."""
@@ -51,6 +52,7 @@ class UnaryCorrectionRow(NamedTuple):
             oa_model=self.oa_model,
             embargo_expired=self.embargo_expired,
             self_declared_preprint=self.self_declared_preprint,
+            declares_conference=self.declares_conference,
         )
 
 

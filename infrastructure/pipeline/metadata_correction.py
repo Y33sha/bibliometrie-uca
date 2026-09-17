@@ -41,7 +41,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 )
 
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
-# alimente (appariement par nom). Les booléens `embargo_expired` et `self_declared_preprint`
+# alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. Chaque variante ajoute son `WHERE`.
 _SELECT = """
     SELECT sp.id, sp.source::text AS source,
@@ -52,7 +52,8 @@ _SELECT = """
            sp.raw_metadata,
            (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired,
            COALESCE(jsonb_exists(sp.meta->'relation', 'is-preprint-of'), false)
-               AS self_declared_preprint
+               AS self_declared_preprint,
+           COALESCE(sp.meta ? 'conference', false) AS declares_conference
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
 """

@@ -444,6 +444,21 @@ class TestUpsertPublisherEtJournal:
         assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
         assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
         assert fake.call_args.kwargs["source"] == "crossref"
+        assert fake.call_args.kwargs["declares_conference"] is False
+
+    def test_transmet_le_congres_declare(self, monkeypatch):
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_crossref, "find_or_create_container_journal", fake)
+        msg = {
+            "type": "book-chapter",
+            "container-title": ["Graph-Theoretic Concepts in Computer Science"],
+            "assertion": [
+                {"group": {"name": "ConferenceInfo"}, "name": "conference_name", "value": "WG"}
+            ],
+        }
+
+        upsert_journal(msg, 7, journal_repo=MagicMock())
+        assert fake.call_args.kwargs["declares_conference"] is True
 
     def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
         vus: dict[str, object] = {}

@@ -36,5 +36,11 @@ def test_type_composite_article_de_congres_garde_son_conteneur():
     assert container_is_journal("Book Chapter; Proceedings Paper", "wos", has_issn=False)
 
 
+def test_chapitre_sans_issn_issu_d_un_congres_garde_son_recueil():
+    assert container_is_journal(
+        "book-chapter", "crossref", has_issn=False, declares_conference=True
+    )
+
+
 def test_type_absent_garde_son_conteneur():
     assert container_is_journal(None, "crossref", has_issn=False)
