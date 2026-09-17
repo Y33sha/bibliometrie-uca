@@ -243,10 +243,6 @@
 		font-size: 0.95rem;
 		vertical-align: middle;
 	}
-	td a {
-		color: var(--accent);
-		text-decoration: none;
-	}
 	td a:not(.id-badge, .lab-tag, .source-tag):hover {
 		text-decoration: underline;
 	}

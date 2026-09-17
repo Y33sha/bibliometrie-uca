@@ -529,13 +529,6 @@
     margin: 0 0 4px;
     font-size: 0.85rem;
   }
-  .back-link a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .back-link a:hover {
-    text-decoration: underline;
-  }
   .loading {
     color: var(--muted);
   }

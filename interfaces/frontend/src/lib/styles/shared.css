@@ -20,13 +20,12 @@
 	--border-subtle: #f0efec;  /* séparateurs légers (border-bottom) */
 	--section-heading: #3d7a7c; /* teal foncé du menu — titres de section */
 	--section-heading-light: #e4efef; /* teal pâle — survol des tags du corps */
-	--link: #3d7a7c; /* teal du menu — liens */
 }
 
 /* ── Liens ── */
-/* Style par défaut : teal, souligné au survol. `:where()` donne une spécificité nulle : un lien stylé par une classe garde son style. */
+/* Style par défaut : couleur d'accent, souligné au survol. `:where()` donne une spécificité nulle : un lien stylé par une classe garde son style. */
 :where(a) {
-	color: var(--link);
+	color: var(--accent);
 	text-decoration: none;
 }
 :where(a:hover) {
