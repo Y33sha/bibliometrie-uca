@@ -234,6 +234,21 @@ class TestFindJournalsOfUnknownType:
         assert len(repo.find_journals_of_unknown_type(limit=0)) >= 2
 
 
+class TestTitlesOfNonProceedingsJournals:
+    def test_recueils_exclus_et_issn_signale(self, sa_sync_conn, repo):
+        with_issnl = _create_journal(sa_sync_conn, title="NuFACT 2022", issnl="1234-5679")
+        proceedings = _create_journal(sa_sync_conn, title="ESAFORM 2021")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'proceedings' WHERE id = :id"),
+            {"id": proceedings},
+        )
+
+        rows = {r.id: r for r in repo.find_titles_of_non_proceedings_journals()}
+
+        assert rows[with_issnl].has_issn is True
+        assert proceedings not in rows
+
+
 class TestRecordTypesOfUnknownJournals:
     def test_type_brut_avant_correction(self, sa_sync_conn, repo):
         """Un document retypé par la correction est compté avec son type de source."""
