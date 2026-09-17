@@ -625,6 +625,33 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=j1)
         assert row.publisher_id == target
 
+    def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+        """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
+        target = _insert_publisher(sa_sync_conn, "Elsevier BV")
+        source = _insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, publisher_checked_at)"
+                " VALUES ('10.99999', 'Crossref', :s, now())"
+            ),
+            {"s": source},
+        )
+
+        merge_publishers(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=publisher_repo,
+            journal_repo=repo,
+            publication_repo=publication_repo,
+        )
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT publisher_id FROM doi_prefixes WHERE prefix = '10.99999'"
+        )
+        assert row.publisher_id == target
+
     def test_merges_same_title_journals(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = _insert_publisher(sa_sync_conn, "Target")
