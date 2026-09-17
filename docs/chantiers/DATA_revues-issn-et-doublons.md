@@ -93,7 +93,12 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
     - ISSN de revue portés par un livre : Reliability Engineering, Artificial Intelligence in Medicine ;
     - enregistrements d'un livre ou d'actes rattachés à la revue homonyme : Livestock Science, Lectures.
 - [x] Onglets « Titres identiques » et « ISSN partagés » dans l'administration des revues, sans mémoire des paires distinctes. Le bouton « Garder celle-ci » y fusionne les autres revues du groupe. Après les fusions et les suppressions, il reste 11 700 revues. Les doublons potentiels comptent 45 groupes de même titre (21 sans ISSN, 13 dont une seule revue a un ISSN, 11 titres portés par trois revues ou plus) et 3 ISSN de colonne partagés. Les 18 paires de même titre dont les deux revues ont un ISSN sont des homonymes probables.
-- [ ] Doublons d'éditeurs : Elsevier et Springer ont chacun une soixantaine de fiches. Normaliser les noms (dates, « on behalf of », formes juridiques), puis regrouper. Ces doublons recréent des revues en double, la recherche d'une revue par titre se limitant à son éditeur.
+- Doublons d'éditeurs : Elsevier et Springer ont chacun une soixantaine de fiches. Ces doublons recréent des revues en double, la recherche d'une revue par titre se limitant à son éditeur. Sur 10 918 éditeurs, 6 771 n'ont ni revue ni préfixe DOI ; 1 747 d'entre eux portent encore des formes de nom de revue.
+    - [x] Clé de nom (`publisher_name_key`) : crochets, années, « on behalf of », parenthèses et formes juridiques finales retirés. Le trouve-ou-crée des normaliseurs et `resolve_publishers` rapprochent les éditeurs par cette clé.
+    - [x] La fusion d'éditeurs transfère les préfixes DOI de l'éditeur absorbé.
+    - [x] Oneshot `backfill_merge_publisher_name_variants` : fusion des éditeurs de même clé. À blanc : 853 fusions, 1 refusée (Duncker & Humblot, revues homonymes aux ISSN divergents).
+    - [x] Sous-étape `delete_empty_publishers` : suppression des éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
+    - [ ] Marques et groupes : l'éditeur d'une revue est-il le groupe (Informa, Springer Nature) ou la marque (Routledge, BMC, Masson) ? Le préfixe DOI donne le déposant Crossref, qui est souvent le groupe, parfois une plateforme (CAIRN.INFO, OpenEdition, CCSD). Sur 9 100 revues à DOI, il concorde avec l'éditeur de la revue pour 5 929.
 - [ ] Volet latéral pour les revues et les éditeurs, à l'image de ceux des publications et des personnes.
 - [ ] Contrainte d'unicité sur `issn` et `eissn`, une fois ces doublons traités. `issnl` reste sans contrainte : un titre et son supplément le partagent.
 
