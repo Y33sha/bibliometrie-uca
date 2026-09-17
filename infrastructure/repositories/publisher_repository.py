@@ -134,6 +134,10 @@ class PgPublisherRepository(PublisherRepository):
             text("UPDATE apc_payments SET publisher_id = :t WHERE publisher_id = :s"),
             {"t": target_id, "s": source_id},
         )
+        self._conn.execute(
+            text("UPDATE doi_prefixes SET publisher_id = :t WHERE publisher_id = :s"),
+            {"t": target_id, "s": source_id},
+        )
 
         # Ordre : capture src → NULL-er openalex_id src (libère la contrainte UNIQUE) → enrich target → delete source.
         src = self._conn.execute(
