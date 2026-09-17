@@ -164,6 +164,25 @@ describe('usePaginatedFetch', () => {
 		expect(gotoSpy).toHaveBeenCalledWith('/admin/orphan-authorships?search=x', expect.anything());
 	});
 
+	it('une liste dont la page reste hors de l’URL ne touche pas l’URL', async () => {
+		window.history.replaceState({}, '', '/admin/persons?page=3');
+		gotoSpy.mockClear();
+		apiSpy
+			.mockImplementationOnce(async () => ({ items: [], total: 10, page: 2, pages: 1 }))
+			.mockImplementationOnce(async () => ({ items: [1], total: 10, page: 1, pages: 1 }));
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+			pageParam: null,
+		});
+		f.page = 2;
+		await f.load();
+		expect(f.page).toBe(1);
+		expect(gotoSpy).not.toHaveBeenCalled();
+	});
+
 	it('une liste vide en page 1 reste en page 1', async () => {
 		apiResponse = { items: [], total: 0, page: 1, pages: 0 };
 		const f = mount<number>({

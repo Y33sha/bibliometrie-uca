@@ -23,8 +23,8 @@ export interface PaginatedFetchOptions {
 	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement (ex. invalidation après édition admin) déclenche un rechargement. */
 	apiKey: string | (() => string);
 	buildParams: () => URLSearchParams;
-	/** Clé du numéro de page dans l'URL, retirée quand la page demandée dépasse la dernière. Défaut `page`. */
-	pageParam?: string;
+	/** Clé du numéro de page dans l'URL, retirée quand la page demandée dépasse la dernière. Défaut `page` ; `null` pour une liste dont la page reste hors de l'URL. */
+	pageParam?: string | null;
 }
 
 export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
@@ -57,7 +57,7 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 			if (isPageOutOfRange(range)) {
 				// La liste a rétréci sous la page demandée : retour à la première page.
 				page = 1;
-				dropPageParam(opts.pageParam);
+				if (opts.pageParam !== null) dropPageParam(opts.pageParam);
 				return await load();
 			}
 			items = data[opts.itemsKey] as T[];
