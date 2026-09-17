@@ -60,7 +60,8 @@
 	const mergeSearch = useDebouncedSearch<Publisher>({
 		search: async (q) => {
 			const data = await api<{ publishers: Publisher[] }>(
-				`/api/publishers?search=${encodeURIComponent(q)}&per_page=10`,
+				// Les éditeurs les plus fournis en revues d'abord : la cible d'une fusion est rarement une variante isolée.
+				`/api/publishers?search=${encodeURIComponent(q)}&sort=journals_desc&per_page=10`,
 			);
 			return data.publishers;
 		},
