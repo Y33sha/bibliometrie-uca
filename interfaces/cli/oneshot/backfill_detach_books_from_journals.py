@@ -19,7 +19,7 @@ import argparse
 import os
 from collections import Counter
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.services.publications.core import refresh_from_sources
 from domain.journals.containers import container_is_journal
@@ -53,7 +53,7 @@ _DETACH = text("""
 """)
 
 
-def _to_detach(conn: Connection) -> list:
+def _to_detach(conn: Connection) -> list[Row[tuple[object, ...]]]:
     rows = conn.execute(_CANDIDATES).all()
     return [
         r
