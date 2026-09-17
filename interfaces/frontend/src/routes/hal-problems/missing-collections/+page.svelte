@@ -5,6 +5,7 @@
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { docTypeSingular } from '$lib/labels';
 	import { halDocUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
@@ -13,22 +14,27 @@
 	import type { components } from '$lib/api/schema';
 	type Lab = components['schemas']['HalCollectionLab'];
 	type Pub = components['schemas']['HalMissingCollectionPub'];
-	type Response = components['schemas']['HalMissingCollectionsResponse'];
 
 	let labs: Lab[] = $state([]);
+	let labsLoaded = $state(false);
 	let selectedLabId: number | null = $state(null);
-	let pubs: Pub[] = $state([]);
-	let total = $state(0);
-	let page = $state(1);
-	let pages = $state(1);
-	let loading = $state(false);
-	let labAcronym = $state('');
-	let halCollection = $state('');
+	const selectedLab = $derived(labs.find((lab) => lab.id === selectedLabId));
+
+	const list = usePaginatedFetch<Pub>({
+		endpoint: '/api/hal-problems/missing-collections',
+		itemsKey: 'publications',
+		apiKey: 'hal-missing-collections',
+		buildParams() {
+			const params = new URLSearchParams();
+			if (selectedLabId) params.set('lab_id', String(selectedLabId));
+			return params;
+		},
+	});
 
 	function syncUrl() {
 		const p = new URLSearchParams();
 		if (selectedLabId) p.set('lab_id', String(selectedLabId));
-		if (page > 1) p.set('page', String(page));
+		if (list.page > 1) p.set('page', String(list.page));
 		const qs = p.toString();
 		replaceState(`${base}/hal-problems/missing-collections` + (qs ? '?' + qs : ''), {});
 	}
@@ -38,28 +44,16 @@
 		if (labs.length > 0 && !selectedLabId) {
 			selectedLabId = labs[0].id;
 		}
-		loadPubs();
-	}
-
-	async function loadPubs() {
+		labsLoaded = true;
 		if (!selectedLabId) return;
-		loading = true;
-		const data = await api<Response>(
-			`/api/hal-problems/missing-collections?lab_id=${selectedLabId}&page=${page}&per_page=50`
-		);
-		pubs = data.publications;
-		total = data.total;
-		pages = data.pages;
-		page = data.page;
-		labAcronym = data.lab_acronym ?? '';
-		halCollection = data.hal_collection;
-		loading = false;
+		await list.load();
 		syncUrl();
 	}
 
 	function onLabChange() {
-		page = 1;
-		loadPubs();
+		list.page = 1;
+		syncUrl();
+		list.load();
 	}
 
 	const halUrl = halDocUrl;
@@ -67,7 +61,7 @@
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
 		if (urlParams.get('lab_id')) selectedLabId = parseInt(urlParams.get('lab_id')!);
-		if (urlParams.get('page')) page = parseInt(urlParams.get('page')!);
+		if (urlParams.get('page')) list.page = parseInt(urlParams.get('page')!) || 1;
 		loadLabs();
 	});
 </script>
@@ -88,16 +82,16 @@
 			<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
 		{/each}
 	</select>
-	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
+	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
 </div>
 
-{#if loading}
+{#if !labsLoaded || (selectedLabId && list.loading)}
 	<div class="loading">Chargement…</div>
-{:else if pubs.length === 0 && selectedLabId}
-	<div class="no-results">Aucune publication manquante pour {labAcronym} (collection {halCollection})</div>
+{:else if list.items.length === 0 && selectedLabId}
+	<div class="no-results">Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})</div>
 {:else}
 	<div class="pub-list">
-		{#each pubs as pub}
+		{#each list.items as pub}
 			<div class="pub-card">
 				<div class="pub-meta-line">
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
@@ -118,7 +112,7 @@
 			</div>
 		{/each}
 	</div>
-	<Pagination {page} {pages} onchange={(p) => { page = p; syncUrl(); loadPubs(); window.scrollTo(0, 0); }} />
+	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 {/if}
 
 <style>

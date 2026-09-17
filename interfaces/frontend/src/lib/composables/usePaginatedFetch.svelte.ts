@@ -14,10 +14,13 @@ import { dropPageParam, isPageOutOfRange } from '$lib/pagination';
  *   });
  *   await pubs.load();          // charge la page courante
  *   pubs.goToPage(3);           // change de page + recharge + scroll top
+ *
+ * `data` expose la dernière réponse entière, pour les champs portés à côté de la liste (facettes, drapeaux).
  */
 
 export interface PaginatedFetchOptions {
-	endpoint: string;
+	/** Chemin de l'API. Passer un getter `() => ...` quand il dépend d'un état (identifiant d'entité, onglet) : il est relu à chaque chargement. */
+	endpoint: string | (() => string);
 	itemsKey: string;
 	perPage?: number;
 	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement (ex. invalidation après édition admin) déclenche un rechargement. */
@@ -27,8 +30,9 @@ export interface PaginatedFetchOptions {
 	pageParam?: string | null;
 }
 
-export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
+export function usePaginatedFetch<T, R = Record<string, unknown>>(opts: PaginatedFetchOptions) {
 	let items: T[] = $state([]);
+	let data: R | null = $state.raw(null);
 	let total = $state(0);
 	let page = $state(1);
 	let pages = $state(1);
@@ -49,19 +53,18 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 			params.set('page', String(page));
 			params.set('per_page', String(perPage));
 
-			const data = await api<Record<string, unknown>>(
-				opts.endpoint + '?' + params,
-				{ key: lastKey },
-			);
-			const range = { page: data.page as number, pages: data.pages as number };
+			const endpoint = typeof opts.endpoint === 'function' ? opts.endpoint() : opts.endpoint;
+			const response = await api<Record<string, unknown>>(endpoint + '?' + params, { key: lastKey });
+			const range = { page: response.page as number, pages: response.pages as number };
 			if (isPageOutOfRange(range)) {
 				// La liste a rétréci sous la page demandée : retour à la première page.
 				page = 1;
 				if (opts.pageParam !== null) dropPageParam(opts.pageParam);
 				return await load();
 			}
-			items = data[opts.itemsKey] as T[];
-			total = data.total as number;
+			data = response as R;
+			items = response[opts.itemsKey] as T[];
+			total = response.total as number;
 			pages = range.pages;
 			page = range.page;
 			loaded = true;
@@ -86,6 +89,8 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 		get items() { return items; },
 		set items(v: T[]) { items = v; },
 		get total() { return total; },
+		set total(v: number) { total = v; },
+		get data() { return data; },
 		get page() { return page; },
 		set page(v: number) { page = v; },
 		get pages() { return pages; },

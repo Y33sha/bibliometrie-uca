@@ -7,6 +7,7 @@
   import { deriveStructDetectionStatus } from "$lib/utils";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { autofocus } from "$lib/actions/focus";
   import { confirmDialog, toast } from '$lib/dialogs.svelte';
 
@@ -17,7 +18,6 @@
   type AddressStructure = components["schemas"]["AddressStructureSummary"];
   type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
   type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
-  type FeedbackPage = components["schemas"]["FeedbackAddressesResponse"];
   type Structure = components["schemas"]["StructureListItem"];
 
   type GroupedStructures = Record<string, Structure[]>;
@@ -57,7 +57,7 @@
     if (currentStructureId) sp.set("structure_id", String(currentStructureId));
     if (currentTab !== "fn") sp.set("tab", currentTab);
     if (search) sp.set("search", search);
-    if (currentPage > 1) sp.set("page", String(currentPage));
+    if (list.page > 1) sp.set("page", String(list.page));
     const qs = sp.toString();
     const newUrl = window.location.pathname + (qs ? "?" + qs : "");
     replaceState(newUrl, {});
@@ -73,12 +73,20 @@
 
   let stats: FeedbackStats | null = $state(null);
   let currentTab: Tab = $state("fn");
-  let currentPage = $state(1);
-  let pages = $state(0);
-  let total = $state(0);
-  let addresses: FeedbackAddress[] = $state([]);
   let search = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+  const list = usePaginatedFetch<FeedbackAddress>({
+    endpoint: () =>
+      currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives",
+    itemsKey: "addresses",
+    apiKey: "feedback-table",
+    buildParams() {
+      const params = new URLSearchParams({ structure_id: String(currentStructureId) });
+      if (search) params.set("search", search);
+      return params;
+    },
+  });
+  const addresses = $derived(list.items);
 
   // Context picker state
   let ctxPicker: { formId: number; x: number; y: number } | null = $state(null);
@@ -132,27 +140,15 @@
     stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`, { key: "feedback-stats" });
   }
 
-  async function loadTable() {
+  function loadTable() {
     if (!currentStructureId) return;
     syncUrl();
-    const endpoint = currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives";
-    const params = new URLSearchParams({
-      structure_id: String(currentStructureId),
-      page: String(currentPage),
-      per_page: "50",
-    });
-    if (search) params.set("search", search);
-
-    const data = await api<FeedbackPage>(endpoint + "?" + params, { key: "feedback-table" });
-    addresses = data.addresses;
-    total = data.total;
-    pages = data.pages;
-    currentPage = data.page;
+    list.load();
   }
 
   function switchTab(tab: Tab) {
     currentTab = tab;
-    currentPage = 1;
+    list.page = 1;
     search = "";
     loadTable();
   }
@@ -160,21 +156,20 @@
   function onSearchInput() {
     if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      currentPage = 1;
+      list.page = 1;
       loadTable();
     }, 400);
   }
 
   function onPageChange(p: number) {
-    currentPage = p;
-    loadTable();
-    window.scrollTo(0, 0);
+    list.goToPage(p);
+    syncUrl();
   }
 
   function onStructureChange(e: Event) {
     currentStructureId = parseInt((e.target as HTMLSelectElement).value);
     localStorage.setItem('admin_structure_id', String(currentStructureId));
-    currentPage = 1;
+    list.page = 1;
     loadStats();
     loadTable();
   }
@@ -264,7 +259,7 @@
     const url = readUrlParams();
     currentTab = url.tab;
     search = url.search;
-    currentPage = url.p;
+    list.page = url.p;
 
     await loadStructures();
     if (url.structureId) {
@@ -344,7 +339,7 @@
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
     <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-    <span class="count">{total} adresses</span>
+    <span class="count">{list.total} adresses</span>
   </div>
 
   <!-- Table -->
@@ -406,7 +401,7 @@
       </tbody>
     </table>
 
-    <Pagination page={currentPage} {pages} onchange={onPageChange} />
+    <Pagination page={list.page} pages={list.pages} onchange={onPageChange} />
   {/if}
 
   <!-- Context picker -->

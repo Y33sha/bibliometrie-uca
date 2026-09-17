@@ -12,6 +12,7 @@
 	import TabNav from '$lib/components/TabNav.svelte';
 	import ThesesListView from '$lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 
@@ -24,7 +25,6 @@
 	type RelatedStructure = components['schemas']['RelatedStructureOut'];
 	type LabProfile = components['schemas']['StructureDetailResponse'];
 	type LabAddress = components['schemas']['StructureAddressOut'];
-	type AddressesResponse = components['schemas']['StructureAddressesResponse'];
 
 	// --- State ---
 	let lab: Structure | null = $state(null);
@@ -42,10 +42,13 @@
 	);
 
 	// Addresses tab
-	let addresses: LabAddress[] = $state([]);
-	let addrPage = $state(1);
-	let addrPages = $state(1);
-	let addrLoaded = $state(false);
+	const addresses = usePaginatedFetch<LabAddress>({
+		endpoint: () => `/api/structures/${labId}/addresses`,
+		itemsKey: 'addresses',
+		apiKey: 'lab-addresses',
+		buildParams: () => new URLSearchParams(),
+		pageParam: 'apage',
+	});
 
 	// Dashboard tab
 	let dashboardLoaded = $state(false);
@@ -83,22 +86,8 @@
 	function syncUrl() {
 		url.syncUrl(() => ({
 			tab: activeTab,
-			addrPage,
+			addrPage: addresses.page,
 		}));
-	}
-
-	async function loadAddresses() {
-		const params = new URLSearchParams({
-			page: String(addrPage),
-			per_page: '50'
-		});
-		const data = await api<AddressesResponse>(
-			`/api/structures/${labId}/addresses?${params}`, { key: 'lab-addresses' }
-		);
-		addresses = data.addresses;
-		addrPages = data.pages;
-		addrPage = data.page;
-		addrLoaded = true;
 	}
 
 	async function loadDashboard() {
@@ -124,7 +113,7 @@
 	function onTabSwitch(tab: string) {
 		// Les onglets "publications" et "theses" sont gérés par leurs ListView respectives, qui chargent leurs données dans leur propre onMount.
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'addresses' && !addrLoaded) loadAddresses();
+		if (tab === 'addresses' && !addresses.loaded) addresses.load();
 	}
 
 	onMount(async () => {
@@ -132,7 +121,7 @@
 
 		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl($page.url.searchParams);
-		if (restored.addrPage) addrPage = restored.addrPage as number;
+		if (restored.addrPage) addresses.page = restored.addrPage as number;
 
 		try {
 			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
@@ -148,7 +137,7 @@
 		if (activeTab === 'dashboard') {
 			loadDashboard();
 		} else if (activeTab === 'addresses') {
-			loadAddresses();
+			addresses.load();
 		}
 	});
 </script>
@@ -327,10 +316,10 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#if addresses.length === 0}
+					{#if addresses.items.length === 0}
 						<tr><td colspan="2" class="no-results">Aucune adresse</td></tr>
 					{:else}
-						{#each addresses as a (a.id)}
+						{#each addresses.items as a (a.id)}
 							<tr>
 								<td class="addr-cell">{a.raw_text}</td>
 								<td>
@@ -345,7 +334,7 @@
 					{/if}
 				</tbody>
 			</table>
-			<Pagination page={addrPage} pages={addrPages} onchange={(p) => { addrPage = p; syncUrl(); loadAddresses(); }} />
+			<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; syncUrl(); addresses.load(); }} />
 		</div>
 	{/if}
 {/if}

@@ -5,20 +5,33 @@
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api } from '$lib/api';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 
 	import type { components } from '$lib/api/schema';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
+	type Facet = { value: string; count: number };
+	type AddressesResponse = { suggestion_facets?: Facet[]; country_facets?: Facet[] };
 
-	let addresses: Address[] = $state([]);
 	let countries: Country[] = $state([]);
 	let countryMap: Record<string, string> = $state({});
-	let total = $state(0);
-	let page = $state(1);
-	let pages = $state(1);
-	let loading = $state(false);
+	const list = usePaginatedFetch<Address, AddressesResponse>({
+		endpoint: '/api/addresses/countries',
+		itemsKey: 'addresses',
+		apiKey: 'countries-addr-list',
+		buildParams() {
+			const params = new URLSearchParams();
+			if (search.trim()) params.set('search', search.trim());
+			if (selectedHasCountry.length === 1) params.set('has_country', selectedHasCountry[0]);
+			if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
+			if (suggestMode) params.set('suggest', 'true');
+			if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
+			return params;
+		},
+	});
+	const addresses = $derived(list.items);
 
 	let search = $state('');
 	let selectedHasCountry: string[] = $state([]);
@@ -56,37 +69,22 @@
 		countryMap = Object.fromEntries(countries.map(c => [c.code, c.name]));
 	}
 
-	async function loadAddresses() {
-		loading = true;
-		const params = new URLSearchParams({ page: String(page), per_page: '50' });
-		if (search.trim()) params.set('search', search.trim());
-		if (selectedHasCountry.length === 1) params.set('has_country', selectedHasCountry[0]);
-		if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
-		if (suggestMode) params.set('suggest', 'true');
-		if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
-		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { value: string; count: number }[]; country_facets?: { value: string; count: number }[] }>(
-			'/api/addresses/countries?' + params, { key: 'countries-addr-list' }
-		);
-		addresses = data.addresses;
-		total = data.total;
-		pages = data.pages;
-		page = data.page;
-		if (data.country_facets) {
-			countryFacets = data.country_facets;
-		}
-		if (data.suggestion_facets) {
+	// Les facettes arrivent avec la page d'adresses ; une réponse qui n'en porte pas garde les précédentes.
+	$effect(() => {
+		const data = list.data;
+		if (data?.country_facets) countryFacets = data.country_facets;
+		if (data?.suggestion_facets) {
 			sugFacetOptions = data.suggestion_facets.map(f => ({
 				value: f.value,
 				text: countryLabel(f.value),
 				count: f.count,
 			}));
 		}
-		loading = false;
-	}
+	});
 
 	function syncUrl() {
 		const p = new URLSearchParams();
-		if (page > 1) p.set('page', String(page));
+		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
 		if (selectedHasCountry.length === 1) p.set('has_country', selectedHasCountry[0]);
@@ -96,14 +94,14 @@
 	}
 
 	function onFilterChange() {
-		page = 1;
+		list.page = 1;
 		selectedIds = new Set();
 		// Synchroniser le select pays avec la facette pays suggéré
 		if (selectedSugCountry.length === 1) {
 			batchCountry = selectedSugCountry[0];
 		}
 		syncUrl();
-		loadAddresses();
+		list.load();
 	}
 
 	function onSearchInput() {
@@ -121,10 +119,10 @@
 		const newList = [...new Set([...(addr.countries || []), code])].sort();
 		await addressesApi.setCountry(addrId, { countries: newList });
 		if (selectedHasCountry.includes('no') || suggestMode) {
-			loadAddresses();
+			list.load();
 		} else {
 			addr.countries = newList;
-			addresses = [...addresses];
+			list.items = [...addresses];
 		}
 	}
 
@@ -134,7 +132,7 @@
 		const newList = (addr.countries || []).filter(c => c !== code);
 		await addressesApi.setCountry(addrId, { countries: newList.length ? newList : null });
 		addr.countries = newList.length ? newList : null;
-		addresses = [...addresses];
+		list.items = [...addresses];
 	}
 
 	function toggleSelect(id: number) {
@@ -173,8 +171,8 @@
 		} else {
 			selectedHasCountry = [];
 		}
-		page = 1;
-		loadAddresses();
+		list.page = 1;
+		list.load();
 	}
 
 	async function acceptSuggestion(addrId: number, code: string) {
@@ -204,19 +202,19 @@
 		} finally {
 			batchApplying = false;
 		}
-		loadAddresses();
+		list.load();
 		setTimeout(() => { batchResult = ''; }, 3000);
 	}
 
 	onMount(() => {
 		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) page = parseInt(params.get('page')!) || 1;
+		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
 		if (params.get('search')) search = params.get('search')!;
 		if (params.get('country')) selectedCountry = [params.get('country')!];
 		if (params.get('has_country')) selectedHasCountry = [params.get('has_country')!];
 		if (params.get('sug_country')) selectedSugCountry = [params.get('sug_country')!];
 		loadCountries();
-		loadAddresses();
+		list.load();
 	});
 </script>
 
@@ -238,7 +236,7 @@
 		<FacetDropdown label="Pays suggéré" options={sugFacetOptions} bind:selected={selectedSugCountry} onchange={onFilterChange} />
 	{/if}
 	<span class="toolbar-spacer"></span>
-	<span class="count">{total.toLocaleString('fr-FR')} adresse{total > 1 ? 's' : ''}</span>
+	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>
 </div>
 
 <div class="batch-bar">
@@ -255,7 +253,7 @@
 	{/if}
 	{#if batchCountry && hasActiveFilter}
 		<button class="btn" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
-			Ajouter à tout le filtre ({total.toLocaleString('fr-FR')})
+			Ajouter à tout le filtre ({list.total.toLocaleString('fr-FR')})
 		</button>
 	{/if}
 	{#if batchResult}
@@ -307,7 +305,7 @@
 	</tbody>
 </table>
 
-<Pagination {page} {pages} onchange={(p) => { page = p; syncUrl(); loadAddresses(); }} />
+<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 
 <style>
 	h1 { font-size: 1.3rem; margin-bottom: 12px; }

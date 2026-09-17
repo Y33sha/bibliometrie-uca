@@ -4,7 +4,7 @@
 	import { replaceState } from '$app/navigation';
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { docTypeSingular } from '$lib/labels';
 	import { halDocUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
@@ -12,40 +12,27 @@
 
 	import type { components } from '$lib/api/schema';
 	type Pub = components['schemas']['HalAffiliationConflictPub'];
-	type Response = components['schemas']['HalAffiliationConflictsResponse'];
 
-	let pubs: Pub[] = $state([]);
-	let total = $state(0);
-	let page = $state(1);
-	let pages = $state(1);
-	let loading = $state(false);
+	const list = usePaginatedFetch<Pub>({
+		endpoint: '/api/hal-problems/affiliation-conflicts',
+		itemsKey: 'publications',
+		apiKey: 'hal-affiliation-conflicts',
+		buildParams: () => new URLSearchParams(),
+	});
 
 	function syncUrl() {
 		const p = new URLSearchParams();
-		if (page > 1) p.set('page', String(page));
+		if (list.page > 1) p.set('page', String(list.page));
 		const qs = p.toString();
 		replaceState(`${base}/hal-problems/affiliation-conflicts` + (qs ? '?' + qs : ''), {});
-	}
-
-	async function load() {
-		loading = true;
-		const data = await api<Response>(
-			`/api/hal-problems/affiliation-conflicts?page=${page}&per_page=50`
-		);
-		pubs = data.publications;
-		total = data.total;
-		pages = data.pages;
-		page = data.page;
-		loading = false;
-		syncUrl();
 	}
 
 	const halUrl = halDocUrl;
 
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
-		if (urlParams.get('page')) page = parseInt(urlParams.get('page')!);
-		load();
+		if (urlParams.get('page')) list.page = parseInt(urlParams.get('page')!) || 1;
+		list.load();
 	});
 </script>
 
@@ -60,16 +47,16 @@
 </div>
 
 <div class="toolbar">
-	<span class="count">{total} publication{total > 1 ? 's' : ''}</span>
+	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
 </div>
 
-{#if loading}
+{#if list.loading}
 	<div class="loading">Chargement…</div>
-{:else if pubs.length === 0}
+{:else if list.items.length === 0}
 	<div class="no-results">Aucun conflit détecté</div>
 {:else}
 	<div class="pub-list">
-		{#each pubs as pub}
+		{#each list.items as pub}
 			<div class="pub-card">
 				<div class="pub-meta-line">
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
@@ -90,7 +77,7 @@
 			</div>
 		{/each}
 	</div>
-	<Pagination {page} {pages} onchange={(p) => { page = p; syncUrl(); load(); window.scrollTo(0, 0); }} />
+	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 {/if}
 
 <style>

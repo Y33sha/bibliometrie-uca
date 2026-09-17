@@ -1,11 +1,12 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { api, persons as personsApi } from "$lib/api";
+  import { persons as personsApi } from "$lib/api";
   import { titleCase } from "$lib/utils";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
   import type { components } from "$lib/api/schema";
 
-  type AmbiguousNameFormsResponse = components["schemas"]["AmbiguousNameFormsResponse"];
+  type AmbiguousNameForm = components["schemas"]["AmbiguousNameFormOut"];
 
   let {
     onopenPerson,
@@ -20,23 +21,13 @@
     reloadKey: number;
   } = $props();
 
-  let page = $state(1);
-  let data = $state<AmbiguousNameFormsResponse | null>(null);
-  let loading = $state(false);
-
-  async function load() {
-    loading = true;
-    data = await api<AmbiguousNameFormsResponse>(
-      `/api/persons/ambiguous-name-forms?page=${page}&per_page=50`,
-    );
-    loading = false;
-  }
-
-  function handlePage(p: number) {
-    page = p;
-    load();
-    window.scrollTo(0, 0);
-  }
+  const list = usePaginatedFetch<AmbiguousNameForm>({
+    endpoint: "/api/persons/ambiguous-name-forms",
+    itemsKey: "forms",
+    apiKey: "ambiguous-name-forms",
+    buildParams: () => new URLSearchParams(),
+    pageParam: null,
+  });
 
   async function setStatus(personId: number, nameForm: string, status: string) {
     await personsApi.updateNameFormStatus(
@@ -44,15 +35,15 @@
       nameForm,
       status as "pending" | "confirmed" | "rejected",
     );
-    await load();
+    await list.load();
     onchange();
   }
 
   // Charge au montage et à chaque incrément de `reloadKey` (action dans le drawer).
-  // `untrack` autour de `load()` pour ne pas dépendre de `page`/`data`.
+  // `untrack` autour de `list.load()` pour ne pas dépendre de l'état de la liste.
   $effect(() => {
     void reloadKey;
-    untrack(load);
+    untrack(list.load);
   });
 </script>
 
@@ -63,13 +54,13 @@
   homonymes (à confirmer chacune), soit un doublon (à fusionner).
 </p>
 
-{#if !data}
+{#if !list.loaded}
   <div class="empty">Chargement…</div>
-{:else if data.forms.length === 0 && !loading}
+{:else if list.items.length === 0 && !list.loading}
   <div class="empty">Aucune forme ambiguë à trancher.</div>
 {:else}
   <div class="forms">
-    {#each data.forms as form (form.name_form)}
+    {#each list.items as form (form.name_form)}
       <div class="form-block">
         <div class="form-head">
           <span class="form-name">{form.name_form}</span>
@@ -120,7 +111,7 @@
     {/each}
   </div>
 
-  <Pagination {page} pages={data.pages} onchange={handlePage} />
+  <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
 {/if}
 
 <style>

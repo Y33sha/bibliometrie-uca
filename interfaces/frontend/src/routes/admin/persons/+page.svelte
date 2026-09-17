@@ -6,6 +6,7 @@
   import { api, ApiError, orphanAuthorships, persons as personsApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
   import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { titleCase } from "$lib/utils";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
@@ -15,7 +16,6 @@
     IdFormState,
     OtherPerson,
     Person,
-    PersonListResponse,
     PersonSearchResult,
   } from "./types";
   import type { components } from "$lib/api/schema";
@@ -84,12 +84,20 @@
     pending_identifiers: "has_pending_identifiers",
   };
 
-  let currentPage = $state(1);
-  let totalPages = $state(0);
-  let totalCount = $state(0);
-  let persons: Person[] = $state([]);
-  let loading = $state(false);
   let sortField = $state("name_asc");
+  const list = usePaginatedFetch<Person>({
+    endpoint: "/api/persons",
+    itemsKey: "persons",
+    apiKey: "persons-list",
+    pageParam: "p",
+    buildParams() {
+      const params = buildFilterParams();
+      if (search.trim()) params.set("search", search.trim());
+      params.set("sort", sortField);
+      return params;
+    },
+  });
+  const persons = $derived(list.items);
 
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -170,34 +178,13 @@
   }
 
   async function loadTable() {
-    loading = true;
-    const params = new URLSearchParams({ page: String(currentPage), per_page: "50" });
-    if (search.trim()) params.set("search", search.trim());
-    if (selectedDepts.length) params.set("department", selectedDepts.join(","));
-    if (selectedRoles.length) params.set("role", selectedRoles.join(","));
-    for (const [key, qk] of Object.entries(idQueryKey)) {
-      const v = idStates[key];
-      if (v === "yes" || v === "no") params.set(qk, v);
-    }
-    for (const [key, qk] of Object.entries(pendingQueryKey)) {
-      const v = pendingStates[key];
-      if (v === "yes" || v === "no") params.set(qk, v);
-    }
-    if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
-    params.set("sort", sortField);
-
-    const data = await api<PersonListResponse>("/api/persons?" + params, { key: "persons-list" });
-    persons = data.persons;
-    totalCount = data.total;
-    totalPages = data.pages;
-    currentPage = data.page;
-    loading = false;
+    await list.load();
     updateUrl();
   }
 
   function toggleSort(field: string) {
     sortField = sortField === `${field}_asc` ? `${field}_desc` : `${field}_asc`;
-    currentPage = 1;
+    list.page = 1;
     loadTable();
   }
 
@@ -215,7 +202,7 @@
       if (val) url.searchParams.set(key, val);
       else url.searchParams.delete(key);
     };
-    setOrDel("p", currentPage > 1 ? String(currentPage) : "");
+    setOrDel("p", list.page > 1 ? String(list.page) : "");
     setOrDel("search", search);
     setOrDel("dept", selectedDepts.length === 1 ? selectedDepts[0] : "");
     setOrDel("role", selectedRoles.length === 1 ? selectedRoles[0] : "");
@@ -237,7 +224,7 @@
 
   function readUrlFilters() {
     const p = new URLSearchParams(window.location.search);
-    if (p.get("p")) currentPage = Math.max(1, parseInt(p.get("p")!, 10) || 1);
+    if (p.get("p")) list.page = Math.max(1, parseInt(p.get("p")!, 10) || 1);
     if (p.get("search")) search = p.get("search")!;
     if (p.get("dept")) selectedDepts = [p.get("dept")!];
     if (p.get("role")) selectedRoles = [p.get("role")!];
@@ -275,21 +262,20 @@
   function handleSearch() {
     if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      currentPage = 1;
+      list.page = 1;
       loadTable();
     }, 400);
   }
 
   function handleFilterChange() {
-    currentPage = 1;
+    list.page = 1;
     loadTable();
     loadFacets();
   }
 
   function handlePageChange(p: number) {
-    currentPage = p;
-    loadTable();
-    window.scrollTo(0, 0);
+    list.goToPage(p);
+    updateUrl();
   }
 
   /* ── Identifiers ── */
@@ -559,7 +545,7 @@
   {rhOptions}
   {idCounts}
   {pendingCounts}
-  {totalCount}
+  totalCount={list.total}
   onsearch={handleSearch}
   onfilterchange={handleFilterChange}
 />
@@ -572,7 +558,7 @@
   </a>
 {/if}
 
-{#if persons.length === 0 && !loading}
+{#if persons.length === 0 && !list.loading}
   <div class="empty">Aucune personne trouv&eacute;e.</div>
 {:else}
   <table class="data-table">
@@ -611,7 +597,7 @@
     </tbody>
   </table>
 
-  <Pagination page={currentPage} pages={totalPages} onchange={handlePageChange} />
+  <Pagination page={list.page} pages={list.pages} onchange={handlePageChange} />
   {/if}
 {:else if tab === "ambiguous-forms"}
   <AmbiguousFormsList
