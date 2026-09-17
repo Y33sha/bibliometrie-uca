@@ -310,6 +310,12 @@ class TestFindOrCreateJournal:
         found = find_or_create_journal("Nature Variant", issn="ISSN 00280836", repo=gateway)
         assert found == existing
 
+    def test_titles_emptied_by_normalization_do_not_match(self, sa_sync_conn, gateway):
+        """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
+        greek = find_or_create_journal("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
+        cyrillic = find_or_create_journal("Теория вероятностей и ее применения", repo=gateway)
+        assert greek != cyrillic
+
     def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
         j_id = find_or_create_journal("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
         row = _fetch_one(

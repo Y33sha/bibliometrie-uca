@@ -290,6 +290,14 @@ class TestJournalsWithSameTitle:
         ids = {j["id"] for g in r.json()["groups"] for j in g["journals"]}
         assert not ({a, b} & ids)
 
+    def test_titles_emptied_by_normalization_form_no_group(self, client):
+        """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
+        a = _seed_journal("Παιδαγωγικά ρεύματα στο Αιγαίο")
+        b = _seed_journal("Теория вероятностей и ее применения")
+        r = client.get("/api/journals/same-titles")
+        ids = {j["id"] for g in r.json()["groups"] for j in g["journals"]}
+        assert not ({a, b} & ids)
+
     def test_count_matches_the_groups(self, client):
         groups = client.get("/api/journals/same-titles").json()["groups"]
         assert client.get("/api/journals/same-titles/count").json() == {"total": len(groups)}
