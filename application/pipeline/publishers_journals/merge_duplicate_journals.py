@@ -25,6 +25,15 @@ MergeJournals = Callable[[int, int], None]
 MergeGroup = tuple[str, tuple[int, ...]]
 """`(libellé, revues)` : ce que les revues partagent, puis les revues, la cible en tête."""
 
+# Ce que les revues d'un groupe partagent, une règle par barre d'avancement.
+_REGLES = ("même ISSN-L", "même ISSN et titre emboîté", "mêmes titre et préfixe DOI")
+_LARGEUR_REGLE = max(len(regle) for regle in _REGLES)
+
+
+def _branche(regle: str) -> str:
+    """Libellé de la barre d'avancement d'une règle : sa branche, son nom, et le remplissage qui aligne les barres les unes sous les autres."""
+    return f"{BRANCHE}{regle:<{_LARGEUR_REGLE}}"
+
 
 def run_merge_duplicate_journals(
     logger: logging.Logger,
@@ -36,25 +45,30 @@ def run_merge_duplicate_journals(
     metrics = PhaseMetrics()
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
+    issnl, issn_et_titre, titre_et_prefixe = _REGLES
+    ouverte = False
 
-    def merge_groups(groups: Sequence[MergeGroup], titre: str) -> None:
-        _merge_groups(logger, metrics, journal_repo, merge, absorbed, groups, titre)
+    def merge_groups(groups: Sequence[MergeGroup], regle: str) -> None:
+        nonlocal ouverte
+        if not groups:
+            return
+        if not ouverte:
+            etape(logger, "Fusion de revues :")
+            ouverte = True
+        _merge_groups(logger, metrics, journal_repo, merge, absorbed, groups, regle)
 
     merge_groups(
         [(f"ISSN-L {g.key}", g.journal_ids) for g in journal_repo.find_journals_sharing_issnl()],
-        "%s : fusion des revues de même ISSN-L",
+        issnl,
     )
     shared = [
         (f"ISSN {g.issn}", tuple(j.id for j in g.journals if _nested(g.journals[0], j)))
         for g in journal_repo.find_journals_sharing_column_issn()
     ]
-    merge_groups(
-        [(label, ids) for label, ids in shared if len(ids) > 1],
-        "%s : fusion des revues de même ISSN et de titre emboîté",
-    )
+    merge_groups([(label, ids) for label, ids in shared if len(ids) > 1], issn_et_titre)
     merge_groups(
         [(f"titre {g.key!r}", g.journal_ids) for g in journal_repo.find_same_title_duplicates()],
-        "%s : fusion des revues de même titre et de même préfixe DOI",
+        titre_et_prefixe,
     )
     if metrics.total:
         logger.info(
@@ -79,14 +93,11 @@ def _merge_groups(
     merge: MergeJournals,
     absorbed: dict[int, int],
     groups: Sequence[MergeGroup],
-    titre: str,
+    regle: str,
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
-    if not groups:
-        return
-    etape(logger, titre, accord(len(groups), "groupe de revues", "groupes de revues"))
     metrics.add(total=len(groups))
-    with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
+    with progression(len(groups), _branche(regle), logger) as avancement:
         for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             sources = [s for s in journal_ids[1:] if s not in absorbed and s != target]
