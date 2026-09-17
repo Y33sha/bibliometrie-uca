@@ -1994,6 +1994,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/duplicates/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journal Duplicates Count
+         * @description Compteur de l'onglet « Doublons potentiels » (badge).
+         */
+        get: operations["journal_duplicates_count_api_journals_duplicates_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journal Duplicates
+         * @description Groupes de revues en double potentiel, à fusionner à la main : même titre normalisé, ou même ISSN dans `issn` ou `eissn`.
+         *
+         *     Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées. La liste ne garde pas mémoire des groupes examinés.
+         */
+        get: operations["journal_duplicates_api_journals_duplicates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journals/{journal_id}": {
         parameters: {
             query?: never;
@@ -3198,6 +3240,29 @@ export interface components {
             } | null;
             /** Doaj Imported At */
             doaj_imported_at: string | null;
+        };
+        /**
+         * JournalDuplicateGroup
+         * @description Revues en double potentiel : ce qu'elles partagent, puis les revues, la plus riche en publications en tête.
+         */
+        JournalDuplicateGroup: {
+            /**
+             * Shared
+             * @enum {string}
+             */
+            shared: "title" | "issn";
+            /** Value */
+            value: string;
+            /** Journals */
+            journals: components["schemas"]["JournalListItem"][];
+        };
+        /**
+         * JournalDuplicatesResponse
+         * @description GET /api/journals/duplicates : groupes de revues en double potentiel, les plus riches en publications en tête.
+         */
+        JournalDuplicatesResponse: {
+            /** Groups */
+            groups: components["schemas"]["JournalDuplicateGroup"][];
         };
         /**
          * JournalListItem
@@ -8302,6 +8367,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    journal_duplicates_count_api_journals_duplicates_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    journal_duplicates_api_journals_duplicates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDuplicatesResponse"];
                 };
             };
         };

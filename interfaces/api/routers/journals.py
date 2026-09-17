@@ -13,6 +13,7 @@ from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
+    JournalDuplicatesResponse,
     JournalFilters,
     JournalListResponse,
     JournalQueries,
@@ -46,6 +47,7 @@ from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
     OkResponse,
+    TotalCountResponse,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
 
@@ -135,6 +137,25 @@ def list_journals(
     `with_pubs` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_journals(filters=filters, sort=sort, page=page, per_page=per_page)
+
+
+@router.get("/duplicates/count", response_model=TotalCountResponse)
+def journal_duplicates_count(
+    queries: JournalQueries = Depends(journal_queries),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Doublons potentiels » (badge)."""
+    return TotalCountResponse(total=len(queries.journal_duplicates().groups))
+
+
+@router.get("/duplicates", response_model=JournalDuplicatesResponse)
+def journal_duplicates(
+    queries: JournalQueries = Depends(journal_queries),
+) -> JournalDuplicatesResponse:
+    """Groupes de revues en double potentiel, à fusionner à la main : même titre normalisé, ou même ISSN dans `issn` ou `eissn`.
+
+    Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées. La liste ne garde pas mémoire des groupes examinés.
+    """
+    return queries.journal_duplicates()
 
 
 @router.get("/{journal_id}", response_model=JournalDetailResponse)

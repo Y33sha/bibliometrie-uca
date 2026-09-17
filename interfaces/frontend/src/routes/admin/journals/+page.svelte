@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount } from 'svelte';
+	import { replaceState } from '$app/navigation';
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
+	import HubTabs from '$lib/components/HubTabs.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import JournalDuplicatesList from './JournalDuplicatesList.svelte';
+	import { mergeJournal } from './mergeJournal';
 	import Modal from '$lib/components/Modal.svelte';
 	import { autofocus } from '$lib/actions/focus';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
@@ -16,6 +20,27 @@
 
 	let journalTypes: EnumOption[] = $state([]);
 	let oaModels: EnumOption[] = $state([]);
+
+	// Onglets : la liste des revues, ou la file des doublons potentiels. L'onglet ouvert se garde dans l'URL (`?tab=`).
+	type TabKey = 'all' | 'duplicates';
+	let tab = $state<TabKey>('all');
+	let duplicateCount = $state(0);
+
+	async function loadDuplicateCount() {
+		try {
+			duplicateCount = (await api<{ total: number }>('/api/journals/duplicates/count')).total;
+		} catch {
+			duplicateCount = 0;
+		}
+	}
+
+	function selectTab(t: TabKey) {
+		tab = t;
+		const url = new URL(window.location.href);
+		if (t === 'all') url.searchParams.delete('tab');
+		else url.searchParams.set('tab', t);
+		replaceState(url, {});
+	}
 
 	// Clé d'API utilisée pour invalider le cache de JournalsListView après une édition ou fusion (force un reload via incrément).
 	let viewVersion = $state(0);
@@ -121,34 +146,17 @@
 
 	async function doMerge(sourceId: number) {
 		if (!mergeTargetId) return;
-		// Prévisualiser la requalification : fusionner dans un journal d'un autre type re-dérive le doc_type des publications absorbées contre le type de la cible (cf. merge_journals). Compte exact via le même endpoint que le changement de type, appliqué au journal source avec le type de la cible (count = 0 si même type → pas de confirmation).
-		try {
-			const impact = await journalsApi.typeChangeImpact(sourceId, mergeTargetType);
-			if (impact.count > 0) {
-				const plural = impact.count > 1 ? 's' : '';
-				const msg = `Cette fusion entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural} du journal absorbé. Continuer ?`;
-				if (!(await confirmDialog({ message: msg, danger: true }))) return;
-			}
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur lors du calcul d\'impact : ' + msg, 'error');
-			return;
-		}
-		try {
-			await journalsApi.merge(mergeTargetId, sourceId);
+		if (await mergeJournal({ id: mergeTargetId, journal_type: mergeTargetType }, sourceId)) {
 			closeMerge();
 			reload();
-		} catch (e: any) {
-			if (e instanceof ApiError) {
-				const detail = (e.detail as { detail?: string })?.detail;
-				toast(detail || `Erreur ${e.status}: ${JSON.stringify(e.detail)}`, 'error');
-				return;
-			}
-			toast('Erreur réseau : ' + e.message, 'error');
+			loadDuplicateCount();
 		}
 	}
 
 	onMount(async () => {
+		const t = new URLSearchParams(window.location.search).get('tab');
+		if (t === 'duplicates') tab = t;
+		loadDuplicateCount();
 		[journalTypes, oaModels] = await Promise.all([
 			api<EnumOption[]>('/api/journals/types'),
 			api<EnumOption[]>('/api/journals/oa-models')
@@ -160,6 +168,18 @@
 
 <h2>Revues</h2>
 
+<HubTabs
+	tabs={[
+		{ key: 'all', label: 'Revues' },
+		{ key: 'duplicates', label: 'Doublons potentiels', count: duplicateCount },
+	]}
+	active={tab}
+	onselect={(key) => selectTab(key as TabKey)}
+/>
+
+{#if tab === 'duplicates'}
+<JournalDuplicatesList onchange={loadDuplicateCount} />
+{:else}
 <JournalsListView {apiKey}>
 	{#snippet actionCell(j: Journal)}
 		{#if mergeTargetId === j.id}
@@ -190,6 +210,7 @@
 		{/if}
 	{/snippet}
 </JournalsListView>
+{/if}
 
 {#if editModal}
 <Modal title="Modifier la revue" maxWidth="520px" onclose={() => editModal = null} onsubmit={saveEdit}>
