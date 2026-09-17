@@ -3,57 +3,46 @@
   import { onMount } from "svelte";
   import { autofocus } from "$lib/actions/focus";
   import { base } from "$app/paths";
-  import { api } from "$lib/api";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
   import type { components } from "$lib/api/schema";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
-  type SubjectListResponse = components["schemas"]["SubjectListResponse"];
-
-  const PER_PAGE = 50;
 
   let search = $state("");
   let minCount = $state(3);
-  let page = $state(1);
-
-  let data = $state<SubjectListResponse | null>(null);
-  let loading = $state(false);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  async function load() {
-    loading = true;
-    try {
+  const list = usePaginatedFetch<SubjectListItem>({
+    endpoint: "/api/subjects",
+    itemsKey: "items",
+    apiKey: "subjects",
+    pageParam: null,
+    buildParams() {
       const params = new URLSearchParams();
       const q = search.trim();
       if (q) params.set("search", q);
       params.set("min_count", String(minCount));
-      params.set("page", String(page));
-      params.set("per_page", String(PER_PAGE));
-      data = await api<SubjectListResponse>(`/api/subjects?${params}`);
-    } finally {
-      loading = false;
-    }
-  }
+      return params;
+    },
+  });
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      page = 1;
-      load();
+      list.page = 1;
+      list.load();
     }, 300);
   }
 
   function onMinCountChange() {
-    page = 1;
-    load();
+    list.page = 1;
+    list.load();
   }
 
-  function onPageChange(p: number) {
-    page = p;
-    load();
-  }
-
-  onMount(load);
+  onMount(() => {
+    list.load();
+  });
 </script>
 
 <svelte:head>
@@ -81,13 +70,13 @@
     </label>
   </div>
 
-  {#if !data}
+  {#if !list.loaded}
     <p class="loading">Chargement…</p>
   {:else}
-    <p class="total" class:loading-overlay={loading}>
-      {data.total.toLocaleString("fr-FR")} sujets
+    <p class="total" class:loading-overlay={list.loading}>
+      {list.total.toLocaleString("fr-FR")} sujets
     </p>
-    {#if data.items.length === 0}
+    {#if list.items.length === 0}
       <p class="empty">Aucun sujet ne correspond à ces critères.</p>
     {:else}
       <table>
@@ -98,7 +87,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.items as s (s.id)}
+          {#each list.items as s (s.id)}
             <tr>
               <td>
                 <a href="{base}/subjects/{s.id}">{s.label}</a>
@@ -109,7 +98,7 @@
         </tbody>
       </table>
 
-      <Pagination page={data.page} pages={data.pages} onchange={onPageChange} />
+      <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
     {/if}
   {/if}
 

@@ -4,7 +4,7 @@
 	import { replaceState } from '$app/navigation';
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { docTypeSingular } from '$lib/labels';
 	import { halDocUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
@@ -13,58 +13,38 @@
 	import type { components } from '$lib/api/schema';
 	type DoiPair = components['schemas']['HalDoiDuplicatePair'];
 	type MetaPair = components['schemas']['HalMetaDuplicatePair'];
-	type DoiResponse = components['schemas']['HalDoiDuplicatesResponse'];
-	type MetaResponse = components['schemas']['HalMetaDuplicatesResponse'];
 
 	let activeTab: 'doi' | 'meta' = $state('doi');
 
-	let doiPairs: DoiPair[] = $state([]);
-	let doiTotal = $state(0);
-	let doiPage = $state(1);
-	let doiPages = $state(1);
-	let doiLoading = $state(false);
+	const doi = usePaginatedFetch<DoiPair>({
+		endpoint: '/api/hal-problems/duplicate-pubs-doi',
+		itemsKey: 'pairs',
+		apiKey: 'hal-duplicate-pubs-doi',
+		pageParam: 'doi_page',
+		buildParams: () => new URLSearchParams(),
+	});
 
-	let metaPairs: MetaPair[] = $state([]);
-	let metaTotal = $state(0);
-	let metaPage = $state(1);
-	let metaPages = $state(1);
-	let metaLoading = $state(false);
-
-	async function loadDoi() {
-		doiLoading = true;
-		const data = await api<DoiResponse>(`/api/hal-problems/duplicate-pubs-doi?page=${doiPage}&per_page=50`);
-		doiPairs = data.pairs;
-		doiTotal = data.total;
-		doiPages = data.pages;
-		doiPage = data.page;
-		doiLoading = false;
-		syncUrl();
-	}
-
-	async function loadMeta() {
-		metaLoading = true;
-		const data = await api<MetaResponse>(`/api/hal-problems/duplicate-pubs-meta?page=${metaPage}&per_page=50`);
-		metaPairs = data.pairs;
-		metaTotal = data.total;
-		metaPages = data.pages;
-		metaPage = data.page;
-		metaLoading = false;
-		syncUrl();
-	}
+	const meta = usePaginatedFetch<MetaPair>({
+		endpoint: '/api/hal-problems/duplicate-pubs-meta',
+		itemsKey: 'pairs',
+		apiKey: 'hal-duplicate-pubs-meta',
+		pageParam: 'meta_page',
+		buildParams: () => new URLSearchParams(),
+	});
 
 	function syncUrl() {
 		const p = new URLSearchParams();
 		if (activeTab !== 'doi') p.set('tab', activeTab);
-		if (doiPage > 1) p.set('doi_page', String(doiPage));
-		if (metaPage > 1) p.set('meta_page', String(metaPage));
+		if (doi.page > 1) p.set('doi_page', String(doi.page));
+		if (meta.page > 1) p.set('meta_page', String(meta.page));
 		const qs = p.toString();
 		replaceState(`${base}/hal-problems/duplicate-pubs` + (qs ? '?' + qs : ''), {});
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {
 		activeTab = tab;
-		if (tab === 'doi' && doiPairs.length === 0) loadDoi();
-		if (tab === 'meta' && metaPairs.length === 0) loadMeta();
+		if (tab === 'doi' && doi.items.length === 0) doi.load();
+		if (tab === 'meta' && meta.items.length === 0) meta.load();
 		syncUrl();
 	}
 
@@ -73,14 +53,10 @@
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
 		if (urlParams.get('tab')) activeTab = urlParams.get('tab') as 'doi' | 'meta';
-		if (urlParams.get('doi_page')) doiPage = parseInt(urlParams.get('doi_page')!);
-		if (urlParams.get('meta_page')) metaPage = parseInt(urlParams.get('meta_page')!);
-		if (activeTab === 'meta') {
-			loadMeta();
-			loadDoi();
-		} else {
-			loadDoi();
-		}
+		if (urlParams.get('doi_page')) doi.page = parseInt(urlParams.get('doi_page')!) || 1;
+		if (urlParams.get('meta_page')) meta.page = parseInt(urlParams.get('meta_page')!) || 1;
+		if (activeTab === 'meta') meta.load();
+		doi.load();
 	});
 </script>
 
@@ -100,21 +76,21 @@
 
 <div class="tabs">
 	<button class="tab" class:active={activeTab === 'doi'} onclick={() => switchTab('doi')}>
-		Par DOI{doiPairs.length || doiLoading ? ` (${doiTotal})` : ''}
+		Par DOI{doi.items.length ? ` (${doi.total})` : ''}
 	</button>
 	<button class="tab" class:active={activeTab === 'meta'} onclick={() => switchTab('meta')}>
-		Par métadonnées{metaPairs.length || metaLoading ? ` (${metaTotal})` : ''}
+		Par métadonnées{meta.items.length ? ` (${meta.total})` : ''}
 	</button>
 </div>
 
 {#if activeTab === 'doi'}
-	{#if doiLoading}
+	{#if doi.loading}
 		<div class="loading">Chargement…</div>
-	{:else if doiPairs.length === 0}
+	{:else if doi.items.length === 0}
 		<div class="no-results">Aucun doublon par DOI</div>
 	{:else}
 		<div class="doi-list">
-			{#each doiPairs as pair}
+			{#each doi.items as pair}
 				<div class="doi-card">
 					<div class="pub-meta-line">
 						{#if pair.publication.pub_year}<span class="meta-badge">{pair.publication.pub_year}</span>{/if}
@@ -135,13 +111,13 @@
 				</div>
 			{/each}
 		</div>
-		<Pagination page={doiPage} pages={doiPages} onchange={(p) => { doiPage = p; syncUrl(); loadDoi(); window.scrollTo(0, 0); }} />
+		<Pagination page={doi.page} pages={doi.pages} onchange={(p) => { doi.goToPage(p); syncUrl(); }} />
 	{/if}
 
 {:else}
-	{#if metaLoading}
+	{#if meta.loading}
 		<div class="loading">Chargement…</div>
-	{:else if metaPairs.length === 0}
+	{:else if meta.items.length === 0}
 		<div class="no-results">Aucun doublon par métadonnées</div>
 	{:else}
 		<table class="pub-table meta-table">
@@ -152,7 +128,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each metaPairs as pair}
+				{#each meta.items as pair}
 					<tr>
 						{#each [pair.pub_a, pair.pub_b] as pub}
 							<td>
@@ -181,7 +157,7 @@
 				{/each}
 			</tbody>
 		</table>
-		<Pagination page={metaPage} pages={metaPages} onchange={(p) => { metaPage = p; syncUrl(); loadMeta(); window.scrollTo(0, 0); }} />
+		<Pagination page={meta.page} pages={meta.pages} onchange={(p) => { meta.goToPage(p); syncUrl(); }} />
 	{/if}
 {/if}
 

@@ -13,6 +13,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import { confirmDialog } from '$lib/dialogs.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import type { components } from '$lib/api/schema';
 
 	const personId = $derived($page.params.id);
@@ -48,9 +49,14 @@
 	let thesesLoaded = $state(false);
 
 	// Addresses tab
-	let addresses: Address[] = $state([]);
-	let addrPage = $state(1);
-	let addrPages = $state(1);
+	const addresses = usePaginatedFetch<Address>({
+		endpoint: () => `/api/persons/${personId}/addresses`,
+		itemsKey: 'addresses',
+		apiKey: 'person-detail-addresses',
+		buildParams: () => new URLSearchParams(),
+		pageParam: null,
+	});
+	// Remis à `false` à chaque changement de personne.
 	let addrLoaded = $state(false);
 
 	// Dashboard tab
@@ -85,16 +91,7 @@
 	}
 
 	async function loadAddresses() {
-		const params = new URLSearchParams({
-			page: String(addrPage),
-			per_page: '50'
-		});
-		const data = await api<{
-			total: number; page: number; pages: number; addresses: Address[];
-		}>(`/api/persons/${personId}/addresses?${params}`, { key: 'person-detail-addresses' });
-		addresses = data.addresses;
-		addrPages = data.pages;
-		addrPage = data.page;
+		await addresses.load();
 		addrLoaded = true;
 	}
 
@@ -133,6 +130,7 @@
 		profile = null;
 		thesesLoaded = false;
 		addrLoaded = false;
+		addresses.page = 1;
 		dashboardLoaded = false;
 		try {
 			const profileData = await api<ProfileResponse>(`/api/persons/${id}`);
@@ -309,7 +307,7 @@
 		<div class="tab-content">
 			{#if !addrLoaded}
 				<div class="loading">Chargement…</div>
-			{:else if addresses.length === 0}
+			{:else if addresses.items.length === 0}
 				<div class="no-results">Aucune adresse</div>
 			{:else}
 				<table>
@@ -320,7 +318,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each addresses as a (a.id)}
+						{#each addresses.items as a (a.id)}
 							<tr>
 								<td class="addr-cell">{a.raw_text}</td>
 								<td>
@@ -334,7 +332,7 @@
 						{/each}
 					</tbody>
 				</table>
-				<Pagination page={addrPage} pages={addrPages} onchange={(p) => { addrPage = p; loadAddresses(); }} />
+				<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; addresses.load(); }} />
 			{/if}
 		</div>
 	{/if}

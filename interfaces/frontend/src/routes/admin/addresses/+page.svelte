@@ -8,6 +8,7 @@
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import { toast } from '$lib/dialogs.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { autofocus } from '$lib/actions/focus';
 
 	// ---- Type definitions ----
@@ -113,7 +114,7 @@
 		if (currentDetected !== 'yes') sp.set('detected', currentDetected);
 		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
 		serializePredicateParams(sp);
-		if (currentPage > 1) sp.set('page', String(currentPage));
+		if (list.page > 1) sp.set('page', String(list.page));
 		const qs = sp.toString();
 		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
 		replaceState(newUrl, {});
@@ -121,7 +122,6 @@
 
 	// ---- Reactive state ----
 
-	let currentPage = $state(1);
 	let currentDetected = $state('yes');
 	let currentValidation = $state('pending');
 	const newTextPredicate = (): TextPredicate => ({ mode: 'contains', term: '' });
@@ -133,11 +133,23 @@
 	// Liste plate de toutes les structures (hors `site`) pour le picker des prédicats Structure — distincte du scope (limité aux ALLOWED_TYPES).
 	let allStructures = $state<Structure[]>([]);
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
-	let addresses = $state<Address[]>([]);
-	let totalAddresses = $state(0);
-	let totalPages = $state(0);
-	let loading = $state(true);
-	let requiresSearch = $state(false);
+	const list = usePaginatedFetch<Address, AddressesResponse>({
+		endpoint: '/api/addresses',
+		itemsKey: 'addresses',
+		perPage: 200,
+		apiKey: 'addr-list',
+		buildParams() {
+			const params = new URLSearchParams({
+				structure_id: String(currentStructureId),
+				detected: currentDetected,
+				validation: currentValidation
+			});
+			serializePredicateParams(params);
+			return params;
+		},
+	});
+	const addresses = $derived(list.items);
+	const requiresSearch = $derived(list.data?.requires_search ?? false);
 
 	let selectedIds = $state<Set<number>>(new Set());
 	let selectAll = $state(false);
@@ -152,7 +164,7 @@
 
 	const selectedCount = $derived(selectedIds.size);
 	const resultCountText = $derived(
-		`${totalAddresses} adresse${totalAddresses > 1 ? 's' : ''}`
+		`${list.total} adresse${list.total > 1 ? 's' : ''}`
 	);
 
 	// Libellé d'une structure par id (pour les tags des prédicats).
@@ -180,7 +192,7 @@
 	});
 
 	function reload(): void {
-		currentPage = 1;
+		list.page = 1;
 		loadAddresses();
 	}
 
@@ -227,24 +239,9 @@
 		syncUrl();
 		// Les deux lectures sont scopées à une structure : sans elle, il n'y a rien à demander.
 		if (currentStructureId === null) return;
-		loading = true;
-		const params = new URLSearchParams({
-			structure_id: String(currentStructureId),
-			page: String(currentPage),
-			per_page: '200',
-			detected: currentDetected,
-			validation: currentValidation
-		});
-		serializePredicateParams(params);
-
-		const data = await api<AddressesResponse>(`/api/addresses?${params}`, { key: 'addr-list' });
-		requiresSearch = data.requires_search ?? false;
-		addresses = data.addresses;
-		totalAddresses = data.total;
-		totalPages = data.pages;
+		await list.load();
 		selectAll = false;
 		selectedIds = new Set();
-		loading = false;
 	}
 
 	async function loadPublications(addrId: number): Promise<void> {
@@ -277,10 +274,10 @@
 			// Mise à jour locale : mettre à jour puis retirer si ne correspond plus au filtre
 			const updated = { ...addresses.find((a) => a.id === addrId)!, is_confirmed: result.is_confirmed, is_detected: result.is_detected, structures: result.structures };
 			const keep = matchesFilter(updated);
-			addresses = keep
+			list.items = keep
 				? addresses.map((a) => (a.id === addrId ? updated : a))
 				: addresses.filter((a) => a.id !== addrId);
-			if (!keep) totalAddresses--;
+			if (!keep) list.total--;
 			loadStats();
 		} catch (e: unknown) {
 			if (e instanceof ApiError) {
@@ -389,20 +386,20 @@
 	}
 
 	function onFilterChange(): void {
-		currentPage = 1;
+		list.page = 1;
 		loadAddresses();
 	}
 
 	function onStructureChange(e: Event): void {
 		currentStructureId = parseInt((e.target as HTMLSelectElement).value);
 		localStorage.setItem('admin_structure_id', String(currentStructureId));
-		currentPage = 1;
+		list.page = 1;
 		loadStats();
 		loadAddresses();
 	}
 
 	function goToPage(p: number): void {
-		currentPage = p;
+		list.page = p;
 		loadAddresses();
 		mainPanel?.scrollTo(0, 0);
 	}
@@ -436,7 +433,7 @@
 		currentValidation = url.validation;
 		textPredicates = url.textPredicates.length ? url.textPredicates : [newTextPredicate()];
 		structurePredicates = url.structurePredicates;
-		currentPage = url.p;
+		list.page = url.p;
 
 		Promise.all([loadStructures(), loadInstitution()]).then(() => {
 			resolveScopeStructure();
@@ -595,7 +592,7 @@
 
 	<!-- Address list -->
 	<div class="main-panel" bind:this={mainPanel}>
-		{#if loading}
+		{#if list.loading}
 			<div class="loading-msg">Chargement…</div>
 		{:else if requiresSearch}
 			<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
@@ -698,7 +695,7 @@
 			{/each}
 		{/if}
 
-		<Pagination page={currentPage} pages={totalPages} onchange={goToPage} />
+		<Pagination page={list.page} pages={list.pages} onchange={goToPage} />
 	</div>
 </div>
 

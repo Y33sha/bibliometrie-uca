@@ -1,12 +1,12 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { ApiError, api, persons as personsApi } from "$lib/api";
+  import { ApiError, persons as personsApi } from "$lib/api";
   import { titleCase } from "$lib/utils";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
   import { confirmMerge } from "./confirmMerge";
   import type { components } from "$lib/api/schema";
 
-  type Resp = components["schemas"]["NameDuplicatesResponse"];
   type Pair = components["schemas"]["NameDuplicatePairOut"];
   type Person = components["schemas"]["CurationPersonOut"];
 
@@ -23,9 +23,13 @@
     reloadKey: number;
   } = $props();
 
-  let page = $state(1);
-  let data = $state<Resp | null>(null);
-  let loading = $state(false);
+  const list = usePaginatedFetch<Pair>({
+    endpoint: "/api/persons/name-duplicates",
+    itemsKey: "pairs",
+    apiKey: "name-duplicates",
+    buildParams: () => new URLSearchParams(),
+    pageParam: null,
+  });
   let acting = $state(false);
   let error = $state("");
 
@@ -36,25 +40,13 @@
     ["journals", "revues"],
   ];
 
-  async function load() {
-    loading = true;
-    data = await api<Resp>(`/api/persons/name-duplicates?page=${page}&per_page=50`);
-    loading = false;
-  }
-
-  function handlePage(p: number) {
-    page = p;
-    load();
-    window.scrollTo(0, 0);
-  }
-
   async function merge(targetId: number, sourceId: number) {
     if (!(await confirmMerge(sourceId))) return;
     acting = true;
     error = "";
     try {
       await personsApi.merge(targetId, sourceId);
-      await load();
+      await list.load();
       onchange();
     } catch (e) {
       error = e instanceof ApiError ? `Erreur ${e.status}` : "Erreur de fusion";
@@ -67,7 +59,7 @@
     error = "";
     try {
       await personsApi.markDistinct(a, b);
-      await load();
+      await list.load();
       onchange();
     } catch {
       error = "Erreur";
@@ -78,7 +70,7 @@
   // Charge au montage et à chaque incrément de `reloadKey` (action dans le drawer).
   $effect(() => {
     void reloadKey;
-    untrack(load);
+    untrack(list.load);
   });
 </script>
 
@@ -90,13 +82,13 @@
 
 {#if error}<p class="error">{error}</p>{/if}
 
-{#if !data}
+{#if !list.loaded}
   <div class="empty">Chargement…</div>
-{:else if data.pairs.length === 0 && !loading}
+{:else if list.items.length === 0 && !list.loading}
   <div class="empty">Aucune paire candidate par nom.</div>
 {:else}
   <div class="pairs">
-    {#each data.pairs as pair, i (i)}
+    {#each list.items as pair, i (i)}
       <div class="pair-block">
         <div class="overlaps">
           {#each OVERLAPS as [key, label] (key)}
@@ -136,7 +128,7 @@
     {/each}
   </div>
 
-  <Pagination {page} pages={data.pages} onchange={handlePage} />
+  <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
 {/if}
 
 {#snippet personCol(p: Person)}

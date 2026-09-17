@@ -4,42 +4,31 @@
   import { replaceState } from "$app/navigation";
   import { page as pageStore } from "$app/stores";
   import { onMount } from "svelte";
-  import { api } from "$lib/api";
+  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { halPersonUrl, titleCase } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
 
   import type { components } from "$lib/api/schema";
   type PersonRow = components["schemas"]["HalDuplicateAccountPerson"];
-  type Response = components["schemas"]["HalDuplicateAccountsResponse"];
 
-  let persons: PersonRow[] = $state([]);
-  let total = $state(0);
-  let page = $state(1);
-  let pages = $state(1);
-  let loading = $state(false);
+  const list = usePaginatedFetch<PersonRow>({
+    endpoint: "/api/hal-problems/duplicate-accounts",
+    itemsKey: "persons",
+    apiKey: "hal-duplicate-accounts",
+    buildParams: () => new URLSearchParams(),
+  });
 
   function syncUrl() {
     const p = new URLSearchParams();
-    if (page > 1) p.set("page", String(page));
+    if (list.page > 1) p.set("page", String(list.page));
     const qs = p.toString();
     replaceState(`${base}/hal-problems/duplicate-accounts` + (qs ? "?" + qs : ""), {});
   }
 
-  async function load() {
-    loading = true;
-    const data = await api<Response>(`/api/hal-problems/duplicate-accounts?page=${page}&per_page=50`);
-    persons = data.persons;
-    total = data.total;
-    pages = data.pages;
-    page = data.page;
-    loading = false;
-    syncUrl();
-  }
-
   onMount(() => {
     const urlParams = new URLSearchParams($pageStore.url.search);
-    if (urlParams.get("page")) page = parseInt(urlParams.get("page")!);
-    load();
+    if (urlParams.get("page")) list.page = parseInt(urlParams.get("page")!) || 1;
+    list.load();
   });
 </script>
 
@@ -52,12 +41,12 @@
 <div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
 
 <div class="toolbar">
-  <span class="count">{total} personne{total > 1 ? "s" : ""}</span>
+  <span class="count">{list.total} personne{list.total > 1 ? "s" : ""}</span>
 </div>
 
-{#if loading}
+{#if list.loading}
   <div class="loading">Chargement…</div>
-{:else if persons.length === 0}
+{:else if list.items.length === 0}
   <div class="no-results">Aucun doublon détecté</div>
 {:else}
   <table class="pub-table">
@@ -68,7 +57,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each persons as p}
+      {#each list.items as p}
         <tr>
           <td>
             <a href="{base}/persons/{p.person_id}" class="person-link">
@@ -103,13 +92,11 @@
   </table>
 
   <Pagination
-    {page}
-    {pages}
+    page={list.page}
+    pages={list.pages}
     onchange={(p) => {
-      page = p;
+      list.goToPage(p);
       syncUrl();
-      load();
-      window.scrollTo(0, 0);
     }}
   />
 {/if}
