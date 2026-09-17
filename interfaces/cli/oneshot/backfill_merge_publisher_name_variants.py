@@ -19,13 +19,14 @@ import os
 import re
 from collections import defaultdict
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.services.publishers.core import match_or_create_publisher, merge_publishers
 from domain.errors import PublisherMergeBlockedError
 from domain.normalize import normalize_text
 from domain.publishers.names import publisher_name_key
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -59,7 +60,7 @@ def _cleanest_name(names: list[str]) -> str:
 
 
 def _merge_variants(conn: Connection) -> tuple[int, int]:
-    groups: dict[str, list] = defaultdict(list)
+    groups: dict[str, list[Row[tuple[object, ...]]]] = defaultdict(list)
     for row in conn.execute(_PUBLISHERS):
         key = publisher_name_key(row.name)
         if key:
@@ -121,12 +122,12 @@ def _merge_variants(conn: Connection) -> tuple[int, int]:
 
 def _add_key_forms(conn: Connection) -> int:
     gateway = PgPublisherGatewayQueries(conn)
-    before = conn.execute(text("SELECT count(*) FROM publisher_name_forms")).scalar_one()
+    before = scalar_int(conn.execute(text("SELECT count(*) FROM publisher_name_forms")))
     for row in conn.execute(text("SELECT id, name FROM publishers ORDER BY id")).all():
         key = publisher_name_key(row.name)
         if key:
             gateway.add_publisher_name_form(row.id, key)
-    after = conn.execute(text("SELECT count(*) FROM publisher_name_forms")).scalar_one()
+    after = scalar_int(conn.execute(text("SELECT count(*) FROM publisher_name_forms")))
     return after - before
 
 
