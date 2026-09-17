@@ -10,7 +10,7 @@
 	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
-	type Publisher = components['schemas']['Publisher'];
+	type Publisher = components['schemas']['PublisherListItem'];
 	type EnumOption = components['schemas']['EnumOption'];
 	type Country = components['schemas']['CountryOut'];
 

@@ -265,6 +265,20 @@ class TestGetPublisher:
         assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
         assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
 
+    def test_doi_prefixes_in_list(self, client):
+        """Régression : la colonne « Préfixes DOI » du tableau des éditeurs restait vide, la liste ne les renvoyant pas."""
+        name = _uniq("ListedPrefixedPub")
+        pid = _seed_publisher(name)
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.cccc', 'Crossref', %s)",
+                (pid,),
+            )
+        r = client.get("/api/publishers", params={"search": name})
+        assert r.status_code == 200
+        mine = next(p for p in r.json()["publishers"] if p["id"] == pid)
+        assert [p["prefix"] for p in mine["doi_prefixes"]] == ["10.cccc"]
+
 
 # ── GET /api/publishers/{id}/dashboard ──────────────────────────
 
