@@ -318,6 +318,52 @@ class TestJournalsSharingIssn:
         assert client.get("/api/journals/shared-issns/count").json() == {"total": len(groups)}
 
 
+def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
+    """Revue typée `journal` portant un enregistrement par couple `(source, type brut)`."""
+    jid = _seed_journal()
+    with owner_pool() as cur:
+        cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
+        for source, raw_type in raw_types:
+            cur.execute(
+                "INSERT INTO source_publications (source, source_id, title, journal_id, doc_type)"
+                " VALUES (%s, %s, 'Doc', %s, %s)",
+                (source, _uniq("sp"), jid, raw_type),
+            )
+    return jid
+
+
+class TestLikelyProceedings:
+    def test_revue_d_articles_de_congres_dans_la_file(self, client):
+        """Cas réel : « 2020 Winter Simulation Conference (WSC) », typée journal."""
+        proceedings = _seed_typed_journal_with_records(
+            [("crossref", "proceedings-article"), ("hal", "COMM"), ("hal", "ART")]
+        )
+        journal = _seed_typed_journal_with_records([("hal", "COMM"), ("hal", "ART")])
+
+        items = client.get("/api/journals/likely-proceedings").json()["journals"]
+
+        mine = {i["journal"]["id"]: i for i in items}
+        assert proceedings in mine
+        assert (mine[proceedings]["conference_papers"], mine[proceedings]["records"]) == (2, 3)
+        assert journal not in mine
+
+    def test_revues_sans_issn_en_tete(self, client):
+        with_issn = _seed_typed_journal_with_records([("hal", "COMM")] * 5)
+        _set_issns(with_issn, "2999-2222")
+        without_issn = _seed_typed_journal_with_records([("hal", "COMM")])
+
+        ids = [
+            i["journal"]["id"]
+            for i in client.get("/api/journals/likely-proceedings").json()["journals"]
+        ]
+
+        assert ids.index(without_issn) < ids.index(with_issn)
+
+    def test_count_matches_the_queue(self, client):
+        items = client.get("/api/journals/likely-proceedings").json()["journals"]
+        assert client.get("/api/journals/likely-proceedings/count").json() == {"total": len(items)}
+
+
 class TestGetJournal:
     def test_404_when_unknown(self, client):
         r = client.get("/api/journals/999999999")

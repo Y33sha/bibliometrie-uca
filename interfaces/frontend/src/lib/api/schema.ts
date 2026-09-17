@@ -2076,6 +2076,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/likely-proceedings/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Likely Proceedings Count
+         * @description Compteur de l'onglet « Recueils d'actes probables » (badge).
+         */
+        get: operations["likely_proceedings_count_api_journals_likely_proceedings_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/likely-proceedings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Likely Proceedings
+         * @description Revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main.
+         */
+        get: operations["likely_proceedings_api_journals_likely_proceedings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journals/{journal_id}": {
         parameters: {
             query?: never;
@@ -3411,6 +3451,25 @@ export interface components {
             oa_models: components["schemas"]["FacetOption"][];
             /** Doaj */
             doaj: components["schemas"]["FacetOption"][];
+        };
+        /**
+         * LikelyProceedingsItem
+         * @description Revue typée `journal` qui contient surtout des articles de congrès : `conference_papers` sur `records` documents, d'après le type donné par chaque source.
+         */
+        LikelyProceedingsItem: {
+            journal: components["schemas"]["JournalListItem"];
+            /** Conference Papers */
+            conference_papers: number;
+            /** Records */
+            records: number;
+        };
+        /**
+         * LikelyProceedingsResponse
+         * @description File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en documents.
+         */
+        LikelyProceedingsResponse: {
+            /** Journals */
+            journals: components["schemas"]["LikelyProceedingsItem"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -8482,6 +8541,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JournalDuplicatesResponse"];
+                };
+            };
+        };
+    };
+    likely_proceedings_count_api_journals_likely_proceedings_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    likely_proceedings_api_journals_likely_proceedings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LikelyProceedingsResponse"];
                 };
             };
         };

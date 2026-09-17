@@ -19,6 +19,7 @@ from application.ports.read_models.journals_queries import (
     JournalQueries,
     JournalsFacetsResponse,
     JournalSort,
+    LikelyProceedingsResponse,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
@@ -175,6 +176,22 @@ def journals_sharing_issn(
 ) -> JournalDuplicatesResponse:
     """Groupes de revues qui portent le même ISSN dans `issn` ou `eissn`, à fusionner à la main."""
     return queries.journals_sharing_issn()
+
+
+@router.get("/likely-proceedings/count", response_model=TotalCountResponse)
+def likely_proceedings_count(
+    queries: JournalQueries = Depends(journal_queries),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Recueils d'actes probables » (badge)."""
+    return TotalCountResponse(total=len(queries.likely_proceedings().journals))
+
+
+@router.get("/likely-proceedings", response_model=LikelyProceedingsResponse)
+def likely_proceedings(
+    queries: JournalQueries = Depends(journal_queries),
+) -> LikelyProceedingsResponse:
+    """Revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main."""
+    return queries.likely_proceedings()
 
 
 @router.get("/{journal_id}", response_model=JournalDetailResponse)

@@ -139,8 +139,26 @@ class JournalDuplicatesResponse(BaseModel):
     groups: list[JournalDuplicateGroup]
 
 
+class LikelyProceedingsItem(BaseModel):
+    """Revue typée `journal` qui contient surtout des articles de congrès : `conference_papers` sur `records` documents, d'après le type donné par chaque source."""
+
+    journal: JournalListItem
+    conference_papers: int
+    records: int
+
+
+class LikelyProceedingsResponse(BaseModel):
+    """File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en documents."""
+
+    journals: list[LikelyProceedingsItem]
+
+
 class JournalQueries(Protocol):
     """Opérations de lecture sur les revues."""
+
+    def likely_proceedings(self) -> LikelyProceedingsResponse:
+        """Revues typées `journal` dont la majorité stricte des documents sont des articles de congrès."""
+        ...
 
     def journals_with_same_title(self) -> JournalDuplicatesResponse:
         """Revues de même titre normalisé. Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées."""

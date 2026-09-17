@@ -179,6 +179,16 @@ Audit manuel par paire (journal_publi, journal_match_DOI) :
 - **DOI d'un preprint qui aurait dû être filtré** : ajouter le préfixe à `OUTLIER_DOI_PREFIXES` dans `seed_journals_doi_prefix.py` et re-runner.
 - **Faux positif persistant** : indique probablement un préfixe encore trop court — retour Cas 4.
 
+## Cas 6 — Recueils d'actes typés revue
+
+### Diagnostic
+
+L'onglet « Recueils d'actes probables » de `/admin/journals` liste les revues typées « revue » dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source. La colonne « Articles de congrès » donne leur part. Les revues sans ISSN viennent en tête.
+
+### Action
+
+Le bouton « Recueil d'actes » type la revue en recueil d'actes, après confirmation. Les publications de la revue sont requalifiées, et la revue sort de la file. Une vraie revue qui publie les résumés d'un congrès en supplément (*Value in Health*, *Diabetologia*) reste dans la file.
+
 ## Refresh post-nettoyage
 
 Après chaque session de nettoyage (Cas 1-4), re-runner le seed pour bénéficier des données dédoublonnées :

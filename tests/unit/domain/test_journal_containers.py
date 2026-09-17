@@ -2,7 +2,11 @@
 
 import pytest
 
-from domain.journals.containers import container_is_journal, holds_mostly_conference_papers
+from domain.journals.containers import (
+    conference_paper_share,
+    container_is_journal,
+    holds_mostly_conference_papers,
+)
 
 
 @pytest.mark.parametrize(
@@ -57,6 +61,11 @@ def test_moitie_d_articles_de_congres_insuffisante():
 
 def test_type_composite_compte_comme_article_de_congres():
     assert holds_mostly_conference_papers([("wos", "Article; Proceedings Paper")])
+
+
+def test_part_d_articles_de_congres():
+    records = [("crossref", "proceedings-article"), ("hal", "COMM"), ("hal", "ART")]
+    assert conference_paper_share(records) == (2, 3)
 
 
 def test_revue_sans_document():
