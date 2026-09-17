@@ -126,16 +126,15 @@ class JournalDashboardResponse(BaseModel):
 
 
 class JournalDuplicateGroup(BaseModel):
-    """Revues en double potentiel : ce qu'elles partagent, puis les revues, la plus riche en publications en tête."""
+    """Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête."""
 
-    shared: Literal["title", "issn"]
     value: str
     """Titre normalisé, ou ISSN porté dans `issn` ou `eissn`."""
     journals: list[JournalListItem]
 
 
 class JournalDuplicatesResponse(BaseModel):
-    """GET /api/journals/duplicates : groupes de revues en double potentiel, les plus riches en publications en tête."""
+    """File de groupes de revues en double potentiel, les plus riches en publications en tête."""
 
     groups: list[JournalDuplicateGroup]
 
@@ -143,8 +142,12 @@ class JournalDuplicatesResponse(BaseModel):
 class JournalQueries(Protocol):
     """Opérations de lecture sur les revues."""
 
-    def journal_duplicates(self) -> JournalDuplicatesResponse:
-        """Revues de même titre normalisé, et revues qui portent le même ISSN dans `issn` ou `eissn`. Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées."""
+    def journals_with_same_title(self) -> JournalDuplicatesResponse:
+        """Revues de même titre normalisé. Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées."""
+        ...
+
+    def journals_sharing_issn(self) -> JournalDuplicatesResponse:
+        """Revues qui portent le même ISSN dans `issn` ou `eissn`."""
         ...
 
     def list_journals(

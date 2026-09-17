@@ -139,23 +139,42 @@ def list_journals(
     return queries.list_journals(filters=filters, sort=sort, page=page, per_page=per_page)
 
 
-@router.get("/duplicates/count", response_model=TotalCountResponse)
-def journal_duplicates_count(
+# ── Files de triage ──────────────────────────────────────────────
+
+
+@router.get("/same-titles/count", response_model=TotalCountResponse)
+def journals_with_same_title_count(
     queries: JournalQueries = Depends(journal_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « Doublons potentiels » (badge)."""
-    return TotalCountResponse(total=len(queries.journal_duplicates().groups))
+    """Compteur de l'onglet « Titres identiques » (badge)."""
+    return TotalCountResponse(total=len(queries.journals_with_same_title().groups))
 
 
-@router.get("/duplicates", response_model=JournalDuplicatesResponse)
-def journal_duplicates(
+@router.get("/same-titles", response_model=JournalDuplicatesResponse)
+def journals_with_same_title(
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDuplicatesResponse:
-    """Groupes de revues en double potentiel, à fusionner à la main : même titre normalisé, ou même ISSN dans `issn` ou `eissn`.
+    """Groupes de revues de même titre normalisé, à fusionner à la main.
 
-    Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées. La liste ne garde pas mémoire des groupes examinés.
+    Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées.
     """
-    return queries.journal_duplicates()
+    return queries.journals_with_same_title()
+
+
+@router.get("/shared-issns/count", response_model=TotalCountResponse)
+def journals_sharing_issn_count(
+    queries: JournalQueries = Depends(journal_queries),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « ISSN partagés » (badge)."""
+    return TotalCountResponse(total=len(queries.journals_sharing_issn().groups))
+
+
+@router.get("/shared-issns", response_model=JournalDuplicatesResponse)
+def journals_sharing_issn(
+    queries: JournalQueries = Depends(journal_queries),
+) -> JournalDuplicatesResponse:
+    """Groupes de revues qui portent le même ISSN dans `issn` ou `eissn`, à fusionner à la main."""
+    return queries.journals_sharing_issn()
 
 
 @router.get("/{journal_id}", response_model=JournalDetailResponse)
