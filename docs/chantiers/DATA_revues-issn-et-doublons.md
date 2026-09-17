@@ -99,8 +99,14 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
     - [x] Oneshot `backfill_merge_publisher_name_variants` : fusion des éditeurs de même clé. À blanc : 853 fusions, 1 refusée (Duncker & Humblot, revues homonymes aux ISSN divergents).
     - [x] Sous-étape `delete_empty_publishers` : suppression des éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
     - [x] Marques et groupes : l'usage décide, revue par revue. Une marque reste l'éditeur que donnent les sources (Routledge, Dove Medical Press), et aucune fusion automatique ne la range dans son groupe. Un rattachement d'usage (Elsevier Masson dans Elsevier) passe par la fusion d'éditeurs de l'administration. Le préfixe DOI donne le déposant Crossref, souvent le groupe (Informa UK Limited pour Taylor & Francis), parfois une plateforme (CAIRN.INFO, OpenEdition, CCSD) : il ne sert pas de référence.
+- [x] ISSN partagés : aucun. Deux ISSN de collection portés aussi par l'un de ses volumes (2364-1886, 1680-0737) sont retirés des volumes. L'eISSN d'*Hermès, La Revue* (1963-1006), porté aussi par *Les Essentiels d'Hermès*, est traité dans l'administration.
+- Contrainte d'unicité sur `issn` et `eissn`. `issnl` reste sans contrainte : un titre et son supplément le partagent. Une écriture qui viole la contrainte fait échouer le document à chaque normalisation : les écritures d'ISSN doivent d'abord tenir compte des autres revues.
+    - [ ] Ordre de rapprochement de `find_or_create_journal` : l'`openalex_id` passe avant les ISSN, un choix antérieur à l'unicité des ISSN. À réexaminer.
+    - [ ] `enrich_journal` : un ISSN déjà porté par une autre revue ne va pas dans une colonne.
+    - [ ] Vérification Sudoc : un ISSN porté par une autre revue vérifiée déclenche la fusion des deux revues, au lieu d'une écriture qui dédouble l'ISSN.
+    - [ ] Administration : l'enregistrement d'une revue dont l'ISSN appartient à une autre revue affiche un message qui nomme cette revue, au lieu de l'erreur brute de la base.
+    - [ ] Migration : contrainte d'unicité sur `issn` et `eissn`.
 - [ ] Volet latéral pour les revues et les éditeurs, à l'image de ceux des publications et des personnes.
-- [ ] Contrainte d'unicité sur `issn` et `eissn`, une fois ces doublons traités. `issnl` reste sans contrainte : un titre et son supplément le partagent.
 
 ### 5. Préfixes DOI des revues
 
