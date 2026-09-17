@@ -5,6 +5,7 @@
 	import { replaceState } from '$app/navigation';
 	import { api, ApiError, orphanAuthorships } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { titleCase } from '$lib/utils';
 	import { autofocus } from '$lib/actions/focus';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -13,7 +14,6 @@
 
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
-	type OrphansResponse = components['schemas']['OrphanAuthorshipsResponse'];
 	type RejectedPair = components['schemas']['RejectedPairItem'];
 
 	async function searchPersons(q: string): Promise<PersonResult[]> {
@@ -21,12 +21,17 @@
 	}
 
 	let search = $state('');
-	let currentPage = $state(1);
-	let totalPages = $state(1);
-	let total = $state(0);
-	let orphans: OrphanAuthorship[] = $state([]);
-	// `true` tant que le premier chargement n'a pas abouti : le tableau affiche « Chargement… », pas « vide ».
-	let loading = $state(true);
+	const list = usePaginatedFetch<OrphanAuthorship>({
+		endpoint: '/api/authorships/orphans',
+		itemsKey: 'authorships',
+		apiKey: 'orphans',
+		buildParams() {
+			const params = new URLSearchParams();
+			if (search.trim()) params.set('search', search.trim());
+			return params;
+		},
+	});
+	const orphans = $derived(list.items);
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
 	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
@@ -73,23 +78,6 @@
 		datacite: 'DataCite',
 	};
 
-	async function loadOrphans() {
-		loading = true;
-		try {
-			const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
-			if (search.trim()) params.set('search', search.trim());
-			const data = await api<OrphansResponse>(
-				'/api/authorships/orphans?' + params, { key: 'orphans' }
-			);
-			orphans = data.authorships;
-			total = data.total;
-			totalPages = data.pages;
-			currentPage = data.page;
-		} finally {
-			loading = false;
-		}
-	}
-
 	function openAssign(idx: number) {
 		activeAssignIdx = idx;
 		assignSearch.clear();
@@ -108,7 +96,7 @@
 				force,
 			});
 			closeAssign();
-			loadOrphans();
+			list.load();
 		});
 	}
 
@@ -146,7 +134,7 @@
 			});
 			selectedIds = new Set();
 			batchSearch.clear();
-			loadOrphans();
+			list.load();
 		});
 	}
 
@@ -181,12 +169,12 @@
 		createModal = null;
 		selectedIds = new Set();
 		batchSearch.clear();
-		loadOrphans();
+		list.load();
 	}
 
 	function syncUrl() {
 		const p = new URLSearchParams();
-		if (currentPage > 1) p.set('page', String(currentPage));
+		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		const qs = p.toString();
 		replaceState(`${base}/admin/orphan-authorships` + (qs ? '?' + qs : ''), {});
@@ -195,14 +183,14 @@
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	function onSearchInput() {
 		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { currentPage = 1; syncUrl(); loadOrphans(); }, 400);
+		debounceTimer = setTimeout(() => { list.page = 1; syncUrl(); list.load(); }, 400);
 	}
 
 	onMount(() => {
 		const params = new URLSearchParams(window.location.search);
-		if (params.get('page')) currentPage = parseInt(params.get('page')!) || 1;
+		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
 		if (params.get('search')) search = params.get('search')!;
-		loadOrphans();
+		list.load();
 	});
 </script>
 
@@ -211,7 +199,7 @@
 </svelte:head>
 
 <div class="header">
-	<h1>Authorships orphelines ({total})</h1>
+	<h1>Authorships orphelines ({list.total})</h1>
 	<a href="{base}/admin/persons" class="btn">← Retour aux personnes</a>
 </div>
 
@@ -249,7 +237,7 @@
 {/if}
 
 {#if orphans.length === 0}
-	{#if loading}
+	{#if list.loading}
 		<p class="loading-msg">Chargement des résultats en cours…</p>
 	{:else}
 		<p class="empty">Aucune authorship orpheline{search.trim() ? ' pour ce filtre' : ''}.</p>
@@ -313,7 +301,7 @@
 		</tbody>
 	</table>
 
-	<Pagination page={currentPage} pages={totalPages} onchange={(p) => { currentPage = p; syncUrl(); loadOrphans(); }} />
+	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 {/if}
 
 {#if createModal}
