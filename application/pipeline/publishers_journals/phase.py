@@ -6,7 +6,7 @@ Sous-étapes incrémentales, dans l'ordre :
 2. **enrich_journals_from_openalex** — OpenAlex Sources → APC + journal_type (clé ou email OpenAlex).
 3. **check_journals_in_sudoc** — Sudoc (public) → ISSN des revues vérifiés, corrigés et rangés par support.
 4. **merge_duplicate_journals** — fusion des revues en double : même ISSN-L, même ISSN sous un titre emboîté, même titre et même préfixe DOI.
-5. **delete_empty_journals** — suppression des revues sans enregistrement, sans publication et sans paiement APC.
+5. **delete_empty_journals** — suppression des revues sans enregistrement, sans publication et sans paiement APC, puis des éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
 6. **type_proceedings_journals** — typage en recueil d'actes des revues de type inconnu qui contiennent surtout des articles de congrès.
 7. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
 
@@ -31,6 +31,7 @@ def run(
     check_in_sudoc: RunSubstep,
     merge_duplicates: RunSubstep,
     delete_empty: RunSubstep,
+    delete_empty_publishers: RunSubstep,
     type_proceedings: RunSubstep,
     enrich_from_doaj: RunSubstep,
     credentials_missing: CredentialsMissing,
@@ -62,11 +63,21 @@ def run(
     sudoc = check_in_sudoc()
     merges = merge_duplicates()
     deletions = delete_empty()
+    publisher_deletions = delete_empty_publishers()
     proceedings = type_proceedings()
     doaj = enrich_from_doaj()
 
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
-    for sub in (publishers, openalex, sudoc, merges, deletions, proceedings, doaj):
+    for sub in (
+        publishers,
+        openalex,
+        sudoc,
+        merges,
+        deletions,
+        publisher_deletions,
+        proceedings,
+        doaj,
+    ):
         metrics.merge(sub)
 
     # Chaque sous-étape se tait quand elle n'a rien à traiter : la phase le dit pour elles.
@@ -103,6 +114,12 @@ def run(
                 "key": "revues vides supprimées",
                 "traités": deletions.total,
                 "identifiés": deletions.extras.get("journals_deleted", 0),
+                "créés": 0,
+            },
+            {
+                "key": "éditeurs vides supprimés",
+                "traités": publisher_deletions.total,
+                "identifiés": publisher_deletions.extras.get("publishers_deleted", 0),
                 "créés": 0,
             },
             {

@@ -26,3 +26,11 @@ class PublisherFindOrCreateQueries(Protocol):
     ) -> tuple[int, bool]:
         """`(id, created)` : l'éditeur qui porte déjà la forme de nom `name_key`, sinon un éditeur créé sous `name_raw` et `name_normalized`, avec sa forme `name_key`."""
         ...
+
+
+class PublisherCleanupQueries(Protocol):
+    """Suppression des éditeurs vides."""
+
+    def delete_empty_publishers(self) -> list[tuple[int, str]]:
+        """Supprime les éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue, et rend `(id, nom)` de chacun."""
+        ...

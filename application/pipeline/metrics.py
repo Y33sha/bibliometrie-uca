@@ -31,6 +31,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "not_found": "introuvable",
     "publisher_created": ("éditeur créé", "éditeurs créés"),
     "publisher_matched": ("éditeur rapproché", "éditeurs rapprochés"),
+    "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),
     "resolved": "résolu",
     "skipped": "sauté",
     "stale": ("à rafraîchir", "à rafraîchir"),

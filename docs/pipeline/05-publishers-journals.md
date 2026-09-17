@@ -17,7 +17,7 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 
     La revue qui porte le plus de publications absorbe les autres. La fusion est celle de l'administration des revues : publications et métadonnées passent à la cible, dont le `journal_type` requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 
-5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
+5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée. Suivent les éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue (`delete_empty_publishers`).
 
 6. **`type_proceedings_journals`** — type en recueil d'actes (`proceedings`) trois sortes de revues :
     - les revues de type inconnu dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source ;
