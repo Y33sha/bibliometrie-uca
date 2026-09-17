@@ -19,9 +19,12 @@ from application.ports.read_models.journals_queries import (
     JournalQueries,
     JournalsFacetsResponse,
     JournalSort,
+    LikelyProceedingsItem,
+    LikelyProceedingsResponse,
     OaStatusCount,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
+from domain.journals.containers import conference_paper_share, holds_mostly_conference_papers
 from domain.journals.expected import (
     EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE,
     EXPECTED_OA_STATUSES_BY_OA_MODEL,
@@ -153,6 +156,18 @@ _SAME_TITLE_GROUPS = """
         OR (count(*) = 2 AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
 """
 
+# Type brut de chaque document des revues typées `journal`, celui de la source avant correction.
+_JOURNAL_RECORD_TYPES = """
+    SELECT j.id,
+           array_agg(s.source::text ORDER BY s.id) AS sources,
+           array_agg(coalesce(s.raw_metadata->'doc_type'->>'raw', s.doc_type) ORDER BY s.id)
+               AS raw_types
+    FROM journals j
+    JOIN source_publications s ON s.journal_id = j.id
+    WHERE j.journal_type = 'journal'
+    GROUP BY j.id
+"""
+
 # Revues qui portent le même ISSN dans `issn` ou `eissn`.
 _SHARED_ISSN_GROUPS = """
     WITH colonnes AS (
@@ -172,6 +187,34 @@ class PgJournalQueries(JournalQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def likely_proceedings(self) -> LikelyProceedingsResponse:
+        shares: dict[int, tuple[int, int]] = {}
+        for candidate in self._conn.execute(text(_JOURNAL_RECORD_TYPES)):
+            records = list(zip(candidate.sources, candidate.raw_types, strict=True))
+            if holds_mostly_conference_papers(records):
+                shares[candidate.id] = conference_paper_share(records)
+        rows = self._conn.execute(
+            text(f"""
+                SELECT {_JOURNAL_LIST_COLUMNS}
+                FROM journals j
+                LEFT JOIN publishers p ON p.id = j.publisher_id
+                WHERE j.id = ANY(:ids)
+            """),
+            {"ids": list(shares)},
+        ).all()
+        items = [
+            LikelyProceedingsItem(
+                journal=_journal_list_item(r),
+                conference_papers=shares[r.id][0],
+                records=shares[r.id][1],
+            )
+            for r in rows
+        ]
+        items.sort(
+            key=lambda i: (bool(i.journal.issn or i.journal.eissn), -i.records, i.journal.id)
+        )
+        return LikelyProceedingsResponse(journals=items)
 
     def journals_with_same_title(self) -> JournalDuplicatesResponse:
         return self._duplicate_groups(_SAME_TITLE_GROUPS)

@@ -26,8 +26,8 @@ def container_is_journal(
     return _CONFERENCE_PAPER in types or not types & _BOOK_TYPES
 
 
-def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) -> bool:
-    """Indique si la majorité stricte des documents d'une revue sont des articles de congrès.
+def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[int, int]:
+    """Nombre d'articles de congrès et nombre de documents d'une revue.
 
     `records` : `(source, type brut)` de chaque document. Le type brut évite de compter les documents que la correction a retypés d'après le type de la revue.
     """
@@ -35,4 +35,10 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
     for source, raw_doc_type in records:
         total += 1
         conference += _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
+    return conference, total
+
+
+def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) -> bool:
+    """Indique si la majorité stricte des documents d'une revue sont des articles de congrès (`conference_paper_share`)."""
+    conference, total = conference_paper_share(records)
     return conference * 2 > total
