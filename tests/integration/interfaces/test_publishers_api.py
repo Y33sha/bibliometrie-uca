@@ -255,13 +255,13 @@ class TestGetPublisher:
             cur.execute(
                 "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
                 "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
-                ("10.aaaa", "Crossref", pid, 42, "10.bbbb", "Crossref", pid, 42),
+                ("10.9008", "Crossref", pid, 42, "10.9009", "Crossref", pid, 42),
             )
         r = client.get(f"/api/publishers/{pid}")
         assert r.status_code == 200
         pub = r.json()
         prefixes = {p["prefix"] for p in pub["doi_prefixes"]}
-        assert prefixes == {"10.aaaa", "10.bbbb"}
+        assert prefixes == {"10.9008", "10.9009"}
         assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
         assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
 
@@ -271,13 +271,13 @@ class TestGetPublisher:
         pid = _seed_publisher(name)
         with owner_pool() as cur:
             cur.execute(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.cccc', 'Crossref', %s)",
+                "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.9010', 'Crossref', %s)",
                 (pid,),
             )
         r = client.get("/api/publishers", params={"search": name})
         assert r.status_code == 200
         mine = next(p for p in r.json()["publishers"] if p["id"] == pid)
-        assert [p["prefix"] for p in mine["doi_prefixes"]] == ["10.cccc"]
+        assert [p["prefix"] for p in mine["doi_prefixes"]] == ["10.9010"]
 
 
 # ── GET /api/publishers/{id}/dashboard ──────────────────────────

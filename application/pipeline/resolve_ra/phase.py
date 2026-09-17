@@ -1,6 +1,6 @@
 """Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `fetch_missing`.
 
-Pour chaque préfixe du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper.
+Pour chaque préfixe valide (`DoiPrefix`) du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper.
 
 Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
@@ -14,6 +14,7 @@ from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
+from domain.publications.identifiers import DoiPrefix
 
 ResolveRaFn = Callable[[str], str | None]
 """Signature : `(doi) -> ra_name | None`. `None` = DOI inexistant ou erreur HTTP."""
@@ -33,7 +34,14 @@ def run(
     S'arrête si le `breaker` a tripé (doi.org à bout de budget).
     """
     metrics = PhaseMetrics()
-    prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
+    # Un préfixe hors de la forme `10.<chiffres>` vient d'une valeur qui n'est pas un DOI : il n'est pas enregistré.
+    prefixes = [
+        (prefix, samples)
+        for prefix, samples in repo.get_unresolved_prefixes_with_samples(
+            n_samples_per_prefix=n_samples
+        )
+        if str(DoiPrefix.try_parse(prefix)) == prefix
+    ]
     log.info("%s à résoudre", accord(len(prefixes), "préfixe DOI", "préfixes DOI"))
     if prefixes:
         log.info("")

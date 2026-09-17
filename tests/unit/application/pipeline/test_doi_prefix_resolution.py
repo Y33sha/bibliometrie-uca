@@ -187,6 +187,22 @@ def test_resolve_ra_inserts_ra_only():
     assert metrics.extras.get("resolved") == 1
 
 
+def test_resolve_ra_ecarte_les_prefixes_malformes():
+    """Régression : « doi:10.5194 » et « https: » entraient dans doi_prefixes, et le premier y recevait un éditeur."""
+    repo = FakeDoiPrefixRepo(
+        unresolved=[
+            ("doi:10.5194", ["doi:10.5194/acp-21-1"]),
+            ("https:", ["https://jssidoi.org/ird/article/116"]),
+            ("10.5194", ["10.5194/acp-21-1"]),
+        ]
+    )
+    ra = StubResolveRa(answers={"10.5194/acp-21-1": "Crossref"})
+
+    _run_ra(repo, ra)
+
+    assert set(repo.rows) == {"10.5194"}
+
+
 def test_resolve_ra_expose_la_repartition_par_ra():
     repo = FakeDoiPrefixRepo(
         unresolved=[("10.1038", ["10.1038/a"])],
@@ -205,13 +221,13 @@ def test_resolve_ra_expose_la_repartition_par_ra():
 
 
 def test_resolve_ra_unknown_when_all_samples_fail():
-    repo = FakeDoiPrefixRepo(unresolved=[("10.xxx", ["10.xxx/a", "10.xxx/b"])])
-    ra = StubResolveRa(answers={"10.xxx/a": None, "10.xxx/b": None})
+    repo = FakeDoiPrefixRepo(unresolved=[("10.9014", ["10.9014/a", "10.9014/b"])])
+    ra = StubResolveRa(answers={"10.9014/a": None, "10.9014/b": None})
 
     metrics = _run_ra(repo, ra)
 
-    assert ra.calls == ["10.xxx/a", "10.xxx/b"]
-    assert repo.rows["10.xxx"].ra == "unknown"
+    assert ra.calls == ["10.9014/a", "10.9014/b"]
+    assert repo.rows["10.9014"].ra == "unknown"
     assert metrics.extras.get("unresolved") == 1
 
 
@@ -303,14 +319,14 @@ def test_publishers_unknown_tries_both_and_corrects_ra():
 def test_publishers_unknown_both_muet_marks_checked_no_publisher():
     """ra=unknown, /prefixes muet partout → pas de publisher, mais row marquée vérifiée
     (garde : ne sera plus reprise au run suivant)."""
-    repo = FakeDoiPrefixRepo(rows={"10.dead": _Row("10.dead", "unknown")})
+    repo = FakeDoiPrefixRepo(rows={"10.9012": _Row("10.9012", "unknown")})
     pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.dead": None})
-    dc = StubDataCite(answers={"10.dead": None})
+    cr = StubCrossref(answers={"10.9012": None})
+    dc = StubDataCite(answers={"10.9012": None})
 
     metrics = _run_pub(repo, pubrepo, cr, dc)
 
-    row = repo.rows["10.dead"]
+    row = repo.rows["10.9012"]
     assert row.publisher_id is None
     assert row.checked is True  # garde anti-réinterrogation
     assert metrics.extras.get("no_publisher") == 1
@@ -321,12 +337,12 @@ def test_publishers_unknown_both_muet_marks_checked_no_publisher():
 def test_publishers_skips_already_checked_and_unmanaged_ra():
     repo = FakeDoiPrefixRepo(
         rows={
-            "10.checked": _Row("10.checked", "Crossref", checked=True),
-            "10.medra": _Row("10.medra", "mEDRA"),
+            "10.9011": _Row("10.9011", "Crossref", checked=True),
+            "10.9013": _Row("10.9013", "mEDRA"),
         }
     )
     pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.checked": ("X", 1), "10.medra": ("Y", 2)})
+    cr = StubCrossref(answers={"10.9011": ("X", 1), "10.9013": ("Y", 2)})
 
     metrics = _run_pub(repo, pubrepo, cr)
 
@@ -358,16 +374,16 @@ def test_publishers_name_present_attaches_without_fetch():
 
 def test_publishers_dedup_same_name_one_creation():
     repo = FakeDoiPrefixRepo(
-        rows={"10.aaaa": _Row("10.aaaa", "Crossref"), "10.bbbb": _Row("10.bbbb", "Crossref")}
+        rows={"10.9008": _Row("10.9008", "Crossref"), "10.9009": _Row("10.9009", "Crossref")}
     )
     pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.aaaa": ("Wiley", 311), "10.bbbb": ("Wiley", 311)})
+    cr = StubCrossref(answers={"10.9008": ("Wiley", 311), "10.9009": ("Wiley", 311)})
 
     metrics = _run_pub(repo, pubrepo, cr)
 
     assert len(pubrepo.created) == 1
     cid = pubrepo.created[0]["id"]
-    assert repo.rows["10.aaaa"].publisher_id == cid
-    assert repo.rows["10.bbbb"].publisher_id == cid
+    assert repo.rows["10.9008"].publisher_id == cid
+    assert repo.rows["10.9009"].publisher_id == cid
     assert metrics.extras.get("publisher_created") == 1
     assert metrics.extras.get("publisher_matched") == 1

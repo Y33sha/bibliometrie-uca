@@ -24,7 +24,7 @@ def _sp(**overrides) -> SourcePublication:
         "title": "Titre",
         "pub_year": 2020,
         "doc_type": "dataset",
-        "doi": "10.parent/set",
+        "doi": "10.9001/set",
         "journal_id": None,
         "container_title": None,
         "language": None,

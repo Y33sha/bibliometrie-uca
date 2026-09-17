@@ -1,6 +1,6 @@
 """Value objects et helpers de normalisation des identifiants publication.
 
-DOI, HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre). VOs immuables et auto-validés au même contrat que `domain/persons/identifiers.py` :
+DOI et son préfixe (DoiPrefix), HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre). VOs immuables et auto-validés au même contrat que `domain/persons/identifiers.py` :
 
 - `X("...")` strict : lève `ValidationError` si malformé
 - `X.try_parse(...)` tolérant : renvoie None si malformé
@@ -34,11 +34,18 @@ _DOI_URL_PREFIXES = (
     "http://doi.org/",
     "https://dx.doi.org/",
     "http://dx.doi.org/",
+    "https://www.doi.org/",
+    "http://www.doi.org/",
 )
 # Tirets typographiques Unicode (hyphen, non-breaking, figure, en/em dash, minus,
 # variantes small/fullwidth) ramenés sur le `-` ASCII : un DOI saisi/copié avec un
 # de ces caractères ne s'apparierait pas à sa forme ASCII (faux doublon).
 _DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
+# Forme d'un DOI : le préfixe `10.<chiffres>`, une barre oblique, un suffixe non vide.
+_DOI_SHAPE = re.compile(r"10\.\d+/\S")
+# Préfixe DOI en tête d'une chaîne, ni prolongé par une lettre, un chiffre ou un point
+# (« 10.101621gloenvcha.2020.102168 », DOI privé de sa barre oblique, n'en porte pas).
+_DOI_PREFIX_RE = re.compile(r"(10\.\d+)(?![\w.])")
 # Séparateurs des identifiants qui s'écrivent par groupes de chiffres (ISSN, ISBN), retirés pour les comparer.
 _SEPARATORS_RE = re.compile(r"[\s-]")
 
@@ -58,7 +65,8 @@ def _normalize_doi(raw: str | None) -> str | None:
         if reduced == s:
             break
         s = reduced
-    return s or None
+    # Une valeur sans la forme d'un DOI n'en est pas un : identifiant numérique, URL d'article.
+    return s if _DOI_SHAPE.match(s) else None
 
 
 def _normalize_doi_step(s: str) -> str:
@@ -103,7 +111,7 @@ def _normalize_doi_step(s: str) -> str:
 class DOI:
     """Digital Object Identifier, normalisé et validé.
 
-    Lève ValidationError à la construction si la valeur est invalide ou vide.
+    Lève ValidationError à la construction si la valeur est invalide ou vide : après nettoyage, un DOI a la forme `10.<chiffres>/<suffixe>`.
     Utiliser `DOI.try_parse()` quand l'absence est un cas normal.
     """
 
@@ -118,6 +126,40 @@ class DOI:
 
     @classmethod
     def try_parse(cls, raw: str | None) -> "DOI | None":
+        """Tente de parser ; renvoie None si l'entrée est vide ou invalide."""
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+    @property
+    def prefix(self) -> "DoiPrefix":
+        """Préfixe du DOI, qui identifie son registrant."""
+        return DoiPrefix(self.value.split("/", 1)[0])
+
+
+@dataclass(frozen=True)
+class DoiPrefix:
+    """Préfixe DOI (`10.<chiffres>`), partie registrant d'un DOI, avant la première barre oblique.
+
+    À la construction, tolère une entrée bruitée : espaces, DOI complet, ponctuation finale. Lève ValidationError si aucun préfixe n'est en tête de la valeur (« doi:10.5194 », « https: », « 10.101621gloenvcha.2020.102168 »).
+    """
+
+    value: str
+
+    def __post_init__(self) -> None:
+        match = _DOI_PREFIX_RE.match(self.value.strip())
+        if not match:
+            raise ValidationError(f"Préfixe DOI invalide : {self.value!r}")
+        object.__setattr__(self, "value", match.group(1))
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "DoiPrefix | None":
         """Tente de parser ; renvoie None si l'entrée est vide ou invalide."""
         if not raw:
             return None
@@ -536,23 +578,10 @@ def clean_doi(doi: str | None) -> str | None:
     return _normalize_doi(doi)
 
 
-_DOI_PREFIX_RE = re.compile(r"(10\.\d+)")
-
-
-def clean_doi_prefix(prefix: str | None) -> str | None:
-    """Isole le préfixe DOI canonique (`10.<chiffres>`) d'une chaîne brute.
-
-    Le préfixe est la partie registrant d'un DOI, avant le premier `/`. Tolère une entrée bruitée (espaces, casse, DOI complet, ponctuation parasite) en extrayant le motif `10.<chiffres>` en tête. Retourne `None` si aucun préfixe valide n'est présent. À appliquer avant d'interroger les endpoints préfixe (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`)."""
-    if not prefix:
-        return None
-    match = _DOI_PREFIX_RE.match(prefix.strip())
-    return match.group(1) if match else None
-
-
 def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
     """Vrai si deux DOI portent le même préfixe, c'est-à-dire relèvent du même registrant."""
-    prefixe = clean_doi_prefix(doi_a)
-    return prefixe is not None and prefixe == clean_doi_prefix(doi_b)
+    prefixe = DoiPrefix.try_parse(doi_a)
+    return prefixe is not None and prefixe == DoiPrefix.try_parse(doi_b)
 
 
 def normalize_nnt(nnt: str | None) -> str | None:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 
-from domain.publications.identifiers import clean_doi_prefix
+from domain.publications.identifiers import DoiPrefix
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import http_request_with_retry
 
@@ -37,7 +37,8 @@ def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | N
 
     Renvoie `(publisher_name, member_id)` ou `None` si l'appel échoue ou si `name` est absent. `member_id` peut être `None` si l'API ne le renvoie pas pour ce préfixe.
     """
-    cleaned = clean_doi_prefix(prefix)
+    parsed = DoiPrefix.try_parse(prefix)
+    cleaned = str(parsed) if parsed else None
     if not cleaned:
         return None
     url = f"{API_BASE_URLS['crossref']}/prefixes/{cleaned}"
