@@ -23,6 +23,13 @@ _DELTA_CTE = """
     )
 """
 
+# Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
+_MARK_ORPHANS_DIRTY = """
+    UPDATE source_publications
+    SET keys_dirty = TRUE
+    WHERE id IN ({ids}) AND publication_id IS NULL AND NOT keys_dirty
+"""
+
 
 class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
@@ -35,13 +42,22 @@ class PgAffiliationsQueries(AffiliationsQueries):
             text(
                 _DELTA_CTE
                 + """
-                UPDATE source_authorships
-                SET in_perimeter = TRUE
-                WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
+                , entrees AS (
+                    UPDATE source_authorships
+                    SET in_perimeter = TRUE
+                    WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
+                    RETURNING source_publication_id
+                ), marquees AS (
+                    """
+                + _MARK_ORPHANS_DIRTY.format(ids="SELECT source_publication_id FROM entrees")
+                + """
+                    RETURNING 1
+                )
+                SELECT count(*) FROM entrees
             """
             ),
             params,
-        ).rowcount
+        ).scalar_one()
         removed = conn.execute(
             text(
                 _DELTA_CTE
@@ -78,6 +94,15 @@ class PgAffiliationsQueries(AffiliationsQueries):
                 WHERE sa.id = ANY(:source_authorship_ids)
             """),
             {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
+        )
+        conn.execute(
+            text(
+                _MARK_ORPHANS_DIRTY.format(
+                    ids="SELECT source_publication_id FROM source_authorships"
+                    " WHERE id = ANY(:source_authorship_ids) AND in_perimeter"
+                )
+            ),
+            {"source_authorship_ids": source_authorship_ids},
         )
 
     def propagate_in_perimeter_to_authorships(

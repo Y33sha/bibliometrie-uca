@@ -264,3 +264,56 @@ class TestPopulateAffiliationsTheses:
         ).one()
         assert row.in_perimeter is True
         assert row.structure_ids == [80001]
+
+
+def _keys_dirty(conn, source_publication_id: int) -> bool:
+    from sqlalchemy import text
+
+    return conn.execute(
+        text("SELECT keys_dirty FROM source_publications WHERE id = :id"),
+        {"id": source_publication_id},
+    ).scalar_one()
+
+
+class TestEntreeDansLePerimetre:
+    """Régression : un enregistrement sans publication qui entre dans le périmètre après sa normalisation n'était jamais mis en publication, faute d'être marqué `keys_dirty` (1 936 publications UCA créées tardivement en septembre 2026)."""
+
+    def _orpheline(self, conn) -> None:
+        from sqlalchemy import text
+
+        conn.execute(
+            text(
+                "UPDATE source_publications SET publication_id = NULL, keys_dirty = FALSE"
+                " WHERE id = 80002"
+            )
+        )
+
+    def test_enregistrement_sans_publication_marque(self, sa_sync_conn):
+        _setup_affiliations_test_data(sa_sync_conn)
+        self._orpheline(sa_sync_conn)
+
+        _run_populate_affiliations(sa_sync_conn)
+
+        assert _keys_dirty(sa_sync_conn, 80002) is True
+
+    def test_enregistrement_en_publication_non_marque(self, sa_sync_conn):
+        from sqlalchemy import text
+
+        _setup_affiliations_test_data(sa_sync_conn)
+        sa_sync_conn.execute(text("UPDATE source_publications SET keys_dirty = FALSE"))
+
+        _run_populate_affiliations(sa_sync_conn)
+
+        assert _keys_dirty(sa_sync_conn, 80002) is False
+
+    def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
+        from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+
+        _setup_affiliations_test_data(sa_sync_conn)
+        self._orpheline(sa_sync_conn)
+
+        PgAffiliationsQueries().recompute_in_perimeter_on_source_authorships(
+            sa_sync_conn, [80002], [80000, 80001]
+        )
+
+        assert _keys_dirty(sa_sync_conn, 80002) is True

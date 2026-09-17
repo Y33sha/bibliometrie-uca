@@ -21,7 +21,10 @@ class AffiliationsQueries(Protocol):
     def sync_in_perimeter(
         self, conn: Connection, *, perimeter_ids: list[int]
     ) -> InPerimeterSyncCounts:
-        """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, en n'écrivant que les changements."""
+        """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, en n'écrivant que les changements.
+
+        Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty`.
+        """
         ...
 
     def refresh_source_authorship_structures(self, conn: Connection) -> None:
@@ -37,7 +40,7 @@ class AffiliationsQueries(Protocol):
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        """Recalcule `source_authorships.in_perimeter` pour les signatures données, directement depuis leurs adresses résolues (`address_structures`, lien `is_confirmed IS DISTINCT FROM FALSE`) filtrées par `perimeter_structure_ids`. Variante ciblée par ids, en temps réel après une édition admin d'adresse — sans passer par la matview."""
+        """Recalcule `source_authorships.in_perimeter` pour les signatures données, directement depuis leurs adresses résolues (`address_structures`, lien `is_confirmed IS DISTINCT FROM FALSE`) filtrées par `perimeter_structure_ids`. Variante ciblée par ids, en temps réel après une édition admin d'adresse — sans passer par la matview. Un enregistrement sans publication dont une signature est dans le périmètre est marqué `keys_dirty`."""
         ...
 
     def propagate_in_perimeter_to_authorships(
