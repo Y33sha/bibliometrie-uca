@@ -22,6 +22,10 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "issn_unranged": ("revue non rangée par support", "revues non rangées par support"),
     "journals_deleted": ("revue vide supprimée", "revues vides supprimées"),
     "journals_merged": ("revue fusionnée", "revues fusionnées"),
+    "journals_typed_proceedings": (
+        "revue typée recueil d'actes",
+        "revues typées recueils d'actes",
+    ),
     "matched": "rapproché",
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",

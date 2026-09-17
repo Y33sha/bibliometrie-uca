@@ -234,6 +234,38 @@ class TestFindJournalsOfUnknownType:
         assert len(repo.find_journals_of_unknown_type(limit=0)) >= 2
 
 
+class TestRecordTypesOfUnknownJournals:
+    def test_type_brut_avant_correction(self, sa_sync_conn, repo):
+        """Un document retypé par la correction est compté avec son type de source."""
+        jid = _create_journal(sa_sync_conn)
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_publications (source, source_id, title, journal_id, doc_type, raw_metadata)
+                VALUES ('crossref', '10.1/a', 'A', :jid, 'conference_paper',
+                        '{"doc_type": {"raw": "book-chapter", "corrected_by": "X"}}'),
+                       ('hal', 'hal-1', 'B', :jid, 'COMM', '{}')
+            """),
+            {"jid": jid},
+        )
+
+        rows = [r for r in repo.find_record_types_of_unknown_journals() if r.journal_id == jid]
+
+        assert rows[0].records == (("crossref", "book-chapter"), ("hal", "COMM"))
+
+    def test_revues_typees_et_vides_exclues(self, sa_sync_conn, repo):
+        typed = _create_journal(sa_sync_conn)
+        empty = _create_journal(sa_sync_conn)
+        _create_record(sa_sync_conn, typed, doi="10.1/b")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": typed}
+        )
+
+        ids = {r.journal_id for r in repo.find_record_types_of_unknown_journals()}
+
+        assert typed not in ids
+        assert empty not in ids
+
+
 class TestJournalIssnIndex:
     def test_exposes_all_issn_fields(self, sa_sync_conn, repo):
         jid = _create_journal(sa_sync_conn, issn="1111-1111", eissn="2222-2222")
