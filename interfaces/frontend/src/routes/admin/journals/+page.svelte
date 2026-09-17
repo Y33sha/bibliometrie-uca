@@ -166,8 +166,6 @@
 
 <svelte:head><title>{pageTitle("Revues")}</title></svelte:head>
 
-<h2>Revues</h2>
-
 <HubTabs
 	tabs={[
 		{ key: 'all', label: 'Revues' },
@@ -251,8 +249,6 @@
 {/if}
 
 <style>
-	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }
-
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
