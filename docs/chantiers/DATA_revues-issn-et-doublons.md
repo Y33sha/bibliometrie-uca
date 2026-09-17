@@ -98,7 +98,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
     - [x] La fusion d'éditeurs transfère les préfixes DOI de l'éditeur absorbé.
     - [x] Oneshot `backfill_merge_publisher_name_variants` : fusion des éditeurs de même clé. À blanc : 853 fusions, 1 refusée (Duncker & Humblot, revues homonymes aux ISSN divergents).
     - [x] Sous-étape `delete_empty_publishers` : suppression des éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
-    - [ ] Marques et groupes : l'éditeur d'une revue est-il le groupe (Informa, Springer Nature) ou la marque (Routledge, BMC, Masson) ? Le préfixe DOI donne le déposant Crossref, qui est souvent le groupe, parfois une plateforme (CAIRN.INFO, OpenEdition, CCSD). Sur 9 100 revues à DOI, il concorde avec l'éditeur de la revue pour 5 929.
+    - [x] Marques et groupes : l'usage décide, revue par revue. Une marque reste l'éditeur que donnent les sources (Routledge, Dove Medical Press), et aucune fusion automatique ne la range dans son groupe. Un rattachement d'usage (Elsevier Masson dans Elsevier) passe par la fusion d'éditeurs de l'administration. Le préfixe DOI donne le déposant Crossref, souvent le groupe (Informa UK Limited pour Taylor & Francis), parfois une plateforme (CAIRN.INFO, OpenEdition, CCSD) : il ne sert pas de référence.
 - [ ] Volet latéral pour les revues et les éditeurs, à l'image de ceux des publications et des personnes.
 - [ ] Contrainte d'unicité sur `issn` et `eissn`, une fois ces doublons traités. `issnl` reste sans contrainte : un titre et son supplément le partagent.
 
@@ -131,3 +131,4 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 
 - **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
 - **Recueils et collections.** La table `journals` range au même niveau les recueils d'actes et la collection qui les réunit (*Communications in Computer and Information Science*, *IFIP AICT*). Faut-il une table des monographies, identifiées par leur ISBN et rattachées à leur collection ?
+- **Groupes d'éditeurs.** Faut-il compter les publications par groupe (Informa, Springer Nature, Elsevier) ? Un lien de groupe entre éditeurs y répondrait, sans fusion.
