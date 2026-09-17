@@ -7,6 +7,8 @@ let apiResponse: Record<string, unknown> = {};
 // `(..._args: unknown[])` plutôt que `()` : permet à TS de typer `apiSpy.mock.calls[0][0]` lors des assertions.
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
 vi.mock('$lib/api', () => ({ api: (...args: unknown[]) => apiSpy(...args) }));
+const gotoSpy = vi.fn(async (..._args: unknown[]) => {});
+vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => gotoSpy(...args) }));
 
 const { usePaginatedFetch } = await import('./usePaginatedFetch.svelte');
 
@@ -139,6 +141,40 @@ describe('usePaginatedFetch', () => {
 		});
 		f.items = [1, 2, 3];
 		expect(f.items).toEqual([1, 2, 3]);
+	});
+
+	it('une page au-delà de la dernière ramène à la page 1 et retire le paramètre de l’URL', async () => {
+		// Cas réel : la page 27 des authorships orphelines, vidée par son traitement.
+		window.history.replaceState({}, '', '/admin/orphan-authorships?page=27&search=x');
+		gotoSpy.mockClear();
+		apiSpy
+			.mockImplementationOnce(async () => ({ items: [], total: 1300, page: 27, pages: 26 }))
+			.mockImplementationOnce(async () => ({ items: [1], total: 1300, page: 1, pages: 26 }));
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		f.page = 27;
+		await f.load();
+		expect(apiSpy.mock.calls[1][0]).toContain('page=1');
+		expect(f.page).toBe(1);
+		expect(f.items).toEqual([1]);
+		expect(gotoSpy).toHaveBeenCalledWith('/admin/orphan-authorships?search=x', expect.anything());
+	});
+
+	it('une liste vide en page 1 reste en page 1', async () => {
+		apiResponse = { items: [], total: 0, page: 1, pages: 0 };
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		await f.load();
+		expect(apiSpy).toHaveBeenCalledTimes(1);
+		expect(f.page).toBe(1);
 	});
 
 	it('page est mutable (set externe possible avant load)', async () => {
