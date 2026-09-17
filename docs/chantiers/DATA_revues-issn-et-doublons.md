@@ -83,13 +83,13 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] Revues partageant un ISSN de colonne sous un titre emboîté : même fusion automatique. Elle couvre dix des treize doublons à ISSN-L différents. L'éditeur ne sert pas de contrôle : deux revues sur treize seulement partagent la même fiche d'éditeur, le référentiel des éditeurs ayant lui-même ses doublons.
 - [x] Index partiel sur `source_publications.journal_id`, que chaque fusion interroge.
 - [x] Revues de même titre, seules à le porter, dont au moins une sans ISSN : même fusion automatique. Un premier passage a fusionné 623 paires, dont celles où l'une des revues était vide. L'audit y relève des homonymes : un livre fusionné dans une revue de même titre y a laissé sa forme de nom, ou y a pris les ISSN de la revue. La règle se limite aux paires dont les enregistrements partagent un préfixe DOI.
-- [x] Revues vides, sans enregistrement, publication ni paiement APC : supprimées, avec leurs formes de nom.
+- [x] Revues vides, sans enregistrement, publication ni paiement APC : supprimées, avec leurs formes de nom. Le premier passage en supprime 1 374.
 - [x] Journalisation des fusions et des suppressions : titre, éditeur et ISSN de chaque revue.
-- [ ] Réparation ciblée des homonymes relevés par l'audit, par `backfill_repair_homonym_journal_merges` :
+- [x] Réparation ciblée des homonymes relevés par l'audit, par `backfill_repair_homonym_journal_merges` :
     - formes de nom égarées : Livestock Science, Psychologie du travail et des organisations, Food Science & Nutrition, Food Science and Technology, Lectures ;
     - ISSN de revue portés par un livre : Reliability Engineering, Artificial Intelligence in Medicine ;
     - enregistrements d'un livre ou d'actes rattachés à la revue homonyme : Livestock Science, Lectures.
-- [ ] Page de fusion manuelle des revues, sans mémoire des paires distinctes : paires de même titre restantes (une centaine, dont les revues vides à paiements APC et les titres portés par trois revues ou plus), et les deux doublons d'ISSN restants.
+- [ ] Page de fusion manuelle des revues, sans mémoire des paires distinctes. Après les fusions et les suppressions, il reste 11 700 revues. Les doublons potentiels comptent 45 groupes de même titre (21 sans ISSN, 13 dont une seule revue a un ISSN, 11 titres portés par trois revues ou plus) et 3 ISSN de colonne partagés. Les 18 paires de même titre dont les deux revues ont un ISSN sont des homonymes probables.
 - [ ] Doublons d'éditeurs : Elsevier et Springer ont chacun une soixantaine de fiches. Normaliser les noms (dates, « on behalf of », formes juridiques), puis regrouper. Ces doublons recréent des revues en double, la recherche d'une revue par titre se limitant à son éditeur.
 - [ ] Volet latéral pour les revues et les éditeurs, à l'image de ceux des publications et des personnes.
 - [ ] Contrainte d'unicité sur `issn` et `eissn`, une fois ces doublons traités. `issnl` reste sans contrainte : un titre et son supplément le partagent.
