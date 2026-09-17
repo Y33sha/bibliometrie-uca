@@ -12,6 +12,8 @@
 * [ ] suggested countries: jamais remis à null
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
+* [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer)
+* [ ] normalisation des caractères non-latins?
 
 # Code
 * [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
@@ -19,7 +21,7 @@
 # Données
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * [ ] place_name_forms n'a pas de clé étrangère vers countries
-* [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
+* [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée) / Cf personne 62293
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
@@ -60,6 +62,8 @@
 * [ ] "Total phase persons : 3 new, 51333 updated" comment est-ce possible, avec 14k personnes en base?
 * [ ] 172655 titre mal formé (notation mathématique mal développée)
 * 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
+* 100685: pourquoi preprint?
+* 138474: 1 seul document alors que le preprint devrait être distinct
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
