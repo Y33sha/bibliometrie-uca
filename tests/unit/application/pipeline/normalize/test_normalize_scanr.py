@@ -239,6 +239,13 @@ class TestUpsertPublisherEtJournal:
     def test_sans_titre_de_revue_aucune_revue(self):
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
+    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        monkeypatch.setattr(normalize_scanr, "find_or_create_journal", MagicMock())
+        doc = {"type": "book-chapter", "source": {"title": "Handbook of Things"}}
+
+        assert upsert_journal(doc, 7, journal_repo=MagicMock()) is None
+        normalize_scanr.find_or_create_journal.assert_not_called()
+
     def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
         """Les identifiants de revue arrivent en liste : le premier est celui du papier, le second celui de l'édition en ligne."""
         vus: dict[str, object] = {}

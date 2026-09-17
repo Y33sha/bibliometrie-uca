@@ -748,6 +748,13 @@ class TestUpsertWrappers:
         repo = MagicMock()
         assert upsert_journal(rec, publisher_id=1, journal_repo=repo) is None
 
+    def test_upsert_journal_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        monkeypatch.setattr(normalize_wos, "find_or_create_journal", MagicMock())
+        rec = {"journal_title": "Handbook of Things", "doc_type": "Book Chapter"}
+
+        assert upsert_journal(rec, publisher_id=1, journal_repo=MagicMock()) is None
+        normalize_wos.find_or_create_journal.assert_not_called()
+
     def test_upsert_journal_delegates_with_issn(self, monkeypatch):
         calls: list[dict] = []
 

@@ -435,6 +435,30 @@ class TestUpsertPublisherEtJournal:
         """Un document sans revue ni série qui le porte ne crée pas d'entrée au référentiel."""
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
+    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        """Le conteneur d'un chapitre sans ISSN est le livre, qui reste en container_title."""
+        monkeypatch.setattr(normalize_crossref, "find_or_create_journal", MagicMock())
+        msg = {"type": "book-chapter", "container-title": ["Handbook of Things"]}
+
+        assert upsert_journal(msg, 7, journal_repo=MagicMock()) is None
+        normalize_crossref.find_or_create_journal.assert_not_called()
+
+    def test_chapitre_avec_issn_rattache_a_sa_collection(self, monkeypatch):
+        monkeypatch.setattr(normalize_crossref, "find_or_create_journal", lambda title, **kw: 3)
+        msg = {
+            "type": "book-chapter",
+            "container-title": ["Lecture Notes in Things"],
+            "issn-type": [{"type": "print", "value": "1234-5678"}],
+        }
+
+        assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
+
+    def test_article_de_congres_sans_issn_garde_son_recueil(self, monkeypatch):
+        monkeypatch.setattr(normalize_crossref, "find_or_create_journal", lambda title, **kw: 3)
+        msg = {"type": "proceedings-article", "container-title": ["Proc. of Things"]}
+
+        assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
+
     def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(

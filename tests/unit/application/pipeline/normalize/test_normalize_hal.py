@@ -86,6 +86,13 @@ class TestUpsertJournal:
     def test_no_title_returns_none(self):
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
+    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        monkeypatch.setattr(normalize_hal, "find_or_create_journal", MagicMock())
+        doc = {"docType_s": "COUV", "journalTitle_s": "Handbook of Things"}
+
+        assert upsert_journal(doc, 42, journal_repo=MagicMock()) is None
+        normalize_hal.find_or_create_journal.assert_not_called()
+
     def test_happy_path(self, monkeypatch):
         captured: dict[str, Any] = {}
 

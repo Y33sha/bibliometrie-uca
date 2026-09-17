@@ -220,6 +220,27 @@ class TestUpsertJournal:
         assert result is None
         repo.create_journal.assert_not_called()
 
+    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
+        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", MagicMock())
+        work = {
+            "type": "book-chapter",
+            "primary_location": {"source": {"display_name": "Handbook", "type": "book series"}},
+        }
+
+        assert upsert_journal(work, None, journal_repo=MagicMock()) is None
+        normalize_openalex.find_or_create_journal.assert_not_called()
+
+    def test_chapitre_avec_issn_l_rattache_a_sa_collection(self, monkeypatch):
+        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", lambda *a, **kw: 5)
+        work = {
+            "type": "book-chapter",
+            "primary_location": {
+                "source": {"display_name": "Series", "type": "book series", "issn_l": "1234-5678"}
+            },
+        }
+
+        assert upsert_journal(work, None, journal_repo=MagicMock()) == 5
+
     def test_repository_source_oa_model(self, monkeypatch):
         captured: dict[str, Any] = {}
 
