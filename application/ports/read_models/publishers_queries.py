@@ -51,12 +51,11 @@ class PublisherListItem(BaseModel):
     publisher_type: str
     journal_count: int
     pub_count: int
+    doi_prefixes: list[DoiPrefixInfo]
 
 
 class Publisher(PublisherListItem):
-    """Profil complet d'un éditeur (page publique `/publishers/[id]`) : la ligne de liste, enrichie de ses préfixes DOI."""
-
-    doi_prefixes: list[DoiPrefixInfo]
+    """Profil d'un éditeur (page publique `/publishers/[id]`)."""
 
 
 class PublisherListResponse(PaginatedResponse):

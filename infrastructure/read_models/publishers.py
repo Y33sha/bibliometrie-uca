@@ -78,27 +78,18 @@ def _doi_prefixes_sql() -> str:
     """
 
 
-# Colonnes du profil d'un éditeur (alias `p` = publishers). Le détail ajoute les préfixes DOI, que la liste n'affiche pas.
-_PUBLISHER_LIST_COLUMNS = """
+# Colonnes d'un éditeur (alias `p` = publishers), pour la liste comme pour le profil.
+_PUBLISHER_COLUMNS = f"""
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
     (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
-    p.pub_count
+    p.pub_count,
+    {_doi_prefixes_sql()} AS doi_prefixes
 """.strip()
-
-_PUBLISHER_DETAIL_COLUMNS = f"{_PUBLISHER_LIST_COLUMNS},\n    {_doi_prefixes_sql()} AS doi_prefixes"
 
 
 def _row_to_list_item(row: Row[tuple[object, ...]]) -> PublisherListItem:
-    return PublisherListItem(
-        id=row.id,
-        name=row.name,
-        openalex_id=row.openalex_id,
-        country=row.country,
-        publisher_type=row.publisher_type,
-        journal_count=row.journal_count,
-        pub_count=row.pub_count,
-    )
+    return PublisherListItem(**_row_to_publisher(row).model_dump())
 
 
 def _row_to_publisher(row: Row[tuple[object, ...]]) -> Publisher:
@@ -135,7 +126,7 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT {_PUBLISHER_LIST_COLUMNS}
+                SELECT {_PUBLISHER_COLUMNS}
                 FROM publishers p
                 WHERE {where}
                 ORDER BY {order}
@@ -195,7 +186,7 @@ class PgPublisherQueries(PublisherQueries):
     def get_publisher_detail(self, publisher_id: int) -> Publisher | None:
         row = self._conn.execute(
             text(f"""
-                SELECT {_PUBLISHER_DETAIL_COLUMNS}
+                SELECT {_PUBLISHER_COLUMNS}
                 FROM publishers p
                 WHERE p.id = :id
             """),

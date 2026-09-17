@@ -4355,7 +4355,7 @@ export interface components {
         };
         /**
          * Publisher
-         * @description Profil complet d'un éditeur (page publique `/publishers/[id]`) : la ligne de liste, enrichie de ses préfixes DOI.
+         * @description Profil d'un éditeur (page publique `/publishers/[id]`).
          */
         Publisher: {
             /** Id */
@@ -4412,6 +4412,8 @@ export interface components {
             journal_count: number;
             /** Pub Count */
             pub_count: number;
+            /** Doi Prefixes */
+            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
         };
         /** PublisherListResponse */
         PublisherListResponse: {
