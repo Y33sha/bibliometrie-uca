@@ -273,36 +273,41 @@ def _set_issns(journal_id: int, issn: str | None, eissn: str | None = None) -> N
         )
 
 
-class TestJournalDuplicates:
-    def test_groups_same_title_and_shared_issn(self, client):
+class TestJournalsWithSameTitle:
+    def test_groups_journals_with_the_same_title(self, client):
         title = _uniq("Doublon")
         same_title = {_seed_journal(title), _seed_journal(title)}
-        shared_a, shared_b = _seed_journal(), _seed_journal()
-        _set_issns(shared_a, "2999-1111")
-        _set_issns(shared_b, None, "2999-1111")
-
-        r = client.get("/api/journals/duplicates")
+        r = client.get("/api/journals/same-titles")
         assert r.status_code == 200
-        groups = {(g["shared"], g["value"]): g for g in r.json()["groups"]}
-        titles = [g for (shared, _), g in groups.items() if shared == "title"]
-        assert any({j["id"] for j in g["journals"]} == same_title for g in titles)
-        assert {j["id"] for j in groups[("issn", "2999-1111")]["journals"]} == {
-            shared_a,
-            shared_b,
-        }
+        assert any({j["id"] for j in g["journals"]} == same_title for g in r.json()["groups"])
 
     def test_two_journals_with_their_own_issn_are_homonyms(self, client):
         title = _uniq("Homonyme")
         a, b = _seed_journal(title), _seed_journal(title)
         _set_issns(a, "2999-2222")
         _set_issns(b, "2999-3333")
-        r = client.get("/api/journals/duplicates")
+        r = client.get("/api/journals/same-titles")
         ids = {j["id"] for g in r.json()["groups"] for j in g["journals"]}
         assert not ({a, b} & ids)
 
     def test_count_matches_the_groups(self, client):
-        groups = client.get("/api/journals/duplicates").json()["groups"]
-        assert client.get("/api/journals/duplicates/count").json() == {"total": len(groups)}
+        groups = client.get("/api/journals/same-titles").json()["groups"]
+        assert client.get("/api/journals/same-titles/count").json() == {"total": len(groups)}
+
+
+class TestJournalsSharingIssn:
+    def test_groups_journals_sharing_an_issn_across_columns(self, client):
+        a, b = _seed_journal(), _seed_journal()
+        _set_issns(a, "2999-1111")
+        _set_issns(b, None, "2999-1111")
+        r = client.get("/api/journals/shared-issns")
+        assert r.status_code == 200
+        groups = {g["value"]: g for g in r.json()["groups"]}
+        assert {j["id"] for j in groups["2999-1111"]["journals"]} == {a, b}
+
+    def test_count_matches_the_groups(self, client):
+        groups = client.get("/api/journals/shared-issns").json()["groups"]
+        assert client.get("/api/journals/shared-issns/count").json() == {"total": len(groups)}
 
 
 class TestGetJournal:

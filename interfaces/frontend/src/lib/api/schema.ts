@@ -1994,7 +1994,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/duplicates/count": {
+    "/api/journals/same-titles/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -2002,10 +2002,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journal Duplicates Count
-         * @description Compteur de l'onglet « Doublons potentiels » (badge).
+         * Journals With Same Title Count
+         * @description Compteur de l'onglet « Titres identiques » (badge).
          */
-        get: operations["journal_duplicates_count_api_journals_duplicates_count_get"];
+        get: operations["journals_with_same_title_count_api_journals_same_titles_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2014,7 +2014,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/duplicates": {
+    "/api/journals/same-titles": {
         parameters: {
             query?: never;
             header?: never;
@@ -2022,12 +2022,52 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journal Duplicates
-         * @description Groupes de revues en double potentiel, à fusionner à la main : même titre normalisé, ou même ISSN dans `issn` ou `eissn`.
+         * Journals With Same Title
+         * @description Groupes de revues de même titre normalisé, à fusionner à la main.
          *
-         *     Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées. La liste ne garde pas mémoire des groupes examinés.
+         *     Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées.
          */
-        get: operations["journal_duplicates_api_journals_duplicates_get"];
+        get: operations["journals_with_same_title_api_journals_same_titles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/shared-issns/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journals Sharing Issn Count
+         * @description Compteur de l'onglet « ISSN partagés » (badge).
+         */
+        get: operations["journals_sharing_issn_count_api_journals_shared_issns_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/shared-issns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journals Sharing Issn
+         * @description Groupes de revues qui portent le même ISSN dans `issn` ou `eissn`, à fusionner à la main.
+         */
+        get: operations["journals_sharing_issn_api_journals_shared_issns_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3243,14 +3283,9 @@ export interface components {
         };
         /**
          * JournalDuplicateGroup
-         * @description Revues en double potentiel : ce qu'elles partagent, puis les revues, la plus riche en publications en tête.
+         * @description Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête.
          */
         JournalDuplicateGroup: {
-            /**
-             * Shared
-             * @enum {string}
-             */
-            shared: "title" | "issn";
             /** Value */
             value: string;
             /** Journals */
@@ -3258,7 +3293,7 @@ export interface components {
         };
         /**
          * JournalDuplicatesResponse
-         * @description GET /api/journals/duplicates : groupes de revues en double potentiel, les plus riches en publications en tête.
+         * @description File de groupes de revues en double potentiel, les plus riches en publications en tête.
          */
         JournalDuplicatesResponse: {
             /** Groups */
@@ -8371,7 +8406,7 @@ export interface operations {
             };
         };
     };
-    journal_duplicates_count_api_journals_duplicates_count_get: {
+    journals_with_same_title_count_api_journals_same_titles_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8391,7 +8426,47 @@ export interface operations {
             };
         };
     };
-    journal_duplicates_api_journals_duplicates_get: {
+    journals_with_same_title_api_journals_same_titles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDuplicatesResponse"];
+                };
+            };
+        };
+    };
+    journals_sharing_issn_count_api_journals_shared_issns_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    journals_sharing_issn_api_journals_shared_issns_get: {
         parameters: {
             query?: never;
             header?: never;

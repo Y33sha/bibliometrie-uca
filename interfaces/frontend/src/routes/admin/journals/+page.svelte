@@ -21,17 +21,25 @@
 	let journalTypes: EnumOption[] = $state([]);
 	let oaModels: EnumOption[] = $state([]);
 
-	// Onglets : la liste des revues, ou la file des doublons potentiels. L'onglet ouvert se garde dans l'URL (`?tab=`).
-	type TabKey = 'all' | 'duplicates';
+	// Onglets : la liste des revues, puis une file par type de doublon potentiel. L'onglet ouvert se garde dans l'URL (`?tab=`).
+	type TabKey = 'all' | 'same-titles' | 'shared-issns';
 	let tab = $state<TabKey>('all');
-	let duplicateCount = $state(0);
+	let sameTitleCount = $state(0);
+	let sharedIssnCount = $state(0);
 
-	async function loadDuplicateCount() {
+	async function queueCount(queue: Exclude<TabKey, 'all'>): Promise<number> {
 		try {
-			duplicateCount = (await api<{ total: number }>('/api/journals/duplicates/count')).total;
+			return (await api<{ total: number }>(`/api/journals/${queue}/count`)).total;
 		} catch {
-			duplicateCount = 0;
+			return 0;
 		}
+	}
+
+	async function loadQueueCounts() {
+		[sameTitleCount, sharedIssnCount] = await Promise.all([
+			queueCount('same-titles'),
+			queueCount('shared-issns'),
+		]);
 	}
 
 	function selectTab(t: TabKey) {
@@ -149,14 +157,14 @@
 		if (await mergeJournal({ id: mergeTargetId, journal_type: mergeTargetType }, sourceId)) {
 			closeMerge();
 			reload();
-			loadDuplicateCount();
+			loadQueueCounts();
 		}
 	}
 
 	onMount(async () => {
 		const t = new URLSearchParams(window.location.search).get('tab');
-		if (t === 'duplicates') tab = t;
-		loadDuplicateCount();
+		if (t === 'same-titles' || t === 'shared-issns') tab = t;
+		loadQueueCounts();
 		[journalTypes, oaModels] = await Promise.all([
 			api<EnumOption[]>('/api/journals/types'),
 			api<EnumOption[]>('/api/journals/oa-models')
@@ -168,15 +176,22 @@
 
 <HubTabs
 	tabs={[
-		{ key: 'all', label: 'Revues' },
-		{ key: 'duplicates', label: 'Doublons potentiels', count: duplicateCount },
+		{ key: 'all', label: 'Toutes les revues' },
+		{ key: 'same-titles', label: 'Titres identiques', count: sameTitleCount },
+		{ key: 'shared-issns', label: 'ISSN partagés', count: sharedIssnCount },
 	]}
 	active={tab}
 	onselect={(key) => selectTab(key as TabKey)}
 />
 
-{#if tab === 'duplicates'}
-<JournalDuplicatesList onchange={loadDuplicateCount} />
+{#if tab === 'same-titles'}
+<JournalDuplicatesList
+	url="/api/journals/same-titles"
+	intro="Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles n'apparaissent pas ici."
+	onchange={loadQueueCounts}
+/>
+{:else if tab === 'shared-issns'}
+<JournalDuplicatesList url="/api/journals/shared-issns" valueLabel="ISSN" onchange={loadQueueCounts} />
 {:else}
 <JournalsListView {apiKey}>
 	{#snippet actionCell(j: Journal)}

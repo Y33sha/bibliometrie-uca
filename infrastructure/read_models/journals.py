@@ -142,29 +142,26 @@ _SORT_MAP = {
 }
 
 
-# Groupes de revues en double potentiel : même titre normalisé, hors paire de deux revues à ISSN, ou même
-# ISSN dans `issn` ou `eissn`.
-_JOURNAL_DUPLICATE_GROUPS = """
-    WITH titres AS (
-        SELECT title_normalized AS value, array_agg(id) AS ids
-        FROM journals
-        GROUP BY title_normalized
-        HAVING count(*) > 2
-            OR (count(*) = 2
-                AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
-    ), colonnes AS (
+# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN.
+_SAME_TITLE_GROUPS = """
+    SELECT title_normalized AS value, array_agg(id) AS ids
+    FROM journals
+    GROUP BY title_normalized
+    HAVING count(*) > 2
+        OR (count(*) = 2 AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
+"""
+
+# Revues qui portent le même ISSN dans `issn` ou `eissn`.
+_SHARED_ISSN_GROUPS = """
+    WITH colonnes AS (
         SELECT id, issn AS v FROM journals WHERE issn IS NOT NULL
         UNION
         SELECT id, eissn FROM journals WHERE eissn IS NOT NULL
-    ), issns AS (
-        SELECT v AS value, array_agg(id) AS ids
-        FROM colonnes
-        GROUP BY v
-        HAVING count(*) > 1
     )
-    SELECT 'title' AS shared, value, ids FROM titres
-    UNION ALL
-    SELECT 'issn' AS shared, value, ids FROM issns
+    SELECT v AS value, array_agg(id) AS ids
+    FROM colonnes
+    GROUP BY v
+    HAVING count(*) > 1
 """
 
 
@@ -174,8 +171,15 @@ class PgJournalQueries(JournalQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def journal_duplicates(self) -> JournalDuplicatesResponse:
-        groups = self._conn.execute(text(_JOURNAL_DUPLICATE_GROUPS)).all()
+    def journals_with_same_title(self) -> JournalDuplicatesResponse:
+        return self._duplicate_groups(_SAME_TITLE_GROUPS)
+
+    def journals_sharing_issn(self) -> JournalDuplicatesResponse:
+        return self._duplicate_groups(_SHARED_ISSN_GROUPS)
+
+    def _duplicate_groups(self, groups_sql: str) -> JournalDuplicatesResponse:
+        """Groupes `(value, ids)` rendus avec la ligne de liste de chaque revue, les plus riches en publications en tête."""
+        groups = self._conn.execute(text(groups_sql)).all()
         ids = sorted({i for g in groups for i in g.ids})
         rows = self._conn.execute(
             text(f"""
@@ -189,7 +193,6 @@ class PgJournalQueries(JournalQueries):
         items = {r.id: _journal_list_item(r) for r in rows}
         duplicates = [
             JournalDuplicateGroup(
-                shared=g.shared,
                 value=g.value,
                 journals=sorted(
                     (items[i] for i in g.ids if i in items), key=lambda j: (-j.pub_count, j.id)
@@ -197,7 +200,7 @@ class PgJournalQueries(JournalQueries):
             )
             for g in groups
         ]
-        duplicates.sort(key=lambda g: (-g.journals[0].pub_count, g.shared, g.value))
+        duplicates.sort(key=lambda g: (-g.journals[0].pub_count, g.value))
         return JournalDuplicatesResponse(groups=duplicates)
 
     def list_journals(
