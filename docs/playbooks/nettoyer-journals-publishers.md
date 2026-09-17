@@ -35,22 +35,13 @@ HAVING COUNT(*) > 1
 ORDER BY doi_prefix;
 ```
 
-```sql
--- Journaux partageant un même ISSN ou eISSN (au-delà du doi_prefix).
-SELECT issn, array_agg(id ORDER BY id) AS ids, array_agg(title ORDER BY id) AS titles
-FROM journals WHERE issn IS NOT NULL
-GROUP BY issn HAVING COUNT(*) > 1
-UNION ALL
-SELECT eissn, array_agg(id ORDER BY id), array_agg(title ORDER BY id)
-FROM journals WHERE eissn IS NOT NULL
-GROUP BY eissn HAVING COUNT(*) > 1;
-```
+L'onglet « Doublons potentiels » de `/admin/journals` liste les revues de même titre normalisé et celles qui portent le même ISSN dans `issn` ou `eissn`. Il écarte deux revues de même titre qui ont chacune un ISSN, homonymes probables.
 
 Cas typiques observés : `Physical Review Letters` / `Phys.Rev.Lett.`, `The European Physical Journal C` / `Eur.Phys.J.C`, `Journal of Instrumentation` / `JINST`.
 
 ### Action
 
-UI admin `/admin/journals` → recherche du journal cible → bouton « Fusionner » → sélectionner la source (le doublon) → confirmer. L'endpoint backend (`POST /api/journals/{id}/merge`) repointe les publis et supprime la row source.
+Dans l'onglet « Doublons potentiels », le bouton « Garder celle-ci » fusionne les autres revues du groupe dans la revue choisie. Pour une paire hors de l'onglet : onglet « Revues » → recherche du journal cible → bouton « Fusionner » → sélectionner la source (le doublon) → confirmer. L'endpoint backend (`POST /api/journals/{id}/merge`) repointe les publis et supprime la row source.
 
 Choisir comme cible la row avec le titre le plus canonique (nom long, métadonnées les plus riches).
 

@@ -11,6 +11,8 @@ from application.ports.read_models.journals_queries import (
     DocTypeCount,
     JournalDashboardResponse,
     JournalDetailResponse,
+    JournalDuplicateGroup,
+    JournalDuplicatesResponse,
     JournalFilters,
     JournalListItem,
     JournalListResponse,
@@ -140,11 +142,63 @@ _SORT_MAP = {
 }
 
 
+# Groupes de revues en double potentiel : même titre normalisé, hors paire de deux revues à ISSN, ou même
+# ISSN dans `issn` ou `eissn`.
+_JOURNAL_DUPLICATE_GROUPS = """
+    WITH titres AS (
+        SELECT title_normalized AS value, array_agg(id) AS ids
+        FROM journals
+        GROUP BY title_normalized
+        HAVING count(*) > 2
+            OR (count(*) = 2
+                AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
+    ), colonnes AS (
+        SELECT id, issn AS v FROM journals WHERE issn IS NOT NULL
+        UNION
+        SELECT id, eissn FROM journals WHERE eissn IS NOT NULL
+    ), issns AS (
+        SELECT v AS value, array_agg(id) AS ids
+        FROM colonnes
+        GROUP BY v
+        HAVING count(*) > 1
+    )
+    SELECT 'title' AS shared, value, ids FROM titres
+    UNION ALL
+    SELECT 'issn' AS shared, value, ids FROM issns
+"""
+
+
 class PgJournalQueries(JournalQueries):
     """Adapter SA pour `application.ports.read_models.journals_queries.JournalQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def journal_duplicates(self) -> JournalDuplicatesResponse:
+        groups = self._conn.execute(text(_JOURNAL_DUPLICATE_GROUPS)).all()
+        ids = sorted({i for g in groups for i in g.ids})
+        rows = self._conn.execute(
+            text(f"""
+                SELECT {_JOURNAL_LIST_COLUMNS}
+                FROM journals j
+                LEFT JOIN publishers p ON p.id = j.publisher_id
+                WHERE j.id = ANY(:ids)
+            """),
+            {"ids": ids},
+        ).all()
+        items = {r.id: _journal_list_item(r) for r in rows}
+        duplicates = [
+            JournalDuplicateGroup(
+                shared=g.shared,
+                value=g.value,
+                journals=sorted(
+                    (items[i] for i in g.ids if i in items), key=lambda j: (-j.pub_count, j.id)
+                ),
+            )
+            for g in groups
+        ]
+        duplicates.sort(key=lambda g: (-g.journals[0].pub_count, g.shared, g.value))
+        return JournalDuplicatesResponse(groups=duplicates)
 
     def list_journals(
         self, *, filters: JournalFilters, sort: JournalSort, page: int, per_page: int
