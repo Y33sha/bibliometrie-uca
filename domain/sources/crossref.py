@@ -24,15 +24,15 @@ def strip_jats_tags(s: str) -> str:
 
 
 def extract_crossref_pub_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
-    """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print`.
+    """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print > approved`.
 
-    Sémantique CrossRef : `published` = min(published-online, published-print) ; `issued` = date déclarée par l'éditeur (peut être prospective sur des « futur numéro » 2030+ déposés avant publication réelle).
+    Sémantique CrossRef : `published` = min(published-online, published-print) ; `issued` = date déclarée par l'éditeur (peut être prospective sur des « futur numéro » 2030+ déposés avant publication réelle) ; `approved` = date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
 
     Borne supérieure `max_year` (typiquement `current_year + 1` — un preprint daté de l'année suivante reste plausible). Au-dessus, on considère la donnée polluée et on retourne None ; le caller skippera la normalisation, et `refresh_from_sources` arbitrera depuis les autres sources. Borne inférieure 1500 (un DOI antérieur est manifestement aberrant).
 
     `max_year` est un paramètre injecté pour la testabilité (sinon couplage au calendrier réel rendrait les tests fragiles).
     """
-    for field in ("published", "issued", "published-online", "published-print"):
+    for field in ("published", "issued", "published-online", "published-print", "approved"):
         date_parts = as_sequence(as_mapping(msg.get(field)).get("date-parts"))
         if not date_parts:
             continue
