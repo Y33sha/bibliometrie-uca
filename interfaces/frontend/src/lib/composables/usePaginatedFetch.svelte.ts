@@ -1,4 +1,5 @@
 import { api } from '$lib/api';
+import { dropPageParam, isPageOutOfRange } from '$lib/pagination';
 
 /**
  * Composable pour le chargement paginé de données.
@@ -22,6 +23,8 @@ export interface PaginatedFetchOptions {
 	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement (ex. invalidation après édition admin) déclenche un rechargement. */
 	apiKey: string | (() => string);
 	buildParams: () => URLSearchParams;
+	/** Clé du numéro de page dans l'URL, retirée quand la page demandée dépasse la dernière. Défaut `page`. */
+	pageParam?: string;
 }
 
 export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
@@ -50,10 +53,17 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 				opts.endpoint + '?' + params,
 				{ key: lastKey },
 			);
+			const range = { page: data.page as number, pages: data.pages as number };
+			if (isPageOutOfRange(range)) {
+				// La liste a rétréci sous la page demandée : retour à la première page.
+				page = 1;
+				dropPageParam(opts.pageParam);
+				return await load();
+			}
 			items = data[opts.itemsKey] as T[];
 			total = data.total as number;
-			pages = data.pages as number;
-			page = data.page as number;
+			pages = range.pages;
+			page = range.page;
 			loaded = true;
 		} finally {
 			loading = false;
