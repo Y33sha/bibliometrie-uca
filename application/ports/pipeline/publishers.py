@@ -21,6 +21,8 @@ class PublisherFindOrCreateQueries(Protocol):
         """Attribue un `openalex_id` à l'éditeur s'il n'en porte pas déjà un."""
         ...
 
-    def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
-        """`(id, created)` : l'éditeur dont la forme de nom normalisée existe déjà, sinon un éditeur créé et sa forme enregistrée."""
+    def match_or_create_by_name_form(
+        self, name_raw: str, name_normalized: str, name_key: str
+    ) -> tuple[int, bool]:
+        """`(id, created)` : l'éditeur qui porte déjà la forme de nom `name_key`, sinon un éditeur créé sous `name_raw` et `name_normalized`, avec sa forme `name_key`."""
         ...

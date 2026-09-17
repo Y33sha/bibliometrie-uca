@@ -43,14 +43,16 @@ class PgPublisherGatewayQueries(PublisherFindOrCreateQueries):
         )
         self._conn.execute(stmt)
 
-    def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
-        existing = self.find_publisher_by_name_form(name_normalized)
+    def match_or_create_by_name_form(
+        self, name_raw: str, name_normalized: str, name_key: str
+    ) -> tuple[int, bool]:
+        existing = self.find_publisher_by_name_form(name_key)
         if existing is not None:
             return existing, False
         new_id = self.create_publisher(
             name=name_raw, name_normalized=name_normalized, openalex_id=None
         )
-        self.add_publisher_name_form(new_id, name_normalized)
+        self.add_publisher_name_form(new_id, name_key)
         return new_id, True
 
     # ── Helpers internes de `match_or_create_by_name_form` ─────────
