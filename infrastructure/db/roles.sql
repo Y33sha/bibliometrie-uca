@@ -122,7 +122,8 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE ON
-    addresses, apc_payments, config, persons_rh, source_authorships, source_publications
+    addresses, apc_payments, config, doi_prefixes, persons_rh, source_authorships,
+    source_publications
 TO bibliometrie_app;
 
 -- Une table créée par une migration future est lisible, et rien de plus : sa nature se
