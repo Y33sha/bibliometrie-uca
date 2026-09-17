@@ -239,19 +239,22 @@ class TestUpsertPublisherEtJournal:
     def test_sans_titre_de_revue_aucune_revue(self):
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
-    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_scanr, "find_or_create_journal", MagicMock())
+    def test_transmet_le_type_brut(self, monkeypatch):
+        """Le type brut du document décide du rattachement à une revue."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_scanr, "find_or_create_container_journal", fake)
         doc = {"type": "book-chapter", "source": {"title": "Handbook of Things"}}
 
-        assert upsert_journal(doc, 7, journal_repo=MagicMock()) is None
-        normalize_scanr.find_or_create_journal.assert_not_called()
+        assert upsert_journal(doc, 7, journal_repo=MagicMock()) == 3
+        assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
+        assert fake.call_args.kwargs["source"] == "scanr"
 
     def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
         """Les identifiants de revue arrivent en liste : le premier est celui du papier, le second celui de l'édition en ligne."""
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_scanr,
-            "find_or_create_journal",
+            "find_or_create_container_journal",
             lambda title, **kw: vus.update(title=title, **kw) or 3,
         )
         doc = {"source": {"title": "J. Things", "journalIssns": ["1234-5678", "8765-4321"]}}

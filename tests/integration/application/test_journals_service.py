@@ -12,6 +12,7 @@ from sqlalchemy import text
 from application.ports.repositories.journal_repository import JournalUpdate
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.journals.core import (
+    find_or_create_container_journal,
     find_or_create_journal,
     merge_journals,
     requalify_publications_for_journal,
@@ -28,6 +29,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
+from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -398,6 +400,43 @@ class TestFindOrCreateJournal:
         )
         assert row.rejected_issns == ["1476-4688"]
         assert row.sudoc_checked_at is None
+
+
+class TestFindOrCreateContainerJournal:
+    def test_chapitre_sans_issn_ne_cree_pas_de_revue(self, sa_sync_conn, gateway):
+        found = find_or_create_container_journal(
+            "Handbook of Things", raw_doc_type="book-chapter", source="crossref", repo=gateway
+        )
+        assert found is None
+        n = sa_sync_conn.execute(text("SELECT count(*) FROM journals")).scalar_one()
+        assert n == 0
+
+    def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(self, sa_sync_conn, gateway):
+        find_or_create_journal("Handbook of Things", repo=gateway)
+        found = find_or_create_container_journal(
+            "Handbook of Things", raw_doc_type="book-chapter", source="crossref", repo=gateway
+        )
+        assert found is None
+
+    def test_chapitre_sans_issn_rejoint_un_recueil_d_actes(self, sa_sync_conn, gateway):
+        """Cas réel : chapitres Crossref des actes SODA, typés proceedings par l'administration."""
+        title = "Proceedings of the 2025 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)"
+        proceedings = find_or_create_journal(title, repo=gateway)
+        gateway.set_journal_type(proceedings, JournalType.PROCEEDINGS)
+        found = find_or_create_container_journal(
+            title, raw_doc_type="book-chapter", source="crossref", repo=gateway
+        )
+        assert found == proceedings
+
+    def test_chapitre_avec_issn_cree_sa_collection(self, sa_sync_conn, gateway):
+        found = find_or_create_container_journal(
+            "Lecture Notes in Things",
+            raw_doc_type="book-chapter",
+            source="crossref",
+            issn="0302-9743",
+            repo=gateway,
+        )
+        assert found is not None
 
 
 def _mark_checked_in_sudoc(conn, journal_id: int) -> None:

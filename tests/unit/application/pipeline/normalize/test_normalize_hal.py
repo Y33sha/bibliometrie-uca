@@ -86,21 +86,24 @@ class TestUpsertJournal:
     def test_no_title_returns_none(self):
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
-    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_hal, "find_or_create_journal", MagicMock())
+    def test_transmet_le_type_brut(self, monkeypatch):
+        """Le type brut du document décide du rattachement à une revue."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_hal, "find_or_create_container_journal", fake)
         doc = {"docType_s": "COUV", "journalTitle_s": "Handbook of Things"}
 
-        assert upsert_journal(doc, 42, journal_repo=MagicMock()) is None
-        normalize_hal.find_or_create_journal.assert_not_called()
+        assert upsert_journal(doc, 42, journal_repo=MagicMock()) == 3
+        assert fake.call_args.kwargs["raw_doc_type"] == "COUV"
+        assert fake.call_args.kwargs["source"] == "hal"
 
     def test_happy_path(self, monkeypatch):
         captured: dict[str, Any] = {}
 
-        def fake_create(title, *, issn, eissn, publisher_id, repo):
+        def fake_create(title, *, issn, eissn, publisher_id, repo, **_):
             captured.update(title=title, issn=issn, eissn=eissn, publisher_id=publisher_id)
             return 7
 
-        monkeypatch.setattr(normalize_hal, "find_or_create_journal", fake_create)
+        monkeypatch.setattr(normalize_hal, "find_or_create_container_journal", fake_create)
         result = upsert_journal(
             {
                 "journalTitle_s": "Nature",
@@ -152,6 +155,13 @@ class TestExtractPubMetadata:
     def test_conference_title_fallback(self):
         meta = extract_pub_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
         assert meta.container_title == "Conf"
+
+    def test_journal_title_fallback_when_no_journal(self):
+        """Un chapitre sans ISSN n'a pas de revue : son titre de revue reste en container_title."""
+        meta = extract_pub_metadata(
+            {"docType_s": "COUV", "journalTitle_s": "Handbook"}, journal_id=None
+        )
+        assert meta.container_title == "Handbook"
 
     def test_language_from_list(self):
         meta = extract_pub_metadata({"language_s": ["fr", "en"]}, journal_id=None)

@@ -26,10 +26,9 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_journal
+from application.services.journals.core import find_or_create_container_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
-from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -81,11 +80,10 @@ def upsert_journal(
         return None
     issn = hal_text_field(doc.get("journalIssn_s"))
     eissn = hal_text_field(doc.get("journalEissn_s"))
-    raw_type = hal_text_field(doc.get("docType_s"))
-    if not container_is_journal(raw_type, "hal", has_issn=bool(issn or eissn)):
-        return None
-    return find_or_create_journal(
+    return find_or_create_container_journal(
         title,
+        raw_doc_type=hal_text_field(doc.get("docType_s")),
+        source="hal",
         issn=issn,
         eissn=eissn,
         publisher_id=publisher_id,
@@ -114,8 +112,10 @@ def extract_pub_metadata(
 
     container_title = None
     if not journal_id:
-        container_title = hal_text_field(doc.get("bookTitle_s")) or hal_text_field(
-            doc.get("conferenceTitle_s")
+        container_title = (
+            hal_text_field(doc.get("bookTitle_s"))
+            or hal_text_field(doc.get("conferenceTitle_s"))
+            or hal_text_field(doc.get("journalTitle_s"))
         )
 
     embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
