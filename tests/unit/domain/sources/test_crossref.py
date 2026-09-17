@@ -35,6 +35,15 @@ class TestExtractCrossrefPubYearOrder:
         msg = {"published-print": _date_field(2022)}
         assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2022
 
+    def test_thesis_falls_back_to_approved(self):
+        """Cas réel : thèse ABES (10.70675) dont `issued` est vide et seule la soutenance est datée."""
+        msg = {
+            "type": "dissertation",
+            "issued": {"date-parts": [[None]]},
+            "approved": {"date-parts": [[2023, 12, 11]]},
+        }
+        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2023
+
 
 class TestExtractCrossrefPubYearFutureBound:
     """Garde-fou : les éditeurs déposent parfois des dates de "futur numéro"
