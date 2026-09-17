@@ -87,7 +87,8 @@ _JOURNALS_SHARING_COLUMN_ISSN = text("""
 
 
 # Paires de revues seules à porter leur titre, dont au moins une sans ISSN, et dont les
-# enregistrements partagent un préfixe DOI. La cible de la fusion en tête.
+# enregistrements partagent un préfixe DOI. La cible de la fusion en tête. Un titre normalisé vide
+# (alphabet non latin, symboles) ne rapproche aucune revue.
 _SAME_TITLE_DUPLICATES = text("""
     WITH prefixes AS (
         SELECT journal_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
@@ -95,7 +96,10 @@ _SAME_TITLE_DUPLICATES = text("""
         WHERE journal_id IS NOT NULL AND doi IS NOT NULL
         GROUP BY journal_id
     ), paires_de_titre AS (
-        SELECT title_normalized FROM journals GROUP BY title_normalized HAVING count(*) = 2
+        SELECT title_normalized FROM journals
+        WHERE title_normalized <> ''
+        GROUP BY title_normalized
+        HAVING count(*) = 2
     ), revues AS (
         SELECT j.id, j.title_normalized, j.pub_count,
                (j.issn IS NOT NULL OR j.eissn IS NOT NULL) AS a_issn,

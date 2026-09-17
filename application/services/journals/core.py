@@ -118,8 +118,13 @@ def find_or_create_journal(
             if jid:
                 return _match_and_enrich(jid)
 
-        # 5. Par forme de nom (priorité aux journals avec eISSN)
-        jid = repo.find_journal_by_name_form(title_normalized, publisher_id)
+        # 5. Par forme de nom (priorité aux journals avec eISSN). Un titre dont la normalisation ne
+        # garde rien (alphabet non latin, symboles) ne désigne aucune revue.
+        jid = (
+            repo.find_journal_by_name_form(title_normalized, publisher_id)
+            if title_normalized
+            else None
+        )
         if jid:
             repo.enrich_journal(
                 jid,

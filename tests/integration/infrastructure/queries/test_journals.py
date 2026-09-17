@@ -147,6 +147,16 @@ class TestSudocCheck:
         assert "revue test homonymes à issn" not in groups
         assert "revue test actives distinctes" not in groups
 
+    def test_same_title_duplicates_ignore_empty_normalized_titles(self, sa_sync_conn, repo):
+        """Un titre grec et un titre cyrillique se normalisent en chaîne vide : ils ne forment pas une paire."""
+        for title in ("Παιδαγωγικά ρεύματα στο Αιγαίο", "Теория вероятностей и ее применения"):
+            journal_id = sa_sync_conn.execute(
+                text("INSERT INTO journals (title, title_normalized) VALUES (:t, '') RETURNING id"),
+                {"t": title},
+            ).scalar_one()
+            _create_record(sa_sync_conn, journal_id, doi=f"10.9999/vide-{journal_id}")
+        assert "" not in {g.key for g in repo.find_same_title_duplicates()}
+
     def test_delete_empty_journals_spares_records_and_apc_payments(self, sa_sync_conn, repo):
         empty = _create_journal(sa_sync_conn, title="Revue test vide", issn="2999-0007")
         with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")

@@ -142,10 +142,12 @@ _SORT_MAP = {
 }
 
 
-# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN.
+# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN. Un titre dont la
+# normalisation ne garde rien (alphabet non latin, symboles) n'en rapproche aucun autre.
 _SAME_TITLE_GROUPS = """
     SELECT title_normalized AS value, array_agg(id) AS ids
     FROM journals
+    WHERE title_normalized <> ''
     GROUP BY title_normalized
     HAVING count(*) > 2
         OR (count(*) = 2 AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
