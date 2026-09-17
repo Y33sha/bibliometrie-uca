@@ -308,21 +308,24 @@ class TestUpsertJournal:
         """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
         assert upsert_journal({}, None, journal_repo=MagicMock()) is None
 
-    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_datacite, "find_or_create_journal", MagicMock())
+    def test_transmet_le_type_brut(self, monkeypatch):
+        """Le type brut du document décide du rattachement à une revue."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
         attrs = {
             "types": {"resourceTypeGeneral": "BookChapter"},
-            "container": {"title": "Handbook of Things"},
+            "container": {"title": "Handbook"},
         }
 
-        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) is None
-        normalize_datacite.find_or_create_journal.assert_not_called()
+        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
+        assert fake.call_args.kwargs["raw_doc_type"] == "BookChapter"
+        assert fake.call_args.kwargs["source"] == "datacite"
 
     def test_contenant_titre_cree_la_revue(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_datacite,
-            "find_or_create_journal",
+            "find_or_create_container_journal",
             lambda title, **kw: vus.update(title=title, **kw) or 3,
         )
         attrs = {

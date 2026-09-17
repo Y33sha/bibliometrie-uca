@@ -24,6 +24,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services._merge import load_merge_pair
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
+from domain.journals.containers import container_is_journal
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISSN, issn_rejection_reason
@@ -153,6 +154,40 @@ def find_or_create_journal(
     if rejected:
         repo.add_rejected_issns(journal_id, rejected)
     return journal_id
+
+
+def find_or_create_container_journal(
+    title: str | None,
+    *,
+    raw_doc_type: str | None,
+    source: str,
+    issn: str | None = None,
+    eissn: str | None = None,
+    issnl: str | None = None,
+    publisher_id: int | None = None,
+    openalex_id: str | None = None,
+    oa_model: OaModel | None = None,
+    repo: JournalFindOrCreateQueries,
+) -> int | None:
+    """Revue du conteneur d'un document, selon son type brut `raw_doc_type` dans la source `source`.
+
+    Un livre ou un chapitre sans ISSN a pour conteneur le livre : il est rattaché seulement à un recueil d'actes existant de même titre. Les autres documents passent par `find_or_create_journal`.
+    """
+    if container_is_journal(raw_doc_type, source, has_issn=bool(issn or eissn or issnl)):
+        return find_or_create_journal(
+            title,
+            issn=issn,
+            eissn=eissn,
+            issnl=issnl,
+            publisher_id=publisher_id,
+            openalex_id=openalex_id,
+            oa_model=oa_model,
+            repo=repo,
+        )
+    title_normalized = normalize_text(to_plain_text(title)) if title else ""
+    if not title_normalized:
+        return None
+    return repo.find_proceedings_by_name_form(title_normalized, publisher_id)
 
 
 def update_journal(

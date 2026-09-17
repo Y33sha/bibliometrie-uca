@@ -21,9 +21,8 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_journal
+from application.services.journals.core import find_or_create_container_journal
 from application.services.publishers.core import find_or_create_publisher
-from domain.journals.containers import container_is_journal
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -91,10 +90,10 @@ def upsert_journal(
     if not title:
         return None
     issn, eissn = _extract_journal_issns(source)
-    if not container_is_journal(as_str(doc.get("type")), "scanr", has_issn=bool(issn or eissn)):
-        return None
-    return find_or_create_journal(
+    return find_or_create_container_journal(
         title,
+        raw_doc_type=as_str(doc.get("type")),
+        source="scanr",
         issn=issn,
         eissn=eissn,
         publisher_id=publisher_id,

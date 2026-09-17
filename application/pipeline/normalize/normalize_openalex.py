@@ -21,9 +21,8 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_journal
+from application.services.journals.core import find_or_create_container_journal
 from application.services.publishers.core import find_or_create_publisher
-from domain.journals.containers import container_is_journal
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
     compact_identifiers,
@@ -167,10 +166,6 @@ def upsert_journal(
                 issn = i
             elif not eissn:
                 eissn = i
-    if not container_is_journal(
-        as_str(work.get("type")), "openalex", has_issn=bool(issn_l or issn or eissn)
-    ):
-        return None
 
     source_type = as_str(source.get("type"))
     oa_model: OaModel | None = None
@@ -179,8 +174,10 @@ def upsert_journal(
     elif source_type == "repository":
         oa_model = OaModel.REPOSITORY
 
-    return find_or_create_journal(
+    return find_or_create_container_journal(
         title,
+        raw_doc_type=as_str(work.get("type")),
+        source="openalex",
         issn=issn,
         eissn=eissn,
         issnl=issn_l,

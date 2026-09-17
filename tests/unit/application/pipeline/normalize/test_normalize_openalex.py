@@ -220,26 +220,18 @@ class TestUpsertJournal:
         assert result is None
         repo.create_journal.assert_not_called()
 
-    def test_chapitre_sans_issn_aucune_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", MagicMock())
+    def test_transmet_le_type_brut(self, monkeypatch):
+        """Le type brut du document décide du rattachement à une revue."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake)
         work = {
             "type": "book-chapter",
-            "primary_location": {"source": {"display_name": "Handbook", "type": "book series"}},
+            "primary_location": {"source": {"display_name": "Handbook"}},
         }
 
-        assert upsert_journal(work, None, journal_repo=MagicMock()) is None
-        normalize_openalex.find_or_create_journal.assert_not_called()
-
-    def test_chapitre_avec_issn_l_rattache_a_sa_collection(self, monkeypatch):
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", lambda *a, **kw: 5)
-        work = {
-            "type": "book-chapter",
-            "primary_location": {
-                "source": {"display_name": "Series", "type": "book series", "issn_l": "1234-5678"}
-            },
-        }
-
-        assert upsert_journal(work, None, journal_repo=MagicMock()) == 5
+        assert upsert_journal(work, None, journal_repo=MagicMock()) == 3
+        assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
+        assert fake.call_args.kwargs["source"] == "openalex"
 
     def test_repository_source_oa_model(self, monkeypatch):
         captured: dict[str, Any] = {}
@@ -248,7 +240,7 @@ class TestUpsertJournal:
             captured.update(kwargs)
             return 42
 
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", fake_create)
+        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
         work = {
             "primary_location": {
                 "source": {
@@ -269,7 +261,7 @@ class TestUpsertJournal:
             captured.update(kwargs)
             return 1
 
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", fake_create)
+        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
         work = {
             "primary_location": {"source": {"display_name": "OA", "type": "journal", "is_oa": True}}
         }
@@ -283,7 +275,7 @@ class TestUpsertJournal:
             captured.update(kwargs)
             return 1
 
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", fake_create)
+        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
         work = {
             "primary_location": {
                 "source": {"display_name": "Sub", "type": "journal"}
@@ -300,7 +292,7 @@ class TestUpsertJournal:
             captured.update(kwargs)
             return 1
 
-        monkeypatch.setattr(normalize_openalex, "find_or_create_journal", fake_create)
+        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
         work = {
             "primary_location": {
                 "source": {

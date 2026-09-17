@@ -748,17 +748,20 @@ class TestUpsertWrappers:
         repo = MagicMock()
         assert upsert_journal(rec, publisher_id=1, journal_repo=repo) is None
 
-    def test_upsert_journal_chapitre_sans_issn_aucune_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_wos, "find_or_create_journal", MagicMock())
+    def test_transmet_le_type_brut(self, monkeypatch):
+        """Le type brut du document décide du rattachement à une revue."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_wos, "find_or_create_container_journal", fake)
         rec = {"journal_title": "Handbook of Things", "doc_type": "Book Chapter"}
 
-        assert upsert_journal(rec, publisher_id=1, journal_repo=MagicMock()) is None
-        normalize_wos.find_or_create_journal.assert_not_called()
+        assert upsert_journal(rec, publisher_id=1, journal_repo=MagicMock()) == 3
+        assert fake.call_args.kwargs["raw_doc_type"] == "Book Chapter"
+        assert fake.call_args.kwargs["source"] == "wos"
 
     def test_upsert_journal_delegates_with_issn(self, monkeypatch):
         calls: list[dict] = []
 
-        def fake_find_or_create_journal(title, *, issn, eissn, publisher_id, repo):
+        def fake_find_or_create_journal(title, *, issn, eissn, publisher_id, repo, **_):
             calls.append(
                 {
                     "title": title,
@@ -770,7 +773,9 @@ class TestUpsertWrappers:
             )
             return 77
 
-        monkeypatch.setattr(normalize_wos, "find_or_create_journal", fake_find_or_create_journal)
+        monkeypatch.setattr(
+            normalize_wos, "find_or_create_container_journal", fake_find_or_create_journal
+        )
         rec = {"journal_title": "Nature", "issn": "0028-0836", "eissn": "1476-4687"}
         repo = MagicMock()
         result = upsert_journal(rec, publisher_id=11, journal_repo=repo)
@@ -941,7 +946,7 @@ class TestProcessRecord:
             },
         )
         monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: 11)
-        monkeypatch.setattr(normalize_wos, "find_or_create_journal", lambda *a, **kw: 22)
+        monkeypatch.setattr(normalize_wos, "find_or_create_container_journal", lambda *a, **kw: 22)
 
         queries = MagicMock()
         queries.upsert_source_publication.return_value = 555
@@ -989,7 +994,9 @@ class TestProcessRecord:
 
         monkeypatch.setattr(normalize_wos, "extract_from_api", fake_extract)
         monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: None)
-        monkeypatch.setattr(normalize_wos, "find_or_create_journal", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            normalize_wos, "find_or_create_container_journal", lambda *a, **kw: None
+        )
 
         queries = MagicMock()
 
