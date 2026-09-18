@@ -13,7 +13,7 @@ La fusion de deux revues se fait à la main, dans l'administration des revues (`
 
 Le value object `ISSN` (`domain/publications/identifiers.py`) vérifie la clé de contrôle et produit la forme `NNNN-NNNC`. Il normalise `source_publications.external_ids.issn`, rempli par Crossref. Sur 9 397 couples (revue, ISSN d'un enregistrement Crossref rattaché à la revue), 24 sont discordants : l'ISSN de l'enregistrement est absent des ISSN de la revue.
 
-Le script de maintenance `interfaces/cli/maintenance/seed_journals_doi_prefix.py` calcule `journals.doi_prefix` : le plus long préfixe commun des DOI des publications de la revue. La phase `metadata_correction` lit `doi_prefix` (`resolve_journal_by_doi`) pour rattacher à une revue un enregistrement qui a un DOI et aucun `journal_id`. 304 revues ont un `doi_prefix`. 13 partagent le même préfixe qu'une autre, 12 ont un préfixe qui préfixe celui d'une autre.
+Le script de maintenance `interfaces/cli/maintenance/seed_journals_doi_prefix.py` calcule `journals.doi_prefix` : le plus long préfixe commun des DOI des publications de la revue. La phase `metadata_correction` lit `doi_prefix` (`resolve_journal_by_doi`) pour rattacher à une revue un enregistrement qui a un DOI et aucun `journal_id`. 304 revues ont un `doi_prefix`. 13 partagent le même préfixe qu'une autre, 12 ont un préfixe qui préfixe celui d'une autre. Un préfixe peut aussi couvrir tout un entrepôt : `10.18154/rwth`, calculé sur des copies DataCite, rattache à la revue parasite « II » les préprints de l'entrepôt de RWTH, et la maintient en vie.
 
 La phase `publishers_journals` interroge l'API OpenAlex Sources par `openalex_id` (`enrich_journals_from_openalex.py`, 8 661 revues) et importe le dump DOAJ.
 

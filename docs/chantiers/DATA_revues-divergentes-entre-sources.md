@@ -47,6 +47,7 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 
 ### 5. Revue erronée dans une source
 
+- [x] Audit préalable (`audit_journals_against_crossref`) : écarts à Crossref par source, divergences sans Crossref, préprints DataCite.
 - [ ] Correction dans `metadata_correction` : l'enregistrement dont la revue diffère de celle de l'enregistrement Crossref de même DOI prend la revue de Crossref, avec trace dans `raw_metadata`.
 
 ## Questions ouvertes
