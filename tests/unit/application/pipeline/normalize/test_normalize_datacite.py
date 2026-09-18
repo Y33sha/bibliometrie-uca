@@ -329,13 +329,35 @@ class TestUpsertJournal:
             lambda title, **kw: vus.update(title=title, **kw) or 3,
         )
         attrs = {
-            "container": {"title": "J. Things", "identifier": "1234-5678", "identifierType": "ISSN"}
+            "types": {"resourceTypeGeneral": "JournalArticle"},
+            "container": {
+                "title": "J. Things",
+                "identifier": "1234-5678",
+                "identifierType": "ISSN",
+            },
         }
 
         assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
         assert vus["title"] == "J. Things"
         assert vus["issn"] == "1234-5678"
         assert vus["publisher_id"] == 7
+
+    def test_copie_d_entrepot_sans_revue(self, monkeypatch):
+        """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
+        attrs = {
+            "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
+            "container": {
+                "title": "Physics letters / B 777",
+                "firstPage": "151",
+                "lastPage": "162 (2018). doi:10.1016/j.physletb.2017.12.021",
+                "type": "Series",
+            },
+        }
+
+        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) is None
+        fake.assert_not_called()
 
 
 def _attributs(**surcharges) -> dict:
