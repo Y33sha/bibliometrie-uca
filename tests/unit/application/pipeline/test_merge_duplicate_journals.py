@@ -7,7 +7,9 @@ from application.pipeline.publishers_journals.merge_duplicate_journals import (
 )
 from application.ports.pipeline.journals import (
     JournalIssnGroup,
+    JournalMergeCandidate,
     JournalMergeGroup,
+    JournalPublicationPair,
     JournalSummary,
     JournalTitleRow,
 )
@@ -19,10 +21,12 @@ class _Repo:
         issnl_groups: list[JournalMergeGroup] | None = None,
         issn_groups: list[JournalIssnGroup] | None = None,
         title_groups: list[JournalMergeGroup] | None = None,
+        publication_pairs: list[JournalPublicationPair] | None = None,
     ) -> None:
         self._issnl_groups = issnl_groups or []
         self._issn_groups = issn_groups or []
         self._title_groups = title_groups or []
+        self._publication_pairs = publication_pairs or []
 
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
         return self._issnl_groups
@@ -32,6 +36,9 @@ class _Repo:
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
         return self._title_groups
+
+    def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
+        return self._publication_pairs
 
     def describe_journals(self, journal_ids) -> dict[int, JournalSummary]:
         return {i: JournalSummary(i, f"Revue {i}", None, None, None) for i in journal_ids}
@@ -111,6 +118,42 @@ def test_same_title_pair_is_merged_after_the_issn_rules():
     metrics, merges = _run(repo)
     assert merges == [(7, 9), (2, 86095)]
     assert metrics.extras["journals_merged"] == 2
+
+
+def _journal(journal_id: int, title: str, *issns: str, pub_count: int = 1) -> JournalMergeCandidate:
+    return JournalMergeCandidate(journal_id, title, frozenset(issns), pub_count)
+
+
+def test_abbreviated_title_is_absorbed_by_the_journal_with_an_issn():
+    """Cas réel : HAL rattache à « JINST », sans ISSN, les articles du Journal of Instrumentation."""
+    pair = JournalPublicationPair(
+        _journal(1631, "Journal of Instrumentation", "1748-0221", pub_count=40),
+        _journal(21071, "JINST", pub_count=47),
+        publications=47,
+    )
+    metrics, merges = _run(_Repo(publication_pairs=[pair]))
+    assert merges == [(1631, 21071)]
+    assert metrics.extras["journals_merged"] == 1
+
+
+def test_journals_with_distinct_issns_are_spared():
+    """Cas réel : deux revues nommées « Geosciences », chacune avec son ISSN."""
+    pair = JournalPublicationPair(
+        _journal(1, "Geosciences", "2076-3263"), _journal(2, "Geosciences", "1023-7429"), 1
+    )
+    _, merges = _run(_Repo(publication_pairs=[pair]))
+    assert merges == []
+
+
+def test_journal_attached_by_mistake_is_spared():
+    """Cas réel : HAL rattache à une autre revue un article d'Atmospheric Chemistry and Physics."""
+    pair = JournalPublicationPair(
+        _journal(144, "Atmospheric chemistry and physics", "1680-7316"),
+        _journal(67209, "Journal of Atmospheric and Terrestrial Physics"),
+        1,
+    )
+    _, merges = _run(_Repo(publication_pairs=[pair]))
+    assert merges == []
 
 
 def test_without_group_nothing_is_merged():

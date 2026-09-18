@@ -15,10 +15,12 @@ from application.ports.pipeline.journals import (
     JournalFindOrCreateQueries,
     JournalIssnGroup,
     JournalIssnRow,
+    JournalMergeCandidate,
     JournalMergeGroup,
     JournalMergeQueries,
     JournalOpenAlexEnrichmentQueries,
     JournalProceedingsTypingQueries,
+    JournalPublicationPair,
     JournalRecordTypes,
     JournalSudocQueries,
     JournalSudocRow,
@@ -118,6 +120,32 @@ _SAME_TITLE_DUPLICATES = text("""
     JOIN revues y ON y.title_normalized = x.title_normalized AND x.id < y.id
     WHERE NOT (x.a_issn AND y.a_issn) AND x.pfx && y.pfx
     ORDER BY x.title_normalized
+""")
+
+# Paires de revues que les enregistrements d'une même publication portent, les plus partagées en tête.
+# Une revue rattachée par le préfixe du DOI (`raw_metadata.journal_id`) ne compte pas : seules comptent
+# celles que les sources donnent.
+_JOURNALS_SHARING_A_PUBLICATION = text("""
+    WITH rattachements AS (
+        SELECT DISTINCT publication_id, journal_id
+        FROM source_publications
+        WHERE publication_id IS NOT NULL AND journal_id IS NOT NULL
+          AND NOT (raw_metadata ? 'journal_id')
+    ), paires AS (
+        SELECT a.journal_id AS first_id, b.journal_id AS second_id, count(*) AS publications
+        FROM rattachements a
+        JOIN rattachements b ON b.publication_id = a.publication_id AND a.journal_id < b.journal_id
+        GROUP BY a.journal_id, b.journal_id
+    )
+    SELECT p.publications,
+           x.id AS first_id, x.title AS first_title, x.pub_count AS first_pub_count,
+           array_remove(ARRAY[x.issn, x.eissn, x.issnl], NULL) AS first_issns,
+           y.id AS second_id, y.title AS second_title, y.pub_count AS second_pub_count,
+           array_remove(ARRAY[y.issn, y.eissn, y.issnl], NULL) AS second_issns
+    FROM paires p
+    JOIN journals x ON x.id = p.first_id
+    JOIN journals y ON y.id = p.second_id
+    ORDER BY p.publications DESC, p.first_id, p.second_id
 """)
 
 _JOURNAL_SUMMARIES = text("""
@@ -434,6 +462,20 @@ class PgJournalGatewayQueries(
         return [
             JournalMergeGroup(r.title_normalized, tuple(r.ids))
             for r in self._conn.execute(_SAME_TITLE_DUPLICATES).all()
+        ]
+
+    def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
+        return [
+            JournalPublicationPair(
+                JournalMergeCandidate(
+                    r.first_id, r.first_title, frozenset(r.first_issns), r.first_pub_count
+                ),
+                JournalMergeCandidate(
+                    r.second_id, r.second_title, frozenset(r.second_issns), r.second_pub_count
+                ),
+                r.publications,
+            )
+            for r in self._conn.execute(_JOURNALS_SHARING_A_PUBLICATION).all()
         ]
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:

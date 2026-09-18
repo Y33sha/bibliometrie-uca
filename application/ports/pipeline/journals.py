@@ -183,6 +183,25 @@ class JournalIssnGroup(NamedTuple):
     journals: tuple[JournalTitleRow, ...]
 
 
+class JournalMergeCandidate(NamedTuple):
+    """Une revue candidate à une fusion, avec ce qui départage la cible."""
+
+    id: int
+    title: str
+    issns: frozenset[str]
+    """Valeurs des colonnes `issn`, `eissn` et `issnl`."""
+    pub_count: int
+
+
+class JournalPublicationPair(NamedTuple):
+    """Deux revues que des enregistrements d'une même publication portent."""
+
+    first: JournalMergeCandidate
+    second: JournalMergeCandidate
+    publications: int
+    """Nombre de publications communes."""
+
+
 class JournalMergeQueries(Protocol):
     """Fusion des revues séparées à tort."""
 
@@ -196,6 +215,10 @@ class JournalMergeQueries(Protocol):
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
         """Paires de revues seules à porter leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements partagent un préfixe DOI. La revue qui porte le plus de publications vient en premier, puis celle qui a un ISSN."""
+        ...
+
+    def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
+        """Paires de revues que les enregistrements d'une même publication portent, hors rattachement par préfixe DOI. Les paires qui partagent le plus de publications viennent en premier."""
         ...
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
