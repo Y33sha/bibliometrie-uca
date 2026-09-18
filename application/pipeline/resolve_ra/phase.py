@@ -1,6 +1,6 @@
 """Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `fetch_missing`.
 
-Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) du pool `candidate_dois` absents de `doi_prefixes`, et les préfixes d'agence `unknown`. Un préfixe que doi.org ne connaît pas est enregistré avec `ra='unknown'`, et soumis de nouveau au run suivant. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
+Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) du pool `candidate_dois` absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
 Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
@@ -25,9 +25,9 @@ def run(
     repo: DoiPrefixesQueries,
     resolve_ras_fn: ResolveRasFn,
 ) -> PhaseMetrics:
-    """Résout l'agence des préfixes à résoudre (`doi.org/ra`) et l'enregistre.
+    """Résout l'agence des préfixes absents de `doi_prefixes` (`doi.org/ra`) et l'insère.
 
-    `total` = préfixes enregistrés, insérés ou reclassés ; `new` = idem ; `extras` = `resolved` / `unresolved` parmi eux. Un préfixe d'agence `unknown` qui le reste n'est pas compté.
+    `total` = préfixes auxquels doi.org a répondu ; `new` = rows insérées ; `extras` = `resolved` / `unresolved`.
     """
     metrics = PhaseMetrics()
     # Un préfixe hors de la forme `10.<chiffres>` vient d'une valeur qui n'est pas un DOI : il n'est pas enregistré.
@@ -43,10 +43,10 @@ def run(
     new_by_ra: dict[str, int] = {}
     for prefix, answer in resolve_ras_fn(prefixes):
         ra = answer or "unknown"
-        if not repo.save_ra(prefix=prefix, ra=ra):
-            continue
-        metrics.add(total=1, new=1, **{"resolved" if answer else "unresolved": 1})
-        new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
+        metrics.add(total=1, **{"resolved" if answer else "unresolved": 1})
+        if repo.insert_ra(prefix=prefix, ra=ra):
+            metrics.add(new=1)
+            new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("%s → %s", prefix, ra)
 
     # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org ne connaît pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).

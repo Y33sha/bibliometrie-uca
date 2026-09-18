@@ -2,7 +2,7 @@
 
 Pour chaque row en attente (`publisher_id IS NULL` et `publisher_checked_at IS NULL`, RA gérée), interroge `/prefixes` en routant par Registration Agency (`Crossref`/`DataCite` → l'endpoint correspondant ; `unknown` → tente les deux et corrige la RA), renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), puis match ou crée le publisher contre `publisher_name_forms` et l'attache. Chaque row est marquée vérifiée (`publisher_checked_at`) : `/prefixes` n'est tenté qu'une fois par row, succès ou échec, ce qui garde contre la réinterrogation sans fin. Placé après `normalize` pour matcher contre les publishers déjà créés par les sources.
 
-La Registration Agency de chaque préfixe est posée en amont par la phase `resolve_ra`, qui remet en attente une row d'agence `unknown` quand elle la reclasse. Les clients HTTP (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`) sont injectés en callables, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
+La Registration Agency de chaque préfixe est posée en amont par la phase `resolve_ra`. Les clients HTTP (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`) sont injectés en callables, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour la table `doi_prefixes`.
 
-Sert la phase `resolve_ra` (lecture des préfixes à résoudre, enregistrement de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
+Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
 """
 
 from sqlalchemy import Connection, text
@@ -22,27 +22,21 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
         result = self._conn.execute(
             text(
                 """
-                SELECT split_part(c.doi, '/', 1) AS prefix
+                SELECT DISTINCT split_part(c.doi, '/', 1) AS prefix
                 FROM candidate_dois c
                 LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)
                 WHERE c.doi <> '' AND dp.prefix IS NULL
-                UNION
-                SELECT prefix FROM doi_prefixes WHERE ra = 'unknown'
                 ORDER BY prefix
                 """
             )
         )
         return [row.prefix for row in result]
 
-    def save_ra(self, *, prefix: str, ra: str) -> bool:
+    def insert_ra(self, *, prefix: str, ra: str) -> bool:
         result = self._conn.execute(
             text(
-                """
-                INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra)
-                ON CONFLICT (prefix) DO UPDATE
-                    SET ra = EXCLUDED.ra, fetched_at = now(), publisher_checked_at = NULL
-                    WHERE doi_prefixes.ra = 'unknown' AND EXCLUDED.ra <> 'unknown'
-                """
+                "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
+                "ON CONFLICT (prefix) DO NOTHING"
             ),
             {"prefix": prefix, "ra": ra},
         )
