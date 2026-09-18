@@ -38,9 +38,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - La cohérence entre les ISSN d'un enregistrement et ceux de sa revue est vérifiée.
 - Le Sudoc, interrogé dans la phase `publishers_journals`, sert de source de référence. Il confirme les ISSN d'une revue et fournit son titre, son ISSN-L et le support de chaque ISSN. Le périmètre se limite aux revues qui ont au moins un ISSN.
 - L'ISSN-L du Sudoc est écrit dans `issnl`. Deux revues de même ISSN-L sont fusionnées automatiquement.
-- Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est rangé parmi les ISSN rejetés et signalé.
+- Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est écarté et signalé.
 - Le titre en base reste la référence. La notice Sudoc porte le titre propre, sans le sous-titre, donc elle donne souvent un titre plus court.
-- Les ISSN rejetés (`journals.rejected_issns`) sont soit fautifs, tels que reçus des sources, soit périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant), soit d'une autre publication. Ils servent au rapprochement. La sous-étape Sudoc corrige les fautifs.
+- Les ISSN rejetés (`journals.rejected_issns`) sont ceux de la même revue hors de ses colonnes : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues. La sous-étape Sudoc corrige les fautifs.
 - La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
 - Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
 - `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.

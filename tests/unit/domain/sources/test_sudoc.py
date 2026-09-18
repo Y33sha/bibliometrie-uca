@@ -34,7 +34,25 @@ class TestParseSudocSerialRecord:
             preceding_issns=("0762-5332",),
             succeeding_issns=(),
             title="Hermès",
+            continuation_issns=("0762-5332",),
         )
+
+    def test_title_links_other_than_continuation(self):
+        """Une scission (`446`) et une absorption (`434`) lient des titres sans continuer la revue ; `421` et `422` désignent un supplément."""
+        record = parse_sudoc_serial_record(
+            "000000000",
+            [
+                _field("011", ("a", "0031-899X")),
+                _field("421", ("x", "0373-7934")),
+                _field("422", ("x", "0001-5385")),
+                _field("434", ("x", "0021-9606")),
+                _field("446", ("x", "2469-9926"), ("x", "2469-9950")),
+            ],
+        )
+        assert record.preceding_issns == ("0021-9606",)
+        assert record.succeeding_issns == ("2469-9926", "2469-9950")
+        assert record.continuation_issns == ()
+        assert record.supplement_issns == ("0373-7934", "0001-5385")
 
     def test_print_record_with_cancelled_issn_and_successor(self):
         record = parse_sudoc_serial_record(
@@ -50,6 +68,7 @@ class TestParseSudocSerialRecord:
         assert record.support is Support.PRINT
         assert record.cancelled_issns == ("0302-2889",)
         assert record.succeeding_issns == ("1476-4687",)
+        assert record.continuation_issns == ("1476-4687",)
 
     def test_cd_rom_record(self):
         """Le Sudoc code « électronique » un CD-ROM comme une ressource en ligne (`182$c`) : `183$a` les distingue."""

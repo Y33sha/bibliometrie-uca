@@ -270,7 +270,7 @@ journals = Table(
         ARRAY(Text),
         nullable=False,
         server_default="{}",
-        comment="ISSN rejetés des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant). Ils servent au rapprochement ; la vérification dans le Sudoc tente de corriger les fautifs.",
+        comment="ISSN de la revue hors des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues ; la vérification dans le Sudoc tente de corriger les fautifs.",
     ),
     Column(
         "sudoc_checked_at",

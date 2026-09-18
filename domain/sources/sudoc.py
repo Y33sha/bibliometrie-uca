@@ -5,7 +5,8 @@ Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en lig
 - `011$a` : ISSN de la notice ; `011$f` : ISSN-L ; `011$y` : ISSN annulé ;
 - `183$a` : type de support, `n…` pour le papier, `ceb` pour une ressource en ligne, un autre code pour un autre support (`cde` : CD-ROM). À défaut, `182$c` (`n` papier, `c` électronique) et `135$a`, dont le deuxième caractère `r` désigne une ressource en ligne ;
 - `452$x` : ISSN de la même publication sur un autre support ; `452$t` : son titre, dont la mention entre parenthèses indique souvent le support (« (Print) », « (CD-ROM) »…) ;
-- `430$x` à `437$x` : ISSN des titres précédents ; `440$x` à `448$x` : ISSN des titres suivants ;
+- `430$x` à `437$x` : ISSN des titres précédents ; `440$x` à `448$x` : ISSN des titres suivants. Parmi eux, `430` (suite de) et `440` (devient) désignent la même revue sous un autre titre ; les autres zones, une scission, une fusion de titres ou une absorption ;
+- `421$x`, `422$x` : ISSN du supplément de la revue, ou de la revue dont elle est le supplément ;
 - `200$a`, `200$h`, `200$i` : titre, numéro et nom de la partie (« Physical review » « D »).
 
 Une notice dont le titre nomme le CD-ROM (« The L & O on CD-ROM ») décrit un autre support, quel que soit son codage.
@@ -47,6 +48,8 @@ class Support(StrEnum):
 
 _PRECEDING_TAGS = frozenset(str(t) for t in range(430, 438))
 _SUCCEEDING_TAGS = frozenset(str(t) for t in range(440, 449))
+_CONTINUATION_TAGS = frozenset({"430", "440"})
+_SUPPLEMENT_TAGS = frozenset({"421", "422"})
 
 # Mentions de support dans le titre d'une zone `452`, entre parenthèses. Le CD-ROM se reconnaît aussi dans le titre de la notice.
 _OTHER_SUPPORT_WORDS = ("cd-rom", "cdrom", "cédérom")
@@ -69,6 +72,10 @@ class SudocSerialRecord:
     title: str | None
     other_support_hints: tuple[tuple[str, Support], ...] = ()
     """ISSN d'autre support (`452`) dont le titre mentionne le support."""
+    continuation_issns: tuple[str, ...] = ()
+    """ISSN des titres précédents et suivants de la même revue (`430`, `440`)."""
+    supplement_issns: tuple[str, ...] = ()
+    """ISSN du supplément de la revue, ou de la revue dont elle est le supplément (`421`, `422`)."""
 
 
 def _issns(values: Sequence[str]) -> tuple[str, ...]:
@@ -152,4 +159,6 @@ def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSer
         succeeding_issns=_issns(_subfield_values(fields, _SUCCEEDING_TAGS, "x")),
         title=title,
         other_support_hints=_other_support_hints(fields),
+        continuation_issns=_issns(_subfield_values(fields, _CONTINUATION_TAGS, "x")),
+        supplement_issns=_issns(_subfield_values(fields, _SUPPLEMENT_TAGS, "x")),
     )

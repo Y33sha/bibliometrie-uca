@@ -1,11 +1,12 @@
 """Sous-étape de la phase `publishers_journals` — fusionne les revues en double.
 
-Quatre règles désignent la même publication :
+Cinq règles désignent la même publication :
 
 1. deux revues vérifiées dans le Sudoc partagent leur ISSN-L ;
 2. elles portent le même ISSN dans une colonne, et les mots d'un titre sont tous dans l'autre (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
-3. elles sont seules à porter leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements partagent un préfixe DOI ;
-4. des enregistrements d'une même publication les portent, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles n'ont pas chacune des ISSN sans aucun en commun.
+3. vérifiées dans le Sudoc, l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses colonnes : titre précédent ou suivant de la même revue, supplément. La revue dont le document le plus récent est le plus tardif absorbe l'autre ;
+4. elles sont seules à porter leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements partagent un préfixe DOI ;
+5. des enregistrements d'une même publication les portent, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles n'ont pas chacune des ISSN sans aucun en commun.
 
 L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications et métadonnées passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 """
@@ -35,6 +36,7 @@ MergeGroup = tuple[str, tuple[int, ...]]
 _REGLES = (
     "même ISSN-L",
     "même ISSN et titre emboîté",
+    "titre successif ou supplément",
     "mêmes titre et préfixe DOI",
     "même publication et titre compatible",
 )
@@ -46,11 +48,11 @@ def run_merge_duplicate_journals(
     journal_repo: JournalMergeQueries,
     merge: MergeJournals,
 ) -> PhaseMetrics:
-    """Applique les quatre règles dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
+    """Applique les cinq règles dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
     metrics = PhaseMetrics()
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
-    issnl, issn_et_titre, titre_et_prefixe, publication_et_titre = _REGLES
+    issnl, issn_et_titre, titre_successif, titre_et_prefixe, publication_et_titre = _REGLES
     ouverte = False
 
     def merge_groups(groups: Sequence[MergeGroup], regle: str) -> None:
@@ -71,6 +73,13 @@ def run_merge_duplicate_journals(
         for g in journal_repo.find_journals_sharing_column_issn()
     ]
     merge_groups([(label, ids) for label, ids in shared if len(ids) > 1], issn_et_titre)
+    merge_groups(
+        [
+            (f"ISSN rejeté {g.key}", g.journal_ids)
+            for g in journal_repo.find_journals_sharing_a_rejected_issn()
+        ],
+        titre_successif,
+    )
     merge_groups(
         [(f"titre {g.key!r}", g.journal_ids) for g in journal_repo.find_same_title_duplicates()],
         titre_et_prefixe,
