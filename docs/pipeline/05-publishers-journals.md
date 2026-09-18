@@ -1,6 +1,6 @@
 # Enrichissement des référentiels publishers et journals
 
-*À jour le 2026-09-17.*
+*À jour le 2026-09-18.*
 
 La phase `publishers_journals` complète deux référentiels que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, et va chercher auprès de sources externes le type des revues et leurs frais de publication. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
@@ -10,12 +10,13 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
 
 3. **`check_journals_in_sudoc`** — vérifie les ISSN des revues dans le [Sudoc](../sources/09-sources-supplementaires.md#sudoc). Sont reprises les revues jamais vérifiées (`sudoc_checked_at` nul) qui portent un ISSN, valide ou rejeté, et les revues dont un enregistrement porte un ISSN absent de leurs ISSN. Cet ISSN complète la revue quand le Sudoc l'y rattache, et rejoint les ISSN rejetés sinon. Les notices Sudoc regroupent les ISSN de la revue par publication. Le groupe principal reste à la revue et donne `issnl`. Les ISSN d'une autre publication et les ISSN périmés (CD-ROM, ISSN annulé, titre précédent ou suivant) rejoignent les ISSN rejetés (`rejected_issns`), qui servent au matching. Un ISSN rejeté fautif est corrigé à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support : `issn` pour le papier, `eissn` pour l'en ligne. Les règles sont détaillées dans `domain/journals/issn_check.py`. Une revue qui reçoit un ISSN nouveau redevient à vérifier. Les revues sont vérifiées 4 à la fois, à 5 requêtes par seconde au plus. Une revue dont une requête échoue reste à vérifier, et le run suivant la reprend.
 
-4. **`merge_duplicate_journals`** — fusionne les revues en double, selon trois règles appliquées dans l'ordre :
+4. **`merge_duplicate_journals`** — fusionne les revues en double, selon quatre règles appliquées dans l'ordre :
     - revues vérifiées qui partagent leur ISSN-L ;
     - revues qui portent le même ISSN dans une colonne, sous des titres emboîtés (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
-    - paires de même titre dont au moins une revue est sans ISSN, et dont les enregistrements partagent un préfixe DOI.
+    - paires de même titre dont au moins une revue est sans ISSN, et dont les enregistrements partagent un préfixe DOI ;
+    - revues que les enregistrements d'une même publication portent, sous des titres compatibles, et qui n'ont pas chacune des ISSN sans aucun en commun. Deux titres sont compatibles quand l'un abrège l'autre, mot à mot (« Phys.Rev.Lett. » et « Physical Review Letters ») ou par acronyme (« JINST » et « Journal of Instrumentation »). Ils le sont aussi quand ils diffèrent seulement par la casse, la ponctuation, un titre parallèle ou un sous-titre. Les règles de comparaison sont dans `domain/journals/titles.py`.
 
-    La revue qui porte le plus de publications absorbe les autres. La fusion est celle de l'administration des revues : publications et métadonnées passent à la cible, dont le `journal_type` requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
+    La revue qui porte le plus de publications absorbe les autres. Pour la quatrième règle, une revue qui a un ISSN passe avant. La fusion est celle de l'administration des revues : publications et métadonnées passent à la cible, dont le `journal_type` requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 
 5. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication et sans paiement APC, avec leurs formes de nom. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée. Suivent les éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue (`delete_empty_publishers`).
 

@@ -157,6 +157,40 @@ class TestSudocCheck:
             _create_record(sa_sync_conn, journal_id, doi=f"10.9999/vide-{journal_id}")
         assert "" not in {g.key for g in repo.find_same_title_duplicates()}
 
+    def test_journals_sharing_a_publication(self, sa_sync_conn, repo):
+        """Deux revues que les enregistrements d'une publication portent forment une paire ; une revue rattachée par le préfixe du DOI reste hors de la paire."""
+        full = _create_journal(sa_sync_conn, title="Journal test complet", issn="2999-0009")
+        abbreviated = _create_journal(sa_sync_conn, title="J.Test Compl.")
+        by_prefix = _create_journal(sa_sync_conn, title="Revue test par préfixe")
+        publication_id = sa_sync_conn.execute(
+            text("INSERT INTO publications (title, pub_year) VALUES ('Article', 2024) RETURNING id")
+        ).scalar_one()
+        stash = '{"journal_id": {"raw": null, "corrected_by": "JOURNAL_BY_DOI_PREFIX"}}'
+        for journal_id, raw_metadata in ((full, "{}"), (abbreviated, "{}"), (by_prefix, stash)):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO source_publications"
+                    " (source, source_id, title, journal_id, publication_id, raw_metadata)"
+                    " VALUES ('hal', :sid, 'Article', :jid, :pid, CAST(:raw AS jsonb))"
+                ),
+                {
+                    "sid": f"sp-publication-{journal_id}",
+                    "jid": journal_id,
+                    "pid": publication_id,
+                    "raw": raw_metadata,
+                },
+            )
+        pairs = [
+            p
+            for p in repo.find_journals_sharing_a_publication()
+            if {p.first.id, p.second.id} & {full, abbreviated, by_prefix}
+        ]
+        assert [(p.first.id, p.second.id, p.publications) for p in pairs] == [
+            (full, abbreviated, 1)
+        ]
+        assert pairs[0].first.issns == frozenset({"2999-0009"})
+        assert pairs[0].second.title == "J.Test Compl."
+
     def test_delete_empty_journals_spares_records_and_apc_payments(self, sa_sync_conn, repo):
         empty = _create_journal(sa_sync_conn, title="Revue test vide", issn="2999-0007")
         with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")

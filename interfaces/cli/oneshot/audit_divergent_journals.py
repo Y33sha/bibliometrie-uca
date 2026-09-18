@@ -5,7 +5,7 @@ Chaque couple (publication, revue A, revue B) reçoit une cause, dans cet ordre 
 
 1. **titre parasite** — un titre de revue porte un volume, un numéro ou un texte étranger à un titre ;
 2. **ouvrage** — un côté est une plateforme d'ebooks ou une collection, ou les documents sont des livres ou des chapitres ;
-3. **doublon** — les deux revues partagent leur titre normalisé, un ISSN ou une forme de nom, ou l'un des titres abrège l'autre ;
+3. **doublon** — les deux revues partagent leur titre normalisé, un ISSN ou une forme de nom, ou leurs titres sont compatibles (`compatible_titles`) ;
 4. **dépôt ou preprint** — un côté est un entrepôt ou un serveur de preprints ;
 5. **documents réunis à tort** — un côté est sans DOI et les types de document sont disjoints ;
 6. **revue erronée** — les deux éditeurs sont connus et un seul répond à l'éditeur du préfixe du DOI ;
@@ -35,6 +35,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.journals.titles import compatible_titles
 from domain.publishers.names import publisher_name_key
 from infrastructure import PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
@@ -51,15 +52,9 @@ _DEPOSIT_JOURNAL_TYPES = frozenset({"repository", "preprint_server"})
 # Un couple de revues porté par au moins autant de publications vient d'un rattachement systématique.
 _RECURRENT_MIN = 3
 
-# Mots qu'une abréviation de titre laisse tomber.
-_STOP_WORDS = frozenset(
-    {"the", "of", "and", "in", "for", "on", "de", "la", "le", "les", "des", "du", "et", "l", "d", "a"}
-)  # fmt: skip
-
 # Volume ou numéro dans un titre : « Physical review / D 103 », « Journal of high energy physics 2018(7) ».
 _VOLUME_IN_TITLE = re.compile(r"(/ .*\d|\d+\s*\(\d+\)\s*$|\s\d{2,}\s*$)")
 _LONGEST_TITLE = 200
-_WORD_SEPARATORS = re.compile(r"[^0-9a-zà-ÿ]+")
 
 _COLUMNS = (
     "cause",
@@ -126,30 +121,6 @@ class Side:
     has_doi: bool
 
 
-def _words(title: str) -> list[str]:
-    return [word for word in _WORD_SEPARATORS.split(title.lower()) if word]
-
-
-def _abbreviates(short: str, full: str) -> bool:
-    """Chaque mot du titre court commence un mot du titre long, dans l'ordre.
-
-    `Eur.Phys.J.C` abrège ainsi `The European Physical Journal C`.
-    """
-    abbreviated = [word for word in _words(short) if word not in _STOP_WORDS]
-    complete = _words(full)
-    significant = [word for word in complete if word not in _STOP_WORDS]
-    if not abbreviated or len(abbreviated) > len(significant):
-        return False
-    position = 0
-    for word in abbreviated:
-        while position < len(complete) and not complete[position].startswith(word):
-            position += 1
-        if position == len(complete):
-            return False
-        position += 1
-    return True
-
-
 def _is_parasite(journal: Journal) -> bool:
     """Titre qui n'est pas celui d'une revue : volume ou numéro, retour à la ligne, longueur d'un résumé."""
     return (
@@ -169,8 +140,7 @@ def _is_duplicate(a: Journal, b: Journal) -> bool:
         a.title_normalized == b.title_normalized
         or bool(a.issns & b.issns)
         or bool(a.name_forms & b.name_forms)
-        or _abbreviates(a.title, b.title)
-        or _abbreviates(b.title, a.title)
+        or compatible_titles(a.title, b.title)
     )
 
 
