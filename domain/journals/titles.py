@@ -12,7 +12,7 @@ from domain.normalize import normalize_text
 # Suivie d'une lettre, d'un chiffre, d'un trait ou d'une parenthèse ouvrante, elle fait partie d'un code ou date
 # le fascicule d'une revue (« VTC2025-Spring », « 2018(7) »). Une lettre peut la précéder : « Goldschmidt2023 »,
 # « PoS(ICRC2021) ».
-_YEAR = re.compile(r"(?<![\d\-–/])(?:1[89]\d\d|20\d\d)(?![\w\-–/(])")
+_EVENT_YEAR = re.compile(r"(?<![\d\-–/])(?:1[89]\d\d|20\d\d)(?![\w\-–/(])")
 _YEAR_RANGE = re.compile(r"(\d{4})\s*[-–]\s*(\d{4})")
 _JOURNAL = re.compile(r"\bjournal\b", re.IGNORECASE)
 _PROCEEDINGS = re.compile(r"\bproceedings\b", re.IGNORECASE)
@@ -37,7 +37,7 @@ def names_a_dated_event(title: str) -> bool:
     title = _YEAR_RANGE.sub(lambda m: " " if m.group(1) < m.group(2) else m.group(0), title)
     return any(
         not (title[m.start() - 1 : m.start()] == "(" and title[m.end() : m.end() + 1] == ")")
-        for m in _YEAR.finditer(title)
+        for m in _EVENT_YEAR.finditer(title)
     )
 
 
