@@ -158,7 +158,7 @@ class TestSudocCheck:
         assert "" not in {g.key for g in repo.find_same_title_duplicates()}
 
     def test_journals_sharing_a_rejected_issn(self, sa_sync_conn, repo):
-        """L'ISSN rejeté de l'une est dans les colonnes de l'autre ; la revue publiée le plus récemment vient en tête. Une revue non vérifiée reste hors de la règle."""
+        """L'ISSN rejeté de l'une est dans les colonnes de l'autre ; la revue dont le premier document est le plus tardif vient en tête, même quand l'ancien titre reçoit encore des documents récents. Une revue non vérifiée reste hors de la règle."""
         earlier = _create_journal(sa_sync_conn, title="Revue test ancien titre", issn="2999-0012")
         later = _create_journal(sa_sync_conn, title="Revue test nouveau titre", eissn="2999-0013")
         unchecked = _create_journal(sa_sync_conn, title="Revue test non vérifiée", issn="2999-0014")
@@ -175,13 +175,13 @@ class TestSudocCheck:
             text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
             {"ids": [earlier, later]},
         )
-        for journal_id, year in ((earlier, 2020), (later, 2025)):
+        for journal_id, year in ((earlier, 2018), (earlier, 2026), (later, 2022), (later, 2025)):
             sa_sync_conn.execute(
                 text(
                     "INSERT INTO source_publications (source, source_id, title, journal_id, pub_year)"
                     " VALUES ('hal', :sid, 'Article', :jid, :year)"
                 ),
-                {"sid": f"sp-rejete-{journal_id}", "jid": journal_id, "year": year},
+                {"sid": f"sp-rejete-{journal_id}-{year}", "jid": journal_id, "year": year},
             )
         groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_a_rejected_issn()}
         assert groups["2999-0013"] == (later, earlier)

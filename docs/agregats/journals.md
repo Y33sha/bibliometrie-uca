@@ -27,7 +27,7 @@ Routeur `interfaces/api/routers/journals.py`, commandes dans `application/servic
 
 **Éditer une revue** (`PUT /api/journals/{id}`). Le repository re-dérive `title_normalized` à l'enregistrement. Si le type de revue change, `requalify_publications_for_journal` rejoue immédiatement le type de document de toutes ses publications et consigne un événement `journal.type_requalified`.
 
-**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_publications`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
+**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_publications`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. La cible garde ses ISSN ; ceux de la source hors de ses colonnes rejoignent ses ISSN rejetés, et la cible redevient à vérifier dans le Sudoc. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
 
 **Prévisualiser un changement de type** (`GET /api/journals/{id}/type-change-impact`). Le chemin d'écriture réel est exécuté puis annulé, ce qui donne l'impact exact sans rien modifier.
 

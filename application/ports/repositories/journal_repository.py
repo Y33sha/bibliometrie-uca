@@ -74,5 +74,5 @@ class JournalRepository(Protocol):
         ...
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la revue `source_id` dans `target_id` : transfère publications, formes de nom et paiements APC, enrichit la cible par COALESCE, supprime la source, puis recalcule les compteurs de publications."""
+        """Fusionne la revue `source_id` dans `target_id` : transfère publications, formes de nom et paiements APC, enrichit la cible par COALESCE, supprime la source, puis recalcule les compteurs de publications. Les ISSN de la source hors des colonnes de la cible rejoignent ses ISSN rejetés, et la cible redevient à vérifier dans le Sudoc."""
         ...

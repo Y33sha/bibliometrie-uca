@@ -92,8 +92,8 @@ _JOURNALS_SHARING_COLUMN_ISSN = text("""
 
 
 # Paires de revues vérifiées dont l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses
-# colonnes. La cible de la fusion en tête : la revue dont le document le plus récent est le plus tardif, puis
-# celle qui porte le plus de publications.
+# colonnes. La cible de la fusion en tête : la revue dont le premier document est le plus tardif, puis celle
+# qui porte le plus de publications.
 _JOURNALS_SHARING_A_REJECTED_ISSN = text("""
     WITH verifiees AS (
         SELECT id, issn, eissn, issnl, rejected_issns
@@ -106,13 +106,13 @@ _JOURNALS_SHARING_A_REJECTED_ISSN = text("""
         JOIN verifiees b ON b.id <> a.id AND r.issn IN (b.issn, b.eissn, b.issnl)
     ), revues AS (
         SELECT j.id, j.pub_count,
-               (SELECT max(s.pub_year) FROM source_publications s WHERE s.journal_id = j.id)
-                   AS derniere_annee
+               (SELECT min(s.pub_year) FROM source_publications s WHERE s.journal_id = j.id)
+                   AS premiere_annee
         FROM journals j
         WHERE j.id IN (SELECT x_id FROM paires UNION SELECT y_id FROM paires)
     )
     SELECT p.issn,
-           (SELECT array_agg(r.id ORDER BY r.derniere_annee DESC NULLS LAST, r.pub_count DESC, r.id)
+           (SELECT array_agg(r.id ORDER BY r.premiere_annee DESC NULLS LAST, r.pub_count DESC, r.id)
             FROM revues r WHERE r.id IN (p.x_id, p.y_id)) AS ids
     FROM paires p
     ORDER BY p.issn
