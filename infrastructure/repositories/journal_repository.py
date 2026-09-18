@@ -199,16 +199,22 @@ class PgJournalRepository(JournalRepository):
                 journals.c.rejected_issns,
             ).where(journals.c.id == source_id)
         ).one()
-        target_rejected = self._conn.execute(
-            select(journals.c.rejected_issns).where(journals.c.id == target_id)
-        ).scalar_one()
+        target = self._conn.execute(
+            select(
+                journals.c.issn, journals.c.eissn, journals.c.issnl, journals.c.rejected_issns
+            ).where(journals.c.id == target_id)
+        ).one()
+        # Les ISSN de la source hors des colonnes de la cible rejoignent ses ISSN rejetés ; un ISSN de ses colonnes en sort.
+        columns = {target.issn or src.issn, target.eissn or src.eissn, target.issnl or src.issnl}
+        absorbed = {v for v in (src.issn, src.eissn, src.issnl) if v}
+        rejected = (set(target.rejected_issns) | set(src.rejected_issns) | absorbed) - columns
         self._conn.execute(delete(journals).where(journals.c.id == source_id))
         self._conn.execute(
             update(journals)
             .where(journals.c.id == target_id)
             .values(
                 # La cible porte des ISSN absorbés, pas encore vérifiés dans le Sudoc.
-                rejected_issns=sorted(set(target_rejected) | set(src.rejected_issns)),
+                rejected_issns=sorted(rejected),
                 sudoc_checked_at=None,
                 issn=func.coalesce(journals.c.issn, src.issn),
                 eissn=func.coalesce(journals.c.eissn, src.eissn),

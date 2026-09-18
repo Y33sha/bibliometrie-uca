@@ -927,6 +927,34 @@ class TestMergeJournals:
         assert row.rejected_issns == ["(Internet)", "1234-5678"]
         assert row.sudoc_checked_at is None
 
+    def test_source_issns_outside_target_columns_become_rejected(
+        self, sa_sync_conn, repo, publication_repo
+    ):
+        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint les ISSN rejetés, l'ISSN de la cible en sort."""
+        target = _insert_journal(sa_sync_conn, "BMC Primary Care", eissn="2731-4553")
+        source = _insert_journal(sa_sync_conn, "BMC Family Practice", eissn="1471-2296")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET rejected_issns = '{2731-4553}' WHERE id = :id"),
+            {"id": source},
+        )
+
+        merge_journals(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            publication_repo=publication_repo,
+        )
+
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT eissn, rejected_issns FROM journals WHERE id = :id",
+            id=target,
+        )
+        assert row.eissn == "2731-4553"
+        assert row.rejected_issns == ["1471-2296"]
+
     def test_enriches_target_metadata(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
         source = _insert_journal(
