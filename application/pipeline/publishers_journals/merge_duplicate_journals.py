@@ -31,19 +31,13 @@ MergeJournals = Callable[[int, int], None]
 MergeGroup = tuple[str, tuple[int, ...]]
 """`(libellé, revues)` : ce que les revues partagent, puis les revues, la cible en tête."""
 
-# Ce que les revues d'un groupe partagent, une règle par barre d'avancement.
+# Ce que les revues d'un groupe partagent : la ligne qui annonce chaque règle, au-dessus de sa barre d'avancement.
 _REGLES = (
     "même ISSN-L",
     "même ISSN et titre emboîté",
     "mêmes titre et préfixe DOI",
     "même publication et titre compatible",
 )
-_LARGEUR_REGLE = max(len(regle) for regle in _REGLES)
-
-
-def _branche(regle: str) -> str:
-    """Libellé de la barre d'avancement d'une règle : sa branche, son nom, et le remplissage qui aligne les barres les unes sous les autres."""
-    return f"{BRANCHE}{regle:<{_LARGEUR_REGLE}}"
 
 
 def run_merge_duplicate_journals(
@@ -135,7 +129,8 @@ def _merge_groups(
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
     metrics.add(total=len(groups))
-    with progression(len(groups), _branche(regle), logger) as avancement:
+    logger.info("%s%s", BRANCHE, regle)
+    with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
         for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             sources = [s for s in journal_ids[1:] if s not in absorbed and s != target]
