@@ -30,27 +30,20 @@ class _Row:
 
 @dataclass
 class FakeDoiPrefixRepo:
-    """Repo de test : `candidates` (préfixes du pool `candidate_dois`) et les rows d'agence
-    `unknown` alimentent `resolve_ra` ; `rows` modélise la table `doi_prefixes` (clé = prefix)."""
+    """Repo de test : `candidates` (préfixes du pool `candidate_dois`) alimente `resolve_ra` ;
+    `rows` modélise la table `doi_prefixes` (clé = prefix)."""
 
     candidates: list[str] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
     ra_breakdown: list[tuple[str, int, int]] = field(default_factory=list)
 
     def get_prefixes_to_resolve(self) -> list[str]:
-        absent = {p for p in self.candidates if p not in self.rows}
-        unknown = {p for p, r in self.rows.items() if r.ra == "unknown"}
-        return sorted(absent | unknown)
+        return sorted(p for p in self.candidates if p not in self.rows)
 
-    def save_ra(self, *, prefix: str, ra: str) -> bool:
-        row = self.rows.get(prefix)
-        if row is None:
-            self.rows[prefix] = _Row(prefix=prefix, ra=ra)
-            return True
-        if row.ra != "unknown" or ra == "unknown":
+    def insert_ra(self, *, prefix: str, ra: str) -> bool:
+        if prefix in self.rows:
             return False
-        row.ra = ra
-        row.checked = False
+        self.rows[prefix] = _Row(prefix=prefix, ra=ra)
         return True
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
@@ -242,28 +235,6 @@ def test_resolve_ra_prefix_without_answer_stays_to_resolve():
     assert repo.rows == {}
     assert metrics.total == 0
     assert repo.get_prefixes_to_resolve() == ["10.1038"]
-
-
-def test_resolve_ra_reclassifies_unknown_prefix():
-    """Un préfixe `unknown` est soumis de nouveau ; reclassé, il redevient à vérifier par le volet publisher."""
-    repo = FakeDoiPrefixRepo(rows={"10.1007": _Row("10.1007", "unknown", checked=True)})
-    ras = StubResolveRas(answers={"10.1007": "Crossref"})
-
-    metrics = _run_ra(repo, ras)
-
-    assert ras.calls == [["10.1007"]]
-    assert repo.rows["10.1007"].ra == "Crossref"
-    assert [p.prefix for p in repo.get_prefixes_pending_publisher()] == ["10.1007"]
-    assert metrics.new == 1
-
-
-def test_resolve_ra_unknown_prefix_still_unknown_is_not_counted():
-    repo = FakeDoiPrefixRepo(rows={"10.99999": _Row("10.99999", "unknown", checked=True)})
-
-    metrics = _run_ra(repo, StubResolveRas(answers={"10.99999": None}))
-
-    assert repo.rows["10.99999"].checked is True
-    assert metrics.total == 0
 
 
 # ── run_resolve_publishers ─────────────────────────────────────────
