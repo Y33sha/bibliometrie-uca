@@ -90,9 +90,12 @@ DataCite porte le type sur deux champs : `resourceTypeGeneral` (vocabulaire cont
 
 ### Revue hôte
 
-DataCite déduit `container` des éléments liés de la notice ou de sa description `SeriesInformation`, un texte libre. Le conteneur désigne une revue, une collection ou un recueil d'actes quand la notice décrit la version publiée du document : types `JournalArticle`, `ConferencePaper`, `ConferenceProceeding`, `Book`, `BookChapter`, `DataPaper`. C'est le cas des actes LIPIcs et des revues qui déposent leurs DOI chez DataCite.
+DataCite déduit `container` des éléments liés de la notice ou de sa description `SeriesInformation`, un texte libre. Le conteneur désigne une revue, une collection ou un recueil d'actes à deux conditions (`container_names_a_journal`) :
 
-Les autres notices sont des copies déposées dans un entrepôt, des préprints, des jeux de données ou des logiciels. La `SeriesInformation` d'une copie cite l'article publié (« Physics letters / B 777, 151 - 162 (2018). doi:… »), et DataCite la découpe mal : le volume reste dans le titre. Le conteneur de ces notices reste dans `container_title`, sans créer de revue.
+- Le type est celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un article porte la valeur contrôlée `JournalArticle` depuis la version 4.4 du schéma (2021). Avant, il se déclarait `Text`, avec « Journal article » ou « Article » en texte libre, forme que des éditeurs gardent encore.
+- Le conteneur ne vient pas d'une citation en texte libre. Les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent l'article publié dans leur `SeriesInformation` (« Physics letters / B 777, 151 - 162 (2018). doi:… »). DataCite la découpe mal : le volume reste dans le titre, l'année et le DOI passent dans les pages.
+
+Les deux champs de type viennent du déposant du DOI : logiciel de l'entrepôt, plateforme de l'éditeur, ou auteur sur Zenodo. Ils disent la nature du document, pas s'il s'agit de la version publiée : des entrepôts déclarent `JournalArticle`, des éditeurs `Text`. Un préprint, un rapport, un logiciel ou un jeu de données n'a pas de revue. Le titre d'un conteneur écarté reste dans `container_title`.
 
 ### Affiliations textuelles
 

@@ -22,7 +22,7 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 ### 2. Titres parasites
 
 - [x] Origine : notices DataCite qui ne décrivent pas la version publiée. Ce sont surtout des copies d'articles déposées par les entrepôts GSI, DESY et RWTH, de type `Text` : DataCite découpe mal leur `SeriesInformation`, une citation en texte libre (« Physics letters / B 777 »). S'y ajoutent des notes de version de logiciels Zenodo et des mentions de pagination (« 22 Seiten (2023). »).
-- [x] Normalisation DataCite : le conteneur désigne une revue seulement quand la notice décrit la version publiée (`describes_published_version`). Mesure sur la base locale : 67 publications perdent leur seule revue, dont une trentaine de titres parasites ; les actes LIPIcs et les revues de type `JournalArticle` gardent la leur.
+- [x] Normalisation DataCite : le conteneur désigne une revue selon `container_names_a_journal` : type d'article, de communication, de recueil d'actes, de livre, de chapitre ou de data paper, sous sa forme contrôlée ou libre, et conteneur qui ne vient pas d'une citation. Le type seul ne suffit pas : à l'échelle de DataCite, les premiers déposants de `JournalArticle` sont des entrepôts (Zenodo, figshare), et des éditeurs déclarent encore `Text` (E-Periodica, Classiques Garnier).
 - [ ] Stock : oneshot `backfill_detach_datacite_journals`, puis `publishers_journals` pour supprimer les revues vidées.
 - [ ] Autres sources : mesure en production après le nettoyage de DataCite.
 

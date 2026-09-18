@@ -1,9 +1,9 @@
 # STATUS: oneshot (2026-09-18)
-"""Détache de leur revue les notices DataCite qui ne décrivent pas la version publiée du document.
+"""Détache de leur revue les notices DataCite dont le conteneur ne désigne pas une revue.
 
-La normalisation DataCite prend le conteneur pour revue seulement quand la notice décrit la version publiée (`describes_published_version`) : article de revue, communication, recueil d'actes, livre, chapitre ou data paper. Une copie d'article déposée dans un entrepôt (GSI, DESY, RWTH), un préprint, un logiciel ou un rapport n'a pas de revue, et le titre de son conteneur reste dans `container_title`.
+La normalisation DataCite prend le conteneur pour revue selon `container_names_a_journal` : type d'article, de communication, de recueil d'actes, de livre, de chapitre ou de data paper, et conteneur qui ne vient pas d'une citation en texte libre. Une copie d'article déposée dans un entrepôt (GSI, DESY, RWTH), un préprint, un logiciel ou un rapport n'a pas de revue, et le titre de son conteneur reste dans `container_title`.
 
-Ce script applique la règle aux notices existantes. Le type brut vient de `raw_metadata`, où la correction des métadonnées le range quand elle réécrit `doc_type`. Une revue rattachée par le préfixe du DOI reste en place. Les publications concernées sont recalculées. La sous-étape de suppression des revues vides de la phase `publishers_journals` supprime ensuite les revues sans enregistrement.
+Ce script applique la règle aux notices existantes. Le type brut vient de `raw_metadata`, où la correction des métadonnées le range quand elle réécrit `doc_type` ; le titre et les pages du conteneur viennent de `biblio`. Une revue rattachée par le préfixe du DOI reste en place. Les publications concernées sont recalculées. La sous-étape de suppression des revues vides de la phase `publishers_journals` supprime ensuite les revues sans enregistrement.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_detach_datacite_journals             # applique
@@ -20,7 +20,7 @@ from sqlalchemy import Connection, Row, text
 
 from application.services.publications.core import refresh_from_sources
 from domain.source_publications.raw_metadata import raw_value
-from domain.sources.datacite import describes_published_version
+from domain.sources.datacite import container_names_a_journal
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories.publication_repository import PgPublicationRepository
@@ -30,7 +30,9 @@ log = setup_logger("backfill_detach_datacite_journals", os.path.dirname(__file__
 # Notices DataCite rattachées à une revue par leur conteneur, hors rattachement par préfixe DOI.
 _CANDIDATES = text("""
     SELECT s.id, s.publication_id, s.journal_id, s.doc_type, s.raw_metadata,
-           j.title AS journal_title
+           j.title AS journal_title,
+           coalesce(s.biblio->'journal'->>'title', j.title) AS container_title,
+           s.biblio->>'first_page' AS first_page, s.biblio->>'last_page' AS last_page
     FROM source_publications s
     JOIN journals j ON j.id = s.journal_id
     WHERE s.source = 'datacite' AND NOT (s.raw_metadata ? 'journal_id')
@@ -48,7 +50,11 @@ def _to_detach(conn: Connection) -> list[Row[tuple[object, ...]]]:
     return [
         r
         for r in conn.execute(_CANDIDATES).all()
-        if not describes_published_version(raw_value(r.raw_metadata, "doc_type", r.doc_type))
+        if not container_names_a_journal(
+            raw_value(r.raw_metadata, "doc_type", r.doc_type),
+            r.container_title,
+            (r.first_page, r.last_page),
+        )
     ]
 
 
