@@ -1,3 +1,7 @@
+# Backfill à lancer sur base de prod:
+python -m interfaces.cli.oneshot.backfill_detach_datacite_journals
+puis: run_pipeline --only publishers_journals
+
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
