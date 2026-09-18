@@ -23,7 +23,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 ## Données récupérées
 
-- **Publications** : DOI, titre, type (voir Particularités), langue, année (`publicationYear`), résumé (`descriptions` de type `Abstract`), mots-clés (`subjects`), citations (`citationCount`), revue/série hôte (`container` : titre et ISSN), éditeur ou entrepôt déposant (`publisher`), licences (`rightsList`), financeurs (`fundingReferences`), DOI liés (`relatedIdentifiers`, voir Particularités)
+- **Publications** : DOI, titre, type (voir Particularités), langue, année (`publicationYear`), résumé (`descriptions` de type `Abstract`), mots-clés (`subjects`), citations (`citationCount`), revue/série hôte (`container` : titre et ISSN, voir Particularités), éditeur ou entrepôt déposant (`publisher`), licences (`rightsList`), financeurs (`fundingReferences`), DOI liés (`relatedIdentifiers`, voir Particularités)
 - **Auteurs** : nom (`creators`), ORCID si présent (`nameIdentifiers`), affiliation textuelle
 
 ## Exemple de payload
@@ -87,6 +87,12 @@ DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous d
 ### `doc_type` à deux niveaux
 
 DataCite porte le type sur deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_publications.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_publications/doc_types.py).
+
+### Revue hôte
+
+DataCite déduit `container` des éléments liés de la notice ou de sa description `SeriesInformation`, un texte libre. Le conteneur désigne une revue, une collection ou un recueil d'actes quand la notice décrit la version publiée du document : types `JournalArticle`, `ConferencePaper`, `ConferenceProceeding`, `Book`, `BookChapter`, `DataPaper`. C'est le cas des actes LIPIcs et des revues qui déposent leurs DOI chez DataCite.
+
+Les autres notices sont des copies déposées dans un entrepôt, des préprints, des jeux de données ou des logiciels. La `SeriesInformation` d'une copie cite l'article publié (« Physics letters / B 777, 151 - 162 (2018). doi:… »), et DataCite la découpe mal : le volume reste dans le titre. Le conteneur de ces notices reste dans `container_title`, sans créer de revue.
 
 ### Affiliations textuelles
 

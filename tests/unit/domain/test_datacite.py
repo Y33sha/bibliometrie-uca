@@ -3,6 +3,7 @@ doc_type DataCite."""
 
 from domain.source_publications.doc_types import map_doc_type
 from domain.sources.datacite import (
+    describes_published_version,
     extract_datacite_doc_type_token,
     extract_datacite_meta,
     extract_datacite_pub_year,
@@ -148,6 +149,18 @@ class TestDocTypeToken:
     def test_resourcetype_without_general(self):
         attrs = {"types": {"resourceType": "Journal Article"}}
         assert extract_datacite_doc_type_token(attrs) == "Journal Article"
+
+
+class TestPublishedVersion:
+    def test_publisher_record(self):
+        """Actes LIPIcs, petites revues qui déposent leurs DOI chez DataCite."""
+        for token in ("ConferencePaper", "JournalArticle", "ConferenceProceeding", "BookChapter"):
+            assert describes_published_version(token)
+
+    def test_repository_copy_and_unpublished(self):
+        """Copie d'entrepôt (type `Text`, texte libre de l'entrepôt), préprint, logiciel, rapport."""
+        for token in ("Journal article", "Article", "Text", "Preprint", "Software", "Report", None):
+            assert not describes_published_version(token)
 
 
 class TestDocTypeMapping:

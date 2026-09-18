@@ -41,6 +41,7 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.datacite import (
+    describes_published_version,
     extract_datacite_doc_type_token,
     extract_datacite_meta,
     extract_datacite_pub_year,
@@ -76,13 +77,14 @@ def upsert_journal(
     *,
     journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
-    """Trouve ou crée la revue désignée par le titre du `container` (revue, série)."""
+    """Trouve ou crée la revue désignée par le titre du `container` (revue, série), quand la notice décrit la version publiée du document (`describes_published_version`)."""
     title, issn = get_container(attributes)
-    if not title:
+    doc_type_token = extract_datacite_doc_type_token(attributes)
+    if not title or not describes_published_version(doc_type_token):
         return None
     return find_or_create_container_journal(
         title,
-        raw_doc_type=extract_datacite_doc_type_token(attributes),
+        raw_doc_type=doc_type_token,
         source="datacite",
         issn=issn,
         eissn=None,

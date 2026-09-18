@@ -160,6 +160,28 @@ def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str 
     return general or None
 
 
+# Types DataCite d'une version publiée, dont le conteneur désigne une revue, une collection ou un recueil
+# d'actes.
+_PUBLISHED_VERSION_TYPES = frozenset(
+    {
+        "Book",
+        "BookChapter",
+        "ConferencePaper",
+        "ConferenceProceeding",
+        "DataPaper",
+        "JournalArticle",
+    }
+)
+
+
+def describes_published_version(doc_type_token: str | None) -> bool:
+    """La notice DataCite décrit la version publiée du document : son type brut (`extract_datacite_doc_type_token`) est un article de revue, une communication, un recueil d'actes, un livre, un chapitre ou un data paper.
+
+    Une copie d'article déposée dans un entrepôt, un préprint, un jeu de données ou un logiciel ont un autre type. Une copie porte le type générique `Text`, et son type brut est alors le texte libre de l'entrepôt (« Journal article »).
+    """
+    return doc_type_token in _PUBLISHED_VERSION_TYPES
+
+
 def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[str, str]]:
     """`relatedIdentifiers` de type DOI, normalisés en `{"doi": <doi minuscule>, "relation_type": <relationType>}`.
 

@@ -21,9 +21,10 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 
 ### 2. Titres parasites
 
-- [ ] Origine des titres parasites, surtout `unknown` : « 22 Seiten (2023). », « 1-26 (2021). », « Journal of high energy physics 2018(7) ».
-- [ ] Correction dans les normaliseurs concernés, DataCite en tête.
-- [ ] Nettoyage du stock.
+- [x] Origine : notices DataCite qui ne décrivent pas la version publiée. Ce sont surtout des copies d'articles déposées par les entrepôts GSI, DESY et RWTH, de type `Text` : DataCite découpe mal leur `SeriesInformation`, une citation en texte libre (« Physics letters / B 777 »). S'y ajoutent des notes de version de logiciels Zenodo et des mentions de pagination (« 22 Seiten (2023). »).
+- [x] Normalisation DataCite : le conteneur désigne une revue seulement quand la notice décrit la version publiée (`describes_published_version`). Mesure sur la base locale : 67 publications perdent leur seule revue, dont une trentaine de titres parasites ; les actes LIPIcs et les revues de type `JournalArticle` gardent la leur.
+- [ ] Stock : oneshot `backfill_detach_datacite_journals`, puis `publishers_journals` pour supprimer les revues vidées.
+- [ ] Autres sources : mesure en production après le nettoyage de DataCite.
 
 ### 3. Doublons restants
 
