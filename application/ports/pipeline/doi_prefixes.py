@@ -1,6 +1,6 @@
 """Port DoiPrefixesQueries — contrat d'accès à la table `doi_prefixes`.
 
-Cette table sert de cache `prefix → Registration Agency + publisher`. Elle est peuplée en deux temps : la phase `resolve_ra` (avant fetch_missing) insère `(prefix, ra)` via `insert_ra` ; le volet publisher de la phase `publishers_journals` interroge `/prefixes` pour les rows non encore vérifiées (`publisher_checked_at IS NULL`), renseigne les métadonnées et attache le publisher.
+Cette table sert de cache `prefix → Registration Agency + publisher`. Elle est peuplée en deux temps : la phase `resolve_ra` (avant fetch_missing) enregistre `(prefix, ra)` via `save_ra` ; le volet publisher de la phase `publishers_journals` interroge `/prefixes` pour les rows non encore vérifiées (`publisher_checked_at IS NULL`), renseigne les métadonnées et attache le publisher.
 
 Pour les rows `ra='DataCite'`, on stocke aussi le nom du DataCite client (= repository) et son symbole stable dans des colonnes dédiées (`client_name_*`, `datacite_client_symbol`). Le provider DataCite (organisation-mère) occupe les mêmes colonnes `publisher_*` que le publisher Crossref, et passe par le même matching/création.
 """
@@ -20,14 +20,12 @@ class PendingPublisherPrefix(NamedTuple):
 class DoiPrefixesQueries(Protocol):
     """Contrat d'accès à la table `doi_prefixes`."""
 
-    def get_unresolved_prefixes_with_samples(
-        self, *, n_samples_per_prefix: int
-    ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI du pool `candidate_dois` absent de `doi_prefixes`. Jusqu'à `n_samples_per_prefix` DOIs distincts par préfixe, ordre stable (par longueur croissante pour limiter la complexité d'encodage). Sert à `resolve_ra` (doi.org/ra résout un DOI, pas un préfixe nu)."""
+    def get_prefixes_to_resolve(self) -> list[str]:
+        """Préfixes à soumettre à `resolve_ra`, triés : préfixes du pool `candidate_dois` absents de `doi_prefixes`, et préfixes d'agence `unknown`."""
         ...
 
-    def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        """Insère un préfixe avec sa RA seule (`publisher_*` NULL, `publisher_checked_at` NULL). `ra='unknown'` si doi.org/ra n'a pas su classer. Retourne True si inséré, False si déjà présent (`ON CONFLICT (prefix) DO NOTHING`)."""
+    def save_ra(self, *, prefix: str, ra: str) -> bool:
+        """Enregistre l'agence d'un préfixe : insère la row (`publisher_*` NULL, `publisher_checked_at` NULL), ou remplace l'agence `unknown` d'une row existante et la remet à vérifier par le volet publisher. Une agence connue reste en place. Retourne True si la row est insérée ou modifiée."""
         ...
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:

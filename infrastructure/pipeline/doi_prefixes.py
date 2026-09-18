@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour la table `doi_prefixes`.
 
-Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
+Sert la phase `resolve_ra` (lecture des préfixes à résoudre, enregistrement de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
 """
 
 from sqlalchemy import Connection, text
@@ -17,51 +17,32 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def get_unresolved_prefixes_with_samples(
-        self, *, n_samples_per_prefix: int
-    ) -> list[tuple[str, list[str]]]:
+    def get_prefixes_to_resolve(self) -> list[str]:
         """Les DOI proviennent de la vue `candidate_dois` — la même liste que la recherche par DOI de la phase `fetch_missing` (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cette recherche soit résolu ici."""
         result = self._conn.execute(
             text(
                 """
-                WITH all_dois AS (
-                    SELECT doi FROM candidate_dois WHERE doi <> ''
-                ),
-                new_prefixes AS (
-                    SELECT DISTINCT split_part(ad.doi, '/', 1) AS prefix
-                    FROM all_dois ad
-                    LEFT JOIN doi_prefixes dp
-                        ON dp.prefix = split_part(ad.doi, '/', 1)
-                    WHERE dp.prefix IS NULL
-                ),
-                samples AS (
-                    SELECT
-                        split_part(ad.doi, '/', 1) AS prefix,
-                        ad.doi,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY split_part(ad.doi, '/', 1)
-                            ORDER BY length(ad.doi), ad.doi
-                        ) AS rn
-                    FROM all_dois ad
-                    JOIN new_prefixes np
-                        ON np.prefix = split_part(ad.doi, '/', 1)
-                )
-                SELECT prefix, array_agg(doi ORDER BY rn) AS dois
-                FROM samples
-                WHERE rn <= :n_samples
-                GROUP BY prefix
+                SELECT split_part(c.doi, '/', 1) AS prefix
+                FROM candidate_dois c
+                LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)
+                WHERE c.doi <> '' AND dp.prefix IS NULL
+                UNION
+                SELECT prefix FROM doi_prefixes WHERE ra = 'unknown'
                 ORDER BY prefix
                 """
-            ),
-            {"n_samples": n_samples_per_prefix},
+            )
         )
-        return [(row.prefix, list(row.dois)) for row in result]
+        return [row.prefix for row in result]
 
-    def insert_ra(self, *, prefix: str, ra: str) -> bool:
+    def save_ra(self, *, prefix: str, ra: str) -> bool:
         result = self._conn.execute(
             text(
-                "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
-                "ON CONFLICT (prefix) DO NOTHING"
+                """
+                INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra)
+                ON CONFLICT (prefix) DO UPDATE
+                    SET ra = EXCLUDED.ra, fetched_at = now(), publisher_checked_at = NULL
+                    WHERE doi_prefixes.ra = 'unknown' AND EXCLUDED.ra <> 'unknown'
+                """
             ),
             {"prefix": prefix, "ra": ra},
         )

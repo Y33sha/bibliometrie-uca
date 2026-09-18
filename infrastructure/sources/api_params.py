@@ -14,7 +14,7 @@ API_BASE_URLS: dict[str, str] = {
     "crossref": "https://api.crossref.org",
     # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.
     "datacite": "https://api.datacite.org",
-    # doi.org : résolution de Registration Agency, l'adapter compose `/<doi>`.
+    # doi.org : agence d'enregistrement, l'adapter compose `/<préfixe>,<préfixe>,…`.
     "doi_org": "https://doi.org/ra",
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
@@ -53,6 +53,9 @@ THESES_PER_PAGE = 500  # max accepté par l'API
 
 # CrossRef — polite pool (avec mailto), pas de seuil documenté ; on reste raisonnable à ~10 req/s
 CROSSREF_DELAY = 0.1
+
+# doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent
+DOI_ORG_RA_BATCH = 100  # préfixes par requête
 
 # Unpaywall — ~8 req/s conservateur
 UNPAYWALL_DELAY = 0.12

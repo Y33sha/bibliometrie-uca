@@ -1,45 +1,44 @@
-"""Client doi.org/ra : Registration Agency d'un DOI.
+"""Client doi.org/ra : agence d'enregistrement des préfixes DOI.
 
-`doi.org/ra/<doi>` renvoie l'agence d'enregistrement d'un DOI (`Crossref`, `DataCite`, `mEDRA`, `unknown`, …). Une RA est permanente à l'échelle d'un préfixe (un préfixe = un registrant = une RA) : un seul appel par préfixe suffit côté pipeline, mais plusieurs DOI samples par préfixe se prémunissent d'un DOI erroné dans le staging. Interrogé par la phase `resolve_ra`. Polite pool via header `User-Agent` (mailto).
+`doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`. Polite pool via header `User-Agent` (mailto).
 """
 
 from __future__ import annotations
 
+import json
 import logging
-import urllib.parse
+from collections.abc import Iterator, Sequence
 
-from domain.publications.identifiers import clean_doi
-from infrastructure.sources.api_params import API_BASE_URLS
+import httpx2
+
+from domain.types import as_mapping, as_sequence, as_str
+from infrastructure.sources.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
 from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
 
-# Sentinelle renvoyée par doi.org/ra quand le DOI fourni n'existe pas.
-_DOI_NOT_FOUND = "DOI Not Found"
 
+def fetch_registration_agencies(
+    prefixes: Sequence[str], *, user_agent: str
+) -> Iterator[tuple[str, str | None]]:
+    """Agence d'enregistrement de chaque préfixe DOI, par lots de `DOI_ORG_RA_BATCH` préfixes.
 
-def resolve_ra(doi: str, *, user_agent: str) -> str | None:
-    """Interroge `doi.org/ra` pour récupérer la Registration Agency d'un DOI.
-
-    Renvoie le nom de la RA (`'Crossref'`, `'DataCite'`, `'mEDRA'`, `'unknown'`, …) ou `None` si la résolution échoue (DOI inconnu, erreur réseau/HTTP). Le caller doit retenter avec un autre DOI du même préfixe si `None`.
-
-    `'unknown'` est une valeur valide renvoyée par doi.org pour un préfixe enregistré chez une RA hors du set principal, distincte de la non-résolution (qui renvoie `None`).
+    Rend `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot dont la requête échoue sont absents du résultat. L'indisponibilité de doi.org sous circuit-breaker lève `SourceUnavailableError`.
     """
-    cleaned = clean_doi(doi)
-    if not cleaned:
-        return None
-    url = f"{API_BASE_URLS['doi_org']}/{urllib.parse.quote(cleaned, safe='')}"
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
-    try:
-        data = http_request_with_retry(
-            "GET", url, headers=headers, timeout=15, max_retries=3, label=f"DOI {doi}"
-        )
-    except Exception as exc:
-        logger.warning("doi.org/ra %s : %r", doi, exc)
-        return None
-    if not isinstance(data, list) or not data:
-        return None
-    ra = data[0].get("RA") if isinstance(data[0], dict) else None
-    if not isinstance(ra, str) or not ra or ra == _DOI_NOT_FOUND:
-        return None
-    return ra
+    for i in range(0, len(prefixes), DOI_ORG_RA_BATCH):
+        batch = prefixes[i : i + DOI_ORG_RA_BATCH]
+        url = f"{API_BASE_URLS['doi_org']}/{','.join(batch)}"
+        try:
+            data = http_request_with_retry(
+                "GET", url, headers=headers, timeout=15, label=f"lot de {len(batch)} préfixes"
+            )
+        except (httpx2.HTTPStatusError, json.JSONDecodeError) as exc:
+            logger.warning("doi.org/ra, lot de %d préfixes : %r", len(batch), exc)
+            continue
+        asked = set(batch)
+        for entry in as_sequence(data):
+            answer = as_mapping(entry)
+            prefix = as_str(answer.get("DOI"))
+            if prefix in asked:
+                yield prefix, as_str(answer.get("RA")) or None

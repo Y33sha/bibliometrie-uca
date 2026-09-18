@@ -416,7 +416,7 @@ class TestDisappearedMarking:
         assert marked is True
 
 
-class TestGetUnresolvedPrefixes:
+class TestGetPrefixesToResolve:
     """Régression : resolve tire ses préfixes de la vue `candidate_dois`, le même
     pool que la recherche par DOI — donc aussi les cibles de relations et les arXiv-dérivés,
     pas seulement staging + related_dois. L'ancienne requête ratait ces préfixes,
@@ -447,10 +447,6 @@ class TestGetUnresolvedPrefixes:
             )
         )
 
-        prefixes = dict(
-            PgDoiPrefixesQueries(sa_sync_conn).get_unresolved_prefixes_with_samples(
-                n_samples_per_prefix=3
-            )
-        )
+        prefixes = PgDoiPrefixesQueries(sa_sync_conn).get_prefixes_to_resolve()
         assert "10.77777" in prefixes  # cible de relation
         assert "10.48550" in prefixes  # arxiv-dérivé

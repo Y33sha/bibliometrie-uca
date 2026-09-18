@@ -136,7 +136,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   resolve_ra: {
     summary: [
-      { key: "new_prefixes", label: "Nouveaux préfixes" },
+      { key: "new_prefixes", label: "Préfixes enregistrés" },
       { key: "resolved", label: "Résolus" },
     ],
     tables: [
