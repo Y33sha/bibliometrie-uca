@@ -213,6 +213,10 @@ class JournalMergeQueries(Protocol):
         """Groupes de revues vérifiées dans le Sudoc qui portent le même ISSN dans `issn` ou `eissn`, dans le même ordre."""
         ...
 
+    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
+        """Paires de revues vérifiées dans le Sudoc dont l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses colonnes. La revue dont le document le plus récent est le plus tardif vient en premier, puis celle qui porte le plus de publications."""
+        ...
+
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
         """Paires de revues seules à porter leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements partagent un préfixe DOI. La revue qui porte le plus de publications vient en premier, puis celle qui a un ISSN."""
         ...

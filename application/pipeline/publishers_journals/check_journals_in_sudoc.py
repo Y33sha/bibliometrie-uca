@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
 
-Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté, et les revues dont un enregistrement porte un ISSN absent de leurs ISSN. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à mettre parmi les rejetés, à corriger et à ranger. La revue est ensuite marquée vérifiée.
+Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté, et les revues dont un enregistrement porte un ISSN absent de leurs ISSN. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à mettre parmi les rejetés, à écarter, à corriger et à ranger. La revue est ensuite marquée vérifiée.
 
 Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue n'est pas marquée vérifiée : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
 """
@@ -65,6 +65,8 @@ def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) 
         logger.info(
             "%s : ISSN %s rangé parmi les ISSN rejetés (%s)", label, issn, reason, extra=_DETAIL
         )
+    for issn, reason in check.discarded:
+        logger.info("%s : ISSN %s écarté (%s)", label, issn, reason, extra=_DETAIL)
     for raw, corrected in check.corrections:
         logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
     if check.ambiguous_support is not None:
@@ -173,6 +175,7 @@ async def run_check_journals_in_sudoc(
                 unchanged=int(not changed),
                 sudoc_found=int(check.found),
                 issn_set_aside=len(check.set_aside),
+                issn_discarded=len(check.discarded),
                 issn_corrected=len(check.corrections),
                 issn_conflicts=int(check.conflict),
                 issn_unranged=int(check.ambiguous_support is not None),

@@ -91,6 +91,34 @@ _JOURNALS_SHARING_COLUMN_ISSN = text("""
 """)
 
 
+# Paires de revues vérifiées dont l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses
+# colonnes. La cible de la fusion en tête : la revue dont le document le plus récent est le plus tardif, puis
+# celle qui porte le plus de publications.
+_JOURNALS_SHARING_A_REJECTED_ISSN = text("""
+    WITH verifiees AS (
+        SELECT id, issn, eissn, issnl, rejected_issns
+        FROM journals
+        WHERE sudoc_checked_at IS NOT NULL
+    ), paires AS (
+        SELECT DISTINCT r.issn, least(a.id, b.id) AS x_id, greatest(a.id, b.id) AS y_id
+        FROM verifiees a
+        CROSS JOIN LATERAL unnest(a.rejected_issns) AS r(issn)
+        JOIN verifiees b ON b.id <> a.id AND r.issn IN (b.issn, b.eissn, b.issnl)
+    ), revues AS (
+        SELECT j.id, j.pub_count,
+               (SELECT max(s.pub_year) FROM source_publications s WHERE s.journal_id = j.id)
+                   AS derniere_annee
+        FROM journals j
+        WHERE j.id IN (SELECT x_id FROM paires UNION SELECT y_id FROM paires)
+    )
+    SELECT p.issn,
+           (SELECT array_agg(r.id ORDER BY r.derniere_annee DESC NULLS LAST, r.pub_count DESC, r.id)
+            FROM revues r WHERE r.id IN (p.x_id, p.y_id)) AS ids
+    FROM paires p
+    ORDER BY p.issn
+""")
+
+
 # Paires de revues seules à porter leur titre, dont au moins une sans ISSN, et dont les
 # enregistrements partagent un préfixe DOI. La cible de la fusion en tête. Un titre normalisé vide
 # (alphabet non latin, symboles) ne rapproche aucune revue.
@@ -462,6 +490,12 @@ class PgJournalGatewayQueries(
         return [
             JournalMergeGroup(r.title_normalized, tuple(r.ids))
             for r in self._conn.execute(_SAME_TITLE_DUPLICATES).all()
+        ]
+
+    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
+        return [
+            JournalMergeGroup(r.issn, tuple(r.ids))
+            for r in self._conn.execute(_JOURNALS_SHARING_A_REJECTED_ISSN).all()
         ]
 
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:

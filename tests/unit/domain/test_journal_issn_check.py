@@ -20,9 +20,12 @@ def _record(
     other: tuple[str, ...] = (),
     preceding: tuple[str, ...] = (),
     succeeding: tuple[str, ...] = (),
+    continuation: bool = True,
+    supplements: tuple[str, ...] = (),
     cancelled: tuple[str, ...] = (),
     hints: tuple[tuple[str, Support], ...] = (),
 ) -> SudocSerialRecord:
+    """Notice de test. Les titres précédents et suivants sont par défaut une continuation (`430`, `440`) ; `continuation=False` en fait une scission, une fusion ou une absorption."""
     return SudocSerialRecord(
         ppn=f"ppn-{issn}",
         issn=issn,
@@ -34,6 +37,8 @@ def _record(
         succeeding_issns=succeeding,
         title=title,
         other_support_hints=hints,
+        continuation_issns=(*preceding, *succeeding) if continuation else (),
+        supplement_issns=supplements,
     )
 
 
@@ -199,8 +204,8 @@ class TestPlacement:
             },
         )
         assert (check.issn, check.eissn, check.issnl) == ("1275-7500", "2491-5769", "1275-7500")
-        assert check.set_aside == (("2802-3315", SetAsideReason.OTHER_PUBLICATION),)
-        assert check.rejected == ("2802-3315",)
+        assert check.discarded == (("2802-3315", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ()
 
     def test_same_value_in_both_columns_keeps_the_column_of_its_support(self):
         check = check_journal_issns(
@@ -352,10 +357,74 @@ class TestSetAside:
         assert check.eissn is None
         assert check.set_aside == (("0302-2889", SetAsideReason.CANCELLED),)
 
+    def test_title_before_a_split_is_discarded(self):
+        """*Physical Review* s'est scindé en sections : sa notice désigne ses successeurs sans continuation (`446`)."""
+        check = check_journal_issns(
+            _journal(issn="2469-9926", title="Physical review A", candidates=("0031-899X",)),
+            {
+                "2469-9926": _record(
+                    "2469-9926",
+                    "2469-9926",
+                    PRINT,
+                    title="Physical review A",
+                    preceding=("0031-899X",),
+                    continuation=False,
+                ),
+                "0031-899X": _record(
+                    "0031-899X",
+                    "0031-899X",
+                    PRINT,
+                    title="Physical review",
+                    succeeding=("2469-9926",),
+                    continuation=False,
+                ),
+            },
+        )
+        assert check.discarded == (("0031-899X", SetAsideReason.LINKED_TITLE),)
+        assert check.rejected == ()
+
+    def test_supplement_is_set_aside(self):
+        """Cas réel : des enregistrements d'Acta Cardiologica portent l'ISSN de son supplément, dont la notice désigne la revue (`422`)."""
+        check = check_journal_issns(
+            _journal(issn="0001-5385", title="Acta Cardiologica", candidates=("0373-7934",)),
+            {
+                "0001-5385": _record("0001-5385", "0001-5385", PRINT, title="Acta cardiologica"),
+                "0373-7934": _record(
+                    "0373-7934",
+                    "0373-7934",
+                    PRINT,
+                    title="Acta cardiologica. Supplementum",
+                    supplements=("0001-5385",),
+                ),
+            },
+        )
+        assert check.set_aside == (("0373-7934", SetAsideReason.SUPPLEMENT),)
+        assert check.rejected == ("0373-7934",)
+
+    def test_continuation_coded_on_one_side_only(self):
+        """Cas réel : la notice de BMC Family Practice désigne BMC Primary Care comme titre suivant (`440`) ; la notice de BMC Primary Care ne désigne rien."""
+        check = check_journal_issns(
+            _journal(eissn="2731-4553", title="BMC Primary Care", candidates=("1471-2296",)),
+            {
+                "2731-4553": _record(
+                    "2731-4553", "2731-4553", ELECTRONIC, title="BMC primary care"
+                ),
+                "1471-2296": _record(
+                    "1471-2296",
+                    "1471-2296",
+                    ELECTRONIC,
+                    title="BMC family practice",
+                    succeeding=("2731-4553",),
+                ),
+            },
+        )
+        assert check.set_aside == (("1471-2296", SetAsideReason.RELATED_TITLE),)
+        assert check.rejected == ("1471-2296",)
+
 
 class TestCoherence:
-    def test_issn_of_another_publication_is_set_aside(self):
-        """Cas réel : HAL donne à Neuropsychopharmacology l'ISSN de British Journal of Cancer. Il rejoint les rejetés : une revue qui le porte dans ses colonnes l'emporte au rapprochement."""
+    def test_issn_of_another_publication_is_discarded(self):
+        """Cas réel : HAL donne à Neuropsychopharmacology l'ISSN de British Journal of Cancer. Il est écarté : parmi les ISSN rejetés, il ferait fusionner les deux revues."""
         check = check_journal_issns(
             _journal(
                 issn="1740-634X",
@@ -375,8 +444,8 @@ class TestCoherence:
                 ),
             },
         )
-        assert check.set_aside == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
-        assert check.rejected == ("0007-0920",)
+        assert check.discarded == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ()
         assert (check.issn, check.eissn, check.issnl) == ("0893-133X", "1740-634X", "0893-133X")
 
     def test_other_supports_form_one_group_despite_different_issnls(self):
@@ -436,7 +505,7 @@ class TestCoherence:
             },
         )
         assert (check.issn, check.eissn) == ("1967-3566", None)
-        assert check.set_aside == (("1963-1006", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.discarded == (("1963-1006", SetAsideReason.OTHER_PUBLICATION),)
 
     def test_different_series_are_not_joined(self):
         """« Physical review C » et « Physical review D » : les mots de l'un ne sont pas tous dans l'autre."""
@@ -461,7 +530,7 @@ class TestCoherence:
                 ),
             },
         )
-        assert check.set_aside == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.discarded == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
         assert check.issn == "0028-0836"
 
     def test_tie_between_groups_changes_nothing(self):
@@ -552,8 +621,8 @@ class TestRejectedReexamined:
         assert (check.issn, check.eissn) == ("0937-4477", "1434-4726")
         assert check.rejected == ()
 
-    def test_rejected_issn_of_another_publication_stays_rejected(self):
-        """Un ISSN déjà rejeté qui le reste n'est pas signalé."""
+    def test_rejected_issn_of_another_publication_is_discarded(self):
+        """Un ISSN d'une autre publication, rangé parmi les rejetés par une vérification antérieure, en est retiré."""
         check = check_journal_issns(
             _journal(
                 issn="1740-634X",
@@ -573,10 +642,11 @@ class TestRejectedReexamined:
                 ),
             },
         )
-        assert check.rejected == ("0007-0920",)
+        assert check.rejected == ()
         assert check.set_aside == ()
+        assert check.discarded == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
 
-    def test_group_of_rejected_issns_with_another_title_stays_rejected(self):
+    def test_group_of_rejected_issns_with_another_title_is_discarded(self):
         check = check_journal_issns(
             _journal(issn="0028-0836", rejected=("0007-0920",), title="Nature"),
             {
@@ -585,7 +655,8 @@ class TestRejectedReexamined:
                 )
             },
         )
-        assert (check.issn, check.rejected) == ("0028-0836", ("0007-0920",))
+        assert (check.issn, check.rejected) == ("0028-0836", ())
+        assert check.discarded == (("0007-0920", SetAsideReason.OTHER_PUBLICATION),)
 
     def test_print_issn_prevails_over_the_cd_rom(self):
         """Cas réel : la revue « Methods in enzymology on CD-ROM/Methods in enzymology » a ses ISSN papier et CD-ROM parmi les rejetés."""
@@ -621,7 +692,7 @@ class TestDocumentIssns:
         assert (check.issn, check.eissn) == ("0149-5992", "1935-5548")
         assert check.rejected == ()
 
-    def test_document_issn_of_another_publication_is_rejected(self):
+    def test_document_issn_of_another_publication_is_discarded(self):
         """Cas réel : des enregistrements de Technè portent l'ISSN de la revue « Spotlight »."""
         check = check_journal_issns(
             _journal(
@@ -638,8 +709,8 @@ class TestDocumentIssns:
             },
         )
         assert (check.issn, check.eissn) == ("1254-7867", "2534-5168")
-        assert check.set_aside == (("2750-6185", SetAsideReason.OTHER_PUBLICATION),)
-        assert check.rejected == ("2750-6185",)
+        assert check.discarded == (("2750-6185", SetAsideReason.OTHER_PUBLICATION),)
+        assert check.rejected == ()
 
     def test_document_issns_do_not_take_over_the_journal(self):
         """Cas réel (INRAE productions animales) : les enregistrements portent les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""

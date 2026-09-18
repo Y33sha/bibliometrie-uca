@@ -2,7 +2,7 @@
 
 Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent à la revue.
 
-Les ISSN rejetés sont soit fautifs, soit périmés, soit d'une autre publication. La vérification range parmi eux les ISSN hors du groupe principal, les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés et les titres précédents ou suivants. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides et les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN d'une colonne ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
+Les ISSN rejetés sont ceux de la revue hors de ses colonnes : fautifs, tels que reçus des sources, ou valides mais périmés. La vérification y range les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés, les titres précédents ou suivants de la même revue (`430`, `440`) et les ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`). Elle écarte les ISSN d'une autre publication : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides et les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN d'une colonne ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
 """
 
 from __future__ import annotations
@@ -27,13 +27,19 @@ TITLE_TIE_MARGIN = 0.1
 
 
 class SetAsideReason(StrEnum):
-    """Motif pour lequel un ISSN rejoint les ISSN rejetés."""
+    """Motif pour lequel un ISSN quitte les colonnes de la revue : il rejoint les ISSN rejetés, ou il est écarté (`DISCARDED`)."""
 
     OTHER_PUBLICATION = "autre publication"
     OTHER_SUPPORT = "autre support"
     CANCELLED = "ISSN annulé"
     RELATED_TITLE = "titre précédent ou suivant"
+    LINKED_TITLE = "titre issu d'une scission, d'une fusion ou d'une absorption"
+    SUPPLEMENT = "supplément"
     NO_FREE_COLUMN = "sans colonne libre"
+
+
+DISCARDED = frozenset({SetAsideReason.OTHER_PUBLICATION, SetAsideReason.LINKED_TITLE})
+"""Motifs d'un ISSN d'une autre publication, écarté de la revue."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +78,8 @@ class SudocCheck:
     """Deux groupes d'ISSN de même taille et de titres aussi proches : rien n'est modifié."""
     set_aside: tuple[tuple[str, SetAsideReason], ...]
     """ISSN que la vérification ajoute aux ISSN rejetés, avec leur motif."""
+    discarded: tuple[tuple[str, SetAsideReason], ...]
+    """ISSN d'une autre publication que la vérification retire de la revue, avec leur motif."""
     corrections: tuple[tuple[str, str], ...]
     """Couples (valeur rejetée, ISSN corrigé)."""
     ambiguous_support: Support | None
@@ -214,6 +222,7 @@ def check_journal_issns(
                 found=True,
                 conflict=True,
                 set_aside=(),
+                discarded=(),
                 corrections=(),
                 ambiguous_support=None,
             )
@@ -245,9 +254,9 @@ def check_journal_issns(
         elif support is Support.OTHER:
             set_aside.append((i, SetAsideReason.OTHER_SUPPORT))
         elif i in preceding or (record is not None and i not in main and i in related):
-            set_aside.append((i, SetAsideReason.RELATED_TITLE))
+            set_aside.append((i, _outside_reason(i, main, records, related_title=True)))
         elif record is not None and i not in main:
-            set_aside.append((i, SetAsideReason.OTHER_PUBLICATION))
+            set_aside.append((i, _outside_reason(i, main, records, related_title=False)))
         else:
             kept.append(i)
     reference = _reference_issnl([i for i in main if i in kept] or main, records)
@@ -281,10 +290,12 @@ def check_journal_issns(
     ]
     # Un ISSN mis de côté qui est l'ISSN-L garde sa place dans `issnl`.
     set_aside = [(i, reason) for i, reason in set_aside if i not in placed]
-    corrected = {raw for raw, _ in corrections}
+    discarded = [(i, reason) for i, reason in set_aside if reason in DISCARDED]
+    set_aside = [(i, reason) for i, reason in set_aside if reason not in DISCARDED]
+    removed = {raw for raw, _ in corrections} | {i for i, _ in discarded}
     rejected = tuple(
         dict.fromkeys(
-            [r for r in journal.rejected if r not in corrected and r not in placed]
+            [r for r in journal.rejected if r not in removed and r not in placed]
             + [i for i, _ in set_aside]
         )
     )
@@ -296,9 +307,34 @@ def check_journal_issns(
         found=bool(known) or bool(corrections),
         conflict=False,
         set_aside=tuple((i, reason) for i, reason in set_aside if i not in journal.rejected),
+        discarded=tuple(discarded),
         corrections=tuple(corrections),
         ambiguous_support=placement.ambiguous_support,
     )
+
+
+def _linked(
+    i: str,
+    main: Sequence[str],
+    records: Mapping[str, SudocSerialRecord],
+    links: Callable[[SudocSerialRecord], tuple[str, ...]],
+) -> bool:
+    """`i` et le groupe principal `main` se désignent par ces zones, dans un sens ou dans l'autre : le Sudoc code parfois la liaison d'un seul côté."""
+    record = records.get(i)
+    return any(i in links(records[m]) for m in main) or (
+        record is not None and any(x in main for x in links(record))
+    )
+
+
+def _outside_reason(
+    i: str, main: Sequence[str], records: Mapping[str, SudocSerialRecord], *, related_title: bool
+) -> SetAsideReason:
+    """Motif d'un ISSN hors de la revue : même revue sous un autre titre, supplément, ou autre publication."""
+    if _linked(i, main, records, lambda r: r.continuation_issns):
+        return SetAsideReason.RELATED_TITLE
+    if _linked(i, main, records, lambda r: r.supplement_issns):
+        return SetAsideReason.SUPPLEMENT
+    return SetAsideReason.LINKED_TITLE if related_title else SetAsideReason.OTHER_PUBLICATION
 
 
 def _narrow(

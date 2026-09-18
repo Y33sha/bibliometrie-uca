@@ -157,6 +157,37 @@ class TestSudocCheck:
             _create_record(sa_sync_conn, journal_id, doi=f"10.9999/vide-{journal_id}")
         assert "" not in {g.key for g in repo.find_same_title_duplicates()}
 
+    def test_journals_sharing_a_rejected_issn(self, sa_sync_conn, repo):
+        """L'ISSN rejeté de l'une est dans les colonnes de l'autre ; la revue publiée le plus récemment vient en tête. Une revue non vérifiée reste hors de la règle."""
+        earlier = _create_journal(sa_sync_conn, title="Revue test ancien titre", issn="2999-0012")
+        later = _create_journal(sa_sync_conn, title="Revue test nouveau titre", eissn="2999-0013")
+        unchecked = _create_journal(sa_sync_conn, title="Revue test non vérifiée", issn="2999-0014")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE journals SET rejected_issns = :r WHERE id = :id",
+            ),
+            [
+                {"r": ["2999-0013"], "id": earlier},
+                {"r": ["2999-0014"], "id": later},
+            ],
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
+            {"ids": [earlier, later]},
+        )
+        for journal_id, year in ((earlier, 2020), (later, 2025)):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO source_publications (source, source_id, title, journal_id, pub_year)"
+                    " VALUES ('hal', :sid, 'Article', :jid, :year)"
+                ),
+                {"sid": f"sp-rejete-{journal_id}", "jid": journal_id, "year": year},
+            )
+        groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_a_rejected_issn()}
+        assert groups["2999-0013"] == (later, earlier)
+        assert "2999-0014" not in groups
+        assert unchecked not in {i for ids in groups.values() for i in ids}
+
     def test_journals_sharing_a_publication(self, sa_sync_conn, repo):
         """Deux revues que les enregistrements d'une publication portent forment une paire ; une revue rattachée par le préfixe du DOI reste hors de la paire."""
         full = _create_journal(sa_sync_conn, title="Journal test complet", issn="2999-0009")

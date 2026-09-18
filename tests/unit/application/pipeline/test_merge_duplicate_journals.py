@@ -22,11 +22,13 @@ class _Repo:
         issn_groups: list[JournalIssnGroup] | None = None,
         title_groups: list[JournalMergeGroup] | None = None,
         publication_pairs: list[JournalPublicationPair] | None = None,
+        rejected_issn_groups: list[JournalMergeGroup] | None = None,
     ) -> None:
         self._issnl_groups = issnl_groups or []
         self._issn_groups = issn_groups or []
         self._title_groups = title_groups or []
         self._publication_pairs = publication_pairs or []
+        self._rejected_issn_groups = rejected_issn_groups or []
 
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
         return self._issnl_groups
@@ -39,6 +41,9 @@ class _Repo:
 
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
         return self._publication_pairs
+
+    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
+        return self._rejected_issn_groups
 
     def describe_journals(self, journal_ids) -> dict[int, JournalSummary]:
         return {i: JournalSummary(i, f"Revue {i}", None, None, None) for i in journal_ids}
@@ -118,6 +123,14 @@ def test_same_title_pair_is_merged_after_the_issn_rules():
     metrics, merges = _run(repo)
     assert merges == [(7, 9), (2, 86095)]
     assert metrics.extras["journals_merged"] == 2
+
+
+def test_succeeding_title_absorbs_the_preceding_one():
+    """Cas réel : BMC Family Practice porte parmi ses ISSN rejetés l'ISSN de son titre suivant, BMC Primary Care."""
+    repo = _Repo(rejected_issn_groups=[JournalMergeGroup("2731-4553", (1194, 33723))])
+    metrics, merges = _run(repo)
+    assert merges == [(1194, 33723)]
+    assert metrics.extras["journals_merged"] == 1
 
 
 def _journal(journal_id: int, title: str, *issns: str, pub_count: int = 1) -> JournalMergeCandidate:
