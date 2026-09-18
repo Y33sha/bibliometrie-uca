@@ -342,6 +342,17 @@ class TestUpsertJournal:
         assert vus["issn"] == "1234-5678"
         assert vus["publisher_id"] == 7
 
+    def test_revue_au_type_libre_cree_la_revue(self, monkeypatch):
+        """Cas réel : ATeM dépose ses articles sous le type générique `Text`, « Journal article » en texte libre."""
+        fake = MagicMock(return_value=3)
+        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
+        attrs = {
+            "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
+            "container": {"title": "ATeM Archiv für Textmusikforschung", "type": "Series"},
+        }
+
+        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
+
     def test_copie_d_entrepot_sans_revue(self, monkeypatch):
         """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
         fake = MagicMock(return_value=3)

@@ -3,7 +3,7 @@ doc_type DataCite."""
 
 from domain.source_publications.doc_types import map_doc_type
 from domain.sources.datacite import (
-    describes_published_version,
+    container_names_a_journal,
     extract_datacite_doc_type_token,
     extract_datacite_meta,
     extract_datacite_pub_year,
@@ -151,16 +151,35 @@ class TestDocTypeToken:
         assert extract_datacite_doc_type_token(attrs) == "Journal Article"
 
 
-class TestPublishedVersion:
-    def test_publisher_record(self):
-        """Actes LIPIcs, petites revues qui déposent leurs DOI chez DataCite."""
-        for token in ("ConferencePaper", "JournalArticle", "ConferenceProceeding", "BookChapter"):
-            assert describes_published_version(token)
+class TestContainerNamesAJournal:
+    """Cas réels de notices DataCite."""
 
-    def test_repository_copy_and_unpublished(self):
-        """Copie d'entrepôt (type `Text`, texte libre de l'entrepôt), préprint, logiciel, rapport."""
-        for token in ("Journal article", "Article", "Text", "Preprint", "Software", "Report", None):
-            assert not describes_published_version(token)
+    def test_publisher_records(self):
+        assert container_names_a_journal(
+            "ConferencePaper", "LIPIcs, Volume 274, ESA 2023", ("60:1", "60:17")
+        )
+        assert container_names_a_journal("JournalArticle", "Reti Medievali Rivista", ())
+        # Revue qui dépose ses DOI sous le type générique `Text`, avec un type libre.
+        assert container_names_a_journal(
+            "Journal article", "ATeM Archiv für Textmusikforschung", ()
+        )
+
+    def test_repository_copy_citing_the_article(self):
+        assert not container_names_a_journal(
+            "Journal article",
+            "Physics letters / B 777",
+            ("151", "162 (2018). doi:10.1016/j.physletb.2017.12.021"),
+        )
+        assert not container_names_a_journal("Article", "Journal of Instrumentation 16(07)", ())
+        assert not container_names_a_journal(
+            "Journal article",
+            "Physical Review Letters",
+            ("052301 (2021). doi:10.1103/PhysRevLett.126.052301", None),
+        )
+
+    def test_unpublished_documents(self):
+        for token in ("Working Paper", "Report", "Software", "Front Matter", "Text", None):
+            assert not container_names_a_journal(token, "Some Series", ())
 
 
 class TestDocTypeMapping:

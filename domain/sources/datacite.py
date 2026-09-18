@@ -7,7 +7,8 @@ Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API DataCite
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
+from collections.abc import Iterable, Mapping
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_str
@@ -86,6 +87,14 @@ def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str 
     return title, issn
 
 
+def get_container_pages(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
+    """`(firstPage, lastPage)` du `container`."""
+    container = attributes.get("container")
+    if not isinstance(container, dict):
+        return None, None
+    return as_str(container.get("firstPage")), as_str(container.get("lastPage"))
+
+
 def get_abstract(attributes: Mapping[str, JsonValue]) -> str | None:
     """Résumé : `descriptions` de `descriptionType == 'Abstract'` en priorité, sinon la première description disponible."""
     descriptions = attributes.get("descriptions") or []
@@ -160,9 +169,10 @@ def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str 
     return general or None
 
 
-# Types DataCite d'une version publiée, dont le conteneur désigne une revue, une collection ou un recueil
-# d'actes.
-_PUBLISHED_VERSION_TYPES = frozenset(
+# Types d'un document que publie une revue, une collection ou un recueil d'actes. La valeur contrôlée
+# `JournalArticle` date du schéma 4.4 (2021) ; avant, un article se déclarait `Text`, avec « Journal article »
+# ou « Article » en texte libre.
+_PUBLISHED_TYPES = frozenset(
     {
         "Book",
         "BookChapter",
@@ -172,14 +182,30 @@ _PUBLISHED_VERSION_TYPES = frozenset(
         "JournalArticle",
     }
 )
+_ARTICLE_FREE_TEXT = frozenset({"article", "journal article"})
+# Conteneur découpé dans une citation en texte libre (`SeriesInformation`) : volume dans le titre (« Physics
+# letters / B 777 », « Journal of Instrumentation 16(07) »), année ou DOI dans les pages (« 162 (2018).
+# doi:10.1016/… »).
+_VOLUME_IN_TITLE = re.compile(r"/ .*\d|\d+\s*\(\d+\)\s*$")
+_CITATION_IN_PAGES = re.compile(r"doi:|\((?:1[89]|20)\d\d\)", re.IGNORECASE)
 
 
-def describes_published_version(doc_type_token: str | None) -> bool:
-    """La notice DataCite décrit la version publiée du document : son type brut (`extract_datacite_doc_type_token`) est un article de revue, une communication, un recueil d'actes, un livre, un chapitre ou un data paper.
+def container_names_a_journal(
+    doc_type_token: str | None, title: str, pages: Iterable[str | None]
+) -> bool:
+    """Le conteneur d'une notice DataCite désigne la revue, la collection ou le recueil d'actes qui publie le document.
 
-    Une copie d'article déposée dans un entrepôt, un préprint, un jeu de données ou un logiciel ont un autre type. Une copie porte le type générique `Text`, et son type brut est alors le texte libre de l'entrepôt (« Journal article »).
+    Le type brut (`extract_datacite_doc_type_token`) est celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un préprint, un rapport, un logiciel ou un jeu de données n'a pas de revue. Le conteneur ne vient pas d'une citation en texte libre : les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent ainsi l'article publié, et DataCite en découpe mal le titre et les pages.
     """
-    return doc_type_token in _PUBLISHED_VERSION_TYPES
+    published_type = (
+        doc_type_token in _PUBLISHED_TYPES
+        or (doc_type_token or "").strip().lower() in _ARTICLE_FREE_TEXT
+    )
+    return (
+        published_type
+        and not _VOLUME_IN_TITLE.search(title)
+        and not any(page and _CITATION_IN_PAGES.search(page) for page in pages)
+    )
 
 
 def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[str, str]]:
