@@ -178,12 +178,12 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
         set_current_breaker,
     )
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.doi_org.registration_agency import resolve_ra
+    from infrastructure.sources.doi_org.registration_agency import fetch_registration_agencies
     from infrastructure.sources.polite_pool import build_user_agent
 
     conn = get_sync_engine().connect()
-    # Circuit-breaker de doi.org/ra : le client HTTP lit la ContextVar, `run` consulte
-    # `breaker.tripped` pour s'arrêter.
+    # Circuit-breaker de doi.org/ra : le client HTTP lit la ContextVar et lève
+    # `SourceUnavailableError` quand doi.org est indisponible.
     breaker = SourceCircuitBreaker("doi.org/ra")
     token = set_current_breaker(breaker)
     try:
@@ -192,8 +192,9 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
         metrics = run(
             log,
             repo=PgDoiPrefixesQueries(conn),
-            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
-            breaker=breaker,
+            resolve_ras_fn=lambda prefixes: fetch_registration_agencies(
+                prefixes, user_agent=user_agent
+            ),
         )
         conn.commit()
     except SourceUnavailableError:

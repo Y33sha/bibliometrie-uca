@@ -1,6 +1,6 @@
 """Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `fetch_missing`.
 
-Pour chaque préfixe valide (`DoiPrefix`) du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper.
+Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) du pool `candidate_dois` absents de `doi_prefixes`, et les préfixes d'agence `unknown`. Un préfixe que doi.org ne connaît pas est enregistré avec `ra='unknown'`, et soumis de nouveau au run suivant. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
 Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
@@ -8,38 +8,32 @@ Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 
 from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
 from domain.publications.identifiers import DoiPrefix
 
-ResolveRaFn = Callable[[str], str | None]
-"""Signature : `(doi) -> ra_name | None`. `None` = DOI inexistant ou erreur HTTP."""
+ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
+"""Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""
 
 
 def run(
     log: logging.Logger,
     *,
     repo: DoiPrefixesQueries,
-    resolve_ra_fn: ResolveRaFn,
-    n_samples: int = 3,
-    breaker: CircuitBreaker | None = None,
+    resolve_ras_fn: ResolveRasFn,
 ) -> PhaseMetrics:
-    """Résout la RA des préfixes non encore en base (`doi.org/ra` seul) et l'insère.
+    """Résout l'agence des préfixes à résoudre (`doi.org/ra`) et l'enregistre.
 
-    `total` = préfixes traités ; `new` = rows insérées ; `extras` = `resolved` / `unresolved`.
-    S'arrête si le `breaker` a tripé (doi.org à bout de budget).
+    `total` = préfixes enregistrés, insérés ou reclassés ; `new` = idem ; `extras` = `resolved` / `unresolved` parmi eux. Un préfixe d'agence `unknown` qui le reste n'est pas compté.
     """
     metrics = PhaseMetrics()
     # Un préfixe hors de la forme `10.<chiffres>` vient d'une valeur qui n'est pas un DOI : il n'est pas enregistré.
     prefixes = [
-        (prefix, samples)
-        for prefix, samples in repo.get_unresolved_prefixes_with_samples(
-            n_samples_per_prefix=n_samples
-        )
+        prefix
+        for prefix in repo.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
     log.info("%s à résoudre", accord(len(prefixes), "préfixe DOI", "préfixes DOI"))
@@ -47,23 +41,15 @@ def run(
         log.info("")
 
     new_by_ra: dict[str, int] = {}
-    for prefix, samples in prefixes:
-        if breaker is not None and breaker.tripped:
-            log.warning("circuit-breaker tripé, arrêt (doi.org indisponible)")
-            break
-        metrics.add(total=1)
-        ra = _resolve_ra_with_retry(prefix, samples, resolve_ra_fn, log)
-        if ra is None:
-            ra = "unknown"
-            metrics.add(unresolved=1)
-        else:
-            metrics.add(resolved=1)
-        if repo.insert_ra(prefix=prefix, ra=ra):
-            metrics.add(new=1)
-            new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
+    for prefix, answer in resolve_ras_fn(prefixes):
+        ra = answer or "unknown"
+        if not repo.save_ra(prefix=prefix, ra=ra):
+            continue
+        metrics.add(total=1, new=1, **{"resolved" if answer else "unresolved": 1})
+        new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("%s → %s", prefix, ra)
 
-    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
+    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org ne connaît pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
     metrics.details["summary"] = {
         "new_prefixes": metrics.new,
         "resolved": metrics.extras.get("resolved", 0),
@@ -78,19 +64,3 @@ def run(
     total = metrics.total
     metrics.resume = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
     return metrics
-
-
-def _resolve_ra_with_retry(
-    prefix: str,
-    samples: list[str],
-    resolve_ra_fn: ResolveRaFn,
-    log: logging.Logger,
-) -> str | None:
-    """Tente chaque DOI sample jusqu'à obtenir une RA valide. Renvoie None si tous les samples échouent (le préfixe sera marqué `unknown`)."""
-    for doi in samples:
-        ra = resolve_ra_fn(doi)
-        if ra is not None:
-            return ra
-        log.debug("%s : sample %s non résoluble, tente le suivant", prefix, doi)
-    log.warning("%s : tous les samples ont échoué (%d) → unknown", prefix, len(samples))
-    return None

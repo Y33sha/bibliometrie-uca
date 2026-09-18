@@ -30,22 +30,27 @@ class _Row:
 
 @dataclass
 class FakeDoiPrefixRepo:
-    """Repo de test : `unresolved` alimente `resolve_ra` ; `rows` modélise la table
-    `doi_prefixes` (clé = prefix) pour le volet publisher."""
+    """Repo de test : `candidates` (préfixes du pool `candidate_dois`) et les rows d'agence
+    `unknown` alimentent `resolve_ra` ; `rows` modélise la table `doi_prefixes` (clé = prefix)."""
 
-    unresolved: list[tuple[str, list[str]]] = field(default_factory=list)
+    candidates: list[str] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
     ra_breakdown: list[tuple[str, int, int]] = field(default_factory=list)
 
-    def get_unresolved_prefixes_with_samples(
-        self, *, n_samples_per_prefix: int
-    ) -> list[tuple[str, list[str]]]:
-        return [(p, dois[:n_samples_per_prefix]) for p, dois in self.unresolved]
+    def get_prefixes_to_resolve(self) -> list[str]:
+        absent = {p for p in self.candidates if p not in self.rows}
+        unknown = {p for p, r in self.rows.items() if r.ra == "unknown"}
+        return sorted(absent | unknown)
 
-    def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        if prefix in self.rows:
+    def save_ra(self, *, prefix: str, ra: str) -> bool:
+        row = self.rows.get(prefix)
+        if row is None:
+            self.rows[prefix] = _Row(prefix=prefix, ra=ra)
+            return True
+        if row.ra != "unknown" or ra == "unknown":
             return False
-        self.rows[prefix] = _Row(prefix=prefix, ra=ra)
+        row.ra = ra
+        row.checked = False
         return True
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
@@ -125,13 +130,15 @@ class FakePublisherRepo:
 
 
 @dataclass
-class StubResolveRa:
-    answers: dict[str, str | None] = field(default_factory=dict)
-    calls: list[str] = field(default_factory=list)
+class StubResolveRas:
+    """Répond pour les préfixes de `answers` ; un préfixe absent de `answers` reste sans réponse, comme ceux d'un lot en échec."""
 
-    def __call__(self, doi: str) -> str | None:
-        self.calls.append(doi)
-        return self.answers.get(doi)
+    answers: dict[str, str | None] = field(default_factory=dict)
+    calls: list[list[str]] = field(default_factory=list)
+
+    def __call__(self, prefixes):
+        self.calls.append(list(prefixes))
+        return [(p, self.answers[p]) for p in prefixes if p in self.answers]
 
 
 @dataclass
@@ -157,8 +164,8 @@ class StubDataCite:
 _LOG = logging.getLogger("test")
 
 
-def _run_ra(repo, ra_fn, **kw):
-    return run_resolve_ra(_LOG, repo=repo, resolve_ra_fn=ra_fn, **kw)
+def _run_ra(repo, ras_fn):
+    return run_resolve_ra(_LOG, repo=repo, resolve_ras_fn=ras_fn)
 
 
 def _run_pub(repo, pubrepo, cr=None, dc=None, **kw):
@@ -176,11 +183,12 @@ def _run_pub(repo, pubrepo, cr=None, dc=None, **kw):
 
 
 def test_resolve_ra_inserts_ra_only():
-    repo = FakeDoiPrefixRepo(unresolved=[("10.1038", ["10.1038/a"])])
-    ra = StubResolveRa(answers={"10.1038/a": "Crossref"})
+    repo = FakeDoiPrefixRepo(candidates=["10.1038"])
+    ras = StubResolveRas(answers={"10.1038": "Crossref"})
 
-    metrics = _run_ra(repo, ra)
+    metrics = _run_ra(repo, ras)
 
+    assert ras.calls == [["10.1038"]]  # le préfixe seul, sans DOI
     assert repo.rows["10.1038"].ra == "Crossref"
     assert repo.rows["10.1038"].publisher_id is None  # aucun publisher en resolve_ra
     assert metrics.new == 1
@@ -189,28 +197,23 @@ def test_resolve_ra_inserts_ra_only():
 
 def test_resolve_ra_ecarte_les_prefixes_malformes():
     """Régression : « doi:10.5194 » et « https: » entraient dans doi_prefixes, et le premier y recevait un éditeur."""
-    repo = FakeDoiPrefixRepo(
-        unresolved=[
-            ("doi:10.5194", ["doi:10.5194/acp-21-1"]),
-            ("https:", ["https://jssidoi.org/ird/article/116"]),
-            ("10.5194", ["10.5194/acp-21-1"]),
-        ]
-    )
-    ra = StubResolveRa(answers={"10.5194/acp-21-1": "Crossref"})
+    repo = FakeDoiPrefixRepo(candidates=["doi:10.5194", "https:", "10.5194"])
+    ras = StubResolveRas(answers={"10.5194": "Crossref"})
 
-    _run_ra(repo, ra)
+    _run_ra(repo, ras)
 
+    assert ras.calls == [["10.5194"]]
     assert set(repo.rows) == {"10.5194"}
 
 
 def test_resolve_ra_expose_la_repartition_par_ra():
     repo = FakeDoiPrefixRepo(
-        unresolved=[("10.1038", ["10.1038/a"])],
+        candidates=["10.1038"],
         ra_breakdown=[("Crossref", 80, 12), ("DataCite", 15, 4), ("unknown", 5, 2)],
     )
-    ra = StubResolveRa(answers={"10.1038/a": "Crossref"})
+    ras = StubResolveRas(answers={"10.1038": "Crossref"})
 
-    metrics = _run_ra(repo, ra)
+    metrics = _run_ra(repo, ras)
 
     assert metrics.details["summary"] == {"new_prefixes": 1, "resolved": 1}
     rows = metrics.details["table"]["rows"]
@@ -220,25 +223,47 @@ def test_resolve_ra_expose_la_repartition_par_ra():
     assert rows[1]["new"] == 0  # DataCite non touché ce run
 
 
-def test_resolve_ra_unknown_when_all_samples_fail():
-    repo = FakeDoiPrefixRepo(unresolved=[("10.9014", ["10.9014/a", "10.9014/b"])])
-    ra = StubResolveRa(answers={"10.9014/a": None, "10.9014/b": None})
+def test_resolve_ra_unknown_when_doi_org_ignores_the_prefix():
+    repo = FakeDoiPrefixRepo(candidates=["10.99999"])
+    ras = StubResolveRas(answers={"10.99999": None})
 
-    metrics = _run_ra(repo, ra)
+    metrics = _run_ra(repo, ras)
 
-    assert ra.calls == ["10.9014/a", "10.9014/b"]
-    assert repo.rows["10.9014"].ra == "unknown"
+    assert repo.rows["10.99999"].ra == "unknown"
     assert metrics.extras.get("unresolved") == 1
 
 
-def test_resolve_ra_first_sample_fails_second_succeeds():
-    repo = FakeDoiPrefixRepo(unresolved=[("10.1038", ["10.1038/bad", "10.1038/good"])])
-    ra = StubResolveRa(answers={"10.1038/bad": None, "10.1038/good": "DataCite"})
+def test_resolve_ra_prefix_without_answer_stays_to_resolve():
+    """Requête en échec : rien n'est enregistré, le run suivant soumet de nouveau le préfixe."""
+    repo = FakeDoiPrefixRepo(candidates=["10.1038"])
 
-    _run_ra(repo, ra)
+    metrics = _run_ra(repo, StubResolveRas())
 
-    assert ra.calls == ["10.1038/bad", "10.1038/good"]
-    assert repo.rows["10.1038"].ra == "DataCite"
+    assert repo.rows == {}
+    assert metrics.total == 0
+    assert repo.get_prefixes_to_resolve() == ["10.1038"]
+
+
+def test_resolve_ra_reclassifies_unknown_prefix():
+    """Un préfixe `unknown` est soumis de nouveau ; reclassé, il redevient à vérifier par le volet publisher."""
+    repo = FakeDoiPrefixRepo(rows={"10.1007": _Row("10.1007", "unknown", checked=True)})
+    ras = StubResolveRas(answers={"10.1007": "Crossref"})
+
+    metrics = _run_ra(repo, ras)
+
+    assert ras.calls == [["10.1007"]]
+    assert repo.rows["10.1007"].ra == "Crossref"
+    assert [p.prefix for p in repo.get_prefixes_pending_publisher()] == ["10.1007"]
+    assert metrics.new == 1
+
+
+def test_resolve_ra_unknown_prefix_still_unknown_is_not_counted():
+    repo = FakeDoiPrefixRepo(rows={"10.99999": _Row("10.99999", "unknown", checked=True)})
+
+    metrics = _run_ra(repo, StubResolveRas(answers={"10.99999": None}))
+
+    assert repo.rows["10.99999"].checked is True
+    assert metrics.total == 0
 
 
 # ── run_resolve_publishers ─────────────────────────────────────────

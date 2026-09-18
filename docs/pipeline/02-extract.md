@@ -18,7 +18,7 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 
 Résolution de l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) de chaque DOI, pour que [la phase suivante](#documents-absents-dune-source-fetch_missing) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
 
-Pour chaque préfixe pas encore résolu, interroge `doi.org/ra` et enregistre l'agence dans `doi_prefixes` (`unknown` quand elle n'est pas classée). Seuls les préfixes absents de la table `doi_prefixes` sont traités.
+Interroge `doi.org/ra` sur les préfixes absents de la table `doi_prefixes` et sur les préfixes d'agence `unknown`, par lots de 100 préfixes, et enregistre leur agence. Un préfixe que doi.org ne connaît pas reçoit l'agence `unknown` et repasse au run suivant. Un préfixe d'une requête en échec reste à résoudre.
 
 Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; la phase [publishers_journals](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
 
