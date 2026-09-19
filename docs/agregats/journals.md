@@ -10,8 +10,9 @@ Un `journal` est un support de publication : revue, conférence, dépôt ou autr
 |---|---|---|
 | `journals` | La revue | `title` / `title_normalized`, `issn` / `eissn` / `issnl`, `publisher_id`, `openalex_id` (unique), `journal_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `pub_count` |
 | `journal_name_forms` | Formes de nom permettant de reconnaître une revue par son titre | `journal_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
+| `journal_doi_namespaces` | Espaces de noms DOI qui désignent une revue, recalculés par `publishers_journals` | `namespace` (clé), `journal_id`, `dois`, `share` (part des DOI de l'espace qui portent la revue) |
 
-Trois tables extérieures référencent une revue, avec des politiques de suppression différentes : `journal_name_forms` disparaît avec elle, `apc_payments.journal_id` repasse à nul, tandis que `publications.journal_id` et `source_publications.journal_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
+Les tables qui référencent une revue ont des politiques de suppression différentes : `journal_name_forms` et `journal_doi_namespaces` disparaissent avec elle, `apc_payments.journal_id` repasse à nul, tandis que `publications.journal_id` et `source_publications.journal_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
 
 ## Écriture par le pipeline
 

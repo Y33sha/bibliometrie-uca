@@ -18,6 +18,7 @@ from sqlalchemy import (
     Computed,
     Date,
     DateTime,
+    Float,
     Integer,
     MetaData,
     Numeric,
@@ -289,6 +290,16 @@ journal_name_forms = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
     UniqueConstraint("form_normalized", "publisher_id", name="uq_jnl_nf_form_publisher"),
+)
+
+
+journal_doi_namespaces = Table(
+    "journal_doi_namespaces",
+    metadata,
+    Column("namespace", Text, primary_key=True),
+    Column("journal_id", Integer, nullable=False),
+    Column("dois", Integer, nullable=False),
+    Column("share", Float, nullable=False),
 )
 
 

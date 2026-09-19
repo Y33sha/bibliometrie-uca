@@ -14,6 +14,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import NamedTuple, Protocol
 
+from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType, OaModel
 from domain.types import JsonValue
 
@@ -262,6 +263,26 @@ class JournalProceedingsTypingQueries(Protocol):
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
         """Pose le `journal_type` d'une revue."""
+        ...
+
+
+class DoiJournalRow(NamedTuple):
+    """Un DOI et la revue que lui donne sa source, avec le type de cette revue."""
+
+    doi: str
+    journal_id: int
+    journal_type: JournalType
+
+
+class JournalDoiNamespaceQueries(Protocol):
+    """Calcul des espaces de noms DOI des revues."""
+
+    def find_doi_journal_pairs(self) -> list[DoiJournalRow]:
+        """Les couples (DOI, revue) distincts des enregistrements. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
+        ...
+
+    def store_doi_namespaces(self, namespaces: Sequence[DoiNamespace]) -> None:
+        """Vide `journal_doi_namespaces`, puis y écrit `namespaces`."""
         ...
 
 

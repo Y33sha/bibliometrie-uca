@@ -1,10 +1,12 @@
 """Tests des espaces de noms DOI des revues (`domain.journals.doi_namespaces`)."""
 
 from domain.journals.doi_namespaces import (
+    designated_by_namespace,
     learn_namespaces,
     namespace_candidates,
     resolve_journal,
 )
+from domain.journals.journal import JournalType
 
 
 def test_candidats_coupes_aux_separateurs_qu_ils_incluent():
@@ -81,3 +83,17 @@ def test_espace_plus_court_de_meme_revue_suffit():
 
 def test_sous_le_seuil_non_retenu():
     assert learn_namespaces(_evidence("10.1234/abc.", 1, 4)) == {}
+
+
+def test_une_plateforme_n_est_designee_par_aucun_espace():
+    """Cas réel : SSRN, dont le préfixe désigne la plateforme. Ses DOI comptent dans le total : une revue qui en porte quelques-uns ne capte pas l'espace."""
+    evidence = _evidence("10.2139/ssrn.", 1, 20) + [("10.2139/ssrn.00003", 2)]
+    namespaces = learn_namespaces(evidence, platforms={1})
+    assert resolve_journal("10.2139/ssrn.99999", namespaces) is None
+
+
+def test_types_designes_par_un_espace():
+    assert designated_by_namespace(JournalType.JOURNAL)
+    assert designated_by_namespace(JournalType.MEDIA)
+    assert not designated_by_namespace(JournalType.PREPRINT_SERVER)
+    assert not designated_by_namespace(JournalType.EBOOK_PLATFORM)
