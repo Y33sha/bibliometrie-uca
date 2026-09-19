@@ -332,6 +332,54 @@ def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
     return jid
 
 
+def _seed_record(journal_id: int, doi: str, *, source: str = "hal", raw_metadata: str = "{}"):
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO source_publications (source, source_id, title, journal_id, doi, raw_metadata)"
+            " VALUES (%s, %s, 'Doc', %s, %s, %s::jsonb)",
+            (source, _uniq("sp"), journal_id, doi, raw_metadata),
+        )
+
+
+class TestDoiNamespaceConflicts:
+    def test_enregistrement_contredit_par_l_espace_de_noms(self, client):
+        """Cas réel : *Physical review. C* et son titre parasite chez OpenAlex."""
+        namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
+        journal = _seed_journal()
+        parasite = _seed_journal()
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
+                " VALUES (%s, %s, 40, 0.95)",
+                (namespace, journal),
+            )
+        _seed_record(journal, f"{namespace}1")
+        _seed_record(parasite, f"{namespace}2", source="openalex")
+        _seed_record(parasite, f"{namespace}3", source="openalex")
+        # Revue posée par l'espace de noms : ni contradiction, ni témoin.
+        _seed_record(
+            parasite,
+            f"{namespace}4",
+            raw_metadata='{"journal_id": {"raw": null, "corrected_by": "X"}}',
+        )
+
+        conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
+
+        mine = [c for c in conflicts if c["namespace"] == namespace]
+        assert len(mine) == 1
+        conflict = mine[0]
+        assert conflict["namespace_journal"]["id"] == journal
+        assert conflict["record_journal"]["id"] == parasite
+        assert (conflict["records"], conflict["sources"]) == (2, {"openalex": 2})
+        assert conflict["sample_dois"] == [f"{namespace}2", f"{namespace}3"]
+
+    def test_count_matches_the_queue(self, client):
+        conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
+        assert client.get("/api/journals/doi-namespace-conflicts/count").json() == {
+            "total": len(conflicts)
+        }
+
+
 class TestLikelyProceedings:
     def test_revue_d_articles_de_congres_dans_la_file(self, client):
         """Cas réel : « 2020 Winter Simulation Conference (WSC) », typée journal."""

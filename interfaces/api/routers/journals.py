@@ -11,6 +11,7 @@ from sqlalchemy import Connection
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.journals_queries import (
+    DoiNamespaceConflictsResponse,
     JournalDashboardResponse,
     JournalDetailResponse,
     JournalDuplicatesResponse,
@@ -192,6 +193,22 @@ def likely_proceedings(
 ) -> LikelyProceedingsResponse:
     """Revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main."""
     return queries.likely_proceedings()
+
+
+@router.get("/doi-namespace-conflicts/count", response_model=TotalCountResponse)
+def doi_namespace_conflicts_count(
+    queries: JournalQueries = Depends(journal_queries),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Contredites par le DOI » (badge)."""
+    return TotalCountResponse(total=len(queries.doi_namespace_conflicts().conflicts))
+
+
+@router.get("/doi-namespace-conflicts", response_model=DoiNamespaceConflictsResponse)
+def doi_namespace_conflicts(
+    queries: JournalQueries = Depends(journal_queries),
+) -> DoiNamespaceConflictsResponse:
+    """Paires de revues dont l'une porte des enregistrements dont le DOI tombe dans l'espace de noms de l'autre."""
+    return queries.doi_namespace_conflicts()
 
 
 @router.get("/{journal_id}", response_model=JournalDetailResponse)
