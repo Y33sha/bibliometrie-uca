@@ -373,6 +373,26 @@ class TestDoiNamespaceConflicts:
         assert (conflict["records"], conflict["sources"]) == (2, {"openalex": 2})
         assert conflict["sample_dois"] == [f"{namespace}2", f"{namespace}3"]
 
+    def test_exemples_de_doi_distincts(self, client):
+        """Un même DOI porté par deux sources figure une fois parmi les exemples."""
+        namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
+        journal = _seed_journal()
+        other = _seed_journal()
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
+                " VALUES (%s, %s, 40, 0.95)",
+                (namespace, journal),
+            )
+        _seed_record(other, f"{namespace}1", source="hal")
+        _seed_record(other, f"{namespace}1", source="openalex")
+
+        conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
+
+        (conflict,) = [c for c in conflicts if c["namespace"] == namespace]
+        assert conflict["records"] == 2
+        assert conflict["sample_dois"] == [f"{namespace}1"]
+
     def test_count_matches_the_queue(self, client):
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
         assert client.get("/api/journals/doi-namespace-conflicts/count").json() == {
