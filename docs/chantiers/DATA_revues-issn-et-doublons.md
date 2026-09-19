@@ -110,7 +110,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 
 - [x] Mesure : le rattachement d'une revue par préfixe DOI (`journal_by_doi`, phase `metadata_correction`) n'apporte de revue à aucune publication. Chacune de ses 2 754 publications tient déjà une revue d'un autre enregistrement. Il impose en revanche sa revue dans 1 280 publications, dont des erreurs : blocs d'ISBN (`10.1007/978-3-030` pour *Lecture Notes in Mathematics*, 464 chapitres), préfixe qui coupe un mot (`10.1016/j.ins`), préprints de Copernicus rattachés à la revue.
 - [x] Retrait de la sous-étape `journal_by_doi`. Oneshot `backfill_drop_journal_by_doi_prefix` : les enregistrements ainsi rattachés perdent leur revue et leur trace dans `raw_metadata` (11 618 à blanc).
-- [ ] Retrait de la colonne `journals.doi_prefix`, de `seed_journals_doi_prefix` et de leurs usages. Une revue connaît plusieurs préfixes au fil des changements d'éditeur et de convention : une colonne unique ne les décrit pas.
+- [x] Retrait de la colonne `journals.doi_prefix` (migration), de `seed_journals_doi_prefix` et de leurs usages : administration, page publique d'une revue, playbook de nettoyage. Une revue connaît plusieurs préfixes au fil des changements d'éditeur et de convention : une colonne unique ne les décrit pas.
 
 ### 6. Livres, chapitres et recueils d'actes
 

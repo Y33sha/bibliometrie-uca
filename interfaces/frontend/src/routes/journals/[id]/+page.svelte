@@ -148,10 +148,6 @@
 					<span class="meta-label">ISSN-L</span>
 					<span class="id-badge">{journal.issnl}</span>
 				{/if}
-				{#if journal.doi_prefix}
-					<span class="meta-label">DOI préfixe</span>
-					<span class="id-badge">{journal.doi_prefix}</span>
-				{/if}
 			</div>
 			<div class="meta-row">
 				{#if journal.pub_name}

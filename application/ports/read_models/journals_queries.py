@@ -63,7 +63,7 @@ class JournalListResponse(PaginatedResponse):
 class JournalDetailResponse(JournalListItem):
     """GET /api/journals/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
 
-    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA, préfixe DOI…), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
     """
 
     issnl: str | None
@@ -72,7 +72,6 @@ class JournalDetailResponse(JournalListItem):
     apc_currency: str | None
     oa_model: OaModel | None
     is_academic: bool | None
-    doi_prefix: str | None
     doaj_payload: dict[str, str] | None
     doaj_imported_at: datetime | None
 

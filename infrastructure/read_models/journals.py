@@ -56,7 +56,7 @@ _JOURNAL_LIST_COLUMNS = """
 _JOURNAL_DETAIL_COLUMNS = f"""
     {_JOURNAL_LIST_COLUMNS},
     j.issnl, j.openalex_id, j.apc_amount, j.apc_currency,
-    j.oa_model, j.is_academic, j.doi_prefix
+    j.oa_model, j.is_academic
 """
 
 
@@ -385,7 +385,6 @@ class PgJournalQueries(JournalQueries):
             apc_currency=row.apc_currency,
             oa_model=row.oa_model,
             is_academic=row.is_academic,
-            doi_prefix=row.doi_prefix,
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
         )

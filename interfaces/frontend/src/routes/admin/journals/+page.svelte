@@ -76,7 +76,7 @@
 	// Modal édition
 	let editModal: {
 		id: number; title: string; issn: string; eissn: string; issnl: string;
-		doi_prefix: string; oa_model: string;
+		oa_model: string;
 		journal_type: string; original_journal_type: string;
 		is_academic: boolean; is_in_doaj: boolean;
 		apc_amount: string;
@@ -96,7 +96,7 @@
 		editModal = {
 			id: detail.id, title: detail.title,
 			issn: detail.issn || '', eissn: detail.eissn || '', issnl: detail.issnl || '',
-			doi_prefix: detail.doi_prefix || '', oa_model: detail.oa_model || '',
+			oa_model: detail.oa_model || '',
 			journal_type: jt, original_journal_type: jt,
 			is_academic: detail.is_academic ?? true,
 			is_in_doaj: detail.is_in_doaj,
@@ -129,7 +129,6 @@
 		body.issn = editModal.issn.trim() || null;
 		body.eissn = editModal.eissn.trim() || null;
 		body.issnl = editModal.issnl.trim() || null;
-		body.doi_prefix = editModal.doi_prefix.trim() || null;
 		body.oa_model = editModal.oa_model || null;
 		body.journal_type = editModal.journal_type;
 		body.is_academic = editModal.is_academic;
@@ -243,7 +242,6 @@
 			<div style="flex:1"><label>eISSN <input bind:value={editModal.eissn} /></label></div>
 			<div style="flex:1"><label>ISSN-L <input bind:value={editModal.issnl} /></label></div>
 		</div>
-		<label>DOI prefix <input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038/s41586" /></label>
 		<div style="display:flex;gap:8px">
 			<div style="flex:1">
 				<label>Modèle OA <select bind:value={editModal.oa_model}>
