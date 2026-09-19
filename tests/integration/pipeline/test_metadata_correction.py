@@ -4,6 +4,7 @@ import json
 
 from sqlalchemy import text
 
+from application.pipeline.metadata_correction import journal_by_doi
 from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
 from application.pipeline.metadata_correction.correct_unary import compute_update
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
@@ -11,14 +12,23 @@ from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQuer
 _Q = PgMetadataCorrectionQueries()
 
 
-def _seed_journal(conn, journal_type: str) -> int:
-    return conn.execute(
+def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
+    journal_id = conn.execute(
         text(
             "INSERT INTO journals (title, title_normalized, journal_type) "
             "VALUES ('J', 'j', :jt) RETURNING id"
         ),
         {"jt": journal_type},
     ).scalar_one()
+    if namespace is not None:
+        conn.execute(
+            text(
+                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share) "
+                "VALUES (:ns, :jid, 10, 1.0)"
+            ),
+            {"ns": namespace, "jid": journal_id},
+        )
+    return journal_id
 
 
 def _seed_sp(
@@ -54,6 +64,55 @@ def _apply(conn) -> int:
     language_forms = _Q.fetch_language_forms(conn)
     updates = [u for r in rows if (u := compute_update(r, language_forms)) is not None]
     return _Q.persist_corrections(conn, updates)
+
+
+def _apply_journal_by_doi(conn) -> int:
+    """Joue le sous-step journal_by_doi sans committer."""
+    namespaces = _Q.fetch_journal_doi_namespaces(conn)
+    rows = _Q.fetch_journal_by_doi_candidates(conn)
+    return _Q.persist_journal_corrections(conn, journal_by_doi.compute_updates(rows, namespaces))
+
+
+def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
+    # The Conversation : DOI dans l'espace de noms d'une revue media, sans journal_id. journal_by_doi
+    # pose la revue ; l'unaire qui suit (même run) la joint et reclasse preprint → media.
+    conn = sa_sync_conn
+    media_journal = _seed_journal(conn, "media", namespace="10.64628/aak.")
+    sp = _seed_sp(conn, source_id="W_tc", doc_type="preprint", doi="10.64628/aak.xyz")
+
+    assert _apply_journal_by_doi(conn) == 1
+    jid, raw = conn.execute(
+        text("SELECT journal_id, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert jid == media_journal
+    assert raw == {"journal_id": {"raw": None, "corrected_by": "JOURNAL_BY_DOI_NAMESPACE"}}
+
+    _apply(conn)
+    doc_type, raw2 = _state(conn, sp)
+    assert doc_type == "media"
+    assert raw2["doc_type"] == {"raw": "preprint", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+    # Le sous-step unaire préserve la clé possédée par journal_by_doi.
+    assert raw2["journal_id"] == {"raw": None, "corrected_by": "JOURNAL_BY_DOI_NAMESPACE"}
+
+
+def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
+    conn = sa_sync_conn
+    journal = _seed_journal(conn, "journal", namespace="10.5194/acp-")
+    sp = _seed_sp(conn, source_id="W_acp", doc_type="article", doi="10.5194/acp-20-1-2020")
+
+    assert _apply_journal_by_doi(conn) == 1
+    assert _apply_journal_by_doi(conn) == 0  # second run : rien ne change
+
+    # L'espace de noms disparaît → restauration NULL, stash retiré.
+    conn.execute(text("DELETE FROM journal_doi_namespaces WHERE journal_id = :id"), {"id": journal})
+    assert _apply_journal_by_doi(conn) == 1
+    jid, raw = conn.execute(
+        text("SELECT journal_id, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert jid is None
+    assert raw == {}
 
 
 def _state(conn, sp_id: int) -> tuple:

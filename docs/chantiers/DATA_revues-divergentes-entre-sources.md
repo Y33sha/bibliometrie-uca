@@ -56,10 +56,10 @@ Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.p
 
 - [x] Découpe et apprentissage (`domain/journals/doi_namespaces.py`) : un espace de noms est un préfixe de DOI coupé à une frontière de segment. Il inclut le séparateur qui le suit (`10.1016/j.ins.`, pour ne pas prendre `j.insmatheco`) ; sans séparateur, il exige un changement de nature à sa suite (`10.3390/nu` suivi d'un chiffre). Un ISSN reste entier (`10.1088/1748-0221/`). Le préfixe du déposant seul n'est pas un espace de noms. Un espace est retenu pour une revue s'il réunit un nombre minimal de DOI et qu'une part minimale d'entre eux porte cette revue, d'après les enregistrements de toutes les sources. Les DOI construits sur un ISBN sont écartés.
 - [x] Audit à blanc (`audit_journal_doi_namespaces`) : espaces retenus, enregistrements sans revue rattachables, paires de revues qui se partagent un espace, enregistrements dont la revue contredit l'espace de noms de leur DOI. Base locale, seuils de 5 DOI et 90 % : 1 706 espaces pour 1 649 revues ; 733 publications sans revue en recevraient une ; 381 enregistrements contredisent l'espace de noms, surtout des doublons de revues.
-- [ ] Table `journal_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishers_journals`.
-- [ ] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI (The Conversation : 277 publications sans revue).
+- [x] Table `journal_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishers_journals`. Les dépôts, serveurs de preprints, plateformes et collections de livres n'ont aucun espace de noms.
+- [x] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI, dans `metadata_correction` (The Conversation : 277 publications sans revue).
 - [ ] Doublons : deux revues qui se partagent un espace de noms forment une paire candidate à la fusion.
-- [ ] Revue erronée : un enregistrement dont la revue contredit l'espace de noms de son DOI est corrigé, avec trace dans `raw_metadata`.
+- [ ] Revue erronée : onglet d'administration des enregistrements dont la revue contredit l'espace de noms de leur DOI. Correction automatique, avec trace dans `raw_metadata`, si l'examen montre qu'elle est sans risque.
 
 ## Questions ouvertes
 

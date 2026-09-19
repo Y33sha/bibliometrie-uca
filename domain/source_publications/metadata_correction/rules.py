@@ -8,7 +8,7 @@ Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre
 
 Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
 
-Champs corrigés : `doc_type` et `oa_status` (la correction du DOI de groupe vit dans le module frère `shared_doi`).
+Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant et la correction du DOI de groupe vivent dans les modules frères `journal_by_doi` et `shared_doi`).
 """
 
 import re
