@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ReyMakWsDaM1pD9xPqPIJs6vLiREGAoi9uAv9udVba9kdw7IPQgXJ8OIPIn2hlP
+\restrict lcCr6EuzbwA1cqORFidABXYBmCDYHzOAEX36tgCasRAfsTcGhglrJ9sbEIUGkId
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -911,6 +911,18 @@ CREATE TABLE public.failed_lookups (
 --
 
 COMMENT ON TABLE public.failed_lookups IS 'Identifiants cherchés en vain dans une source par la phase fetch_missing. next_retry porte la date de la prochaine tentative. Il est NULL quand l''identifiant est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : l''échec est alors définitif.';
+
+
+--
+-- Name: journal_doi_namespaces; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.journal_doi_namespaces (
+    namespace text NOT NULL,
+    journal_id integer NOT NULL,
+    dois integer NOT NULL,
+    share double precision NOT NULL
+);
 
 
 --
@@ -1997,6 +2009,14 @@ ALTER TABLE ONLY public.failed_lookups
 
 
 --
+-- Name: journal_doi_namespaces journal_doi_namespaces_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_doi_namespaces
+    ADD CONSTRAINT journal_doi_namespaces_pkey PRIMARY KEY (namespace);
+
+
+--
 -- Name: journal_name_forms journal_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3006,6 +3026,13 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
+-- Name: ix_journal_doi_namespaces_journal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_journal_doi_namespaces_journal_id ON public.journal_doi_namespaces USING btree (journal_id);
+
+
+--
 -- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3200,6 +3227,14 @@ ALTER TABLE ONLY public.distinct_persons
 
 ALTER TABLE ONLY public.doi_prefixes
     ADD CONSTRAINT doi_prefixes_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id) ON DELETE SET NULL;
+
+
+--
+-- Name: journal_doi_namespaces journal_doi_namespaces_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_doi_namespaces
+    ADD CONSTRAINT journal_doi_namespaces_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id) ON DELETE CASCADE;
 
 
 --
@@ -3454,5 +3489,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ReyMakWsDaM1pD9xPqPIJs6vLiREGAoi9uAv9udVba9kdw7IPQgXJ8OIPIn2hlP
+\unrestrict lcCr6EuzbwA1cqORFidABXYBmCDYHzOAEX36tgCasRAfsTcGhglrJ9sbEIUGkId
 
