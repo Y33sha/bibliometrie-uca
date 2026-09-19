@@ -9,9 +9,12 @@ from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
     DoiClusterRow,
     DoiCorrectionUpdate,
+    JournalCorrectionRow,
+    JournalCorrectionUpdate,
     MetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
+from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
 from domain.source_publications.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
@@ -64,7 +67,7 @@ _SELECT = """
 # s'interpole dans le SQL — un paramètre lié ne peut porter qu'une valeur, jamais un
 # identifiant —, donc il ne vient d'aucune autre origine que cette liste.
 _CORRECTABLE_COLUMNS: frozenset[str] = frozenset(
-    {"doc_type", "oa_status", "language", "external_ids", "raw_metadata", "doi"}
+    {"doc_type", "oa_status", "language", "external_ids", "raw_metadata", "journal_id", "doi"}
 )
 
 # Garde-fou de dérive : une colonne renommée dans le schéma fait échouer l'import, plutôt que
@@ -129,6 +132,33 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
             [u._asdict() for u in updates],
             set_columns=("doc_type", "oa_status", "language", "external_ids", "raw_metadata"),
             jsonb_params=("external_ids", "raw_metadata"),
+        )
+
+    def fetch_journal_doi_namespaces(self, conn: Connection) -> list[DoiNamespace]:
+        rows = conn.execute(
+            text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
+        )
+        return rows_as(DoiNamespace, rows)
+
+    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
+        rows = conn.execute(
+            text("""
+                SELECT id, doi, journal_id, raw_metadata
+                FROM source_publications
+                WHERE (journal_id IS NULL AND doi IS NOT NULL)
+                   OR raw_metadata ? 'journal_id'
+            """)
+        )
+        return rows_as(JournalCorrectionRow, rows)
+
+    def persist_journal_corrections(
+        self, conn: Connection, updates: list[JournalCorrectionUpdate]
+    ) -> int:
+        return _persist_updates(
+            conn,
+            [u._asdict() for u in updates],
+            set_columns=("journal_id", "raw_metadata"),
+            jsonb_params=("raw_metadata",),
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
