@@ -1,9 +1,8 @@
-# Backfill à lancer sur base de prod:
-python -m interfaces.cli.oneshot.backfill_detach_datacite_journals
-puis: run_pipeline --only publishers_journals
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
+* fetch_stale: skip en mode daily
+* mode daily: fixer J d'après le dernier import hal dans le staging
+* plafond d'interrogations sudoc
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
