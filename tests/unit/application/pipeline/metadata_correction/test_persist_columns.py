@@ -24,7 +24,6 @@ class TestColonnesCorrigibles:
     def test_les_appelants_reels_passent_la_garde(self):
         for colonnes in (
             ("doc_type", "oa_status", "external_ids", "raw_metadata"),
-            ("journal_id", "raw_metadata"),
             ("doi", "raw_metadata"),
         ):
             assert _persist_updates(None, [], set_columns=colonnes) == 0

@@ -151,14 +151,11 @@ _SAME_TITLE_DUPLICATES = text("""
 """)
 
 # Paires de revues que les enregistrements d'une même publication portent, les plus partagées en tête.
-# Une revue rattachée par le préfixe du DOI (`raw_metadata.journal_id`) ne compte pas : seules comptent
-# celles que les sources donnent.
 _JOURNALS_SHARING_A_PUBLICATION = text("""
     WITH rattachements AS (
         SELECT DISTINCT publication_id, journal_id
         FROM source_publications
         WHERE publication_id IS NOT NULL AND journal_id IS NOT NULL
-          AND NOT (raw_metadata ? 'journal_id')
     ), paires AS (
         SELECT a.journal_id AS first_id, b.journal_id AS second_id, count(*) AS publications
         FROM rattachements a

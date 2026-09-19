@@ -2,7 +2,6 @@
 
 import pytest
 
-from domain.source_publications.metadata_correction.journal_by_doi import resolve_journal_by_doi
 from domain.source_publications.metadata_correction.rules import (
     _SOURCE_ONLY_PREDICATES,
     MetadataCorrectionRule,
@@ -13,31 +12,6 @@ from domain.source_publications.metadata_correction.rules import (
     effective_metadata,
     strip_dissertation_keys,
 )
-
-
-class TestResolveJournalByDoi:
-    def test_unique_prefix_matches(self):
-        prefixes = [("10.64628/aak", 7)]
-        assert resolve_journal_by_doi("10.64628/aak.abc123", prefixes) == 7
-
-    def test_no_prefix_matches(self):
-        prefixes = [("10.64628/aak", 7)]
-        assert resolve_journal_by_doi("10.1016/j.ex.2020.01", prefixes) is None
-
-    def test_nested_prefixes_pick_most_specific(self):
-        # Registrant nu (un journal) et namespace propre (un autre) : le plus long gagne.
-        prefixes = [("10.5194", 1), ("10.5194/acp", 2)]
-        assert resolve_journal_by_doi("10.5194/acp.123", prefixes) == 2
-
-    def test_shared_prefix_abstains(self):
-        # Deux journaux portent le même doi_prefix : ambigu → abstention.
-        prefixes = [("10.5194/x", 1), ("10.5194/x", 2)]
-        assert resolve_journal_by_doi("10.5194/x.123", prefixes) is None
-
-    def test_same_journal_twice_still_matches(self):
-        # Même journal listé deux fois (préfixe dupliqué) : non ambigu.
-        prefixes = [("10.5194/acp", 2), ("10.5194/acp", 2)]
-        assert resolve_journal_by_doi("10.5194/acp.123", prefixes) == 2
 
 
 def _view(**overrides: object) -> MetadataForCorrection:
@@ -928,8 +902,7 @@ class TestEffectiveMetadataScope:
 
     def test_only_doc_type_is_touched(self):
         # oa_status n'a que la règle embargo, ici non déclenchée (gold non expiré).
-        # Seul doc_type pourrait être corrigé sur cette vue (journal_id n'est plus un
-        # champ corrigé par ce moteur : il relève du sous-step `journal_by_doi`).
+        # Seul doc_type pourrait être corrigé sur cette vue.
         view = _view(
             doc_type="article",
             urls=("https://theses.fr/s1",),

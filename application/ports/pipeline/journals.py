@@ -222,7 +222,7 @@ class JournalMergeQueries(Protocol):
         ...
 
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
-        """Paires de revues que les enregistrements d'une même publication portent, hors rattachement par préfixe DOI. Les paires qui partagent le plus de publications viennent en premier."""
+        """Paires de revues que les enregistrements d'une même publication portent. Les paires qui partagent le plus de publications viennent en premier."""
         ...
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
