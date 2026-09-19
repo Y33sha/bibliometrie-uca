@@ -452,6 +452,7 @@ class TestPublisherTypes:
             "academic_institution",
             "repository",
             "aggregator",
+            "media",
             "unknown",
         ]
         assert all("label_fr" in opt and opt["label_fr"] for opt in body)

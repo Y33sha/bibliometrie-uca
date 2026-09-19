@@ -4439,7 +4439,7 @@ export interface components {
          * @description Type d'éditeur — les membres portent les libellés de l'enum PostgreSQL `publisher_type`.
          * @enum {string}
          */
-        PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "unknown";
+        PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "media" | "unknown";
         /**
          * PublisherUpdate
          * @description Champs éditables d'un éditeur, en modification sélective.

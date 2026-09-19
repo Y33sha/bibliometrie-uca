@@ -17,6 +17,7 @@ class PublisherType(StrEnum):
     ACADEMIC_INSTITUTION = "academic_institution"
     REPOSITORY = "repository"
     AGGREGATOR = "aggregator"
+    MEDIA = "media"
     UNKNOWN = "unknown"
 
 
@@ -30,6 +31,7 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     PublisherType.ACADEMIC_INSTITUTION: "Établissement d'enseignement",
     PublisherType.REPOSITORY: "Archive / dépôt",
     PublisherType.AGGREGATOR: "Agrégateur",
+    PublisherType.MEDIA: "Média",
     PublisherType.UNKNOWN: "Type inconnu",
 }
 

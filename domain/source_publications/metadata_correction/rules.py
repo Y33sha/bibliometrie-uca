@@ -19,6 +19,7 @@ from typing import NamedTuple, TypedDict
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
+from domain.publishers.publisher import PublisherType
 from domain.source_publications.external_ids import ExternalIdType
 from domain.types import JsonValue
 
@@ -29,7 +30,7 @@ class MetadataForCorrection:
 
     Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
-    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint` et `declares_conference` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference` et `registrant_publisher_type` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
@@ -52,6 +53,8 @@ class MetadataForCorrection:
     # Calculé à la lecture : l'enregistrement nomme le congrès dont il est issu (Crossref `event`,
     # ou `assertion` Springer).
     declares_conference: bool
+    # Joint à la lecture : type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
+    registrant_publisher_type: str | None
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -66,6 +69,7 @@ class MetadataCorrectionRule(StrEnum):
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
+    DOI_REGISTRANT_MEDIA_TO_MEDIA = "DOI_REGISTRANT_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
@@ -180,6 +184,7 @@ class _AppliesTo(TypedDict, total=False):
     - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
     - `self_declared_preprint` : `bool` — `sp.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
     - `declares_conference` : `bool` — `sp.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
+    - `registrant_publisher_type` : `str` — équivalence sur `sp.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -197,6 +202,7 @@ class _AppliesTo(TypedDict, total=False):
     embargo_expired: bool
     self_declared_preprint: bool
     declares_conference: bool
+    registrant_publisher_type: str
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -249,6 +255,11 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
         "applies_to": {"journal_type": JournalType.MEDIA},
+        "applies_correction": {"doc_type": DocType.MEDIA},
+    },
+    # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type` brut. The Conversation dépose ses articles sans titre de revue.
+    MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: {
+        "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
     # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
@@ -414,7 +425,13 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 # pas la table des règles : un champ propre aux sources ajouté à `MetadataForCorrection` s'inscrit
 # ici, et les règles qui le liront seront écartées d'elles-mêmes.
 _SOURCE_ONLY_PREDICATES = frozenset(
-    {"url_contains", "embargo_expired", "self_declared_preprint", "declares_conference"}
+    {
+        "url_contains",
+        "embargo_expired",
+        "self_declared_preprint",
+        "declares_conference",
+        "registrant_publisher_type",
+    }
 )
 
 
@@ -429,7 +446,7 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
             return doc_type in value
         return doc_type == value
     # Égalité simple sur l'attribut de même nom.
-    if key in ("journal_type", "oa_model", "oa_status"):
+    if key in ("journal_type", "oa_model", "oa_status", "registrant_publisher_type"):
         return bool(getattr(sp, key) == value)
     if key == "url_contains":
         assert isinstance(value, str)
