@@ -74,25 +74,27 @@ def learn_namespaces(
     min_dois: int = 5,
     min_share: float = 0.9,
 ) -> dict[str, DoiNamespace]:
-    """Espaces de noms que désignent les couples `(DOI, revue)` observés dans les enregistrements.
+    """Espaces de noms que désignent les couples `(DOI, revue)` des enregistrements, un couple par enregistrement.
 
-    Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'au moins `min_share` d'entre eux portent la même revue, hors des revues de `platforms`. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
+    Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue hors de `platforms` y recueille au moins `min_share` des voix. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
     """
-    journals_by_doi: dict[str, set[int]] = defaultdict(set)
+    records_by_doi: dict[str, Counter[int]] = defaultdict(Counter)
     for doi, journal_id in evidence:
-        journals_by_doi[doi].add(journal_id)
+        records_by_doi[doi][journal_id] += 1
     dois_by_namespace: Counter[str] = Counter()
-    votes: dict[str, Counter[int]] = defaultdict(Counter)
-    for doi, journal_ids in journals_by_doi.items():
+    votes: dict[str, defaultdict[int, float]] = defaultdict(lambda: defaultdict(float))
+    for doi, records in records_by_doi.items():
+        total_records = records.total()
         for namespace in namespace_candidates(doi):
             dois_by_namespace[namespace] += 1
-            votes[namespace].update(journal_ids)
+            for journal_id, n in records.items():
+                votes[namespace][journal_id] += n / total_records
     retained: dict[str, DoiNamespace] = {}
     for namespace in sorted(dois_by_namespace, key=len):
         total = dois_by_namespace[namespace]
         if total < min_dois:
             continue
-        journal_id, count = votes[namespace].most_common(1)[0]
+        journal_id, count = max(votes[namespace].items(), key=lambda vote: vote[1])
         if count / total < min_share or journal_id in platforms:
             continue
         shorter = _longest_retained(namespace, retained)

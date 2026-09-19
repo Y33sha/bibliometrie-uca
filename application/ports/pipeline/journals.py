@@ -278,7 +278,7 @@ class JournalDoiNamespaceQueries(Protocol):
     """Calcul des espaces de noms DOI des revues."""
 
     def find_doi_journal_pairs(self) -> list[DoiJournalRow]:
-        """Les couples (DOI, revue) distincts des enregistrements. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
+        """Le couple (DOI, revue) de chaque enregistrement. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
         ...
 
     def store_doi_namespaces(self, namespaces: Sequence[DoiNamespace]) -> None:
