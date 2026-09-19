@@ -214,7 +214,7 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
 
 # Une revue posée par son espace de noms porte sa trace dans `raw_metadata.journal_id`.
 _DOI_JOURNAL_PAIRS = text("""
-    SELECT DISTINCT s.doi, s.journal_id, j.journal_type
+    SELECT s.doi, s.journal_id, j.journal_type
     FROM source_publications s
     JOIN journals j ON j.id = s.journal_id
     WHERE s.doi IS NOT NULL AND NOT s.raw_metadata ? 'journal_id'

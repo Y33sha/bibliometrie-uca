@@ -52,6 +52,17 @@ def test_espace_retenu_malgre_une_erreur_isolee():
     assert resolve_journal("10.1016/j.physletb.99999", namespaces).journal_id == 1
 
 
+def test_doi_partage_entre_deux_revues_vote_au_prorata_des_enregistrements():
+    """Cas réel : le volume 109 de *Physical Review C*, porté par la revue dans quatre sources et par un titre parasite dans OpenAlex. Le volume ne désigne pas le parasite."""
+    evidence = _evidence("10.1103/physrevc.1", 1, 20)
+    for i in range(7):
+        doi = f"10.1103/physrevc.109.{i:06d}"
+        evidence += [(doi, 1)] * 4 + [(doi, 2)]
+    namespaces = learn_namespaces(evidence)
+    assert "10.1103/physrevc.109." not in namespaces
+    assert resolve_journal("10.1103/physrevc.109.000001", namespaces).journal_id == 1
+
+
 def test_plusieurs_espaces_pour_une_revue():
     """Cas réel : *Scientific Reports*, `srep` puis `s41598-`."""
     evidence = _evidence("10.1038/srep", 7, 10) + _evidence("10.1038/s41598-", 7, 10)
