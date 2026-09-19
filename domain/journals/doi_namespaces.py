@@ -1,14 +1,26 @@
 """Espaces de noms DOI des revues : le segment d'un DOI qui désigne sa revue.
 
 Un espace de noms est un préfixe de DOI coupé à une frontière de segment : `10.1016/j.physletb.`, `10.1038/s41598-`, `10.3390/nu`. Une revue en a souvent plusieurs, au fil des changements de convention, de plateforme ou d'éditeur.
+
+Un dépôt, un serveur de preprints, une plateforme de livres ou une collection de livres n'est désigné par aucun espace de noms : leur préfixe désigne la plateforme, et la suite du DOI désigne le document.
 """
 
 import re
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from typing import NamedTuple
 
+from domain.journals.journal import JournalType
+
 _SEPARATORS = frozenset("./-_(")
+_PLATFORM_TYPES = frozenset(
+    {
+        JournalType.REPOSITORY,
+        JournalType.PREPRINT_SERVER,
+        JournalType.EBOOK_PLATFORM,
+        JournalType.BOOK_SERIES,
+    }
+)
 # DOI construit sur un ISBN : il désigne une monographie, pas une revue.
 _ISBN_SUFFIX = re.compile(r"97[89][-\d]")
 # Tiret interne d'un ISSN (`1748-0221`, `s0273-0979`) : l'ISSN reste d'un seul tenant.
@@ -50,12 +62,21 @@ class DoiNamespace(NamedTuple):
     share: float
 
 
+def designated_by_namespace(journal_type: JournalType) -> bool:
+    """Vrai si un espace de noms DOI peut désigner une revue de ce type."""
+    return journal_type not in _PLATFORM_TYPES
+
+
 def learn_namespaces(
-    evidence: Iterable[tuple[str, int]], *, min_dois: int = 5, min_share: float = 0.9
+    evidence: Iterable[tuple[str, int]],
+    *,
+    platforms: Collection[int] = (),
+    min_dois: int = 5,
+    min_share: float = 0.9,
 ) -> dict[str, DoiNamespace]:
     """Espaces de noms que désignent les couples `(DOI, revue)` observés dans les enregistrements.
 
-    Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'au moins `min_share` d'entre eux portent la même revue. Un espace n'est pas retenu quand un espace plus court, retenu, désigne déjà la même revue.
+    Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'au moins `min_share` d'entre eux portent la même revue, hors des revues de `platforms`. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
     """
     journals_by_doi: dict[str, set[int]] = defaultdict(set)
     for doi, journal_id in evidence:
@@ -72,7 +93,7 @@ def learn_namespaces(
         if total < min_dois:
             continue
         journal_id, count = votes[namespace].most_common(1)[0]
-        if count / total < min_share:
+        if count / total < min_share or journal_id in platforms:
             continue
         shorter = _longest_retained(namespace, retained)
         if shorter is not None and shorter.journal_id == journal_id:

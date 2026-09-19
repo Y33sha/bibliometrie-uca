@@ -10,8 +10,10 @@ from sqlalchemy import Connection, case, func, literal, or_, select, text, updat
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.journals import (
+    DoiJournalRow,
     JournalCleanupQueries,
     JournalDoajQueries,
+    JournalDoiNamespaceQueries,
     JournalFindOrCreateQueries,
     JournalIssnGroup,
     JournalIssnRow,
@@ -28,11 +30,12 @@ from application.ports.pipeline.journals import (
     JournalTitleIssnRow,
     JournalTitleRow,
 )
+from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
-from infrastructure.db.tables import journal_name_forms, journals
+from infrastructure.db.tables import journal_doi_namespaces, journal_name_forms, journals
 
 # Revues à vérifier dans le Sudoc, avec les ISSN de leurs enregistrements absents de leurs ISSN.
 _JOURNALS_TO_CHECK_IN_SUDOC = text("""
@@ -209,6 +212,15 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
 """)
 
 
+# Une revue posée par son espace de noms porte sa trace dans `raw_metadata.journal_id`.
+_DOI_JOURNAL_PAIRS = text("""
+    SELECT DISTINCT s.doi, s.journal_id, j.journal_type
+    FROM source_publications s
+    JOIN journals j ON j.id = s.journal_id
+    WHERE s.doi IS NOT NULL AND NOT s.raw_metadata ? 'journal_id'
+""")
+
+
 class PgJournalGatewayQueries(
     JournalFindOrCreateQueries,
     JournalOpenAlexEnrichmentQueries,
@@ -216,6 +228,7 @@ class PgJournalGatewayQueries(
     JournalMergeQueries,
     JournalCleanupQueries,
     JournalProceedingsTypingQueries,
+    JournalDoiNamespaceQueries,
     JournalDoajQueries,
 ):
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
@@ -580,6 +593,19 @@ class PgJournalGatewayQueries(
         self._conn.execute(
             update(journals).where(journals.c.id == journal_id).values(journal_type=journal_type)
         )
+
+    # ── Espaces de noms DOI ────────────────────────────────────────
+
+    def find_doi_journal_pairs(self) -> list[DoiJournalRow]:
+        return [
+            DoiJournalRow(r.doi, r.journal_id, JournalType(r.journal_type))
+            for r in self._conn.execute(_DOI_JOURNAL_PAIRS)
+        ]
+
+    def store_doi_namespaces(self, namespaces: Sequence[DoiNamespace]) -> None:
+        self._conn.execute(journal_doi_namespaces.delete())
+        if namespaces:
+            self._conn.execute(journal_doi_namespaces.insert(), [ns._asdict() for ns in namespaces])
 
     # ── Import DOAJ ────────────────────────────────────────────────
 

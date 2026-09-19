@@ -1,6 +1,6 @@
 # Enrichissement des référentiels publishers et journals
 
-*À jour le 2026-09-18.*
+*À jour le 2026-09-19.*
 
 La phase `publishers_journals` complète deux référentiels que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, et va chercher auprès de sources externes le type des revues et leurs frais de publication. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
@@ -26,7 +26,9 @@ La phase `publishers_journals` complète deux référentiels que la phase [norma
     - les revues sans ISSN, de n'importe quel type, dont le titre nomme une édition datée (« NuFACT 2022 », « 2024 IEEE SENSORS ») ;
     - les revues sans ISSN, de n'importe quel type, dont le titre contient « proceedings » sans nommer une société savante, une académie ou une institution.
 
-7. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
+7. **`learn_journal_doi_namespaces`** — recalcule la table `journal_doi_namespaces`. Un espace de noms est un préfixe de DOI coupé à une frontière de segment (`10.1016/j.physletb.`, `10.1038/s41598-`). Il désigne une revue quand il réunit au moins 5 DOI et que 90 % d'entre eux portent cette revue, d'après les enregistrements de toutes les sources. Un dépôt, un serveur de preprints, une plateforme de livres ou une collection de livres n'est désigné par aucun espace de noms. Les règles sont dans `domain/journals/doi_namespaces.py`.
+
+8. **`enrich_journals_from_doaj`** — télécharge l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj), puis met à jour toutes les revues en une passe, par appariement sur l'ISSN : la fiche DOAJ (`doaj_payload`) et le drapeau `is_in_doaj`. Le drapeau `is_in_doaj` est remis à `false` partout, puis à `true` pour les seules revues présentes dans l'export. L'étape se déclenche seulement si le dernier import date de plus que le délai `doaj_refresh_after_days` (30 jours par défaut, réglable dans `admin/config`).
 
 ## Import manuel d'un export DOAJ
 

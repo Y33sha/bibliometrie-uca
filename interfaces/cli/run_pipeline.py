@@ -385,6 +385,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         delete_empty=_run_delete_empty_journals,
         delete_empty_publishers=_run_delete_empty_publishers,
         type_proceedings=_run_type_proceedings_journals,
+        learn_doi_namespaces=_run_learn_journal_doi_namespaces,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
         logger=log,
@@ -846,6 +847,19 @@ def _run_type_proceedings_journals() -> PhaseMetrics:
 
     with get_sync_engine().connect() as conn:
         metrics = run_type_proceedings_journals(log, journal_repo=PgJournalGatewayQueries(conn))
+        conn.commit()
+    return metrics
+
+
+def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.learn_journal_doi_namespaces import (
+        run_learn_journal_doi_namespaces,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+
+    with get_sync_engine().connect() as conn:
+        metrics = run_learn_journal_doi_namespaces(log, journal_repo=PgJournalGatewayQueries(conn))
         conn.commit()
     return metrics
 

@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import text
 
+from domain.journals.doi_namespaces import DoiNamespace
+from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
 
@@ -337,6 +339,30 @@ class TestRecordTypesOfUnknownJournals:
 
         assert typed not in ids
         assert empty not in ids
+
+
+class TestDoiNamespaces:
+    def test_revue_posee_par_son_espace_exclue_des_temoins(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn)
+        _create_record(sa_sync_conn, journal_id, doi="10.9001/abc.1")
+        _create_record(sa_sync_conn, journal_id, doi="10.9001/abc.2")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE doi = :doi"
+            ),
+            {"raw": '{"journal_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
+        )
+        pairs = [p for p in repo.find_doi_journal_pairs() if p.journal_id == journal_id]
+        assert [(p.doi, p.journal_type) for p in pairs] == [("10.9001/abc.1", JournalType.UNKNOWN)]
+
+    def test_store_vide_puis_ecrit(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn)
+        repo.store_doi_namespaces([DoiNamespace("10.9001/old.", journal_id, 5, 1.0)])
+        repo.store_doi_namespaces([DoiNamespace("10.9001/abc.", journal_id, 8, 0.95)])
+        rows = sa_sync_conn.execute(
+            text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
+        ).all()
+        assert [tuple(r) for r in rows] == [("10.9001/abc.", journal_id, 8, 0.95)]
 
 
 class TestJournalIssnIndex:

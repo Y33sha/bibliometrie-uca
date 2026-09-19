@@ -15,6 +15,7 @@ def _run(substep_metrics: PhaseMetrics, logger: logging.Logger) -> PhaseMetrics:
         delete_empty=lambda: PhaseMetrics(),
         delete_empty_publishers=lambda: PhaseMetrics(),
         type_proceedings=lambda: PhaseMetrics(),
+        learn_doi_namespaces=lambda: PhaseMetrics(),
         enrich_from_doaj=lambda: PhaseMetrics(),
         credentials_missing=lambda source: None,
         logger=logger,
