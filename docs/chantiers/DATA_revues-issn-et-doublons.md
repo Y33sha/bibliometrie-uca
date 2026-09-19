@@ -41,9 +41,7 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - Ordre de traitement : cohérence des ISSN de chaque revue, fusion des revues de même ISSN-L, puis placement et complément des ISSN. Un ISSN d'une autre publication est écarté et signalé.
 - Le titre en base reste la référence. La notice Sudoc porte le titre propre, sans le sous-titre, donc elle donne souvent un titre plus court.
 - Les ISSN rejetés (`journals.rejected_issns`) sont ceux de la même revue hors de ses colonnes : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues. La sous-étape Sudoc corrige les fautifs.
-- La phase `publishers_journals` calcule `doi_prefix` à chaque exécution, pour toutes les revues.
-- Un `doi_prefix` identifie une seule revue, indépendamment des autres revues : aucun DOI d'une autre revue ne commence par lui, et il n'est ni préfixe ni prolongement d'un autre `doi_prefix`. Il contient au moins un caractère après la barre oblique, car la partie qui précède identifie l'éditeur. Sans chaîne qui remplit ces conditions, `doi_prefix` est NULL.
-- `resolve_journal_by_doi` est réécrit : au plus un `doi_prefix` correspond à un DOI.
+- Le préfixe DOI ne rattache aucun enregistrement à une revue, et les revues ne portent pas de préfixe DOI.
 - Un chapitre ou un livre crée ou retrouve une revue seulement s'il porte un ISSN, celui de sa collection. Sans ISSN, son conteneur est le livre lui-même, dont le titre va dans `container_title`, sauf si un recueil d'actes existant porte ce titre. Un article de congrès garde son recueil d'actes, avec ou sans ISSN.
 - Le titre type en recueil d'actes une revue sans ISSN, quel que soit son type : une édition datée, ou « proceedings » sans société savante, académie ni institution. *PNAS* et *Proceedings of the Royal Society B* sont des revues.
 - Le typage par les documents s'applique aux seuls conteneurs `unknown`.
@@ -110,11 +108,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 
 ### 5. Préfixes DOI des revues
 
-- [ ] Sous-étape de `publishers_journals` qui calcule `doi_prefix` pour toutes les revues : plus long préfixe commun des DOI de la revue, retenu s'il identifie la revue.
-- [ ] Contrainte d'unicité sur `doi_prefix`.
-- [ ] Recalcul du stock, dont les 25 revues à préfixe identique ou emboîté.
-- [ ] Réécriture de `resolve_journal_by_doi`.
-- [ ] Retrait de `seed_journals_doi_prefix` et de ses tests.
+- [x] Mesure : le rattachement d'une revue par préfixe DOI (`journal_by_doi`, phase `metadata_correction`) n'apporte de revue à aucune publication. Chacune de ses 2 754 publications tient déjà une revue d'un autre enregistrement. Il impose en revanche sa revue dans 1 280 publications, dont des erreurs : blocs d'ISBN (`10.1007/978-3-030` pour *Lecture Notes in Mathematics*, 464 chapitres), préfixe qui coupe un mot (`10.1016/j.ins`), préprints de Copernicus rattachés à la revue.
+- [x] Retrait de la sous-étape `journal_by_doi`. Oneshot `backfill_drop_journal_by_doi_prefix` : les enregistrements ainsi rattachés perdent leur revue et leur trace dans `raw_metadata` (11 618 à blanc).
+- [ ] Retrait de la colonne `journals.doi_prefix`, de `seed_journals_doi_prefix` et de leurs usages. Une revue connaît plusieurs préfixes au fil des changements d'éditeur et de convention : une colonne unique ne les décrit pas.
 
 ### 6. Livres, chapitres et recueils d'actes
 

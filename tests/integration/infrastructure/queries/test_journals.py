@@ -189,32 +189,25 @@ class TestSudocCheck:
         assert unchecked not in {i for ids in groups.values() for i in ids}
 
     def test_journals_sharing_a_publication(self, sa_sync_conn, repo):
-        """Deux revues que les enregistrements d'une publication portent forment une paire ; une revue rattachée par le préfixe du DOI reste hors de la paire."""
+        """Deux revues que les enregistrements d'une publication portent forment une paire."""
         full = _create_journal(sa_sync_conn, title="Journal test complet", issn="2999-0009")
         abbreviated = _create_journal(sa_sync_conn, title="J.Test Compl.")
-        by_prefix = _create_journal(sa_sync_conn, title="Revue test par préfixe")
         publication_id = sa_sync_conn.execute(
             text("INSERT INTO publications (title, pub_year) VALUES ('Article', 2024) RETURNING id")
         ).scalar_one()
-        stash = '{"journal_id": {"raw": null, "corrected_by": "JOURNAL_BY_DOI_PREFIX"}}'
-        for journal_id, raw_metadata in ((full, "{}"), (abbreviated, "{}"), (by_prefix, stash)):
+        for journal_id in (full, abbreviated):
             sa_sync_conn.execute(
                 text(
                     "INSERT INTO source_publications"
-                    " (source, source_id, title, journal_id, publication_id, raw_metadata)"
-                    " VALUES ('hal', :sid, 'Article', :jid, :pid, CAST(:raw AS jsonb))"
+                    " (source, source_id, title, journal_id, publication_id)"
+                    " VALUES ('hal', :sid, 'Article', :jid, :pid)"
                 ),
-                {
-                    "sid": f"sp-publication-{journal_id}",
-                    "jid": journal_id,
-                    "pid": publication_id,
-                    "raw": raw_metadata,
-                },
+                {"sid": f"sp-publication-{journal_id}", "jid": journal_id, "pid": publication_id},
             )
         pairs = [
             p
             for p in repo.find_journals_sharing_a_publication()
-            if {p.first.id, p.second.id} & {full, abbreviated, by_prefix}
+            if {p.first.id, p.second.id} & {full, abbreviated}
         ]
         assert [(p.first.id, p.second.id, p.publications) for p in pairs] == [
             (full, abbreviated, 1)

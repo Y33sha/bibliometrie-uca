@@ -17,8 +17,6 @@ Trois tables extérieures référencent une revue, avec des politiques de suppre
 
 **Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`application/services/journals/core.py`), qui essaie successivement l'`openalex_id`, puis les ISSN sous leurs trois formes (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues portant un eISSN), et crée la revue en dernier recours avec sa forme de nom. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante. La publication reçoit son `journal_id` par `extract_pub_metadata`. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
 
-**Rattachement tardif par préfixe de DOI (`metadata_correction`).** `journal_by_doi.py` renseigne `source_publications.journal_id` lorsqu'un préfixe de DOI désigne une revue sans ambiguïté. La décision elle-même est prise dans `domain/source_publications/metadata_correction/journal_by_doi.py`.
-
 **Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
 ## Écriture par l'API — édition manuelle

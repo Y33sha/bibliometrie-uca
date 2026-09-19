@@ -31,13 +31,6 @@ class TestRelevesRendantUneListe:
         queries = PgMetadataCorrectionQueries()
         assert queries.fetch_for_unary_correction_by_journal(sa_sync_conn_owner, 1) == []
 
-    def test_les_prefixes_doi_des_revues_s_accordent(self, sa_sync_conn_owner):
-        assert PgMetadataCorrectionQueries().fetch_journal_doi_prefixes(sa_sync_conn_owner) == []
-
-    def test_les_candidates_au_rattachement_par_doi_s_accordent(self, sa_sync_conn_owner):
-        queries = PgMetadataCorrectionQueries()
-        assert queries.fetch_journal_by_doi_candidates(sa_sync_conn_owner) == []
-
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
         repo = PgPublicationRepository(sa_sync_conn_owner)
         assert repo.get_source_publications(1) == []
@@ -105,8 +98,6 @@ class TestRelevesRendantUneLigne:
 
 TYPES_EXERCES = {
     "FacetOption",
-    "JournalCorrectionRow",
-    "JournalDoiPrefixRow",
     "UnaryCorrectionRow",
     "_JournalRow",
     "_PerimeterRow",
@@ -148,7 +139,7 @@ def _types_apparies() -> set[str]:
 
 def test_le_parcours_trouve_les_appariements():
     """Filet du filet : un parcours qui n'en trouverait aucun rendrait l'assertion vide, donc verte."""
-    assert len(_types_apparies()) >= 10
+    assert len(_types_apparies()) >= 8
 
 
 def test_chaque_type_apparie_est_exerce_par_un_test():

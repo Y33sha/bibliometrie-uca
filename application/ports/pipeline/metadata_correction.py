@@ -67,30 +67,6 @@ class CorrectionUpdate(NamedTuple):
     raw_metadata: dict[str, JsonValue]
 
 
-class JournalDoiPrefixRow(NamedTuple):
-    """Un préfixe DOI et la revue qui le porte. Matière du longest-prefix-match qui rattache une `source_publication` à sa revue."""
-
-    doi_prefix: str
-    journal_id: int
-
-
-class JournalCorrectionRow(NamedTuple):
-    """Une `source_publication` candidate au rattachement du journal par préfixe DOI : son id, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
-
-    id: int
-    doi: str | None
-    journal_id: int | None
-    raw_metadata: dict[str, JsonValue]
-
-
-class JournalCorrectionUpdate(NamedTuple):
-    """Une mise à jour de rattachement : colonne `journal_id` (posée ou restaurée à NULL) + sidecar `raw_metadata`. Produite par la sous-étape `journal_by_doi`, persistée via `persist_journal_corrections`."""
-
-    id: int
-    journal_id: int | None
-    raw_metadata: dict[str, JsonValue]
-
-
 class DoiClusterRow(NamedTuple):
     """Une `source_publication` candidate à la correction de DOI par cluster.
 
@@ -138,20 +114,6 @@ class MetadataCorrectionQueries(Protocol):
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation ; celle-ci recalcule aussi la langue de la publication. Retourne le nombre de lignes mises à jour."""
-        ...
-
-    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[JournalDoiPrefixRow]:
-        """Toutes les revues portant un `doi_prefix`. Carte chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
-        ...
-
-    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
-        """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par préfixe (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
-        ...
-
-    def persist_journal_corrections(
-        self, conn: Connection, updates: list[JournalCorrectionUpdate]
-    ) -> int:
-        """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` canonique — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         ...
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:

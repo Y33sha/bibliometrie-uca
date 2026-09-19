@@ -6,7 +6,7 @@ Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type
 
 Idempotent et auto-cicatrisant : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 
-Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`language`/`external_ids` ; cluster : `doi` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas.
+Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`language`/`external_ids` ; cluster : `doi`) ; chaque passe préserve donc les clés qu'elle ne gère pas.
 """
 
 import logging
@@ -38,7 +38,7 @@ from domain.source_publications.raw_metadata import (
 )
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
-# Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par le sous-step `journal_by_doi`) sont préservées.
+# Les autres (`doi`, géré par la sous-étape cluster) sont préservées.
 _UNARY_FIELDS = ("doc_type", "oa_status", "language", "external_ids")
 
 # Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping source→canonique a changé la valeur (aucune règle de correction n'a firé).
@@ -58,7 +58,7 @@ def compute_update(
 
     `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). `language` n'a que le mapping : `language_forms` associe chaque forme connue au code de sa langue, et une valeur inconnue donne `None`. Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` / `LANGUAGE_MAP` quand seul le mapping a changé la valeur.
 
-    Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, le sous-step `journal_by_doi` gère `journal_id`)."""
+    Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`)."""
     raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)
 
     # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire), puis correction sur la valeur canonique.
