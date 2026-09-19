@@ -371,10 +371,9 @@ class TestDoiNamespaceConflicts:
         assert conflict["namespace_journal"]["id"] == journal
         assert conflict["record_journal"]["id"] == parasite
         assert (conflict["records"], conflict["sources"]) == (2, {"openalex": 2})
-        assert conflict["sample_dois"] == [f"{namespace}2", f"{namespace}3"]
 
-    def test_exemples_de_doi_distincts(self, client):
-        """Un même DOI porté par deux sources figure une fois parmi les exemples."""
+    def test_part_des_documents_de_l_espace(self, client):
+        """DOI distincts, documents, et part des documents qui portent la revue de l'espace de noms."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         journal = _seed_journal()
         other = _seed_journal()
@@ -384,14 +383,14 @@ class TestDoiNamespaceConflicts:
                 " VALUES (%s, %s, 40, 0.95)",
                 (namespace, journal),
             )
-        _seed_record(other, f"{namespace}1", source="hal")
+        for source in ("hal", "crossref", "scanr"):
+            _seed_record(journal, f"{namespace}1", source=source)
         _seed_record(other, f"{namespace}1", source="openalex")
 
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
 
         (conflict,) = [c for c in conflicts if c["namespace"] == namespace]
-        assert conflict["records"] == 2
-        assert conflict["sample_dois"] == [f"{namespace}1"]
+        assert (conflict["dois"], conflict["documents"], conflict["share"]) == (1, 4, 0.75)
 
     def test_count_matches_the_queue(self, client):
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
