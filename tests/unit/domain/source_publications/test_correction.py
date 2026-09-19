@@ -27,6 +27,7 @@ def _view(**overrides: object) -> MetadataForCorrection:
         "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
+        "registrant_publisher_type": None,
     }
     defaults.update(overrides)
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
@@ -323,6 +324,21 @@ class TestTitleSupplementaryContentRule:
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "thesis"
+
+
+class TestDoiRegistrantMediaRule:
+    def test_doi_depose_par_un_editeur_de_presse_devient_media(self):
+        """Cas réel : article de The Conversation, que Crossref type `posted-content`, sans revue."""
+        corrected = effective_metadata(
+            _view(doc_type="preprint", registrant_publisher_type="media")
+        ).doc_type
+        assert corrected is not None
+        assert corrected.value == "media"
+        assert corrected.rule == MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA
+
+    def test_autre_type_de_deposant_sans_effet(self):
+        view = _view(doc_type="article", registrant_publisher_type="commercial")
+        assert effective_metadata(view).doc_type is None
 
 
 class TestConferenceDeclaredRule:

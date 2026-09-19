@@ -96,6 +96,37 @@ def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     assert plain_raw == {}
 
 
+def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
+    """Cas réel : The Conversation dépose ses articles sous `10.64628`, sans titre de revue."""
+    conn = sa_sync_conn
+    publisher = conn.execute(
+        text(
+            "INSERT INTO publishers (name, name_normalized, publisher_type)"
+            " VALUES ('The Conversation Media Group', 'the conversation media group', 'media')"
+            " RETURNING id"
+        )
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.64628', 'Crossref', :p)"
+        ),
+        {"p": publisher},
+    )
+    sp = _seed_sp(
+        conn,
+        source_id="10.64628/aak.x",
+        source="crossref",
+        doc_type="posted-content",
+        doi="10.64628/aak.x",
+    )
+
+    _apply(conn)
+
+    doc_type, raw = _state(conn, sp)
+    assert doc_type == "media"
+    assert raw["doc_type"]["corrected_by"] == "DOI_REGISTRANT_MEDIA_TO_MEDIA"
+
+
 def test_hal_code_mapped_to_canonical(sa_sync_conn):
     conn = sa_sync_conn
     sp = _seed_sp(conn, source_id="hal-1", source="hal", doc_type="ART")
