@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iRVlsd4y40CPaC9m6iEj9m20U9xoP6lToggW2csZAh6nQ4Tbo0cLq7IJJyfYxs4
+\restrict ReyMakWsDaM1pD9xPqPIJs6vLiREGAoi9uAv9udVba9kdw7IPQgXJ8OIPIn2hlP
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -155,6 +155,7 @@ CREATE TYPE public.publisher_type AS ENUM (
     'academic_institution',
     'repository',
     'aggregator',
+    'media',
     'unknown'
 );
 
@@ -3453,5 +3454,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iRVlsd4y40CPaC9m6iEj9m20U9xoP6lToggW2csZAh6nQ4Tbo0cLq7IJJyfYxs4
+\unrestrict ReyMakWsDaM1pD9xPqPIJs6vLiREGAoi9uAv9udVba9kdw7IPQgXJ8OIPIn2hlP
 
