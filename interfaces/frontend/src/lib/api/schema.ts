@@ -3279,7 +3279,7 @@ export interface components {
          * JournalDetailResponse
          * @description GET /api/journals/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
-         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA, préfixe DOI…), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
          */
         JournalDetailResponse: {
             /** Id */
@@ -3312,8 +3312,6 @@ export interface components {
             oa_model: components["schemas"]["OaModel"] | null;
             /** Is Academic */
             is_academic: boolean | null;
-            /** Doi Prefix */
-            doi_prefix: string | null;
             /** Doaj Payload */
             doaj_payload: {
                 [key: string]: string;
@@ -3427,8 +3425,6 @@ export interface components {
             eissn?: string | null;
             /** Issnl */
             issnl?: string | null;
-            /** Doi Prefix */
-            doi_prefix?: string | null;
             oa_model?: components["schemas"]["OaModel"] | null;
             journal_type?: components["schemas"]["JournalType"] | null;
             /** Is Academic */

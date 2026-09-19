@@ -74,4 +74,3 @@ class Journal:
     oa_model: OaModel | None = None
     journal_type: JournalType = JournalType.UNKNOWN
     is_academic: bool = True
-    doi_prefix: str | None = None

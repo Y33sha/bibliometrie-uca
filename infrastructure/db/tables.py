@@ -258,7 +258,6 @@ journals = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("journal_type", journal_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),
-    Column("doi_prefix", Text),
     Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
     # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le

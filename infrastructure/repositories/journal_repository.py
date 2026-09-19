@@ -41,7 +41,6 @@ class _JournalRow(NamedTuple):
     oa_model: str | None
     journal_type: str | None
     is_academic: bool | None
-    doi_prefix: str | None
 
 
 def _journal_from_row(row: _JournalRow) -> Journal:
@@ -65,7 +64,6 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         if row.journal_type is not None
         else JournalType.UNKNOWN,
         is_academic=row.is_academic if row.is_academic is not None else True,
-        doi_prefix=row.doi_prefix,
     )
 
 
@@ -93,7 +91,6 @@ class PgJournalRepository(JournalRepository):
                 journals.c.oa_model,
                 journals.c.journal_type,
                 journals.c.is_academic,
-                journals.c.doi_prefix,
             ).where(journals.c.id == journal_id)
         ).first()
         if row is None:
@@ -113,7 +110,6 @@ class PgJournalRepository(JournalRepository):
                 issn=journal.issn,
                 eissn=journal.eissn,
                 issnl=journal.issnl,
-                doi_prefix=journal.doi_prefix,
                 oa_model=journal.oa_model,
                 journal_type=journal.journal_type,
                 is_academic=journal.is_academic,
