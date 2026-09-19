@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ds6oSWDw5kcN5eCcIbt12BtSMQUFcBrDMJhPkc6ZqwK2bbxmn6n4VJ4ruLhytye
+\restrict iRVlsd4y40CPaC9m6iEj9m20U9xoP6lToggW2csZAh6nQ4Tbo0cLq7IJJyfYxs4
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -965,7 +965,6 @@ CREATE TABLE public.journals (
     created_at timestamp with time zone DEFAULT now(),
     journal_type public.journal_type DEFAULT 'unknown'::public.journal_type,
     is_academic boolean DEFAULT true,
-    doi_prefix text,
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
     pub_count integer DEFAULT 0 NOT NULL,
@@ -978,7 +977,7 @@ CREATE TABLE public.journals (
 -- Name: COLUMN journals.rejected_issns; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN rejetés des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou périmés (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant). Ils servent au rapprochement ; la vérification dans le Sudoc tente de corriger les fautifs.';
+COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN de la revue hors des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues ; la vérification dans le Sudoc tente de corriger les fautifs.';
 
 
 --
@@ -2579,13 +2578,6 @@ CREATE INDEX idx_jnl_nf_journal ON public.journal_name_forms USING btree (journa
 
 
 --
--- Name: idx_journals_doi_prefix; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_journals_doi_prefix ON public.journals USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
-
-
---
 -- Name: idx_journals_eissn; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3461,5 +3453,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ds6oSWDw5kcN5eCcIbt12BtSMQUFcBrDMJhPkc6ZqwK2bbxmn6n4VJ4ruLhytye
+\unrestrict iRVlsd4y40CPaC9m6iEj9m20U9xoP6lToggW2csZAh6nQ4Tbo0cLq7IJJyfYxs4
 
