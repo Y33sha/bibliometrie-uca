@@ -8,6 +8,7 @@
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
 	import JournalDuplicatesList from './JournalDuplicatesList.svelte';
 	import LikelyProceedingsList from './LikelyProceedingsList.svelte';
+	import DoiNamespaceConflictsList from './DoiNamespaceConflictsList.svelte';
 	import { mergeJournal } from './mergeJournal';
 	import Modal from '$lib/components/Modal.svelte';
 	import { autofocus } from '$lib/actions/focus';
@@ -22,13 +23,14 @@
 	let journalTypes: EnumOption[] = $state([]);
 	let oaModels: EnumOption[] = $state([]);
 
-	// Onglets : la liste des revues, une file par type de doublon potentiel, puis la file des recueils d'actes probables. L'onglet ouvert se garde dans l'URL (`?tab=`).
-	type TabKey = 'all' | 'same-titles' | 'shared-issns' | 'likely-proceedings';
-	const QUEUES: TabKey[] = ['same-titles', 'shared-issns', 'likely-proceedings'];
+	// Onglets : la liste des revues, une file par type de doublon potentiel, la file des recueils d'actes probables, puis celle des revues que contredit l'espace de noms DOI. L'onglet ouvert se garde dans l'URL (`?tab=`).
+	type TabKey = 'all' | 'same-titles' | 'shared-issns' | 'likely-proceedings' | 'doi-namespace-conflicts';
+	const QUEUES: TabKey[] = ['same-titles', 'shared-issns', 'likely-proceedings', 'doi-namespace-conflicts'];
 	let tab = $state<TabKey>('all');
 	let sameTitleCount = $state(0);
 	let sharedIssnCount = $state(0);
 	let likelyProceedingsCount = $state(0);
+	let doiNamespaceConflictsCount = $state(0);
 
 	async function queueCount(queue: Exclude<TabKey, 'all'>): Promise<number> {
 		try {
@@ -39,10 +41,11 @@
 	}
 
 	async function loadQueueCounts() {
-		[sameTitleCount, sharedIssnCount, likelyProceedingsCount] = await Promise.all([
+		[sameTitleCount, sharedIssnCount, likelyProceedingsCount, doiNamespaceConflictsCount] = await Promise.all([
 			queueCount('same-titles'),
 			queueCount('shared-issns'),
 			queueCount('likely-proceedings'),
+			queueCount('doi-namespace-conflicts'),
 		]);
 	}
 
@@ -186,6 +189,7 @@
 		{ key: 'same-titles', label: 'Titres identiques', count: sameTitleCount },
 		{ key: 'shared-issns', label: 'ISSN partagés', count: sharedIssnCount },
 		{ key: 'likely-proceedings', label: "Recueils d'actes probables", count: likelyProceedingsCount },
+		{ key: 'doi-namespace-conflicts', label: 'Contredites par le DOI', count: doiNamespaceConflictsCount },
 	]}
 	active={tab}
 	onselect={(key) => selectTab(key as TabKey)}
@@ -201,6 +205,8 @@
 <JournalDuplicatesList url="/api/journals/shared-issns" valueLabel="ISSN" onchange={loadQueueCounts} />
 {:else if tab === 'likely-proceedings'}
 <LikelyProceedingsList onchange={loadQueueCounts} />
+{:else if tab === 'doi-namespace-conflicts'}
+<DoiNamespaceConflictsList onchange={loadQueueCounts} />
 {:else}
 <JournalsListView {apiKey}>
 	{#snippet actionCell(j: Journal)}

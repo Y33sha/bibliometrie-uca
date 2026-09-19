@@ -1,5 +1,7 @@
 """Query services pour les revues (table `journals`)."""
 
+from collections import Counter, defaultdict
+
 from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models._common import (
@@ -9,6 +11,8 @@ from application.ports.read_models._common import (
 )
 from application.ports.read_models.journals_queries import (
     DocTypeCount,
+    DoiNamespaceConflict,
+    DoiNamespaceConflictsResponse,
     JournalDashboardResponse,
     JournalDetailResponse,
     JournalDuplicateGroup,
@@ -25,6 +29,7 @@ from application.ports.read_models.journals_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.journals.containers import conference_paper_share, holds_mostly_conference_papers
+from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
 from domain.journals.expected import (
     EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE,
     EXPECTED_OA_STATUSES_BY_OA_MODEL,
@@ -168,6 +173,16 @@ _JOURNAL_RECORD_TYPES = """
     GROUP BY j.id
 """
 
+# Enregistrements à DOI et à revue. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
+_RECORDS_WITH_DOI_AND_JOURNAL = """
+    SELECT doi, journal_id, source::text AS source
+    FROM source_publications
+    WHERE doi IS NOT NULL AND journal_id IS NOT NULL AND NOT raw_metadata ? 'journal_id'
+"""
+
+# Nombre d'exemples de DOI par paire de revues.
+_SAMPLE_DOIS = 3
+
 # Revues qui portent le même ISSN dans `issn` ou `eissn`.
 _SHARED_ISSN_GROUPS = """
     WITH colonnes AS (
@@ -215,6 +230,50 @@ class PgJournalQueries(JournalQueries):
             key=lambda i: (bool(i.journal.issn or i.journal.eissn), -i.records, i.journal.id)
         )
         return LikelyProceedingsResponse(journals=items)
+
+    def doi_namespace_conflicts(self) -> DoiNamespaceConflictsResponse:
+        namespaces = {
+            r.namespace: DoiNamespace(r.namespace, r.journal_id, r.dois, r.share)
+            for r in self._conn.execute(
+                text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
+            )
+        }
+        # Paire (revue de l'enregistrement, revue de l'espace de noms) → enregistrements.
+        pairs: dict[tuple[int, int], list[tuple[str, str, DoiNamespace]]] = defaultdict(list)
+        for r in self._conn.execute(text(_RECORDS_WITH_DOI_AND_JOURNAL)):
+            ns = resolve_journal(r.doi, namespaces)
+            if ns is not None and ns.journal_id != r.journal_id:
+                pairs[(r.journal_id, ns.journal_id)].append((r.doi, r.source, ns))
+        journal_ids = list({journal_id for pair in pairs for journal_id in pair})
+        journals = {
+            r.id: _journal_list_item(r)
+            for r in self._conn.execute(
+                text(f"""
+                    SELECT {_JOURNAL_LIST_COLUMNS}
+                    FROM journals j
+                    LEFT JOIN publishers p ON p.id = j.publisher_id
+                    WHERE j.id = ANY(:ids)
+                """),
+                {"ids": journal_ids},
+            )
+        }
+        conflicts = []
+        for (record_journal, namespace_journal), records in pairs.items():
+            ns = Counter(ns for _, _, ns in records).most_common(1)[0][0]
+            conflicts.append(
+                DoiNamespaceConflict(
+                    namespace=ns.namespace,
+                    dois=ns.dois,
+                    share=ns.share,
+                    namespace_journal=journals[namespace_journal],
+                    record_journal=journals[record_journal],
+                    records=len(records),
+                    sources=dict(Counter(source for _, source, _ in records).most_common()),
+                    sample_dois=sorted(doi for doi, _, _ in records)[:_SAMPLE_DOIS],
+                )
+            )
+        conflicts.sort(key=lambda c: (-c.records, c.record_journal.id, c.namespace_journal.id))
+        return DoiNamespaceConflictsResponse(conflicts=conflicts)
 
     def journals_with_same_title(self) -> JournalDuplicatesResponse:
         return self._duplicate_groups(_SAME_TITLE_GROUPS)

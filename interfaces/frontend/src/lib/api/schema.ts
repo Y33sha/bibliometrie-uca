@@ -2116,6 +2116,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/doi-namespace-conflicts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Doi Namespace Conflicts Count
+         * @description Compteur de l'onglet « Contredites par le DOI » (badge).
+         */
+        get: operations["doi_namespace_conflicts_count_api_journals_doi_namespace_conflicts_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/doi-namespace-conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Doi Namespace Conflicts
+         * @description Paires de revues dont l'une porte des enregistrements dont le DOI tombe dans l'espace de noms de l'autre.
+         */
+        get: operations["doi_namespace_conflicts_api_journals_doi_namespace_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journals/{journal_id}": {
         parameters: {
             query?: never;
@@ -2840,6 +2880,38 @@ export interface components {
             deleted_authorships: number;
             /** Cleaned Forms */
             cleaned_forms: number;
+        };
+        /**
+         * DoiNamespaceConflict
+         * @description Enregistrements de `record_journal` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_journal`.
+         *
+         *     `dois` et `share` décrivent l'espace de noms : le nombre de DOI qui l'attestent, et la part d'entre eux qui porte `namespace_journal`. `sources` compte les enregistrements par source.
+         */
+        DoiNamespaceConflict: {
+            /** Namespace */
+            namespace: string;
+            /** Dois */
+            dois: number;
+            /** Share */
+            share: number;
+            namespace_journal: components["schemas"]["JournalListItem"];
+            record_journal: components["schemas"]["JournalListItem"];
+            /** Records */
+            records: number;
+            /** Sources */
+            sources: {
+                [key: string]: number;
+            };
+            /** Sample Dois */
+            sample_dois: string[];
+        };
+        /**
+         * DoiNamespaceConflictsResponse
+         * @description Paires de revues que contredisent les espaces de noms DOI, les plus fournies en enregistrements d'abord.
+         */
+        DoiNamespaceConflictsResponse: {
+            /** Conflicts */
+            conflicts: components["schemas"]["DoiNamespaceConflict"][];
         };
         /**
          * DoiPrefixInfo
@@ -8579,6 +8651,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LikelyProceedingsResponse"];
+                };
+            };
+        };
+    };
+    doi_namespace_conflicts_count_api_journals_doi_namespace_conflicts_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    doi_namespace_conflicts_api_journals_doi_namespace_conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoiNamespaceConflictsResponse"];
                 };
             };
         };

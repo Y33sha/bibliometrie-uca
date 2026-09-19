@@ -152,8 +152,34 @@ class LikelyProceedingsResponse(BaseModel):
     journals: list[LikelyProceedingsItem]
 
 
+class DoiNamespaceConflict(BaseModel):
+    """Enregistrements de `record_journal` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_journal`.
+
+    `dois` et `share` décrivent l'espace de noms : le nombre de DOI qui l'attestent, et la part d'entre eux qui porte `namespace_journal`. `sources` compte les enregistrements par source.
+    """
+
+    namespace: str
+    dois: int
+    share: float
+    namespace_journal: JournalListItem
+    record_journal: JournalListItem
+    records: int
+    sources: dict[str, int]
+    sample_dois: list[str]
+
+
+class DoiNamespaceConflictsResponse(BaseModel):
+    """Paires de revues que contredisent les espaces de noms DOI, les plus fournies en enregistrements d'abord."""
+
+    conflicts: list[DoiNamespaceConflict]
+
+
 class JournalQueries(Protocol):
     """Opérations de lecture sur les revues."""
+
+    def doi_namespace_conflicts(self) -> DoiNamespaceConflictsResponse:
+        """Enregistrements dont la revue diffère de celle que désigne l'espace de noms de leur DOI, groupés par paire de revues."""
+        ...
 
     def likely_proceedings(self) -> LikelyProceedingsResponse:
         """Revues typées `journal` dont la majorité stricte des documents sont des articles de congrès."""

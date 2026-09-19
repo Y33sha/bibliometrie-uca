@@ -59,7 +59,8 @@ Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.p
 - [x] Table `journal_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishers_journals`. Les dépôts, serveurs de preprints, plateformes et collections de livres n'ont aucun espace de noms.
 - [x] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI, dans `metadata_correction` (The Conversation : 277 publications sans revue).
 - [ ] Doublons : deux revues qui se partagent un espace de noms forment une paire candidate à la fusion.
-- [ ] Revue erronée : onglet d'administration des enregistrements dont la revue contredit l'espace de noms de leur DOI. Correction automatique, avec trace dans `raw_metadata`, si l'examen montre qu'elle est sans risque.
+- [x] Revue erronée, examen : onglet « Contredites par le DOI » de l'administration des revues. Il groupe par paire de revues les enregistrements dont la revue diffère de celle de l'espace de noms de leur DOI.
+- [ ] Revue erronée, correction automatique avec trace dans `raw_metadata`, si l'examen montre qu'elle est sans risque.
 
 ## Questions ouvertes
 
