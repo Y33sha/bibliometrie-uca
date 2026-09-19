@@ -50,6 +50,17 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 - [x] Audit préalable (`audit_journals_against_crossref`) : écarts à Crossref par source, divergences sans Crossref, préprints DataCite.
 - [ ] Correction dans `metadata_correction` : l'enregistrement dont la revue diffère de celle de l'enregistrement Crossref de même DOI prend la revue de Crossref, avec trace dans `raw_metadata`.
 
+### 6. Espaces de noms DOI des revues
+
+Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.physletb.`, `10.1038/s41598-`). Un audit sur les 207 revues qui ont au moins 20 DOI Crossref montre que des espaces de noms propres à une revue couvrent au moins 90 % des DOI de 172 d'entre elles. Une revue en a souvent plusieurs : changement de convention (`srep` puis `s41598`), de plateforme (*Viatica*), d'éditeur (*animal*, de Cambridge à Elsevier). Les DOI construits sur un ISBN (`10.1007/978-3-030-…`) désignent une monographie, pas une revue. Quelques DOI sont opaques (APS récents, OpenEdition récents).
+
+- [x] Découpe et apprentissage (`domain/journals/doi_namespaces.py`) : un espace de noms est un préfixe de DOI coupé à une frontière de segment. Il inclut le séparateur qui le suit (`10.1016/j.ins.`, pour ne pas prendre `j.insmatheco`) ; sans séparateur, il exige un changement de nature à sa suite (`10.3390/nu` suivi d'un chiffre). Un ISSN reste entier (`10.1088/1748-0221/`). Le préfixe du déposant seul n'est pas un espace de noms. Un espace est retenu pour une revue s'il réunit un nombre minimal de DOI et qu'une part minimale d'entre eux porte cette revue, d'après les enregistrements de toutes les sources. Les DOI construits sur un ISBN sont écartés.
+- [x] Audit à blanc (`audit_journal_doi_namespaces`) : espaces retenus, enregistrements sans revue rattachables, paires de revues qui se partagent un espace, enregistrements dont la revue contredit l'espace de noms de leur DOI. Base locale, seuils de 5 DOI et 90 % : 1 706 espaces pour 1 649 revues ; 733 publications sans revue en recevraient une ; 381 enregistrements contredisent l'espace de noms, surtout des doublons de revues.
+- [ ] Table `journal_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishers_journals`.
+- [ ] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI (The Conversation : 277 publications sans revue).
+- [ ] Doublons : deux revues qui se partagent un espace de noms forment une paire candidate à la fusion.
+- [ ] Revue erronée : un enregistrement dont la revue contredit l'espace de noms de son DOI est corrigé, avec trace dans `raw_metadata`.
+
 ## Questions ouvertes
 
 - Revue erronée sans enregistrement Crossref : quelle source fait foi ?
