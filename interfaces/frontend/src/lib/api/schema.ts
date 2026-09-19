@@ -2885,13 +2885,15 @@ export interface components {
          * DoiNamespaceConflict
          * @description Enregistrements de `record_journal` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_journal`.
          *
-         *     `dois` et `share` décrivent l'espace de noms : le nombre de DOI qui l'attestent, et la part d'entre eux qui porte `namespace_journal`. `sources` compte les enregistrements par source.
+         *     `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part de ces enregistrements qui porte `namespace_journal`. `records` compte les enregistrements de `record_journal`, `sources` les répartit par source.
          */
         DoiNamespaceConflict: {
             /** Namespace */
             namespace: string;
             /** Dois */
             dois: number;
+            /** Documents */
+            documents: number;
             /** Share */
             share: number;
             namespace_journal: components["schemas"]["JournalListItem"];
@@ -2902,8 +2904,6 @@ export interface components {
             sources: {
                 [key: string]: number;
             };
-            /** Sample Dois */
-            sample_dois: string[];
         };
         /**
          * DoiNamespaceConflictsResponse

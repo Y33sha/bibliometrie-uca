@@ -29,7 +29,7 @@ from application.ports.read_models.journals_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.journals.containers import conference_paper_share, holds_mostly_conference_papers
-from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
+from domain.journals.doi_namespaces import DoiNamespace, namespace_candidates, resolve_journal
 from domain.journals.expected import (
     EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE,
     EXPECTED_OA_STATUSES_BY_OA_MODEL,
@@ -180,9 +180,6 @@ _RECORDS_WITH_DOI_AND_JOURNAL = """
     WHERE doi IS NOT NULL AND journal_id IS NOT NULL AND NOT raw_metadata ? 'journal_id'
 """
 
-# Nombre d'exemples de DOI par paire de revues.
-_SAMPLE_DOIS = 3
-
 # Revues qui portent le même ISSN dans `issn` ou `eissn`.
 _SHARED_ISSN_GROUPS = """
     WITH colonnes AS (
@@ -239,11 +236,18 @@ class PgJournalQueries(JournalQueries):
             )
         }
         # Paire (revue de l'enregistrement, revue de l'espace de noms) → enregistrements.
-        pairs: dict[tuple[int, int], list[tuple[str, str, DoiNamespace]]] = defaultdict(list)
+        pairs: dict[tuple[int, int], list[tuple[str, DoiNamespace]]] = defaultdict(list)
+        # Espace de noms → ses DOI distincts, et ses enregistrements par revue.
+        dois: defaultdict[str, set[str]] = defaultdict(set)
+        documents: defaultdict[str, Counter[int]] = defaultdict(Counter)
         for r in self._conn.execute(text(_RECORDS_WITH_DOI_AND_JOURNAL)):
+            for candidate in namespace_candidates(r.doi):
+                if candidate in namespaces:
+                    dois[candidate].add(r.doi)
+                    documents[candidate][r.journal_id] += 1
             ns = resolve_journal(r.doi, namespaces)
             if ns is not None and ns.journal_id != r.journal_id:
-                pairs[(r.journal_id, ns.journal_id)].append((r.doi, r.source, ns))
+                pairs[(r.journal_id, ns.journal_id)].append((r.source, ns))
         journal_ids = list({journal_id for pair in pairs for journal_id in pair})
         journals = {
             r.id: _journal_list_item(r)
@@ -259,17 +263,18 @@ class PgJournalQueries(JournalQueries):
         }
         conflicts = []
         for (record_journal, namespace_journal), records in pairs.items():
-            ns = Counter(ns for _, _, ns in records).most_common(1)[0][0]
+            ns = Counter(ns for _, ns in records).most_common(1)[0][0]
+            by_journal = documents[ns.namespace]
             conflicts.append(
                 DoiNamespaceConflict(
                     namespace=ns.namespace,
-                    dois=ns.dois,
-                    share=ns.share,
+                    dois=len(dois[ns.namespace]),
+                    documents=by_journal.total(),
+                    share=by_journal[namespace_journal] / by_journal.total(),
                     namespace_journal=journals[namespace_journal],
                     record_journal=journals[record_journal],
                     records=len(records),
-                    sources=dict(Counter(source for _, source, _ in records).most_common()),
-                    sample_dois=sorted({doi for doi, _, _ in records})[:_SAMPLE_DOIS],
+                    sources=dict(Counter(source for source, _ in records).most_common()),
                 )
             )
         conflicts.sort(key=lambda c: (-c.records, c.record_journal.id, c.namespace_journal.id))

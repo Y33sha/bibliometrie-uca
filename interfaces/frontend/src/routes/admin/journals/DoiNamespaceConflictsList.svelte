@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { api, ApiError } from '$lib/api';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
+	import { sourceLabel } from '$lib/sources';
 	import type { components } from '$lib/api/schema';
 	import { mergeJournal } from './mergeJournal';
 
@@ -54,9 +55,14 @@
 		return [j.issn, j.eissn].filter(Boolean).join(' / ') || 'sans ISSN';
 	}
 
+	/** « 32 documents OpenAlex », « 20 documents OpenAlex, 12 HAL ». */
 	function sources(c: Conflict): string {
 		return Object.entries(c.sources)
-			.map(([source, n]) => `${source} ${n}`)
+			.map(([source, n], i) =>
+				i === 0
+					? `${n} document${n > 1 ? 's' : ''} ${sourceLabel(source)}`
+					: `${n} ${sourceLabel(source)}`
+			)
 			.join(', ');
 	}
 
@@ -69,7 +75,7 @@
 	<p class="muted">Aucune contradiction.</p>
 {:else}
 	<p class="muted intro">
-		Enregistrements dont la revue diffère de celle que désigne l'espace de noms de leur DOI. La première ligne de chaque paire est la revue de l'espace de noms, la seconde celle des enregistrements.
+		Documents dont la revue diffère de celle que désigne l'espace de noms de leur DOI. La première ligne de chaque paire est la revue de l'espace de noms, la seconde l'attribution concurrente.
 	</p>
 	<table>
 		<colgroup>
@@ -86,14 +92,9 @@
 			<tbody class="group">
 				<tr class="group-head">
 					<th colspan="5">
-						<code>{c.namespace}</code>
-						<span class="muted">
-							— {percent.format(c.share)} de {c.dois} DOI ;
-							{c.records} enregistrement{c.records > 1 ? 's' : ''} contredit{c.records > 1 ? 's' : ''} ({sources(c)}) :
-						</span>
-						{#each c.sample_dois as doi, i (doi)}
-							{#if i > 0}, {/if}<a href="https://doi.org/{doi}" target="_blank" rel="noopener">{doi}</a>
-						{/each}
+						<code>{c.namespace}</code> : {c.dois} DOI sur {c.documents} documents.
+						{percent.format(c.share)} désignent {c.namespace_journal.title}.<br />
+						Attribution concurrente : {c.record_journal.title} ({sources(c)}).
 					</th>
 				</tr>
 				{#each [[c.namespace_journal, c.record_journal], [c.record_journal, c.namespace_journal]] as [j, other] (j.id)}
