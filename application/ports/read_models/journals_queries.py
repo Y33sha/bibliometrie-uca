@@ -155,7 +155,7 @@ class LikelyProceedingsResponse(BaseModel):
 class DoiNamespaceConflict(BaseModel):
     """Enregistrements de `record_journal` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_journal`.
 
-    `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part de ces enregistrements qui porte `namespace_journal`. `records` compte les enregistrements de `record_journal`, `sources` les répartit par source.
+    `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_journal`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_journal`, `sources` les répartit par source.
     """
 
     namespace: str
