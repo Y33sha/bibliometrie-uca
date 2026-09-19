@@ -200,13 +200,12 @@ async def run_check_journals_in_sudoc(
             checked,
             total,
         )
+    found = metrics.extras.get("sudoc_found", 0)
     logger.info(
-        "%sTerminé : %d/%d %s vérifiées, %d présentes dans le Sudoc, %d modifiées",
+        "%sTerminé : %s dans le Sudoc, %d %s",
         DERNIERE_BRANCHE,
-        checked,
-        total,
-        forme(total, "revue"),
-        metrics.extras.get("sudoc_found", 0),
+        accord(found, "revue présente", "revues présentes"),
         metrics.updated,
+        forme(metrics.updated, "modifiée"),
     )
     return metrics
