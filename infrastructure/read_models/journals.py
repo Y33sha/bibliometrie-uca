@@ -269,7 +269,7 @@ class PgJournalQueries(JournalQueries):
                     record_journal=journals[record_journal],
                     records=len(records),
                     sources=dict(Counter(source for _, source, _ in records).most_common()),
-                    sample_dois=sorted(doi for doi, _, _ in records)[:_SAMPLE_DOIS],
+                    sample_dois=sorted({doi for doi, _, _ in records})[:_SAMPLE_DOIS],
                 )
             )
         conflicts.sort(key=lambda c: (-c.records, c.record_journal.id, c.namespace_journal.id))
