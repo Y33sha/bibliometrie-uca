@@ -93,7 +93,7 @@
 				<tr class="group-head">
 					<th colspan="5">
 						<code>{c.namespace}</code> : {c.dois} DOI sur {c.documents} documents.
-						{percent.format(c.share)} désignent {c.namespace_journal.title}.<br />
+						{percent.format(c.share)} des DOI désignent {c.namespace_journal.title}.<br />
 						Attribution concurrente : {c.record_journal.title} ({sources(c)}).
 					</th>
 				</tr>

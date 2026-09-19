@@ -372,8 +372,8 @@ class TestDoiNamespaceConflicts:
         assert conflict["record_journal"]["id"] == parasite
         assert (conflict["records"], conflict["sources"]) == (2, {"openalex": 2})
 
-    def test_part_des_documents_de_l_espace(self, client):
-        """DOI distincts, documents, et part des documents qui portent la revue de l'espace de noms."""
+    def test_doi_documents_et_part_de_l_espace(self, client):
+        """DOI distincts et documents de l'espace de noms ; la part des DOI est celle de l'apprentissage."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         journal = _seed_journal()
         other = _seed_journal()
@@ -390,7 +390,7 @@ class TestDoiNamespaceConflicts:
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
 
         (conflict,) = [c for c in conflicts if c["namespace"] == namespace]
-        assert (conflict["dois"], conflict["documents"], conflict["share"]) == (1, 4, 0.75)
+        assert (conflict["dois"], conflict["documents"], conflict["share"]) == (1, 4, 0.95)
 
     def test_count_matches_the_queue(self, client):
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]

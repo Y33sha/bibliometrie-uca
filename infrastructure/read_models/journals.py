@@ -237,14 +237,14 @@ class PgJournalQueries(JournalQueries):
         }
         # Paire (revue de l'enregistrement, revue de l'espace de noms) → enregistrements.
         pairs: dict[tuple[int, int], list[tuple[str, DoiNamespace]]] = defaultdict(list)
-        # Espace de noms → ses DOI distincts, et ses enregistrements par revue.
+        # Espace de noms → ses DOI distincts et ses enregistrements.
         dois: defaultdict[str, set[str]] = defaultdict(set)
-        documents: defaultdict[str, Counter[int]] = defaultdict(Counter)
+        documents: Counter[str] = Counter()
         for r in self._conn.execute(text(_RECORDS_WITH_DOI_AND_JOURNAL)):
             for candidate in namespace_candidates(r.doi):
                 if candidate in namespaces:
                     dois[candidate].add(r.doi)
-                    documents[candidate][r.journal_id] += 1
+                    documents[candidate] += 1
             ns = resolve_journal(r.doi, namespaces)
             if ns is not None and ns.journal_id != r.journal_id:
                 pairs[(r.journal_id, ns.journal_id)].append((r.source, ns))
@@ -264,13 +264,12 @@ class PgJournalQueries(JournalQueries):
         conflicts = []
         for (record_journal, namespace_journal), records in pairs.items():
             ns = Counter(ns for _, ns in records).most_common(1)[0][0]
-            by_journal = documents[ns.namespace]
             conflicts.append(
                 DoiNamespaceConflict(
                     namespace=ns.namespace,
                     dois=len(dois[ns.namespace]),
-                    documents=by_journal.total(),
-                    share=by_journal[namespace_journal] / by_journal.total(),
+                    documents=documents[ns.namespace],
+                    share=ns.share,
                     namespace_journal=journals[namespace_journal],
                     record_journal=journals[record_journal],
                     records=len(records),
