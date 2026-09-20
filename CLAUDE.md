@@ -47,6 +47,7 @@
 
 - Pose tes questions en **texte libre**. Pas de QCM à choix limités.
 - Gère les **commits** git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
+- Ne commite **pas** une pure modif de doc, sauf demande expresse.
 - **Ne fais PAS tourner toute la suite de tests** avant chaque commit (sauf les tests directement concernés par tes modifs). Les hooks et la CI sont là pour ça.
 
 ## Phases du pipeline
