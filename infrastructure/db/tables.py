@@ -303,6 +303,36 @@ journal_doi_namespaces = Table(
 )
 
 
+monographs = Table(
+    "monographs",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("title", Text, nullable=False),
+    Column("title_normalized", Text, nullable=False),
+    Column(
+        "proceedings",
+        Boolean,
+        nullable=False,
+        server_default="false",
+        comment="Vrai pour un volume d'actes de congrès, faux pour un livre.",
+    ),
+    Column(
+        "year",
+        Integer,
+        comment="Année de publication. Elle classe les volumes d'actes d'un même congrès.",
+    ),
+    Column("isbn", Text),
+    Column("publisher_id", Integer),
+    Column(
+        "journal_id",
+        Integer,
+        comment="Collection dont la monographie fait partie, quand cette collection porte un ISSN.",
+    ),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    UniqueConstraint("isbn", name="monographs_isbn_key"),
+)
+
+
 publishers = Table(
     "publishers",
     metadata,
@@ -670,6 +700,7 @@ publications = Table(
     Column("doi", Text),
     Column("oa_status", oa_type_enum, server_default="unknown"),
     Column("journal_id", Integer),
+    Column("monograph_id", Integer),
     Column("container_title", Text),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
