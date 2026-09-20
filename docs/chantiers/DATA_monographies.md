@@ -4,9 +4,12 @@ Périmètre : les publications qui portent un ISBN, celles de type `book` ou `bo
 
 ## Contexte
 
-Un livre n'a pas d'entité dans la base. Le conteneur d'un livre ou d'un chapitre est le livre lui-même, et non une revue : la normalisation n'en crée donc aucune, et le titre du livre va dans `container_title`, colonne de `publications` et de `source_publications`. Deux cas y échappent : un ISSN, qui désigne la collection et lui sert de revue ; un titre déjà porté par un recueil d'actes, qui reçoit alors le chapitre.
+Un livre n'a pas d'entité dans la base. Le conteneur d'un livre ou d'un chapitre est le livre lui-même, et le titre du livre va dans la colonne `container_title`. Deux cas y échappent :
 
-Un volume d'actes, lui, a une entrée dans `journals` : une communication de congrès garde son conteneur, avec ou sans ISSN. La table range donc au même niveau les revues, les recueils d'actes et les collections qui les réunissent.
+- la notice porte un ISSN, celui de la collection : cette collection devient la revue du document ;
+- le titre du conteneur est déjà celui d'un recueil d'actes en base : le document y est rattaché, sans création.
+
+Un volume d'actes, lui, a une entrée dans `journals`. La table range donc au même niveau les revues, les recueils d'actes et les collections qui les réunissent.
 
 Les chapitres d'un même livre ne partagent qu'une chaîne de caractères, qui varie d'une source à l'autre. Rien ne réunit un livre et ses chapitres.
 
