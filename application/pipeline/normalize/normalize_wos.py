@@ -25,7 +25,8 @@ from application.services.journals.core import find_or_create_container_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import clean_doi, find_isbns
+from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 
@@ -171,6 +172,17 @@ def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> 
     return None
 
 
+def _get_api_isbns(dynamic: Mapping[str, JsonValue], isbn_type: str) -> list[str]:
+    """ISBN d'un support (`isbn` papier, `eisbn` électronique), que WoS distingue par le type de l'identifiant."""
+    identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
+    isbns: list[str] = []
+    for entree in _safe_list(identifiers):
+        ident = as_mapping(entree)
+        if as_str(ident.get("type")) == isbn_type:
+            isbns += find_isbns(as_str(ident.get("value")))
+    return list(dict.fromkeys(isbns))
+
+
 def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:  # noqa: C901
     """Extrait un record structuré depuis le format API."""
     static = at_path(raw, "static_data")
@@ -311,7 +323,15 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "keywords": keywords,
         "topics": topics or None,
         "urls": None,
-        "external_ids": None,
+        "external_ids": {
+            key: isbns
+            for key, isbns in (
+                (ExternalIdType.ISBN, _get_api_isbns(dynamic, "isbn")),
+                (ExternalIdType.EISBN, _get_api_isbns(dynamic, "eisbn")),
+            )
+            if isbns
+        }
+        or None,
     }
 
 

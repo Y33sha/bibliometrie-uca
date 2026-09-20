@@ -232,6 +232,19 @@ class TestGetExternalIds:
         result = get_external_ids({"ISSN": ["1234-5678"], "ISBN": ["978-0-12345-678-9"]})
         assert result == {"issn": ["1234-5678"], "isbn": ["978-0-12345-678-9"]}
 
+    def test_electronic_isbn_goes_to_eisbn(self):
+        """`isbn-type` donne le support : l'édition électronique a sa clé."""
+        result = get_external_ids(
+            {
+                "ISBN": ["978-3-030-04869-3", "978-3-030-04870-9"],
+                "isbn-type": [
+                    {"value": "978-3-030-04869-3", "type": "print"},
+                    {"value": "978-3-030-04870-9", "type": "electronic"},
+                ],
+            }
+        )
+        assert result == {"isbn": ["978-3-030-04869-3"], "eisbn": ["978-3-030-04870-9"]}
+
     def test_filters_non_strings(self):
         # ISSN/ISBN avec valeurs non-str sont filtrés.
         assert get_external_ids({"ISSN": ["1234-5678", 12345, None]}) == ({"issn": ["1234-5678"]})

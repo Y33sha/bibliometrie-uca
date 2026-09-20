@@ -23,6 +23,7 @@ from application.pipeline.normalize import normalize_wos
 from application.pipeline.normalize.normalize_wos import (
     WosNormalizer,
     _get_api_doi,
+    _get_api_isbns,
     _get_api_issn,
     _get_api_title,
     _parse_api_authors,
@@ -158,6 +159,29 @@ class TestGetApiIssn:
 
     def test_handles_missing_keys(self):
         assert _get_api_issn({}, "issn") is None
+
+
+class TestGetApiIsbns:
+    """WoS distingue les supports : `isbn` pour le papier, `eisbn` pour l'électronique."""
+
+    DYNAMIC = {
+        "cluster_related": {
+            "identifiers": {
+                "identifier": [
+                    {"type": "isbn", "value": "978-3-030-04869-3"},
+                    {"type": "eisbn", "value": "978-3-030-04870-9"},
+                    {"type": "issn", "value": "0123-4567"},
+                ]
+            }
+        }
+    }
+
+    def test_separates_supports(self):
+        assert _get_api_isbns(self.DYNAMIC, "isbn") == ["9783030048693"]
+        assert _get_api_isbns(self.DYNAMIC, "eisbn") == ["9783030048709"]
+
+    def test_handles_missing_keys(self):
+        assert _get_api_isbns({}, "isbn") == []
 
 
 # ── _parse_api_authors ───────────────────────────────────────────

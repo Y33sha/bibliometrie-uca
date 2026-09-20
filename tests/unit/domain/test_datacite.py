@@ -11,6 +11,7 @@ from domain.sources.datacite import (
     get_abstract,
     get_cited_by_count,
     get_container,
+    get_isbns,
     get_keywords,
     get_language,
     get_publisher_name,
@@ -89,6 +90,37 @@ class TestContainer:
 
     def test_empty(self):
         assert get_container({"container": {}}) == (None, None)
+
+
+class TestIsbns:
+    def test_related_identifier(self):
+        attrs = {
+            "relatedIdentifiers": [
+                {"relatedIdentifier": "10.5555/x", "relatedIdentifierType": "DOI"},
+                {"relatedIdentifier": "978-3-95977-266-2", "relatedIdentifierType": "ISBN"},
+            ]
+        }
+        assert get_isbns(attrs) == ["9783959772662"]
+
+    def test_container_identifier(self):
+        attrs = {"container": {"identifier": "9783959772662", "identifierType": "ISBN"}}
+        assert get_isbns(attrs) == ["9783959772662"]
+
+    def test_same_isbn_twice_counts_once(self):
+        attrs = {
+            "relatedIdentifiers": [
+                {"relatedIdentifier": "978-3-95977-266-2", "relatedIdentifierType": "ISBN"}
+            ],
+            "container": {"identifier": "9783959772662", "identifierType": "ISBN"},
+        }
+        assert get_isbns(attrs) == ["9783959772662"]
+
+    def test_issn_container_gives_nothing(self):
+        attrs = {"container": {"identifier": "1234-5678", "identifierType": "ISSN"}}
+        assert get_isbns(attrs) == []
+
+    def test_empty(self):
+        assert get_isbns({}) == []
 
 
 class TestAbstract:

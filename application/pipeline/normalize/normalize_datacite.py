@@ -50,6 +50,7 @@ from domain.sources.datacite import (
     get_cited_by_count,
     get_container,
     get_container_pages,
+    get_isbns,
     get_keywords,
     get_language,
     get_publisher_name,
@@ -263,6 +264,8 @@ def process_work(
     external_ids: dict[str, JsonValue] = {}
     if related_dois:
         external_ids[ExternalIdType.RELATED_DOIS] = related_dois
+    if isbns := get_isbns(attributes):
+        external_ids[ExternalIdType.ISBN] = isbns
 
     source_publication_id = queries.upsert_source_publication(
         conn,

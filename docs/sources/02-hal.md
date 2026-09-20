@@ -18,7 +18,7 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 ## Données récupérées
 
-- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), OA, URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
+- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` de la notice TEI `label_xml`, seul endroit où HAL le donne), OA, URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
 - **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
 - **Affiliations** : structures HAL rattachées à chaque auteur via `authIdHasStructure_fs` (pas d'adresses textuelles)
 

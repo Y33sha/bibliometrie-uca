@@ -20,11 +20,19 @@ class ExternalIdType(StrEnum):
     """Autres DOI du document : preprint, dépôt, dataset, édition, ouvrage hôte d'un chapitre."""
     ISSN = "issn"
     ISBN = "isbn"
+    EISBN = "eisbn"
+    """ISBN de l'édition électronique, quand la source distingue les supports (Crossref, WoS)."""
 
 
 # Types portant une liste de valeurs. Les autres portent une seule valeur.
 MULTIVALUED_ID_TYPES = frozenset(
-    {ExternalIdType.HAL_ID, ExternalIdType.RELATED_DOIS, ExternalIdType.ISSN, ExternalIdType.ISBN}
+    {
+        ExternalIdType.HAL_ID,
+        ExternalIdType.RELATED_DOIS,
+        ExternalIdType.ISSN,
+        ExternalIdType.ISBN,
+        ExternalIdType.EISBN,
+    }
 )
 
 
@@ -46,6 +54,7 @@ _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
     ExternalIdType.RELATED_DOIS: _via(DOI.try_parse),
     ExternalIdType.ISSN: _via(ISSN.try_parse),
     ExternalIdType.ISBN: _via(ISBN.try_parse),
+    ExternalIdType.EISBN: _via(ISBN.try_parse),
 }
 
 

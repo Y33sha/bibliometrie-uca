@@ -23,6 +23,7 @@ from application.pipeline.normalize.normalize_hal import (
     get_title,
     insert_hal_document,
     parse_author_structures,
+    parse_tei_isbns,
     process_work,
     upsert_journal,
     upsert_publisher,
@@ -181,6 +182,31 @@ class TestExtractPubMetadata:
 
 def _embargo_tei(refs: str) -> str:
     return f'<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>{refs}</body></text></TEI>'
+
+
+class TestParseTeiIsbns:
+    """HAL ne donne l'ISBN que dans la notice TEI, et la zone porte parfois autre chose."""
+
+    def test_reads_the_isbn_zone(self):
+        xml = _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>')
+        assert parse_tei_isbns(xml) == ["9783031332104"]
+
+    def test_two_isbns_in_one_zone(self):
+        xml = _embargo_tei('<idno type="isbn">978-3-030-34162-6 ; 978-3-030-34163-3</idno>')
+        assert parse_tei_isbns(xml) == ["9783030341626", "9783030341633"]
+
+    def test_other_idno_ignored(self):
+        xml = _embargo_tei('<idno type="halId">hal-04434640</idno>')
+        assert parse_tei_isbns(xml) == []
+
+    def test_issn_in_the_zone_gives_nothing(self):
+        assert parse_tei_isbns(_embargo_tei('<idno type="isbn">2055-0472</idno>')) == []
+
+    def test_malformed_tei(self):
+        assert parse_tei_isbns("<TEI") == []
+
+    def test_no_label_xml(self):
+        assert parse_tei_isbns(None) == []
 
 
 class TestActiveEmbargoUntil:

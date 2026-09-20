@@ -23,7 +23,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 ## Données récupérées
 
-- **Publications** : DOI, titre, type (voir Particularités), langue, année (`publicationYear`), résumé (`descriptions` de type `Abstract`), mots-clés (`subjects`), citations (`citationCount`), revue/série hôte (`container` : titre et ISSN, voir Particularités), éditeur ou entrepôt déposant (`publisher`), licences (`rightsList`), financeurs (`fundingReferences`), DOI liés (`relatedIdentifiers`, voir Particularités)
+- **Publications** : DOI, titre, type (voir Particularités), langue, année (`publicationYear`), résumé (`descriptions` de type `Abstract`), mots-clés (`subjects`), citations (`citationCount`), revue/série hôte (`container` : titre et ISSN, voir Particularités), éditeur ou entrepôt déposant (`publisher`), licences (`rightsList`), financeurs (`fundingReferences`), DOI liés (`relatedIdentifiers`, voir Particularités), ISBN (`relatedIdentifiers` de type ISBN, ou identifiant du `container` quand il en est un)
 - **Auteurs** : nom (`creators`), ORCID si présent (`nameIdentifiers`), affiliation textuelle
 
 ## Exemple de payload
