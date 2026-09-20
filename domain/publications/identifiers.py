@@ -565,6 +565,24 @@ class ISBN:
         return self.value
 
 
+# Suite de chiffres, tirets et espaces de la longueur d'un ISBN, isolée de ce qui l'entoure. La
+# clé de contrôle départage ensuite les vrais ISBN.
+_ISBN_CANDIDATE_RE = re.compile(r"(?<![\dXx])(?:97[89][-\s]?)?(?:\d[-\s]?){9}[\dXx](?![\dXx])")
+
+
+def find_isbns(text: str | None) -> list[str]:
+    """ISBN-13 portés par `text`, dans l'ordre, sans doublon.
+
+    Une zone donne parfois plusieurs ISBN (`978-2-84867-659-3 ; 978-2-84867-660-9`), un EAN qui répète l'ISBN, ou un ISBN suivi d'un numéro de chapitre (`978-3-319-77273-8_16`). Une suite de chiffres dont la clé de contrôle est fausse est écartée, de même qu'un ISSN, plus court.
+    """
+    found: list[str] = []
+    for match in _ISBN_CANDIDATE_RE.finditer(text or ""):
+        isbn = ISBN.try_parse(match.group(0))
+        if isbn is not None and isbn.value not in found:
+            found.append(isbn.value)
+    return found
+
+
 # ── Helpers publics (API string-in/string-out) ─────────────────────
 #
 # Ces fonctions couvrent le besoin du code existant qui travaille sur

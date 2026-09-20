@@ -17,6 +17,7 @@ from domain.publications.identifiers import (
     DoiPrefix,
     HALId,
     extract_doi_from_url,
+    find_isbns,
     is_hal_host,
     issn_rejection_reason,
     issn_search_prefix,
@@ -469,6 +470,29 @@ class TestISBN:
     )
     def test_try_parse_rejects_invalid(self, raw):
         assert ISBN.try_parse(raw) is None
+
+
+class TestFindIsbns:
+    """Zones de notice telles que HAL, DataCite et WoS les portent."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("978-3-030-34162-6 ; 978-3-030-34163-3", ["9783030341626", "9783030341633"]),
+            ("978-2-7380-1445-0 / EAN: 9782738014450", ["9782738014450"]),  # l'EAN répète l'ISBN
+            ("978-3-319-77273-8_16", ["9783319772738"]),  # suffixe de chapitre
+            ("10.1007/978-3-030-58080-3_309", ["9783030580803"]),  # ISBN porté par un DOI
+            ("2055-0472", []),  # un ISSN est plus court
+            ("9786-2-916153-40-7", []),  # tiret mal placé, clé fausse
+            ("978753589865", []),  # douze chiffres
+            ("", []),
+        ],
+    )
+    def test_extracts(self, raw, expected):
+        assert find_isbns(raw) == expected
+
+    def test_none_gives_nothing(self):
+        assert find_isbns(None) == []
 
 
 # ── DoiPrefix ──────────────────────────────────────────────────────

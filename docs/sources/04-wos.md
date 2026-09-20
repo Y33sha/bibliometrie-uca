@@ -15,7 +15,7 @@ https://developer.clarivate.com/apis/wos
 
 ## Données récupérées
 
-- **Publications** : UID (identifiant interne WoS), titre, DOI, année, type de document, langue, OA status, nombre de citations, résumé, mots-clés, topics (sujets + headings WoS), biblio (volume/numéro/pages), journal (titre, ISSN, eISSN, éditeur)
+- **Publications** : UID (identifiant interne WoS), titre, DOI, année, type de document, langue, OA status, nombre de citations, résumé, mots-clés, topics (sujets + headings WoS), biblio (volume/numéro/pages), journal (titre, ISSN, eISSN, éditeur), ISBN et eISBN (identifiants `isbn` et `eisbn`, qui disent le support)
 - **Auteurs** : nom complet, position, rôle, drapeau corresponding, ResearcherID Clarivate (identifiant stable de l'auteur côté WoS).
 - **Affiliations** : adresses textuelles + noms d'organisations rattachés à chaque auteur (pas d'identifiant stable d'institution côté WoS — le nom fait office d'identifiant).
 

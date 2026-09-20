@@ -122,14 +122,25 @@ def get_language(msg: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Identifiants secondaires (ISSN, ISBN). DOI vit dans la colonne dédiée."""
+    """Identifiants secondaires (ISSN, ISBN). DOI vit dans la colonne dédiée.
+
+    `isbn-type` donne le support de chaque ISBN : celui de l'édition électronique va sous `eisbn`. Un ISBN sans support déclaré reste sous `isbn`.
+    """
     ext: dict[str, JsonValue] = {}
     issns = msg.get("ISSN") or []
     if isinstance(issns, list) and issns:
         ext[ExternalIdType.ISSN] = [s for s in issns if isinstance(s, str)]
-    isbns = msg.get("ISBN") or []
-    if isinstance(isbns, list) and isbns:
-        ext[ExternalIdType.ISBN] = [s for s in isbns if isinstance(s, str)]
+    electroniques = {
+        value
+        for entry in as_sequence(msg.get("isbn-type"))
+        if (value := as_str(as_mapping(entry).get("value")))
+        and as_str(as_mapping(entry).get("type")) == "electronic"
+    }
+    isbns = [s for s in as_sequence(msg.get("ISBN")) if isinstance(s, str)]
+    if papier := [s for s in isbns if s not in electroniques]:
+        ext[ExternalIdType.ISBN] = papier
+    if en_ligne := [s for s in isbns if s in electroniques]:
+        ext[ExternalIdType.EISBN] = en_ligne
     return ext or None
 
 

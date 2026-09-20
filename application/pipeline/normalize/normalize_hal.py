@@ -36,6 +36,7 @@ from domain.persons.identifiers import (
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
+    find_isbns,
     normalize_arxiv_id,
     normalize_nnt,
     normalize_pmcid,
@@ -155,6 +156,8 @@ def build_hal_external_ids(
     external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
         external_ids[ExternalIdType.NNT] = nnt
+    if isbns := parse_tei_isbns(hal_text_field(doc.get("label_xml"))):
+        external_ids[ExternalIdType.ISBN] = isbns
     if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
         external_ids[ExternalIdType.PMID] = pmid
     brut = doc.get("linkExtUrl_s")
@@ -303,6 +306,25 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
         return None
     latest = max(dates)
     return latest if latest > today else None
+
+
+def parse_tei_isbns(label_xml: str | None) -> list[str]:
+    """ISBN portés par le TEI HAL (`idno[@type='isbn']`), le seul endroit où HAL les donne.
+
+    Une zone porte parfois deux ISBN, un EAN qui répète l'ISBN, ou un numéro de chapitre à la suite : `find_isbns` en tire les ISBN valides.
+    """
+    if not label_xml:
+        return []
+    try:
+        root = _parse_tei(label_xml)
+    except (ParseError, DefusedXmlException):
+        return []
+    isbns: list[str] = []
+    for idno in root.iter(f"{{{_TEI_NS['tei']}}}idno"):
+        if idno.get("type") != "isbn":
+            continue
+        isbns += [isbn for isbn in find_isbns(idno.text) if isbn not in isbns]
+    return isbns
 
 
 def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:

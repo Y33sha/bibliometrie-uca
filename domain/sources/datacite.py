@@ -10,8 +10,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_str
+from domain.publications.identifiers import clean_doi, find_isbns
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
 def get_title(attributes: Mapping[str, JsonValue]) -> str | None:
@@ -85,6 +85,22 @@ def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str 
         if isinstance(identifier, str) and identifier.strip():
             issn = identifier.strip()
     return title, issn
+
+
+def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
+    """ISBN du document : ceux des `relatedIdentifiers` de type ISBN, et celui du conteneur quand son identifiant en est un.
+
+    DataCite ne dit pas le support : ces ISBN sont ceux du livre hôte, papier ou électronique.
+    """
+    isbns: list[str] = []
+    for related in as_sequence(attributes.get("relatedIdentifiers")):
+        entry = as_mapping(related)
+        if (as_str(entry.get("relatedIdentifierType")) or "").upper() == "ISBN":
+            isbns += find_isbns(as_str(entry.get("relatedIdentifier")))
+    container = as_mapping(attributes.get("container"))
+    if (as_str(container.get("identifierType")) or "").upper() == "ISBN":
+        isbns += find_isbns(as_str(container.get("identifier")))
+    return list(dict.fromkeys(isbns))
 
 
 def get_container_pages(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
