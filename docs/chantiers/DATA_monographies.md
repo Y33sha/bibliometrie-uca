@@ -4,9 +4,9 @@ Périmètre : les publications qui portent un ISBN, celles de type `book` ou `bo
 
 ## Contexte
 
-Un livre n'a pas d'entité dans la base. La normalisation ne crée aucune revue pour un livre ou un chapitre sans ISSN : elle le rattache seulement à un recueil d'actes existant de même titre, et sinon son titre va dans `container_title`, colonne de `publications` et de `source_publications`. Avec un ISSN, la revue est sa collection.
+Un livre n'a pas d'entité dans la base. Le conteneur d'un livre ou d'un chapitre est le livre lui-même, et non une revue : la normalisation n'en crée donc aucune, et le titre du livre va dans `container_title`, colonne de `publications` et de `source_publications`. Deux cas y échappent : un ISSN, qui désigne la collection et lui sert de revue ; un titre déjà porté par un recueil d'actes, qui reçoit alors le chapitre.
 
-Un volume d'actes, lui, a une entrée dans `journals` : un document issu d'un congrès garde son conteneur, avec ou sans ISSN. La table range donc au même niveau les revues, les recueils d'actes et les collections qui les réunissent.
+Un volume d'actes, lui, a une entrée dans `journals` : une communication de congrès garde son conteneur, avec ou sans ISSN. La table range donc au même niveau les revues, les recueils d'actes et les collections qui les réunissent.
 
 Les chapitres d'un même livre ne partagent qu'une chaîne de caractères, qui varie d'une source à l'autre. Rien ne réunit un livre et ses chapitres.
 
