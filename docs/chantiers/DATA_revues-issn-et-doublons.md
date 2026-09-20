@@ -126,10 +126,9 @@ Mesure sur 1 000 ISSN de revues tirés au hasard : 832 sont présents dans le Su
 - [x] File de l'administration pour les 232 conteneurs typés `journal` que ce signal désigne comme recueils d'actes : onglet « Recueils d'actes probables » de `admin/journals`. Les vraies revues qui publient les résumés d'un congrès (*Value in Health*, *Diabetologia*) y restent : une colonne qui retiendrait leur vérification attend de savoir si ce résidu gêne.
 - [x] Typage par le titre dans `type_proceedings_journals` : une revue sans ISSN dont le titre nomme une édition datée devient `proceedings` (`names_a_dated_event`). Ne comptent ni une période (« 1960–2015 »), ni une année seule entre parenthèses, ni un titre qui contient « journal ». Mesure : 95 revues typées `journal` et 3 `unknown`, toutes des actes ; 447 des recueils sans ISSN déjà typés sont retrouvés.
 - [x] Typage par un titre d'actes : une revue sans ISSN dont le titre contient « proceedings », sans « society », « academy » ni « institution », devient `proceedings` (`names_proceedings`). Les revues ainsi nommées (*PNAS*, *Proceedings of the Institution of Civil Engineers*) sont écartées par leur ISSN, puis par ces mots. Mesure : 10 revues typées `journal`, toutes des actes.
-- [ ] ISBN : seul Crossref est lu (`external_ids.isbn`). HAL (TEI `idno type="isbn"`) et WoS (identifiants `isbn`, `eisbn`) le fournissent aussi, DataCite surtout en texte libre. Le DOI contient un ISBN pour 3 464 chapitres, 465 livres et 1 287 articles de congrès (`10.1007/978-3-030-58080-3_309-1`).
+- Les ISBN, les livres et les chapitres relèvent du chantier [Monographies](DATA_monographies.md). Mesure reprise : le DOI contient un ISBN pour 3 464 chapitres, 465 livres et 1 287 articles de congrès (`10.1007/978-3-030-58080-3_309-1`).
 
 ## Questions ouvertes
 
 - **Seconde source.** Faut-il une seconde source pour les ISSN absents du Sudoc (17 % de l'échantillon) ?
-- **Recueils et collections.** La table `journals` range au même niveau les recueils d'actes et la collection qui les réunit (*Communications in Computer and Information Science*, *IFIP AICT*). Faut-il une table des monographies, identifiées par leur ISBN et rattachées à leur collection ?
 - **Groupes d'éditeurs.** Faut-il compter les publications par groupe (Informa, Springer Nature, Elsevier) ? Un lien de groupe entre éditeurs y répondrait, sans fusion.
