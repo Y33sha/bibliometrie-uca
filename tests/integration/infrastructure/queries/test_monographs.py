@@ -68,6 +68,21 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
     assert tuple(_row(sa_sync_conn, mid)) == (_PAPER, None, 2020, True)
 
 
+def test_suppression_des_monographies_vides(repo, sa_sync_conn):
+    empty = _create(repo, "Vide")
+    held = _create(repo, "Portée")
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
+            " VALUES ('hal', 'hal-monographie', 'Chapitre', :mid)"
+        ),
+        {"mid": held},
+    )
+    deleted = [mid for mid, _ in repo.delete_empty_monographs()]
+    assert empty in deleted
+    assert held not in deleted
+
+
 def test_isbn_d_une_autre_monographie_hors_des_colonnes(repo, sa_sync_conn):
     """Deux monographies en double : l'ISBN de l'une ne va pas dans l'autre, la contrainte d'unicité le refuserait."""
     holder = _create(repo, "Livre A", eisbn=_ELECTRONIC)

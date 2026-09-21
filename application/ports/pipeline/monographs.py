@@ -11,6 +11,14 @@ class MonographMatch(NamedTuple):
     eisbn: str | None
 
 
+class MonographCleanupQueries(Protocol):
+    """Suppression des monographies vides."""
+
+    def delete_empty_monographs(self) -> list[tuple[int, str]]:
+        """Supprime les monographies qu'aucun enregistrement ni aucune publication ne porte, et rend `(id, titre)` de chacune."""
+        ...
+
+
 class MonographFindOrCreateQueries(Protocol):
     """Trouve ou crée une monographie à partir des métadonnées d'une source (consommé par les normaliseurs)."""
 

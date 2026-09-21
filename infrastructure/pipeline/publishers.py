@@ -21,6 +21,7 @@ _DELETE_EMPTY_PUBLISHERS = text("""
       AND NOT EXISTS (SELECT 1 FROM doi_prefixes d WHERE d.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM journal_name_forms f WHERE f.publisher_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.publisher_id = p.id)
     RETURNING p.id, p.name
 """)
 

@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishers_journals` — supprime les éditeurs vides.
 
-Un éditeur vide ne porte ni revue, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue rattachée à un éditeur retrouve une revue par son titre chez cet éditeur : l'éditeur qui la porte reste. Ses propres formes de nom partent avec lui. Le journal garde le nom de chaque éditeur supprimé.
+Un éditeur vide ne porte ni revue, ni monographie, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue rattachée à un éditeur retrouve une revue par son titre chez cet éditeur : l'éditeur qui la porte reste. Ses propres formes de nom partent avec lui. Le journal garde le nom de chaque éditeur supprimé.
 """
 
 import logging

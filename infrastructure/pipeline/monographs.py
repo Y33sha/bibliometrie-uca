@@ -2,7 +2,11 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.monographs import MonographFindOrCreateQueries, MonographMatch
+from application.ports.pipeline.monographs import (
+    MonographCleanupQueries,
+    MonographFindOrCreateQueries,
+    MonographMatch,
+)
 from infrastructure.db.scalars import scalar_int
 
 _FIND_BY_ISBN = text("""
@@ -43,11 +47,22 @@ _ENRICH = text("""
 """)
 
 
-class PgMonographGatewayQueries(MonographFindOrCreateQueries):
+_DELETE_EMPTY = text("""
+    DELETE FROM monographs m
+    WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.monograph_id = m.id)
+      AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.monograph_id = m.id)
+    RETURNING m.id, m.title
+""")
+
+
+class PgMonographGatewayQueries(MonographFindOrCreateQueries, MonographCleanupQueries):
     """Accès PostgreSQL à `monographs` pour le pipeline, via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def delete_empty_monographs(self) -> list[tuple[int, str]]:
+        return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))
 
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
         return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()

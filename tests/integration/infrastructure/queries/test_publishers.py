@@ -50,8 +50,17 @@ class TestDeleteEmptyPublishers:
             {"j": other_journal, "p": with_form},
         )
 
+        with_monograph = _publisher(sa_sync_conn, "Presses universitaires de Rennes")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO monographs (title, title_normalized, publisher_id)"
+                " VALUES ('Livre', 'livre', :p)"
+            ),
+            {"p": with_monograph},
+        )
+
         deleted = PgPublisherGatewayQueries(sa_sync_conn).delete_empty_publishers()
 
         ids = {publisher_id for publisher_id, _ in deleted}
         assert empty in ids
-        assert not ids & {with_journal, with_prefix, with_form}
+        assert not ids & {with_journal, with_prefix, with_form, with_monograph}

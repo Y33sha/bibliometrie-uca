@@ -32,5 +32,5 @@ class PublisherCleanupQueries(Protocol):
     """Suppression des éditeurs vides."""
 
     def delete_empty_publishers(self) -> list[tuple[int, str]]:
-        """Supprime les éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue, et rend `(id, nom)` de chacun."""
+        """Supprime les éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue, et rend `(id, nom)` de chacun."""
         ...
