@@ -74,7 +74,10 @@ def upsert_publisher(
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
-    """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`, à défaut le congrès, `conferenceTitle_s`), et les ISBN de la notice TEI."""
+    """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN de la notice TEI.
+
+    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : le congrès ne désigne pas un volume.
+    """
     journal_title = hal_text_field(doc.get("journalTitle_s"))
     return ContainerFacts(
         source="hal",
@@ -82,8 +85,7 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
         document_title=get_title(doc),
         journal_title=journal_title,
         collection_title=journal_title,
-        book_title=hal_text_field(doc.get("bookTitle_s"))
-        or hal_text_field(doc.get("conferenceTitle_s")),
+        book_title=hal_text_field(doc.get("bookTitle_s")),
         issn=hal_text_field(doc.get("journalIssn_s")),
         eissn=hal_text_field(doc.get("journalEissn_s")),
         isbns=tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml")))),
