@@ -13,6 +13,7 @@ def _run(substep_metrics: PhaseMetrics, logger: logging.Logger) -> PhaseMetrics:
         check_in_sudoc=lambda: PhaseMetrics(),
         merge_duplicates=lambda: PhaseMetrics(),
         delete_empty=lambda: PhaseMetrics(),
+        merge_duplicate_monographs=lambda: PhaseMetrics(),
         delete_empty_monographs=lambda: PhaseMetrics(),
         delete_empty_publishers=lambda: PhaseMetrics(),
         type_proceedings=lambda: PhaseMetrics(),
