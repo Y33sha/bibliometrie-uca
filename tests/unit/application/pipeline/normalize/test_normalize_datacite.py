@@ -342,10 +342,8 @@ class TestContainers:
 
         assert upsert_containers(attrs, 7, container_repo=MagicMock()) == Containers(3, None)
 
-    def test_copie_d_entrepot_sans_revue(self, monkeypatch):
+    def test_copie_d_entrepot_sans_revue(self):
         """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
-        fake = MagicMock(return_value=Containers(3, None))
-        monkeypatch.setattr(normalize_datacite, "find_or_create_containers", fake)
         attrs = {
             "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
             "container": {
@@ -355,9 +353,21 @@ class TestContainers:
                 "type": "Series",
             },
         }
+        facts = get_container_facts(attrs)
+        assert (facts.journal_title, facts.book_title) == (None, None)
 
-        assert upsert_containers(attrs, 7, container_repo=MagicMock()) == Containers(None, None)
-        fake.assert_not_called()
+    def test_livre_sans_conteneur_garde_titre_et_isbn(self):
+        """Cas réel : Classiques Garnier décrit la collection par ses seuls ISSN, sans titre."""
+        attrs = {
+            "types": {"resourceTypeGeneral": "Book", "resourceType": "Book"},
+            "titles": [{"title": "Éléments et Matières"}],
+            "container": {"identifier": "2493-8947", "identifierType": "LISSN", "type": "Series"},
+            "identifiers": [{"identifier": "978-2-406-09785-3", "identifierType": "ISBN"}],
+        }
+        facts = get_container_facts(attrs)
+        assert facts.document_title == "Éléments et Matières"
+        assert facts.isbns == ("9782406097853",)
+        assert facts.journal_title is None
 
 
 def _attributs(**surcharges) -> dict:
