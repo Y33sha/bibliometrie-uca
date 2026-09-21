@@ -24,33 +24,25 @@ class MonographMergeQueries(Protocol):
         ...
 
 
-class MonographCollectionLink(NamedTuple):
-    """Une monographie rattachée à sa collection, avec l'entrée de `journals` qu'elle désignait avant."""
+class MonographJournalCandidates(NamedTuple):
+    """Une monographie, son `journal_id`, et les entrées de `journals` que portent ses enregistrements, à ISSN et sans ISSN."""
 
     monograph_id: int
     title: str
-    collection_id: int
-    collection_title: str
-    previous_id: int | None
-
-
-class MonographCollectionConflict(NamedTuple):
-    """Une monographie dont les enregistrements portent plusieurs entrées de `journals` à ISSN."""
-
-    monograph_id: int
-    title: str
-    candidate_ids: tuple[int, ...]
+    journal_id: int | None
+    with_issn: tuple[int, ...]
+    without_issn: tuple[int, ...]
 
 
 class MonographCollectionQueries(Protocol):
     """Rattachement des monographies à leur collection."""
 
-    def link_monographs_to_collections(self) -> list[MonographCollectionLink]:
-        """Donne pour `journal_id` à chaque monographie la seule entrée de `journals` à ISSN que portent ses enregistrements. Une monographie sans entrée à ISSN, ou à plusieurs, garde son `journal_id`. Rend les rattachements modifiés."""
+    def find_monograph_journal_candidates(self) -> list[MonographJournalCandidates]:
+        """Chaque monographie portée par au moins un enregistrement, avec les entrées de `journals` de ses enregistrements."""
         ...
 
-    def find_monograph_collection_conflicts(self) -> list[MonographCollectionConflict]:
-        """Les monographies dont les enregistrements portent plusieurs entrées de `journals` à ISSN."""
+    def set_monograph_journal(self, monograph_id: int, journal_id: int | None) -> None:
+        """Pose le `journal_id` d'une monographie."""
         ...
 
 

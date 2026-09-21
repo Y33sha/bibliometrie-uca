@@ -8,6 +8,7 @@ from domain.journals.containers import (
     container_is_journal,
     container_role,
     holds_mostly_conference_papers,
+    is_book_or_chapter,
     is_conference,
     is_dated_event_without_issn,
 )
@@ -129,3 +130,10 @@ def test_titre_date_avec_issn():
 
 def test_revue_sans_document():
     assert not holds_mostly_conference_papers([])
+
+
+def test_livre_ou_chapitre_hors_article_de_congres():
+    assert is_book_or_chapter("book-chapter", "crossref")
+    assert is_book_or_chapter("OUV", "hal")
+    assert not is_book_or_chapter("Book Chapter; Proceedings Paper", "wos")
+    assert not is_book_or_chapter("journal-article", "crossref")

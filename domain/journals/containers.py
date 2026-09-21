@@ -56,6 +56,12 @@ def container_is_journal(
     return _CONFERENCE_PAPER in types or not types & {_BOOK, _BOOK_CHAPTER}
 
 
+def is_book_or_chapter(raw_doc_type: str | None, source: str) -> bool:
+    """Indique si un document est un livre ou un chapitre, hors article de congrès."""
+    types = _doc_types(raw_doc_type, source)
+    return bool(types & {_BOOK, _BOOK_CHAPTER}) and _CONFERENCE_PAPER not in types
+
+
 def is_conference(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> bool:

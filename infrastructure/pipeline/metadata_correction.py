@@ -143,7 +143,9 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
         rows = conn.execute(
             text("""
-                SELECT id, doi, journal_id, raw_metadata
+                SELECT id, source::text AS source,
+                       coalesce(raw_metadata->'doc_type'->>'raw', doc_type) AS raw_doc_type,
+                       doi, journal_id, raw_metadata
                 FROM source_publications
                 WHERE (journal_id IS NULL AND doi IS NOT NULL)
                    OR raw_metadata ? 'journal_id'

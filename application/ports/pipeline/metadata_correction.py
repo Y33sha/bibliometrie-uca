@@ -71,9 +71,11 @@ class CorrectionUpdate(NamedTuple):
 
 
 class JournalCorrectionRow(NamedTuple):
-    """Une `source_publication` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
+    """Une `source_publication` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
 
     id: int
+    source: str
+    raw_doc_type: str | None
     doi: str | None
     journal_id: int | None
     raw_metadata: dict[str, JsonValue]

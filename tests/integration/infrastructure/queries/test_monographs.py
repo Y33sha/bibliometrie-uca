@@ -112,31 +112,28 @@ def _record(conn, source_id: str, monograph_id: int, journal_id: int) -> None:
     )
 
 
-def test_rattachement_a_la_seule_collection_a_issn(repo, sa_sync_conn):
+def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
     volume = _journal(sa_sync_conn, "NuFACT 2022")
     collection = _journal(sa_sync_conn, "Lecture notes test", issn="2999-0101")
     mid = _create(repo, "NuFACT 2022", journal_id=volume)
     _record(sa_sync_conn, "c-1", mid, collection)
     _record(sa_sync_conn, "c-2", mid, volume)
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
+            " VALUES ('hal', 'c-3', 'Chapitre', :mid)"
+        ),
+        {"mid": mid},
+    )
 
-    links = [link for link in repo.link_monographs_to_collections() if link.monograph_id == mid]
+    candidates = {c.monograph_id: c for c in repo.find_monograph_journal_candidates()}
+    assert candidates[mid][2:] == (volume, (collection,), (volume,))
 
-    assert [(link.collection_id, link.previous_id) for link in links] == [(collection, volume)]
-    assert repo.link_monographs_to_collections() == []
-
-
-def test_plusieurs_collections_signalees_sans_changement(repo, sa_sync_conn):
-    first = _journal(sa_sync_conn, "Collection A", issn="2999-0102")
-    second = _journal(sa_sync_conn, "Collection B", issn="2999-0103")
-    mid = _create(repo, "Algorithms")
-    _record(sa_sync_conn, "c-3", mid, first)
-    _record(sa_sync_conn, "c-4", mid, second)
-
-    assert mid not in {link.monograph_id for link in repo.link_monographs_to_collections()}
-    conflicts = {
-        c.monograph_id: c.candidate_ids for c in repo.find_monograph_collection_conflicts()
-    }
-    assert conflicts[mid] == (first, second)
+    repo.set_monograph_journal(mid, collection)
+    journal_id = sa_sync_conn.execute(
+        text("SELECT journal_id FROM monographs WHERE id = :id"), {"id": mid}
+    ).scalar_one()
+    assert journal_id == collection
 
 
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
