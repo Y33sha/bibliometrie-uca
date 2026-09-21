@@ -4,6 +4,9 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.monographs import (
     MonographCleanupQueries,
+    MonographCollectionConflict,
+    MonographCollectionLink,
+    MonographCollectionQueries,
     MonographFindOrCreateQueries,
     MonographMergeQueries,
     MonographTitleGroup,
@@ -77,8 +80,46 @@ _RELEASE_SOURCE_ISBNS = text("UPDATE monographs SET isbn = NULL, eisbn = NULL WH
 _DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
 
 
+# Entrées de `journals` à ISSN que portent les enregistrements de chaque monographie.
+_COLLECTION_CANDIDATES = """
+    SELECT s.monograph_id, array_agg(DISTINCT s.journal_id ORDER BY s.journal_id) AS candidate_ids
+    FROM source_publications s
+    JOIN journals j ON j.id = s.journal_id
+    WHERE s.monograph_id IS NOT NULL
+      AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL)
+    GROUP BY s.monograph_id
+"""
+
+_LINK_TO_COLLECTIONS = text(f"""
+    WITH candidates AS ({_COLLECTION_CANDIDATES}), changes AS (
+        SELECT m.id, m.journal_id AS previous_id, c.candidate_ids[1] AS collection_id
+        FROM monographs m
+        JOIN candidates c ON c.monograph_id = m.id
+        WHERE cardinality(c.candidate_ids) = 1
+          AND m.journal_id IS DISTINCT FROM c.candidate_ids[1]
+    )
+    UPDATE monographs m
+    SET journal_id = ch.collection_id
+    FROM changes ch, journals j
+    WHERE m.id = ch.id AND j.id = ch.collection_id
+    RETURNING m.id, m.title, ch.collection_id, j.title AS collection_title, ch.previous_id
+""")
+
+_COLLECTION_CONFLICTS = text(f"""
+    WITH candidates AS ({_COLLECTION_CANDIDATES})
+    SELECT m.id, m.title, c.candidate_ids
+    FROM candidates c
+    JOIN monographs m ON m.id = c.monograph_id
+    WHERE cardinality(c.candidate_ids) > 1
+    ORDER BY m.id
+""")
+
+
 class PgMonographGatewayQueries(
-    MonographFindOrCreateQueries, MonographMergeQueries, MonographCleanupQueries
+    MonographFindOrCreateQueries,
+    MonographMergeQueries,
+    MonographCollectionQueries,
+    MonographCleanupQueries,
 ):
     """Accès PostgreSQL à `monographs` pour le pipeline, via une `Connection` SQLAlchemy."""
 
@@ -114,6 +155,20 @@ class PgMonographGatewayQueries(
             journal_id=source.journal_id,
         )
         self._conn.execute(_DELETE_SOURCE, params)
+
+    def link_monographs_to_collections(self) -> list[MonographCollectionLink]:
+        return sorted(
+            MonographCollectionLink(
+                r.id, r.title, r.collection_id, r.collection_title, r.previous_id
+            )
+            for r in self._conn.execute(_LINK_TO_COLLECTIONS)
+        )
+
+    def find_monograph_collection_conflicts(self) -> list[MonographCollectionConflict]:
+        return [
+            MonographCollectionConflict(r.id, r.title, tuple(r.candidate_ids))
+            for r in self._conn.execute(_COLLECTION_CONFLICTS)
+        ]
 
     def delete_empty_monographs(self) -> list[tuple[int, str]]:
         return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))

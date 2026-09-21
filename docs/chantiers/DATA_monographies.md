@@ -100,9 +100,11 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 6. Normalisation cible
 
-- [ ] Résolution du conteneur : la série par ISSN, créée sous la forme de série du titre reçu quand elle manque ; la monographie par ISBN ou par titre de volume. Un titre de volume ne crée plus d'entrée dans `journals`, même pour un article (source OpenAlex de type `conference`).
+- [x] `determine_container_type` (`domain/journals/containers.py`) sépare la description du conteneur (`ContainerDescription`) en série et volume. La normalisation en tire la monographie ; le `journal_id` des enregistrements suit la règle en place jusqu'à la phase 7.
+- [ ] Résolution de la série : par ISSN, créée sous son titre de série quand elle manque. Un titre de volume ne crée plus d'entrée dans `journals`, même pour un article (source OpenAlex de type `conference`).
 - [ ] Sous-étape de `publishers_journals` : séries sans ISSN, reconnues par clé de série entre plusieurs monographies ; la monographie reçoit leur `journal_id`.
-- [ ] Rattachement des monographies à leur collection : ISSN porté par leurs enregistrements, ou série sans ISSN.
+- [x] Sous-étape `link_monographs_to_collections` : une monographie a pour `journal_id` la seule entrée de `journals` à ISSN que portent ses enregistrements ; sans elle, son `journal_id` reste. Plusieurs entrées à ISSN sont signalées comme conflit, sans changement. Mesure : 734 monographies à collection, aucune à plusieurs candidats.
+- [ ] Rattachement aux séries sans ISSN.
 - [ ] Agrégation : le `journal_id` d'une publication vient de ses enregistrements, à défaut de la collection de sa monographie.
 - [ ] Règle de correction : les articles et chapitres d'un volume d'actes deviennent des articles de congrès, d'après la monographie.
 

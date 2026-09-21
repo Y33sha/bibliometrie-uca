@@ -92,6 +92,53 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     assert gone == 0
 
 
+def _journal(conn, title: str, issn: str | None = None) -> int:
+    return conn.execute(
+        text(
+            "INSERT INTO journals (title, title_normalized, issn)"
+            " VALUES (:t, lower(:t), :i) RETURNING id"
+        ),
+        {"t": title, "i": issn},
+    ).scalar_one()
+
+
+def _record(conn, source_id: str, monograph_id: int, journal_id: int) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, monograph_id, journal_id)"
+            " VALUES ('crossref', :sid, 'Chapitre', :mid, :jid)"
+        ),
+        {"sid": source_id, "mid": monograph_id, "jid": journal_id},
+    )
+
+
+def test_rattachement_a_la_seule_collection_a_issn(repo, sa_sync_conn):
+    volume = _journal(sa_sync_conn, "NuFACT 2022")
+    collection = _journal(sa_sync_conn, "Lecture notes test", issn="2999-0101")
+    mid = _create(repo, "NuFACT 2022", journal_id=volume)
+    _record(sa_sync_conn, "c-1", mid, collection)
+    _record(sa_sync_conn, "c-2", mid, volume)
+
+    links = [link for link in repo.link_monographs_to_collections() if link.monograph_id == mid]
+
+    assert [(link.collection_id, link.previous_id) for link in links] == [(collection, volume)]
+    assert repo.link_monographs_to_collections() == []
+
+
+def test_plusieurs_collections_signalees_sans_changement(repo, sa_sync_conn):
+    first = _journal(sa_sync_conn, "Collection A", issn="2999-0102")
+    second = _journal(sa_sync_conn, "Collection B", issn="2999-0103")
+    mid = _create(repo, "Algorithms")
+    _record(sa_sync_conn, "c-3", mid, first)
+    _record(sa_sync_conn, "c-4", mid, second)
+
+    assert mid not in {link.monograph_id for link in repo.link_monographs_to_collections()}
+    conflicts = {
+        c.monograph_id: c.candidate_ids for c in repo.find_monograph_collection_conflicts()
+    }
+    assert conflicts[mid] == (first, second)
+
+
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
     empty = _create(repo, "Vide")
     held = _create(repo, "Portée")

@@ -386,6 +386,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         delete_empty=_run_delete_empty_journals,
         merge_duplicate_monographs=_run_merge_duplicate_monographs,
         delete_empty_monographs=_run_delete_empty_monographs,
+        link_monographs_to_collections=_run_link_monographs_to_collections,
         delete_empty_publishers=_run_delete_empty_publishers,
         type_proceedings=_run_type_proceedings_journals,
         learn_doi_namespaces=_run_learn_journal_doi_namespaces,
@@ -837,6 +838,21 @@ def _run_merge_duplicate_monographs() -> PhaseMetrics:
 
     with get_sync_engine().connect() as conn:
         metrics = run_merge_duplicate_monographs(
+            log, monograph_repo=PgMonographGatewayQueries(conn)
+        )
+        conn.commit()
+    return metrics
+
+
+def _run_link_monographs_to_collections() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.link_monographs_to_collections import (
+        run_link_monographs_to_collections,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+
+    with get_sync_engine().connect() as conn:
+        metrics = run_link_monographs_to_collections(
             log, monograph_repo=PgMonographGatewayQueries(conn)
         )
         conn.commit()
