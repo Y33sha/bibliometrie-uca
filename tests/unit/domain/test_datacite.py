@@ -102,6 +102,19 @@ class TestIsbns:
         }
         assert get_isbns(attrs) == ["9783959772662"]
 
+    def test_identifiant_du_livre(self):
+        """Cas réel : Classiques Garnier, `10.15122/isbn.978-2-406-09785-3`."""
+        attrs = {
+            "identifiers": [
+                {"identifier": "978-2-406-09785-3", "identifierType": "ISBN"},
+                {"identifier": "9782406097853", "identifierType": "EAN13"},
+            ],
+            "alternateIdentifiers": [
+                {"alternateIdentifier": "9782406097853", "alternateIdentifierType": "ISBN"}
+            ],
+        }
+        assert get_isbns(attrs) == ["9782406097853"]
+
     def test_container_identifier(self):
         attrs = {"container": {"identifier": "9783959772662", "identifierType": "ISBN"}}
         assert get_isbns(attrs) == ["9783959772662"]

@@ -78,11 +78,17 @@ def upsert_publisher(
 
 
 def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerFacts:
-    """Ce que DataCite dit du conteneur d'un document. Le titre du `container` est la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon."""
+    """Ce que DataCite dit du conteneur d'un document.
+
+    Le `container` compte seulement quand il désigne celui qui publie le document (`container_names_a_journal`) : son titre est alors la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon. Un livre garde son propre titre et ses ISBN, et un chapitre l'ISBN de son livre, même sans conteneur.
+    """
     title, issn = get_container(attributes)
+    doc_type = extract_datacite_doc_type_token(attributes)
+    if not (title and container_names_a_journal(doc_type, title, get_container_pages(attributes))):
+        title = issn = None
     return ContainerFacts(
         source="datacite",
-        raw_doc_type=extract_datacite_doc_type_token(attributes),
+        raw_doc_type=doc_type,
         document_title=get_title(attributes),
         journal_title=title,
         collection_title=title if issn else None,
@@ -99,12 +105,7 @@ def upsert_containers(
     *,
     container_repo: ContainerFindOrCreateQueries,
 ) -> Containers:
-    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document, quand le `container` désigne celui qui le publie (`container_names_a_journal`)."""
-    title, _ = get_container(attributes)
-    if not title or not container_names_a_journal(
-        extract_datacite_doc_type_token(attributes), title, get_container_pages(attributes)
-    ):
-        return Containers(None, None)
+    """Trouve ou crée l'entrée de `journals` et la monographie qui contiennent le document."""
     return find_or_create_containers(
         get_container_facts(attributes), publisher_id=publisher_id, repo=container_repo
     )

@@ -88,11 +88,19 @@ def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str 
 
 
 def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
-    """ISBN du document : ceux des `relatedIdentifiers` de type ISBN, et celui du conteneur quand son identifiant en est un.
+    """ISBN du document : ceux de ses identifiants (`identifiers`, `alternateIdentifiers`) et des `relatedIdentifiers` de type ISBN, et celui du conteneur quand son identifiant en est un.
 
-    DataCite ne dit pas le support : ces ISBN sont ceux du livre hôte, papier ou électronique.
+    Un livre porte son ISBN parmi ses identifiants ; un chapitre porte celui de son livre en `IsPartOf`. DataCite ne dit pas le support.
     """
     isbns: list[str] = []
+    for key, value_key, type_key in (
+        ("identifiers", "identifier", "identifierType"),
+        ("alternateIdentifiers", "alternateIdentifier", "alternateIdentifierType"),
+    ):
+        for identifier in as_sequence(attributes.get(key)):
+            entry = as_mapping(identifier)
+            if (as_str(entry.get(type_key)) or "").upper() == "ISBN":
+                isbns += find_isbns(as_str(entry.get(value_key)))
     for related in as_sequence(attributes.get("relatedIdentifiers")):
         entry = as_mapping(related)
         if (as_str(entry.get("relatedIdentifierType")) or "").upper() == "ISBN":
