@@ -1,7 +1,5 @@
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
-* fetch_stale: skip en mode daily
-* mode daily: fixer J d'après le dernier import hal dans le staging
 * plafond d'interrogations sudoc
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
@@ -40,13 +38,14 @@
 # UI
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes)
-* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
+* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
 * [ ] admin/countries: aligner les boutons à droite
 * [ ] runs pipeline: les messages d'erreur n'affichent aucune info utile (Can't reconnect until invalid transaction is rolled back. Please rollback() fully before proceeding (Background on this error at: https://sqlalche.me/e/20/8s2b))
 * [ ] admin/person: ne pas proposer d'absorber un homonyme si les deux ont une fiche RH
+* [ ] Référentiels: ajouter Monographies + Conférences
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
@@ -67,6 +66,7 @@
 * 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
 * 100685: pourquoi preprint?
 * 138474: 1 seul document alors que le preprint devrait être distinct
+* 206321: pourquoi UNH non reconnue?
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
