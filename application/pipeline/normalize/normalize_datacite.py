@@ -30,13 +30,10 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
+from domain.journals.containers import ContainerDescription
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -77,7 +74,7 @@ def upsert_publisher(
     return find_or_create_publisher(name, repo=publisher_repo)
 
 
-def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que DataCite dit du conteneur d'un document.
 
     Le `container` compte seulement quand il désigne celui qui publie le document (`container_names_a_journal`) : son titre est alors la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon. Un livre garde son propre titre et ses ISBN, et un chapitre l'ISBN de son livre, même sans conteneur.
@@ -86,7 +83,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerFacts:
     doc_type = extract_datacite_doc_type_token(attributes)
     if not (title and container_names_a_journal(doc_type, title, get_container_pages(attributes))):
         title = issn = None
-    return ContainerFacts(
+    return ContainerDescription(
         source="datacite",
         raw_doc_type=doc_type,
         document_title=get_title(attributes),

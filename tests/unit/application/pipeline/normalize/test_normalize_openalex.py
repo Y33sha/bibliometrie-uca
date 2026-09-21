@@ -215,7 +215,7 @@ class TestUpsertPublisher:
 # ── conteneurs (branches issn/eissn/oa_model) ───────────────────
 
 
-class TestContainerFacts:
+class TestContainerDescription:
     def test_sans_source_aucun_conteneur(self):
         repo = MagicMock()
         assert upsert_containers({}, None, container_repo=repo) == Containers(None, None)

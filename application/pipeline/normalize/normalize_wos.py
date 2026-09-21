@@ -21,12 +21,9 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import ContainerDescription
 from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, find_isbns
@@ -351,12 +348,12 @@ def upsert_publisher(
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
-def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
     title = as_str(rec.get("journal_title"))
     issn, eissn = as_str(rec.get("issn")), as_str(rec.get("eissn"))
     external_ids = as_mapping(rec.get("external_ids"))
-    return ContainerFacts(
+    return ContainerDescription(
         source="wos",
         raw_doc_type=as_str(rec.get("doc_type")),
         document_title=as_str(rec.get("title")),

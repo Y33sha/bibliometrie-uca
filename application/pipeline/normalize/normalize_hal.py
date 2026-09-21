@@ -26,13 +26,10 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
+from domain.journals.containers import ContainerDescription
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -73,13 +70,13 @@ def upsert_publisher(
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
-def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN de la notice TEI.
 
     Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : le congrès ne désigne pas un volume.
     """
     journal_title = hal_text_field(doc.get("journalTitle_s"))
-    return ContainerFacts(
+    return ContainerDescription(
         source="hal",
         raw_doc_type=hal_text_field(doc.get("docType_s")),
         document_title=get_title(doc),

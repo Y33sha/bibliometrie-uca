@@ -21,12 +21,9 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import ContainerDescription
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
     compact_identifiers,
@@ -147,7 +144,7 @@ def upsert_publisher(
     )
 
 
-def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce qu'OpenAlex dit du conteneur d'un document : la source de sa localisation principale.
 
     Une source `book series` ou `journal` est la collection d'un livre, d'un chapitre ou d'un article de congrès ; une source `conference` est son volume d'actes. OpenAlex ne donne ni le titre du livre qui contient un chapitre, ni ISBN.
@@ -174,7 +171,7 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerFacts:
     elif source_type == "repository":
         oa_model = OaModel.REPOSITORY
 
-    return ContainerFacts(
+    return ContainerDescription(
         source="openalex",
         raw_doc_type=as_str(work.get("type")),
         document_title=as_str(work.get("title")) or as_str(work.get("display_name")),
