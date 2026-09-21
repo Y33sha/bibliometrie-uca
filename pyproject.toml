@@ -455,6 +455,8 @@ exclude = [
     "^mutants/",
     # Répertoire de travail local : données brutes et scripts jetables, hors du dépôt.
     "^data/",
+    # Scripts jetables (audits, rattrapages), exécutés une fois.
+    "^interfaces/cli/oneshot/",
 ]
 
 # Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
