@@ -156,18 +156,26 @@ def resolve_stored(record: StoredRecord, conn: Connection) -> Containers:
 _Replay = Callable[[Mapping[str, JsonValue], StoredRecord, Connection], Containers]
 
 
-def _replay_with(module: object, read: Callable[[Mapping[str, JsonValue]], object]) -> _Replay:
-    def replay(
-        payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
-    ) -> Containers:
-        publisher_id = module.upsert_publisher(
-            read(payload), publisher_repo=PgPublisherGatewayQueries(conn)
-        )  # type: ignore[attr-defined]
-        return module.upsert_containers(
-            payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
-        )  # type: ignore[attr-defined]
+def _replay_crossref(
+    payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
+) -> Containers:
+    publisher_id = normalize_crossref.upsert_publisher(
+        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+    )
+    return normalize_crossref.upsert_containers(
+        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+    )
 
-    return replay
+
+def _replay_scanr(
+    payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
+) -> Containers:
+    publisher_id = normalize_scanr.upsert_publisher(
+        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+    )
+    return normalize_scanr.upsert_containers(
+        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+    )
 
 
 def _replay_hal(
@@ -191,14 +199,23 @@ def _replay_openalex(
 ) -> Containers:
     if should_skip_publisher_journal(parse_primary_location(payload)):
         return Containers(None, None)
-    return _replay_with(normalize_openalex, lambda work: work)(payload, record, conn)
+    publisher_id = normalize_openalex.upsert_publisher(
+        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+    )
+    return normalize_openalex.upsert_containers(
+        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+    )
 
 
 def _replay_datacite(
     payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
 ) -> Containers:
-    return _replay_with(normalize_datacite, lambda attributes: attributes)(
-        as_mapping(payload.get("attributes")), record, conn
+    attributes = as_mapping(payload.get("attributes"))
+    publisher_id = normalize_datacite.upsert_publisher(
+        attributes, publisher_repo=PgPublisherGatewayQueries(conn)
+    )
+    return normalize_datacite.upsert_containers(
+        attributes, publisher_id, container_repo=PgContainerGatewayQueries(conn)
     )
 
 
@@ -206,12 +223,17 @@ def _replay_wos(
     payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
 ) -> Containers:
     rec = normalize_wos.extract_from_api(payload, record.doi)
-    return _replay_with(normalize_wos, lambda r: as_str(r.get("publisher_name")))(rec, record, conn)
+    publisher_id = normalize_wos.upsert_publisher(
+        as_str(rec.get("publisher_name")), publisher_repo=PgPublisherGatewayQueries(conn)
+    )
+    return normalize_wos.upsert_containers(
+        rec, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+    )
 
 
 _REPLAYS: dict[str, _Replay] = {
-    "crossref": _replay_with(normalize_crossref, lambda msg: msg),
-    "scanr": _replay_with(normalize_scanr, lambda doc: doc),
+    "crossref": _replay_crossref,
+    "scanr": _replay_scanr,
     "hal": _replay_hal,
     "openalex": _replay_openalex,
     "datacite": _replay_datacite,
