@@ -6,7 +6,7 @@ Toutes les queries publications utilisent `text()` paramétré : trop intriquée
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
@@ -252,6 +252,13 @@ class PgPublicationRepository(PublicationRepository):
             {"id": pub_id, "cases": list(CONVERGENCE_CASES)},
         )
         return frozenset(row.id for row in result)
+
+    def get_monograph_journal_ids(self, monograph_ids: Sequence[int]) -> dict[int, int | None]:
+        rows = self._conn.execute(
+            text("SELECT id, journal_id FROM monographs WHERE id = ANY(:ids)"),
+            {"ids": list(monograph_ids)},
+        )
+        return {r.id: r.journal_id for r in rows}
 
     def get_journal_type(self, journal_id: int) -> str | None:
         return self._conn.execute(

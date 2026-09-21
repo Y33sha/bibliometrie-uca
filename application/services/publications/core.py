@@ -66,7 +66,14 @@ def refresh_from_sources(
 
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
-    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
+    monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
+    _refresh_aggregate(
+        pub,
+        sources,
+        source_priority=SOURCE_PRIORITY,
+        secondary_ids=secondary_ids,
+        monograph_journals=repo.get_monograph_journal_ids(monograph_ids) if monograph_ids else {},
+    )
     _apply_canonical_doc_type_correction(pub, repo=repo)
 
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:

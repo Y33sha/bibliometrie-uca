@@ -1,5 +1,6 @@
 """Port PublicationRepository — contrat d'accès à l'agrégat Publication."""
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from domain.publications.publication import Publication
@@ -43,6 +44,10 @@ class PublicationRepository(Protocol):
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
         """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
+        ...
+
+    def get_monograph_journal_ids(self, monograph_ids: Sequence[int]) -> dict[int, int | None]:
+        """`journal_id` de chaque monographie : sa collection, pour l'agrégation dans `refresh_from_sources`."""
         ...
 
     def get_journal_type(self, journal_id: int) -> str | None:
