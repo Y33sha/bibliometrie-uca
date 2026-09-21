@@ -4,7 +4,10 @@ Un titre qui désigne une édition ou un tome précis est celui d'un volume : un
 """
 
 import re
+from collections import defaultdict
+from collections.abc import Sequence
 from enum import StrEnum
+from typing import NamedTuple
 
 from domain.journals.journal import JournalType
 from domain.journals.titles import names_a_dated_event
@@ -95,3 +98,41 @@ def reference_series_title(title: str, sudoc_title: str | None) -> str | None:
 def series_key(title: str) -> str:
     """Clé de série d'un titre : son titre de série, normalisé. « NuFACT 2022 » et « NuFACT 2023 » partagent la clé « nufact »."""
     return normalize_text(series_title(title))
+
+
+class VolumeTitle(NamedTuple):
+    """Un volume candidat à une série : son identifiant, son titre et son éditeur."""
+
+    id: int
+    title: str
+    publisher_id: int | None
+
+
+class SeriesGroup(NamedTuple):
+    """Volumes d'une même série, avec le titre de la série et son éditeur."""
+
+    title: str
+    publisher_id: int | None
+    volume_ids: tuple[int, ...]
+
+
+def group_series(volumes: Sequence[VolumeTitle]) -> list[SeriesGroup]:
+    """Séries reconnues entre plusieurs volumes : titres de volume (`container_level`) de même clé de série, chez le même éditeur.
+
+    Des titres sans marque d'édition identiques désignent un ouvrage en plusieurs volumes, pas une série. Le titre de la série est le titre de série du plus ancien volume.
+    """
+    groups: dict[tuple[str, int | None], list[VolumeTitle]] = defaultdict(list)
+    for volume in volumes:
+        if container_level(volume.title) is ContainerLevel.VOLUME and (
+            key := series_key(volume.title)
+        ):
+            groups[(key, volume.publisher_id)].append(volume)
+    return [
+        SeriesGroup(
+            series_title(min(members).title),
+            publisher_id,
+            tuple(sorted(v.id for v in members)),
+        )
+        for (_, publisher_id), members in groups.items()
+        if len(members) > 1
+    ]

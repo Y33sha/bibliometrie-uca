@@ -80,7 +80,7 @@ _DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
 
 
 _JOURNAL_CANDIDATES = text("""
-    SELECT m.id, m.title, m.journal_id,
+    SELECT m.id, m.title, m.publisher_id, m.proceedings, m.journal_id,
            coalesce(array_agg(DISTINCT j.id ORDER BY j.id) FILTER (
                WHERE j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
            ), '{}') AS with_issn,
@@ -141,7 +141,13 @@ class PgMonographGatewayQueries(
     def find_monograph_journal_candidates(self) -> list[MonographJournalCandidates]:
         return [
             MonographJournalCandidates(
-                r.id, r.title, r.journal_id, tuple(r.with_issn), tuple(r.without_issn)
+                r.id,
+                r.title,
+                r.publisher_id,
+                r.proceedings,
+                r.journal_id,
+                tuple(r.with_issn),
+                tuple(r.without_issn),
             )
             for r in self._conn.execute(_JOURNAL_CANDIDATES)
         ]

@@ -4,7 +4,10 @@ import pytest
 
 from domain.journals.series import (
     ContainerLevel,
+    SeriesGroup,
+    VolumeTitle,
     container_level,
+    group_series,
     reference_series_title,
     series_key,
     series_title,
@@ -101,3 +104,26 @@ class TestReferenceSeriesTitle:
 
     def test_titre_sudoc_de_volume_ignore(self):
         assert reference_series_title("NuFACT 2022", "NuFACT 2021") == "NuFACT"
+
+
+class TestGroupSeries:
+    def test_volumes_d_une_meme_serie(self):
+        volumes = [
+            VolumeTitle(2, "2023 Winter Simulation Conference (WSC)", 5),
+            VolumeTitle(1, "2022 Winter Simulation Conference (WSC)", 5),
+        ]
+        assert group_series(volumes) == [
+            SeriesGroup("Winter Simulation Conference (WSC)", 5, (1, 2))
+        ]
+
+    def test_editeurs_differents_pas_de_serie(self):
+        volumes = [VolumeTitle(1, "NuFACT 2022", 5), VolumeTitle(2, "NuFACT 2023", 6)]
+        assert group_series(volumes) == []
+
+    def test_ouvrage_en_plusieurs_volumes_pas_de_serie(self):
+        """Cas réel : « Current Developments in Biotechnology and Bioengineering », quatre volumes sans marque d'édition."""
+        title = "Current Developments in Biotechnology and Bioengineering"
+        assert group_series([VolumeTitle(1, title, 5), VolumeTitle(2, title, 5)]) == []
+
+    def test_volume_seul_pas_de_serie(self):
+        assert group_series([VolumeTitle(1, "NuFACT 2022", 5)]) == []

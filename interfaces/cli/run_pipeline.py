@@ -849,11 +849,11 @@ def _run_link_monographs_to_collections() -> PhaseMetrics:
         run_link_monographs_to_collections,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+    from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
     with get_sync_engine().connect() as conn:
         metrics = run_link_monographs_to_collections(
-            log, monograph_repo=PgMonographGatewayQueries(conn)
+            log, monograph_repo=PgContainerGatewayQueries(conn)
         )
         conn.commit()
     return metrics

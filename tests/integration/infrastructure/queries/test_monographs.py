@@ -127,7 +127,12 @@ def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
     )
 
     candidates = {c.monograph_id: c for c in repo.find_monograph_journal_candidates()}
-    assert candidates[mid][2:] == (volume, (collection,), (volume,))
+    found = candidates[mid]
+    assert (found.journal_id, found.with_issn, found.without_issn) == (
+        volume,
+        (collection,),
+        (volume,),
+    )
 
     repo.set_monograph_journal(mid, collection)
     journal_id = sa_sync_conn.execute(

@@ -36,6 +36,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
         "monographie à plusieurs collections possibles",
         "monographies à plusieurs collections possibles",
     ),
+    "monograph_series": ("série sans ISSN de monographies", "séries sans ISSN de monographies"),
     "monographs_deleted": ("monographie vide supprimée", "monographies vides supprimées"),
     "monographs_linked": (
         "monographie rattachée à sa collection",
