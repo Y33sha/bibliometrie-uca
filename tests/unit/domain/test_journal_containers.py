@@ -3,9 +3,11 @@
 import pytest
 
 from domain.journals.containers import (
+    ContainerRole,
     conference_paper_share,
-    container_is_journal,
+    container_role,
     holds_mostly_conference_papers,
+    is_conference,
     is_dated_event_without_issn,
 )
 
@@ -14,41 +16,46 @@ from domain.journals.containers import (
     ("raw_type", "source"),
     [
         ("book-chapter", "crossref"),
-        ("book", "openalex"),
         ("COUV", "hal"),
-        ("OUV", "hal"),
         ("Book Chapter", "wos"),
         ("BookChapter", "datacite"),
     ],
 )
-def test_livre_ou_chapitre_sans_issn_sans_revue(raw_type, source):
-    assert not container_is_journal(raw_type, source, has_issn=False)
-
-
-def test_chapitre_avec_issn_rattache_a_sa_collection():
-    assert container_is_journal("book-chapter", "crossref", has_issn=True)
+def test_chapitre_partie_d_une_monographie(raw_type, source):
+    assert container_role(raw_type, source) is ContainerRole.PART
 
 
 @pytest.mark.parametrize(
-    ("raw_type", "source"),
-    [("proceedings-article", "crossref"), ("COMM", "hal"), ("journal-article", "crossref")],
+    ("raw_type", "source"), [("book", "openalex"), ("OUV", "hal"), ("monograph", "crossref")]
 )
-def test_article_et_article_de_congres_gardent_leur_conteneur(raw_type, source):
-    assert container_is_journal(raw_type, source, has_issn=False)
+def test_livre_porte_sa_propre_monographie(raw_type, source):
+    assert container_role(raw_type, source) is ContainerRole.BOOK
 
 
-def test_type_composite_article_de_congres_garde_son_conteneur():
-    assert container_is_journal("Book Chapter; Proceedings Paper", "wos", has_issn=False)
+@pytest.mark.parametrize(
+    ("raw_type", "source"), [("proceedings-article", "crossref"), ("COMM", "hal")]
+)
+def test_article_de_congres_partie_d_un_volume_d_actes(raw_type, source):
+    assert container_role(raw_type, source) is ContainerRole.PART
+    assert is_conference(raw_type, source)
 
 
-def test_chapitre_sans_issn_issu_d_un_congres_garde_son_recueil():
-    assert container_is_journal(
-        "book-chapter", "crossref", has_issn=False, declares_conference=True
+def test_type_composite_article_de_congres():
+    assert container_role("Book Chapter; Proceedings Paper", "wos") is ContainerRole.PART
+    assert is_conference("Book Chapter; Proceedings Paper", "wos")
+
+
+def test_chapitre_issu_d_un_congres_partie_d_un_volume_d_actes():
+    assert (
+        container_role("book-chapter", "crossref", declares_conference=True) is ContainerRole.PART
     )
+    assert is_conference("book-chapter", "crossref", declares_conference=True)
+    assert not is_conference("book-chapter", "crossref")
 
 
-def test_type_absent_garde_son_conteneur():
-    assert container_is_journal(None, "crossref", has_issn=False)
+@pytest.mark.parametrize("raw_type", ["journal-article", None])
+def test_article_ou_type_absent_dans_une_revue(raw_type):
+    assert container_role(raw_type, "crossref") is ContainerRole.JOURNAL
 
 
 def test_majorite_stricte_d_articles_de_congres():

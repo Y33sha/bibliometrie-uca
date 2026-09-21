@@ -12,7 +12,7 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -21,7 +21,11 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
     compact_identifiers,
@@ -79,30 +83,42 @@ def _extract_journal_issns(source: Mapping[str, JsonValue]) -> tuple[str | None,
     return issn, eissn
 
 
-def upsert_journal(
+def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce que ScanR dit du conteneur d'un document. `source.title` est la revue d'un article, le congrès d'une communication (type `proceedings`), et la plateforme de l'éditeur d'un chapitre : un chapitre reçoit sa seule collection, quand un ISSN la désigne. ScanR ne donne pas d'ISBN."""
+    source = as_mapping(doc.get("source"))
+    title = as_str(source.get("title"))
+    issn, eissn = _extract_journal_issns(source)
+    raw_type = as_str(doc.get("type"))
+    return ContainerFacts(
+        source="scanr",
+        raw_doc_type=raw_type,
+        document_title=get_title(doc),
+        journal_title=title,
+        collection_title=title,
+        book_title=title if raw_type == "proceedings" else None,
+        issn=issn,
+        eissn=eissn,
+        year=as_int(doc.get("year")),
+    )
+
+
+def upsert_containers(
     doc: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    source = as_mapping(doc.get("source"))
-    title = as_str(source.get("title"))
-    if not title:
-        return None
-    issn, eissn = _extract_journal_issns(source)
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=as_str(doc.get("type")),
-        source="scanr",
-        issn=issn,
-        eissn=eissn,
-        publisher_id=publisher_id,
-        repo=journal_repo,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(doc), publisher_id=publisher_id, repo=container_repo
     )
 
 
 def extract_pub_metadata(
-    doc: Mapping[str, JsonValue], journal_id: int | None, scanr_id: str | None = None
+    doc: Mapping[str, JsonValue],
+    journal_id: int | None,
+    scanr_id: str | None = None,
+    monograph_id: int | None = None,
 ) -> PublicationMetadata:
     """Extrait les métadonnées de publication d'un document ScanR.
 
@@ -123,6 +139,7 @@ def extract_pub_metadata(
             ouvert if isinstance(ouvert, bool) else None, as_mapping(doc.get("oaEvidence"))
         ),
         journal_id=journal_id,
+        monograph_id=monograph_id,
         container_title=container_title,
         language=None,
     )
@@ -232,6 +249,7 @@ def insert_scanr_document(  # noqa: C901
             pub_year=pub_meta.pub_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=biblio_json,
@@ -321,7 +339,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -338,9 +356,11 @@ def process_work(
         return False
 
     publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
-    journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
+    containers = upsert_containers(doc, publisher_id, container_repo=container_repo)
 
-    pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
+    pub_meta = extract_pub_metadata(
+        doc, containers.journal_id, scanr_id, monograph_id=containers.monograph_id
+    )
 
     source_publication_id = insert_scanr_document(
         conn, queries, doc, staging_id, scanr_id, pub_meta
@@ -356,13 +376,13 @@ class ScanrNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 100
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,

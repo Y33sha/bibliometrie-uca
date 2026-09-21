@@ -111,7 +111,7 @@ def run_normalize_oa(conn):
 
     from application.pipeline.normalize.normalize_openalex import process_work
     from application.ports.pipeline.normalize.staging import StagingRow
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from infrastructure.pipeline.containers import PgContainerGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
@@ -124,7 +124,7 @@ def run_normalize_oa(conn):
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
-    journal_repo = PgJournalGatewayQueries(conn)
+    container_repo = PgContainerGatewayQueries(conn)
     publisher_repo = PgPublisherGatewayQueries(conn)
     publication_repo = publication_repository(conn)
 
@@ -144,7 +144,7 @@ def run_normalize_oa(conn):
             queries,
             logger,
             staging_row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=staging_queries,

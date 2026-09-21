@@ -21,7 +21,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -30,7 +30,11 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.persons.identifiers import (
@@ -73,27 +77,36 @@ def upsert_publisher(
     return find_or_create_publisher(name, repo=publisher_repo)
 
 
-def upsert_journal(
+def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce que DataCite dit du conteneur d'un document. Le titre du `container` est la revue d'un article, la collection quand un ISSN l'identifie, le livre ou le volume d'actes sinon."""
+    title, issn = get_container(attributes)
+    return ContainerFacts(
+        source="datacite",
+        raw_doc_type=extract_datacite_doc_type_token(attributes),
+        document_title=get_title(attributes),
+        journal_title=title,
+        collection_title=title if issn else None,
+        book_title=None if issn else title,
+        issn=issn,
+        isbns=tuple(get_isbns(attributes)),
+        year=extract_datacite_pub_year(attributes, max_year=today().year + 1),
+    )
+
+
+def upsert_containers(
     attributes: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Trouve ou crée la revue désignée par le titre du `container` (revue, série), quand le conteneur désigne celle qui publie le document (`container_names_a_journal`)."""
-    title, issn = get_container(attributes)
-    doc_type_token = extract_datacite_doc_type_token(attributes)
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document, quand le `container` désigne celui qui le publie (`container_names_a_journal`)."""
+    title, _ = get_container(attributes)
     if not title or not container_names_a_journal(
-        doc_type_token, title, get_container_pages(attributes)
+        extract_datacite_doc_type_token(attributes), title, get_container_pages(attributes)
     ):
-        return None
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=doc_type_token,
-        source="datacite",
-        issn=issn,
-        eissn=None,
-        publisher_id=publisher_id,
-        repo=journal_repo,
+        return Containers(None, None)
+    return find_or_create_containers(
+        get_container_facts(attributes), publisher_id=publisher_id, repo=container_repo
     )
 
 
@@ -225,7 +238,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -257,7 +270,7 @@ def process_work(
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
     publisher_id = upsert_publisher(attributes, publisher_repo=publisher_repo)
-    journal_id = upsert_journal(attributes, publisher_id, journal_repo=journal_repo)
+    containers = upsert_containers(attributes, publisher_id, container_repo=container_repo)
 
     container_title, _ = get_container(attributes)
     related_dois = extract_related_dois(attributes, doi)
@@ -278,8 +291,9 @@ def process_work(
             title=title,
             pub_year=pub_year,
             doc_type=extract_datacite_doc_type_token(attributes),
-            journal_id=journal_id,
-            container_title=container_title if not journal_id else None,
+            journal_id=containers.journal_id,
+            monograph_id=containers.monograph_id,
+            container_title=container_title if not containers.journal_id else None,
             language=get_language(attributes),
             biblio=get_biblio(attributes),
             abstract=get_abstract(attributes),
@@ -299,13 +313,13 @@ class DataciteNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 100
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,

@@ -630,7 +630,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from infrastructure.pipeline.containers import PgContainerGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
@@ -648,7 +648,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             log,
             PgStagingQueries(raw_store),
             PgSourcePublicationQueries(),
-            journal_repo_factory=PgJournalGatewayQueries,
+            container_repo_factory=PgContainerGatewayQueries,
             publisher_repo_factory=PgPublisherGatewayQueries,
             publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),

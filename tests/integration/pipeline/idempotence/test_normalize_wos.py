@@ -65,7 +65,7 @@ def run_normalize_wos(conn):
     import logging
 
     from application.pipeline.normalize.normalize_wos import process_record
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from infrastructure.pipeline.containers import PgContainerGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
@@ -78,7 +78,7 @@ def run_normalize_wos(conn):
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
-    journal_repo = PgJournalGatewayQueries(conn)
+    container_repo = PgContainerGatewayQueries(conn)
     publisher_repo = PgPublisherGatewayQueries(conn)
     publication_repo = publication_repository(conn)
 
@@ -90,7 +90,7 @@ def run_normalize_wos(conn):
             queries,
             logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=staging_queries,

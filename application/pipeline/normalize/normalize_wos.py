@@ -12,7 +12,7 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -21,7 +21,11 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
@@ -347,26 +351,34 @@ def upsert_publisher(
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
-def upsert_journal(
+def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, la source désigne aussi la collection : quand les deux titres coïncident, le document relève de la collection seule."""
+    title = as_str(rec.get("journal_title"))
+    external_ids = as_mapping(rec.get("external_ids"))
+    return ContainerFacts(
+        source="wos",
+        raw_doc_type=as_str(rec.get("doc_type")),
+        document_title=as_str(rec.get("title")),
+        journal_title=title,
+        collection_title=title,
+        book_title=title,
+        issn=as_str(rec.get("issn")),
+        eissn=as_str(rec.get("eissn")),
+        isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
+        eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
+        year=as_int(rec.get("pub_year")),
+    )
+
+
+def upsert_containers(
     rec: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Trouve ou crée une revue depuis les données WoS."""
-    title = as_str(rec.get("journal_title"))
-    if not title:
-        return None
-    issn = as_str(rec.get("issn"))
-    eissn = as_str(rec.get("eissn"))
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=as_str(rec.get("doc_type")),
-        source="wos",
-        issn=issn,
-        eissn=eissn,
-        publisher_id=publisher_id,
-        repo=journal_repo,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(rec), publisher_id=publisher_id, repo=container_repo
     )
 
 
@@ -376,7 +388,7 @@ def upsert_journal(
 
 
 def extract_pub_metadata(
-    rec: Mapping[str, JsonValue], journal_id: int | None
+    rec: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un record WoS.
 
@@ -390,6 +402,7 @@ def extract_pub_metadata(
         nnt=None,
         oa_status=as_str(rec.get("oa_status")),
         journal_id=journal_id,
+        monograph_id=monograph_id,
         container_title=as_str(rec.get("journal_title")) if not journal_id else None,
         language=as_str(rec.get("language")),
     )
@@ -427,6 +440,7 @@ def insert_wos_document(
             pub_year=pub_meta.pub_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=dict(as_mapping(rec.get("biblio"))) or None,
@@ -518,7 +532,7 @@ def process_record(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -538,8 +552,8 @@ def process_record(
     publisher_id = upsert_publisher(
         as_str(rec.get("publisher_name")), publisher_repo=publisher_repo
     )
-    journal_id = upsert_journal(rec, publisher_id, journal_repo=journal_repo)
-    pub_meta = extract_pub_metadata(rec, journal_id)
+    containers = upsert_containers(rec, publisher_id, container_repo=container_repo)
+    pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
 
     source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
     process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
@@ -552,13 +566,13 @@ class WosNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 500
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_record(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,

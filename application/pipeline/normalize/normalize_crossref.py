@@ -18,7 +18,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -27,9 +27,14 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
+from domain.journals.containers import ContainerRole, container_role
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -44,7 +49,7 @@ from domain.sources.crossref import (
     parse_crossref_issns,
     strip_jats_tags,
 )
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS
@@ -192,26 +197,61 @@ def upsert_publisher(
     return find_or_create_publisher(name, repo=publisher_repo)
 
 
-def upsert_journal(
+def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
+    cts = msg.get("container-title")
+    values = cts if isinstance(cts, list) else [cts]
+    return [v.strip() for v in values if isinstance(v, str) and v.strip()]
+
+
+def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce que Crossref dit du conteneur d'un document.
+
+    Un livre porte sa collection dans `container-title`. Un chapitre y porte `[collection, livre]`, ou le seul livre, ou la seule collection quand un ISSN la désigne. Un article de congrès y porte le volume d'actes en tête ; sous une collection désignée par un ISSN, le volume prend le nom du congrès.
+    """
+    raw_type = as_str(msg.get("type"))
+    conference = extract_crossref_conference(msg)
+    titles = _container_titles(msg)
+    issn, eissn = get_issns(msg)
+    external_ids = get_external_ids(msg) or {}
+    role = container_role(raw_type, "crossref", declares_conference=conference is not None)
+    collection_title = book_title = None
+    if role is ContainerRole.BOOK:
+        collection_title = titles[0] if titles else None
+    elif role is ContainerRole.PART:
+        if raw_type == "proceedings-article" and len(titles) >= 2:
+            book_title = titles[0]
+        elif len(titles) >= 2:
+            collection_title, book_title = titles[0], titles[-1]
+        elif titles and (issn or eissn):
+            collection_title = titles[0]
+            book_title = as_str(conference.get("name")) if conference else None
+        elif titles:
+            book_title = titles[0]
+    return ContainerFacts(
+        source="crossref",
+        raw_doc_type=raw_type,
+        declares_conference=conference is not None,
+        document_title=get_title(msg),
+        journal_title=titles[0] if titles else None,
+        collection_title=collection_title,
+        book_title=book_title,
+        issn=issn,
+        eissn=eissn,
+        isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
+        eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
+        year=get_pub_year(msg),
+    )
+
+
+def upsert_containers(
     msg: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Trouve ou crée la revue désignée par le container-title (revue, série, recueil d'actes)."""
-    title = get_container_title(msg)
-    if not title:
-        return None
-    issn, eissn = get_issns(msg)
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=as_str(msg.get("type")),
-        source="crossref",
-        issn=issn,
-        eissn=eissn,
-        publisher_id=publisher_id,
-        declares_conference=extract_crossref_conference(msg) is not None,
-        repo=journal_repo,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(msg), publisher_id=publisher_id, repo=container_repo
     )
 
 
@@ -300,7 +340,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -327,7 +367,7 @@ def process_work(
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
-    journal_id = upsert_journal(msg, publisher_id, journal_repo=journal_repo)
+    containers = upsert_containers(msg, publisher_id, container_repo=container_repo)
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
@@ -344,8 +384,9 @@ def process_work(
             title=title,
             pub_year=pub_year,
             doc_type=as_str(msg.get("type")),
-            journal_id=journal_id,
-            container_title=get_container_title(msg) if not journal_id else None,
+            journal_id=containers.journal_id,
+            monograph_id=containers.monograph_id,
+            container_title=get_container_title(msg) if not containers.journal_id else None,
             language=get_language(msg),
             biblio=biblio,
             abstract=get_abstract(msg),
@@ -365,13 +406,13 @@ class CrossrefNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 100
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,
