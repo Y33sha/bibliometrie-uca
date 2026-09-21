@@ -44,7 +44,7 @@ def test_phase_extract_daily_hal_unconfigured():
 
     with (
         patch(
-            "infrastructure.observability.phase_executions.get_last_extract_date",
+            "infrastructure.observability.phase_executions.get_last_daily_extract_date",
             return_value=None,
         ),
         patch.object(run_pipeline, "_extraction_structure_count", return_value=1),

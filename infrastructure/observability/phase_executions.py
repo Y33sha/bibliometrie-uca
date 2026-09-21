@@ -58,33 +58,30 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
     )
 
 
-def last_extract_date(conn: Connection, source: str) -> datetime.date | None:
-    """Jour (UTC) de la dernière phase `extract` ayant inclus `source`, hors échec.
+def last_daily_extract_date(conn: Connection) -> datetime.date | None:
+    """Jour (UTC) de début de la dernière phase `extract` du mode `daily` terminée sans signal.
 
-    Sert de borne « depuis » à l'extraction incrémentale : on repart de la dernière extraction réussie de cette source (un run partiel sans phase `extract` ne fait pas avancer le curseur). L'ancrage au jour de début (`started_at`) ménage un léger recouvrement, l'upsert staging étant idempotent. `status <> 'error'` écarte les extractions échouées.
+    Sert de borne « depuis » à l'extraction incrémentale. Une extraction par années (mode `full`, éventuellement bornée à `--year`) laisse la borne en place. Le mode `daily` extrait HAL seul : le statut `ok` garantit que HAL a abouti. L'ancrage au jour de début ménage un léger recouvrement, l'upsert staging étant idempotent.
     """
     last = conn.execute(
         text(
             """
             SELECT max(started_at)
             FROM pipeline_phase_executions
-            WHERE phase = 'extract'
-              AND :source = ANY(sources)
-              AND status <> 'error'
+            WHERE phase = 'extract' AND mode = 'daily' AND status = 'ok'
             """
-        ),
-        {"source": source},
+        )
     ).scalar()
     return last.date() if last is not None else None
 
 
-def get_last_extract_date(source: str) -> datetime.date | None:
+def get_last_daily_extract_date() -> datetime.date | None:
     """Variante best-effort ouvrant sa propre connexion ; renvoie None (→ fallback de l'appelant) si la lecture échoue (table absente, connexion impossible)."""
     try:
         with get_sync_engine().connect() as conn:
-            return last_extract_date(conn, source)
+            return last_daily_extract_date(conn)
     except Exception as exc:
-        log.warning("Lecture de la dernière extraction %s échouée : %s", source, exc)
+        log.warning("Lecture de la dernière extraction quotidienne échouée : %s", exc)
         return None
 
 

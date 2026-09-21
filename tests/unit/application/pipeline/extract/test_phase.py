@@ -38,7 +38,7 @@ def test_parallel_skips_unconfigured_source():
         include_wos=False,
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
-        get_last_extract_date=lambda _s: None,
+        get_last_daily_extract_date=lambda: None,
         count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
@@ -63,7 +63,7 @@ def test_since_last_extracts_hal_from_last_date():
         include_wos=False,
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
-        get_last_extract_date=lambda _s: date(2026, 1, 1),
+        get_last_daily_extract_date=lambda: date(2026, 1, 1),
         count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
@@ -89,7 +89,7 @@ def test_theses_ignores_year_range_bound():
         include_wos=False,
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
-        get_last_extract_date=lambda _s: None,
+        get_last_daily_extract_date=lambda: None,
         count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
@@ -114,7 +114,7 @@ def test_parallel_skips_unavailable_source():
         include_wos=False,
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
-        get_last_extract_date=lambda _s: None,
+        get_last_daily_extract_date=lambda: None,
         count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
@@ -138,7 +138,7 @@ def test_since_last_marks_hal_unavailable():
         include_wos=False,
         extract_one=extract_one,
         run_parallel=_sync_run_parallel,
-        get_last_extract_date=lambda _s: None,
+        get_last_daily_extract_date=lambda: None,
         count_extraction_structures=lambda: 1,
         logger=_LOG,
     )
@@ -165,7 +165,7 @@ def test_empty_extraction_perimeter_stops_the_phase():
             count_extraction_structures=lambda: 0,
             extract_one=extract_one,
             run_parallel=_sync_run_parallel,
-            get_last_extract_date=lambda _s: None,
+            get_last_daily_extract_date=lambda: None,
             logger=_LOG,
         )
 

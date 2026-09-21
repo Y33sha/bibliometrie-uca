@@ -140,7 +140,7 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
     `application/pipeline/modes.py` porte la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le câblage : registre des adaptateurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from application.pipeline.extract.phase import run
-    from infrastructure.observability.phase_executions import get_last_extract_date
+    from infrastructure.observability.phase_executions import get_last_daily_extract_date
     from infrastructure.parallel import run_parallel
 
     registry = _extractors()
@@ -157,7 +157,7 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
         count_extraction_structures=_extraction_structure_count,
         extract_one=extract_one,
         run_parallel=run_parallel,
-        get_last_extract_date=get_last_extract_date,
+        get_last_daily_extract_date=get_last_daily_extract_date,
         logger=log,
     )
 
