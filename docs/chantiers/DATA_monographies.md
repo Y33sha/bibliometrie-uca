@@ -33,12 +33,30 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ## Décisions
 
+### Table des monographies
+
 - Une table `monographs` porte les livres et les volumes d'actes. Seul y entre un titre qui contient des publications de la base.
 - Une colonne booléenne `proceedings` distingue le volume d'actes du livre. Ces deux natures suffisent, donc aucun type n'est nécessaire.
 - La table a une clé technique. L'ISBN, absent de nombreuses monographies, porte une contrainte d'unicité.
 - Deux colonnes portent les ISBN, `isbn` et `eisbn`, comme les revues portent leurs ISSN. Une source qui déclare le support électronique alimente `eisbn` ; sans déclaration, l'ISBN va dans `isbn`. Les identifiants externes d'un enregistrement suivent la même partition.
 - Chaque écriture d'un ISBN passe par le value object `ISBN` : forme ISBN-13 sans séparateur, ISBN-10 converti, clé de contrôle vérifiée. `normalize_external_ids` l'applique déjà aux identifiants externes.
 - Une zone qui porte plusieurs valeurs donne son premier ISBN. Rien n'indique l'ordre des supports.
+- Une monographie est retrouvée par ISBN, puis par titre normalisé chez le même éditeur : deux éditeurs publient des livres de même titre. Deux monographies de même titre qui portent chacune des ISBN restent distinctes.
+- La normalisation pose `source_publications.monograph_id`, que l'agrégation reporte sur `publications.monograph_id`, comme `journal_id`.
+
+### Cible
+
+- `journals` contient les publications en série : revues et collections, avec ou sans ISSN, sous leur titre de référence. `journal_type = proceedings` désigne une série d'actes, jamais un volume.
+- `monographs` contient les livres et les volumes d'actes. Leur `journal_id` désigne leur collection, quand elle existe.
+- Le `journal_id` d'un enregistrement désigne une série, jamais un volume. Son `monograph_id` désigne le livre ou le volume qui le contient.
+- La cible s'atteint par le processus, depuis une base vide : chaque règle se calcule à chaque run, sans état antérieur.
+
+### Règles
+
+- **Niveau d'un titre de conteneur.** Un ISBN désigne un livre ; un ISSN désigne une série, jamais un volume. Quand la source sépare les deux niveaux, sa structure fait foi : `container-title` de Crossref, `bookTitle_s` de HAL, type de source OpenAlex. Sans ISSN, une entrée dont les documents sont des livres, des chapitres ou des articles de congrès est un volume, quel que soit son titre. Avec un ISSN, le titre départage : une année, un ordinal d'édition ou un numéro de volume désignent un volume qui porte l'ISSN de sa collection ; sinon, c'est la collection. Le classement vit dans le domaine (`domain/journals/series.py`).
+- **Titre de référence d'une série à ISSN.** Le titre propre de la notice Sudoc remplace un titre en base qui a la forme d'un volume. Les autres titres restent la référence.
+- **Série sans ISSN.** Elle se reconnaît seulement entre plusieurs volumes : même clé de série (titre sans année, numéro d'édition ni ordinal), éditeur compatible. Son titre est la forme commune des volumes.
+- **Chemin.** Aucune suppression avant la dernière étape. Les monographies doublonnent d'abord les entrées de `journals` ; elles sont ensuite rattachées à leur collection ; les entrées de `journals` qui décrivent un volume sont supprimées en dernier, une fois vidées.
 
 ## Phasage
 
@@ -52,30 +70,71 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Audit du raw store (`audit_isbn_in_raw_store`, `5dee27b41`). Les notices brutes portent l'ISBN à quatre places : la zone TEI `<idno type="isbn">` de HAL, un `relatedIdentifiers` de type ISBN ou l'identifiant du conteneur chez DataCite, un identifiant `isbn` ou `eisbn` chez WoS, les identifiants externes de ScanR. Sur la base locale, DataCite en porte un dans 91 % de ses notices, WoS dans 31 %, HAL dans 20 %, ScanR dans aucune. Leur lecture donnerait un ISBN à 2 954 publications et à 1 774 conteneurs de chapitres qui n'en ont pas.
 - [x] Lecture de ces champs par les normaliseurs de HAL, DataCite et WoS. Crossref range sous `eisbn` l'ISBN dont il déclare le support électronique, WoS celui de son identifiant `eisbn`. `find_isbns` extrait chaque motif d'ISBN d'une zone, et le value object valide à l'écriture.
 - [ ] Stock : réhydrater le staging depuis le raw store, puis renormaliser HAL, DataCite et WoS. La zone TEI de HAL demande d'extraire chaque motif d'ISBN : sur 4 421 valeurs, 182 portent deux ISBN, un EAN, un ISSN, une faute de frappe ou un suffixe de chapitre (`978-3-319-77273-8_16`).
-- [ ] Colonne `eisbn` de `monographs`, alimentée par les sources qui déclarent le support électronique.
+- [x] Colonne `eisbn` de `monographs`, alimentée par les sources qui déclarent le support électronique.
 - [ ] Support inconnu : vérification dans le Sudoc, qui le donne en zone 182 (`n` papier, `c` électronique) et accepte plusieurs ISBN par requête. Sur un échantillon interrogé un à un, le Sudoc tient 11 des 12 ISBN venus de HAL et 12 des 12 venus de Crossref, contre 1 sur 12 pour ceux de DataCite.
 - Deuxième source écartée pour l'instant : la DNB, interrogeable en SRU sans clé, couvre les éditeurs allemands que le Sudoc rate — Springer, De Gruyter, Dagstuhl — et donne le support en zones 337 et 338. Open Library et Google Books ne conviennent pas : le premier couvre peu et se trompe de support, le second ne le donne pas.
 
 ### 3. Remplissage
 
-- [ ] Mesure : livres, chapitres et communications sans conteneur, et titres de conteneur distincts qu'ils portent.
-- [ ] Étape du pipeline qui crée et retrouve une monographie.
-- [ ] Reprise du stock à partir de `container_title`.
+- [x] Rattachement des enregistrements : `source_publications.monograph_id`, agrégé dans `publications.monograph_id`.
+- [x] Trouve-ou-crée d'une monographie (`application/services/monographs/core.py`).
+- [x] Normalisation, sans rien retirer : l'enregistrement garde son `journal_id` selon la règle en place, et reçoit en outre sa monographie, dont le `journal_id` désigne la même entrée de `journals`. Chaque source décrit le conteneur du document (`ContainerFacts`). Crossref : `container-title` porte `[collection, livre]` pour un chapitre, le volume d'actes en tête pour un article de congrès. HAL : `bookTitle_s` ; le congrès (`conferenceTitle_s`) ne désigne pas un volume, une communication le nomme avec ou sans actes publiés. OpenAlex : source `conference` pour le volume, `book series` ou `journal` pour la collection. WoS : titre de la source, hors ISSN. ScanR : congrès d'une communication. DataCite : conteneur sans ISSN.
+- [x] Sous-étape `delete_empty_monographs` de `publishers_journals`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.
+- [x] Audit de 2026 : 161 monographies, correspondance un pour un avec `journals` (6 entrées). 15 titres en double, presque tous parce que HAL ne donne pas l'éditeur.
+- [x] Rapprochement par titre dans le domaine (`choose_monograph`) : un éditeur absent ne sépare pas deux monographies ; la monographie du même éditeur passe avant celle sans éditeur.
+- [x] Sous-étape `merge_duplicate_monographs` : une monographie rejoint la seule monographie compatible de son titre (`duplicate_monographs`). Simulation : 12 fusions sur 24 titres en double. Les autres opposent des éditeurs en double (Quæ et Quae, Peter Lang et Peter Lang Verlag, Garnier et Classiques Garnier, Springer et ses filiales) ou des volumes de même titre à ISBN distincts.
+- [ ] Volumes HAL : la plupart des documents typés `PROCEEDINGS` sont des communications. Trois signaux désignent un volume : seulement des éditeurs ou des contributeurs, un titre qui commence par « Actes », « Proceedings », « Book of abstracts » ou « Dossier », un titre égal à celui du conteneur. Ils retiennent 107 documents sur 350.
+- [x] DataCite : le filtre des conteneurs vaut pour `journal_id` seulement. Un livre prend l'ISBN de ses identifiants (`identifiers`, `alternateIdentifiers`). Les livres et chapitres Classiques Garnier (226) ont un conteneur sans titre, décrit par les seuls ISSN de la collection (`LISSN`, `EISSN`).
+- [ ] Stock : renormalisation de toutes les sources (Crossref réhydraté depuis le raw store).
+- [ ] Mesure : monographies créées, correspondance avec les entrées de `journals` (un pour un attendu), doublons (même livre sous deux titres, sans ISBN commun), livres, chapitres et communications sans monographie.
 
-### 4. Type contredit par la forme du DOI
+### 4. Classement des conteneurs (à blanc)
+
+- [x] Fonction du domaine : niveau d'un titre de conteneur (`container_level`), d'après l'année, l'ordinal d'édition et le numéro de volume ; un siècle n'est pas un ordinal. Clé de série d'un titre de volume (`series_key`).
+- [x] Audit versionné (`audit_container_levels`) sur 10 864 entrées. Revues : 9 663, dont 520 sans ISSN. Plateformes : 92. Titres de volume : 654 sans ISSN, 3 avec ISSN (ICORES 2023, World Congress 2009, CoDIT). Titres de série : 324 avec ISSN, des collections ; 127 sans ISSN, presque tous des livres ou des volumes sans marque d'édition, d'où la règle : sans ISSN, une entrée de livres, chapitres ou articles de congrès est un volume.
+- [x] Audit des séries sans ISSN : 97 séries reconnues pour 321 volumes, par clé de série et éditeur (Winter Simulation Conference, CoDIT, IROS, ICRA, Goldschmidt, PoS ICRC). Aucun faux regroupement dans l'échantillon.
+
+### 5. Titre de référence des séries
+
+- [ ] Vérification Sudoc : le titre propre de la notice remplace un titre en base qui a la forme d'un volume (ICORES 2023 pour la série ICORES). Mesure des titres remplacés.
+
+### 6. Normalisation cible
+
+- [ ] Résolution du conteneur : la série par ISSN, créée sous la forme de série du titre reçu quand elle manque ; la monographie par ISBN ou par titre de volume. Un titre de volume ne crée plus d'entrée dans `journals`, même pour un article (source OpenAlex de type `conference`).
+- [ ] Sous-étape de `publishers_journals` : séries sans ISSN, reconnues par clé de série entre plusieurs monographies ; la monographie reçoit leur `journal_id`.
+- [ ] Rattachement des monographies à leur collection : ISSN porté par leurs enregistrements, ou série sans ISSN.
+- [ ] Agrégation : le `journal_id` d'une publication vient de ses enregistrements, à défaut de la collection de sa monographie.
+- [ ] Règle de correction : les articles et chapitres d'un volume d'actes deviennent des articles de congrès, d'après la monographie.
+
+### 7. Stock
+
+- [ ] Choix du chemin : reconstruction depuis une base vide, ou script oneshot qui applique les règles de classement aux entrées de `journals` et aux enregistrements en base.
+- [ ] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
+- [ ] Mesure finale : entrées de `journals` par classe, monographies avec et sans collection, publications sans série ni monographie.
+
+### 8. Administration
+
+- [ ] Conversion d'une entrée de `journals` en monographie, et l'inverse. La décision survit à la renormalisation : le classement d'un titre la consulte avant ses règles.
+
+### 9. Type contredit par la forme du DOI
 
 - [ ] Mesure : publications dont le DOI porte un ISBN et dont le type ne s'y accorde pas — ISBN seul hors de `book` et `proceedings`, ISBN suffixé hors de `book_chapter` et `conference_paper`. Causes et volumes.
 
-### 5. Correction du DOI des chapitres
+### 10. Correction du DOI des chapitres
 
 - [ ] Mesure : part des groupes corrigés dont les titres sont presque identiques, part de ceux dont le DOI partagé porte un ISBN suffixé.
 - [ ] Opposition livre/chapitre : exiger que les titres diffèrent.
 - [ ] Forme du DOI : un ISBN suffixé désigne un chapitre, donc aucune correction de divergence ne s'applique.
 - [ ] Comparaison des titres : tolérer les coquilles dans le test de distinction.
 
+### 11. Documentation
+
+- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishers-journals.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
+
 ## Questions ouvertes
 
 - **Identification sans ISBN.** L'ISBN réunit deux enregistrements quand il est là. Sinon, quel signal les réunit : le titre normalisé du conteneur, l'éditeur, le préfixe du DOI ? Les titres divergent d'une source à l'autre.
-- **Collection.** Une monographie rattachée à une collection pointe-t-elle la revue qui porte l'ISSN de cette collection ?
 - **Volumes multiples.** Un titre paru en plusieurs volumes n'est pas traité. Chaque volume est-il une monographie, et qu'est-ce qui les relie ?
-- **Recueils d'actes déjà en base.** Les entrées `proceedings` de `journals` rejoignent-elles `monographs`, ou la table `journals` garde-t-elle les recueils qui portent un ISSN ? Un recueil et la collection qui le réunit y occupent aujourd'hui le même niveau (*Communications in Computer and Information Science*, *IFIP AICT*).
+- **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui porte un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` n'en désigne qu'une : laquelle ?
+- **Volumes HAL.** Faut-il faire une monographie d'un document `PROCEEDINGS` qui présente l'un des trois signaux de volume ? Les « Dossier : … Actes du colloque » (une trentaine) sont-ils des monographies, ou des numéros spéciaux de revue ?
+
