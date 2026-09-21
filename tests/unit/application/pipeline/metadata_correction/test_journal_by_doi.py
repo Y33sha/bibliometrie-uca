@@ -19,6 +19,8 @@ _STASH = stash_entry(None, "JOURNAL_BY_DOI_NAMESPACE")
 def _row(**overrides: object) -> JournalCorrectionRow:
     base: dict[str, object] = {
         "id": 1,
+        "source": "crossref",
+        "raw_doc_type": "journal-article",
         "doi": None,
         "journal_id": None,
         "raw_metadata": {},
@@ -67,3 +69,27 @@ def test_autres_cles_de_raw_metadata_preservees():
             1, 7, {"doc_type": stash_entry("preprint", "SOME_RULE"), "journal_id": _STASH}
         )
     ]
+
+
+def test_article_de_congres_rattache_a_sa_serie():
+    """Cas réel : IFAC-PapersOnLine, série à ISSN de ses articles de congrès."""
+    row = _row(doi="10.64628/aak.335cx4kw5", raw_doc_type="proceedings-article")
+    assert compute_updates([row], _NAMESPACES) == [
+        JournalCorrectionUpdate(1, 7, {"journal_id": _STASH})
+    ]
+
+
+def test_chapitre_sans_revue_par_espace_de_noms():
+    """Régression : l'espace `10.17184/eac.` de l'éditeur EAC rattachait ses chapitres de livres à sa revue."""
+    row = _row(doi="10.64628/aak.335cx4kw5", raw_doc_type="book-chapter")
+    assert compute_updates([row], _NAMESPACES) == []
+
+
+def test_chapitre_rattache_a_tort_retrouve_sa_revue_brute():
+    row = _row(
+        doi="10.64628/aak.335cx4kw5",
+        raw_doc_type="book-chapter",
+        journal_id=7,
+        raw_metadata={"journal_id": _STASH},
+    )
+    assert compute_updates([row], _NAMESPACES) == [JournalCorrectionUpdate(1, None, {})]

@@ -1,6 +1,6 @@
 """Phase `metadata_correction` — sous-étape **journal_by_doi** : rattachement de la revue manquante.
 
-Une `source_publication` qui porte un DOI mais aucun `journal_id` reçoit la revue que désigne l'espace de noms de son DOI, d'après la table `journal_doi_namespaces` (`domain/journals/doi_namespaces.py`).
+Un article ou un article de congrès qui porte un DOI mais aucun `journal_id` reçoit la revue ou la série que désigne l'espace de noms de son DOI, d'après la table `journal_doi_namespaces` (`domain/journals/doi_namespaces.py`). Un livre ou un chapitre n'en reçoit pas : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
 
 Chaque passage repart du `journal_id` brut reconstruit et agit seulement s'il est nul. Quand l'espace de noms désigne une autre revue, ou plus aucune, la revue suit, et le `journal_id` brut revient avec le retrait de la trace `raw_metadata.journal_id`.
 """
@@ -18,6 +18,7 @@ from application.ports.pipeline.metadata_correction import (
     JournalCorrectionUpdate,
     MetadataCorrectionQueries,
 )
+from domain.journals.containers import is_book_or_chapter
 from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
 from domain.source_publications.metadata_correction.journal_by_doi import (
     JOURNAL_BY_DOI_NAMESPACE,
@@ -33,7 +34,7 @@ def _compute_update(
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k != "journal_id"}
 
     new_journal_id = raw_journal_id
-    if raw_journal_id is None and row.doi:
+    if raw_journal_id is None and row.doi and not is_book_or_chapter(row.raw_doc_type, row.source):
         namespace = resolve_journal(row.doi, namespaces)
         if namespace is not None:
             new_journal_id = namespace.journal_id

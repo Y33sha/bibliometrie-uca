@@ -4,10 +4,9 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.monographs import (
     MonographCleanupQueries,
-    MonographCollectionConflict,
-    MonographCollectionLink,
     MonographCollectionQueries,
     MonographFindOrCreateQueries,
+    MonographJournalCandidates,
     MonographMergeQueries,
     MonographTitleGroup,
 )
@@ -80,39 +79,22 @@ _RELEASE_SOURCE_ISBNS = text("UPDATE monographs SET isbn = NULL, eisbn = NULL WH
 _DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
 
 
-# Entrées de `journals` à ISSN que portent les enregistrements de chaque monographie.
-_COLLECTION_CANDIDATES = """
-    SELECT s.monograph_id, array_agg(DISTINCT s.journal_id ORDER BY s.journal_id) AS candidate_ids
-    FROM source_publications s
-    JOIN journals j ON j.id = s.journal_id
-    WHERE s.monograph_id IS NOT NULL
-      AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL)
-    GROUP BY s.monograph_id
-"""
-
-_LINK_TO_COLLECTIONS = text(f"""
-    WITH candidates AS ({_COLLECTION_CANDIDATES}), changes AS (
-        SELECT m.id, m.journal_id AS previous_id, c.candidate_ids[1] AS collection_id
-        FROM monographs m
-        JOIN candidates c ON c.monograph_id = m.id
-        WHERE cardinality(c.candidate_ids) = 1
-          AND m.journal_id IS DISTINCT FROM c.candidate_ids[1]
-    )
-    UPDATE monographs m
-    SET journal_id = ch.collection_id
-    FROM changes ch, journals j
-    WHERE m.id = ch.id AND j.id = ch.collection_id
-    RETURNING m.id, m.title, ch.collection_id, j.title AS collection_title, ch.previous_id
-""")
-
-_COLLECTION_CONFLICTS = text(f"""
-    WITH candidates AS ({_COLLECTION_CANDIDATES})
-    SELECT m.id, m.title, c.candidate_ids
-    FROM candidates c
-    JOIN monographs m ON m.id = c.monograph_id
-    WHERE cardinality(c.candidate_ids) > 1
+_JOURNAL_CANDIDATES = text("""
+    SELECT m.id, m.title, m.journal_id,
+           coalesce(array_agg(DISTINCT j.id ORDER BY j.id) FILTER (
+               WHERE j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
+           ), '{}') AS with_issn,
+           coalesce(array_agg(DISTINCT j.id ORDER BY j.id) FILTER (
+               WHERE j.id IS NOT NULL AND j.issn IS NULL AND j.eissn IS NULL AND j.issnl IS NULL
+           ), '{}') AS without_issn
+    FROM monographs m
+    JOIN source_publications s ON s.monograph_id = m.id
+    LEFT JOIN journals j ON j.id = s.journal_id
+    GROUP BY m.id
     ORDER BY m.id
 """)
+
+_SET_JOURNAL = text("UPDATE monographs SET journal_id = :journal_id WHERE id = :id")
 
 
 class PgMonographGatewayQueries(
@@ -156,19 +138,16 @@ class PgMonographGatewayQueries(
         )
         self._conn.execute(_DELETE_SOURCE, params)
 
-    def link_monographs_to_collections(self) -> list[MonographCollectionLink]:
-        return sorted(
-            MonographCollectionLink(
-                r.id, r.title, r.collection_id, r.collection_title, r.previous_id
-            )
-            for r in self._conn.execute(_LINK_TO_COLLECTIONS)
-        )
-
-    def find_monograph_collection_conflicts(self) -> list[MonographCollectionConflict]:
+    def find_monograph_journal_candidates(self) -> list[MonographJournalCandidates]:
         return [
-            MonographCollectionConflict(r.id, r.title, tuple(r.candidate_ids))
-            for r in self._conn.execute(_COLLECTION_CONFLICTS)
+            MonographJournalCandidates(
+                r.id, r.title, r.journal_id, tuple(r.with_issn), tuple(r.without_issn)
+            )
+            for r in self._conn.execute(_JOURNAL_CANDIDATES)
         ]
+
+    def set_monograph_journal(self, monograph_id: int, journal_id: int | None) -> None:
+        self._conn.execute(_SET_JOURNAL, {"id": monograph_id, "journal_id": journal_id})
 
     def delete_empty_monographs(self) -> list[tuple[int, str]]:
         return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))
