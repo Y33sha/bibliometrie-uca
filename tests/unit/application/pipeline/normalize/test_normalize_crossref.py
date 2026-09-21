@@ -505,19 +505,38 @@ class TestUpsertPublisherEtJournal:
             "WG",
         )
 
-    def test_article_de_congres_volume_en_tete(self):
+    def test_article_de_congres_collection_et_volume(self):
+        """Cas réel : le volume suit la collection."""
         facts = get_container_facts(
             {
                 "type": "proceedings-article",
                 "container-title": [
-                    "Proceedings of the 5th International Conference UNCECOMP 2019",
-                    "5th International Conference on Uncertainty Quantification",
+                    "Annals of Computer Science and Information Systems",
+                    "Proceedings of the 2019 Federated Conference on Computer Science and Information Systems",
                 ],
-                "ISSN": ["2623-3339"],
+                "ISSN": ["2300-5963"],
             }
         )
-        assert facts.book_title == "Proceedings of the 5th International Conference UNCECOMP 2019"
-        assert facts.collection_title is None
+        assert (facts.collection_title, facts.book_title) == (
+            "Annals of Computer Science and Information Systems",
+            "Proceedings of the 2019 Federated Conference on Computer Science and Information Systems",
+        )
+
+    def test_volume_reconnu_a_sa_forme_quel_que_soit_l_ordre(self):
+        facts = get_container_facts(
+            {
+                "type": "proceedings-article",
+                "container-title": [
+                    "Les journées de l'interdisciplinarité 2022",
+                    "Les journées de l'interdisciplinarité",
+                ],
+                "ISSN": ["2300-5963"],
+            }
+        )
+        assert (facts.collection_title, facts.book_title) == (
+            "Les journées de l'interdisciplinarité",
+            "Les journées de l'interdisciplinarité 2022",
+        )
 
     def test_livre_titre_propre_et_collection(self):
         facts = get_container_facts(

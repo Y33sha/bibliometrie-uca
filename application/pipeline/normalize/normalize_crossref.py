@@ -31,6 +31,7 @@ from application.services.monographs.containers import Containers, find_or_creat
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
+from domain.journals.series import split_collection_and_volume
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -202,7 +203,7 @@ def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
 def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que Crossref dit du conteneur d'un document.
 
-    Un livre porte sa collection dans `container-title`. Un chapitre y porte `[collection, livre]`, ou le seul livre, ou la seule collection quand un ISSN la désigne. Un article de congrès y porte le volume d'actes en tête ; sous une collection désignée par un ISSN, le volume prend le nom du congrès.
+    Un livre porte sa collection dans `container-title`. Un chapitre ou un article de congrès y porte la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
     """
     raw_type = as_str(msg.get("type"))
     conference = extract_crossref_conference(msg)
@@ -214,10 +215,8 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     if role is ContainerRole.BOOK:
         collection_title = titles[0] if titles else None
     elif role is ContainerRole.PART:
-        if raw_type == "proceedings-article" and len(titles) >= 2:
-            book_title = titles[0]
-        elif len(titles) >= 2:
-            collection_title, book_title = titles[0], titles[-1]
+        if len(titles) >= 2:
+            collection_title, book_title = split_collection_and_volume(titles[0], titles[-1])
         elif titles and (issn or eissn):
             collection_title = titles[0]
             book_title = as_str(conference.get("name")) if conference else None

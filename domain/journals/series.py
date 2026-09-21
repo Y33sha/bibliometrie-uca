@@ -67,6 +67,16 @@ def container_level(title: str) -> ContainerLevel:
     return ContainerLevel.SERIES
 
 
+def split_collection_and_volume(first: str, second: str) -> tuple[str, str]:
+    """Collection et volume parmi deux titres de conteneur. Le volume est le seul titre qui a la forme d'un volume (`container_level`) ; à défaut, l'ordre des titres tranche."""
+    if (
+        container_level(first) is ContainerLevel.VOLUME
+        and container_level(second) is ContainerLevel.SERIES
+    ):
+        return second, first
+    return first, second
+
+
 def series_title(title: str) -> str:
     """Titre de la série d'un titre de volume : le titre sans dates, années, ordinaux d'édition ni numéros de volume, casse et ponctuation conservées.
 

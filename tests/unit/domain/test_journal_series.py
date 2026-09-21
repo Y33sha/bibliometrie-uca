@@ -11,6 +11,7 @@ from domain.journals.series import (
     reference_series_title,
     series_key,
     series_title,
+    split_collection_and_volume,
 )
 
 
@@ -127,3 +128,29 @@ class TestGroupSeries:
 
     def test_volume_seul_pas_de_serie(self):
         assert group_series([VolumeTitle(1, "NuFACT 2022", 5)]) == []
+
+
+def test_deux_titres_le_volume_a_la_forme_d_un_volume():
+    assert split_collection_and_volume(
+        "ICORES 2023", "Lecture Notes in Business Information Processing"
+    ) == (
+        "Lecture Notes in Business Information Processing",
+        "ICORES 2023",
+    )
+
+
+def test_deux_titres_sans_forme_distinctive_l_ordre_tranche():
+    """Cas réel : UNCECOMP, deux titres de volume ; Operator Theory, aucun."""
+    assert split_collection_and_volume(
+        "Proceedings of the 5th International Conference UNCECOMP 2019",
+        "5th International Conference on Uncertainty Quantification",
+    ) == (
+        "Proceedings of the 5th International Conference UNCECOMP 2019",
+        "5th International Conference on Uncertainty Quantification",
+    )
+    assert split_collection_and_volume(
+        "Operator Theory: Advances and Applications", "Ritt Operators and Their Functional Calculus"
+    ) == (
+        "Operator Theory: Advances and Applications",
+        "Ritt Operators and Their Functional Calculus",
+    )
