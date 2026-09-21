@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_openalex`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `get_container_facts` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
 
 Pattern : `FakeSourcePublicationQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
 """
@@ -22,11 +22,13 @@ from application.pipeline.normalize.normalize_openalex import (
     extract_locations_data,
     extract_pub_metadata,
     extract_topics,
+    get_container_facts,
     insert_openalex_document,
     process_work,
     reconstruct_abstract,
-    upsert_journal,
+    upsert_containers,
 )
+from application.services.monographs.containers import Containers
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -210,37 +212,16 @@ class TestUpsertPublisher:
         assert captured["openalex_id"] is None
 
 
-# ── upsert_journal (branches issn/eissn/oa_model) ────────────────
+# ── conteneurs (branches issn/eissn/oa_model) ───────────────────
 
 
-class TestUpsertJournal:
-    def test_no_title_returns_none(self):
+class TestContainerFacts:
+    def test_sans_source_aucun_conteneur(self):
         repo = MagicMock()
-        result = upsert_journal({}, None, journal_repo=repo)
-        assert result is None
+        assert upsert_containers({}, None, container_repo=repo) == Containers(None, None)
         repo.create_journal.assert_not_called()
 
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake)
-        work = {
-            "type": "book-chapter",
-            "primary_location": {"source": {"display_name": "Handbook"}},
-        }
-
-        assert upsert_journal(work, None, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
-        assert fake.call_args.kwargs["source"] == "openalex"
-
-    def test_repository_source_oa_model(self, monkeypatch):
-        captured: dict[str, Any] = {}
-
-        def fake_create(*args, **kwargs):
-            captured.update(kwargs)
-            return 42
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
+    def test_repository_source_oa_model(self):
         work = {
             "primary_location": {
                 "source": {
@@ -250,49 +231,22 @@ class TestUpsertJournal:
                 }
             }
         }
-        result = upsert_journal(work, None, journal_repo=MagicMock())
-        assert result == 42
-        assert captured["oa_model"] == "repository"
+        facts = get_container_facts(work)
+        assert facts.oa_model == "repository"
+        assert facts.openalex_id == "S1"
 
-    def test_journal_full_oa(self, monkeypatch):
-        captured: dict[str, Any] = {}
-
-        def fake_create(*args, **kwargs):
-            captured.update(kwargs)
-            return 1
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
+    def test_journal_full_oa(self):
         work = {
             "primary_location": {"source": {"display_name": "OA", "type": "journal", "is_oa": True}}
         }
-        upsert_journal(work, None, journal_repo=MagicMock())
-        assert captured["oa_model"] == "full_oa"
+        assert get_container_facts(work).oa_model == "full_oa"
 
-    def test_journal_subscription(self, monkeypatch):
-        captured: dict[str, Any] = {}
+    def test_journal_subscription(self):
+        work = {"primary_location": {"source": {"display_name": "Sub", "type": "journal"}}}
+        assert get_container_facts(work).oa_model == "subscription"
 
-        def fake_create(*args, **kwargs):
-            captured.update(kwargs)
-            return 1
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
-        work = {
-            "primary_location": {
-                "source": {"display_name": "Sub", "type": "journal"}
-            }  # is_oa absent
-        }
-        upsert_journal(work, None, journal_repo=MagicMock())
-        assert captured["oa_model"] == "subscription"
-
-    def test_issn_eissn_picked_from_array(self, monkeypatch):
+    def test_issn_eissn_picked_from_array(self):
         """Le premier ISSN différent de issn_l alimente issn ; le second alimente eissn."""
-        captured: dict[str, Any] = {}
-
-        def fake_create(*args, **kwargs):
-            captured.update(kwargs)
-            return 1
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_container_journal", fake_create)
         work = {
             "primary_location": {
                 "source": {
@@ -302,9 +256,30 @@ class TestUpsertJournal:
                 }
             }
         }
-        upsert_journal(work, None, journal_repo=MagicMock())
-        assert captured["issn"] == "2222-2222"
-        assert captured["eissn"] == "3333-3333"
+        facts = get_container_facts(work)
+        assert (facts.issn, facts.eissn, facts.issnl) == ("2222-2222", "3333-3333", "1111-1111")
+
+    def test_collection_d_un_chapitre(self):
+        work = {
+            "type": "book-chapter",
+            "primary_location": {
+                "source": {
+                    "display_name": "Lecture notes in computer science",
+                    "type": "book series",
+                }
+            },
+        }
+        facts = get_container_facts(work)
+        assert facts.collection_title == "Lecture notes in computer science"
+        assert facts.book_title is None
+
+    def test_congres_volume_d_actes(self):
+        work = {
+            "type": "article",
+            "primary_location": {"source": {"display_name": "2021 ICCAS", "type": "conference"}},
+        }
+        facts = get_container_facts(work)
+        assert (facts.book_title, facts.collection_title) == ("2021 ICCAS", None)
 
 
 # ── extract_pub_metadata ─────────────────────────────────────────
@@ -592,7 +567,9 @@ class TestBuildOpenalexAuthorRecords:
 def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
     monkeypatch.setattr(
-        normalize_openalex, "extract_pub_metadata", lambda w, j, primary=None: {"journal_id": j}
+        normalize_openalex,
+        "extract_pub_metadata",
+        lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
     )
     monkeypatch.setattr(
         normalize_openalex,
@@ -609,7 +586,7 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourcePublicationQueries(),
             "logger": logger_ or logging.getLogger("test"),
-            "journal_repo": MagicMock(),
+            "container_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
@@ -628,13 +605,17 @@ class TestProcessWork:
         assert sq.marked_done == [1]
 
     def test_should_skip_publisher_journal_false_calls_upserts(self, monkeypatch):
-        """Quand should_skip_publisher_journal renvoie False, upsert_publisher / upsert_journal sont appelés."""
+        """Quand should_skip_publisher_journal renvoie False, upsert_publisher / upsert_containers sont appelés."""
         monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: object())
         monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: False)
         monkeypatch.setattr(normalize_openalex, "upsert_publisher", lambda w, **kw: 1)
-        monkeypatch.setattr(normalize_openalex, "upsert_journal", lambda w, p, **kw: 2)
         monkeypatch.setattr(
-            normalize_openalex, "extract_pub_metadata", lambda w, j, primary=None: {"journal_id": j}
+            normalize_openalex, "upsert_containers", lambda w, p, **kw: Containers(2, None)
+        )
+        monkeypatch.setattr(
+            normalize_openalex,
+            "extract_pub_metadata",
+            lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
         )
         monkeypatch.setattr(normalize_openalex, "insert_openalex_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_openalex, "process_authorships", lambda *a, **kw: None)
@@ -664,7 +645,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        journal_repo_factory=lambda c: MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
@@ -675,7 +656,7 @@ class TestOpenalexNormalizerClass:
     def test_preload_caches_sets_repos(self):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
-        assert norm._journal_repo is not None
+        assert norm._container_repo is not None
         assert norm._publisher_repo is not None
         assert norm._publication_repo is not None
 
@@ -693,7 +674,7 @@ class TestOpenalexNormalizerClass:
         assert result is True
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {
-            "journal_repo",
+            "container_repo",
             "publisher_repo",
             "publication_repo",
             "staging_queries",

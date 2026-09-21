@@ -14,11 +14,13 @@ from application.pipeline.normalize.normalize_datacite import (
     DataciteNormalizer,
     build_datacite_author_records,
     get_biblio,
+    get_container_facts,
     process_authorships,
     process_work,
-    upsert_journal,
+    upsert_containers,
     upsert_publisher,
 )
+from application.services.monographs.containers import Containers
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -303,31 +305,12 @@ class TestUpsertPublisher:
         assert vus == ["Zenodo"]
 
 
-class TestUpsertJournal:
-    def test_sans_titre_de_contenant_aucune_revue(self):
+class TestContainers:
+    def test_sans_titre_de_contenant_aucun_conteneur(self):
         """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
-        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
+        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
-        attrs = {
-            "types": {"resourceTypeGeneral": "BookChapter"},
-            "container": {"title": "Handbook"},
-        }
-
-        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "BookChapter"
-        assert fake.call_args.kwargs["source"] == "datacite"
-
-    def test_contenant_titre_cree_la_revue(self, monkeypatch):
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_datacite,
-            "find_or_create_container_journal",
-            lambda title, **kw: vus.update(title=title, **kw) or 3,
-        )
+    def test_revue_identifiee_par_son_issn(self):
         attrs = {
             "types": {"resourceTypeGeneral": "JournalArticle"},
             "container": {
@@ -336,27 +319,33 @@ class TestUpsertJournal:
                 "identifierType": "ISSN",
             },
         }
+        facts = get_container_facts(attrs)
+        assert (facts.journal_title, facts.issn) == ("J. Things", "1234-5678")
+        assert (facts.collection_title, facts.book_title) == ("J. Things", None)
 
-        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
-        assert vus["title"] == "J. Things"
-        assert vus["issn"] == "1234-5678"
-        assert vus["publisher_id"] == 7
+    def test_chapitre_livre_du_contenant(self):
+        attrs = {
+            "types": {"resourceTypeGeneral": "BookChapter"},
+            "container": {"title": "Transmission and Gender"},
+        }
+        facts = get_container_facts(attrs)
+        assert (facts.raw_doc_type, facts.book_title) == ("BookChapter", "Transmission and Gender")
 
     def test_revue_au_type_libre_cree_la_revue(self, monkeypatch):
         """Cas réel : ATeM dépose ses articles sous le type générique `Text`, « Journal article » en texte libre."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
+        fake = MagicMock(return_value=Containers(3, None))
+        monkeypatch.setattr(normalize_datacite, "find_or_create_containers", fake)
         attrs = {
             "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
             "container": {"title": "ATeM Archiv für Textmusikforschung", "type": "Series"},
         }
 
-        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) == 3
+        assert upsert_containers(attrs, 7, container_repo=MagicMock()) == Containers(3, None)
 
     def test_copie_d_entrepot_sans_revue(self, monkeypatch):
         """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_datacite, "find_or_create_container_journal", fake)
+        fake = MagicMock(return_value=Containers(3, None))
+        monkeypatch.setattr(normalize_datacite, "find_or_create_containers", fake)
         attrs = {
             "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
             "container": {
@@ -367,7 +356,7 @@ class TestUpsertJournal:
             },
         }
 
-        assert upsert_journal(attrs, 7, journal_repo=MagicMock()) is None
+        assert upsert_containers(attrs, 7, container_repo=MagicMock()) == Containers(None, None)
         fake.assert_not_called()
 
 
@@ -386,7 +375,7 @@ def _attributs(**surcharges) -> dict:
 class TestProcessWork:
     def _kwargs(self, queries, staging_queries):
         return {
-            "journal_repo": MagicMock(),
+            "container_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries,
@@ -397,7 +386,9 @@ class TestProcessWork:
     def _sans_editeur_ni_revue(self, monkeypatch):
         """Les créations d'éditeur et de revue ont leurs propres tests : la boucle s'en passe."""
         monkeypatch.setattr(normalize_datacite, "upsert_publisher", lambda a, **kw: None)
-        monkeypatch.setattr(normalize_datacite, "upsert_journal", lambda a, p, **kw: None)
+        monkeypatch.setattr(
+            normalize_datacite, "upsert_containers", lambda a, p, **kw: Containers(None, None)
+        )
         monkeypatch.setattr(normalize_datacite, "process_authorships", lambda *a, **kw: None)
 
     @pytest.fixture
@@ -489,7 +480,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        journal_repo_factory=lambda c: MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),

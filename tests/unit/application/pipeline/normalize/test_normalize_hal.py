@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers ( get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers (get_title, get_container_facts, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
 Pattern : `FakeSourcePublicationQueries` + `FakeAuthorshipsBatchQueries` + `MagicMock`, pas de DB.
 """
@@ -20,15 +20,17 @@ from application.pipeline.normalize.normalize_hal import (
     active_embargo_until,
     build_hal_author_records,
     extract_pub_metadata,
+    get_container_facts,
     get_title,
     insert_hal_document,
     parse_author_structures,
     parse_tei_isbns,
     process_work,
-    upsert_journal,
+    upsert_containers,
     upsert_publisher,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
+from application.services.monographs.containers import Containers
 from domain.sources.hal import hal_text_field
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeAuthorshipsBatchQueries,
@@ -80,47 +82,40 @@ class TestGetTitle:
         assert get_title({"title_s": [], "label_s": "L"}) == "L"
 
 
-# ── upsert_publisher / upsert_journal ────────────────────────────
+# ── conteneurs ───────────────────────────────────────────────────
 
 
-class TestUpsertJournal:
-    def test_no_title_returns_none(self):
-        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
-
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_hal, "find_or_create_container_journal", fake)
-        doc = {"docType_s": "COUV", "journalTitle_s": "Handbook of Things"}
-
-        assert upsert_journal(doc, 42, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "COUV"
-        assert fake.call_args.kwargs["source"] == "hal"
-
-    def test_happy_path(self, monkeypatch):
-        captured: dict[str, Any] = {}
-
-        def fake_create(title, *, issn, eissn, publisher_id, repo, **_):
-            captured.update(title=title, issn=issn, eissn=eissn, publisher_id=publisher_id)
-            return 7
-
-        monkeypatch.setattr(normalize_hal, "find_or_create_container_journal", fake_create)
-        result = upsert_journal(
+class TestContainerFacts:
+    def test_article_revue_et_ses_issn(self):
+        facts = get_container_facts(
             {
+                "docType_s": "ART",
                 "journalTitle_s": "Nature",
                 "journalIssn_s": "1234-5678",
                 "journalEissn_s": "2345-6789",
-            },
-            42,
-            journal_repo=MagicMock(),
+            }
         )
-        assert result == 7
-        assert captured == {
-            "title": "Nature",
-            "issn": "1234-5678",
-            "eissn": "2345-6789",
-            "publisher_id": 42,
-        }
+        assert (facts.raw_doc_type, facts.journal_title) == ("ART", "Nature")
+        assert (facts.issn, facts.eissn) == ("1234-5678", "2345-6789")
+
+    def test_chapitre_livre_et_isbn(self):
+        facts = get_container_facts(
+            {
+                "docType_s": "COUV",
+                "title_s": ["Chapitre 3"],
+                "bookTitle_s": "Le Paris du Moyen Âge",
+                "label_xml": _embargo_tei('<idno type="isbn">978-2-410-01322-1</idno>'),
+            }
+        )
+        assert facts.book_title == "Le Paris du Moyen Âge"
+        assert facts.isbns == ("9782410013221",)
+
+    def test_communication_sans_titre_de_volume_prend_le_congres(self):
+        facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
+        assert facts.book_title == "NuFACT 2022"
+
+    def test_sans_conteneur_aucun(self):
+        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
 
 class TestUpsertPublisher:
@@ -578,11 +573,13 @@ class TestProcessAuthors:
 @pytest.fixture
 def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
-    monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
+    monkeypatch.setattr(
+        normalize_hal, "extract_pub_metadata", lambda d, j, m=None: {"journal_id": j}
+    )
     monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
     monkeypatch.setattr(normalize_hal, "process_authorships", lambda *a, **kw: None)
     monkeypatch.setattr(normalize_hal, "upsert_publisher", lambda name, **kw: 1)
-    monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
+    monkeypatch.setattr(normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None))
 
 
 class TestProcessWork:
@@ -590,7 +587,7 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourcePublicationQueries(),
             "logger": logging.getLogger("test"),
-            "journal_repo": MagicMock(),
+            "container_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
@@ -636,8 +633,12 @@ class TestProcessWork:
             return 1
 
         monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_pub)
-        monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
-        monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
+        monkeypatch.setattr(
+            normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None)
+        )
+        monkeypatch.setattr(
+            normalize_hal, "extract_pub_metadata", lambda d, j, m=None: {"journal_id": j}
+        )
         monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_hal, "process_authorships", lambda *a, **kw: None)
 
@@ -657,7 +658,9 @@ class TestProcessWork:
             raise RuntimeError("kaboom")
 
         monkeypatch.setattr(normalize_hal, "upsert_publisher", boom)
-        monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
+        monkeypatch.setattr(
+            normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None)
+        )
 
         raw = {
             "title_s": ["T"],
@@ -679,7 +682,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        journal_repo_factory=lambda c: MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
@@ -690,7 +693,7 @@ class TestHalNormalizerClass:
     def test_preload_caches_sets_repos(self):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
-        assert norm._journal_repo is not None
+        assert norm._container_repo is not None
         assert norm._publisher_repo is not None
         assert norm._publication_repo is not None
 

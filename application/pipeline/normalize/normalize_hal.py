@@ -17,7 +17,7 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -26,7 +26,11 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.persons.identifiers import (
@@ -69,26 +73,33 @@ def upsert_publisher(
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
-def upsert_journal(
+def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`, à défaut le congrès, `conferenceTitle_s`), et les ISBN de la notice TEI."""
+    journal_title = hal_text_field(doc.get("journalTitle_s"))
+    return ContainerFacts(
+        source="hal",
+        raw_doc_type=hal_text_field(doc.get("docType_s")),
+        document_title=get_title(doc),
+        journal_title=journal_title,
+        collection_title=journal_title,
+        book_title=hal_text_field(doc.get("bookTitle_s"))
+        or hal_text_field(doc.get("conferenceTitle_s")),
+        issn=hal_text_field(doc.get("journalIssn_s")),
+        eissn=hal_text_field(doc.get("journalEissn_s")),
+        isbns=tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml")))),
+        year=as_int(doc.get("producedDateY_i")),
+    )
+
+
+def upsert_containers(
     doc: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Extrait et trouve/crée la revue depuis les champs HAL."""
-    title = hal_text_field(doc.get("journalTitle_s"))
-    if not title:
-        return None
-    issn = hal_text_field(doc.get("journalIssn_s"))
-    eissn = hal_text_field(doc.get("journalEissn_s"))
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=hal_text_field(doc.get("docType_s")),
-        source="hal",
-        issn=issn,
-        eissn=eissn,
-        publisher_id=publisher_id,
-        repo=journal_repo,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(doc), publisher_id=publisher_id, repo=container_repo
     )
 
 
@@ -98,7 +109,7 @@ def upsert_journal(
 
 
 def extract_pub_metadata(
-    doc: Mapping[str, JsonValue], journal_id: int | None
+    doc: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un document HAL.
 
@@ -136,6 +147,7 @@ def extract_pub_metadata(
         ),
         embargo_until=embargo_until,
         journal_id=journal_id,
+        monograph_id=monograph_id,
         container_title=container_title,
         language=language,
     )
@@ -248,6 +260,7 @@ def insert_hal_document(
             pub_year=pub_meta.pub_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=biblio_json,
@@ -542,7 +555,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -569,8 +582,8 @@ def process_work(
     publisher_id = (
         upsert_publisher(publisher_name, publisher_repo=publisher_repo) if publisher_name else None
     )
-    journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-    pub_meta = extract_pub_metadata(doc, journal_id)
+    containers = upsert_containers(doc, publisher_id, container_repo=container_repo)
+    pub_meta = extract_pub_metadata(doc, containers.journal_id, containers.monograph_id)
 
     source_publication_id = insert_hal_document(
         conn,
@@ -591,13 +604,13 @@ class HalNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 500
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,

@@ -3,7 +3,7 @@
 Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `extract_pub_metadata`, `upsert_publisher`, `upsert_journal`, `insert_wos_document` : wiring + propagation des champs.
+- `extract_pub_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
 - `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
 - `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
@@ -31,12 +31,14 @@ from application.pipeline.normalize.normalize_wos import (
     build_wos_author_records,
     extract_from_api,
     extract_pub_metadata,
+    get_container_facts,
     insert_wos_document,
     process_record,
-    upsert_journal,
+    upsert_containers,
     upsert_publisher,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
+from application.services.monographs.containers import Containers
 from tests.unit.application.pipeline.normalize.doubles import (
     staging_row,
 )
@@ -749,7 +751,7 @@ class TestExtractPubMetadata:
         assert meta.container_title == "Container Title"
 
 
-# ── upsert_publisher / upsert_journal ───────────────────────────
+# ── upsert_publisher / conteneurs ───────────────────────────
 
 
 class TestUpsertWrappers:
@@ -767,45 +769,30 @@ class TestUpsertWrappers:
         assert upsert_publisher("Springer", publisher_repo=repo) == 99
         assert calls == [("Springer", repo)]
 
-    def test_upsert_journal_returns_none_when_no_title(self):
+    def test_sans_titre_de_source_aucun_conteneur(self):
         rec = {"journal_title": None}
-        repo = MagicMock()
-        assert upsert_journal(rec, publisher_id=1, journal_repo=repo) is None
-
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_wos, "find_or_create_container_journal", fake)
-        rec = {"journal_title": "Handbook of Things", "doc_type": "Book Chapter"}
-
-        assert upsert_journal(rec, publisher_id=1, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "Book Chapter"
-        assert fake.call_args.kwargs["source"] == "wos"
-
-    def test_upsert_journal_delegates_with_issn(self, monkeypatch):
-        calls: list[dict] = []
-
-        def fake_find_or_create_journal(title, *, issn, eissn, publisher_id, repo, **_):
-            calls.append(
-                {
-                    "title": title,
-                    "issn": issn,
-                    "eissn": eissn,
-                    "publisher_id": publisher_id,
-                    "repo": repo,
-                }
-            )
-            return 77
-
-        monkeypatch.setattr(
-            normalize_wos, "find_or_create_container_journal", fake_find_or_create_journal
+        assert upsert_containers(rec, publisher_id=1, container_repo=MagicMock()) == Containers(
+            None, None
         )
-        rec = {"journal_title": "Nature", "issn": "0028-0836", "eissn": "1476-4687"}
-        repo = MagicMock()
-        result = upsert_journal(rec, publisher_id=11, journal_repo=repo)
-        assert result == 77
-        assert calls[0]["title"] == "Nature"
-        assert calls[0]["publisher_id"] == 11
+
+    def test_article_revue_et_ses_issn(self):
+        facts = get_container_facts(
+            {"journal_title": "Nature", "issn": "0028-0836", "eissn": "1476-4687"}
+        )
+        assert facts.journal_title == "Nature"
+        assert (facts.issn, facts.eissn) == ("0028-0836", "1476-4687")
+
+    def test_chapitre_livre_de_la_source_et_isbn(self):
+        """Cas réel : « GEOLOGICAL MELTS », livre d'une collection."""
+        facts = get_container_facts(
+            {
+                "journal_title": "GEOLOGICAL MELTS",
+                "doc_type": "Book Chapter",
+                "external_ids": {"isbn": ["9783030580803"], "eisbn": ["9783030580810"]},
+            }
+        )
+        assert facts.book_title == "GEOLOGICAL MELTS"
+        assert (facts.isbns, facts.eisbns) == (("9783030580803",), ("9783030580810",))
 
 
 # ── insert_wos_document ──────────────────────────────────────────
@@ -970,7 +957,9 @@ class TestProcessRecord:
             },
         )
         monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: 11)
-        monkeypatch.setattr(normalize_wos, "find_or_create_container_journal", lambda *a, **kw: 22)
+        monkeypatch.setattr(
+            normalize_wos, "find_or_create_containers", lambda *a, **kw: Containers(22, None)
+        )
 
         queries = MagicMock()
         queries.upsert_source_publication.return_value = 555
@@ -983,7 +972,7 @@ class TestProcessRecord:
             queries,
             logger,
             row,
-            journal_repo=MagicMock(),
+            container_repo=MagicMock(),
             publisher_repo=MagicMock(),
             publication_repo=MagicMock(),
             staging_queries=staging_queries,
@@ -1019,7 +1008,7 @@ class TestProcessRecord:
         monkeypatch.setattr(normalize_wos, "extract_from_api", fake_extract)
         monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: None)
         monkeypatch.setattr(
-            normalize_wos, "find_or_create_container_journal", lambda *a, **kw: None
+            normalize_wos, "find_or_create_containers", lambda *a, **kw: Containers(None, None)
         )
 
         queries = MagicMock()
@@ -1036,7 +1025,7 @@ class TestProcessRecord:
             queries,
             logger,
             row,
-            journal_repo=MagicMock(),
+            container_repo=MagicMock(),
             publisher_repo=MagicMock(),
             publication_repo=MagicMock(),
             staging_queries=MagicMock(),
@@ -1060,7 +1049,7 @@ class TestProcessRecord:
                 MagicMock(),
                 logger,
                 row,
-                journal_repo=MagicMock(),
+                container_repo=MagicMock(),
                 publisher_repo=MagicMock(),
                 publication_repo=MagicMock(),
                 staging_queries=MagicMock(),
@@ -1081,7 +1070,7 @@ class TestWosNormalizer:
             logger,
             staging_queries=MagicMock(),
             queries=MagicMock(),
-            journal_repo_factory=journal_factory,
+            container_repo_factory=journal_factory,
             publisher_repo_factory=publisher_factory,
             publication_repo_factory=pub_factory,
             authorship_queries=MagicMock(),
@@ -1093,7 +1082,7 @@ class TestWosNormalizer:
         journal_factory.assert_called_once_with(conn2)
         publisher_factory.assert_called_once_with(conn2)
         pub_factory.assert_called_once_with(conn2)
-        assert norm._journal_repo == "j-repo"
+        assert norm._container_repo == "j-repo"
         assert norm._publisher_repo == "p-repo"
         assert norm._publication_repo == "pub-repo"
 
@@ -1103,7 +1092,7 @@ class TestWosNormalizer:
             logger,
             staging_queries=MagicMock(),
             queries=MagicMock(),
-            journal_repo_factory=lambda c: MagicMock(),
+            container_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
             publication_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
@@ -1126,7 +1115,7 @@ class TestWosNormalizer:
         assert captured["row"] == row
         # Les 4 dépendances (3 repos + staging) sont propagées.
         assert set(captured["kwargs"].keys()) == {
-            "journal_repo",
+            "container_repo",
             "publisher_repo",
             "publication_repo",
             "staging_queries",

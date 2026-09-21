@@ -283,34 +283,6 @@ class PgJournalGatewayQueries(
             )
         return self._conn.execute(stmt).scalar_one_or_none()
 
-    def find_proceedings_by_name_form(
-        self,
-        form_normalized: str,
-        publisher_id: int | None,
-    ) -> int | None:
-        stmt = (
-            select(journal_name_forms.c.journal_id)
-            .select_from(
-                journal_name_forms.join(journals, journals.c.id == journal_name_forms.c.journal_id)
-            )
-            .where(
-                journal_name_forms.c.form_normalized == form_normalized,
-                journals.c.journal_type == JournalType.PROCEEDINGS,
-            )
-            .order_by(journals.c.id.asc())
-            .limit(1)
-        )
-        if publisher_id is not None:
-            stmt = stmt.where(
-                or_(
-                    journal_name_forms.c.publisher_id == publisher_id,
-                    journal_name_forms.c.publisher_id.is_(None),
-                )
-            )
-        return self._conn.execute(stmt).scalar_one_or_none()
-
-    # ── journals ───────────────────────────────────────────────────
-
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None:
         return self._conn.execute(
             select(journals.c.id).where(journals.c.openalex_id == openalex_id)

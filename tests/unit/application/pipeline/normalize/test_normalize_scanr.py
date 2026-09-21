@@ -21,14 +21,16 @@ from application.pipeline.normalize.normalize_scanr import (
     build_scanr_author_records,
     extract_doi,
     extract_pub_metadata,
+    get_container_facts,
     get_title,
     insert_scanr_document,
     process_authorships,
     process_work,
-    upsert_journal,
+    upsert_containers,
     upsert_publisher,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
+from application.services.monographs.containers import Containers
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -237,31 +239,28 @@ class TestUpsertPublisherEtJournal:
         assert vus == ["Elsevier"]
 
     def test_sans_titre_de_revue_aucune_revue(self):
-        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
+        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_scanr, "find_or_create_container_journal", fake)
-        doc = {"type": "book-chapter", "source": {"title": "Handbook of Things"}}
-
-        assert upsert_journal(doc, 7, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
-        assert fake.call_args.kwargs["source"] == "scanr"
-
-    def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
+    def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste : le premier est celui du papier, le second celui de l'édition en ligne."""
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_scanr,
-            "find_or_create_container_journal",
-            lambda title, **kw: vus.update(title=title, **kw) or 3,
+        facts = get_container_facts(
+            {"source": {"title": "J. Things", "journalIssns": ["1234-5678", "8765-4321"]}}
         )
-        doc = {"source": {"title": "J. Things", "journalIssns": ["1234-5678", "8765-4321"]}}
+        assert facts.journal_title == "J. Things"
+        assert (facts.issn, facts.eissn) == ("1234-5678", "8765-4321")
 
-        assert upsert_journal(doc, 7, journal_repo=MagicMock()) == 3
-        assert (vus["issn"], vus["eissn"]) == ("1234-5678", "8765-4321")
-        assert vus["publisher_id"] == 7
+    def test_communication_volume_du_congres(self):
+        facts = get_container_facts(
+            {"type": "proceedings", "source": {"title": "2021 2nd International Conference"}}
+        )
+        assert facts.book_title == "2021 2nd International Conference"
+
+    def test_chapitre_plateforme_sans_livre(self):
+        """Cas réel : la source d'un chapitre ScanR est la plateforme de l'éditeur."""
+        facts = get_container_facts(
+            {"type": "book-chapter", "source": {"title": "Presses de Sciences Po eBooks"}}
+        )
+        assert facts.book_title is None
 
 
 class TestExtractPubMetadata:
@@ -439,7 +438,9 @@ class TestProcessWork:
     @pytest.fixture(autouse=True)
     def _sans_editeur_ni_revue(self, monkeypatch):
         monkeypatch.setattr(normalize_scanr, "upsert_publisher", lambda d, **kw: None)
-        monkeypatch.setattr(normalize_scanr, "upsert_journal", lambda d, p, **kw: None)
+        monkeypatch.setattr(
+            normalize_scanr, "upsert_containers", lambda d, p, **kw: Containers(None, None)
+        )
         monkeypatch.setattr(normalize_scanr, "process_authorships", lambda *a, **kw: None)
 
     def _run(self, raw, logger):
@@ -450,7 +451,7 @@ class TestProcessWork:
             queries,
             logger,
             staging_row(staging_id=42, source_id="sc-1", raw=raw),
-            journal_repo=MagicMock(),
+            container_repo=MagicMock(),
             publisher_repo=MagicMock(),
             publication_repo=MagicMock(),
             staging_queries=staging,
@@ -495,7 +496,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        journal_repo_factory=lambda c: MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),

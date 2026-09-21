@@ -1,12 +1,25 @@
-"""Règles de rattachement d'un document à une revue et de typage d'une revue selon ses documents."""
+"""Règles de rattachement d'un document à son conteneur, revue ou monographie, et de typage d'une revue selon ses documents."""
 
 from collections.abc import Iterable
+from enum import StrEnum
 
 from domain.journals.titles import names_a_dated_event, names_proceedings
 from domain.source_publications.doc_types import map_doc_type
 
-_BOOK_TYPES = frozenset({"book", "book_chapter"})
+_BOOK = "book"
+_BOOK_CHAPTER = "book_chapter"
 _CONFERENCE_PAPER = "conference_paper"
+
+
+class ContainerRole(StrEnum):
+    """Ce que le conteneur d'un document désigne."""
+
+    JOURNAL = "journal"
+    """Le document paraît dans une revue."""
+    BOOK = "book"
+    """Le document est lui-même un livre : sa monographie porte son titre."""
+    PART = "part"
+    """Le document est un chapitre ou un article de congrès : sa monographie est le livre ou le volume d'actes qui le contient."""
 
 
 def _doc_types(raw_doc_type: str | None, source: str) -> set[str]:
@@ -14,17 +27,23 @@ def _doc_types(raw_doc_type: str | None, source: str) -> set[str]:
     return {map_doc_type(part, source) for part in (raw_doc_type or "").split(";")}
 
 
-def container_is_journal(
-    raw_doc_type: str | None, source: str, *, has_issn: bool, declares_conference: bool = False
-) -> bool:
-    """Indique si le conteneur d'un document désigne une revue.
-
-    Sans ISSN, le conteneur d'un livre ou d'un chapitre est le livre lui-même. Avec un ISSN, c'est sa collection. Un document issu d'un congrès garde son conteneur, le recueil d'actes : il déclare le congrès (`declares_conference`), ou son type composite mentionne un article de congrès.
-    """
-    if has_issn or declares_conference:
-        return True
+def container_role(
+    raw_doc_type: str | None, source: str, *, declares_conference: bool = False
+) -> ContainerRole:
+    """Rôle du conteneur d'un document, d'après son type brut dans la source. Un document qui déclare un congrès (`declares_conference`) est un article de congrès."""
     types = _doc_types(raw_doc_type, source)
-    return _CONFERENCE_PAPER in types or not types & _BOOK_TYPES
+    if declares_conference or types & {_BOOK_CHAPTER, _CONFERENCE_PAPER}:
+        return ContainerRole.PART
+    if _BOOK in types:
+        return ContainerRole.BOOK
+    return ContainerRole.JOURNAL
+
+
+def is_conference(
+    raw_doc_type: str | None, source: str, *, declares_conference: bool = False
+) -> bool:
+    """Indique si un document est issu d'un congrès : sa monographie est un volume d'actes."""
+    return declares_conference or _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
 
 
 def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[int, int]:

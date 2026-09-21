@@ -27,6 +27,7 @@ from application.pipeline.normalize.normalize_crossref import (
     get_abstract,
     get_biblio,
     get_cited_by_count,
+    get_container_facts,
     get_container_title,
     get_doi,
     get_external_ids,
@@ -39,9 +40,10 @@ from application.pipeline.normalize.normalize_crossref import (
     get_title,
     process_authorships,
     process_work,
-    upsert_journal,
+    upsert_containers,
     upsert_publisher,
 )
+from application.services.monographs.containers import Containers
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -446,52 +448,90 @@ class TestUpsertPublisherEtJournal:
 
     def test_sans_titre_de_contenant_aucune_revue(self):
         """Un document sans revue ni série qui le porte ne crée pas d'entrée au référentiel."""
-        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
+        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
-    def test_transmet_le_type_brut(self, monkeypatch):
-        """Le type brut du document décide du rattachement à une revue."""
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_crossref, "find_or_create_container_journal", fake)
-        msg = {"type": "book-chapter", "container-title": ["Handbook of Things"]}
-
-        assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
-        assert fake.call_args.kwargs["raw_doc_type"] == "book-chapter"
-        assert fake.call_args.kwargs["source"] == "crossref"
-        assert fake.call_args.kwargs["declares_conference"] is False
-
-    def test_transmet_le_congres_declare(self, monkeypatch):
-        fake = MagicMock(return_value=3)
-        monkeypatch.setattr(normalize_crossref, "find_or_create_container_journal", fake)
-        msg = {
-            "type": "book-chapter",
-            "container-title": ["Graph-Theoretic Concepts in Computer Science"],
-            "assertion": [
-                {"group": {"name": "ConferenceInfo"}, "name": "conference_name", "value": "WG"}
-            ],
-        }
-
-        upsert_journal(msg, 7, journal_repo=MagicMock())
-        assert fake.call_args.kwargs["declares_conference"] is True
-
-    def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_crossref,
-            "find_or_create_container_journal",
-            lambda title, **kw: vus.update(title=title, **kw) or 3,
+    def test_article_revue_et_ses_deux_issn(self):
+        facts = get_container_facts(
+            {
+                "type": "journal-article",
+                "container-title": ["J. Things"],
+                "issn-type": [
+                    {"type": "print", "value": "1234-5678"},
+                    {"type": "electronic", "value": "8765-4321"},
+                ],
+            }
         )
-        msg = {
-            "container-title": ["J. Things"],
-            "issn-type": [
-                {"type": "print", "value": "1234-5678"},
-                {"type": "electronic", "value": "8765-4321"},
-            ],
-        }
+        assert facts.journal_title == "J. Things"
+        assert (facts.issn, facts.eissn) == ("1234-5678", "8765-4321")
 
-        assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
-        assert vus["title"] == "J. Things"
-        assert (vus["issn"], vus["eissn"]) == ("1234-5678", "8765-4321")
-        assert vus["publisher_id"] == 7
+    def test_chapitre_collection_puis_livre(self):
+        """Cas réel : 10.1007/978-3-030-57997-5_58, chapitre d'un livre de la collection IFIP AICT."""
+        facts = get_container_facts(
+            {
+                "type": "book-chapter",
+                "container-title": [
+                    "IFIP Advances in Information and Communication Technology",
+                    "Advances in Production Management Systems",
+                ],
+                "ISSN": ["1868-4238"],
+                "ISBN": ["9783030580803"],
+            }
+        )
+        assert facts.collection_title == "IFIP Advances in Information and Communication Technology"
+        assert facts.book_title == "Advances in Production Management Systems"
+        assert facts.isbns == ("9783030580803",)
+
+    def test_chapitre_sans_issn_livre_seul(self):
+        facts = get_container_facts(
+            {"type": "book-chapter", "container-title": ["Le Paris du Moyen Âge"]}
+        )
+        assert (facts.collection_title, facts.book_title) == (None, "Le Paris du Moyen Âge")
+
+    def test_chapitre_d_une_collection_issu_d_un_congres(self):
+        """Sous une collection à ISSN, le volume d'actes prend le nom du congrès déclaré."""
+        facts = get_container_facts(
+            {
+                "type": "book-chapter",
+                "container-title": ["Lecture Notes in Computer Science"],
+                "ISSN": ["0302-9743"],
+                "assertion": [
+                    {"group": {"name": "ConferenceInfo"}, "name": "conference_name", "value": "WG"}
+                ],
+            }
+        )
+        assert facts.declares_conference is True
+        assert (facts.collection_title, facts.book_title) == (
+            "Lecture Notes in Computer Science",
+            "WG",
+        )
+
+    def test_article_de_congres_volume_en_tete(self):
+        facts = get_container_facts(
+            {
+                "type": "proceedings-article",
+                "container-title": [
+                    "Proceedings of the 5th International Conference UNCECOMP 2019",
+                    "5th International Conference on Uncertainty Quantification",
+                ],
+                "ISSN": ["2623-3339"],
+            }
+        )
+        assert facts.book_title == "Proceedings of the 5th International Conference UNCECOMP 2019"
+        assert facts.collection_title is None
+
+    def test_livre_titre_propre_et_collection(self):
+        facts = get_container_facts(
+            {
+                "type": "book",
+                "title": ["Ubiquitous Networking"],
+                "container-title": ["Lecture Notes in Computer Science"],
+                "ISBN": ["9783030580803", "9783030580810"],
+                "isbn-type": [{"type": "electronic", "value": "9783030580810"}],
+            }
+        )
+        assert facts.document_title == "Ubiquitous Networking"
+        assert facts.collection_title == "Lecture Notes in Computer Science"
+        assert (facts.isbns, facts.eisbns) == (("9783030580803",), ("9783030580810",))
 
 
 class TestAuteursIllisibles:
@@ -540,7 +580,9 @@ class TestProcessWork:
     def _sans_editeur_ni_revue(self, monkeypatch):
         """Les créations d'éditeur et de revue ont leurs propres tests : la boucle s'en passe."""
         monkeypatch.setattr(normalize_crossref, "upsert_publisher", lambda m, **kw: None)
-        monkeypatch.setattr(normalize_crossref, "upsert_journal", lambda m, p, **kw: None)
+        monkeypatch.setattr(
+            normalize_crossref, "upsert_containers", lambda m, p, **kw: Containers(None, None)
+        )
         monkeypatch.setattr(normalize_crossref, "process_authorships", lambda *a, **kw: None)
 
     @pytest.fixture
@@ -557,7 +599,7 @@ class TestProcessWork:
             queries,
             logger,
             staging_row(staging_id=42, raw=raw),
-            journal_repo=MagicMock(),
+            container_repo=MagicMock(),
             publisher_repo=MagicMock(),
             publication_repo=MagicMock(),
             staging_queries=staging,
@@ -613,7 +655,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        journal_repo_factory=lambda c: MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),

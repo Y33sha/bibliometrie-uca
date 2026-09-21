@@ -26,3 +26,4 @@ class PublicationMetadata:
     container_title: str | None
     language: str | None
     embargo_until: date | None = None
+    monograph_id: int | None = None

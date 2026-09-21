@@ -12,7 +12,7 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from application.ports.pipeline.journals import JournalFindOrCreateQueries
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -21,7 +21,11 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals.core import find_or_create_container_journal
+from application.services.monographs.containers import (
+    ContainerFacts,
+    Containers,
+    find_or_create_containers,
+)
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
@@ -143,17 +147,13 @@ def upsert_publisher(
     )
 
 
-def upsert_journal(
-    work: Mapping[str, JsonValue],
-    publisher_id: int | None,
-    *,
-    journal_repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Extrait et trouve/crée la revue depuis le work OpenAlex."""
+def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerFacts:
+    """Ce qu'OpenAlex dit du conteneur d'un document : la source de sa localisation principale.
+
+    Une source `book series` ou `journal` est la collection d'un livre, d'un chapitre ou d'un article de congrès ; une source `conference` est son volume d'actes. OpenAlex ne donne ni le titre du livre qui contient un chapitre, ni ISBN.
+    """
     source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     title = as_str(source.get("display_name"))
-    if not title:
-        return None
 
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
     issn_l = as_str(source.get("issn_l"))
@@ -174,17 +174,31 @@ def upsert_journal(
     elif source_type == "repository":
         oa_model = OaModel.REPOSITORY
 
-    return find_or_create_container_journal(
-        title,
-        raw_doc_type=as_str(work.get("type")),
+    return ContainerFacts(
         source="openalex",
+        raw_doc_type=as_str(work.get("type")),
+        document_title=as_str(work.get("title")) or as_str(work.get("display_name")),
+        journal_title=title,
+        collection_title=title if source_type in ("book series", "journal") else None,
+        book_title=title if source_type == "conference" else None,
         issn=issn,
         eissn=eissn,
         issnl=issn_l,
-        publisher_id=publisher_id,
         openalex_id=openalex_id or None,
         oa_model=oa_model,
-        repo=journal_repo,
+        year=as_int(work.get("publication_year")),
+    )
+
+
+def upsert_containers(
+    work: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(work), publisher_id=publisher_id, repo=container_repo
     )
 
 
@@ -194,7 +208,10 @@ def upsert_journal(
 
 
 def extract_pub_metadata(
-    work: Mapping[str, JsonValue], journal_id: int | None, primary: OpenalexLocation | None = None
+    work: Mapping[str, JsonValue],
+    journal_id: int | None,
+    primary: OpenalexLocation | None = None,
+    monograph_id: int | None = None,
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un work OpenAlex.
 
@@ -216,6 +233,7 @@ def extract_pub_metadata(
         nnt=nnt,
         oa_status=map_openalex_oa_status(as_str(oa_info.get("oa_status"))),
         journal_id=journal_id,
+        monograph_id=monograph_id,
         container_title=container_title,
         language=as_str(work.get("language")),
     )
@@ -320,6 +338,7 @@ def insert_openalex_document(  # noqa: C901
             pub_year=pub_meta.pub_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=biblio_json,
@@ -428,7 +447,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalFindOrCreateQueries,
+    container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -441,12 +460,13 @@ def process_work(
     primary = parse_primary_location(work)
 
     if should_skip_publisher_journal(primary):
-        publisher_id = None
-        journal_id = None
+        containers = Containers(None, None)
     else:
         publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
-        journal_id = upsert_journal(work, publisher_id, journal_repo=journal_repo)
-    pub_meta = extract_pub_metadata(work, journal_id, primary)
+        containers = upsert_containers(work, publisher_id, container_repo=container_repo)
+    pub_meta = extract_pub_metadata(
+        work, containers.journal_id, primary, monograph_id=containers.monograph_id
+    )
 
     source_publication_id = insert_openalex_document(
         conn, queries, work, staging_id, pub_meta, primary
@@ -461,13 +481,13 @@ class OpenalexNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 500
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        journal_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=journal_repo,
+            container_repo=container_repo,
             publisher_repo=publisher_repo,
             publication_repo=publication_repo,
             staging_queries=self._staging,
