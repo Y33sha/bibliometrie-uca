@@ -1,15 +1,6 @@
-"""Tests d'intégration : `last_extract_date`.
+"""Tests d'intégration : `last_daily_extract_date`, borne « depuis » du mode quotidien.
 
-Régression : la date « depuis » du mode quotidien se cale sur la dernière phase
-`extract` ayant inclus la source, et non sur le dernier run quelconque. Un run
-partiel sans phase `extract` ne doit donc pas avancer le curseur (sinon une run
-`publications` lancée le matin ferait chercher les dépôts HAL « depuis aujourd'hui »).
-
-Les cas utilisent une source sentinelle : `last_extract_date` interroge la table
-globalement (`max` toutes lignes confondues), et `pipeline_phase_executions` porte
-des lignes committées par d'autres tests de la session. Une source propre au test
-isole les assertions tout en exerçant la même logique (la spécificité « hal » n'est
-que l'argument passé par l'orchestrateur).
+`last_daily_extract_date` prend le maximum sur toute la table, et `pipeline_phase_executions` porte des lignes committées par d'autres tests de la session. Les cas se placent donc en 2099, après toute ligne réelle.
 """
 
 from __future__ import annotations
@@ -18,70 +9,53 @@ import datetime
 
 from sqlalchemy import text
 
-from infrastructure.observability.phase_executions import last_extract_date
-
-SRC = "test_src_extract_date"
-OTHER = "test_src_other"
+from infrastructure.observability.phase_executions import last_daily_extract_date
 
 
-def _insert_phase(conn, *, run_id, phase, started_at, sources, status="ok"):
+def _insert_phase(conn, *, run_id, phase, started_at, mode="daily", status="ok"):
     conn.execute(
         text(
             """
             INSERT INTO pipeline_phase_executions
                 (run_id, phase, started_at, ended_at, mode, sources, status)
             VALUES
-                (:run_id, :phase, :started_at, :started_at, 'daily', :sources, :status)
+                (:run_id, :phase, :started_at, :started_at, :mode, '{hal}', :status)
             """
         ),
         {
             "run_id": run_id,
             "phase": phase,
             "started_at": started_at,
-            "sources": sources,
+            "mode": mode,
             "status": status,
         },
     )
 
 
 def _at(day: int) -> datetime.datetime:
-    return datetime.datetime(2026, 6, day, 8, 0, tzinfo=datetime.UTC)
+    return datetime.datetime(2099, 6, day, 8, 0, tzinfo=datetime.UTC)
 
 
-class TestLastExtractDate:
-    def test_returns_day_of_latest_extract_with_source(self, sa_sync_conn):
-        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10), sources=[SRC])
-        _insert_phase(
-            sa_sync_conn, run_id=2, phase="extract", started_at=_at(15), sources=[SRC, OTHER]
-        )
-        assert last_extract_date(sa_sync_conn, SRC) == datetime.date(2026, 6, 15)
+class TestLastDailyExtractDate:
+    def test_jour_de_la_derniere_extraction_quotidienne(self, sa_sync_conn):
+        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10))
+        _insert_phase(sa_sync_conn, run_id=2, phase="extract", started_at=_at(15))
+        assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 15)
 
-    def test_partial_run_without_extract_does_not_advance(self, sa_sync_conn):
-        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10), sources=[SRC])
-        _insert_phase(
-            sa_sync_conn, run_id=2, phase="publications", started_at=_at(20), sources=[SRC]
-        )
-        assert last_extract_date(sa_sync_conn, SRC) == datetime.date(2026, 6, 10)
+    def test_extraction_par_annees_ignoree(self, sa_sync_conn):
+        """Cas réel : une extraction HAL bornée à 2020 ne ramène pas les dépôts récents."""
+        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10))
+        _insert_phase(sa_sync_conn, run_id=2, phase="extract", started_at=_at(20), mode="full")
+        assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
-    def test_extract_without_the_source_is_ignored(self, sa_sync_conn):
-        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10), sources=[SRC])
-        _insert_phase(sa_sync_conn, run_id=2, phase="extract", started_at=_at(20), sources=[OTHER])
-        assert last_extract_date(sa_sync_conn, SRC) == datetime.date(2026, 6, 10)
+    def test_run_sans_extraction_ignore(self, sa_sync_conn):
+        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10))
+        _insert_phase(sa_sync_conn, run_id=2, phase="publications", started_at=_at(20))
+        assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
-    def test_failed_extract_is_ignored(self, sa_sync_conn):
-        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10), sources=[SRC])
-        _insert_phase(
-            sa_sync_conn,
-            run_id=2,
-            phase="extract",
-            started_at=_at(20),
-            sources=[SRC],
-            status="error",
-        )
-        assert last_extract_date(sa_sync_conn, SRC) == datetime.date(2026, 6, 10)
-
-    def test_none_when_no_extract_for_source(self, sa_sync_conn):
-        _insert_phase(
-            sa_sync_conn, run_id=1, phase="publications", started_at=_at(10), sources=[SRC]
-        )
-        assert last_extract_date(sa_sync_conn, SRC) is None
+    def test_extraction_avec_signal_ignoree(self, sa_sync_conn):
+        """HAL indisponible ou run interrompu : les notices non récupérées restent dans la fenêtre suivante."""
+        _insert_phase(sa_sync_conn, run_id=1, phase="extract", started_at=_at(10))
+        _insert_phase(sa_sync_conn, run_id=2, phase="extract", started_at=_at(20), status="warning")
+        _insert_phase(sa_sync_conn, run_id=3, phase="extract", started_at=_at(25), status="error")
+        assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)

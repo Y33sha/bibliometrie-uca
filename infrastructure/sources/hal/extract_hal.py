@@ -86,8 +86,8 @@ class PgHalExtractAdapter(HalExtractAdapter):
         """Construit la requête Solr HAL (paramètre `q`).
 
         - `years` borne `producedDateY_i:[min TO max]` (année de publication).
-        - `since` (format `YYYY-MM-DD`) borne `submittedDate_tdate:[since TO *]` (date de dépôt HAL).
-        Les deux filtres se combinent en AND : indispensable en mode daily, où l'on ne veut que les dépôts HAL récents *qui concernent aussi* la fenêtre d'années courante — sinon un dépôt tardif d'une vieille publication passe le filtre et pollue la base.
+        - `since` (format `YYYY-MM-DD`) borne `modifiedDate_tdate:[since TO *]` (date de dernière modification de la notice HAL, qui vaut la date de dépôt pour une notice jamais modifiée).
+        Les deux filtres se combinent en AND : en mode daily, seules les notices récemment modifiées *qui concernent aussi* la fenêtre d'années courante passent le filtre.
         Au moins un des deux paramètres doit être fourni.
         """
         if not years and not since:
@@ -96,7 +96,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
         if years:
             parts.append(f"producedDateY_i:[{min(years)} TO {max(years)}]")
         if since:
-            parts.append(f"submittedDate_tdate:[{since}T00:00:00Z TO *]")
+            parts.append(f"modifiedDate_tdate:[{since}T00:00:00Z TO *]")
         return " AND ".join(parts)
 
     def per_page(self) -> int:

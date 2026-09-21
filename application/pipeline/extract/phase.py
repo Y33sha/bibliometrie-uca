@@ -4,7 +4,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
 - s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
-- mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction HAL réussie ;
+- mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction quotidienne réussie ;
 - sinon : toutes les sources retenues en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
@@ -13,7 +13,7 @@ Les dépendances techniques sont injectées par le composition-root :
 - `count_extraction_structures()` : le nombre de structures du périmètre d'extraction ;
 - `extract_one(source, args)` : ouvre la connexion, câble l'adapter, exécute l'extraction sous circuit-breaker (les métriques rendues portent déjà l'éventuel signal `source_unavailable`), et lève `ExtractionConfigError` si la source n'est pas configurée ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
-- `get_last_extract_date` : la date de la dernière extraction d'une source (branche incrémentale).
+- `get_last_daily_extract_date` : la date de la dernière extraction quotidienne réussie (branche incrémentale).
 """
 
 import argparse
@@ -37,7 +37,7 @@ from application.ports.pipeline.perimeter_structures import EmptyExtractionPerim
 from domain.dates import date_to_french, today
 
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
-GetLastExtractDate = Callable[[str], date | None]
+GetLastDailyExtractDate = Callable[[], date | None]
 
 # Ordre de construction des tâches parallèles (les rows de la table suivent l'ordre d'achèvement).
 _PARALLEL_SOURCES = ("openalex", "hal", "wos", "scanr", "theses")
@@ -84,7 +84,7 @@ def run(
     count_extraction_structures: Callable[[], int],
     extract_one: ExtractOne,
     run_parallel: RunParallel,
-    get_last_extract_date: GetLastExtractDate,
+    get_last_daily_extract_date: GetLastDailyExtractDate,
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
@@ -97,7 +97,9 @@ def run(
     metrics = PhaseMetrics()
 
     if policy.year_selection == "since_last":
-        by_source = _run_since_last(effective, extract_one, get_last_extract_date, metrics, logger)
+        by_source = _run_since_last(
+            effective, extract_one, get_last_daily_extract_date, metrics, logger
+        )
     else:
         by_source = _run_parallel_sources(
             effective, year, start_year, extract_one, run_parallel, metrics, logger
@@ -113,21 +115,21 @@ def run(
 def _run_since_last(
     effective: set[str],
     extract_one: ExtractOne,
-    get_last_extract_date: GetLastExtractDate,
+    get_last_daily_extract_date: GetLastDailyExtractDate,
     metrics: PhaseMetrics,
     logger: logging.Logger,
 ) -> dict[str, dict[str, float]]:
-    """Mode quotidien : HAL depuis la dernière extraction HAL réussie, ou les 30 derniers jours."""
-    last = get_last_extract_date("hal")
+    """Mode quotidien : HAL depuis la dernière extraction quotidienne réussie, ou les 30 derniers jours."""
+    last = get_last_daily_extract_date()
     if last is not None:
         depuis = last
-        origine = "dernière extraction HAL"
+        origine = "dernière extraction quotidienne réussie"
     else:
         depuis = today() - timedelta(days=30)
-        origine = "aucune extraction HAL, repli sur 30 jours"
+        origine = "aucune extraction quotidienne réussie, repli sur 30 jours"
     since = depuis.isoformat()
     logger.info(
-        "Mode incrémental : documents déposés sur HAL depuis le %s (%s)",
+        "Mode incrémental : notices HAL modifiées depuis le %s (%s)",
         date_to_french(depuis),
         origine,
     )

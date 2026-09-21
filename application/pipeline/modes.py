@@ -3,7 +3,7 @@
 Source unique de vérité pour les modes : quelles sources interroger, quelle stratégie d'années, et les bascules de coût (vacuum, rafraîchissement des documents périmés, retry des suggestions de pays vides).
 
 Deux modes :
-- `daily` : HAL seul, extraction incrémentale par date (depuis le dernier rapport), sans `fetch_stale` ;
+- `daily` : HAL seul, notices modifiées depuis la dernière extraction quotidienne réussie, sans `fetch_stale` ;
 - `full` : toutes les sources sauf WoS, plage d'années (depuis une ancre fixe).
 
 WoS est opt-in (`--include-wos`) : crédit API contractuel limité, donc exclue par défaut pour ne pas multiplier les 429.
