@@ -1,13 +1,15 @@
-"""Tests d'intégration de `find_or_create_containers` : revue, monographie et collection d'un document."""
+"""Tests d'intégration de `find_or_create_containers` : entrée de `journals` et monographie d'un document."""
 
 import pytest
 from sqlalchemy import text
 
+from application.services.journals.core import find_or_create_journal
 from application.services.monographs.containers import (
     ContainerFacts,
     Containers,
     find_or_create_containers,
 )
+from domain.journals.journal import JournalType
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
 
@@ -29,10 +31,11 @@ def test_article_revue_sans_monographie(sa_sync_conn, repo):
     assert containers.monograph_id is None
 
 
-def test_chapitre_monographie_et_collection(sa_sync_conn, repo):
+def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, repo):
     facts = ContainerFacts(
         source="crossref",
         raw_doc_type="book-chapter",
+        journal_title="IFIP Advances in Information and Communication Technology",
         collection_title="IFIP Advances in Information and Communication Technology",
         book_title="Advances in Production Management Systems",
         issn="1868-4238",
@@ -64,16 +67,43 @@ def test_chapitre_sans_issn_aucune_revue(sa_sync_conn, repo):
     assert _count(sa_sync_conn, "journals") == before
 
 
-def test_article_de_congres_volume_d_actes(sa_sync_conn, repo):
+def test_article_de_congres_volume_et_son_recueil_dans_journals(sa_sync_conn, repo):
+    """Le recueil d'actes reste dans `journals`, et la monographie du volume le désigne."""
     facts = ContainerFacts(
-        source="crossref", raw_doc_type="proceedings-article", book_title="NuFACT 2022"
+        source="crossref",
+        raw_doc_type="proceedings-article",
+        journal_title="NuFACT 2022",
+        book_title="NuFACT 2022",
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
-    proceedings = sa_sync_conn.execute(
-        text("SELECT proceedings FROM monographs WHERE id = :id"), {"id": containers.monograph_id}
-    ).scalar_one()
-    assert proceedings is True
-    assert containers.journal_id is None
+    row = sa_sync_conn.execute(
+        text("SELECT proceedings, journal_id FROM monographs WHERE id = :id"),
+        {"id": containers.monograph_id},
+    ).one()
+    assert containers.journal_id is not None
+    assert tuple(row) == (True, containers.journal_id)
+
+
+def test_chapitre_sans_issn_rejoint_un_recueil_d_actes(sa_sync_conn, repo):
+    """Cas réel : chapitres Crossref des actes SODA, typés proceedings par l'administration."""
+    title = "Proceedings of the 2025 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)"
+    proceedings = find_or_create_journal(title, repo=repo)
+    repo.set_journal_type(proceedings, JournalType.PROCEEDINGS)
+    facts = ContainerFacts(
+        source="crossref", raw_doc_type="book-chapter", journal_title=title, book_title=title
+    )
+    assert find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id == proceedings
+
+
+def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(sa_sync_conn, repo):
+    find_or_create_journal("Handbook of Things", repo=repo)
+    facts = ContainerFacts(
+        source="crossref",
+        raw_doc_type="book-chapter",
+        journal_title="Handbook of Things",
+        book_title="Handbook of Things",
+    )
+    assert find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id is None
 
 
 def test_livre_monographie_a_son_titre(sa_sync_conn, repo):
@@ -100,26 +130,6 @@ def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, repo)
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
     assert containers.journal_id is not None
     assert containers.monograph_id is None
-
-
-def test_collection_cherchee_par_issn_sans_titre(sa_sync_conn, repo):
-    collection = find_or_create_containers(
-        ContainerFacts(
-            source="crossref",
-            raw_doc_type="journal-article",
-            journal_title="UNCECOMP Proceedings",
-            issn="2623-3339",
-        ),
-        publisher_id=None,
-        repo=repo,
-    ).journal_id
-    facts = ContainerFacts(
-        source="crossref",
-        raw_doc_type="proceedings-article",
-        book_title="Proceedings of UNCECOMP 2019",
-        issn="2623-3339",
-    )
-    assert find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id == collection
 
 
 def test_idempotent(sa_sync_conn, repo):

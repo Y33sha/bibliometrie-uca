@@ -48,6 +48,14 @@ class JournalFindOrCreateQueries(Protocol):
         """Cherche un `journal_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à eISSN. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
         ...
 
+    def find_proceedings_by_name_form(
+        self,
+        form_normalized: str,
+        publisher_id: int | None,
+    ) -> int | None:
+        """Cherche un recueil d'actes (`journal_type = proceedings`) par forme de nom normalisée, avec la même restriction d'éditeur que `find_journal_by_name_form`."""
+        ...
+
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
