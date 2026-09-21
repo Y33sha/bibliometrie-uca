@@ -54,7 +54,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 ### Règles
 
 - **Niveau d'un titre de conteneur.** Un ISBN désigne un livre ; un ISSN désigne une série, jamais un volume. Quand la source sépare les deux niveaux, sa structure fait foi : `container-title` de Crossref, `bookTitle_s` de HAL, type de source OpenAlex. Sans ISSN, une entrée dont les documents sont des livres, des chapitres ou des articles de congrès est un volume, quel que soit son titre. Avec un ISSN, le titre départage : une année, un ordinal d'édition ou un numéro de volume désignent un volume qui porte l'ISSN de sa collection ; sinon, c'est la collection. Le classement vit dans le domaine (`domain/journals/series.py`).
-- **Titre de référence d'une série à ISSN.** Le titre propre de la notice Sudoc remplace un titre en base qui a la forme d'un volume. Les autres titres restent la référence.
+- **Titre de référence d'une série à ISSN.** Une série d'actes ou une collection de livres dont le titre a la forme d'un volume prend le titre de sa notice Sudoc, à défaut son titre sans marques d'édition (`series_title`). Une revue garde son titre, même daté (« Periodontology 2000 »). Les autres titres restent la référence.
 - **Série sans ISSN.** Elle se reconnaît seulement entre plusieurs volumes : même clé de série (titre sans année, numéro d'édition ni ordinal), éditeur compatible. Son titre est la forme commune des volumes.
 - **Chemin.** Aucune suppression avant la dernière étape. Les monographies doublonnent d'abord les entrées de `journals` ; elles sont ensuite rattachées à leur collection ; les entrées de `journals` qui décrivent un volume sont supprimées en dernier, une fois vidées.
 
@@ -96,7 +96,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 5. Titre de référence des séries
 
-- [ ] Vérification Sudoc : le titre propre de la notice remplace un titre en base qui a la forme d'un volume (ICORES 2023 pour la série ICORES). Mesure des titres remplacés.
+- [x] Vérification Sudoc : une série d'actes ou une collection de livres à ISSN dont le titre a la forme d'un volume entre dans la file, et reçoit le titre de sa notice, à défaut son titre sans marques d'édition. Le nouveau titre devient une forme de nom. Aucune des trois séries concernées (ICORES, CoDIT, IFMBE Proceedings) n'a de notice Sudoc, ni de source chez Crossref ; OpenAlex nomme la troisième d'après son volume de 2009. Parmi les 14 entrées à ISSN titrées comme un volume, 10 sont des revues (« Gestion 2000 », « 1895 »), qui gardent leur titre.
 
 ### 6. Normalisation cible
 

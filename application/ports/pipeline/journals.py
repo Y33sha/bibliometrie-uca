@@ -129,13 +129,33 @@ class JournalSudocRow(NamedTuple):
     issnl: str | None
     rejected_issns: tuple[str, ...]
     document_issns: tuple[str, ...] = ()
+    journal_type: JournalType = JournalType.UNKNOWN
+
+
+class JournalTitleRow(NamedTuple):
+    """Une revue et son titre."""
+
+    id: int
+    title: str
+
+
+class JournalTitleTypeRow(NamedTuple):
+    """Une revue, son titre et son type."""
+
+    id: int
+    title: str
+    journal_type: JournalType
 
 
 class JournalSudocQueries(Protocol):
     """Vérification des ISSN des revues dans le Sudoc."""
 
-    def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
-        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté, et revues dont un enregistrement porte un ISSN absent de leurs ISSN."""
+    def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
+        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté, revues dont un enregistrement porte un ISSN absent de leurs ISSN, et revues `also`."""
+        ...
+
+    def find_titles_of_journals_with_issn(self) -> list[JournalTitleTypeRow]:
+        """Les revues qui portent un ISSN dans `issn`, `eissn` ou `issnl`, avec leur titre et leur type."""
         ...
 
     def record_sudoc_check(
@@ -147,8 +167,9 @@ class JournalSudocQueries(Protocol):
         issnl: str | None,
         rejected_issns: Sequence[str],
         checked_at: datetime,
+        title: str | None = None,
     ) -> None:
-        """Écrit les ISSN vérifiés d'une revue et la date de vérification."""
+        """Écrit les ISSN vérifiés d'une revue et la date de vérification. Un `title` remplace le titre de la revue, dont il devient aussi une forme de nom."""
         ...
 
 
@@ -168,13 +189,6 @@ class JournalSummary(NamedTuple):
     publisher: str | None
     issn: str | None
     eissn: str | None
-
-
-class JournalTitleRow(NamedTuple):
-    """Une revue candidate à une fusion."""
-
-    id: int
-    title: str
 
 
 class JournalIssnGroup(NamedTuple):

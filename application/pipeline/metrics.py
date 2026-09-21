@@ -40,6 +40,10 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "publisher_matched": ("éditeur rapproché", "éditeurs rapprochés"),
     "publishers_deleted": ("éditeur vide supprimé", "éditeurs vides supprimés"),
     "resolved": "résolu",
+    "series_titled": (
+        "série renommée d'après son titre de référence",
+        "séries renommées d'après leur titre de référence",
+    ),
     "skipped": "sauté",
     "stale": ("à rafraîchir", "à rafraîchir"),
     "sudoc_found": ("présente dans le Sudoc", "présentes dans le Sudoc"),

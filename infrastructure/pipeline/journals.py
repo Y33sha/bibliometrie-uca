@@ -29,6 +29,7 @@ from application.ports.pipeline.journals import (
     JournalSummary,
     JournalTitleIssnRow,
     JournalTitleRow,
+    JournalTitleTypeRow,
 )
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType, OaModel
@@ -55,13 +56,15 @@ _JOURNALS_TO_CHECK_IN_SUDOC = text("""
         GROUP BY p.journal_id
     )
     SELECT j.id, j.title, j.issn, j.eissn, j.issnl, j.rejected_issns,
-           coalesce(d.issns, ARRAY[]::text[]) AS document_issns
+           coalesce(d.issns, ARRAY[]::text[]) AS document_issns,
+           j.journal_type::text AS journal_type
     FROM journals j
     LEFT JOIN documents d ON d.journal_id = j.id
     WHERE d.issns IS NOT NULL
        OR (j.sudoc_checked_at IS NULL
            AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
                 OR cardinality(j.rejected_issns) > 0))
+       OR j.id = ANY(:also)
     ORDER BY j.id
 """)
 
@@ -425,8 +428,8 @@ class PgJournalGatewayQueries(
             {"id": journal_id, "values": list(values)},
         )
 
-    def find_journals_to_check_in_sudoc(self) -> list[JournalSudocRow]:
-        rows = self._conn.execute(_JOURNALS_TO_CHECK_IN_SUDOC).all()
+    def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
+        rows = self._conn.execute(_JOURNALS_TO_CHECK_IN_SUDOC, {"also": list(also)}).all()
         return [
             JournalSudocRow(
                 r.id,
@@ -436,6 +439,7 @@ class PgJournalGatewayQueries(
                 r.issnl,
                 tuple(r.rejected_issns),
                 tuple(r.document_issns),
+                JournalType(r.journal_type),
             )
             for r in rows
         ]
@@ -449,18 +453,37 @@ class PgJournalGatewayQueries(
         issnl: str | None,
         rejected_issns: Sequence[str],
         checked_at: datetime,
+        title: str | None = None,
     ) -> None:
-        self._conn.execute(
-            update(journals)
-            .where(journals.c.id == journal_id)
-            .values(
-                issn=issn,
-                eissn=eissn,
-                issnl=issnl,
-                rejected_issns=list(rejected_issns),
-                sudoc_checked_at=checked_at,
+        values: dict[str, object] = {
+            "issn": issn,
+            "eissn": eissn,
+            "issnl": issnl,
+            "rejected_issns": list(rejected_issns),
+            "sudoc_checked_at": checked_at,
+        }
+        if title:
+            values |= {"title": title, "title_normalized": normalize_text(title)}
+        self._conn.execute(update(journals).where(journals.c.id == journal_id).values(**values))
+        if title:
+            publisher_id = self._conn.execute(
+                select(journals.c.publisher_id).where(journals.c.id == journal_id)
+            ).scalar_one()
+            self.add_journal_name_form(journal_id, normalize_text(title), publisher_id)
+
+    def find_titles_of_journals_with_issn(self) -> list[JournalTitleTypeRow]:
+        rows = self._conn.execute(
+            select(journals.c.id, journals.c.title, journals.c.journal_type)
+            .where(
+                or_(
+                    journals.c.issn.is_not(None),
+                    journals.c.eissn.is_not(None),
+                    journals.c.issnl.is_not(None),
+                )
             )
+            .order_by(journals.c.id)
         )
+        return [JournalTitleTypeRow(r.id, r.title, JournalType(r.journal_type)) for r in rows]
 
     # ── typage en recueil d'actes ──────────────────────────────────
 

@@ -2,7 +2,13 @@
 
 import pytest
 
-from domain.journals.series import ContainerLevel, container_level, series_key
+from domain.journals.series import (
+    ContainerLevel,
+    container_level,
+    reference_series_title,
+    series_key,
+    series_title,
+)
 
 
 @pytest.mark.parametrize(
@@ -42,3 +48,56 @@ def test_volumes_d_une_meme_serie_partagent_la_cle():
     assert series_key("LIPIcs, Volume 364, STACS 2026") == series_key(
         "LIPIcs, Volume 367, STACS 2027"
     )
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        (
+            (
+                "Proceedings of the 12th International Conference on Operations Research"
+                " and Enterprise Systems (ICORES 2023)"
+            ),
+            (
+                "Proceedings of the International Conference on Operations Research"
+                " and Enterprise Systems (ICORES)"
+            ),
+        ),
+        (
+            (
+                "World Congress on Medical Physics and Biomedical Engineering,"
+                " September 7 - 12, 2009, Munich, Germany"
+            ),
+            "World Congress on Medical Physics and Biomedical Engineering, Munich, Germany",
+        ),
+        ("LIPIcs, Volume 364, STACS 2026", "LIPIcs, STACS"),
+        (
+            "2022 IEEE 95th Vehicular Technology Conference: (VTC2022-Spring)",
+            "IEEE Vehicular Technology Conference: (VTC-Spring)",
+        ),
+        ("Goldschmidt2023 abstracts", "Goldschmidt abstracts"),
+        (
+            "Dossier : Justice pour l'eau, Actes du colloque de Clermont-Ferrand du 6 juin 2019",
+            "Dossier : Justice pour l'eau, Actes du colloque de Clermont-Ferrand",
+        ),
+    ],
+)
+def test_titre_de_serie_d_un_volume(title, expected):
+    assert series_title(title) == expected
+
+
+class TestReferenceSeriesTitle:
+    def test_titre_de_serie_garde(self):
+        assert reference_series_title("Lecture notes in computer science", None) is None
+
+    def test_titre_sudoc_fait_reference(self):
+        assert (
+            reference_series_title("ICORES 2023", "Operations research and enterprise systems")
+            == "Operations research and enterprise systems"
+        )
+
+    def test_sans_notice_titre_sans_marques(self):
+        assert reference_series_title("8th CoDIT", None) == "CoDIT"
+
+    def test_titre_sudoc_de_volume_ignore(self):
+        assert reference_series_title("NuFACT 2022", "NuFACT 2021") == "NuFACT"

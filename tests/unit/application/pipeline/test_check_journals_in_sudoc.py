@@ -7,7 +7,8 @@ import httpx2
 import pytest
 
 from application.pipeline.publishers_journals import check_journals_in_sudoc as mod
-from application.ports.pipeline.journals import JournalSudocRow
+from application.ports.pipeline.journals import JournalSudocRow, JournalTitleTypeRow
+from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord, Support
 
 
@@ -37,9 +38,10 @@ _RECORDS = {
 }
 
 
-async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1):
+async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1, titles=()):
     repo = MagicMock()
     repo.find_journals_to_check_in_sudoc.return_value = rows
+    repo.find_titles_of_journals_with_issn.return_value = list(titles)
     conn = MagicMock()
     calls = {"ppns": [], "records": []}
 
@@ -126,3 +128,37 @@ async def test_stops_when_breaker_trips():
     assert len(calls["ppns"]) == 1  # plus aucune revue tirée après la coupure
     assert repo.record_sudoc_check.call_count == 1
     conn.commit.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_serie_titree_comme_un_volume_recoit_son_titre_de_serie():
+    """Cas réel : la série ICORES porte le titre de son volume de 2023, absent du Sudoc."""
+    title = (
+        "Proceedings of the 12th International Conference on Operations Research"
+        " and Enterprise Systems (ICORES 2023)"
+    )
+    icores = JournalSudocRow(
+        21000, title, "2184-4372", None, None, (), journal_type=JournalType.PROCEEDINGS
+    )
+    repo, _, metrics, _ = await _run(
+        [icores], titles=[JournalTitleTypeRow(21000, title, JournalType.PROCEEDINGS)]
+    )
+    assert repo.find_journals_to_check_in_sudoc.call_args.kwargs["also"] == [21000]
+    assert repo.record_sudoc_check.call_args.kwargs["title"] == (
+        "Proceedings of the International Conference on Operations Research"
+        " and Enterprise Systems (ICORES)"
+    )
+    assert metrics.extras["series_titled"] == 1
+
+
+@pytest.mark.asyncio
+async def test_revue_titree_avec_une_annee_garde_son_titre():
+    """Cas réel : « Periodontology 2000 » est une revue."""
+    row = JournalSudocRow(
+        5, "Periodontology 2000", "0906-6713", None, None, (), JournalType.JOURNAL
+    )
+    repo, _, _, _ = await _run(
+        [row], titles=[JournalTitleTypeRow(5, "Periodontology 2000", JournalType.JOURNAL)]
+    )
+    assert repo.find_journals_to_check_in_sudoc.call_args.kwargs["also"] == []
+    assert repo.record_sudoc_check.call_args.kwargs["title"] is None
