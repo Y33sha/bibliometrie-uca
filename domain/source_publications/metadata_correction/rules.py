@@ -30,7 +30,7 @@ class MetadataForCorrection:
 
     Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
-    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference` et `registrant_publisher_type` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type` et `in_proceedings_volume` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
@@ -55,6 +55,8 @@ class MetadataForCorrection:
     declares_conference: bool
     # Joint à la lecture : type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
     registrant_publisher_type: str | None
+    # Joint à la lecture : la monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
+    in_proceedings_volume: bool = False
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -69,6 +71,7 @@ class MetadataCorrectionRule(StrEnum):
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
+    PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER = "PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER"
     DOI_REGISTRANT_MEDIA_TO_MEDIA = "DOI_REGISTRANT_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
@@ -185,6 +188,7 @@ class _AppliesTo(TypedDict, total=False):
     - `self_declared_preprint` : `bool` — `sp.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
     - `declares_conference` : `bool` — `sp.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
     - `registrant_publisher_type` : `str` — équivalence sur `sp.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
+    - `in_proceedings_volume` : `bool` — `sp.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -203,6 +207,7 @@ class _AppliesTo(TypedDict, total=False):
     self_declared_preprint: bool
     declares_conference: bool
     registrant_publisher_type: str
+    in_proceedings_volume: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -266,6 +271,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
         "applies_to": {
             "journal_type": JournalType.PROCEEDINGS,
+            "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
+        },
+        "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
+    },
+    # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`. Le volume d'actes remplace le recueil de `journals` comme conteneur des articles de congrès.
+    MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER: {
+        "applies_to": {
+            "in_proceedings_volume": True,
             "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
@@ -431,6 +444,7 @@ _SOURCE_ONLY_PREDICATES = frozenset(
         "self_declared_preprint",
         "declares_conference",
         "registrant_publisher_type",
+        "in_proceedings_volume",
     }
 )
 
@@ -446,7 +460,16 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
             return doc_type in value
         return doc_type == value
     # Égalité simple sur l'attribut de même nom.
-    if key in ("journal_type", "oa_model", "oa_status", "registrant_publisher_type"):
+    if key in (
+        "journal_type",
+        "oa_model",
+        "oa_status",
+        "registrant_publisher_type",
+        "embargo_expired",
+        "self_declared_preprint",
+        "declares_conference",
+        "in_proceedings_volume",
+    ):
         return bool(getattr(sp, key) == value)
     if key == "url_contains":
         assert isinstance(value, str)
@@ -471,15 +494,6 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         if not sp.doi:
             return False
         return sp.doi.split("/", 1)[0] not in value
-    if key == "embargo_expired":
-        assert isinstance(value, bool)
-        return sp.embargo_expired == value
-    if key == "self_declared_preprint":
-        assert isinstance(value, bool)
-        return sp.self_declared_preprint == value
-    if key == "declares_conference":
-        assert isinstance(value, bool)
-        return sp.declares_conference == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 

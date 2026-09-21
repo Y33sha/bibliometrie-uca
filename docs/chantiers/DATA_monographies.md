@@ -106,7 +106,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Sous-étape `link_monographs_to_collections` : une monographie a pour `journal_id` la seule entrée de `journals` à ISSN que portent ses enregistrements. Plusieurs entrées au même niveau sont signalées comme conflit, sans changement. Mesure : 734 monographies à collection, aucune à plusieurs candidats.
 - [x] Rattachement par espace de noms DOI réservé aux articles et articles de congrès : 220 livres et chapitres recevaient la revue de leur éditeur (Hermès chez CAIRN, EAC).
 - [ ] Agrégation : le `journal_id` d'une publication vient de ses enregistrements, à défaut de la collection de sa monographie.
-- [ ] Règle de correction : les articles et chapitres d'un volume d'actes deviennent des articles de congrès, d'après la monographie.
+- [x] Règle de correction `PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER` : un article ou un chapitre dont la monographie est un volume d'actes devient un article de congrès. Prédicat `in_proceedings_volume`, joint à la lecture. Aujourd'hui 8 enregistrements ; la règle prend le relais de `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER` quand les volumes quittent `journals`.
 
 ### 7. Stock
 
