@@ -6,7 +6,6 @@ from sqlalchemy import text
 from application.services.journals.core import find_or_create_journal
 from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import ContainerDescription
-from domain.journals.journal import JournalType
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
 
@@ -64,8 +63,9 @@ def test_chapitre_sans_issn_aucune_revue(sa_sync_conn, repo):
     assert _count(sa_sync_conn, "journals") == before
 
 
-def test_article_de_congres_volume_et_son_recueil_dans_journals(sa_sync_conn, repo):
-    """Le recueil d'actes reste dans `journals`, et la monographie du volume le désigne."""
+def test_article_de_congres_sans_issn_volume_seul(sa_sync_conn, repo):
+    """Le volume d'actes devient une monographie, sans entrée dans `journals`."""
+    before = _count(sa_sync_conn, "journals")
     facts = ContainerDescription(
         source="crossref",
         raw_doc_type="proceedings-article",
@@ -77,19 +77,40 @@ def test_article_de_congres_volume_et_son_recueil_dans_journals(sa_sync_conn, re
         text("SELECT proceedings, journal_id FROM monographs WHERE id = :id"),
         {"id": containers.monograph_id},
     ).one()
-    assert containers.journal_id is not None
-    assert tuple(row) == (True, containers.journal_id)
+    assert containers.journal_id is None
+    assert tuple(row) == (True, None)
+    assert _count(sa_sync_conn, "journals") == before
 
 
-def test_chapitre_sans_issn_rejoint_un_recueil_d_actes(sa_sync_conn, repo):
-    """Cas réel : chapitres Crossref des actes SODA, typés proceedings par l'administration."""
-    title = "Proceedings of the 2025 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)"
-    proceedings = find_or_create_journal(title, repo=repo)
-    repo.set_journal_type(proceedings, JournalType.PROCEEDINGS)
+def test_article_dans_un_conteneur_date_volume_seul(sa_sync_conn, repo):
+    """Cas réel : OpenAlex classe en article une communication dont la source est le congrès daté."""
+    before = _count(sa_sync_conn, "journals")
     facts = ContainerDescription(
-        source="crossref", raw_doc_type="book-chapter", journal_title=title, book_title=title
+        source="openalex", raw_doc_type="article", journal_title="2021 21st ICCAS"
     )
-    assert find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id == proceedings
+    containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
+    assert containers.journal_id is None
+    assert containers.monograph_id is not None
+    assert _count(sa_sync_conn, "journals") == before
+
+
+def test_serie_sans_titre_retrouvee_par_issn(sa_sync_conn, repo):
+    collection = find_or_create_journal(
+        "Lecture Notes in Computer Science", issn="0302-9743", repo=repo
+    )
+    facts = ContainerDescription(
+        source="openalex",
+        raw_doc_type="book-chapter",
+        journal_title="ICORES 2023",
+        book_title="ICORES 2023",
+        issn="0302-9743",
+    )
+    containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
+    assert containers.journal_id == collection
+    journal_id = sa_sync_conn.execute(
+        text("SELECT journal_id FROM monographs WHERE id = :id"), {"id": containers.monograph_id}
+    ).scalar_one()
+    assert journal_id == collection
 
 
 def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(sa_sync_conn, repo):

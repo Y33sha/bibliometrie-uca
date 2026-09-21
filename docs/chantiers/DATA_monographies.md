@@ -100,8 +100,8 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 6. Normalisation cible
 
-- [x] `determine_container_type` (`domain/journals/containers.py`) sépare la description du conteneur (`ContainerDescription`) en série et volume. La normalisation en tire la monographie ; le `journal_id` des enregistrements suit la règle en place jusqu'à la phase 7.
-- [ ] Résolution de la série : par ISSN, créée sous son titre de série quand elle manque. Un titre de volume ne crée plus d'entrée dans `journals`, même pour un article (source OpenAlex de type `conference`).
+- [x] `determine_container_type` (`domain/journals/containers.py`) sépare la description du conteneur (`ContainerDescription`) en série et volume. La normalisation en tire le `journal_id` et la monographie des enregistrements.
+- [x] Résolution de la série (`find_or_create_containers`) : trouvée ou créée sous son titre de série. Une série à ISSN sans titre est seulement cherchée par ISSN (source OpenAlex de type `conference`, article de congrès Crossref à deux titres). Un volume donne seulement une monographie. Un article sans ISSN dont le conteneur nomme une édition datée de congrès (« 2021 ICCAS ») reçoit un volume d'actes.
 - [x] Séries sans ISSN, dans la sous-étape `link_monographs_to_collections` : les monographies sans collection à ISSN dont le titre porte une marque d'édition se regroupent par clé de série et éditeur (`group_series`). Chaque série trouve ou crée son entrée dans `journals`, typée série d'actes ou collection de livres selon ses volumes. Le rattachement retient la collection à ISSN, puis la série sans ISSN, puis le volume, puis aucune entrée (`choose_monograph_journal`). La suppression des revues vides épargne une entrée qu'une monographie désigne. Simulation : 92 séries, dont 88 nouvelles entrées, 292 monographies rattachées. Des titres identiques sans marque d'édition (« Current Developments in Biotechnology and Bioengineering », 32 groupes) désignent un ouvrage en plusieurs volumes : pas de série.
 - [x] Sous-étape `link_monographs_to_collections` : une monographie a pour `journal_id` la seule entrée de `journals` à ISSN que portent ses enregistrements. Plusieurs entrées au même niveau sont signalées comme conflit, sans changement. Mesure : 734 monographies à collection, aucune à plusieurs candidats.
 - [x] Rattachement par espace de noms DOI réservé aux articles et articles de congrès : 220 livres et chapitres recevaient la revue de leur éditeur (Hermès chez CAIRN, EAC).
@@ -114,8 +114,8 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 - [x] Choix du chemin : normalisation cible d'un seul coup (la série par ISSN, le volume en monographie, aucun volume créé dans `journals`), et oneshot pour le stock. Le oneshot reconstruit la description du conteneur à partir des champs en base et appelle `determine_container_type`. Condition : l'état qu'il produit est un point fixe du pipeline.
 - [x] Instantané des articles de congrès (`snapshot_conference_papers`), avant la bascule : 12 842 articles, 627 séries (536 à ISSN, 91 sans), 1 198 volumes (1 133 en monographie, 65 dans `journals`), 10 488 articles sans série, 11 070 sans volume.
-- [ ] Normalisation cible.
-- [ ] Audit de l'écart entre le oneshot et la normalisation, sur les notices du raw store.
+- [x] Normalisation cible.
+- [ ] Audit de l'écart entre le oneshot et la normalisation, sur les notices du raw store. Mesurer les séries à ISSN sans titre absentes de `journals`.
 - [ ] Oneshot, puis `publishers_journals` et `publications` ; un second run doit tout laisser en l'état.
 - [ ] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
 - [ ] Mesure finale : instantané après la bascule, comparé au premier (`--compare`).
