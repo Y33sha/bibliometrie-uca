@@ -108,11 +108,17 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Agrégation : le `journal_id` d'une publication vient de ses enregistrements, à défaut de la collection de sa monographie (`monograph_journals`). Aujourd'hui 49 publications, dont 34 vers une collection à ISSN.
 - [x] Règle de correction `PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER` : un article ou un chapitre dont la monographie est un volume d'actes devient un article de congrès. Prédicat `in_proceedings_volume`, joint à la lecture. Aujourd'hui 8 enregistrements ; la règle prend le relais de `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER` quand les volumes quittent `journals`.
 
+- [ ] Conférences sans ISSN : reconnaître les principales conférences par une liste fermée d'acronymes, pour regrouper leurs volumes en série même sans ISSN. Forme de la liste à trancher.
+
 ### 7. Stock
 
-- [ ] Choix du chemin : reconstruction depuis une base vide, ou script oneshot qui applique les règles de classement aux entrées de `journals` et aux enregistrements en base.
+- [x] Choix du chemin : normalisation cible d'un seul coup (la série par ISSN, le volume en monographie, aucun volume créé dans `journals`), et oneshot pour le stock. Le oneshot reconstruit la description du conteneur à partir des champs en base et appelle `determine_container_type`. Condition : l'état qu'il produit est un point fixe du pipeline.
+- [x] Instantané des articles de congrès (`snapshot_conference_papers`), avant la bascule : 12 842 articles, 627 séries (536 à ISSN, 91 sans), 1 198 volumes (1 133 en monographie, 65 dans `journals`), 10 488 articles sans série, 11 070 sans volume.
+- [ ] Normalisation cible.
+- [ ] Audit de l'écart entre le oneshot et la normalisation, sur les notices du raw store.
+- [ ] Oneshot, puis `publishers_journals` et `publications` ; un second run doit tout laisser en l'état.
 - [ ] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
-- [ ] Mesure finale : entrées de `journals` par classe, monographies avec et sans collection, publications sans série ni monographie.
+- [ ] Mesure finale : instantané après la bascule, comparé au premier (`--compare`).
 
 ### 8. Administration
 
