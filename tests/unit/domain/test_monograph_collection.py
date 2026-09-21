@@ -22,3 +22,11 @@ def test_plusieurs_collections_en_conflit():
 
 def test_plusieurs_volumes_en_conflit():
     assert choose_monograph_journal((), (8, 9)) == MonographJournalChoice(None, (8, 9))
+
+
+def test_serie_sans_issn_avant_le_volume():
+    assert choose_monograph_journal((), (99,), series_id=500) == MonographJournalChoice(500)
+
+
+def test_collection_a_issn_avant_la_serie_sans_issn():
+    assert choose_monograph_journal((7,), (), series_id=500) == MonographJournalChoice(7)

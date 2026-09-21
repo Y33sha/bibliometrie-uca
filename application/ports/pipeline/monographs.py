@@ -25,10 +25,12 @@ class MonographMergeQueries(Protocol):
 
 
 class MonographJournalCandidates(NamedTuple):
-    """Une monographie, son `journal_id`, et les entrées de `journals` que portent ses enregistrements, à ISSN et sans ISSN."""
+    """Une monographie, son éditeur, sa nature, son `journal_id`, et les entrées de `journals` que portent ses enregistrements, à ISSN et sans ISSN."""
 
     monograph_id: int
     title: str
+    publisher_id: int | None
+    proceedings: bool
     journal_id: int | None
     with_issn: tuple[int, ...]
     without_issn: tuple[int, ...]

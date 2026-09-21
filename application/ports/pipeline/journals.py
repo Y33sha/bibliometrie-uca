@@ -304,7 +304,7 @@ class JournalCleanupQueries(Protocol):
     """Suppression des revues vides."""
 
     def delete_empty_journals(self) -> list[JournalSummary]:
-        """Supprime les revues sans enregistrement, sans publication et sans paiement APC, et les rend."""
+        """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les rend."""
         ...
 
 

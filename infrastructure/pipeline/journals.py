@@ -185,14 +185,15 @@ _JOURNAL_SUMMARIES = text("""
     WHERE j.id = ANY(:ids)
 """)
 
-# Revues sans enregistrement, sans publication et sans paiement APC ; leurs formes de nom partent avec
-# elles (`ON DELETE CASCADE`).
+# Revues sans enregistrement, sans publication, sans monographie et sans paiement APC ; leurs formes de
+# nom partent avec elles (`ON DELETE CASCADE`).
 _DELETE_EMPTY_JOURNALS = text("""
     WITH supprimees AS (
         DELETE FROM journals j
         WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.journal_id = j.id)
           AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.journal_id = j.id)
           AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.journal_id = j.id)
+          AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.journal_id = j.id)
         RETURNING j.id, j.title, j.publisher_id, j.issn, j.eissn
     )
     SELECT s.id, s.title, p.name AS publisher, s.issn, s.eissn
@@ -609,6 +610,13 @@ class PgJournalGatewayQueries(
             )
         )
         self._conn.execute(stmt)
+
+    def set_journal_type_if_unknown(self, journal_id: int, journal_type: JournalType) -> None:
+        self._conn.execute(
+            update(journals)
+            .where(journals.c.id == journal_id, journals.c.journal_type == JournalType.UNKNOWN)
+            .values(journal_type=journal_type)
+        )
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
         self._conn.execute(
