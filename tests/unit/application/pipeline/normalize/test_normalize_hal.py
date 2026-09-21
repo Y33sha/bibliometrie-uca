@@ -110,9 +110,10 @@ class TestContainerFacts:
         assert facts.book_title == "Le Paris du Moyen Âge"
         assert facts.isbns == ("9782410013221",)
 
-    def test_communication_sans_titre_de_volume_prend_le_congres(self):
+    def test_le_congres_d_une_communication_ne_designe_pas_un_volume(self):
+        """Régression : une communication HAL nomme son congrès, avec ou sans actes publiés."""
         facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
-        assert facts.book_title == "NuFACT 2022"
+        assert facts.book_title is None
 
     def test_sans_conteneur_aucun(self):
         assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
