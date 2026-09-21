@@ -362,6 +362,29 @@ class TestConferenceDeclaredRule:
         assert effective_doc_type_for_publication(view) is None
 
 
+class TestProceedingsVolumeRule:
+    def test_article_d_un_volume_d_actes_devient_article_de_congres(self):
+        corrected = effective_metadata(
+            _view(doc_type="article", in_proceedings_volume=True)
+        ).doc_type
+        assert corrected is not None
+        assert corrected.value == "conference_paper"
+        assert corrected.rule == MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER
+
+    def test_chapitre_d_un_volume_d_actes_devient_article_de_congres(self):
+        view = _view(doc_type="book_chapter", in_proceedings_volume=True)
+        assert effective_metadata(view).doc_type.value == "conference_paper"
+
+    def test_livre_d_un_volume_d_actes_reste_livre(self):
+        """Le volume d'actes lui-même, typé livre."""
+        view = _view(doc_type="book", in_proceedings_volume=True)
+        assert effective_metadata(view).doc_type is None
+
+    def test_regle_ecartee_du_rejeu_canonique(self):
+        view = _view(doc_type="article", in_proceedings_volume=True)
+        assert effective_doc_type_for_publication(view) is None
+
+
 class TestJournalTypeProceedingsRule:
     def test_journal_type_proceedings_article_corrects(self):
         view = _view(doc_type="article", journal_type="proceedings")
