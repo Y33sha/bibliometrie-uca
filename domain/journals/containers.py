@@ -43,19 +43,6 @@ def container_role(
     return ContainerRole.JOURNAL
 
 
-def container_is_journal(
-    raw_doc_type: str | None, source: str, *, has_issn: bool, declares_conference: bool = False
-) -> bool:
-    """Indique si le conteneur d'un document désigne une entrée de `journals`.
-
-    Sans ISSN, le conteneur d'un livre ou d'un chapitre est le livre lui-même. Avec un ISSN, c'est sa collection. Un document issu d'un congrès garde son recueil d'actes dans `journals` : il déclare le congrès (`declares_conference`), ou son type composite mentionne un article de congrès.
-    """
-    if has_issn or declares_conference:
-        return True
-    types = _doc_types(raw_doc_type, source)
-    return _CONFERENCE_PAPER in types or not types & {_BOOK, _BOOK_CHAPTER}
-
-
 def is_book_or_chapter(raw_doc_type: str | None, source: str) -> bool:
     """Indique si un document est un livre ou un chapitre, hors article de congrès."""
     types = _doc_types(raw_doc_type, source)
@@ -157,13 +144,15 @@ def determine_container_type(
 ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
     """Sépare le conteneur d'un document en série et volume, chacun pouvant manquer.
 
-    Un article a sa revue pour série. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection que désigne un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
+    Un article a sa revue pour série ; sans ISSN, un conteneur qui nomme une édition datée de congrès (« 2021 ICCAS ») est un volume d'actes. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection que désigne un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
     """
     d = description
     role = container_role(d.raw_doc_type, d.source, declares_conference=d.declares_conference)
     if role is ContainerRole.JOURNAL:
         if not (d.journal_title or d.has_issn):
             return None, None
+        if d.journal_title and is_dated_event_without_issn(d.journal_title, has_issn=d.has_issn):
+            return None, VolumeDescription(title=d.journal_title, proceedings=True, year=d.year)
         return SeriesDescription(
             title=d.journal_title,
             issn=d.issn,

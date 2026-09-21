@@ -17,6 +17,27 @@ def test_article_sa_revue_pour_serie():
     assert volume is None
 
 
+def test_article_dans_une_edition_datee_de_congres_sans_issn():
+    """Cas réel : OpenAlex classe en article une communication dont la source est le congrès daté."""
+    series, volume = determine_container_type(
+        _describe(
+            raw_doc_type="article", source="openalex", journal_title="2021 21st ICCAS", year=2021
+        )
+    )
+    assert series is None
+    assert (volume.title, volume.proceedings, volume.year) == ("2021 21st ICCAS", True, 2021)
+
+
+def test_revue_datee_avec_issn_reste_une_serie():
+    series, volume = determine_container_type(
+        _describe(
+            raw_doc_type="journal-article", journal_title="Periodontology 2000", issn="0906-6713"
+        )
+    )
+    assert series.title == "Periodontology 2000"
+    assert volume is None
+
+
 def test_article_sans_conteneur():
     assert determine_container_type(_describe(raw_doc_type="journal-article")) == (None, None)
 
