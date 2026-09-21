@@ -160,3 +160,17 @@ def test_idempotent(sa_sync_conn, repo):
     first = find_or_create_containers(facts, publisher_id=None, repo=repo)
     assert find_or_create_containers(facts, publisher_id=None, repo=repo) == first
     assert isinstance(first, Containers)
+
+
+def test_issn_rejete_range_dans_la_revue(sa_sync_conn, repo):
+    facts = ContainerDescription(
+        source="crossref",
+        raw_doc_type="journal-article",
+        journal_title="J. Rejects",
+        issn="1234-5670",
+    )
+    journal_id = find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id
+    rejected = sa_sync_conn.execute(
+        text("SELECT rejected_issns FROM journals WHERE id = :id"), {"id": journal_id}
+    ).scalar_one()
+    assert rejected == ["1234-5670"]

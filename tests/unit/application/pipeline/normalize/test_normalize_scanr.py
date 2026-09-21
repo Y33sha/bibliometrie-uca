@@ -244,10 +244,10 @@ class TestUpsertPublisherEtJournal:
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste : le premier est celui du papier, le second celui de l'édition en ligne."""
         facts = get_container_facts(
-            {"source": {"title": "J. Things", "journalIssns": ["1234-5678", "8765-4321"]}}
+            {"source": {"title": "J. Things", "journalIssns": ["1234-5679", "8765-4326"]}}
         )
         assert facts.journal_title == "J. Things"
-        assert (facts.issn, facts.eissn) == ("1234-5678", "8765-4321")
+        assert (facts.issn, facts.eissn) == ("1234-5679", "8765-4326")
 
     def test_communication_volume_du_congres(self):
         facts = get_container_facts(

@@ -251,13 +251,13 @@ class TestContainerDescription:
             "primary_location": {
                 "source": {
                     "display_name": "J",
-                    "issn_l": "1111-1111",
-                    "issn": ["1111-1111", "2222-2222", "3333-3333"],
+                    "issn_l": "1111-1119",
+                    "issn": ["1111-1119", "2222-2227", "3333-3335"],
                 }
             }
         }
         facts = get_container_facts(work)
-        assert (facts.issn, facts.eissn, facts.issnl) == ("2222-2222", "3333-3333", "1111-1111")
+        assert (facts.issn, facts.eissn, facts.issnl) == ("2222-2227", "3333-3335", "1111-1119")
 
     def test_collection_d_un_chapitre(self):
         work = {

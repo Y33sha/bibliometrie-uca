@@ -168,7 +168,7 @@ class TestBiblio:
                 "issue": "3",
                 "firstPage": "100",
                 "lastPage": "110",
-                "identifier": "1234-5678",
+                "identifier": "1234-5679",
                 "identifierType": "ISSN",
             },
         }
@@ -178,7 +178,7 @@ class TestBiblio:
         assert biblio["first_page"] == "100"
         assert biblio["last_page"] == "110"
         assert biblio["publisher"] == "Some Press"
-        assert biblio["journal"] == {"title": "J. Things", "issn": "1234-5678"}
+        assert biblio["journal"] == {"title": "J. Things", "issn": "1234-5679"}
 
     def test_none_when_empty(self):
         assert get_biblio({}) is None
@@ -315,12 +315,12 @@ class TestContainers:
             "types": {"resourceTypeGeneral": "JournalArticle"},
             "container": {
                 "title": "J. Things",
-                "identifier": "1234-5678",
+                "identifier": "1234-5679",
                 "identifierType": "ISSN",
             },
         }
         facts = get_container_facts(attrs)
-        assert (facts.journal_title, facts.issn) == ("J. Things", "1234-5678")
+        assert (facts.journal_title, facts.issn) == ("J. Things", "1234-5679")
         assert (facts.collection_title, facts.book_title) == ("J. Things", None)
 
     def test_chapitre_livre_du_contenant(self):
