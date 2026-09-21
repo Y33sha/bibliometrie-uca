@@ -15,6 +15,7 @@ from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
+from domain.journals.series import reference_series_title
 from domain.journals.titles import nested_titles
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN, issn_typo_candidates
@@ -53,6 +54,8 @@ class JournalIssns:
     rejected: tuple[str, ...]
     candidates: tuple[str, ...] = ()
     """ISSN portés par les enregistrements de la revue, absents de ses colonnes et de ses ISSN rejetés."""
+    holds_volumes: bool = False
+    """La revue réunit des volumes (`holds_volumes`) : un titre de volume y est remplacé par son titre de série."""
 
     def columns(self) -> tuple[str, ...]:
         """ISSN des trois colonnes de la revue, sans doublon, dans l'ordre des colonnes."""
@@ -84,6 +87,8 @@ class SudocCheck:
     """Couples (valeur rejetée, ISSN corrigé)."""
     ambiguous_support: Support | None
     """Support dont la revue garde plusieurs ISSN : les ISSN restent dans leurs colonnes."""
+    title: str | None = None
+    """Titre de référence qui remplace un titre en base à la forme d'un volume (`reference_series_title`), ou `None`."""
 
 
 def correction_candidates(rejected: Sequence[str]) -> frozenset[str]:
@@ -260,6 +265,10 @@ def check_journal_issns(
         else:
             kept.append(i)
     reference = _reference_issnl([i for i in main if i in kept] or main, records)
+    sudoc_title = next(
+        (r.title for r in main_records if r.issn == reference and r.title),
+        next((r.title for r in main_records if r.title), None),
+    )
 
     corrections: list[tuple[str, str]] = []
     for raw in journal.rejected:
@@ -310,6 +319,7 @@ def check_journal_issns(
         discarded=tuple(discarded),
         corrections=tuple(corrections),
         ambiguous_support=placement.ambiguous_support,
+        title=reference_series_title(journal.title, sudoc_title) if journal.holds_volumes else None,
     )
 
 

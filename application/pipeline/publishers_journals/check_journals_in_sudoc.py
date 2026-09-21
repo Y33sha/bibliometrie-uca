@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
 
-Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté, et les revues dont un enregistrement porte un ISSN absent de leurs ISSN. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à mettre parmi les rejetés, à écarter, à corriger et à ranger. La revue est ensuite marquée vérifiée.
+Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à mettre parmi les rejetés, à écarter, à corriger et à ranger. La revue est ensuite marquée vérifiée.
 
 Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue n'est pas marquée vérifiée : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
 """
@@ -24,6 +24,7 @@ from domain.journals.issn_check import (
     check_journal_issns,
     correction_candidates,
 )
+from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord, Support
 
 COMMIT_EVERY = 50  # revues par commit
@@ -42,7 +43,13 @@ _DETAIL = {"detail": True}
 
 def _journal_issns(row: JournalSudocRow) -> JournalIssns:
     return JournalIssns(
-        row.title, row.issn, row.eissn, row.issnl, row.rejected_issns, row.document_issns
+        row.title,
+        row.issn,
+        row.eissn,
+        row.issnl,
+        row.rejected_issns,
+        row.document_issns,
+        holds_volumes=holds_volumes(row.journal_type),
     )
 
 
@@ -69,6 +76,8 @@ def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) 
         logger.info("%s : ISSN %s écarté (%s)", label, issn, reason, extra=_DETAIL)
     for raw, corrected in check.corrections:
         logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
+    if check.title is not None:
+        logger.info("%s : titre de série « %s »", label, check.title, extra=_DETAIL)
     if check.ambiguous_support is not None:
         logger.info(
             "%s : plusieurs ISSN %s — laissés dans leurs colonnes",
@@ -90,7 +99,12 @@ async def run_check_journals_in_sudoc(
     max_per_second: float,
 ) -> PhaseMetrics:
     """Vérifie les revues à vérifier, `max_concurrent` à la fois, à `max_per_second` requêtes par seconde au plus."""
-    rows = journal_repo.find_journals_to_check_in_sudoc()
+    titled_as_volumes = [
+        j.id
+        for j in journal_repo.find_titles_of_journals_with_issn()
+        if holds_volumes(j.journal_type) and container_level(j.title) is ContainerLevel.VOLUME
+    ]
+    rows = journal_repo.find_journals_to_check_in_sudoc(also=titled_as_volumes)
     total = len(rows)
     metrics = PhaseMetrics()
     if total == 0:
@@ -163,6 +177,7 @@ async def run_check_journals_in_sudoc(
                 issnl=check.issnl,
                 rejected_issns=check.rejected,
                 checked_at=datetime.now(UTC),
+                title=check.title,
             )
             changed = (check.issn, check.eissn, check.issnl, check.rejected) != (
                 row.issn,
@@ -180,6 +195,7 @@ async def run_check_journals_in_sudoc(
                 issn_conflicts=int(check.conflict),
                 issn_unranged=int(check.ambiguous_support is not None),
                 issn_from_documents=len(_adopted(row, check)),
+                series_titled=int(check.title is not None),
             )
             avancement.retient(int(check.found))
 

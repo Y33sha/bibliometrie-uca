@@ -261,6 +261,37 @@ class TestSudocCheck:
         ).one()
         assert tuple(row) == ("0028-0836", "1476-4687", "0028-0836", [], at)
 
+    def test_record_writes_reference_title_and_its_name_form(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, title="ICORES 2023", issn="2184-4372")
+        repo.record_sudoc_check(
+            journal_id,
+            issn="2184-4372",
+            eissn=None,
+            issnl=None,
+            rejected_issns=(),
+            checked_at=datetime(2026, 9, 21, tzinfo=UTC),
+            title="ICORES",
+        )
+        title, forms = sa_sync_conn.execute(
+            text(
+                "SELECT j.title, array_agg(f.form_normalized) FROM journals j"
+                " JOIN journal_name_forms f ON f.journal_id = j.id WHERE j.id = :id GROUP BY j.title"
+            ),
+            {"id": journal_id},
+        ).one()
+        assert (title, forms) == ("ICORES", ["icores"])
+
+    def test_queue_holds_the_journals_asked_for(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, title="ICORES 2023", issn="2184-4372")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
+        )
+        assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
+        assert journal_id in {r.id for r in repo.find_journals_to_check_in_sudoc(also=[journal_id])}
+        assert (journal_id, "ICORES 2023", JournalType.UNKNOWN) in (
+            repo.find_titles_of_journals_with_issn()
+        )
+
 
 class TestFindJournalsOfUnknownType:
     def test_returns_id_and_openalex_id(self, sa_sync_conn, repo):
