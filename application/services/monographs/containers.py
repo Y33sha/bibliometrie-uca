@@ -22,7 +22,7 @@ class Containers(NamedTuple):
 def _find_series(
     series: SeriesDescription, publisher_id: int | None, repo: ContainerFindOrCreateQueries
 ) -> int | None:
-    """Entrée de `journals` d'une série. Une série sans titre est seulement cherchée par ISSN."""
+    """Entrée de `journals` d'une série. Une série sans titre est seulement cherchée par ses ISSN, rejetés compris."""
     if series.title:
         return find_or_create_journal(
             series.title,
@@ -32,9 +32,10 @@ def _find_series(
             publisher_id=publisher_id,
             openalex_id=series.openalex_id,
             oa_model=series.oa_model,
+            rejected_issns=series.rejected_issns,
             repo=repo,
         )
-    for value in (series.issn, series.eissn, series.issnl):
+    for value in (series.issn, series.eissn, series.issnl, *series.rejected_issns):
         if value and (journal_id := repo.find_journal_by_issn_any(value)):
             return journal_id
     return None

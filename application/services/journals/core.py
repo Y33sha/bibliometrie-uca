@@ -8,6 +8,7 @@ Un champ éditable d'une revue commande le `doc_type` de ses publications : le `
 """
 
 import logging
+from collections.abc import Sequence
 
 from sqlalchemy import Connection
 
@@ -34,22 +35,28 @@ logger = logging.getLogger(__name__)
 _ISSN_FIELDS = frozenset({"issn", "eissn", "issnl"})
 
 
+def _reject_issn(value: str, field: str, title: str, rejected: list[str]) -> None:
+    """Journalise une valeur d'ISSN invalide et l'ajoute à `rejected`."""
+    # Ligne de détail : le terminal la masque, le journal la garde.
+    logger.warning(
+        "ISSN écarté (revue %r) : %s = %r — %s, valeur rangée parmi les ISSN rejetés",
+        title,
+        field,
+        value,
+        issn_rejection_reason(value),
+        extra={"detail": True},
+    )
+    if value.strip() not in rejected:
+        rejected.append(value.strip())
+
+
 def _valid_issn(value: str | None, field: str, title: str, rejected: list[str]) -> str | None:
     """ISSN normalisé, ou `None` pour une valeur vide ou invalide. Une valeur invalide est journalisée et ajoutée à `rejected`."""
     if not value:
         return None
     issn = ISSN.try_parse(value)
     if issn is None:
-        # Ligne de détail : le terminal la masque, le journal la garde.
-        logger.warning(
-            "ISSN écarté (revue %r) : %s = %r — %s, valeur rangée parmi les ISSN rejetés",
-            title,
-            field,
-            value,
-            issn_rejection_reason(value),
-            extra={"detail": True},
-        )
-        rejected.append(value.strip())
+        _reject_issn(value, field, title, rejected)
         return None
     return str(issn)
 
@@ -63,11 +70,12 @@ def find_or_create_journal(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: OaModel | None = None,
+    rejected_issns: Sequence[str] = (),
     repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
-    Les ISSN passent par le value object `ISSN`. Une valeur invalide est journalisée et conservée dans `rejected_issns` de la revue.
+    Les ISSN passent par le value object `ISSN`. Une valeur invalide, ou reçue dans `rejected_issns`, est journalisée et conservée dans `rejected_issns` de la revue.
 
     Cascade de recherche : `openalex_id`, puis chacun des identifiants ISSN fournis (`issn`, `eissn`, `issnl`) cherché indifféremment dans les trois colonnes, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
@@ -85,6 +93,8 @@ def find_or_create_journal(
     issn = _valid_issn(issn, "issn", title, rejected)
     eissn = _valid_issn(eissn, "eissn", title, rejected)
     issnl = _valid_issn(issnl, "issnl", title, rejected)
+    for value in rejected_issns:
+        _reject_issn(value, "issn", title, rejected)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""

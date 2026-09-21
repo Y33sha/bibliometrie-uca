@@ -126,8 +126,8 @@ class TestGetContainerTitle:
 class TestGetIssns:
     def test_delegates_to_domain(self):
         # Délégation à `parse_crossref_issns`. Le détail est testé côté domain.
-        issn, eissn = get_issns({"ISSN": ["1234-5678"], "issn-type": []})
-        assert issn == "1234-5678" or eissn == "1234-5678"
+        issn, eissn = get_issns({"ISSN": ["1234-5679"], "issn-type": []})
+        assert issn == "1234-5679" or eissn == "1234-5679"
 
 
 class TestGetPublisherName:
@@ -223,7 +223,7 @@ class TestGetLanguage:
 
 class TestGetExternalIds:
     def test_issn_only(self):
-        assert get_external_ids({"ISSN": ["1234-5678"]}) == {"issn": ["1234-5678"]}
+        assert get_external_ids({"ISSN": ["1234-5679"]}) == {"issn": ["1234-5679"]}
 
     def test_isbn_only(self):
         assert get_external_ids({"ISBN": ["978-0-12345-678-9"]}) == (
@@ -231,8 +231,8 @@ class TestGetExternalIds:
         )
 
     def test_both_issn_and_isbn(self):
-        result = get_external_ids({"ISSN": ["1234-5678"], "ISBN": ["978-0-12345-678-9"]})
-        assert result == {"issn": ["1234-5678"], "isbn": ["978-0-12345-678-9"]}
+        result = get_external_ids({"ISSN": ["1234-5679"], "ISBN": ["978-0-12345-678-9"]})
+        assert result == {"issn": ["1234-5679"], "isbn": ["978-0-12345-678-9"]}
 
     def test_electronic_isbn_goes_to_eisbn(self):
         """`isbn-type` donne le support : l'édition électronique a sa clé."""
@@ -249,7 +249,7 @@ class TestGetExternalIds:
 
     def test_filters_non_strings(self):
         # ISSN/ISBN avec valeurs non-str sont filtrés.
-        assert get_external_ids({"ISSN": ["1234-5678", 12345, None]}) == ({"issn": ["1234-5678"]})
+        assert get_external_ids({"ISSN": ["1234-5679", 12345, None]}) == ({"issn": ["1234-5679"]})
 
     def test_none_when_empty(self):
         assert get_external_ids({}) is None
@@ -456,13 +456,13 @@ class TestUpsertPublisherEtJournal:
                 "type": "journal-article",
                 "container-title": ["J. Things"],
                 "issn-type": [
-                    {"type": "print", "value": "1234-5678"},
-                    {"type": "electronic", "value": "8765-4321"},
+                    {"type": "print", "value": "1234-5679"},
+                    {"type": "electronic", "value": "8765-4326"},
                 ],
             }
         )
         assert facts.journal_title == "J. Things"
-        assert (facts.issn, facts.eissn) == ("1234-5678", "8765-4321")
+        assert (facts.issn, facts.eissn) == ("1234-5679", "8765-4326")
 
     def test_chapitre_collection_puis_livre(self):
         """Cas réel : 10.1007/978-3-030-57997-5_58, chapitre d'un livre de la collection IFIP AICT."""

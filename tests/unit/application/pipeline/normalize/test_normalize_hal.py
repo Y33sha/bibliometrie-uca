@@ -91,12 +91,12 @@ class TestContainerDescription:
             {
                 "docType_s": "ART",
                 "journalTitle_s": "Nature",
-                "journalIssn_s": "1234-5678",
-                "journalEissn_s": "2345-6789",
+                "journalIssn_s": "1234-5679",
+                "journalEissn_s": "2345-6787",
             }
         )
         assert (facts.raw_doc_type, facts.journal_title) == ("ART", "Nature")
-        assert (facts.issn, facts.eissn) == ("1234-5678", "2345-6789")
+        assert (facts.issn, facts.eissn) == ("1234-5679", "2345-6787")
 
     def test_chapitre_livre_et_isbn(self):
         facts = get_container_facts(

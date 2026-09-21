@@ -8,6 +8,7 @@ from domain.journals.journal import OaModel
 from domain.journals.series import ContainerLevel, container_level, series_title
 from domain.journals.titles import names_a_dated_event, names_proceedings
 from domain.normalize import normalize_text, to_plain_text
+from domain.publications.identifiers import ISSN
 from domain.source_publications.doc_types import map_doc_type
 
 _BOOK = "book"
@@ -88,7 +89,7 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
 class ContainerDescription:
     """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
 
-    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection.
+    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection : la construction garde les valeurs valides, normalisées, et range les autres dans `rejected_issns`.
     """
 
     source: str
@@ -106,6 +107,17 @@ class ContainerDescription:
     isbns: tuple[str, ...] = ()
     eisbns: tuple[str, ...] = ()
     year: int | None = None
+    rejected_issns: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        rejected = list(self.rejected_issns)
+        for field in ("issn", "eissn", "issnl"):
+            raw = getattr(self, field)
+            issn = ISSN.try_parse(raw)
+            if raw and issn is None and raw.strip() not in rejected:
+                rejected.append(raw.strip())
+            object.__setattr__(self, field, str(issn) if issn else None)
+        object.__setattr__(self, "rejected_issns", tuple(rejected))
 
     @property
     def has_issn(self) -> bool:
@@ -122,6 +134,7 @@ class SeriesDescription:
     issnl: str | None = None
     openalex_id: str | None = None
     oa_model: OaModel | None = None
+    rejected_issns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -160,6 +173,7 @@ def determine_container_type(
             issnl=d.issnl,
             openalex_id=d.openalex_id,
             oa_model=d.oa_model,
+            rejected_issns=d.rejected_issns,
         ), None
 
     collection_title = d.collection_title
@@ -175,6 +189,7 @@ def determine_container_type(
             issnl=d.issnl,
             openalex_id=d.openalex_id,
             oa_model=d.oa_model,
+            rejected_issns=d.rejected_issns,
         )
         if d.has_issn
         else None

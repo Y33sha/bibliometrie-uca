@@ -11,9 +11,9 @@ def _describe(**fields) -> ContainerDescription:
 
 def test_article_sa_revue_pour_serie():
     series, volume = determine_container_type(
-        _describe(raw_doc_type="journal-article", journal_title="J. Things", issn="1234-5678")
+        _describe(raw_doc_type="journal-article", journal_title="J. Things", issn="1234-5679")
     )
-    assert (series.title, series.issn) == ("J. Things", "1234-5678")
+    assert (series.title, series.issn) == ("J. Things", "1234-5679")
     assert volume is None
 
 
@@ -114,3 +114,23 @@ def test_chapitre_sans_titre_de_livre_retrouve_par_son_isbn():
 
 def test_chapitre_sans_titre_ni_isbn_sans_volume():
     assert determine_container_type(_describe(issn="1868-4238"))[1] is None
+
+
+def test_un_isbn_dans_le_champ_issn_est_rejete():
+    """Cas réel : HAL et ScanR portent l'ISBN des actes « Processing HRI 2017 » dans le champ ISSN."""
+    description = _describe(
+        raw_doc_type="journal-article", journal_title="Processing HRI 2017", issn="9781450348850"
+    )
+    assert (description.issn, description.rejected_issns) == (None, ("9781450348850",))
+    series, volume = determine_container_type(description)
+    assert series is None
+    assert (volume.title, volume.proceedings) == ("Processing HRI 2017", True)
+
+
+def test_issn_normalise_a_la_construction():
+    description = _describe(issn="03029743", eissn="1611-3349")
+    assert (description.issn, description.eissn, description.rejected_issns) == (
+        "0302-9743",
+        "1611-3349",
+        (),
+    )
