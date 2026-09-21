@@ -223,3 +223,22 @@ class TestStatutOa:
         pub.oa_status, pub.unpaywall_checked_at = "hybrid", self._VERIFIE
         refresh_from_sources(pub, [_sp(source="hal", oa_status="green")], source_priority=("hal",))
         assert pub.oa_status == "hybrid"
+
+
+class TestCollectionDeLaMonographie:
+    def test_publication_sans_revue_prend_la_collection_de_sa_monographie(self):
+        pub = _pub()
+        refresh_from_sources(
+            pub, [_sp(monograph_id=9)], source_priority=_PRIORITY, monograph_journals={9: 7}
+        )
+        assert (pub.monograph_id, pub.journal_id) == (9, 7)
+
+    def test_revue_d_une_source_passe_avant_la_collection(self):
+        pub = _pub()
+        refresh_from_sources(
+            pub,
+            [_sp(monograph_id=9, journal_id=3)],
+            source_priority=_PRIORITY,
+            monograph_journals={9: 7},
+        )
+        assert pub.journal_id == 3

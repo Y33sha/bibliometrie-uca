@@ -3,7 +3,7 @@
 Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublication`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
-- **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.
+- **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
 - **`oa_status`** : le statut le plus ouvert toutes sources confondues (cf. `best_oa_status` dans `metadata`). Fallback à `OA_STATUS_UNKNOWN_DEFAULT` si toutes les sources sont silencieuses (la colonne canonique est NOT NULL).
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
@@ -16,6 +16,7 @@ Priorité d'ordre : les enregistrements canoniques passent avant les formes seco
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
+from collections.abc import Mapping
 from typing import cast
 
 from domain.normalize import normalize_text
@@ -38,12 +39,15 @@ def refresh_from_sources(
     *,
     source_priority: tuple[str, ...],
     secondary_ids: frozenset[int] = frozenset(),
+    monograph_journals: Mapping[int, int | None] | None = None,
 ) -> None:
     """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
     `secondary_ids` liste les `source_publications` qui décrivent une **forme secondaire** de l'œuvre — une pièce, une version ou une variante dont le DOI a été substitué par le DOI de l'œuvre canonique (correction de convergence). Elles sont reléguées en fin de priorité, sous les enregistrements canoniques, pour que les scalaires descriptifs (titre en tête) proviennent de l'enregistrement qui porte nativement le DOI, et non d'une pièce prise au hasard (un `README.txt`, un fichier de données). Les listes restent unionnées toutes sources confondues : une pièce peut porter un mot-clé légitime.
+
+    `monograph_journals` donne l'entrée de `journals` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `journal_id` prend celle de sa monographie.
 
     Précondition : `sources` non vide. Le cas orphelin (aucune source) est une décision métier qui doit être traitée par le caller avant d'appeler cette fonction (suppression de la publication via `repo.delete`).
     """
@@ -66,6 +70,8 @@ def refresh_from_sources(
 
     pub.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
     pub.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
+    if pub.journal_id is None and pub.monograph_id is not None and monograph_journals:
+        pub.journal_id = monograph_journals.get(pub.monograph_id)
     # Unpaywall fait autorité sur l'OA une fois qu'il a été interrogé (cf.
     # `publications.unpaywall_checked_at`) : on ne ré-agrège `oa_status` depuis les
     # sources que tant que la publication ne l'a pas été. Sinon un réimport
