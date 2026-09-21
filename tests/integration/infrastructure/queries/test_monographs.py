@@ -40,17 +40,24 @@ def test_recherche_par_isbn_papier_ou_electronique(repo):
     assert repo.find_monograph_by_isbn(_ELECTRONIC) == mid
 
 
-def test_recherche_par_titre_chez_le_meme_editeur(repo, sa_sync_conn):
+def test_recherche_par_titre_editeur_absent_tolere(repo, sa_sync_conn):
     publisher = sa_sync_conn.execute(
         text("INSERT INTO publishers (name, name_normalized) VALUES ('P', 'p') RETURNING id")
     ).scalar_one()
+    other = sa_sync_conn.execute(
+        text("INSERT INTO publishers (name, name_normalized) VALUES ('Q', 'q') RETURNING id")
+    ).scalar_one()
     with_publisher = _create(repo, "Introduction", publisher_id=publisher)
+    with_other = _create(repo, "Introduction", publisher_id=other)
     without_publisher = _create(repo, "Introduction")
     assert [m.id for m in repo.find_monographs_by_title("introduction", publisher)] == [
-        with_publisher
+        with_publisher,
+        without_publisher,
     ]
     assert [m.id for m in repo.find_monographs_by_title("introduction", None)] == [
-        without_publisher
+        with_publisher,
+        with_other,
+        without_publisher,
     ]
 
 

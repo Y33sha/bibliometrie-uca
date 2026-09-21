@@ -4,11 +4,12 @@ from typing import NamedTuple, Protocol
 
 
 class MonographMatch(NamedTuple):
-    """Une monographie trouvée, avec ses ISBN."""
+    """Une monographie trouvée, avec ses ISBN et son éditeur."""
 
     id: int
     isbn: str | None
     eisbn: str | None
+    publisher_id: int | None
 
 
 class MonographCleanupQueries(Protocol):
@@ -29,7 +30,7 @@ class MonographFindOrCreateQueries(Protocol):
     def find_monographs_by_title(
         self, title_normalized: str, publisher_id: int | None
     ) -> list[MonographMatch]:
-        """Les monographies de ce titre normalisé chez cet éditeur, par `id`. Sans éditeur, seules comptent les monographies sans éditeur."""
+        """Les monographies de ce titre normalisé, par `id` : celles de cet éditeur et celles sans éditeur. Sans éditeur, toutes les monographies de ce titre."""
         ...
 
     def create_monograph(

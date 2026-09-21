@@ -18,9 +18,10 @@ class _Repo:
 
     def find_monographs_by_title(self, title_normalized, publisher_id):
         return [
-            MonographMatch(mid, r["isbn"], r["eisbn"])
+            MonographMatch(mid, r["isbn"], r["eisbn"], r["publisher_id"])
             for mid, r in self.rows.items()
-            if r["title_normalized"] == title_normalized and r["publisher_id"] == publisher_id
+            if r["title_normalized"] == title_normalized
+            and (publisher_id is None or r["publisher_id"] in (publisher_id, None))
         ]
 
     def create_monograph(self, **fields) -> int:
@@ -60,6 +61,23 @@ def test_meme_titre_chez_deux_editeurs_donne_deux_monographies():
     assert _find(repo, "Introduction", publisher_id=1) != _find(
         repo, "Introduction", publisher_id=2
     )
+
+
+def test_editeur_absent_ne_separe_pas():
+    """Cas réel : HAL ne donne pas l'éditeur d'un livre de Classiques Garnier, Crossref le donne."""
+    repo = _Repo()
+    from_hal = _find(repo, "Pascal intempestif", publisher_id=None)
+    assert _find(repo, "Pascal intempestif", publisher_id=14001) == from_hal
+    assert repo.rows[from_hal]["publisher_id"] == 14001
+    assert _find(repo, "Pascal intempestif", publisher_id=None) == from_hal
+
+
+def test_editeur_identique_passe_avant_la_monographie_sans_editeur():
+    repo = _Repo()
+    without = _find(repo, "Introduction", publisher_id=None, isbns=[_PAPER])
+    with_publisher = _find(repo, "Introduction", publisher_id=1, isbns=[_OTHER_VOLUME])
+    assert without != with_publisher
+    assert _find(repo, "Introduction", publisher_id=1) == with_publisher
 
 
 def test_isbn_arrive_sur_une_monographie_creee_par_son_titre():

@@ -14,9 +14,10 @@ _FIND_BY_ISBN = text("""
 """)
 
 _FIND_BY_TITLE = text("""
-    SELECT id, isbn, eisbn FROM monographs
+    SELECT id, isbn, eisbn, publisher_id FROM monographs
     WHERE title_normalized = :title_normalized
-      AND publisher_id IS NOT DISTINCT FROM :publisher_id
+      AND (CAST(:publisher_id AS integer) IS NULL
+           OR publisher_id = :publisher_id OR publisher_id IS NULL)
     ORDER BY id
 """)
 
@@ -73,7 +74,7 @@ class PgMonographGatewayQueries(MonographFindOrCreateQueries, MonographCleanupQu
         rows = self._conn.execute(
             _FIND_BY_TITLE, {"title_normalized": title_normalized, "publisher_id": publisher_id}
         )
-        return [MonographMatch(r.id, r.isbn, r.eisbn) for r in rows]
+        return [MonographMatch(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
 
     def create_monograph(
         self,
