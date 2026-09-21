@@ -24,6 +24,36 @@ class MonographMergeQueries(Protocol):
         ...
 
 
+class MonographCollectionLink(NamedTuple):
+    """Une monographie rattachée à sa collection, avec l'entrée de `journals` qu'elle désignait avant."""
+
+    monograph_id: int
+    title: str
+    collection_id: int
+    collection_title: str
+    previous_id: int | None
+
+
+class MonographCollectionConflict(NamedTuple):
+    """Une monographie dont les enregistrements portent plusieurs entrées de `journals` à ISSN."""
+
+    monograph_id: int
+    title: str
+    candidate_ids: tuple[int, ...]
+
+
+class MonographCollectionQueries(Protocol):
+    """Rattachement des monographies à leur collection."""
+
+    def link_monographs_to_collections(self) -> list[MonographCollectionLink]:
+        """Donne pour `journal_id` à chaque monographie la seule entrée de `journals` à ISSN que portent ses enregistrements. Une monographie sans entrée à ISSN, ou à plusieurs, garde son `journal_id`. Rend les rattachements modifiés."""
+        ...
+
+    def find_monograph_collection_conflicts(self) -> list[MonographCollectionConflict]:
+        """Les monographies dont les enregistrements portent plusieurs entrées de `journals` à ISSN."""
+        ...
+
+
 class MonographCleanupQueries(Protocol):
     """Suppression des monographies vides."""
 

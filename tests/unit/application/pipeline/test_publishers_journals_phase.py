@@ -15,6 +15,7 @@ def _run(substep_metrics: PhaseMetrics, logger: logging.Logger) -> PhaseMetrics:
         delete_empty=lambda: PhaseMetrics(),
         merge_duplicate_monographs=lambda: PhaseMetrics(),
         delete_empty_monographs=lambda: PhaseMetrics(),
+        link_monographs_to_collections=lambda: PhaseMetrics(),
         delete_empty_publishers=lambda: PhaseMetrics(),
         type_proceedings=lambda: PhaseMetrics(),
         learn_doi_namespaces=lambda: PhaseMetrics(),
