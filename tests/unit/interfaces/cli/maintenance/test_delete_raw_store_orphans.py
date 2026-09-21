@@ -106,3 +106,20 @@ def test_payload_deja_disparu_du_disque(lancer, caplog):
     assert code == 0
     assert len(store.supprimees) == 2  # les deux tentatives ont eu lieu
     assert "1 orphelins supprimés (2 détectés)" in caplog.text
+
+
+def test_archive_reelle_sur_disque(tmp_path, monkeypatch):
+    """Le script lit l'archive à la racine indiquée : `W2`, seul sans référence, est supprimé."""
+    from contextlib import nullcontext
+
+    from infrastructure.raw_store.local import LocalFileRawStore
+
+    archive = LocalFileRawStore(tmp_path)
+    for key in ("W1", "W2"):
+        archive.put("openalex", key, b"{}")
+    monkeypatch.setattr(module, "fetch_existing_source_ids", lambda conn, source: {"W1"})
+    monkeypatch.setattr(module, "get_sync_engine", lambda: SimpleNamespace(connect=nullcontext))
+    monkeypatch.setattr(sys, "argv", ["delete_raw_store_orphans", "--root", str(tmp_path)])
+
+    assert main() == 0
+    assert sorted(archive.iter_keys("openalex")) == ["W1"]

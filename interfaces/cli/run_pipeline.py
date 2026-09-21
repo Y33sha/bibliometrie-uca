@@ -44,7 +44,7 @@ from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 from domain.dates import date_to_french
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -1379,8 +1379,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--sources",
-        default=",".join(ALL_SOURCES_SET),
-        help="Sources, séparées par des virgules (défaut: hal,openalex,wos,scanr,theses)",
+        default=",".join(ALL_SOURCES),
+        help=f"Sources, séparées par des virgules (défaut : {','.join(ALL_SOURCES)})",
     )
     parser.add_argument(
         "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"

@@ -3,7 +3,7 @@
 
 Le raw store ne fait que croître — `mark_done` n'y écrit que des `put`, aucune suppression. Au fil des re-imports, changements d'identifiants et purges de staging, des payloads y subsistent sans ligne `staging` correspondante. Ce script confronte chaque clé du store au set des `source_id` présents en staging (par source) et supprime celles absentes. La base reste la source de vérité : un payload supprimé du store est ré-archivé au prochain passage de normalisation s'il revient en staging.
 
-`--root` cible un store arbitraire (défaut : `data/raw_store`), ce qui permet de l'appliquer aussi à une copie hors ligne (snapshot pour diagnostic de churn).
+Le store élagué est celui de la configuration (`BIBLIO_RAW_STORE_DIR`). `--root` en désigne un autre, par exemple une copie hors ligne.
 
 Usage :
     python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
@@ -15,7 +15,7 @@ import argparse
 import os
 from pathlib import Path
 
-from infrastructure import PROJECT_ROOT
+from domain.sources.registry import ALL_SOURCES
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.normalize.staging import fetch_existing_source_ids
@@ -23,20 +23,17 @@ from infrastructure.raw_store.factory import get_raw_store
 
 log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
-_DEFAULT_ROOT = PROJECT_ROOT / "data" / "raw_store"
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--root",
         type=Path,
-        default=_DEFAULT_ROOT,
-        help=f"Racine du raw store à élaguer (défaut : {_DEFAULT_ROOT}).",
+        help="Racine d'un autre raw store à élaguer (défaut : celui de la configuration).",
     )
     parser.add_argument(
         "--source",
-        help="Restreindre à une seule source (défaut : toutes les sources présentes sous --root).",
+        help="Restreindre à une seule source (défaut : toutes les sources).",
     )
     parser.add_argument(
         "--dry-run",
@@ -45,14 +42,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    root: Path = args.root.expanduser().resolve()
-    if not root.is_dir():
-        log.error("Racine introuvable : %s", root)
+    if args.root is not None and not args.root.is_dir():
+        log.error("Racine introuvable : %s", args.root)
         return 1
 
-    store = get_raw_store(root.as_uri())
-    sources = [args.source] if args.source else sorted(p.name for p in root.iterdir() if p.is_dir())
-    log.info("Store : %s — sources : %s%s", root, sources, " [DRY-RUN]" if args.dry_run else "")
+    store = get_raw_store(args.root)
+    sources = [args.source] if args.source else list(ALL_SOURCES)
+    log.info("Sources : %s%s", ", ".join(sources), " [DRY-RUN]" if args.dry_run else "")
 
     engine = get_sync_engine()
     total_orphans = 0
