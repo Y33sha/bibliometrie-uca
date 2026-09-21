@@ -39,7 +39,7 @@ Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par s
 
 ## Documents périmés et disparus (`fetch_stale`)
 
-Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la dernière fois il y a plus que le délai `fetch_stale_after_days` (90 jours par défaut, réglable dans `admin/config`) et repère ceux qui ont disparu de leur source.
+Jouée en mode `full`, après l'extraction bulk, cette phase rafraîchit les documents vus pour la dernière fois il y a plus que le délai `fetch_stale_after_days` (90 jours par défaut, réglable dans `admin/config`) et repère ceux qui ont disparu de leur source.
 
 Chaque ligne périmée est réinterrogée par son identifiant natif :
 - trouvée → `raw_data` rafraîchi et `last_seen_at` repoussé ;
