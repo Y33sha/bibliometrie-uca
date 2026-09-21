@@ -322,6 +322,7 @@ monographs = Table(
         comment="Année de publication. Elle classe les volumes d'actes d'un même congrès.",
     ),
     Column("isbn", Text),
+    Column("eisbn", Text),
     Column("publisher_id", Integer),
     Column(
         "journal_id",
@@ -330,6 +331,7 @@ monographs = Table(
     ),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("isbn", name="monographs_isbn_key"),
+    UniqueConstraint("eisbn", name="monographs_eisbn_key"),
 )
 
 
@@ -781,6 +783,7 @@ source_publications = Table(
     Column("urls", ARRAY(Text)),
     Column("cited_by_count", Integer),
     Column("journal_id", Integer),
+    Column("monograph_id", Integer),
     Column("oa_status", Text),
     Column("embargo_until", Date),
     Column("language", Text),

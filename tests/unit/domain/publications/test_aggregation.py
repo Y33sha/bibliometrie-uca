@@ -26,6 +26,7 @@ def _sp(**overrides) -> SourcePublication:
         "doc_type": "dataset",
         "doi": "10.9001/set",
         "journal_id": None,
+        "monograph_id": None,
         "container_title": None,
         "language": None,
         "oa_status": None,
@@ -143,6 +144,7 @@ class TestChampsAgreges:
             pub_year=2021,
             doi="10.1234/ABC",
             journal_id=7,
+            monograph_id=9,
             container_title="Revue d'agronomie",
             language="fr",
             countries=("FR",),
@@ -158,6 +160,7 @@ class TestChampsAgreges:
         assert pub.pub_year == 2021
         assert pub.doi == DOI("10.1234/abc")
         assert pub.journal_id == 7
+        assert pub.monograph_id == 9
         assert pub.container_title == "Revue d'agronomie"
         assert pub.language == "fr"
         assert pub.countries == ("FR",)

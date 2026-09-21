@@ -3,7 +3,7 @@
 Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublication`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
-- **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.
+- **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.
 - **`oa_status`** : le statut le plus ouvert toutes sources confondues (cf. `best_oa_status` dans `metadata`). Fallback à `OA_STATUS_UNKNOWN_DEFAULT` si toutes les sources sont silencieuses (la colonne canonique est NOT NULL).
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
@@ -65,6 +65,7 @@ def refresh_from_sources(
     pub.doi = DOI(new_doi_str) if new_doi_str else None
 
     pub.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
+    pub.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
     # Unpaywall fait autorité sur l'OA une fois qu'il a été interrogé (cf.
     # `publications.unpaywall_checked_at`) : on ne ré-agrège `oa_status` depuis les
     # sources que tant que la publication ne l'a pas été. Sinon un réimport

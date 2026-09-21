@@ -352,6 +352,7 @@ class TestFirstDocTypeArbitration:
             doc_type=doc_type,
             doi=None,
             journal_id=None,
+            monograph_id=None,
             container_title=None,
             language=None,
             oa_status=None,

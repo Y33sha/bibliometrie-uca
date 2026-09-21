@@ -36,6 +36,7 @@ class SourcePublicationUpsert:
     pub_year: int | None = None
     doc_type: str | None = None
     journal_id: int | None = None
+    monograph_id: int | None = None
     container_title: str | None = None
     language: str | None = None
     biblio: JsonValue = None
