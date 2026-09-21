@@ -23,8 +23,9 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
-from application.pipeline.libelles import branche_de_source
+from application.pipeline.libelles import DERNIERE_BRANCHE, branche_de_source
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.modes import MODES
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
@@ -52,6 +53,7 @@ GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
 
 def run_phase(
     *,
+    mode: str,
     sources: set[str] | None,
     include_wos: bool,
     year: int | None,
@@ -63,9 +65,12 @@ def run_phase(
 ) -> PhaseMetrics:
     """Rafraîchit le stale de chaque source configurée, bornée à la fenêtre d'années du run.
 
-    WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
+    La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
     """
     metrics = PhaseMetrics()
+    if not MODES[mode].fetch_stale:
+        logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, mode)
+        return metrics
     targets = select_targets(ALL_SOURCES, sources, include_wos=include_wos)
     configured = filter_configured(
         targets,
