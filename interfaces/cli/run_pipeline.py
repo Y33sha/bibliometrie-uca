@@ -1525,7 +1525,7 @@ def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, Phase]]) -> 
             (args.rebuild_publications, "publications reconstruites"),
             (args.rebuild_authorships, "signatures reconstruites"),
             (args.rebuild_subjects, "sujets reconstruits"),
-            (args.raw_store, "réponses des sources archivées"),
+            (args.raw_store, "archivage des données brutes"),
         )
         if drapeau
     ]
