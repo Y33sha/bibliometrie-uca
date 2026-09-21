@@ -66,6 +66,32 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
     assert tuple(_row(sa_sync_conn, mid)) == (_PAPER, None, 2020, True)
 
 
+def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
+    source = _create(repo, "Pascal intempestif", isbn=_PAPER, year=2024)
+    target = _create(repo, "Pascal intempestif")
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
+            " VALUES ('hal', 'hal-fusion', 'Chapitre', :mid)"
+        ),
+        {"mid": source},
+    )
+    groups = [g for g in repo.find_monographs_sharing_a_title() if g.title == "Pascal intempestif"]
+    assert [m.id for m in groups[0].monographs] == [source, target]
+
+    repo.merge_monograph_into(target, source)
+
+    assert tuple(_row(sa_sync_conn, target))[:3] == (_PAPER, None, 2024)
+    moved = sa_sync_conn.execute(
+        text("SELECT monograph_id FROM source_publications WHERE source_id = 'hal-fusion'")
+    ).scalar_one()
+    assert moved == target
+    gone = sa_sync_conn.execute(
+        text("SELECT count(*) FROM monographs WHERE id = :id"), {"id": source}
+    ).scalar_one()
+    assert gone == 0
+
+
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
     empty = _create(repo, "Vide")
     held = _create(repo, "Portée")

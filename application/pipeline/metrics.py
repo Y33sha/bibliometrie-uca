@@ -33,6 +33,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     ),
     "matched": "rapproché",
     "monographs_deleted": ("monographie vide supprimée", "monographies vides supprimées"),
+    "monographs_merged": ("monographie fusionnée", "monographies fusionnées"),
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",
     "publisher_created": ("éditeur créé", "éditeurs créés"),

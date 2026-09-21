@@ -5,6 +5,8 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.monographs import (
     MonographCleanupQueries,
     MonographFindOrCreateQueries,
+    MonographMergeQueries,
+    MonographTitleGroup,
 )
 from domain.monographs.matching import MonographCandidate
 from infrastructure.db.scalars import scalar_int
@@ -54,11 +56,64 @@ _DELETE_EMPTY = text("""
 """)
 
 
-class PgMonographGatewayQueries(MonographFindOrCreateQueries, MonographCleanupQueries):
+_TITLE_GROUPS = text("""
+    SELECT (array_agg(title ORDER BY id))[1] AS title,
+           array_agg(id ORDER BY id) AS ids,
+           array_agg(isbn ORDER BY id) AS isbns,
+           array_agg(eisbn ORDER BY id) AS eisbns,
+           array_agg(publisher_id ORDER BY id) AS publisher_ids
+    FROM monographs
+    GROUP BY title_normalized
+    HAVING count(*) > 1
+    ORDER BY min(id)
+""")
+
+_MOVE_RECORDS = text("UPDATE source_publications SET monograph_id = :t WHERE monograph_id = :s")
+_MOVE_PUBLICATIONS = text("UPDATE publications SET monograph_id = :t WHERE monograph_id = :s")
+_SOURCE_FIELDS = text("""
+    SELECT proceedings, year, isbn, eisbn, publisher_id, journal_id FROM monographs WHERE id = :s
+""")
+_RELEASE_SOURCE_ISBNS = text("UPDATE monographs SET isbn = NULL, eisbn = NULL WHERE id = :s")
+_DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
+
+
+class PgMonographGatewayQueries(
+    MonographFindOrCreateQueries, MonographMergeQueries, MonographCleanupQueries
+):
     """Accès PostgreSQL à `monographs` pour le pipeline, via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def find_monographs_sharing_a_title(self) -> list[MonographTitleGroup]:
+        return [
+            MonographTitleGroup(
+                r.title,
+                tuple(
+                    MonographCandidate(*fields)
+                    for fields in zip(r.ids, r.isbns, r.eisbns, r.publisher_ids, strict=True)
+                ),
+            )
+            for r in self._conn.execute(_TITLE_GROUPS)
+        ]
+
+    def merge_monograph_into(self, target_id: int, source_id: int) -> None:
+        params = {"t": target_id, "s": source_id}
+        self._conn.execute(_MOVE_RECORDS, params)
+        self._conn.execute(_MOVE_PUBLICATIONS, params)
+        source = self._conn.execute(_SOURCE_FIELDS, params).one()
+        # La source libère ses ISBN avant que la cible les reçoive : la contrainte d'unicité le demande.
+        self._conn.execute(_RELEASE_SOURCE_ISBNS, params)
+        self.enrich_monograph(
+            target_id,
+            proceedings=source.proceedings,
+            year=source.year,
+            isbn=source.isbn,
+            eisbn=source.eisbn,
+            publisher_id=source.publisher_id,
+            journal_id=source.journal_id,
+        )
+        self._conn.execute(_DELETE_SOURCE, params)
 
     def delete_empty_monographs(self) -> list[tuple[int, str]]:
         return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))

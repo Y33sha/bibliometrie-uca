@@ -1,8 +1,27 @@
 """Port d'accès pipeline à la table `monographs`, servi par `PgMonographGatewayQueries` (`infrastructure/pipeline/monographs.py`)."""
 
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from domain.monographs.matching import MonographCandidate
+
+
+class MonographTitleGroup(NamedTuple):
+    """Monographies qui partagent un titre normalisé, avec le titre de la plus ancienne."""
+
+    title: str
+    monographs: tuple[MonographCandidate, ...]
+
+
+class MonographMergeQueries(Protocol):
+    """Fusion des monographies en double."""
+
+    def find_monographs_sharing_a_title(self) -> list[MonographTitleGroup]:
+        """Groupes d'au moins deux monographies de même titre normalisé."""
+        ...
+
+    def merge_monograph_into(self, target_id: int, source_id: int) -> None:
+        """Reporte sur `target_id` les enregistrements et les publications de `source_id`, complète les champs vides de la cible, puis supprime la source."""
+        ...
 
 
 class MonographCleanupQueries(Protocol):
