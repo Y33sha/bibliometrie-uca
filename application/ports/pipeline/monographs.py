@@ -1,15 +1,8 @@
 """Port d'accès pipeline à la table `monographs`, servi par `PgMonographGatewayQueries` (`infrastructure/pipeline/monographs.py`)."""
 
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
-
-class MonographMatch(NamedTuple):
-    """Une monographie trouvée, avec ses ISBN et son éditeur."""
-
-    id: int
-    isbn: str | None
-    eisbn: str | None
-    publisher_id: int | None
+from domain.monographs.matching import MonographCandidate
 
 
 class MonographCleanupQueries(Protocol):
@@ -27,10 +20,8 @@ class MonographFindOrCreateQueries(Protocol):
         """La monographie qui porte `isbn` dans `isbn` ou `eisbn`."""
         ...
 
-    def find_monographs_by_title(
-        self, title_normalized: str, publisher_id: int | None
-    ) -> list[MonographMatch]:
-        """Les monographies de ce titre normalisé, par `id` : celles de cet éditeur et celles sans éditeur. Sans éditeur, toutes les monographies de ce titre."""
+    def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
+        """Les monographies de ce titre normalisé, par `id`."""
         ...
 
     def create_monograph(
