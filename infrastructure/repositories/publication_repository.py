@@ -32,6 +32,7 @@ class _SourcePublicationRow(NamedTuple):
     doc_type: str | None
     doi: str | None
     journal_id: int | None
+    monograph_id: int | None
     container_title: str | None
     language: str | None
     oa_status: str | None
@@ -56,6 +57,7 @@ def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublicatio
         doc_type=row.doc_type,
         doi=row.doi,
         journal_id=row.journal_id,
+        monograph_id=row.monograph_id,
         container_title=row.container_title,
         language=row.language,
         oa_status=row.oa_status,
@@ -105,7 +107,7 @@ class PgPublicationRepository(PublicationRepository):
                        CAST(p.doc_type AS text) AS doc_type,
                        p.pub_year, p.doi,
                        CAST(p.oa_status AS text) AS oa_status,
-                       p.journal_id, p.container_title, p.language,
+                       p.journal_id, p.monograph_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
                        d.topics, d.biblio, p.meta, p.unpaywall_checked_at
                 FROM publications p
@@ -126,6 +128,7 @@ class PgPublicationRepository(PublicationRepository):
             doi=DOI(m["doi"]) if m["doi"] else None,
             oa_status=m["oa_status"],
             journal_id=m["journal_id"],
+            monograph_id=m["monograph_id"],
             container_title=m["container_title"],
             language=m["language"],
             abstract=m["abstract"],
@@ -150,6 +153,7 @@ class PgPublicationRepository(PublicationRepository):
                     doi = :doi,
                     oa_status = CAST(:oa AS oa_type),
                     journal_id = :jid,
+                    monograph_id = :mid,
                     container_title = :ct,
                     language = :lang,
                     is_retracted = :is_retracted,
@@ -168,6 +172,7 @@ class PgPublicationRepository(PublicationRepository):
                 "doi": str(pub.doi) if pub.doi else None,
                 "oa": pub.oa_status,
                 "jid": pub.journal_id,
+                "mid": pub.monograph_id,
                 "ct": pub.container_title,
                 "lang": pub.language,
                 "is_retracted": pub.is_retracted,
@@ -226,7 +231,7 @@ class PgPublicationRepository(PublicationRepository):
                 SELECT sp.id, sp.source::text AS source, sp.source_id,
                        sp.title, sp.pub_year, sp.doc_type::text AS doc_type,
                        sp.doi,
-                       sp.journal_id, sp.container_title, sp.language,
+                       sp.journal_id, sp.monograph_id, sp.container_title, sp.language,
                        sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
                        sp.countries, sp.urls, sp.keywords,
                        sp.topics, sp.biblio, sp.meta

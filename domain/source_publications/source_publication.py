@@ -22,6 +22,7 @@ class SourcePublication:
     doc_type: str | None
     doi: str | None
     journal_id: int | None
+    monograph_id: int | None
     container_title: str | None
     language: str | None
     oa_status: str | None

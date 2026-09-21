@@ -29,6 +29,7 @@ class Publication:
     doi: DOI | None = None
     oa_status: str | None = None
     journal_id: int | None = None
+    monograph_id: int | None = None
     container_title: str | None = None
     language: str | None = None
     abstract: str | None = None
