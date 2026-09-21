@@ -5,8 +5,8 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.monographs import (
     MonographCleanupQueries,
     MonographFindOrCreateQueries,
-    MonographMatch,
 )
+from domain.monographs.matching import MonographCandidate
 from infrastructure.db.scalars import scalar_int
 
 _FIND_BY_ISBN = text("""
@@ -16,8 +16,6 @@ _FIND_BY_ISBN = text("""
 _FIND_BY_TITLE = text("""
     SELECT id, isbn, eisbn, publisher_id FROM monographs
     WHERE title_normalized = :title_normalized
-      AND (CAST(:publisher_id AS integer) IS NULL
-           OR publisher_id = :publisher_id OR publisher_id IS NULL)
     ORDER BY id
 """)
 
@@ -68,13 +66,9 @@ class PgMonographGatewayQueries(MonographFindOrCreateQueries, MonographCleanupQu
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
         return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()
 
-    def find_monographs_by_title(
-        self, title_normalized: str, publisher_id: int | None
-    ) -> list[MonographMatch]:
-        rows = self._conn.execute(
-            _FIND_BY_TITLE, {"title_normalized": title_normalized, "publisher_id": publisher_id}
-        )
-        return [MonographMatch(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
+    def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
+        rows = self._conn.execute(_FIND_BY_TITLE, {"title_normalized": title_normalized})
+        return [MonographCandidate(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
 
     def create_monograph(
         self,

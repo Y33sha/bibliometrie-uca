@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 
 from application.ports.pipeline.monographs import MonographFindOrCreateQueries
+from domain.monographs.matching import choose_monograph
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISBN
 
@@ -30,7 +31,7 @@ def find_or_create_monograph(
 ) -> int | None:
     """Trouve ou crée une monographie. Retourne son id, ou `None` sans ISBN connu ni titre.
 
-    Recherche par ISBN, papier ou électronique, puis par titre normalisé chez le même éditeur. Un éditeur absent, du document ou de la monographie, ne sépare pas : seuls deux éditeurs différents le font, et la monographie du même éditeur passe avant celle sans éditeur. Deux monographies de même titre qui portent chacune des ISBN sont distinctes : volumes d'un même ouvrage, ou éditions différentes. Un document sans ISBN rejoint la seule monographie de son titre, ou la seule sans ISBN ; entre plusieurs volumes, il reste sans monographie. La monographie trouvée voit ses champs vides complétés. `journal_id` est la collection, quand un ISSN la désigne.
+    Recherche par ISBN, papier ou électronique, puis par titre normalisé : `choose_monograph` choisit parmi les monographies de ce titre, selon l'éditeur et les ISBN. La monographie trouvée voit ses champs vides complétés. `journal_id` est la collection, quand un ISSN la désigne.
     """
     paper = _isbns(isbns)
     electronic = [isbn for isbn in _isbns(eisbns) if isbn not in paper]
@@ -57,24 +58,15 @@ def find_or_create_monograph(
     title_normalized = normalize_text(title)
     if not title_normalized:
         return None
-    matches = repo.find_monographs_by_title(title_normalized, publisher_id)
-    same_publisher = [
-        m for m in matches if publisher_id is not None and m.publisher_id == publisher_id
-    ]
-    matches = same_publisher or matches
-    without_isbn = [m for m in matches if not (m.isbn or m.eisbn)]
-    if isbn or eisbn:
-        candidates = without_isbn[:1]
-    elif len(matches) == 1:
-        candidates = matches
-    elif len(without_isbn) == 1:
-        candidates = without_isbn
-    elif matches:
+    choice = choose_monograph(
+        repo.find_monographs_by_title(title_normalized),
+        publisher_id=publisher_id,
+        has_isbn=bool(isbn or eisbn),
+    )
+    if choice.monograph_id is not None:
+        return enrich(choice.monograph_id)
+    if not choice.create:
         return None
-    else:
-        candidates = []
-    if candidates:
-        return enrich(candidates[0].id)
     return repo.create_monograph(
         title=title,
         title_normalized=title_normalized,

@@ -1,7 +1,7 @@
 """Tests du trouve-ou-crée des monographies (`application.services.monographs.core`)."""
 
-from application.ports.pipeline.monographs import MonographMatch
 from application.services.monographs.core import find_or_create_monograph
+from domain.monographs.matching import MonographCandidate
 
 # ISBN valides : Springer (papier et électronique), ISBN-10 converti.
 _PAPER = "9783030580803"
@@ -16,12 +16,11 @@ class _Repo:
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
         return next((mid for mid, r in self.rows.items() if isbn in (r["isbn"], r["eisbn"])), None)
 
-    def find_monographs_by_title(self, title_normalized, publisher_id):
+    def find_monographs_by_title(self, title_normalized):
         return [
-            MonographMatch(mid, r["isbn"], r["eisbn"], r["publisher_id"])
+            MonographCandidate(mid, r["isbn"], r["eisbn"], r["publisher_id"])
             for mid, r in self.rows.items()
             if r["title_normalized"] == title_normalized
-            and (publisher_id is None or r["publisher_id"] in (publisher_id, None))
         ]
 
     def create_monograph(self, **fields) -> int:
