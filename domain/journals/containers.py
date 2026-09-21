@@ -1,9 +1,13 @@
 """Règles de rattachement d'un document à son conteneur, revue ou monographie, et de typage d'une revue selon ses documents."""
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import StrEnum
 
+from domain.journals.journal import OaModel
+from domain.journals.series import ContainerLevel, container_level, series_title
 from domain.journals.titles import names_a_dated_event, names_proceedings
+from domain.normalize import normalize_text, to_plain_text
 from domain.source_publications.doc_types import map_doc_type
 
 _BOOK = "book"
@@ -85,3 +89,112 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
     """Indique si la majorité stricte des documents d'une revue sont des articles de congrès (`conference_paper_share`)."""
     conference, total = conference_paper_share(records)
     return conference * 2 > total
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ContainerDescription:
+    """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
+
+    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection.
+    """
+
+    source: str
+    raw_doc_type: str | None
+    declares_conference: bool = False
+    document_title: str | None = None
+    journal_title: str | None = None
+    collection_title: str | None = None
+    book_title: str | None = None
+    issn: str | None = None
+    eissn: str | None = None
+    issnl: str | None = None
+    openalex_id: str | None = None
+    oa_model: OaModel | None = None
+    isbns: tuple[str, ...] = ()
+    eisbns: tuple[str, ...] = ()
+    year: int | None = None
+
+    @property
+    def has_issn(self) -> bool:
+        return bool(self.issn or self.eissn or self.issnl)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SeriesDescription:
+    """Une série telle qu'une source la décrit : revue ou collection. Sans titre, elle se retrouve seulement par ses ISSN."""
+
+    title: str | None
+    issn: str | None = None
+    eissn: str | None = None
+    issnl: str | None = None
+    openalex_id: str | None = None
+    oa_model: OaModel | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class VolumeDescription:
+    """Un livre ou un volume d'actes tel qu'une source le décrit. Sans titre, il se retrouve seulement par ses ISBN."""
+
+    title: str | None
+    isbns: tuple[str, ...] = ()
+    eisbns: tuple[str, ...] = ()
+    proceedings: bool = False
+    year: int | None = None
+
+
+def _normalized(title: str | None) -> str:
+    return normalize_text(to_plain_text(title)) if title else ""
+
+
+def determine_container_type(
+    description: ContainerDescription,
+) -> tuple[SeriesDescription | None, VolumeDescription | None]:
+    """Sépare le conteneur d'un document en série et volume, chacun pouvant manquer.
+
+    Un article a sa revue pour série. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection que désigne un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
+    """
+    d = description
+    role = container_role(d.raw_doc_type, d.source, declares_conference=d.declares_conference)
+    if role is ContainerRole.JOURNAL:
+        if not (d.journal_title or d.has_issn):
+            return None, None
+        return SeriesDescription(
+            title=d.journal_title,
+            issn=d.issn,
+            eissn=d.eissn,
+            issnl=d.issnl,
+            openalex_id=d.openalex_id,
+            oa_model=d.oa_model,
+        ), None
+
+    collection_title = d.collection_title
+    volume_title = d.document_title if role is ContainerRole.BOOK else d.book_title
+    if collection_title and container_level(collection_title) is ContainerLevel.VOLUME:
+        volume_title = volume_title or collection_title
+        collection_title = series_title(collection_title)
+    series = (
+        SeriesDescription(
+            title=collection_title,
+            issn=d.issn,
+            eissn=d.eissn,
+            issnl=d.issnl,
+            openalex_id=d.openalex_id,
+            oa_model=d.oa_model,
+        )
+        if d.has_issn
+        else None
+    )
+    same_as_collection = bool(volume_title) and _normalized(volume_title) == _normalized(
+        collection_title
+    )
+    if same_as_collection or not (volume_title or d.isbns or d.eisbns):
+        return series, None
+    return series, VolumeDescription(
+        title=volume_title,
+        isbns=d.isbns,
+        eisbns=d.eisbns,
+        proceedings=is_conference(
+            d.raw_doc_type, d.source, declares_conference=d.declares_conference
+        ),
+        year=d.year,
+    )

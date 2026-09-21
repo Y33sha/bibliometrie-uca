@@ -85,7 +85,7 @@ class TestGetTitle:
 # ── conteneurs ───────────────────────────────────────────────────
 
 
-class TestContainerFacts:
+class TestContainerDescription:
     def test_article_revue_et_ses_issn(self):
         facts = get_container_facts(
             {

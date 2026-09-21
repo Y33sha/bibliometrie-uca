@@ -27,14 +27,10 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
-from domain.journals.containers import ContainerRole, container_role
+from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -203,7 +199,7 @@ def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
     return [v.strip() for v in values if isinstance(v, str) and v.strip()]
 
 
-def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que Crossref dit du conteneur d'un document.
 
     Un livre porte sa collection dans `container-title`. Un chapitre y porte `[collection, livre]`, ou le seul livre, ou la seule collection quand un ISSN la désigne. Un article de congrès y porte le volume d'actes en tête ; sous une collection désignée par un ISSN, le volume prend le nom du congrès.
@@ -227,7 +223,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerFacts:
             book_title = as_str(conference.get("name")) if conference else None
         elif titles:
             book_title = titles[0]
-    return ContainerFacts(
+    return ContainerDescription(
         source="crossref",
         raw_doc_type=raw_type,
         declares_conference=conference is not None,

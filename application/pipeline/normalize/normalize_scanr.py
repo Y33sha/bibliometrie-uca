@@ -21,12 +21,9 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import ContainerDescription
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -83,13 +80,13 @@ def _extract_journal_issns(source: Mapping[str, JsonValue]) -> tuple[str | None,
     return issn, eissn
 
 
-def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerFacts:
+def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que ScanR dit du conteneur d'un document. `source.title` est la revue d'un article, le congrès d'une communication (type `proceedings`), et la plateforme de l'éditeur d'un chapitre : un chapitre reçoit sa seule collection, quand un ISSN la désigne. ScanR ne donne pas d'ISBN."""
     source = as_mapping(doc.get("source"))
     title = as_str(source.get("title"))
     issn, eissn = _extract_journal_issns(source)
     raw_type = as_str(doc.get("type"))
-    return ContainerFacts(
+    return ContainerDescription(
         source="scanr",
         raw_doc_type=raw_type,
         document_title=get_title(doc),

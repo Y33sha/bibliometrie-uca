@@ -4,11 +4,8 @@ import pytest
 from sqlalchemy import text
 
 from application.services.journals.core import find_or_create_journal
-from application.services.monographs.containers import (
-    ContainerFacts,
-    Containers,
-    find_or_create_containers,
-)
+from application.services.monographs.containers import Containers, find_or_create_containers
+from domain.journals.containers import ContainerDescription
 from domain.journals.journal import JournalType
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
@@ -23,7 +20,7 @@ def _count(conn, table: str) -> int:
 
 
 def test_article_revue_sans_monographie(sa_sync_conn, repo):
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref", raw_doc_type="journal-article", journal_title="J. Things"
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
@@ -32,7 +29,7 @@ def test_article_revue_sans_monographie(sa_sync_conn, repo):
 
 
 def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, repo):
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref",
         raw_doc_type="book-chapter",
         journal_title="IFIP Advances in Information and Communication Technology",
@@ -58,7 +55,7 @@ def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, repo):
 
 def test_chapitre_sans_issn_aucune_revue(sa_sync_conn, repo):
     before = _count(sa_sync_conn, "journals")
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref", raw_doc_type="book-chapter", book_title="Le Paris du Moyen Âge"
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
@@ -69,7 +66,7 @@ def test_chapitre_sans_issn_aucune_revue(sa_sync_conn, repo):
 
 def test_article_de_congres_volume_et_son_recueil_dans_journals(sa_sync_conn, repo):
     """Le recueil d'actes reste dans `journals`, et la monographie du volume le désigne."""
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref",
         raw_doc_type="proceedings-article",
         journal_title="NuFACT 2022",
@@ -89,7 +86,7 @@ def test_chapitre_sans_issn_rejoint_un_recueil_d_actes(sa_sync_conn, repo):
     title = "Proceedings of the 2025 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA)"
     proceedings = find_or_create_journal(title, repo=repo)
     repo.set_journal_type(proceedings, JournalType.PROCEEDINGS)
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref", raw_doc_type="book-chapter", journal_title=title, book_title=title
     )
     assert find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id == proceedings
@@ -97,7 +94,7 @@ def test_chapitre_sans_issn_rejoint_un_recueil_d_actes(sa_sync_conn, repo):
 
 def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(sa_sync_conn, repo):
     find_or_create_journal("Handbook of Things", repo=repo)
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="crossref",
         raw_doc_type="book-chapter",
         journal_title="Handbook of Things",
@@ -107,7 +104,7 @@ def test_chapitre_sans_issn_ignore_une_revue_de_meme_titre(sa_sync_conn, repo):
 
 
 def test_livre_monographie_a_son_titre(sa_sync_conn, repo):
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="openalex", raw_doc_type="book", document_title="Global Handbook of Health"
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
@@ -119,7 +116,7 @@ def test_livre_monographie_a_son_titre(sa_sync_conn, repo):
 
 def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, repo):
     """Cas réel : WoS type « Article; Proceedings Paper » un article de revue issu d'un congrès ; la source nomme la revue."""
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="wos",
         raw_doc_type="Article; Proceedings Paper",
         journal_title="Physical Review D",
@@ -133,7 +130,7 @@ def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, repo)
 
 
 def test_idempotent(sa_sync_conn, repo):
-    facts = ContainerFacts(
+    facts = ContainerDescription(
         source="hal",
         raw_doc_type="COUV",
         book_title="Le Paris du Moyen Âge",
