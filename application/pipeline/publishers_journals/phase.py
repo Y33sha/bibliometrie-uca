@@ -6,7 +6,7 @@ Sous-étapes incrémentales, dans l'ordre :
 2. **enrich_journals_from_openalex** — OpenAlex Sources → APC + journal_type (clé ou email OpenAlex).
 3. **check_journals_in_sudoc** — Sudoc (public) → ISSN des revues vérifiés, corrigés et rangés par support.
 4. **merge_duplicate_journals** — fusion des revues en double : même ISSN-L, même ISSN sous un titre emboîté, même titre et même préfixe DOI.
-5. **delete_empty_journals** — suppression des revues sans enregistrement, sans publication et sans paiement APC, puis des éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
+5. **delete_empty_journals** — suppression des revues sans enregistrement, sans publication et sans paiement APC, puis des monographies sans enregistrement ni publication, puis des éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
 6. **type_proceedings_journals** — typage en recueil d'actes des revues de type inconnu qui contiennent surtout des articles de congrès.
 7. **learn_journal_doi_namespaces** — calcul des espaces de noms DOI des revues, sur les revues fusionnées et typées.
 8. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
@@ -32,6 +32,7 @@ def run(
     check_in_sudoc: RunSubstep,
     merge_duplicates: RunSubstep,
     delete_empty: RunSubstep,
+    delete_empty_monographs: RunSubstep,
     delete_empty_publishers: RunSubstep,
     type_proceedings: RunSubstep,
     learn_doi_namespaces: RunSubstep,
@@ -65,6 +66,7 @@ def run(
     sudoc = check_in_sudoc()
     merges = merge_duplicates()
     deletions = delete_empty()
+    monograph_deletions = delete_empty_monographs()
     publisher_deletions = delete_empty_publishers()
     proceedings = type_proceedings()
     namespaces = learn_doi_namespaces()
@@ -77,6 +79,7 @@ def run(
         sudoc,
         merges,
         deletions,
+        monograph_deletions,
         publisher_deletions,
         proceedings,
         namespaces,
@@ -118,6 +121,12 @@ def run(
                 "key": "revues vides supprimées",
                 "traités": deletions.total,
                 "identifiés": deletions.extras.get("journals_deleted", 0),
+                "créés": 0,
+            },
+            {
+                "key": "monographies vides supprimées",
+                "traités": monograph_deletions.total,
+                "identifiés": monograph_deletions.extras.get("monographs_deleted", 0),
                 "créés": 0,
             },
             {

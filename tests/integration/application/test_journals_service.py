@@ -576,6 +576,33 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=j1)
         assert row.publisher_id == target
 
+    def test_transfers_monographs(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+        """La monographie garde un éditeur, qui la retrouve par son titre."""
+        target = _insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
+        source = _insert_publisher(sa_sync_conn, "PUR")
+        monograph = sa_sync_conn.execute(
+            text(
+                "INSERT INTO monographs (title, title_normalized, publisher_id)"
+                " VALUES ('Livre', 'livre', :s) RETURNING id"
+            ),
+            {"s": source},
+        ).scalar_one()
+
+        merge_publishers(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=publisher_repo,
+            journal_repo=repo,
+            publication_repo=publication_repo,
+        )
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT publisher_id FROM monographs WHERE id = :id", id=monograph
+        )
+        assert row.publisher_id == target
+
     def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
         target = _insert_publisher(sa_sync_conn, "Elsevier BV")
