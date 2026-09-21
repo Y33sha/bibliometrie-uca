@@ -1,4 +1,4 @@
-"""Conteneurs d'un document : la revue où il paraît, ou la monographie qui le contient et la collection de cette monographie."""
+"""Conteneurs d'un document : son entrée de `journals`, et la monographie qui le contient."""
 
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -6,10 +6,14 @@ from typing import NamedTuple
 from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.services.journals.core import find_or_create_journal
 from application.services.monographs.core import find_or_create_monograph
-from domain.journals.containers import ContainerRole, container_role, is_conference
+from domain.journals.containers import (
+    ContainerRole,
+    container_is_journal,
+    container_role,
+    is_conference,
+)
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import ISSN
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -37,34 +41,10 @@ class ContainerFacts:
 
 
 class Containers(NamedTuple):
-    """Revue ou collection, et monographie, d'un document."""
+    """Entrée de `journals` et monographie d'un document."""
 
     journal_id: int | None
     monograph_id: int | None
-
-
-def _find_collection(
-    facts: ContainerFacts, publisher_id: int | None, repo: ContainerFindOrCreateQueries
-) -> int | None:
-    """Collection désignée par un ISSN. Sans titre de collection, elle est seulement cherchée par ISSN."""
-    issns = [facts.issn, facts.eissn, facts.issnl]
-    if not any(issns):
-        return None
-    if facts.collection_title:
-        return find_or_create_journal(
-            facts.collection_title,
-            issn=facts.issn,
-            eissn=facts.eissn,
-            issnl=facts.issnl,
-            publisher_id=publisher_id,
-            openalex_id=facts.openalex_id,
-            oa_model=facts.oa_model,
-            repo=repo,
-        )
-    for value in issns:
-        if (issn := ISSN.try_parse(value)) and (found := repo.find_journal_by_issn_any(str(issn))):
-            return found
-    return None
 
 
 def _same_title(first: str | None, second: str | None) -> bool:
@@ -73,18 +53,18 @@ def _same_title(first: str | None, second: str | None) -> bool:
     )
 
 
-def find_or_create_containers(
-    facts: ContainerFacts, *, publisher_id: int | None, repo: ContainerFindOrCreateQueries
-) -> Containers:
-    """Trouve ou crée les conteneurs d'un document.
-
-    Un article reçoit sa revue. Un livre, un chapitre ou un article de congrès reçoit sa monographie, et la collection de celle-ci quand un ISSN la désigne. Un titre de livre identique à celui de la collection désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
-    """
-    role = container_role(
-        facts.raw_doc_type, facts.source, declares_conference=facts.declares_conference
-    )
-    if role is ContainerRole.JOURNAL:
-        journal_id = find_or_create_journal(
+def _find_journal(
+    facts: ContainerFacts, publisher_id: int | None, repo: ContainerFindOrCreateQueries
+) -> int | None:
+    """Entrée de `journals` du document : revue, collection, ou recueil d'actes. Un livre ou un chapitre sans ISSN, qui ne déclare pas de congrès, rejoint seulement un recueil d'actes existant de même titre."""
+    has_issn = bool(facts.issn or facts.eissn or facts.issnl)
+    if container_is_journal(
+        facts.raw_doc_type,
+        facts.source,
+        has_issn=has_issn,
+        declares_conference=facts.declares_conference,
+    ):
+        return find_or_create_journal(
             facts.journal_title,
             issn=facts.issn,
             eissn=facts.eissn,
@@ -94,9 +74,28 @@ def find_or_create_containers(
             oa_model=facts.oa_model,
             repo=repo,
         )
+    title_normalized = (
+        normalize_text(to_plain_text(facts.journal_title)) if facts.journal_title else ""
+    )
+    if not title_normalized:
+        return None
+    return repo.find_proceedings_by_name_form(title_normalized, publisher_id)
+
+
+def find_or_create_containers(
+    facts: ContainerFacts, *, publisher_id: int | None, repo: ContainerFindOrCreateQueries
+) -> Containers:
+    """Trouve ou crée les conteneurs d'un document.
+
+    Le document reçoit son entrée de `journals` : revue, collection, ou recueil d'actes. Un livre, un chapitre ou un article de congrès reçoit en outre sa monographie, que son `journal_id` relie à cette même entrée. Un titre de livre identique à celui de la collection ne désigne pas de monographie : c'est le cas d'un article de congrès paru dans une revue.
+    """
+    journal_id = _find_journal(facts, publisher_id, repo)
+    role = container_role(
+        facts.raw_doc_type, facts.source, declares_conference=facts.declares_conference
+    )
+    if role is ContainerRole.JOURNAL:
         return Containers(journal_id, None)
 
-    journal_id = _find_collection(facts, publisher_id, repo)
     title = facts.document_title if role is ContainerRole.BOOK else facts.book_title
     if _same_title(title, facts.collection_title):
         return Containers(journal_id, None)

@@ -352,18 +352,19 @@ def upsert_publisher(
 
 
 def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerFacts:
-    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, la source désigne aussi la collection : quand les deux titres coïncident, le document relève de la collection seule."""
+    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
     title = as_str(rec.get("journal_title"))
+    issn, eissn = as_str(rec.get("issn")), as_str(rec.get("eissn"))
     external_ids = as_mapping(rec.get("external_ids"))
     return ContainerFacts(
         source="wos",
         raw_doc_type=as_str(rec.get("doc_type")),
         document_title=as_str(rec.get("title")),
         journal_title=title,
-        collection_title=title,
+        collection_title=title if issn or eissn else None,
         book_title=title,
-        issn=as_str(rec.get("issn")),
-        eissn=as_str(rec.get("eissn")),
+        issn=issn,
+        eissn=eissn,
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
         year=as_int(rec.get("pub_year")),

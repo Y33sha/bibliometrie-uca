@@ -39,6 +39,19 @@ def container_role(
     return ContainerRole.JOURNAL
 
 
+def container_is_journal(
+    raw_doc_type: str | None, source: str, *, has_issn: bool, declares_conference: bool = False
+) -> bool:
+    """Indique si le conteneur d'un document désigne une entrée de `journals`.
+
+    Sans ISSN, le conteneur d'un livre ou d'un chapitre est le livre lui-même. Avec un ISSN, c'est sa collection. Un document issu d'un congrès garde son recueil d'actes dans `journals` : il déclare le congrès (`declares_conference`), ou son type composite mentionne un article de congrès.
+    """
+    if has_issn or declares_conference:
+        return True
+    types = _doc_types(raw_doc_type, source)
+    return _CONFERENCE_PAPER in types or not types & {_BOOK, _BOOK_CHAPTER}
+
+
 def is_conference(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> bool:
