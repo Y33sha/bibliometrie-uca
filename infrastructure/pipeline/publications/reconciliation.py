@@ -59,10 +59,16 @@ _UNIVERSE_SQL = text(f"""
     WHERE d.doi IS NOT NULL
     {_SCALAR_KEY_ARMS}
     UNION
+    -- hal_id : chaque identifiant est cherché par l'index GIN `idx_source_pubs_hal_id`. `OFFSET 0` garde la sous-requête
+    -- latérale telle quelle ; aplatie en jointure, elle laisse le planificateur comparer chaque identifiant à toute la table.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
     CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> '{ExternalIdType.HAL_ID}') AS dh(hal)
-    JOIN source_publications o ON o.external_ids -> '{ExternalIdType.HAL_ID}' @> jsonb_build_array(dh.hal)
+    CROSS JOIN LATERAL (
+        SELECT * FROM source_publications s
+        WHERE s.external_ids -> '{ExternalIdType.HAL_ID}' @> jsonb_build_array(dh.hal)
+        OFFSET 0
+    ) o
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE jsonb_typeof(d.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
     UNION
