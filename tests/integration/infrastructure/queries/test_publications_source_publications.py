@@ -105,7 +105,7 @@ class TestGetPublicationSources:
             "Nature Publishing Group",
         )
 
-    def test_identifiers_as_lists_of_non_empty_strings_without_issn(self, sa_sync_conn):
+    def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         _create_source_publication(
             sa_sync_conn,
@@ -116,7 +116,6 @@ class TestGetPublicationSources:
                 "pmid": "123",
                 "isbn": ["978-2", "978-3"],
                 "arxiv_id": "",
-                "issn": ["0028-0836"],
             },
         )
         [record] = _records(sa_sync_conn, pub)

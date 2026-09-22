@@ -8,18 +8,12 @@ from application.ports.read_models.publications_queries import (
     PublicationSourcesResponse,
     SourcePublicationMetadataOut,
 )
-from domain.source_publications.external_ids import ExternalIdType
-
-# L'ISSN identifie la revue : il figure avec elle, depuis `biblio`.
-_JOURNAL_IDENTIFIERS = frozenset({ExternalIdType.ISSN})
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
-    """Valeurs textuelles de `external_ids` hors ISSN, en listes : une valeur isolée devient une liste d'un élément."""
+    """Valeurs textuelles de `external_ids`, en listes : une valeur isolée devient une liste d'un élément."""
     out: dict[str, list[str]] = {}
     for key, value in external_ids.items():
-        if key in _JOURNAL_IDENTIFIERS:
-            continue
         values = value if isinstance(value, list) else [value]
         strings = [v for v in values if isinstance(v, str) and v]
         if strings:
