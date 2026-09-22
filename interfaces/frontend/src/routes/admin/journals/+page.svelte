@@ -265,7 +265,7 @@
 		<fieldset class="issns">
 			<legend>ISSN</legend>
 			<table>
-				<thead><tr><th>Valeur</th><th>Support</th><th>Statut</th><th>ISSN-L</th><th>Successeur</th><th></th></tr></thead>
+				<thead><tr><th>Valeur</th><th>Support</th><th>Statut</th><th>ISSN-L</th><th></th></tr></thead>
 				<tbody>
 					{#each editModal.issns as row, index (index)}
 						<tr>
@@ -278,7 +278,6 @@
 								{#each issnStatuses as [value, label] (value)}<option {value}>{label}</option>{/each}
 							</select></td>
 							<td class="center"><input type="radio" name="issnl" checked={row.linking} onchange={() => setLinking(index)} /></td>
-							<td><input bind:value={row.replaced_by} placeholder="1234-5678" /></td>
 							<td><button type="button" class="btn btn-sm" onclick={() => editModal?.issns.splice(index, 1)}>Retirer</button></td>
 						</tr>
 					{/each}
