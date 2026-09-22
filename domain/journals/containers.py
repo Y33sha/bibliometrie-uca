@@ -4,11 +4,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
+from domain.journals.issns import IssnStatus, JournalIssn, received_issns
 from domain.journals.journal import OaModel
 from domain.journals.series import ContainerLevel, container_level, series_title
 from domain.journals.titles import names_a_dated_event, names_proceedings
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import ISSN
 from domain.source_publications.doc_types import map_doc_type
 
 _BOOK = "book"
@@ -89,7 +89,7 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
 class ContainerDescription:
     """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
 
-    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection : la construction garde les valeurs valides, normalisées, et range les autres dans `rejected_issns`.
+    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`).
     """
 
     source: str
@@ -99,29 +99,20 @@ class ContainerDescription:
     journal_title: str | None = None
     collection_title: str | None = None
     book_title: str | None = None
-    issn: str | None = None
-    eissn: str | None = None
-    issnl: str | None = None
+    issns: tuple[JournalIssn, ...] = ()
     openalex_id: str | None = None
     oa_model: OaModel | None = None
     isbns: tuple[str, ...] = ()
     eisbns: tuple[str, ...] = ()
     year: int | None = None
-    rejected_issns: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        rejected = list(self.rejected_issns)
-        for field in ("issn", "eissn", "issnl"):
-            raw = getattr(self, field)
-            issn = ISSN.try_parse(raw)
-            if raw and issn is None and raw.strip() not in rejected:
-                rejected.append(raw.strip())
-            object.__setattr__(self, field, str(issn) if issn else None)
-        object.__setattr__(self, "rejected_issns", tuple(rejected))
+        object.__setattr__(self, "issns", received_issns(self.issns))
 
     @property
     def has_issn(self) -> bool:
-        return bool(self.issn or self.eissn or self.issnl)
+        """Au moins un ISSN valide."""
+        return any(r.status is not IssnStatus.MALFORMED for r in self.issns)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -129,12 +120,9 @@ class SeriesDescription:
     """Une série telle qu'une source la décrit : revue ou collection. Sans titre, elle se retrouve seulement par ses ISSN."""
 
     title: str | None
-    issn: str | None = None
-    eissn: str | None = None
-    issnl: str | None = None
+    issns: tuple[JournalIssn, ...] = ()
     openalex_id: str | None = None
     oa_model: OaModel | None = None
-    rejected_issns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -168,12 +156,9 @@ def determine_container_type(
             return None, VolumeDescription(title=d.journal_title, proceedings=True, year=d.year)
         return SeriesDescription(
             title=d.journal_title,
-            issn=d.issn,
-            eissn=d.eissn,
-            issnl=d.issnl,
+            issns=d.issns,
             openalex_id=d.openalex_id,
             oa_model=d.oa_model,
-            rejected_issns=d.rejected_issns,
         ), None
 
     collection_title = d.collection_title
@@ -184,12 +169,9 @@ def determine_container_type(
     series = (
         SeriesDescription(
             title=collection_title,
-            issn=d.issn,
-            eissn=d.eissn,
-            issnl=d.issnl,
+            issns=d.issns,
             openalex_id=d.openalex_id,
             oa_model=d.oa_model,
-            rejected_issns=d.rejected_issns,
         )
         if d.has_issn
         else None

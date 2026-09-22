@@ -45,7 +45,7 @@ Table `journal_issns`, une ligne par ISSN et par revue. Clé technique `id` ; un
 ### 2. Code
 
 - [x] Normalisation et recherche : `find_or_create_journal` ajoute à la revue trouvée les ISSN qu'elle ne porte pas, avec leur support ; `find_journal_by_issn_any` ignore les valeurs mal formées. Une ligne sans revue retrouvée par son ISSN est rattachée à la revue.
-- [ ] `biblio.journal` des enregistrements : la liste complète des ISSN avec leur support, pour toutes les sources. `get_issns` (Crossref) garde un ISSN par support : 49 notices en déclarent deux du même support (revues IEEE). Renormalisation depuis le raw store pour les retrouver.
+- [x] Support des ISSN reçus : la description du conteneur porte la liste des ISSN de la source, chacun avec le support que donne la notice. Crossref (`issn-type`), HAL et WoS le donnent ; OpenAlex, ScanR et DataCite non, leurs ISSN restent de support inconnu. OpenAlex et ScanR gardent toute leur liste d'ISSN, au-delà de deux. `biblio.journal` garde un ISSN par support (49 notices Crossref en déclarent deux du même support, surtout des revues IEEE) : sans conséquence, abandonné.
 - [x] Vérification Sudoc (`issn_check`) : chaque ISSN reçoit support, statut et date. Plusieurs ISSN d'un même support restent actifs. Un titre précédent désigne l'ISSN-L de la revue comme successeur (`replaced_by`). Un ISSN d'une autre publication est gardé sans revue, vérifié : il ne ramène plus la revue dans la file.
 - [x] Import DOAJ, fusion des doublons (règles sur les ISSN actifs et inactifs), suppression des revues vides.
 - [x] Administration et lecture : repository, read models, API (`issns` en liste, `issn_details` au détail), frontend (liste, fiche publique, édition des ISSN en tableau).
@@ -58,3 +58,4 @@ Table `journal_issns`, une ligne par ISSN et par revue. Clé technique `id` ; un
 ## Questions ouvertes
 
 - **Fusion de revues.** Les ISSN de la revue absorbée rejoignent la revue gardée avec leur support et leur statut, à revérifier au Sudoc ; l'ISSN-L de la revue gardée l'emporte. À confirmer à l'usage.
+- **Utilité de `replaced_by`.** Pour un titre précédent, la colonne répète l'ISSN-L de la revue ; pour une valeur mal formée, elle garde la trace de sa correction. Aucun code ne la lit, et l'administration ne l'affiche pas. À supprimer si l'usage ne la justifie pas.

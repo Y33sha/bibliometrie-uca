@@ -6,6 +6,7 @@ from sqlalchemy import text
 from application.services.journals.core import find_or_create_journal
 from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
 
@@ -34,7 +35,7 @@ def test_chapitre_monographie_et_son_entree_de_journals(sa_sync_conn, repo):
         journal_title="IFIP Advances in Information and Communication Technology",
         collection_title="IFIP Advances in Information and Communication Technology",
         book_title="Advances in Production Management Systems",
-        issn="1868-4238",
+        issns=source_issns(print_issn="1868-4238"),
         isbns=("9783030580803",),
         year=2020,
     )
@@ -96,14 +97,16 @@ def test_article_dans_un_conteneur_date_volume_seul(sa_sync_conn, repo):
 
 def test_serie_sans_titre_retrouvee_par_issn(sa_sync_conn, repo):
     collection = find_or_create_journal(
-        "Lecture Notes in Computer Science", issn="0302-9743", repo=repo
+        "Lecture Notes in Computer Science",
+        issns=source_issns(print_issn="0302-9743"),
+        repo=repo,
     )
     facts = ContainerDescription(
         source="openalex",
         raw_doc_type="book-chapter",
         journal_title="ICORES 2023",
         book_title="ICORES 2023",
-        issn="0302-9743",
+        issns=source_issns(print_issn="0302-9743"),
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
     assert containers.journal_id == collection
@@ -143,7 +146,7 @@ def test_communication_parue_dans_une_revue_sans_monographie(sa_sync_conn, repo)
         journal_title="Physical Review D",
         collection_title="Physical Review D",
         book_title="Physical Review D",
-        issn="2470-0010",
+        issns=source_issns(print_issn="2470-0010"),
     )
     containers = find_or_create_containers(facts, publisher_id=None, repo=repo)
     assert containers.journal_id is not None
@@ -167,7 +170,7 @@ def test_issn_mal_forme_garde_dans_la_revue(sa_sync_conn, repo):
         source="crossref",
         raw_doc_type="journal-article",
         journal_title="J. Rejects",
-        issn="1234-5670",
+        issns=source_issns(print_issn="1234-5670"),
     )
     journal_id = find_or_create_containers(facts, publisher_id=None, repo=repo).journal_id
     rows = sa_sync_conn.execute(

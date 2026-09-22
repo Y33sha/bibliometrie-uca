@@ -1,6 +1,6 @@
 """ISSN d'une revue : support, ISSN-L et statut de chaque valeur."""
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -47,47 +47,61 @@ class JournalIssn:
     replaced_by: str | None = None
 
 
-def issns_from_columns(
-    issn: str | None,
-    eissn: str | None,
-    issnl: str | None,
-    rejected: Iterable[str] = (),
-    *,
-    statuses: Mapping[str, IssnStatus] | None = None,
-    supports: Mapping[str, IssnSupport] | None = None,
-    replaced_by: Mapping[str, str] | None = None,
-) -> list[JournalIssn]:
-    """ISSN d'une revue décrite par ses champs `issn`, `eissn`, `issnl` et ses valeurs mises de côté.
+def received_issns(issns: Iterable[JournalIssn]) -> tuple[JournalIssn, ...]:
+    """ISSN reçus d'une source, normalisés, sans doublon.
 
-    `issn` est l'ISSN papier actif, `eissn` l'ISSN électronique actif, `issnl` porte le drapeau ISSN-L. Une valeur mise de côté prend son statut dans `statuses` ; à défaut, `malformed` si elle est invalide, `unverified` sinon. `supports` et `replaced_by` complètent chaque valeur.
+    Une valeur invalide garde sa forme reçue, au statut `malformed`. Deux mentions d'une même valeur n'en font qu'une : le premier support connu, le drapeau ISSN-L de l'une ou l'autre.
     """
-    statuses = statuses or {}
-    supports = supports or {}
-    replaced_by = replaced_by or {}
     rows: dict[str, JournalIssn] = {}
-    for value, support in ((issn, IssnSupport.PRINT), (eissn, IssnSupport.ELECTRONIC)):
-        if value and value not in rows:
-            rows[value] = JournalIssn(issn=value, support=support)
-    for value in rejected:
-        if value in rows:
+    for row in issns:
+        raw = row.issn.strip()
+        if not raw:
             continue
-        default = IssnStatus.UNVERIFIED if ISSN.try_parse(value) else IssnStatus.MALFORMED
-        rows[value] = JournalIssn(
-            issn=value,
-            support=supports.get(value),
-            status=statuses.get(value, default),
-            replaced_by=replaced_by.get(value),
-        )
-    if issnl:
-        row = rows.get(issnl) or JournalIssn(issn=issnl, support=supports.get(issnl))
-        rows[issnl] = JournalIssn(
-            issn=row.issn,
-            support=row.support,
-            linking=True,
-            status=IssnStatus.ACTIVE,
-            replaced_by=row.replaced_by,
-        )
-    return list(rows.values())
+        issn = ISSN.try_parse(raw)
+        value = str(issn) if issn else raw
+        status = row.status if issn else IssnStatus.MALFORMED
+        if value in rows:
+            known = rows[value]
+            rows[value] = JournalIssn(
+                issn=value,
+                support=known.support or row.support,
+                linking=known.linking or row.linking,
+                status=known.status,
+                replaced_by=known.replaced_by,
+            )
+        else:
+            rows[value] = JournalIssn(
+                issn=value,
+                support=row.support,
+                linking=row.linking and issn is not None,
+                status=status,
+                replaced_by=row.replaced_by,
+            )
+    return tuple(rows.values())
+
+
+def source_issns(
+    *,
+    print_issn: str | None = None,
+    electronic_issn: str | None = None,
+    unknown: Iterable[str | None] = (),
+    linking: str | None = None,
+) -> tuple[JournalIssn, ...]:
+    """ISSN tels qu'une source les donne : papier, en ligne, ou de support inconnu. `linking` est l'ISSN-L."""
+    return received_issns(
+        [
+            *(
+                JournalIssn(issn=value, support=support)
+                for value, support in (
+                    (print_issn, IssnSupport.PRINT),
+                    (electronic_issn, IssnSupport.ELECTRONIC),
+                )
+                if value
+            ),
+            *(JournalIssn(issn=value) for value in unknown if value),
+            *([JournalIssn(issn=linking, linking=True)] if linking else []),
+        ]
+    )
 
 
 def validate_journal_issns(issns: Iterable[JournalIssn]) -> list[JournalIssn]:

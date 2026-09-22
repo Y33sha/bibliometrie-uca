@@ -29,6 +29,7 @@ from application.pipeline.normalize.normalize_openalex import (
     upsert_containers,
 )
 from application.services.monographs.containers import Containers
+from domain.journals.issns import JournalIssn
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -245,8 +246,8 @@ class TestContainerDescription:
         work = {"primary_location": {"source": {"display_name": "Sub", "type": "journal"}}}
         assert get_container_facts(work).oa_model == "subscription"
 
-    def test_issn_eissn_picked_from_array(self):
-        """Le premier ISSN différent de issn_l alimente issn ; le second alimente eissn."""
+    def test_issns_sans_support_et_issnl(self):
+        """OpenAlex ne donne pas le support de ses ISSN : ils restent de support inconnu ; `issn_l` porte le drapeau ISSN-L."""
         work = {
             "primary_location": {
                 "source": {
@@ -257,7 +258,11 @@ class TestContainerDescription:
             }
         }
         facts = get_container_facts(work)
-        assert (facts.issn, facts.eissn, facts.issnl) == ("2222-2227", "3333-3335", "1111-1119")
+        assert facts.issns == (
+            JournalIssn(issn="1111-1119", linking=True),
+            JournalIssn(issn="2222-2227"),
+            JournalIssn(issn="3333-3335"),
+        )
 
     def test_collection_d_un_chapitre(self):
         work = {

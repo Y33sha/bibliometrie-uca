@@ -1,19 +1,27 @@
 """Tests de la séparation d'un conteneur en série et volume (`determine_container_type`)."""
 
 from domain.journals.containers import ContainerDescription, determine_container_type
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn, source_issns
 
 
 def _describe(**fields) -> ContainerDescription:
+    """Description de test ; `issn` et `eissn` donnent un ISSN papier et un ISSN en ligne."""
     fields.setdefault("source", "crossref")
     fields.setdefault("raw_doc_type", "book-chapter")
-    return ContainerDescription(**fields)
+    issns = source_issns(
+        print_issn=fields.pop("issn", None), electronic_issn=fields.pop("eissn", None)
+    )
+    return ContainerDescription(issns=issns, **fields)
 
 
 def test_article_sa_revue_pour_serie():
     series, volume = determine_container_type(
         _describe(raw_doc_type="journal-article", journal_title="J. Things", issn="1234-5679")
     )
-    assert (series.title, series.issn) == ("J. Things", "1234-5679")
+    assert (series.title, series.issns) == (
+        "J. Things",
+        (JournalIssn(issn="1234-5679", support=IssnSupport.PRINT),),
+    )
     assert volume is None
 
 
@@ -121,16 +129,26 @@ def test_un_isbn_dans_le_champ_issn_est_rejete():
     description = _describe(
         raw_doc_type="journal-article", journal_title="Processing HRI 2017", issn="9781450348850"
     )
-    assert (description.issn, description.rejected_issns) == (None, ("9781450348850",))
+    assert description.issns == (
+        JournalIssn(issn="9781450348850", support=IssnSupport.PRINT, status=IssnStatus.MALFORMED),
+    )
+    assert not description.has_issn
     series, volume = determine_container_type(description)
     assert series is None
     assert (volume.title, volume.proceedings) == ("Processing HRI 2017", True)
 
 
-def test_issn_normalise_a_la_construction():
-    description = _describe(issn="03029743", eissn="1611-3349")
-    assert (description.issn, description.eissn, description.rejected_issns) == (
-        "0302-9743",
-        "1611-3349",
-        (),
+def test_issns_normalises_et_fondus_a_la_construction():
+    description = ContainerDescription(
+        source="crossref",
+        raw_doc_type="journal-article",
+        issns=(
+            JournalIssn(issn="03029743"),
+            JournalIssn(issn="0302-9743", support=IssnSupport.PRINT, linking=True),
+            JournalIssn(issn="1611-3349", support=IssnSupport.ELECTRONIC),
+        ),
+    )
+    assert description.issns == (
+        JournalIssn(issn="0302-9743", support=IssnSupport.PRINT, linking=True),
+        JournalIssn(issn="1611-3349", support=IssnSupport.ELECTRONIC),
     )

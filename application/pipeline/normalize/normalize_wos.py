@@ -24,6 +24,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from domain.persons.identifiers import compact_identifiers
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, find_isbns
@@ -360,8 +361,7 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
         journal_title=title,
         collection_title=title if issn or eissn else None,
         book_title=title,
-        issn=issn,
-        eissn=eissn,
+        issns=source_issns(print_issn=issn, electronic_issn=eissn),
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
         year=as_int(rec.get("pub_year")),

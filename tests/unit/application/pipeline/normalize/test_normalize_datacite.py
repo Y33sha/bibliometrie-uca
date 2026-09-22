@@ -21,6 +21,7 @@ from application.pipeline.normalize.normalize_datacite import (
     upsert_publisher,
 )
 from application.services.monographs.containers import Containers
+from domain.journals.issns import JournalIssn
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -320,7 +321,7 @@ class TestContainers:
             },
         }
         facts = get_container_facts(attrs)
-        assert (facts.journal_title, facts.issn) == ("J. Things", "1234-5679")
+        assert (facts.journal_title, facts.issns) == ("J. Things", (JournalIssn(issn="1234-5679"),))
         assert (facts.collection_title, facts.book_title) == ("J. Things", None)
 
     def test_chapitre_livre_du_contenant(self):

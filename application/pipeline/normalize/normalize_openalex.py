@@ -24,6 +24,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
     compact_identifiers,
@@ -41,7 +42,7 @@ from domain.sources.openalex import (
     short_openalex_id,
     should_skip_publisher_journal,
 )
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
 # UTILITAIRES
@@ -153,16 +154,8 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     title = as_str(source.get("display_name"))
 
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
-    issn_l = as_str(source.get("issn_l"))
-    issn = None
-    eissn = None
-    for entree in as_sequence(source.get("issn")):
-        i = as_str(entree)
-        if i and i != issn_l:
-            if not issn:
-                issn = i
-            elif not eissn:
-                eissn = i
+    # OpenAlex ne donne pas le support de ses ISSN.
+    issns = source_issns(unknown=as_strs(source.get("issn")), linking=as_str(source.get("issn_l")))
 
     source_type = as_str(source.get("type"))
     oa_model: OaModel | None = None
@@ -178,9 +171,7 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
         journal_title=title,
         collection_title=title if source_type in ("book series", "journal") else None,
         book_title=title if source_type == "conference" else None,
-        issn=issn,
-        eissn=eissn,
-        issnl=issn_l,
+        issns=issns,
         openalex_id=openalex_id or None,
         oa_model=oa_model,
         year=as_int(work.get("publication_year")),

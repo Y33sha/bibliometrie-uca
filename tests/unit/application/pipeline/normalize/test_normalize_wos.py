@@ -39,6 +39,7 @@ from application.pipeline.normalize.normalize_wos import (
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
+from domain.journals.issns import IssnSupport, JournalIssn
 from tests.unit.application.pipeline.normalize.doubles import (
     staging_row,
 )
@@ -780,7 +781,10 @@ class TestUpsertWrappers:
             {"journal_title": "Nature", "issn": "0028-0836", "eissn": "1476-4687"}
         )
         assert facts.journal_title == "Nature"
-        assert (facts.issn, facts.eissn) == ("0028-0836", "1476-4687")
+        assert facts.issns == (
+            JournalIssn(issn="0028-0836", support=IssnSupport.PRINT),
+            JournalIssn(issn="1476-4687", support=IssnSupport.ELECTRONIC),
+        )
 
     def test_chapitre_livre_de_la_source_et_isbn(self):
         """Cas réel : « GEOLOGICAL MELTS », livre d'une collection."""

@@ -44,6 +44,7 @@ from application.pipeline.normalize.normalize_crossref import (
     upsert_publisher,
 )
 from application.services.monographs.containers import Containers
+from domain.journals.issns import IssnSupport, JournalIssn
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -460,7 +461,10 @@ class TestUpsertPublisherEtJournal:
             }
         )
         assert facts.journal_title == "J. Things"
-        assert (facts.issn, facts.eissn) == ("1234-5679", "8765-4326")
+        assert facts.issns == (
+            JournalIssn(issn="1234-5679", support=IssnSupport.PRINT),
+            JournalIssn(issn="8765-4326", support=IssnSupport.ELECTRONIC),
+        )
 
     def test_chapitre_collection_puis_livre(self):
         """Cas réel : 10.1007/978-3-030-57997-5_58, chapitre d'un livre de la collection IFIP AICT."""

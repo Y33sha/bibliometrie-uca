@@ -31,6 +31,7 @@ from application.pipeline.normalize.normalize_hal import (
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
+from domain.journals.issns import IssnSupport, JournalIssn
 from domain.sources.hal import hal_text_field
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeAuthorshipsBatchQueries,
@@ -96,7 +97,10 @@ class TestContainerDescription:
             }
         )
         assert (facts.raw_doc_type, facts.journal_title) == ("ART", "Nature")
-        assert (facts.issn, facts.eissn) == ("1234-5679", "2345-6787")
+        assert facts.issns == (
+            JournalIssn(issn="1234-5679", support=IssnSupport.PRINT),
+            JournalIssn(issn="2345-6787", support=IssnSupport.ELECTRONIC),
+        )
 
     def test_chapitre_livre_et_isbn(self):
         facts = get_container_facts(

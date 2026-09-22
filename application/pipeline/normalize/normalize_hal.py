@@ -30,6 +30,7 @@ from application.services.monographs.containers import Containers, find_or_creat
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -83,8 +84,10 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         journal_title=journal_title,
         collection_title=journal_title,
         book_title=hal_text_field(doc.get("bookTitle_s")),
-        issn=hal_text_field(doc.get("journalIssn_s")),
-        eissn=hal_text_field(doc.get("journalEissn_s")),
+        issns=source_issns(
+            print_issn=hal_text_field(doc.get("journalIssn_s")),
+            electronic_issn=hal_text_field(doc.get("journalEissn_s")),
+        ),
         isbns=tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml")))),
         year=as_int(doc.get("producedDateY_i")),
     )
