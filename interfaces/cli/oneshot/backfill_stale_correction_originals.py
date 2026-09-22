@@ -74,21 +74,20 @@ def main() -> int:
 
     store = get_raw_store()
     engine = get_sync_engine()
-    with engine.connect() as conn:
-        rows = conn.execute(_RECORDS).all()
-
     updates: list[dict[str, object]] = []
     stale: Counter[tuple[str, str]] = Counter()
-    for row in rows:
-        try:
-            payload = json.loads(store.get(row.source, row.source_id))
-        except KeyError:
-            continue
-        fresh = _fresh(row.source, as_mapping(payload), row.doi)
-        for field in _FIELDS:
-            if field in row.raw_metadata and row.raw_metadata[field].get("raw") != fresh[field]:
-                stale[(row.source, field)] += 1
-                updates.append({"id": row.id, "field": field, "value": fresh[field]})
+    # Lecture par paquets : les lignes ne sont pas chargées d'un coup.
+    with engine.connect() as conn:
+        for row in conn.execution_options(stream_results=True, yield_per=2000).execute(_RECORDS):
+            try:
+                payload = json.loads(store.get(row.source, row.source_id))
+            except KeyError:
+                continue
+            fresh = _fresh(row.source, as_mapping(payload), row.doi)
+            for field in _FIELDS:
+                if field in row.raw_metadata and row.raw_metadata[field].get("raw") != fresh[field]:
+                    stale[(row.source, field)] += 1
+                    updates.append({"id": row.id, "field": field, "value": fresh[field]})
 
     for (source, field), n in sorted(stale.items()):
         log.info("%-9s %-10s %6d valeurs d'origine périmées", source, field, n)
