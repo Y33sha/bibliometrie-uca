@@ -222,17 +222,14 @@ class TestGetLanguage:
 
 
 class TestGetExternalIds:
-    def test_issn_only(self):
-        assert get_external_ids({"ISSN": ["1234-5679"]}) == {"issn": ["1234-5679"]}
+    def test_issn_reste_hors_des_identifiants(self):
+        """L'ISSN identifie la revue : il figure dans `biblio.journal`."""
+        assert get_external_ids({"ISSN": ["1234-5679"]}) is None
 
     def test_isbn_only(self):
         assert get_external_ids({"ISBN": ["978-0-12345-678-9"]}) == (
             {"isbn": ["978-0-12345-678-9"]}
         )
-
-    def test_both_issn_and_isbn(self):
-        result = get_external_ids({"ISSN": ["1234-5679"], "ISBN": ["978-0-12345-678-9"]})
-        assert result == {"issn": ["1234-5679"], "isbn": ["978-0-12345-678-9"]}
 
     def test_electronic_isbn_goes_to_eisbn(self):
         """`isbn-type` donne le support : l'édition électronique a sa clé."""
@@ -248,8 +245,9 @@ class TestGetExternalIds:
         assert result == {"isbn": ["978-3-030-04869-3"], "eisbn": ["978-3-030-04870-9"]}
 
     def test_filters_non_strings(self):
-        # ISSN/ISBN avec valeurs non-str sont filtrés.
-        assert get_external_ids({"ISSN": ["1234-5679", 12345, None]}) == ({"issn": ["1234-5679"]})
+        assert get_external_ids({"ISBN": ["978-0-12345-678-9", 12345, None]}) == (
+            {"isbn": ["978-0-12345-678-9"]}
+        )
 
     def test_none_when_empty(self):
         assert get_external_ids({}) is None

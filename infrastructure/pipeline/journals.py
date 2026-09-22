@@ -34,17 +34,22 @@ from application.ports.pipeline.journals import (
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
+from domain.publications.identifiers import ISSN
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
 from infrastructure.db.tables import journal_doi_namespaces, journal_name_forms, journals
 
-# Revues à vérifier dans le Sudoc, avec les ISSN de leurs enregistrements absents de leurs ISSN.
+# Revues à vérifier dans le Sudoc, avec les ISSN de leurs enregistrements, toutes sources, absents de leurs ISSN. Les valeurs
+# des enregistrements sont telles que reçues : `find_journals_to_check_in_sudoc` les normalise et écarte les revues dont
+# aucun ISSN normalisé ne manque.
 _JOURNALS_TO_CHECK_IN_SUDOC = text("""
     WITH paires AS (
-        SELECT DISTINCT s.journal_id, v.issn
+        SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
         FROM source_publications s
-        CROSS JOIN LATERAL jsonb_array_elements_text(s.external_ids->'issn') AS v(issn)
-        WHERE s.journal_id IS NOT NULL
+        CROSS JOIN LATERAL (
+            VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
+        ) AS v(issn)
+        WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
     ), documents AS (
         SELECT p.journal_id, array_agg(p.issn ORDER BY p.issn) AS issns
         FROM paires p
@@ -57,7 +62,11 @@ _JOURNALS_TO_CHECK_IN_SUDOC = text("""
     )
     SELECT j.id, j.title, j.issn, j.eissn, j.issnl, j.rejected_issns,
            coalesce(d.issns, ARRAY[]::text[]) AS document_issns,
-           j.journal_type::text AS journal_type
+           j.journal_type::text AS journal_type,
+           (j.sudoc_checked_at IS NULL
+            AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
+                 OR cardinality(j.rejected_issns) > 0)
+            OR j.id = ANY(:also)) AS queued
     FROM journals j
     LEFT JOIN documents d ON d.journal_id = j.id
     WHERE d.issns IS NOT NULL
@@ -405,19 +414,30 @@ class PgJournalGatewayQueries(
 
     def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
         rows = self._conn.execute(_JOURNALS_TO_CHECK_IN_SUDOC, {"also": list(also)}).all()
-        return [
-            JournalSudocRow(
-                r.id,
-                r.title,
-                r.issn,
-                r.eissn,
-                r.issnl,
-                tuple(r.rejected_issns),
-                tuple(r.document_issns),
-                JournalType(r.journal_type),
+        journals = []
+        for r in rows:
+            own = {r.issn, r.eissn, r.issnl, *r.rejected_issns}
+            documents = tuple(
+                dict.fromkeys(
+                    str(issn)
+                    for raw in r.document_issns
+                    if (issn := ISSN.try_parse(raw)) is not None and str(issn) not in own
+                )
             )
-            for r in rows
-        ]
+            if documents or r.queued:
+                journals.append(
+                    JournalSudocRow(
+                        r.id,
+                        r.title,
+                        r.issn,
+                        r.eissn,
+                        r.issnl,
+                        tuple(r.rejected_issns),
+                        documents,
+                        JournalType(r.journal_type),
+                    )
+                )
+        return journals
 
     def record_sudoc_check(
         self,

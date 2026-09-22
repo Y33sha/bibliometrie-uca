@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from domain.publications.identifiers import DOI, ISBN, ISSN, NNT, PMCID, PMID, ArxivId, HALId
+from domain.publications.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
 from domain.types import JsonValue
 
 
@@ -18,7 +18,6 @@ class ExternalIdType(StrEnum):
     ARXIV_ID = "arxiv_id"
     RELATED_DOIS = "related_dois"
     """Autres DOI du document : preprint, dépôt, dataset, édition, ouvrage hôte d'un chapitre."""
-    ISSN = "issn"
     ISBN = "isbn"
     EISBN = "eisbn"
     """ISBN de l'édition électronique, quand la source distingue les supports (Crossref, WoS)."""
@@ -29,7 +28,6 @@ MULTIVALUED_ID_TYPES = frozenset(
     {
         ExternalIdType.HAL_ID,
         ExternalIdType.RELATED_DOIS,
-        ExternalIdType.ISSN,
         ExternalIdType.ISBN,
         ExternalIdType.EISBN,
     }
@@ -52,7 +50,6 @@ _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
     ExternalIdType.PMCID: _via(PMCID.try_parse),
     ExternalIdType.ARXIV_ID: _via(ArxivId.try_parse),
     ExternalIdType.RELATED_DOIS: _via(DOI.try_parse),
-    ExternalIdType.ISSN: _via(ISSN.try_parse),
     ExternalIdType.ISBN: _via(ISBN.try_parse),
     ExternalIdType.EISBN: _via(ISBN.try_parse),
 }

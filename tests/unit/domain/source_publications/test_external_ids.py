@@ -51,12 +51,12 @@ class TestNormalizeExternalIds:
         assert clean == {"pmid": "12345"}
         assert rejected == (RejectedExternalId("pmid", "67890"),)
 
-    def test_issn_and_isbn_pass_through_value_objects(self):
+    def test_isbn_pass_through_value_objects(self):
         clean, rejected = normalize_external_ids(
-            {"issn": ["00280836", "1789-1504"], "isbn": ["978-0-12-810422-4", "0306406152"]}
+            {"isbn": ["978-0-12-810422-4", "0306406152", "978-0-00-000000-1"]}
         )
-        assert clean == {"issn": ["0028-0836"], "isbn": ["9780128104224", "9780306406157"]}
-        assert rejected == (RejectedExternalId("issn", "1789-1504"),)
+        assert clean == {"isbn": ["9780128104224", "9780306406157"]}
+        assert rejected == (RejectedExternalId("isbn", "978-0-00-000000-1"),)
 
     def test_null_value_is_dropped_silently(self):
         assert normalize_external_ids({"nnt": None}) == ({}, ())
