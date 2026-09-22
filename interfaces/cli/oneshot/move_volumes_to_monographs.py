@@ -3,7 +3,7 @@
 
 La description du conteneur de chaque enregistrement se reconstruit à partir des champs en base : son entrée de `journals` telle que la normalisation l'a donnée (avant correction par espace de noms DOI), sa monographie, son type brut et ses ISBN. `find_or_create_containers` en tire la série et le volume, comme à la normalisation.
 
-Le script traite les enregistrements absents du raw store, que la renormalisation laisse en l'état. Il écrit leurs conteneurs, retire la trace `raw_metadata.journal_id`, que `metadata_correction` recalcule, et marque l'enregistrement pour la phase `publications`. Enchaîner ensuite `run_pipeline --from publishers_journals`.
+Le script traite les enregistrements absents du raw store, que la renormalisation laisse en l'état. Il écrit leurs conteneurs quand ils changent, et retire la trace `raw_metadata.journal_id`, que `metadata_correction` recalcule. Il marque tout le stock traité (`keys_dirty`) : la phase `publications` recalcule ses publications. Enchaîner ensuite `run_pipeline --from publishers_journals`.
 
 `--audit N` compare ce calcul à la normalisation, sur N notices du raw store par strate. Pour chaque notice, dans une transaction annulée ensuite, le calcul sur la base résout d'abord les conteneurs, puis la normalisation rejouée sur la notice brute doit retrouver les mêmes entrées.
 
@@ -341,10 +341,11 @@ def _audit(size: int) -> None:
 _WRITE = text("""
     UPDATE source_publications
     SET journal_id = :journal_id, monograph_id = :monograph_id,
-        raw_metadata = raw_metadata - 'journal_id',
-        keys_dirty = true, updated_at = clock_timestamp()
+        raw_metadata = raw_metadata - 'journal_id', updated_at = clock_timestamp()
     WHERE id = :id
 """)
+
+_MARK = text("UPDATE source_publications SET keys_dirty = true WHERE id = ANY(:ids)")
 
 _PROGRESS = 500
 
@@ -396,6 +397,7 @@ def _move(dry_run: bool) -> None:
                     )
             if done % _PROGRESS == 0:
                 log.info("%d / %d enregistrements traités", done, len(stock))
+        conn.execute(_MARK, {"ids": [record.id for record in stock]})
         if dry_run:
             conn.rollback()
         else:
