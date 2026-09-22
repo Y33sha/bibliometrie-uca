@@ -42,12 +42,6 @@
 		if (editing?.added) issns.splice(editing.index, 1);
 		editing = null;
 	}
-
-	function remove() {
-		if (!editing) return;
-		issns.splice(editing.index, 1);
-		editing = null;
-	}
 </script>
 
 <fieldset class="issns">
@@ -76,7 +70,6 @@
 						<td class="actions">
 							<button type="button" class="btn btn-sm btn-primary" onclick={validate}>Valider</button>
 							<button type="button" class="btn btn-sm" onclick={cancel}>Annuler</button>
-							{#if !editing.added}<button type="button" class="btn btn-sm btn-danger" onclick={remove}>Retirer</button>{/if}
 						</td>
 					</tr>
 				{:else}
