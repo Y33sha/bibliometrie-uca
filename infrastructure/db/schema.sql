@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lcCr6EuzbwA1cqORFidABXYBmCDYHzOAEX36tgCasRAfsTcGhglrJ9sbEIUGkId
+\restrict dfKEBRLDGswnS8Fym0sUqstWBz9sTDZzKjto1NmZDBOgBCNYtR0H8gdiBoi0w42
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -99,6 +99,31 @@ CREATE TYPE public.identifier_status AS ENUM (
     'confirmed',
     'rejected',
     'authenticated'
+);
+
+
+--
+-- Name: issn_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.issn_status AS ENUM (
+    'active',
+    'malformed',
+    'cancelled',
+    'related_title',
+    'supplement',
+    'unverified'
+);
+
+
+--
+-- Name: issn_support; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.issn_support AS ENUM (
+    'print',
+    'electronic',
+    'other'
 );
 
 
@@ -744,7 +769,8 @@ CREATE TABLE public.publications (
     is_retracted boolean DEFAULT false NOT NULL,
     in_perimeter boolean DEFAULT false NOT NULL,
     unpaywall_checked_at timestamp with time zone,
-    subjects_ingested_at timestamp with time zone
+    subjects_ingested_at timestamp with time zone,
+    monograph_id integer
 );
 
 
@@ -783,6 +809,7 @@ CREATE TABLE public.source_publications (
     title_normalized text,
     keys_dirty boolean DEFAULT true NOT NULL,
     embargo_until date,
+    monograph_id integer,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
@@ -926,6 +953,91 @@ CREATE TABLE public.journal_doi_namespaces (
 
 
 --
+-- Name: journal_issns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.journal_issns (
+    id integer NOT NULL,
+    issn text NOT NULL,
+    journal_id integer,
+    support public.issn_support,
+    linking boolean DEFAULT false NOT NULL,
+    status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
+    replaced_by text,
+    sudoc_checked_at timestamp with time zone
+);
+
+
+--
+-- Name: TABLE journal_issns; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.journal_issns IS 'ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base.';
+
+
+--
+-- Name: COLUMN journal_issns.issn; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.issn IS 'Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).';
+
+
+--
+-- Name: COLUMN journal_issns.support; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.support IS 'Support de l''ISSN. NULL : inconnu.';
+
+
+--
+-- Name: COLUMN journal_issns.linking; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.linking IS 'Vrai pour l''ISSN-L de la revue.';
+
+
+--
+-- Name: COLUMN journal_issns.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
+
+
+--
+-- Name: COLUMN journal_issns.replaced_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.replaced_by IS 'ISSN successeur : titre suivant, forme corrigée d''une valeur mal formée.';
+
+
+--
+-- Name: COLUMN journal_issns.sudoc_checked_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.journal_issns.sudoc_checked_at IS 'Date de la vérification de l''ISSN au Sudoc. NULL : jamais vérifié.';
+
+
+--
+-- Name: journal_issns_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.journal_issns_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: journal_issns_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.journal_issns_id_seq OWNED BY public.journal_issns.id;
+
+
+--
 -- Name: journal_name_forms; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -966,9 +1078,6 @@ CREATE TABLE public.journals (
     id integer NOT NULL,
     title text NOT NULL,
     title_normalized text NOT NULL,
-    issn text,
-    eissn text,
-    issnl text,
     publisher_id integer,
     openalex_id text,
     is_in_doaj boolean DEFAULT false,
@@ -980,24 +1089,8 @@ CREATE TABLE public.journals (
     is_academic boolean DEFAULT true,
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
-    pub_count integer DEFAULT 0 NOT NULL,
-    rejected_issns text[] DEFAULT '{}'::text[] NOT NULL,
-    sudoc_checked_at timestamp with time zone
+    pub_count integer DEFAULT 0 NOT NULL
 );
-
-
---
--- Name: COLUMN journals.rejected_issns; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.journals.rejected_issns IS 'ISSN de la revue hors des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues ; la vérification dans le Sudoc tente de corriger les fautifs.';
-
-
---
--- Name: COLUMN journals.sudoc_checked_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.journals.sudoc_checked_at IS 'Date de la dernière vérification des ISSN de la revue dans le Sudoc. NULL : revue jamais vérifiée.';
 
 
 --
@@ -1052,6 +1145,65 @@ CREATE TABLE public.languages (
 --
 
 COMMENT ON TABLE public.languages IS 'Référentiel des langues. code : ISO 639-1, ou ISO 639-3 pour une langue sans code à deux lettres. name : nom français, affiché.';
+
+
+--
+-- Name: monographs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.monographs (
+    id integer NOT NULL,
+    title text NOT NULL,
+    title_normalized text NOT NULL,
+    proceedings boolean DEFAULT false NOT NULL,
+    year integer,
+    isbn text,
+    publisher_id integer,
+    journal_id integer,
+    created_at timestamp with time zone DEFAULT now(),
+    eisbn text
+);
+
+
+--
+-- Name: COLUMN monographs.proceedings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.monographs.proceedings IS 'Vrai pour un volume d''actes de congrès, faux pour un livre.';
+
+
+--
+-- Name: COLUMN monographs.year; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.monographs.year IS 'Année de publication. Elle classe les volumes d''actes d''un même congrès.';
+
+
+--
+-- Name: COLUMN monographs.journal_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.monographs.journal_id IS 'Collection dont la monographie fait partie, quand cette collection porte un ISSN.';
+
+
+--
+-- Name: monographs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.monographs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: monographs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.monographs_id_seq OWNED BY public.monographs.id;
 
 
 --
@@ -1747,6 +1899,13 @@ ALTER TABLE ONLY public.distinct_persons ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: journal_issns id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_issns ALTER COLUMN id SET DEFAULT nextval('public.journal_issns_id_seq'::regclass);
+
+
+--
 -- Name: journal_name_forms id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1758,6 +1917,13 @@ ALTER TABLE ONLY public.journal_name_forms ALTER COLUMN id SET DEFAULT nextval('
 --
 
 ALTER TABLE ONLY public.journals ALTER COLUMN id SET DEFAULT nextval('public.journals_id_seq'::regclass);
+
+
+--
+-- Name: monographs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs ALTER COLUMN id SET DEFAULT nextval('public.monographs_id_seq'::regclass);
 
 
 --
@@ -2017,6 +2183,14 @@ ALTER TABLE ONLY public.journal_doi_namespaces
 
 
 --
+-- Name: journal_issns journal_issns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_issns
+    ADD CONSTRAINT journal_issns_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: journal_name_forms journal_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2054,6 +2228,30 @@ ALTER TABLE ONLY public.language_forms
 
 ALTER TABLE ONLY public.languages
     ADD CONSTRAINT languages_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: monographs monographs_eisbn_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs
+    ADD CONSTRAINT monographs_eisbn_key UNIQUE (eisbn);
+
+
+--
+-- Name: monographs monographs_isbn_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs
+    ADD CONSTRAINT monographs_isbn_key UNIQUE (isbn);
+
+
+--
+-- Name: monographs monographs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs
+    ADD CONSTRAINT monographs_pkey PRIMARY KEY (id);
 
 
 --
@@ -2353,6 +2551,14 @@ ALTER TABLE ONLY public.journal_name_forms
 
 
 --
+-- Name: journal_issns uq_journal_issns_issn_journal; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_issns
+    ADD CONSTRAINT uq_journal_issns_issn_journal UNIQUE NULLS NOT DISTINCT (issn, journal_id);
+
+
+--
 -- Name: structure_name_forms uq_snf_structure_form; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2599,24 +2805,10 @@ CREATE INDEX idx_jnl_nf_journal ON public.journal_name_forms USING btree (journa
 
 
 --
--- Name: idx_journals_eissn; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_journal_issns_journal; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_journals_eissn ON public.journals USING btree (eissn);
-
-
---
--- Name: idx_journals_issn; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_journals_issn ON public.journals USING btree (issn);
-
-
---
--- Name: idx_journals_issnl; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_journals_issnl ON public.journals USING btree (issnl);
+CREATE INDEX idx_journal_issns_journal ON public.journal_issns USING btree (journal_id);
 
 
 --
@@ -2631,6 +2823,27 @@ CREATE INDEX idx_journals_publisher ON public.journals USING btree (publisher_id
 --
 
 CREATE INDEX idx_journals_titlenorm ON public.journals USING btree (title_normalized);
+
+
+--
+-- Name: idx_monographs_journal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_monographs_journal ON public.monographs USING btree (journal_id);
+
+
+--
+-- Name: idx_monographs_publisher; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_monographs_publisher ON public.monographs USING btree (publisher_id);
+
+
+--
+-- Name: idx_monographs_title_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_monographs_title_normalized ON public.monographs USING btree (title_normalized);
 
 
 --
@@ -2788,6 +3001,13 @@ CREATE INDEX idx_publications_meta ON public.publications USING gin (meta) WHERE
 
 
 --
+-- Name: idx_publications_monograph; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_monograph ON public.publications USING btree (monograph_id) WHERE (monograph_id IS NOT NULL);
+
+
+--
 -- Name: idx_publications_sources; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2883,6 +3103,13 @@ CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (
 --
 
 CREATE INDEX idx_source_authorship_structures_structure_id ON public.source_authorship_structures USING btree (structure_id);
+
+
+--
+-- Name: idx_source_publications_monograph; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_publications_monograph ON public.source_publications USING btree (monograph_id) WHERE (monograph_id IS NOT NULL);
 
 
 --
@@ -3103,6 +3330,13 @@ CREATE INDEX subjects_usage_count_idx ON public.subjects USING btree (usage_coun
 
 
 --
+-- Name: uq_journal_issns_linking; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_journal_issns_linking ON public.journal_issns USING btree (journal_id) WHERE linking;
+
+
+--
 -- Name: person_identifiers trg_protect_authenticated_identifier; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3238,6 +3472,14 @@ ALTER TABLE ONLY public.journal_doi_namespaces
 
 
 --
+-- Name: journal_issns journal_issns_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.journal_issns
+    ADD CONSTRAINT journal_issns_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id) ON DELETE SET NULL;
+
+
+--
 -- Name: journal_name_forms journal_name_forms_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3267,6 +3509,22 @@ ALTER TABLE ONLY public.journals
 
 ALTER TABLE ONLY public.language_forms
     ADD CONSTRAINT language_forms_language_code_fkey FOREIGN KEY (language_code) REFERENCES public.languages(code) ON DELETE CASCADE;
+
+
+--
+-- Name: monographs monographs_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs
+    ADD CONSTRAINT monographs_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id) ON DELETE SET NULL;
+
+
+--
+-- Name: monographs monographs_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.monographs
+    ADD CONSTRAINT monographs_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id) ON DELETE SET NULL;
 
 
 --
@@ -3366,6 +3624,14 @@ ALTER TABLE ONLY public.publications
 
 
 --
+-- Name: publications publications_monograph_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publications
+    ADD CONSTRAINT publications_monograph_id_fkey FOREIGN KEY (monograph_id) REFERENCES public.monographs(id);
+
+
+--
 -- Name: publisher_name_forms publisher_name_forms_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3446,6 +3712,14 @@ ALTER TABLE ONLY public.source_publications
 
 
 --
+-- Name: source_publications source_publications_monograph_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_monograph_id_fkey FOREIGN KEY (monograph_id) REFERENCES public.monographs(id);
+
+
+--
 -- Name: source_publications source_publications_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3489,5 +3763,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lcCr6EuzbwA1cqORFidABXYBmCDYHzOAEX36tgCasRAfsTcGhglrJ9sbEIUGkId
+\unrestrict dfKEBRLDGswnS8Fym0sUqstWBz9sTDZzKjto1NmZDBOgBCNYtR0H8gdiBoi0w42
 

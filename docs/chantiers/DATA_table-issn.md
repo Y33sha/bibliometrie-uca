@@ -40,7 +40,7 @@ Table `journal_issns`, une ligne par ISSN et par revue. Clé technique `id` ; un
 - [x] Migration `b3f6d2a8c417` : création de la table, report des trois colonnes, de `rejected_issns` et de `journals.sudoc_checked_at`, suppression des colonnes. Les valeurs sont mises en majuscules ; une valeur rejetée valide devient `unverified`, sans date de vérification : sa revue retourne dans la file Sudoc.
 - [x] Domaine (`domain/journals/issns.py`) : `JournalIssn`, supports et statuts, validation d'une saisie manuelle, contradiction entre les ISSN de deux revues homonymes (fusion d'éditeurs).
 - [x] Droits de l'API sur `journal_issns` dans `roles.sql`.
-- [ ] Application : migration, puis rejouer `roles.sql`, puis régénérer `schema.sql` (`dump_schema`).
+- [x] Application : migration, `roles.sql` rejoué, `schema.sql` régénéré. En base : 16 332 ISSN actifs, 21 mal formés, 199 à revérifier.
 
 ### 2. Code
 
