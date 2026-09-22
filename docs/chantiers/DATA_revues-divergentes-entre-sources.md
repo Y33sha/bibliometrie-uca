@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Les enregistrements d'une même publication portent parfois des revues différentes selon leur source. Des échantillons examinés sur une base qui n'a reçu ni les fusions (phase 4) ni les règles sur les livres (phase 6) du chantier [Revues](DATA_revues-issn-et-doublons.md) montrent cinq causes :
+Les enregistrements d'une même publication portent parfois des revues différentes selon leur source. Des échantillons examinés sur une base qui n'a reçu ni les fusions (phase 4) ni les règles sur les livres (phase 6) du chantier [Revues](archived/2026-09-22_DATA_revues-issn-et-doublons.md) montrent cinq causes :
 
 - **Doublon de revues.** Hors ISSN et titre communs, ce sont surtout des abréviations de titre sans espace : `Phys.Rev.Lett.`, `Eur.Phys.J.C`, `JINST`. C'est la forme des titres dans INSPIRE, la base bibliographique de la physique des hautes énergies. HAL et ScanR les portent sans ISSN ni éditeur, sur des dépôts des laboratoires de l'IN2P3. S'y ajoutent les titres successifs d'une même revue : *Progrès en Urologie* devenu *The French Journal of Urology*, *BMC Family Practice* devenu *BMC Primary Care*.
 - **Livre ou chapitre.** La plateforme de l'éditeur (OpenAlex, ScanR) s'oppose au titre du livre (Crossref).
