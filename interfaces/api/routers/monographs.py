@@ -1,7 +1,6 @@
-"""Router des monographies : liste, fiche et édition. Sert `/api/monographs/*`."""
+"""Router des monographies : liste et fiche. Sert `/api/monographs/*`."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.read_models.monographs_queries import (
     MonographFilters,
@@ -11,14 +10,7 @@ from application.ports.read_models.monographs_queries import (
     MonographQueries,
     MonographSort,
 )
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.monograph_repository import (
-    MonographRepository,
-    MonographUpdate,
-)
-from application.services.monographs import commands as monograph_commands
-from interfaces.api.deps import audit_repo, db_conn, monograph_queries, monograph_repo
-from interfaces.api.models import OkResponse
+from interfaces.api.deps import monograph_queries
 from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/monographs", tags=["monographs"])
@@ -52,18 +44,3 @@ def get_monograph(
     if row is None:
         raise HTTPException(status_code=404, detail="Monographie introuvable")
     return row
-
-
-@router.put("/{monograph_id}", response_model=OkResponse)
-def update_monograph(
-    monograph_id: int,
-    body: MonographUpdate,
-    conn: Connection = Depends(db_conn),
-    repo: MonographRepository = Depends(monograph_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> OkResponse:
-    """Met à jour une monographie, champ par champ. Renvoie 404 sur une monographie inconnue."""
-    monograph_commands.update_monograph(
-        conn, monograph_id, update=body, repo=repo, audit_repo=audit
-    )
-    return OkResponse()

@@ -1,4 +1,4 @@
-"""Tests du router monographs : liste (recherche, type, tri), fiche, édition."""
+"""Tests du router monographs : liste (recherche, type, tri) et fiche."""
 
 import uuid
 
@@ -66,33 +66,3 @@ class TestGetMonograph:
         mid = _seed_monograph(_uniq("Fiche"))
         assert client.get(f"/api/monographs/{mid}").json()["id"] == mid
         assert client.get("/api/monographs/999999999").status_code == 404
-
-
-class TestUpdateMonograph:
-    def test_requires_auth(self, client):
-        mid = _seed_monograph(_uniq("Protégée"))
-        assert client.put(f"/api/monographs/{mid}", json={"year": 2020}).status_code == 401
-
-    def test_updates_fields_and_normalized_title(self, auth_client):
-        mid = _seed_monograph(_uniq("Ancien titre"))
-        r = auth_client.put(
-            f"/api/monographs/{mid}",
-            json={"title": "  Nouveau Titre  ", "proceedings": True, "year": 2021},
-        )
-        assert r.status_code == 200, r.text
-        with owner_pool() as cur:
-            cur.execute(
-                "SELECT title, title_normalized, proceedings, year FROM monographs WHERE id = %s",
-                (mid,),
-            )
-            assert cur.fetchone() == {
-                "title": "Nouveau Titre",
-                "title_normalized": "nouveau titre",
-                "proceedings": True,
-                "year": 2021,
-            }
-
-    def test_rejects_empty_title_and_unknown_monograph(self, auth_client):
-        mid = _seed_monograph(_uniq("Titre"))
-        assert auth_client.put(f"/api/monographs/{mid}", json={"title": " "}).status_code == 422
-        assert auth_client.put("/api/monographs/999999999", json={"year": 1}).status_code == 404

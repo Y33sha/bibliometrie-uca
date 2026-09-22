@@ -37,7 +37,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from application.ports.repositories.monograph_repository import MonographRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -74,7 +73,6 @@ from infrastructure.repositories import (
     audit_repository,
     authorship_repository,
     journal_repository,
-    monograph_repository,
     perimeter_repository,
     person_repository,
     publication_repository,
@@ -216,10 +214,6 @@ def journal_repo(conn: Connection = Depends(db_conn)) -> JournalRepository:
 
 def monograph_queries(conn: Connection = Depends(db_conn)) -> MonographQueries:
     return PgMonographQueries(conn)
-
-
-def monograph_repo(conn: Connection = Depends(db_conn)) -> MonographRepository:
-    return monograph_repository(conn)
 
 
 def publisher_queries(conn: Connection = Depends(db_conn)) -> PublisherQueries:
