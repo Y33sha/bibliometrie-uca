@@ -203,8 +203,8 @@ class PublicationDetailCore(BaseModel):
     abstract: str | None
     journal_id: int | None
     journal_title: str | None
-    issn: str | None
-    eissn: str | None
+    journal_issns: list[str]
+    """ISSN actifs de la revue."""
     apc_amount: float | None
     apc_currency: str | None
     oa_model: str | None

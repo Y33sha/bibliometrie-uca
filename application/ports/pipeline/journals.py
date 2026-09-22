@@ -15,17 +15,16 @@ from datetime import datetime
 from typing import NamedTuple, Protocol
 
 from domain.journals.doi_namespaces import DoiNamespace
+from domain.journals.issns import JournalIssn
 from domain.journals.journal import JournalType, OaModel
 from domain.types import JsonValue
 
 
 class JournalIssnRow(NamedTuple):
-    """Une revue indexable par ISSN : son `id` et ses trois formes d'ISSN (au moins une non-nulle)."""
+    """Un ISSN valide d'une revue, pour l'index par ISSN."""
 
-    id: int
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
+    journal_id: int
+    issn: str
 
 
 class JournalFindOrCreateQueries(Protocol):
@@ -45,42 +44,34 @@ class JournalFindOrCreateQueries(Protocol):
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
-        """Cherche un `journal_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à eISSN. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
+        """Cherche un `journal_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à ISSN électronique actif. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
         ...
 
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
-        """Cherche une revue dont l'un des trois champs ISSN (`issn`, `eissn`, `issnl`) ou l'un des ISSN rejetés vaut `issn_value`. Une revue qui porte l'ISSN dans ses trois champs passe en premier."""
+        """Cherche une revue qui porte `issn_value`, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
         ...
 
     def enrich_journal(
         self,
         journal_id: int,
         *,
-        issn: str | None = None,
-        eissn: str | None = None,
         publisher_id: int | None = None,
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée.
-
-        Un ISSN que la revue porte déjà dans `issn` ou `eissn`, ou qu'elle a rejeté, n'est pas réécrit dans une colonne. Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
-        """
+        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
         ...
 
-    def add_rejected_issns(self, journal_id: int, values: Sequence[str]) -> None:
-        """Ajoute des ISSN invalides à `rejected_issns` de la revue, sans doublon. Une valeur nouvelle remet la revue à vérifier dans le Sudoc."""
+    def add_journal_issns(self, journal_id: int, issns: Sequence[JournalIssn]) -> None:
+        """Ajoute à la revue les ISSN qu'elle ne porte pas, sans date de vérification : ils attendent la vérification Sudoc. Une ligne sans revue de même ISSN est rattachée à la revue. Un ISSN déjà porté garde ses données ; il reçoit seulement le support qui lui manque."""
         ...
 
     def create_journal(
         self,
         *,
         title: str,
-        issn: str | None,
-        eissn: str | None,
-        issnl: str | None,
         publisher_id: int | None,
         openalex_id: str | None,
         oa_model: OaModel | None,
@@ -112,14 +103,11 @@ class JournalOpenAlexEnrichmentQueries(Protocol):
 
 
 class JournalSudocRow(NamedTuple):
-    """Une revue à vérifier dans le Sudoc : son titre, ses trois formes d'ISSN, ses ISSN rejetés et les ISSN que portent ses enregistrements sans figurer parmi les précédents."""
+    """Une revue à vérifier dans le Sudoc : son titre, ses ISSN et les ISSN que portent ses enregistrements sans figurer parmi les siens."""
 
     id: int
     title: str
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
-    rejected_issns: tuple[str, ...]
+    issns: tuple[JournalIssn, ...]
     document_issns: tuple[str, ...] = ()
     journal_type: JournalType = JournalType.UNKNOWN
 
@@ -143,25 +131,23 @@ class JournalSudocQueries(Protocol):
     """Vérification des ISSN des revues dans le Sudoc."""
 
     def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
-        """Revues jamais vérifiées dans le Sudoc (`sudoc_checked_at` nul) qui portent au moins un ISSN, valide ou rejeté, revues dont un enregistrement porte un ISSN absent de leurs ISSN, et revues `also`."""
+        """Revues dont un ISSN n'est pas vérifié dans le Sudoc, revues dont un enregistrement porte un ISSN valide absent de leurs ISSN et encore jamais vérifié, et revues `also`."""
         ...
 
     def find_titles_of_journals_with_issn(self) -> list[JournalTitleTypeRow]:
-        """Les revues qui portent un ISSN dans `issn`, `eissn` ou `issnl`, avec leur titre et leur type."""
+        """Les revues qui portent un ISSN actif, avec leur titre et leur type."""
         ...
 
     def record_sudoc_check(
         self,
         journal_id: int,
         *,
-        issn: str | None,
-        eissn: str | None,
-        issnl: str | None,
-        rejected_issns: Sequence[str],
+        issns: Sequence[JournalIssn],
+        released: Sequence[JournalIssn],
         checked_at: datetime,
         title: str | None = None,
     ) -> None:
-        """Écrit les ISSN vérifiés d'une revue et la date de vérification. Un `title` remplace le titre de la revue, dont il devient aussi une forme de nom."""
+        """Écrit les ISSN vérifiés d'une revue, datés de `checked_at`. `released` : ISSN d'une autre publication, retirés de la revue et gardés sans revue. Un `title` devient le titre de la revue, et une de ses formes de nom."""
         ...
 
 
@@ -179,12 +165,12 @@ class JournalSummary(NamedTuple):
     id: int
     title: str
     publisher: str | None
-    issn: str | None
-    eissn: str | None
+    issns: tuple[str, ...]
+    """ISSN actifs."""
 
 
 class JournalIssnGroup(NamedTuple):
-    """Revues qui portent le même ISSN dans `issn` ou `eissn`. La cible de la fusion vient en premier."""
+    """Revues où le même ISSN est actif. La cible de la fusion vient en premier."""
 
     issn: str
     journals: tuple[JournalTitleRow, ...]
@@ -196,7 +182,7 @@ class JournalMergeCandidate(NamedTuple):
     id: int
     title: str
     issns: frozenset[str]
-    """Valeurs des colonnes `issn`, `eissn` et `issnl`."""
+    """ISSN actifs."""
     pub_count: int
 
 
@@ -216,12 +202,12 @@ class JournalMergeQueries(Protocol):
         """Groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui porte le plus de publications vient en premier, puis la plus petite par identifiant."""
         ...
 
-    def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
-        """Groupes de revues vérifiées dans le Sudoc qui portent le même ISSN dans `issn` ou `eissn`, dans le même ordre."""
+    def find_journals_sharing_active_issn(self) -> list[JournalIssnGroup]:
+        """Groupes de revues vérifiées dans le Sudoc où le même ISSN est actif, dans le même ordre."""
         ...
 
-    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
-        """Paires de revues vérifiées dans le Sudoc dont l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses colonnes. La revue dont le premier document est le plus tardif vient en premier, puis celle qui porte le plus de publications."""
+    def find_journals_sharing_an_inactive_issn(self) -> list[JournalMergeGroup]:
+        """Paires de revues vérifiées dans le Sudoc dont l'une porte, inactif, un ISSN actif dans l'autre. La revue dont le premier document est le plus tardif vient en premier, puis celle qui porte le plus de publications."""
         ...
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
@@ -245,7 +231,7 @@ class JournalRecordTypes(NamedTuple):
 
 
 class JournalTitleIssnRow(NamedTuple):
-    """Titre d'une revue, et présence d'un ISSN dans `issn`, `eissn` ou `issnl`."""
+    """Titre d'une revue, et présence d'un ISSN actif."""
 
     id: int
     title: str
@@ -304,7 +290,7 @@ class JournalDoajQueries(Protocol):
     """Import du dump DOAJ : index ISSN des revues et pose du drapeau `is_in_doaj`."""
 
     def find_journal_issn_index(self) -> list[JournalIssnRow]:
-        """Les revues portant au moins un ISSN — matière de l'index ISSN → revue à l'import du dump DOAJ."""
+        """Les ISSN valides des revues, quel que soit leur statut : matière de l'index ISSN → revue à l'import du dump DOAJ."""
         ...
 
     def update_journal_doaj(

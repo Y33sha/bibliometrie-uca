@@ -170,10 +170,12 @@ def map_journals(conn: Connection) -> int:
     return conn.execute(
         text("""
             UPDATE apc_payments ap
-            SET journal_id = j.id
-            FROM journals j
+            SET journal_id = i.journal_id
+            FROM journal_issns i
             WHERE ap.issn IS NOT NULL
-              AND (ap.issn = j.issn OR ap.issn = j.eissn)
+              AND ap.issn = i.issn
+              AND i.journal_id IS NOT NULL
+              AND i.status = 'active'
               AND ap.journal_id IS NULL
         """)
     ).rowcount

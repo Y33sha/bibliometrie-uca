@@ -29,7 +29,7 @@ class _Repo:
         return self._titles
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
-        return {i: JournalSummary(i, f"Revue {i}", None, None, None) for i in journal_ids}
+        return {i: JournalSummary(i, f"Revue {i}", None, ()) for i in journal_ids}
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
         self.types[journal_id] = journal_type

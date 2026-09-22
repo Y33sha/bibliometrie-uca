@@ -12,6 +12,7 @@ from application.ports.pipeline.monographs import (
 )
 from domain.monographs.matching import MonographCandidate
 from infrastructure.db.scalars import scalar_int
+from infrastructure.db.sql_fragments import has_active_issn
 
 _FIND_BY_ISBN = text("""
     SELECT id FROM monographs WHERE isbn = :isbn OR eisbn = :isbn ORDER BY id LIMIT 1
@@ -79,17 +80,22 @@ _RELEASE_SOURCE_ISBNS = text("UPDATE monographs SET isbn = NULL, eisbn = NULL WH
 _DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
 
 
-_JOURNAL_CANDIDATES = text("""
+_JOURNAL_CANDIDATES = text(f"""
+    WITH entrees AS (
+        SELECT DISTINCT s.monograph_id, s.journal_id,
+               {has_active_issn("s.journal_id")} AS a_issn
+        FROM source_publications s
+        WHERE s.monograph_id IS NOT NULL
+    )
     SELECT m.id, m.title, m.publisher_id, m.proceedings, m.journal_id,
-           coalesce(array_agg(DISTINCT j.id ORDER BY j.id) FILTER (
-               WHERE j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
-           ), '{}') AS with_issn,
-           coalesce(array_agg(DISTINCT j.id ORDER BY j.id) FILTER (
-               WHERE j.id IS NOT NULL AND j.issn IS NULL AND j.eissn IS NULL AND j.issnl IS NULL
-           ), '{}') AS without_issn
+           coalesce(array_agg(e.journal_id ORDER BY e.journal_id) FILTER (
+               WHERE e.journal_id IS NOT NULL AND e.a_issn
+           ), '{{}}') AS with_issn,
+           coalesce(array_agg(e.journal_id ORDER BY e.journal_id) FILTER (
+               WHERE e.journal_id IS NOT NULL AND NOT e.a_issn
+           ), '{{}}') AS without_issn
     FROM monographs m
-    JOIN source_publications s ON s.monograph_id = m.id
-    LEFT JOIN journals j ON j.id = s.journal_id
+    JOIN entrees e ON e.monograph_id = m.id
     GROUP BY m.id
     ORDER BY m.id
 """)

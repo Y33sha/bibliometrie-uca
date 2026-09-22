@@ -175,7 +175,7 @@ def journals_sharing_issn_count(
 def journals_sharing_issn(
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDuplicatesResponse:
-    """Groupes de revues qui portent le même ISSN dans `issn` ou `eissn`, à fusionner à la main."""
+    """Groupes de revues où le même ISSN est actif, à fusionner à la main."""
     return queries.journals_sharing_issn()
 
 

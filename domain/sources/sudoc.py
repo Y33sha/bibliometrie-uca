@@ -17,8 +17,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
+from domain.journals.issns import IssnSupport
 from domain.publications.identifiers import ISSN
 
 
@@ -34,16 +34,6 @@ class MarcField:
     def values(self, code: str) -> list[str]:
         """Valeurs des sous-zones de code `code`."""
         return [value for c, value in self.subfields if c == code]
-
-
-class Support(StrEnum):
-    """Support d'une publication en série."""
-
-    PRINT = "print"
-    ELECTRONIC = "electronic"
-    """Ressource en ligne."""
-    OTHER = "other"
-    """Autre support : CD-ROM, microforme…"""
 
 
 _PRECEDING_TAGS = frozenset(str(t) for t in range(430, 438))
@@ -65,12 +55,12 @@ class SudocSerialRecord:
     issn: str | None
     issnl: str | None
     cancelled_issns: tuple[str, ...]
-    support: Support | None
+    support: IssnSupport | None
     other_support_issns: tuple[str, ...]
     preceding_issns: tuple[str, ...]
     succeeding_issns: tuple[str, ...]
     title: str | None
-    other_support_hints: tuple[tuple[str, Support], ...] = ()
+    other_support_hints: tuple[tuple[str, IssnSupport], ...] = ()
     """ISSN d'autre support (`452`) dont le titre mentionne le support."""
     continuation_issns: tuple[str, ...] = ()
     """ISSN des titres précédents et suivants de la même revue (`430`, `440`)."""
@@ -89,21 +79,21 @@ def _subfield_values(
     return [value for field in fields if field.tag in wanted for value in field.values(code)]
 
 
-def _support(fields: Sequence[MarcField]) -> Support | None:
+def _support(fields: Sequence[MarcField]) -> IssnSupport | None:
     carriers = _subfield_values(fields, "183", "a")
     if carriers:
         if carriers[0].startswith("n"):
-            return Support.PRINT
-        return Support.ELECTRONIC if carriers[0] == "ceb" else Support.OTHER
+            return IssnSupport.PRINT
+        return IssnSupport.ELECTRONIC if carriers[0] == "ceb" else IssnSupport.OTHER
     mediation = _subfield_values(fields, "182", "c")
     if not mediation:
         return None
     if mediation[0] == "n":
-        return Support.PRINT
+        return IssnSupport.PRINT
     coded = _subfield_values(fields, "135", "a")
     if mediation[0] == "c" and coded and coded[0][1:2] == "r":
-        return Support.ELECTRONIC
-    return Support.OTHER
+        return IssnSupport.ELECTRONIC
+    return IssnSupport.OTHER
 
 
 def _names_other_support(text: str) -> bool:
@@ -111,20 +101,20 @@ def _names_other_support(text: str) -> bool:
     return any(word in lowered for word in _OTHER_SUPPORT_WORDS)
 
 
-def support_mentioned(title: str) -> Support | None:
-    """Support qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
+def support_mentioned(title: str) -> IssnSupport | None:
+    """IssnSupport qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
     mentions = " ".join(re.findall(r"\(([^)]*)\)", title)).lower()
     if _names_other_support(mentions):
-        return Support.OTHER
+        return IssnSupport.OTHER
     if any(word in mentions for word in _ONLINE_WORDS):
-        return Support.ELECTRONIC
+        return IssnSupport.ELECTRONIC
     if any(word in mentions for word in _PRINT_WORDS):
-        return Support.PRINT
+        return IssnSupport.PRINT
     return None
 
 
-def _other_support_hints(fields: Sequence[MarcField]) -> tuple[tuple[str, Support], ...]:
-    hints: dict[str, Support] = {}
+def _other_support_hints(fields: Sequence[MarcField]) -> tuple[tuple[str, IssnSupport], ...]:
+    hints: dict[str, IssnSupport] = {}
     for field in fields:
         if field.tag != "452":
             continue
@@ -153,7 +143,7 @@ def parse_sudoc_serial_record(ppn: str, fields: Sequence[MarcField]) -> SudocSer
         issn=issns[0] if issns else None,
         issnl=issnls[0] if issnls else None,
         cancelled_issns=_issns(_subfield_values(fields, "011", "y")),
-        support=Support.OTHER if title and _names_other_support(title) else _support(fields),
+        support=IssnSupport.OTHER if title and _names_other_support(title) else _support(fields),
         other_support_issns=_issns(_subfield_values(fields, "452", "x")),
         preceding_issns=_issns(_subfield_values(fields, _PRECEDING_TAGS, "x")),
         succeeding_issns=_issns(_subfield_values(fields, _SUCCEEDING_TAGS, "x")),

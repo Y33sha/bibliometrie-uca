@@ -63,7 +63,7 @@
 	}
 
 	function issns(j: Journal): string {
-		return [j.issn, j.eissn].filter(Boolean).join(' / ') || 'sans ISSN';
+		return j.issns.join(' / ') || 'sans ISSN';
 	}
 </script>
 

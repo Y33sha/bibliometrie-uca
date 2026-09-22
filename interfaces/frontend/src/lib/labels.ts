@@ -215,3 +215,27 @@ export const structDetectionLabels: Record<string, string> = {
 	detected: 'détecté auto',
 	manual: 'ajouté manuellement'
 };
+
+/** Libellés FR des supports d'ISSN — enum PG `issn_support`. */
+export const issnSupportLabels: Record<string, string> = {
+	print: 'ISSN',
+	electronic: 'eISSN',
+	other: 'ISSN (autre support)'
+};
+
+/** Libellés FR des statuts d'ISSN — enum PG `issn_status`. */
+export const issnStatusLabels: Record<string, string> = {
+	active: 'Actif',
+	malformed: 'Mal formé',
+	cancelled: 'Annulé',
+	related_title: 'Titre précédent ou suivant',
+	supplement: 'Supplément',
+	unverified: 'À vérifier'
+};
+
+/** Étiquette d'un ISSN : son support, et la mention ISSN-L. */
+export function issnLabel(issn: { support: string | null; linking: boolean }): string {
+	const support = issn.support ? issnSupportLabels[issn.support] : null;
+	if (issn.linking) return support ? `${support} · ISSN-L` : 'ISSN-L';
+	return support ?? 'ISSN';
+}

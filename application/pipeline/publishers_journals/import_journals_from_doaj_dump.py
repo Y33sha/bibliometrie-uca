@@ -1,6 +1,6 @@
 """Import du dump CSV DOAJ dans `journals.doaj_payload` (DOAJ = source de vérité).
 
-Bulk, set-based : indexe les `journals` par ISSN (issn / eissn / issnl) en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
+Bulk, set-based : indexe les `journals` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
 Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump (cf. `infrastructure.sources.doaj.fetch_doaj_dump`) — les deux passent un itérable de dicts `{colonne CSV: valeur}`.
 """
@@ -70,10 +70,8 @@ def run_import_doaj_dump(
     rollbackée). Retourne les stats."""
     # Index ISSN normalisé → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
-    for indexed_journal_id, issn, eissn, issnl in journal_repo.find_journal_issn_index():
-        for issn_value in (issn, eissn, issnl):
-            if parsed := ISSN.try_parse(issn_value):
-                issn_to_journal_id.setdefault(str(parsed), indexed_journal_id)
+    for indexed_journal_id, issn in journal_repo.find_journal_issn_index():
+        issn_to_journal_id.setdefault(issn, indexed_journal_id)
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
     if not dry_run:
         journal_repo.reset_is_in_doaj()

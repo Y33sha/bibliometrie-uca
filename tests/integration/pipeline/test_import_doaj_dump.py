@@ -11,13 +11,19 @@ from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
 
 def _create_journal(conn, *, issn=None, eissn=None):
-    return conn.execute(
-        text(
-            "INSERT INTO journals (title, title_normalized, issn, eissn) "
-            "VALUES ('J', 'j', :issn, :eissn) RETURNING id"
-        ),
-        {"issn": issn, "eissn": eissn},
+    journal_id = conn.execute(
+        text("INSERT INTO journals (title, title_normalized) VALUES ('J', 'j') RETURNING id")
     ).scalar_one()
+    for value, support in ((issn, "print"), (eissn, "electronic")):
+        if value:
+            conn.execute(
+                text(
+                    "INSERT INTO journal_issns (issn, journal_id, support)"
+                    " VALUES (:i, :j, CAST(:s AS issn_support))"
+                ),
+                {"i": value, "j": journal_id, "s": support},
+            )
+    return journal_id
 
 
 def _row(issn="", eissn="", **extra):
@@ -65,8 +71,8 @@ class TestImportDoajDump:
         assert _is_in_doaj(sa_sync_conn, jid) is True
 
     def test_matches_on_normalized_issn(self, sa_sync_conn):
-        """Les ISSN du dump et ceux des revues sont comparés sous leur forme normalisée."""
-        jid = _create_journal(sa_sync_conn, issn="0071-190x")
+        """Un ISSN du dump est normalisé avant d'être comparé aux ISSN des revues."""
+        jid = _create_journal(sa_sync_conn, issn="0071-190X")
         stats = _run(sa_sync_conn, [_row(issn="0071190X")])
         assert stats.matched == 1
         assert _is_in_doaj(sa_sync_conn, jid) is True

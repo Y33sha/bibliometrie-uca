@@ -1,8 +1,8 @@
 """Vérification des ISSN d'une revue par les notices Sudoc.
 
-Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent à la revue.
+Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent actifs, avec le support de leur notice.
 
-Les ISSN rejetés sont ceux de la revue hors de ses colonnes : fautifs, tels que reçus des sources, ou valides mais périmés. La vérification y range les autres supports que le papier et l'en ligne (CD-ROM), les ISSN annulés, les titres précédents ou suivants de la même revue (`430`, `440`) et les ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`). Elle écarte les ISSN d'une autre publication : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste à la revue. Les ISSN rejetés valides et les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN d'une colonne ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. La vérification corrige les ISSN fautifs à une faute de frappe près. Chaque ISSN restant va dans la colonne de son support ; un ISSN sans colonne libre rejoint les ISSN rejetés.
+La vérification donne un statut aux autres : un autre support que le papier et l'en ligne (CD-ROM) reste actif, un ISSN annulé devient `cancelled`, un titre précédent ou suivant de la même revue (`430`, `440`) `related_title`, l'ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`) `supplement`. Elle écarte de la revue les ISSN d'une autre publication : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste actif. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN actif ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. Les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. La vérification corrige les valeurs mal formées à une faute de frappe près.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from enum import StrEnum
 from itertools import combinations
-from typing import NamedTuple
 
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.series import reference_series_title
 from domain.journals.titles import nested_titles
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN, issn_typo_candidates
-from domain.sources.sudoc import SudocSerialRecord, Support
+from domain.sources.sudoc import SudocSerialRecord
 
 # Similarité minimale entre le titre de la revue et celui de la notice pour retenir une correction.
 TITLE_SIMILARITY_MIN = 0.85
@@ -28,19 +28,23 @@ TITLE_TIE_MARGIN = 0.1
 
 
 class SetAsideReason(StrEnum):
-    """Motif pour lequel un ISSN quitte les colonnes de la revue : il rejoint les ISSN rejetés, ou il est écarté (`DISCARDED`)."""
+    """Motif pour lequel un ISSN quitte les ISSN actifs de la revue, ou en est écarté (`DISCARDED`)."""
 
     OTHER_PUBLICATION = "autre publication"
-    OTHER_SUPPORT = "autre support"
     CANCELLED = "ISSN annulé"
     RELATED_TITLE = "titre précédent ou suivant"
     LINKED_TITLE = "titre issu d'une scission, d'une fusion ou d'une absorption"
     SUPPLEMENT = "supplément"
-    NO_FREE_COLUMN = "sans colonne libre"
 
 
 DISCARDED = frozenset({SetAsideReason.OTHER_PUBLICATION, SetAsideReason.LINKED_TITLE})
 """Motifs d'un ISSN d'une autre publication, écarté de la revue."""
+
+_STATUS = {
+    SetAsideReason.CANCELLED: IssnStatus.CANCELLED,
+    SetAsideReason.RELATED_TITLE: IssnStatus.RELATED_TITLE,
+    SetAsideReason.SUPPLEMENT: IssnStatus.SUPPLEMENT,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,54 +52,57 @@ class JournalIssns:
     """ISSN d'une revue tels qu'en base."""
 
     title: str
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
-    rejected: tuple[str, ...]
+    issns: tuple[JournalIssn, ...]
     candidates: tuple[str, ...] = ()
-    """ISSN portés par les enregistrements de la revue, absents de ses colonnes et de ses ISSN rejetés."""
+    """ISSN portés par les enregistrements de la revue, absents de ses ISSN."""
     holds_volumes: bool = False
     """La revue réunit des volumes (`holds_volumes`) : un titre de volume y est remplacé par son titre de série."""
 
-    def columns(self) -> tuple[str, ...]:
-        """ISSN des trois colonnes de la revue, sans doublon, dans l'ordre des colonnes."""
-        return tuple(dict.fromkeys(v for v in (self.issn, self.eissn, self.issnl) if v))
+    def active(self) -> tuple[str, ...]:
+        """ISSN actifs et ISSN-L de la revue."""
+        return tuple(r.issn for r in self.issns if r.status is IssnStatus.ACTIVE or r.linking)
+
+    def malformed(self) -> tuple[str, ...]:
+        return tuple(r.issn for r in self.issns if r.status is IssnStatus.MALFORMED)
+
+    def issnl(self) -> str | None:
+        return next((r.issn for r in self.issns if r.linking), None)
 
     def examined(self) -> tuple[str, ...]:
-        """ISSN des trois colonnes, puis ISSN rejetés et ISSN des enregistrements valides, sans doublon."""
-        valid = (r for r in (*self.rejected, *self.candidates) if ISSN.try_parse(r) is not None)
-        return tuple(dict.fromkeys((*self.columns(), *valid)))
+        """ISSN actifs, puis autres ISSN valides de la revue et ISSN valides des enregistrements, sans doublon."""
+        valid = (
+            i
+            for i in (*(r.issn for r in self.issns), *self.candidates)
+            if ISSN.try_parse(i) is not None
+        )
+        return tuple(dict.fromkeys((*self.active(), *valid)))
 
 
 @dataclass(frozen=True, slots=True)
 class SudocCheck:
     """Résultat de la vérification des ISSN d'une revue."""
 
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
-    rejected: tuple[str, ...]
+    issns: tuple[JournalIssn, ...]
+    """ISSN de la revue après vérification."""
+    released: tuple[JournalIssn, ...]
+    """ISSN d'une autre publication, écartés de la revue."""
     found: bool
     """Au moins un ISSN de la revue, ou une correction, a une notice dans le Sudoc."""
     conflict: bool
     """Deux groupes d'ISSN de même taille et de titres aussi proches : rien n'est modifié."""
     set_aside: tuple[tuple[str, SetAsideReason], ...]
-    """ISSN que la vérification ajoute aux ISSN rejetés, avec leur motif."""
+    """ISSN qui quittent les ISSN actifs de la revue, avec leur motif."""
     discarded: tuple[tuple[str, SetAsideReason], ...]
-    """ISSN d'une autre publication que la vérification retire de la revue, avec leur motif."""
+    """ISSN écartés de la revue, avec leur motif."""
     corrections: tuple[tuple[str, str], ...]
-    """Couples (valeur rejetée, ISSN corrigé)."""
-    ambiguous_support: Support | None
-    """Support dont la revue garde plusieurs ISSN : les ISSN restent dans leurs colonnes."""
+    """Couples (valeur mal formée, ISSN corrigé)."""
     title: str | None = None
     """Titre de référence qui remplace un titre en base à la forme d'un volume (`reference_series_title`), ou `None`."""
 
 
-def correction_candidates(rejected: Sequence[str]) -> frozenset[str]:
-    """ISSN à chercher dans le Sudoc pour corriger les valeurs rejetées fautives. Une valeur valide n'est pas corrigée."""
-    return frozenset(
-        c for raw in rejected if ISSN.try_parse(raw) is None for c in issn_typo_candidates(raw)
-    )
+def correction_candidates(malformed: Sequence[str]) -> frozenset[str]:
+    """ISSN à chercher dans le Sudoc pour corriger des valeurs mal formées."""
+    return frozenset(c for raw in malformed for c in issn_typo_candidates(raw))
 
 
 def _title_ratio(title: str, other: str | None) -> float:
@@ -110,9 +117,9 @@ def _same_title(a: str | None, b: str | None) -> bool:
     return normalize_text(a) == normalize_text(b)
 
 
-def _complementary(a: Support | None, b: Support | None) -> bool:
+def _complementary(a: IssnSupport | None, b: IssnSupport | None) -> bool:
     """L'un des supports est le papier, l'autre l'en ligne."""
-    return {a, b} == {Support.PRINT, Support.ELECTRONIC}
+    return {a, b} == {IssnSupport.PRINT, IssnSupport.ELECTRONIC}
 
 
 def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
@@ -197,39 +204,28 @@ def check_journal_issns(
 ) -> SudocCheck:
     """Vérifie les ISSN d'une revue.
 
-    `records` porte la notice Sudoc de chaque ISSN connu du Sudoc : ISSN de la revue, candidats à la correction de ses ISSN rejetés (`correction_candidates`) et ISSN d'autre support de ses notices.
+    `records` porte la notice Sudoc de chaque ISSN connu du Sudoc : ISSN de la revue, candidats à la correction de ses valeurs mal formées (`correction_candidates`) et ISSN d'autre support de ses notices.
     """
-    if journal.issn is not None and journal.issn == journal.eissn:
-        # La même valeur dans les deux colonnes garde seulement la colonne de son support.
-        online = (r := records.get(journal.issn)) is not None and r.support is Support.ELECTRONIC
-        journal = replace(
-            journal,
-            issn=None if online else journal.issn,
-            eissn=journal.eissn if online else None,
-        )
     own = journal.examined()
-    columns = set(journal.columns())
-    # Une notice d'un autre support (CD-ROM) ne forme pas de groupe : l'ISSN rejoint les rejetés.
-    known = [i for i in own if i in records and records[i].support is not Support.OTHER]
+    active = set(journal.active())
+    previous = {r.issn: r for r in journal.issns}
+    known = [i for i in own if i in records and records[i].support is not IssnSupport.OTHER]
     main: list[str] = []
     if groups := _groups(known, records):
-        # Un ISSN d'une colonne tient la revue. Sans notice pour aucun d'eux, le titre décide.
-        eligible = [g for g in groups if any(i in columns for i in g)] or [
+        # Un ISSN actif tient la revue. Sans notice pour aucun d'eux, le titre décide.
+        eligible = [g for g in groups if any(i in active for i in g)] or [
             g for g in groups if any(nested_titles(journal.title, records[i].title) for i in g)
         ]
         chosen = _main_group(eligible, records, journal.title) if eligible else []
         if chosen is None:
             return SudocCheck(
-                journal.issn,
-                journal.eissn,
-                journal.issnl,
-                journal.rejected,
+                journal.issns,
+                (),
                 found=True,
                 conflict=True,
                 set_aside=(),
                 discarded=(),
                 corrections=(),
-                ambiguous_support=None,
             )
         main = chosen
 
@@ -249,15 +245,19 @@ def check_journal_issns(
     cancelled = {x for r in main_records for x in r.cancelled_issns}
     hints = {x: support for r in main_records for x, support in r.other_support_hints}
 
+    def support_of(i: str) -> IssnSupport | None:
+        if (record := records.get(i)) is not None and record.support is not None:
+            return record.support
+        return hints.get(i) or (previous[i].support if i in previous else None)
+
     set_aside: list[tuple[str, SetAsideReason]] = []
     kept: list[str] = []
     for i in own:
         record = records.get(i)
-        support = record.support if record is not None else hints.get(i)
         if i in cancelled:
             set_aside.append((i, SetAsideReason.CANCELLED))
-        elif support is Support.OTHER:
-            set_aside.append((i, SetAsideReason.OTHER_SUPPORT))
+        elif support_of(i) is IssnSupport.OTHER:
+            kept.append(i)
         elif i in preceding or (record is not None and i not in main and i in related):
             set_aside.append((i, _outside_reason(i, main, records, related_title=True)))
         elif record is not None and i not in main:
@@ -270,10 +270,61 @@ def check_journal_issns(
         next((r.title for r in main_records if r.title), None),
     )
 
+    corrections = _corrections(journal, records, reference)
+    for _, corrected in corrections:
+        reference = reference or records[corrected].issnl
+        if corrected not in kept:
+            kept.append(corrected)
+
+    issnl = reference or (journal.issnl() if journal.issnl() in kept else None)
+    excluded = {i for i, _ in set_aside} | related | cancelled
+    kept, others = _by_support(kept, excluded, records, support_of, reference)
+    set_aside += [(i, SetAsideReason.OTHER_PUBLICATION) for i in others]
+    # L'ISSN-L de la revue reste le sien, même mis de côté.
+    set_aside = [(i, reason) for i, reason in set_aside if i != issnl]
+    discarded = [(i, reason) for i, reason in set_aside if reason in DISCARDED]
+    set_aside = [(i, reason) for i, reason in set_aside if reason not in DISCARDED]
+
+    rows = _journal_rows(
+        journal,
+        kept,
+        set_aside,
+        discarded={i for i, _ in discarded},
+        corrections=dict(corrections),
+        issnl=issnl,
+        replaced_by={
+            i: reference
+            for i, reason in set_aside
+            if reason is SetAsideReason.RELATED_TITLE
+            and reference is not None
+            and reference != i
+            and (i in preceding or (i in records and set(records[i].succeeding_issns) & set(main)))
+        },
+        without_record={i for i in kept if i not in records and i not in hints},
+        support_of=support_of,
+    )
+    return SudocCheck(
+        rows,
+        tuple(JournalIssn(issn=i, support=support_of(i)) for i, _ in discarded),
+        found=bool(known) or bool(corrections),
+        conflict=False,
+        set_aside=tuple(
+            (i, reason)
+            for i, reason in set_aside
+            if i not in previous or previous[i].status is IssnStatus.ACTIVE
+        ),
+        discarded=tuple(discarded),
+        corrections=tuple(corrections),
+        title=reference_series_title(journal.title, sudoc_title) if journal.holds_volumes else None,
+    )
+
+
+def _corrections(
+    journal: JournalIssns, records: Mapping[str, SudocSerialRecord], reference: str | None
+) -> list[tuple[str, str]]:
+    """Correction de chaque valeur mal formée : le seul ISSN à une faute de frappe près dont la notice a un titre proche de celui de la revue, et l'ISSN-L de la revue s'il est connu."""
     corrections: list[tuple[str, str]] = []
-    for raw in journal.rejected:
-        if ISSN.try_parse(raw) is not None:
-            continue  # valeur valide, déjà classée : conservée telle quelle
+    for raw in journal.malformed():
         matches = sorted(
             c
             for c in issn_typo_candidates(raw)
@@ -284,43 +335,48 @@ def check_journal_issns(
         if len(matches) == 1:
             corrections.append((raw, matches[0]))
             reference = reference or records[matches[0]].issnl
-            if matches[0] not in kept:
-                kept.append(matches[0])
+    return corrections
 
-    issnl = reference or (journal.issnl if journal.issnl in kept else None)
-    excluded = {i for i, _ in set_aside} | related | cancelled
-    placement = _place(journal, kept, excluded, records, hints, reference)
-    others = placement.other_publications
 
-    placed = {placement.issn, placement.eissn, issnl}
-    set_aside += [(i, SetAsideReason.OTHER_PUBLICATION) for i in others]
-    set_aside += [
-        (i, SetAsideReason.NO_FREE_COLUMN) for i in kept if i not in placed and i not in others
-    ]
-    # Un ISSN mis de côté qui est l'ISSN-L garde sa place dans `issnl`.
-    set_aside = [(i, reason) for i, reason in set_aside if i not in placed]
-    discarded = [(i, reason) for i, reason in set_aside if reason in DISCARDED]
-    set_aside = [(i, reason) for i, reason in set_aside if reason not in DISCARDED]
-    removed = {raw for raw, _ in corrections} | {i for i, _ in discarded}
-    rejected = tuple(
-        dict.fromkeys(
-            [r for r in journal.rejected if r not in removed and r not in placed]
-            + [i for i, _ in set_aside]
+def _journal_rows(
+    journal: JournalIssns,
+    kept: Sequence[str],
+    set_aside: Sequence[tuple[str, SetAsideReason]],
+    *,
+    discarded: set[str],
+    corrections: Mapping[str, str],
+    issnl: str | None,
+    replaced_by: Mapping[str, str],
+    without_record: set[str],
+    support_of: Callable[[str], IssnSupport | None],
+) -> tuple[JournalIssn, ...]:
+    """ISSN de la revue après vérification.
+
+    Un ISSN retenu est actif, avec son support. Sans notice (`without_record`), un ISSN de la revue garde son statut, un ISSN d'enregistrement devient `unverified`. Un ISSN mis de côté prend le statut de son motif. Une valeur mal formée corrigée désigne sa correction. L'ISSN-L est actif.
+    """
+    previous = {r.issn: r for r in journal.issns}
+    rows: dict[str, JournalIssn] = {}
+    for i in kept:
+        if i in without_record and i in previous and previous[i].status is not IssnStatus.ACTIVE:
+            rows[i] = previous[i]
+        elif i in without_record and i not in previous:
+            rows[i] = JournalIssn(issn=i, status=IssnStatus.UNVERIFIED)
+        else:
+            rows[i] = JournalIssn(issn=i, support=support_of(i))
+    for i, reason in set_aside:
+        rows[i] = JournalIssn(
+            issn=i, support=support_of(i), status=_STATUS[reason], replaced_by=replaced_by.get(i)
         )
-    )
-    return SudocCheck(
-        placement.issn,
-        placement.eissn,
-        issnl,
-        rejected,
-        found=bool(known) or bool(corrections),
-        conflict=False,
-        set_aside=tuple((i, reason) for i, reason in set_aside if i not in journal.rejected),
-        discarded=tuple(discarded),
-        corrections=tuple(corrections),
-        ambiguous_support=placement.ambiguous_support,
-        title=reference_series_title(journal.title, sudoc_title) if journal.holds_volumes else None,
-    )
+    for row in journal.issns:
+        if row.issn in rows or row.issn in discarded:
+            continue
+        rows[row.issn] = replace(row, replaced_by=corrections.get(row.issn, row.replaced_by))
+    if issnl is not None:
+        base = rows.get(issnl) or JournalIssn(issn=issnl)
+        rows[issnl] = replace(
+            base, support=base.support or support_of(issnl), status=IssnStatus.ACTIVE
+        )
+    return tuple(replace(r, linking=i == issnl) for i, r in rows.items())
 
 
 def _linked(
@@ -347,80 +403,46 @@ def _outside_reason(
     return SetAsideReason.LINKED_TITLE if related_title else SetAsideReason.OTHER_PUBLICATION
 
 
-def _narrow(
-    candidates: list[str], records: Mapping[str, SudocSerialRecord], reference: str | None
-) -> tuple[list[str], list[str]]:
-    """ISSN d'un même support : `(restants, autres publications)`. Ceux dont la notice porte un autre ISSN-L que la revue sont d'une autre publication, puis l'ISSN-L, déjà dans `issnl`, cède la colonne."""
-    others: list[str] = []
-    if len(candidates) > 1 and reference is not None:
-        same = [
-            i
-            for i in candidates
-            if i == reference or i not in records or records[i].issnl in (None, reference)
-        ]
-        if same:
-            others = [i for i in candidates if i not in same]
-            candidates = same
-    if len(candidates) > 1 and reference in candidates:
-        candidates = [i for i in candidates if i != reference]
-    return candidates, others
-
-
-class _Placement(NamedTuple):
-    issn: str | None
-    eissn: str | None
-    ambiguous_support: Support | None
-    other_publications: tuple[str, ...]
-    """ISSN d'un support occupé dont la notice porte un autre ISSN-L que la revue."""
-
-
-def _place(
-    journal: JournalIssns,
+def _by_support(
     kept: Sequence[str],
     excluded: set[str],
     records: Mapping[str, SudocSerialRecord],
-    hints: Mapping[str, Support],
+    support_of: Callable[[str], IssnSupport | None],
     reference: str | None,
-) -> _Placement:
-    """Chaque ISSN va dans la colonne de son support.
+) -> tuple[list[str], list[str]]:
+    """ISSN retenus et ISSN d'une autre publication : `(retenus, autres publications)`.
 
-    Le support d'un ISSN vient de sa notice, ou à défaut de la mention de support que lui donne une notice de la revue (`452$t`). Un support manquant se complète par un ISSN d'autre support d'une notice de la revue. Quand plusieurs ISSN ont le même support, ceux dont la notice porte un autre ISSN-L que la revue sont d'une autre publication, puis l'ISSN-L, déjà dans `issnl`, cède la colonne. S'il en reste plusieurs, les ISSN restent dans leurs colonnes. Un ISSN de support inconnu reste dans sa colonne si elle est libre.
+    Un support papier ou en ligne absent des ISSN retenus se complète par un ISSN d'autre support d'une notice de la revue. Parmi plusieurs ISSN d'un même support, ceux dont la notice porte un autre ISSN-L que la revue sont d'une autre publication.
     """
-
-    def support_of(i: str) -> Support | None:
-        return records[i].support if i in records else hints.get(i)
-
-    prints = [i for i in kept if support_of(i) is Support.PRINT]
-    electronics = [i for i in kept if support_of(i) is Support.ELECTRONIC]
-    unknown = [i for i in kept if i not in prints and i not in electronics]
-    for i in [x for x in (*prints, *electronics) if x in records]:
-        for other in records[i].other_support_issns:
-            if other in kept or other in excluded:
+    retained = list(kept)
+    for support in (IssnSupport.PRINT, IssnSupport.ELECTRONIC):
+        if any(support_of(i) is support for i in retained):
+            continue
+        for i in [x for x in kept if x in records]:
+            completion = next(
+                (
+                    other
+                    for other in records[i].other_support_issns
+                    if other not in retained
+                    and other not in excluded
+                    and support_of(other) is support
+                ),
+                None,
+            )
+            if completion is not None:
+                retained.append(completion)
+                break
+    others: list[str] = []
+    if reference is not None:
+        for support in (IssnSupport.PRINT, IssnSupport.ELECTRONIC):
+            same_support = [i for i in retained if support_of(i) is support]
+            if len(same_support) < 2:
                 continue
-            if support_of(other) is Support.PRINT and not prints:
-                prints.append(other)
-            elif support_of(other) is Support.ELECTRONIC and not electronics:
-                electronics.append(other)
-
-    prints, print_others = _narrow(prints, records, reference)
-    electronics, electronic_others = _narrow(electronics, records, reference)
-    other_publications = print_others + electronic_others
-    ambiguous = (
-        Support.PRINT if len(prints) > 1 else Support.ELECTRONIC if len(electronics) > 1 else None
-    )
-    if ambiguous is not None:
-
-        def in_place(value: str | None) -> str | None:
-            return value if value in kept and value not in other_publications else None
-
-        return _Placement(
-            in_place(journal.issn), in_place(journal.eissn), ambiguous, tuple(other_publications)
-        )
-    issn = prints[0] if prints else None
-    eissn = electronics[0] if electronics else None
-    for value in unknown:
-        if value == journal.issn and issn is None:
-            issn = value
-        elif value == journal.eissn and eissn is None:
-            eissn = value
-    return _Placement(issn, eissn, None, tuple(other_publications))
+            same = [
+                i
+                for i in same_support
+                if i == reference or i not in records or records[i].issnl in (None, reference)
+            ]
+            if same:
+                others += [i for i in same_support if i not in same]
+    return [i for i in retained if i not in others], others

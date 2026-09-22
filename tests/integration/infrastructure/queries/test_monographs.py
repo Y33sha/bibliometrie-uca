@@ -93,13 +93,16 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
 
 
 def _journal(conn, title: str, issn: str | None = None) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO journals (title, title_normalized, issn)"
-            " VALUES (:t, lower(:t), :i) RETURNING id"
-        ),
-        {"t": title, "i": issn},
+    journal_id = conn.execute(
+        text("INSERT INTO journals (title, title_normalized) VALUES (:t, lower(:t)) RETURNING id"),
+        {"t": title},
     ).scalar_one()
+    if issn:
+        conn.execute(
+            text("INSERT INTO journal_issns (issn, journal_id, support) VALUES (:i, :j, 'print')"),
+            {"i": issn, "j": journal_id},
+        )
+    return journal_id
 
 
 def _record(conn, source_id: str, monograph_id: int, journal_id: int) -> None:

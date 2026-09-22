@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from domain.journals.doi_namespaces import DoiNamespace
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
@@ -17,25 +18,61 @@ def repo(sa_sync_conn):
     return PgJournalGatewayQueries(sa_sync_conn)
 
 
-def _create_journal(
-    conn, *, title="J", openalex_id=None, issn=None, eissn=None, issnl=None, imported_at=None
+def _add_issn(
+    conn,
+    journal_id,
+    issn,
+    *,
+    support=None,
+    linking=False,
+    status=IssnStatus.ACTIVE,
+    checked=False,
 ):
-    return conn.execute(
+    conn.execute(
         text("""
-            INSERT INTO journals (title, title_normalized, openalex_id,
-                                  issn, eissn, issnl, doaj_imported_at)
-            VALUES (:title, lower(:title), :openalex_id, :issn, :eissn, :issnl, :imported_at)
-            RETURNING id
+            INSERT INTO journal_issns (issn, journal_id, support, linking, status, sudoc_checked_at)
+            VALUES (:issn, :jid, CAST(:support AS issn_support), :linking,
+                    CAST(:status AS issn_status), CASE WHEN :checked THEN now() END)
         """),
         {
-            "title": title,
-            "openalex_id": openalex_id,
             "issn": issn,
-            "eissn": eissn,
-            "issnl": issnl,
-            "imported_at": imported_at,
+            "jid": journal_id,
+            "support": support,
+            "linking": linking,
+            "status": status,
+            "checked": checked,
         },
+    )
+
+
+def _create_journal(
+    conn,
+    *,
+    title="J",
+    openalex_id=None,
+    issn=None,
+    eissn=None,
+    issnl=None,
+    imported_at=None,
+    checked=False,
+):
+    journal_id = conn.execute(
+        text("""
+            INSERT INTO journals (title, title_normalized, openalex_id, doaj_imported_at)
+            VALUES (:title, lower(:title), :openalex_id, :imported_at)
+            RETURNING id
+        """),
+        {"title": title, "openalex_id": openalex_id, "imported_at": imported_at},
     ).scalar_one()
+    if issn:
+        _add_issn(conn, journal_id, issn, support="print", linking=issn == issnl, checked=checked)
+    if eissn:
+        _add_issn(
+            conn, journal_id, eissn, support="electronic", linking=eissn == issnl, checked=checked
+        )
+    if issnl and issnl not in (issn, eissn):
+        _add_issn(conn, journal_id, issnl, linking=True, checked=checked)
+    return journal_id
 
 
 def _create_record(conn, journal_id, *, doi):
@@ -48,31 +85,37 @@ def _create_record(conn, journal_id, *, doi):
     )
 
 
+def _issns(conn, journal_id):
+    return {
+        r.issn: (r.support, r.linking, r.status, r.sudoc_checked_at)
+        for r in conn.execute(
+            text(
+                "SELECT issn, support::text, linking, status::text, sudoc_checked_at"
+                " FROM journal_issns WHERE journal_id IS NOT DISTINCT FROM :id"
+            ),
+            {"id": journal_id},
+        )
+    }
+
+
 class TestSudocCheck:
-    def test_queue_holds_unchecked_journals_with_an_issn(self, sa_sync_conn, repo):
+    def test_queue_holds_journals_with_an_unchecked_issn(self, sa_sync_conn, repo):
         with_issn = _create_journal(sa_sync_conn, issn="0028-0836")
         without_issn = _create_journal(sa_sync_conn)
-        rejected_only = _create_journal(sa_sync_conn)
-        checked = _create_journal(sa_sync_conn, issn="1476-4687")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET rejected_issns = '{1950-2051}' WHERE id = :id"),
-            {"id": rejected_only},
-        )
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": checked}
-        )
+        malformed_only = _create_journal(sa_sync_conn)
+        _add_issn(sa_sync_conn, malformed_only, "1950-2051", status=IssnStatus.MALFORMED)
+        checked = _create_journal(sa_sync_conn, issn="1476-4687", checked=True)
         rows = {r.id: r for r in repo.find_journals_to_check_in_sudoc()}
         assert with_issn in rows
-        assert rows[rejected_only].rejected_issns == ("1950-2051",)
+        assert rows[malformed_only].issns == (
+            JournalIssn(issn="1950-2051", status=IssnStatus.MALFORMED),
+        )
         assert without_issn not in rows
         assert checked not in rows
 
     def test_queue_holds_journals_whose_records_carry_an_unknown_issn(self, sa_sync_conn, repo):
         """Une revue vérifiée revient dans la file quand un de ses enregistrements, quelle que soit sa source, porte un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
-        journal_id = _create_journal(sa_sync_conn, issn="0149-5992")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
-        )
+        journal_id = _create_journal(sa_sync_conn, issn="0149-5992", checked=True)
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
@@ -97,10 +140,7 @@ class TestSudocCheck:
         assert rows[journal_id].document_issns == ("1935-5548",)
 
     def test_queue_ignores_records_whose_issns_the_journal_carries(self, sa_sync_conn, repo):
-        journal_id = _create_journal(sa_sync_conn, issn="0149-5992")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
-        )
+        journal_id = _create_journal(sa_sync_conn, issn="0149-5992", checked=True)
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
@@ -114,26 +154,38 @@ class TestSudocCheck:
         )
         assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
 
-    def test_find_by_issn_reaches_rejected_issns(self, sa_sync_conn, repo):
-        """Un ISSN rejeté sert au rapprochement ; une revue qui le porte dans ses colonnes passe avant."""
-        rejecting = _create_journal(sa_sync_conn, issn="0305-1048")
+    def test_queue_ignores_record_issns_checked_without_journal(self, sa_sync_conn, repo):
+        """Un ISSN d'une autre publication, déjà vérifié et gardé sans revue, ne ramène pas la revue dans la file."""
+        journal_id = _create_journal(sa_sync_conn, issn="1254-7867", checked=True)
+        _add_issn(sa_sync_conn, None, "2750-6185", support="electronic", checked=True)
         sa_sync_conn.execute(
-            text("UPDATE journals SET rejected_issns = '{1362-4954}' WHERE id = :id"),
-            {"id": rejecting},
+            text(
+                "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
+                " VALUES ('hal', :sid, 'Article', :jid, CAST(:biblio AS jsonb))"
+            ),
+            {
+                "sid": f"sp-other-{journal_id}",
+                "jid": journal_id,
+                "biblio": '{"journal": {"issn": "2750-6185"}}',
+            },
         )
-        assert repo.find_journal_by_issn_any("1362-4954") == rejecting
+        assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
+
+    def test_find_by_issn_reaches_inactive_issns(self, sa_sync_conn, repo):
+        """Un ISSN inactif sert au rapprochement ; une revue où il est actif passe avant ; une valeur mal formée n'en sert pas."""
+        holding = _create_journal(sa_sync_conn, issn="0305-1048")
+        _add_issn(sa_sync_conn, holding, "1362-4954", status=IssnStatus.RELATED_TITLE)
+        _add_issn(sa_sync_conn, holding, "1950-2051", status=IssnStatus.MALFORMED)
+        assert repo.find_journal_by_issn_any("1362-4954") == holding
+        assert repo.find_journal_by_issn_any("1950-2051") is None
         carrying = _create_journal(sa_sync_conn, eissn="1362-4954")
         assert repo.find_journal_by_issn_any("1362-4954") == carrying
 
     def test_merge_groups_hold_checked_journals_sharing_an_issnl(self, sa_sync_conn, repo):
         """La revue qui porte le plus de publications vient en tête du groupe ; une revue non vérifiée en est exclue."""
-        keeper = _create_journal(sa_sync_conn, issnl="2999-0001")
-        absorbed = _create_journal(sa_sync_conn, issnl="2999-0001")
+        keeper = _create_journal(sa_sync_conn, issnl="2999-0001", checked=True)
+        absorbed = _create_journal(sa_sync_conn, issnl="2999-0001", checked=True)
         unchecked = _create_journal(sa_sync_conn, issnl="2999-0001")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
-            {"ids": [keeper, absorbed]},
-        )
         sa_sync_conn.execute(
             text("UPDATE journals SET pub_count = 3 WHERE id = :id"), {"id": keeper}
         )
@@ -141,17 +193,15 @@ class TestSudocCheck:
         assert groups["2999-0001"] == (keeper, absorbed)
         assert unchecked not in groups["2999-0001"]
 
-    def test_shared_column_issn_groups_hold_titles(self, sa_sync_conn, repo):
-        keeper = _create_journal(sa_sync_conn, title="BMJ", eissn="2999-0002")
-        other = _create_journal(sa_sync_conn, title="BMJ British Medical Journal", issn="2999-0002")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
-            {"ids": [keeper, other]},
+    def test_shared_active_issn_groups_hold_titles(self, sa_sync_conn, repo):
+        keeper = _create_journal(sa_sync_conn, title="BMJ", eissn="2999-0002", checked=True)
+        other = _create_journal(
+            sa_sync_conn, title="BMJ British Medical Journal", issn="2999-0002", checked=True
         )
         sa_sync_conn.execute(
             text("UPDATE journals SET pub_count = 4 WHERE id = :id"), {"id": keeper}
         )
-        groups = {g.issn: g.journals for g in repo.find_journals_sharing_column_issn()}
+        groups = {g.issn: g.journals for g in repo.find_journals_sharing_active_issn()}
         assert [j.id for j in groups["2999-0002"]] == [keeper, other]
         assert [j.title for j in groups["2999-0002"]] == ["BMJ", "BMJ British Medical Journal"]
 
@@ -186,24 +236,17 @@ class TestSudocCheck:
             _create_record(sa_sync_conn, journal_id, doi=f"10.9999/vide-{journal_id}")
         assert "" not in {g.key for g in repo.find_same_title_duplicates()}
 
-    def test_journals_sharing_a_rejected_issn(self, sa_sync_conn, repo):
-        """L'ISSN rejeté de l'une est dans les colonnes de l'autre ; la revue dont le premier document est le plus tardif vient en tête, même quand l'ancien titre reçoit encore des documents récents. Une revue non vérifiée reste hors de la règle."""
-        earlier = _create_journal(sa_sync_conn, title="Revue test ancien titre", issn="2999-0012")
-        later = _create_journal(sa_sync_conn, title="Revue test nouveau titre", eissn="2999-0013")
+    def test_journals_sharing_an_inactive_issn(self, sa_sync_conn, repo):
+        """L'ISSN inactif de l'une est actif dans l'autre ; la revue dont le premier document est le plus tardif vient en tête, même quand l'ancien titre reçoit encore des documents récents. Une revue non vérifiée reste hors de la règle."""
+        earlier = _create_journal(
+            sa_sync_conn, title="Revue test ancien titre", issn="2999-0012", checked=True
+        )
+        later = _create_journal(
+            sa_sync_conn, title="Revue test nouveau titre", eissn="2999-0013", checked=True
+        )
         unchecked = _create_journal(sa_sync_conn, title="Revue test non vérifiée", issn="2999-0014")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE journals SET rejected_issns = :r WHERE id = :id",
-            ),
-            [
-                {"r": ["2999-0013"], "id": earlier},
-                {"r": ["2999-0014"], "id": later},
-            ],
-        )
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = ANY(:ids)"),
-            {"ids": [earlier, later]},
-        )
+        _add_issn(sa_sync_conn, earlier, "2999-0013", status=IssnStatus.RELATED_TITLE, checked=True)
+        _add_issn(sa_sync_conn, later, "2999-0014", status=IssnStatus.RELATED_TITLE, checked=True)
         for journal_id, year in ((earlier, 2018), (earlier, 2026), (later, 2022), (later, 2025)):
             sa_sync_conn.execute(
                 text(
@@ -212,7 +255,7 @@ class TestSudocCheck:
                 ),
                 {"sid": f"sp-rejete-{journal_id}-{year}", "jid": journal_id, "year": year},
             )
-        groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_a_rejected_issn()}
+        groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_an_inactive_issn()}
         assert groups["2999-0013"] == (later, earlier)
         assert "2999-0014" not in groups
         assert unchecked not in {i for ids in groups.values() for i in ids}
@@ -245,7 +288,10 @@ class TestSudocCheck:
         assert pairs[0].second.title == "J.Test Compl."
 
     def test_delete_empty_journals_spares_records_and_apc_payments(self, sa_sync_conn, repo):
+        """Une revue vide est supprimée ; ses ISSN restent sans revue, sauf un ISSN déjà gardé sans revue."""
         empty = _create_journal(sa_sync_conn, title="Revue test vide", issn="2999-0007")
+        _add_issn(sa_sync_conn, empty, "2999-0015", support="electronic")
+        _add_issn(sa_sync_conn, None, "2999-0015", support="electronic", checked=True)
         with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")
         _create_record(sa_sync_conn, with_record, doi="10.9999/d")
         with_payment = _create_journal(sa_sync_conn, title="Revue test avec paiement")
@@ -254,48 +300,48 @@ class TestSudocCheck:
         )
         deleted = {j.id: j for j in repo.delete_empty_journals()}
         assert deleted[empty].title == "Revue test vide"
-        assert deleted[empty].issn == "2999-0007"
+        assert deleted[empty].issns == ("2999-0007", "2999-0015")
         assert with_record not in deleted
         assert with_payment not in deleted
+        orphans = _issns(sa_sync_conn, None)
+        assert orphans["2999-0007"][:3] == ("print", False, "active")
+        assert orphans["2999-0015"][3] is not None
 
     def test_describe_journals(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, title="Revue test décrite", eissn="2999-0008")
         summary = repo.describe_journals([journal_id])[journal_id]
-        assert (summary.title, summary.publisher, summary.issn, summary.eissn) == (
+        assert (summary.title, summary.publisher, summary.issns) == (
             "Revue test décrite",
             None,
-            None,
-            "2999-0008",
+            ("2999-0008",),
         )
 
     def test_record_writes_issns_and_date(self, sa_sync_conn, repo):
+        """Les ISSN de la revue sont ceux de la vérification, datés ; un ISSN écarté reste sans revue."""
         journal_id = _create_journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
+        _add_issn(sa_sync_conn, journal_id, "0007-0920")
         at = datetime(2026, 9, 15, tzinfo=UTC)
         repo.record_sudoc_check(
             journal_id,
-            issn="0028-0836",
-            eissn="1476-4687",
-            issnl="0028-0836",
-            rejected_issns=(),
+            issns=(
+                JournalIssn(issn="0028-0836", support=IssnSupport.PRINT, linking=True),
+                JournalIssn(issn="1476-4687", support=IssnSupport.ELECTRONIC),
+            ),
+            released=(JournalIssn(issn="0007-0920", support=IssnSupport.PRINT),),
             checked_at=at,
         )
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT issn, eissn, issnl, rejected_issns, sudoc_checked_at "
-                "FROM journals WHERE id = :id"
-            ),
-            {"id": journal_id},
-        ).one()
-        assert tuple(row) == ("0028-0836", "1476-4687", "0028-0836", [], at)
+        assert _issns(sa_sync_conn, journal_id) == {
+            "0028-0836": ("print", True, "active", at),
+            "1476-4687": ("electronic", False, "active", at),
+        }
+        assert _issns(sa_sync_conn, None)["0007-0920"] == ("print", False, "active", at)
 
     def test_record_writes_reference_title_and_its_name_form(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, title="ICORES 2023", issn="2184-4372")
         repo.record_sudoc_check(
             journal_id,
-            issn="2184-4372",
-            eissn=None,
-            issnl=None,
-            rejected_issns=(),
+            issns=(JournalIssn(issn="2184-4372", support=IssnSupport.PRINT),),
+            released=(),
             checked_at=datetime(2026, 9, 21, tzinfo=UTC),
             title="ICORES",
         )
@@ -309,15 +355,44 @@ class TestSudocCheck:
         assert (title, forms) == ("ICORES", ["icores"])
 
     def test_queue_holds_the_journals_asked_for(self, sa_sync_conn, repo):
-        journal_id = _create_journal(sa_sync_conn, title="ICORES 2023", issn="2184-4372")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
+        journal_id = _create_journal(
+            sa_sync_conn, title="ICORES 2023", issn="2184-4372", checked=True
         )
         assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
         assert journal_id in {r.id for r in repo.find_journals_to_check_in_sudoc(also=[journal_id])}
         assert (journal_id, "ICORES 2023", JournalType.UNKNOWN) in (
             repo.find_titles_of_journals_with_issn()
         )
+
+
+class TestAddJournalIssns:
+    def test_adds_new_issns_and_fills_a_missing_support(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, checked=True)
+        _add_issn(sa_sync_conn, journal_id, "0028-0836", checked=True)
+        repo.add_journal_issns(
+            journal_id,
+            [
+                JournalIssn(issn="0028-0836", support=IssnSupport.PRINT, linking=True),
+                JournalIssn(issn="1476-4687", support=IssnSupport.ELECTRONIC),
+            ],
+        )
+        issns = _issns(sa_sync_conn, journal_id)
+        assert issns["0028-0836"][:3] == ("print", True, "active")
+        assert issns["0028-0836"][3] is not None
+        assert issns["1476-4687"] == ("electronic", False, "active", None)
+
+    def test_claims_an_issn_kept_without_journal(self, sa_sync_conn, repo):
+        _add_issn(sa_sync_conn, None, "2750-6185", support="electronic", checked=True)
+        journal_id = _create_journal(sa_sync_conn, title="Spotlight")
+        repo.add_journal_issns(journal_id, [JournalIssn(issn="2750-6185")])
+        assert "2750-6185" not in _issns(sa_sync_conn, None)
+        assert _issns(sa_sync_conn, journal_id)["2750-6185"][:3] == ("electronic", False, "active")
+
+    def test_keeps_the_existing_issnl(self, sa_sync_conn, repo):
+        journal_id = _create_journal(sa_sync_conn, issn="0028-0836", issnl="0028-0836")
+        repo.add_journal_issns(journal_id, [JournalIssn(issn="1476-4687", linking=True)])
+        issns = _issns(sa_sync_conn, journal_id)
+        assert (issns["0028-0836"][1], issns["1476-4687"][1]) == (True, False)
 
 
 class TestFindJournalsOfUnknownType:
@@ -424,14 +499,16 @@ class TestDoiNamespaces:
 
 
 class TestJournalIssnIndex:
-    def test_exposes_all_issn_fields(self, sa_sync_conn, repo):
+    def test_exposes_every_valid_issn(self, sa_sync_conn, repo):
         jid = _create_journal(sa_sync_conn, issn="1111-1111", eissn="2222-2222")
-        ours = [r for r in repo.find_journal_issn_index() if r.id == jid]
-        assert ours and ours[0].issn == "1111-1111" and ours[0].eissn == "2222-2222"
+        _add_issn(sa_sync_conn, jid, "3333-3333", status=IssnStatus.RELATED_TITLE)
+        _add_issn(sa_sync_conn, jid, "(Internet)", status=IssnStatus.MALFORMED)
+        ours = [r.issn for r in repo.find_journal_issn_index() if r.journal_id == jid]
+        assert ours == ["1111-1111", "2222-2222", "3333-3333"]
 
     def test_excludes_journals_with_no_issn(self, sa_sync_conn, repo):
-        jid = _create_journal(sa_sync_conn)  # les trois formes nulles
-        assert jid not in [r.id for r in repo.find_journal_issn_index()]
+        jid = _create_journal(sa_sync_conn)
+        assert jid not in [r.journal_id for r in repo.find_journal_issn_index()]
 
 
 class TestDoajImport:

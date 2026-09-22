@@ -59,7 +59,7 @@
 
 	function issns(item: Item): string {
 		const j = item.journal;
-		return [j.issn, j.eissn].filter(Boolean).join(' / ') || 'sans ISSN';
+		return j.issns.join(' / ') || 'sans ISSN';
 	}
 </script>
 

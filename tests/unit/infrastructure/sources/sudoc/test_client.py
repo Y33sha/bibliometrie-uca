@@ -3,7 +3,7 @@
 import httpx2
 import pytest
 
-from domain.sources.sudoc import Support
+from domain.journals.issns import IssnSupport
 from infrastructure.sources.sudoc import client
 
 _BASE = "https://www.sudoc.fr"
@@ -109,7 +109,7 @@ class TestFetchSerialRecord:
         assert record is not None
         assert record.issn == "1476-4687"
         assert record.issnl == "0028-0836"
-        assert record.support is Support.ELECTRONIC
+        assert record.support is IssnSupport.ELECTRONIC
 
     @pytest.mark.asyncio
     async def test_unknown_ppn(self, monkeypatch):

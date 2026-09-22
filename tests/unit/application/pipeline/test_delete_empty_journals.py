@@ -18,7 +18,7 @@ class _Repo:
 
 def test_each_deleted_journal_is_logged_with_its_publisher_and_issns(caplog):
     logger = logging.getLogger("test_revues_vides")
-    deleted = [JournalSummary(101021, "Livestock Science", "IntechOpen", None, None)]
+    deleted = [JournalSummary(101021, "Livestock Science", "IntechOpen", ())]
     with caplog.at_level(logging.INFO, logger=logger.name):
         metrics = run_delete_empty_journals(logger, journal_repo=_Repo(deleted))
     assert metrics.extras["journals_deleted"] == 1

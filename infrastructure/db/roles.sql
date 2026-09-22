@@ -113,6 +113,11 @@ GRANT UPDATE, DELETE ON
     journal_name_forms, journals, publications, publisher_name_forms, publishers
 TO bibliometrie_app;
 
+-- Les ISSN d'une revue s'éditent à l'administration, et rejoignent la revue qui en absorbe une autre.
+GRANT INSERT, UPDATE, DELETE ON
+    journal_issns
+TO bibliometrie_app;
+
 GRANT INSERT ON
     audit_log
 TO bibliometrie_app;

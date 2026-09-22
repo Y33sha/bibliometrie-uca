@@ -8,12 +8,13 @@ import pytest
 
 from application.pipeline.publishers_journals import check_journals_in_sudoc as mod
 from application.ports.pipeline.journals import JournalSudocRow, JournalTitleTypeRow
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn, issns_from_columns
 from domain.journals.journal import JournalType
-from domain.sources.sudoc import SudocSerialRecord, Support
+from domain.sources.sudoc import SudocSerialRecord
 
 
 def _record(
-    ppn: str, issn: str, issnl: str, support: Support, other: tuple[str, ...] = ()
+    ppn: str, issn: str, issnl: str, support: IssnSupport, other: tuple[str, ...] = ()
 ) -> SudocSerialRecord:
     return SudocSerialRecord(
         ppn=ppn,
@@ -28,12 +29,30 @@ def _record(
     )
 
 
-_NATURE = JournalSudocRow(1, "Nature", "1476-4687", None, "0028-0836", ())
+def _row(
+    journal_id: int,
+    title: str,
+    issn: str | None = None,
+    issnl: str | None = None,
+    rejected: tuple[str, ...] = (),
+    journal_type: JournalType = JournalType.UNKNOWN,
+) -> JournalSudocRow:
+    issns = tuple(issns_from_columns(issn, None, issnl, rejected))
+    return JournalSudocRow(journal_id, title, issns, (), journal_type)
+
+
+def _written(repo: MagicMock) -> dict[str, tuple[IssnSupport | None, bool]]:
+    """ISSN actifs écrits par la vérification : support et drapeau ISSN-L."""
+    issns: list[JournalIssn] = repo.record_sudoc_check.call_args.kwargs["issns"]
+    return {r.issn: (r.support, r.linking) for r in issns if r.status is IssnStatus.ACTIVE}
+
+
+_NATURE = _row(1, "Nature", issn="1476-4687", issnl="0028-0836")
 _PPNS = {"1476-4687": ("068267983",), "0028-0836": ("038758717",)}
 _RECORDS = {
-    "068267983": _record("068267983", "1476-4687", "0028-0836", Support.ELECTRONIC),
+    "068267983": _record("068267983", "1476-4687", "0028-0836", IssnSupport.ELECTRONIC),
     "038758717": _record(
-        "038758717", "0028-0836", "0028-0836", Support.PRINT, other=("1476-4687",)
+        "038758717", "0028-0836", "0028-0836", IssnSupport.PRINT, other=("1476-4687",)
     ),
 }
 
@@ -69,34 +88,34 @@ async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1, titl
 
 
 @pytest.mark.asyncio
-async def test_records_issns_ranged_by_support():
+async def test_records_issns_with_their_support():
     repo, conn, metrics, _ = await _run([_NATURE])
-    kwargs = repo.record_sudoc_check.call_args.kwargs
-    assert (kwargs["issn"], kwargs["eissn"], kwargs["issnl"]) == (
-        "0028-0836",
-        "1476-4687",
-        "0028-0836",
-    )
+    assert _written(repo) == {
+        "1476-4687": (IssnSupport.ELECTRONIC, False),
+        "0028-0836": (IssnSupport.PRINT, True),
+    }
     assert metrics.updated == 1
     assert metrics.extras["sudoc_found"] == 1
     conn.commit.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_queries_correction_candidates_of_rejected_issns():
-    row = JournalSudocRow(2, "Constructif", None, None, None, ("1950-2051",))
+async def test_queries_correction_candidates_of_malformed_issns():
+    row = _row(2, "Constructif", rejected=("1950-2051",))
     _, _, _, calls = await _run([row])
     assert "1950-5051" in calls["ppns"][0]
 
 
 @pytest.mark.asyncio
 async def test_reads_the_other_support_named_by_a_record():
-    """La notice papier désigne l'ISSN en ligne (`452`) : sa notice est lue, et l'ISSN complète `eissn`."""
-    print_only = JournalSudocRow(4, "Nature", "0028-0836", None, None, ())
+    """La notice papier désigne l'ISSN en ligne (`452`) : sa notice est lue, et l'ISSN rejoint la revue."""
+    print_only = _row(4, "Nature", issn="0028-0836")
     repo, _, _, calls = await _run([print_only])
     assert calls["ppns"] == [["0028-0836"], ["1476-4687"]]
-    kwargs = repo.record_sudoc_check.call_args.kwargs
-    assert (kwargs["issn"], kwargs["eissn"]) == ("0028-0836", "1476-4687")
+    assert _written(repo) == {
+        "0028-0836": (IssnSupport.PRINT, True),
+        "1476-4687": (IssnSupport.ELECTRONIC, False),
+    }
 
 
 @pytest.mark.asyncio
@@ -137,9 +156,7 @@ async def test_serie_titree_comme_un_volume_recoit_son_titre_de_serie():
         "Proceedings of the 12th International Conference on Operations Research"
         " and Enterprise Systems (ICORES 2023)"
     )
-    icores = JournalSudocRow(
-        21000, title, "2184-4372", None, None, (), journal_type=JournalType.PROCEEDINGS
-    )
+    icores = _row(21000, title, issn="2184-4372", journal_type=JournalType.PROCEEDINGS)
     repo, _, metrics, _ = await _run(
         [icores], titles=[JournalTitleTypeRow(21000, title, JournalType.PROCEEDINGS)]
     )
@@ -154,9 +171,7 @@ async def test_serie_titree_comme_un_volume_recoit_son_titre_de_serie():
 @pytest.mark.asyncio
 async def test_revue_titree_avec_une_annee_garde_son_titre():
     """Cas réel : « Periodontology 2000 » est une revue."""
-    row = JournalSudocRow(
-        5, "Periodontology 2000", "0906-6713", None, None, (), JournalType.JOURNAL
-    )
+    row = _row(5, "Periodontology 2000", issn="0906-6713", journal_type=JournalType.JOURNAL)
     repo, _, _, _ = await _run(
         [row], titles=[JournalTitleTypeRow(5, "Periodontology 2000", JournalType.JOURNAL)]
     )

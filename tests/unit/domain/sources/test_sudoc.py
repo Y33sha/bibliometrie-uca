@@ -1,6 +1,7 @@
 """Tests de la lecture des notices Sudoc de publications en série (`domain.sources.sudoc`)."""
 
-from domain.sources.sudoc import MarcField, SudocSerialRecord, Support, parse_sudoc_serial_record
+from domain.journals.issns import IssnSupport
+from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
 
 
 def _field(tag: str, *subfields: tuple[str, str], ind1: str = "#", ind2: str = "#") -> MarcField:
@@ -29,7 +30,7 @@ class TestParseSudocSerialRecord:
             issn="1963-1006",
             issnl="0767-9513",
             cancelled_issns=(),
-            support=Support.ELECTRONIC,
+            support=IssnSupport.ELECTRONIC,
             other_support_issns=("0767-9513",),
             preceding_issns=("0762-5332",),
             succeeding_issns=(),
@@ -65,7 +66,7 @@ class TestParseSudocSerialRecord:
                 _field("440", ("x", "1476-4687")),
             ],
         )
-        assert record.support is Support.PRINT
+        assert record.support is IssnSupport.PRINT
         assert record.cancelled_issns == ("0302-2889",)
         assert record.succeeding_issns == ("1476-4687",)
         assert record.continuation_issns == ("1476-4687",)
@@ -75,7 +76,7 @@ class TestParseSudocSerialRecord:
         record = parse_sudoc_serial_record(
             "040645134", [_field("182", ("c", "c")), _field("183", ("a", "cde"))]
         )
-        assert record.support is Support.OTHER
+        assert record.support is IssnSupport.OTHER
 
     def test_cd_rom_named_in_title(self):
         """Cas réel : la notice « The L & O on CD-ROM » est codée comme une ressource en ligne."""
@@ -87,13 +88,17 @@ class TestParseSudocSerialRecord:
                 _field("200", ("a", "The l & o on cd-rom")),
             ],
         )
-        assert record.support is Support.OTHER
+        assert record.support is IssnSupport.OTHER
 
     def test_support_without_carrier_type(self):
         online = [_field("182", ("c", "c")), _field("135", ("a", "|r|||||||||||"))]
-        assert parse_sudoc_serial_record("1", online).support is Support.ELECTRONIC
-        assert parse_sudoc_serial_record("1", [_field("182", ("c", "c"))]).support is Support.OTHER
-        assert parse_sudoc_serial_record("1", [_field("182", ("c", "n"))]).support is Support.PRINT
+        assert parse_sudoc_serial_record("1", online).support is IssnSupport.ELECTRONIC
+        assert (
+            parse_sudoc_serial_record("1", [_field("182", ("c", "c"))]).support is IssnSupport.OTHER
+        )
+        assert (
+            parse_sudoc_serial_record("1", [_field("182", ("c", "n"))]).support is IssnSupport.PRINT
+        )
 
     def test_missing_fields(self):
         record = parse_sudoc_serial_record("1", [])
@@ -130,8 +135,8 @@ class TestParseSudocSerialRecord:
             ],
         )
         assert record.other_support_hints == (
-            ("1126-6708", Support.PRINT),
-            ("1127-2236", Support.OTHER),
+            ("1126-6708", IssnSupport.PRINT),
+            ("1127-2236", IssnSupport.OTHER),
         )
 
     def test_invalid_issn_is_ignored(self):

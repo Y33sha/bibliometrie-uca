@@ -5,7 +5,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular } from '$lib/labels';
+	import { docTypeSingular, issnLabel } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
@@ -136,18 +136,10 @@
 		</h1>
 		<div class="j-meta">
 			<div class="meta-row">
-				{#if journal.issn}
-					<span class="meta-label">ISSN</span>
-					<span class="id-badge">{journal.issn}</span>
-				{/if}
-				{#if journal.eissn}
-					<span class="meta-label">eISSN</span>
-					<span class="id-badge">{journal.eissn}</span>
-				{/if}
-				{#if journal.issnl}
-					<span class="meta-label">ISSN-L</span>
-					<span class="id-badge">{journal.issnl}</span>
-				{/if}
+				{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
+					<span class="meta-label">{issnLabel(issn)}</span>
+					<span class="id-badge">{issn.issn}</span>
+				{/each}
 			</div>
 			<div class="meta-row">
 				{#if journal.pub_name}

@@ -1,8 +1,8 @@
 """Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
 
-Sont reprises les revues jamais vérifiées qui portent un ISSN, valide ou rejeté, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs ISSN rejetés fautifs, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire les ISSN à mettre parmi les rejetés, à écarter, à corriger et à ranger. La revue est ensuite marquée vérifiée.
+Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
-Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue n'est pas marquée vérifiée : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
 """
 
 import logging
@@ -24,8 +24,9 @@ from domain.journals.issn_check import (
     check_journal_issns,
     correction_candidates,
 )
+from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
-from domain.sources.sudoc import SudocSerialRecord, Support
+from domain.sources.sudoc import SudocSerialRecord
 
 COMMIT_EVERY = 50  # revues par commit
 
@@ -35,27 +36,20 @@ FetchPpns = Callable[[httpx2.AsyncClient, Sequence[str]], Awaitable[dict[str, tu
 FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | None]]
 """`(client, ppn) -> notice`, ou `None` si la notice est introuvable ou illisible."""
 
-_SUPPORT_LABELS = {Support.PRINT: "papier", Support.ELECTRONIC: "en ligne"}
-
 # Le sort des ISSN d'une revue tient du détail : le terminal le masque, le journal le garde.
 _DETAIL = {"detail": True}
 
 
 def _journal_issns(row: JournalSudocRow) -> JournalIssns:
     return JournalIssns(
-        row.title,
-        row.issn,
-        row.eissn,
-        row.issnl,
-        row.rejected_issns,
-        row.document_issns,
-        holds_volumes=holds_volumes(row.journal_type),
+        row.title, row.issns, row.document_issns, holds_volumes=holds_volumes(row.journal_type)
     )
 
 
 def _adopted(row: JournalSudocRow, check: SudocCheck) -> tuple[str, ...]:
-    """ISSN venus des enregistrements de la revue que la vérification range dans une de ses colonnes."""
-    return tuple(i for i in row.document_issns if i in (check.issn, check.eissn, check.issnl))
+    """ISSN venus des enregistrements de la revue que la vérification rend actifs."""
+    active = {r.issn for r in check.issns if r.status is IssnStatus.ACTIVE}
+    return tuple(i for i in row.document_issns if i in active)
 
 
 def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) -> None:
@@ -69,22 +63,13 @@ def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) 
             "%s : ISSN de deux publications à égalité — laissés en l'état", label, extra=_DETAIL
         )
     for issn, reason in check.set_aside:
-        logger.info(
-            "%s : ISSN %s rangé parmi les ISSN rejetés (%s)", label, issn, reason, extra=_DETAIL
-        )
+        logger.info("%s : ISSN %s mis de côté (%s)", label, issn, reason, extra=_DETAIL)
     for issn, reason in check.discarded:
         logger.info("%s : ISSN %s écarté (%s)", label, issn, reason, extra=_DETAIL)
     for raw, corrected in check.corrections:
-        logger.info("%s : ISSN rejeté %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
+        logger.info("%s : ISSN mal formé %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
     if check.title is not None:
         logger.info("%s : titre de série « %s »", label, check.title, extra=_DETAIL)
-    if check.ambiguous_support is not None:
-        logger.info(
-            "%s : plusieurs ISSN %s — laissés dans leurs colonnes",
-            label,
-            _SUPPORT_LABELS.get(check.ambiguous_support, check.ambiguous_support),
-            extra=_DETAIL,
-        )
 
 
 async def run_check_journals_in_sudoc(
@@ -139,7 +124,7 @@ async def run_check_journals_in_sudoc(
     ) -> dict[str, SudocSerialRecord] | None:
         """Notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
         journal = _journal_issns(row)
-        issns = (*journal.examined(), *correction_candidates(journal.rejected))
+        issns = (*journal.examined(), *correction_candidates(journal.malformed()))
         records: dict[str, SudocSerialRecord] = {}
         try:
             await _read(client, issns, records)
@@ -172,19 +157,12 @@ async def run_check_journals_in_sudoc(
             _log_check(logger, row, check)
             journal_repo.record_sudoc_check(
                 row.id,
-                issn=check.issn,
-                eissn=check.eissn,
-                issnl=check.issnl,
-                rejected_issns=check.rejected,
+                issns=check.issns,
+                released=check.released,
                 checked_at=datetime.now(UTC),
                 title=check.title,
             )
-            changed = (check.issn, check.eissn, check.issnl, check.rejected) != (
-                row.issn,
-                row.eissn,
-                row.issnl,
-                row.rejected_issns,
-            )
+            changed = set(check.issns) != set(row.issns) or bool(check.released)
             metrics.add(
                 updated=int(changed),
                 unchanged=int(not changed),
@@ -193,7 +171,6 @@ async def run_check_journals_in_sudoc(
                 issn_discarded=len(check.discarded),
                 issn_corrected=len(check.corrections),
                 issn_conflicts=int(check.conflict),
-                issn_unranged=int(check.ambiguous_support is not None),
                 issn_from_documents=len(_adopted(row, check)),
                 series_titled=int(check.title is not None),
             )
