@@ -26,17 +26,18 @@ from pathlib import Path
 from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.sql_fragments import has_active_issn
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("snapshot_conference_papers", os.path.dirname(__file__))
 
 _SNAPSHOTS = Path("data/snapshots")
 
-_PAPERS = text("""
+_PAPERS = text(f"""
     WITH series AS (
-        SELECT j.id, (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL) AS has_issn
+        SELECT j.id, {has_active_issn("j.id")} AS has_issn
         FROM journals j
-        WHERE j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
+        WHERE {has_active_issn("j.id")}
            OR (SELECT count(*) FROM monographs m WHERE m.journal_id = j.id) >= 2
     )
     SELECT p.id,

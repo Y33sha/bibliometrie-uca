@@ -30,7 +30,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
-from domain.journals.issns import IssnSupport, JournalIssn
+from domain.journals.issns import IssnSupport, JournalIssn, source_issns
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -162,6 +162,12 @@ def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
     return journal_id
 
 
+def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
+    """`find_or_create_journal` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
+    issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
+    return find_or_create_journal(title, issns=issns, **kwargs)
+
+
 def _insert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
     return conn.execute(
         text(
@@ -289,11 +295,11 @@ class TestFindOrCreatePublisher:
 
 class TestFindOrCreateJournal:
     def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
-        assert find_or_create_journal(None, repo=gateway) is None
-        assert find_or_create_journal("", repo=gateway) is None
+        assert _find_or_create(None, repo=gateway) is None
+        assert _find_or_create("", repo=gateway) is None
 
     def test_creates_new_journal(self, sa_sync_conn, gateway):
-        j_id = find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
+        j_id = _find_or_create("Nature", issn="0028-0836", repo=gateway)
         row = _fetch_one(sa_sync_conn, "SELECT title FROM journals WHERE id = :id", id=j_id)
         row = SimpleNamespace(title=row.title, issn=_columns(sa_sync_conn, j_id).issn)
         assert row.title == "Nature"
@@ -309,8 +315,8 @@ class TestFindOrCreateJournal:
         deux formes portaient des clés distinctes (`... amp ...`) et la revue naissait en deux
         exemplaires — quatre cas relevés en base.
         """
-        premier = find_or_create_journal("Wood & Fire Safety", repo=gateway)
-        second = find_or_create_journal("Wood &amp; Fire Safety", repo=gateway)
+        premier = _find_or_create("Wood & Fire Safety", repo=gateway)
+        second = _find_or_create("Wood &amp; Fire Safety", repo=gateway)
         assert second == premier
         row = _fetch_one(
             sa_sync_conn,
@@ -322,27 +328,27 @@ class TestFindOrCreateJournal:
 
     def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", openalex_id="S137773608")
-        found = find_or_create_journal("Nature Journal", openalex_id="S137773608", repo=gateway)
+        found = _find_or_create("Nature Journal", openalex_id="S137773608", repo=gateway)
         assert found == existing
 
     def test_finds_by_issn(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
-        found = find_or_create_journal("Nature Variant", issn="0028-0836", repo=gateway)
+        found = _find_or_create("Nature Variant", issn="0028-0836", repo=gateway)
         assert found == existing
 
     def test_finds_by_eissn(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
-        found = find_or_create_journal("Nature", eissn="1476-4687", repo=gateway)
+        found = _find_or_create("Nature", eissn="1476-4687", repo=gateway)
         assert found == existing
 
     def test_finds_by_issnl(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
-        found = find_or_create_journal("Other Title", issnl="0028-0836", repo=gateway)
+        found = _find_or_create("Other Title", issnl="0028-0836", repo=gateway)
         assert found == existing
 
     def test_finds_by_name_form(self, sa_sync_conn, gateway):
-        find_or_create_journal("Nature", repo=gateway)
-        found = find_or_create_journal("nature", repo=gateway)
+        _find_or_create("Nature", repo=gateway)
+        found = _find_or_create("nature", repo=gateway)
         n = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS n FROM journals WHERE title_normalized = 'nature'")
         ).scalar_one()
@@ -353,7 +359,7 @@ class TestFindOrCreateJournal:
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
         pub_id = find_or_create_publisher("Springer", repo=publisher_gateway)
-        find_or_create_journal(
+        _find_or_create(
             "Nature",
             issn="0028-0836",
             eissn="1476-4687",
@@ -368,35 +374,35 @@ class TestFindOrCreateJournal:
         assert row.publisher_id == pub_id
 
     def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
-        j_id = find_or_create_journal("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
+        j_id = _find_or_create("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
     def test_finds_by_issn_under_another_form(self, sa_sync_conn, gateway):
-        existing = find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
-        found = find_or_create_journal("Nature Variant", issn="ISSN 00280836", repo=gateway)
+        existing = _find_or_create("Nature", issn="0028-0836", repo=gateway)
+        found = _find_or_create("Nature Variant", issn="ISSN 00280836", repo=gateway)
         assert found == existing
 
     def test_titles_emptied_by_normalization_do_not_match(self, sa_sync_conn, gateway):
         """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
-        greek = find_or_create_journal("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
-        cyrillic = find_or_create_journal("Теория вероятностей и ее применения", repo=gateway)
+        greek = _find_or_create("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
+        cyrillic = _find_or_create("Теория вероятностей и ее применения", repo=gateway)
         assert greek != cyrillic
 
     def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
-        j_id = find_or_create_journal("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
+        j_id = _find_or_create("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.issn is None
         assert row.eissn == "1476-4687"
         assert row.rejected_issns == ["(Internet)"]
-        assert "ISSN mal formé (revue 'Nature') : issn = '(Internet)'" in caplog.text
+        assert "ISSN mal formé (revue 'Nature') : '(Internet)'" in caplog.text
 
     def test_rejected_issns_accumulate_without_duplicates(self, sa_sync_conn, gateway):
         """Les ISSN invalides s'ajoutent à ceux de la revue trouvée, sans doublon."""
-        j_id = find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        find_or_create_journal("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
+        j_id = _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        _find_or_create("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.rejected_issns == ["1234-5678", "1476-4688"]
 
@@ -404,7 +410,7 @@ class TestFindOrCreateJournal:
         """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        find_or_create_journal("Nature", issn="1476-4687", repo=gateway)
+        _find_or_create("Nature", issn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.issn is None
         assert row.eissn == "1476-4687"
@@ -413,7 +419,7 @@ class TestFindOrCreateJournal:
     def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
         """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
         j_id = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
-        find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
+        _find_or_create("Nature", issn="0028-0836", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
 
@@ -421,7 +427,7 @@ class TestFindOrCreateJournal:
         """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
         j_id = _insert_journal(sa_sync_conn, "Nature", issn="0305-1048", rejected=("1362-4954",))
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        found = find_or_create_journal("Other title", eissn="1362-4954", repo=gateway)
+        found = _find_or_create("Other title", eissn="1362-4954", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert found == j_id
         assert row.eissn is None
@@ -430,7 +436,7 @@ class TestFindOrCreateJournal:
     def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
+        _find_or_create("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.issn == "0028-0836"
         assert row.sudoc_checked_at is None
@@ -438,7 +444,7 @@ class TestFindOrCreateJournal:
     def test_new_rejected_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
         j_id = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
+        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert row.rejected_issns == ["1476-4688"]
         assert row.sudoc_checked_at is None

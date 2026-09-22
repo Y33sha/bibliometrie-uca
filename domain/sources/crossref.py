@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
+from domain.journals.issns import IssnSupport, JournalIssn, received_issns
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 _JATS_TAG_RE = re.compile(r"</?jats:[A-Za-z][^<>]*>")
 
@@ -44,31 +45,33 @@ def extract_crossref_pub_year(msg: Mapping[str, JsonValue], *, max_year: int) ->
     return None
 
 
-def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Retourne `(issn_print, eissn)`.
+_ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRONIC}
 
-    CrossRef expose deux formats : `issn-type` (objets typés `{"type": "electronic"|"print", "value": "..."}`, fiable quand présent) et `ISSN` (liste plate non typée, fallback). Si `issn-type` distingue clairement les deux, on les sépare ; sinon on prend le premier `ISSN` brut comme print et eissn reste None.
-    """
-    issn_print: str | None = None
-    eissn: str | None = None
+
+def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[JournalIssn, ...]:
+    """ISSN d'une notice CrossRef. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
+    typed = []
     for entree in as_sequence(msg.get("issn-type")):
         issn_obj = as_mapping(entree)
-        t = as_str(issn_obj.get("type"))
-        v = issn_obj.get("value")
-        if not isinstance(v, str) or not v.strip():
-            continue
-        if t == "electronic" and not eissn:
-            eissn = v.strip()
-        elif t == "print" and not issn_print:
-            issn_print = v.strip()
+        support = _ISSN_SUPPORTS.get(as_str(issn_obj.get("type")) or "")
+        value = as_str(issn_obj.get("value"))
+        if support is not None and value:
+            typed.append(JournalIssn(issn=value, support=support))
+    plain = [JournalIssn(issn=value) for value in as_strs(msg.get("ISSN"))]
+    return received_issns([*typed, *plain])
+
+
+def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
+    """Retourne `(issn_print, eissn)` : le premier ISSN de chaque support, ou à défaut le premier ISSN de support inconnu comme ISSN papier."""
+    issns = crossref_issns(msg)
+
+    def first(support: IssnSupport | None) -> str | None:
+        return next((r.issn for r in issns if r.support is support), None)
+
+    issn_print, eissn = first(IssnSupport.PRINT), first(IssnSupport.ELECTRONIC)
     if issn_print or eissn:
         return issn_print, eissn
-    issns = msg.get("ISSN") or []
-    if isinstance(issns, list) and issns:
-        first = issns[0]
-        if isinstance(first, str) and first.strip():
-            return first.strip(), None
-    return None, None
+    return first(None), None
 
 
 def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:

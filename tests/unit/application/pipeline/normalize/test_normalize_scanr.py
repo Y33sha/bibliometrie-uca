@@ -31,6 +31,7 @@ from application.pipeline.normalize.normalize_scanr import (
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
+from domain.journals.issns import JournalIssn
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -242,12 +243,12 @@ class TestUpsertPublisherEtJournal:
         assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
     def test_revue_et_ses_deux_issn(self):
-        """Les identifiants de revue arrivent en liste : le premier est celui du papier, le second celui de l'édition en ligne."""
+        """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
         facts = get_container_facts(
             {"source": {"title": "J. Things", "journalIssns": ["1234-5679", "8765-4326"]}}
         )
         assert facts.journal_title == "J. Things"
-        assert (facts.issn, facts.eissn) == ("1234-5679", "8765-4326")
+        assert facts.issns == (JournalIssn(issn="1234-5679"), JournalIssn(issn="8765-4326"))
 
     def test_communication_volume_du_congres(self):
         facts = get_container_facts(

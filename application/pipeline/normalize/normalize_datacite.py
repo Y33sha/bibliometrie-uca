@@ -34,6 +34,7 @@ from application.services.monographs.containers import Containers, find_or_creat
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -90,7 +91,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
         journal_title=title,
         collection_title=title if issn else None,
         book_title=None if issn else title,
-        issn=issn,
+        issns=source_issns(unknown=[issn]),
         isbns=tuple(get_isbns(attributes)),
         year=extract_datacite_pub_year(attributes, max_year=today().year + 1),
     )

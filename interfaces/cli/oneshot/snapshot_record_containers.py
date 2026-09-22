@@ -23,6 +23,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.sql_fragments import has_active_issn
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("snapshot_record_containers", os.path.dirname(__file__))
@@ -30,10 +31,10 @@ log = setup_logger("snapshot_record_containers", os.path.dirname(__file__))
 _SNAPSHOTS = Path("data/snapshots")
 _EXAMPLES = 5
 
-_RECORDS = text("""
+_RECORDS = text(f"""
     SELECT sp.source::text AS source, sp.source_id, sp.doc_type,
            normalized.id AS journal_id, j.title AS journal_title,
-           (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL) AS journal_has_issn,
+           coalesce({has_active_issn("j.id")}, false) AS journal_has_issn,
            sp.monograph_id, m.title AS monograph_title
     FROM source_publications sp
     CROSS JOIN LATERAL (

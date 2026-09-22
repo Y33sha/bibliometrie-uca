@@ -36,11 +36,12 @@ from domain.journals.containers import (
     container_role,
     is_dated_event_without_issn,
 )
+from domain.journals.issns import IssnSupport, JournalIssn
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text
 from domain.sources.hal import hal_text_field
 from domain.sources.openalex import parse_primary_location, should_skip_publisher_journal
-from domain.types import JsonValue, as_mapping, as_str, as_strs
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
@@ -56,7 +57,13 @@ _RECORDS = text("""
            coalesce(sp.meta ? 'conference', false) AS declares_conference,
            sp.external_ids->'isbn' AS isbns, sp.external_ids->'eisbn' AS eisbns,
            normalized.id AS journal_id, sp.monograph_id,
-           j.title AS journal_title, j.issn, j.eissn, j.issnl, j.openalex_id,
+           j.title AS journal_title,
+           (SELECT coalesce(json_agg(json_build_object(
+                        'issn', i.issn, 'support', i.support, 'linking', i.linking) ORDER BY i.id),
+                    '[]')
+            FROM journal_issns i
+            WHERE i.journal_id = normalized.id AND i.status = 'active') AS journal_issns,
+           j.openalex_id,
            j.oa_model::text AS oa_model, j.publisher_id AS journal_publisher_id,
            m.title AS monograph_title, m.publisher_id AS monograph_publisher_id
     FROM source_publications sp
@@ -87,9 +94,8 @@ class StoredRecord(NamedTuple):
     journal_id: int | None
     monograph_id: int | None
     journal_title: str | None
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
+    journal_issns: JsonValue
+    """ISSN actifs de l'entrée de `journals` : `issn`, `support`, `linking`."""
     openalex_id: str | None
     oa_model: str | None
     journal_publisher_id: int | None
@@ -98,7 +104,7 @@ class StoredRecord(NamedTuple):
 
     @property
     def has_issn(self) -> bool:
-        return bool(self.issn or self.eissn or self.issnl)
+        return bool(self.journal_issns)
 
     @property
     def role(self) -> ContainerRole:
@@ -132,9 +138,14 @@ def describe(record: StoredRecord) -> ContainerDescription:
         journal_title=record.journal_title,
         collection_title=collection,
         book_title=book,
-        issn=record.issn,
-        eissn=record.eissn,
-        issnl=record.issnl,
+        issns=tuple(
+            JournalIssn(
+                issn=str(entry["issn"]),
+                support=IssnSupport(entry["support"]) if entry["support"] else None,
+                linking=bool(entry["linking"]),
+            )
+            for entry in (as_mapping(e) for e in as_sequence(record.journal_issns))
+        ),
         openalex_id=record.openalex_id,
         oa_model=OaModel(record.oa_model) if record.oa_model else None,
         isbns=_strs(record.isbns),

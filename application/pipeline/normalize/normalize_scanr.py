@@ -24,6 +24,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
@@ -38,7 +39,7 @@ from domain.sources.scanr import (
     select_leaf_affiliations,
     split_scanr_concepts,
 )
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
 # UTILITAIRES
@@ -84,7 +85,6 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que ScanR dit du conteneur d'un document. `source.title` est la revue d'un article, le congrès d'une communication (type `proceedings`), et la plateforme de l'éditeur d'un chapitre : un chapitre reçoit sa seule collection, quand un ISSN la désigne. ScanR ne donne pas d'ISBN."""
     source = as_mapping(doc.get("source"))
     title = as_str(source.get("title"))
-    issn, eissn = _extract_journal_issns(source)
     raw_type = as_str(doc.get("type"))
     return ContainerDescription(
         source="scanr",
@@ -93,8 +93,8 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         journal_title=title,
         collection_title=title,
         book_title=title if raw_type == "proceedings" else None,
-        issn=issn,
-        eissn=eissn,
+        # ScanR ne donne pas le support de ses ISSN.
+        issns=source_issns(unknown=as_strs(source.get("journalIssns"))),
         year=as_int(doc.get("year")),
     )
 

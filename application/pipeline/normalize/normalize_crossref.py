@@ -40,6 +40,7 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
+    crossref_issns,
     extract_crossref_conference,
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -205,7 +206,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     raw_type = as_str(msg.get("type"))
     conference = extract_crossref_conference(msg)
     titles = _container_titles(msg)
-    issn, eissn = get_issns(msg)
+    issns = crossref_issns(msg)
     external_ids = get_external_ids(msg) or {}
     role = container_role(raw_type, "crossref", declares_conference=conference is not None)
     collection_title = book_title = None
@@ -214,7 +215,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     elif role is ContainerRole.PART:
         if len(titles) >= 2:
             collection_title, book_title = split_collection_and_volume(titles[0], titles[-1])
-        elif titles and (issn or eissn):
+        elif titles and issns:
             collection_title = titles[0]
             book_title = as_str(conference.get("name")) if conference else None
         elif titles:
@@ -227,8 +228,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
         journal_title=titles[0] if titles else None,
         collection_title=collection_title,
         book_title=book_title,
-        issn=issn,
-        eissn=eissn,
+        issns=issns,
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
         year=get_pub_year(msg),

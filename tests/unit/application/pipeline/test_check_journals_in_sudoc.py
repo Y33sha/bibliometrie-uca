@@ -8,9 +8,10 @@ import pytest
 
 from application.pipeline.publishers_journals import check_journals_in_sudoc as mod
 from application.ports.pipeline.journals import JournalSudocRow, JournalTitleTypeRow
-from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn, issns_from_columns
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord
+from tests.journal_issns import issns_from_columns
 
 
 def _record(

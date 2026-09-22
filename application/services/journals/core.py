@@ -25,57 +25,33 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services._merge import load_merge_pair
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
-from domain.journals.issns import JournalIssn, issns_from_columns, validate_journal_issns
+from domain.journals.issns import (
+    IssnStatus,
+    JournalIssn,
+    received_issns,
+    validate_journal_issns,
+)
 from domain.journals.journal import OaModel
 from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import ISSN, issn_rejection_reason
+from domain.publications.identifiers import issn_rejection_reason
 
 logger = logging.getLogger(__name__)
-
-
-def _reject_issn(value: str, field: str, title: str, rejected: list[str]) -> None:
-    """Journalise une valeur d'ISSN invalide et l'ajoute à `rejected`."""
-    # Ligne de détail : le terminal la masque, le journal la garde.
-    logger.warning(
-        "ISSN mal formé (revue %r) : %s = %r — %s, valeur gardée telle que reçue",
-        title,
-        field,
-        value,
-        issn_rejection_reason(value),
-        extra={"detail": True},
-    )
-    if value.strip() not in rejected:
-        rejected.append(value.strip())
-
-
-def _valid_issn(value: str | None, field: str, title: str, rejected: list[str]) -> str | None:
-    """ISSN normalisé, ou `None` pour une valeur vide ou invalide. Une valeur invalide est journalisée et ajoutée à `rejected`."""
-    if not value:
-        return None
-    issn = ISSN.try_parse(value)
-    if issn is None:
-        _reject_issn(value, field, title, rejected)
-        return None
-    return str(issn)
 
 
 def find_or_create_journal(
     title: str | None,
     *,
-    issn: str | None = None,
-    eissn: str | None = None,
-    issnl: str | None = None,
+    issns: Sequence[JournalIssn] = (),
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: OaModel | None = None,
-    rejected_issns: Sequence[str] = (),
     repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
-    Les ISSN passent par le value object `ISSN`. Une valeur invalide, ou reçue dans `rejected_issns`, est journalisée et gardée parmi les ISSN de la revue, au statut `malformed`.
+    Les ISSN passent par `received_issns`. Une valeur invalide est journalisée et gardée parmi les ISSN de la revue, au statut `malformed`.
 
-    Cascade de recherche : `openalex_id`, puis chacun des ISSN valides fournis (`issn`, `eissn`, `issnl`) parmi les ISSN des revues, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
+    Cascade de recherche : `openalex_id`, puis chacun des ISSN valides fournis parmi les ISSN des revues, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
     Un journal trouvé voit ses métadonnées manquantes enrichies et reçoit les ISSN qu'il ne porte pas ; le titre reçu devient une forme de nom — les variantes s'accumulent pour les matchs par titre suivants.
     """
@@ -87,13 +63,17 @@ def find_or_create_journal(
     # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
     title = to_plain_text(title)
     title_normalized = normalize_text(title)
-    rejected: list[str] = []
-    issn = _valid_issn(issn, "issn", title, rejected)
-    eissn = _valid_issn(eissn, "eissn", title, rejected)
-    issnl = _valid_issn(issnl, "issnl", title, rejected)
-    for value in rejected_issns:
-        _reject_issn(value, "issn", title, rejected)
-    issns = issns_from_columns(issn, eissn, issnl, rejected)
+    issns = received_issns(issns)
+    for row in issns:
+        if row.status is IssnStatus.MALFORMED:
+            # Ligne de détail : le terminal la masque, le journal la garde.
+            logger.warning(
+                "ISSN mal formé (revue %r) : %r — %s, valeur gardée telle que reçue",
+                title,
+                row.issn,
+                issn_rejection_reason(row.issn),
+                extra={"detail": True},
+            )
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
         """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
@@ -118,15 +98,15 @@ def find_or_create_journal(
             # openalex_id inconnu : on cherche quand même par ISSN/name_form
             # avant de créer, pour rattacher l'openalex_id à un journal existant
 
-        # 2-4. Par ISSN / eISSN / ISSN-L, parmi les ISSN des revues
-        for value in (issn, eissn, issnl):
-            if not value:
+        # 2. Par chacun des ISSN valides, parmi les ISSN des revues
+        for row in issns:
+            if row.status is IssnStatus.MALFORMED:
                 continue
-            jid = repo.find_journal_by_issn_any(value)
+            jid = repo.find_journal_by_issn_any(row.issn)
             if jid:
                 return _match_and_enrich(jid)
 
-        # 5. Par forme de nom (priorité aux journals à ISSN électronique actif). Un titre dont la normalisation ne
+        # 3. Par forme de nom (priorité aux journals à ISSN électronique actif). Un titre dont la normalisation ne
         # garde rien (alphabet non latin, symboles) ne désigne aucune revue.
         jid = (
             repo.find_journal_by_name_form(title_normalized, publisher_id)
@@ -140,7 +120,7 @@ def find_or_create_journal(
             repo.add_journal_issns(jid, issns)
             return jid
 
-        # 6. Créer + enregistrer la forme de nom
+        # 4. Créer + enregistrer la forme de nom
         created = repo.create_journal(
             title=title, publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model
         )

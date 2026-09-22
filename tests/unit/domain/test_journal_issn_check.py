@@ -7,8 +7,9 @@ from domain.journals.issn_check import (
     check_journal_issns,
     correction_candidates,
 )
-from domain.journals.issns import IssnSupport, JournalIssn, issns_from_columns
+from domain.journals.issns import IssnSupport, JournalIssn
 from domain.sources.sudoc import SudocSerialRecord
+from tests.journal_issns import issns_from_columns
 
 PRINT, ELECTRONIC, OTHER = IssnSupport.PRINT, IssnSupport.ELECTRONIC, IssnSupport.OTHER
 
