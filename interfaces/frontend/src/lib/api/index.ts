@@ -13,7 +13,6 @@ export * as auth from './auth';
 export * as persons from './persons';
 export * as authorships from './authorships';
 export * as journals from './journals';
-export * as monographs from './monographs';
 export * as publishers from './publishers';
 export * as structures from './structures';
 export * as perimeters from './perimeters';

@@ -2310,11 +2310,7 @@ export interface paths {
          * @description Fiche d'une monographie. Renvoie 404 sur une monographie inconnue.
          */
         get: operations["get_monograph_api_monographs__monograph_id__get"];
-        /**
-         * Update Monograph
-         * @description Met à jour une monographie, champ par champ. Renvoie 404 sur une monographie inconnue.
-         */
-        put: operations["update_monograph_api_monographs__monograph_id__put"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3697,18 +3693,6 @@ export interface components {
             monographs: components["schemas"]["MonographListItem"][];
             /** Pages */
             readonly pages: number;
-        };
-        /**
-         * MonographUpdate
-         * @description Champs éditables d'une monographie, en modification sélective : seuls les champs fournis sont écrits.
-         */
-        MonographUpdate: {
-            /** Title */
-            title?: string | null;
-            /** Proceedings */
-            proceedings?: boolean | null;
-            /** Year */
-            year?: number | null;
         };
         /**
          * NameDuplicatePairOut
@@ -9083,41 +9067,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonographListItem"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_monograph_api_monographs__monograph_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                monograph_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MonographUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
