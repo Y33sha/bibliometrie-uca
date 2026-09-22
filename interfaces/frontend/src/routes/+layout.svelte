@@ -16,7 +16,7 @@
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
-  const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publications") || isActive("/admin/publishers") || isActive("/admin/journals"));
+  const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publications") || isActive("/admin/publishers") || isActive("/admin/journals") || isActive("/admin/monographs"));
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
   const isPublicReferentiels = $derived(isActive("/publishers") || isActive("/journals") || isActive("/subjects"));
 
@@ -64,6 +64,7 @@
           <a href="{base}/admin/publications" class:active={isActive("/admin/publications")}>Publications</a>
           <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
           <a href="{base}/admin/journals" class:active={isActive("/admin/journals")}>Revues</a>
+          <a href="{base}/admin/monographs" class:active={isActive("/admin/monographs")}>Monographies</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses}>

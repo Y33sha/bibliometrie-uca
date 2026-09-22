@@ -2276,6 +2276,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/monographs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Monographs
+         * @description Liste paginée des monographies, avec leur éditeur, leur collection et le nombre de publications qu'elles contiennent.
+         *
+         *     `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `kind` restreint aux livres (`book`) ou aux volumes d'actes (`proceedings`).
+         */
+        get: operations["list_monographs_api_monographs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monographs/{monograph_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monograph
+         * @description Fiche d'une monographie. Renvoie 404 sur une monographie inconnue.
+         */
+        get: operations["get_monograph_api_monographs__monograph_id__get"];
+        /**
+         * Update Monograph
+         * @description Met à jour une monographie, champ par champ. Renvoie 404 sur une monographie inconnue.
+         */
+        put: operations["update_monograph_api_monographs__monograph_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pipeline/phases": {
         parameters: {
             query?: never;
@@ -3610,6 +3656,59 @@ export interface components {
             source_id: number;
             /** Target Id */
             target_id: number;
+        };
+        /**
+         * MonographListItem
+         * @description Ligne de la liste des monographies. `pub_count` compte les publications qu'elle contient.
+         */
+        MonographListItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Proceedings */
+            proceedings: boolean;
+            /** Year */
+            year: number | null;
+            /** Isbn */
+            isbn: string | null;
+            /** Eisbn */
+            eisbn: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Pub Name */
+            pub_name: string | null;
+            /** Journal Id */
+            journal_id: number | null;
+            /** Journal Title */
+            journal_title: string | null;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /** MonographListResponse */
+        MonographListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Monographs */
+            monographs: components["schemas"]["MonographListItem"][];
+            /** Pages */
+            readonly pages: number;
+        };
+        /**
+         * MonographUpdate
+         * @description Champs éditables d'une monographie, en modification sélective : seuls les champs fournis sont écrits.
+         */
+        MonographUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Proceedings */
+            proceedings?: boolean | null;
+            /** Year */
+            year?: number | null;
         };
         /**
          * NameDuplicatePairOut
@@ -8918,6 +9017,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MergeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_monographs_api_monographs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+                sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "pubs_asc" | "pubs_desc";
+                search?: string;
+                kind?: "" | "book" | "proceedings";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonographListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monograph_api_monographs__monograph_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                monograph_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonographListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_monograph_api_monographs__monograph_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                monograph_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonographUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
