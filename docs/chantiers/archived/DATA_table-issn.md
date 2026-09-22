@@ -53,7 +53,7 @@ Table `journal_issns`, une ligne par ISSN et par revue. Clé technique `id` ; un
 
 ### 3. Documentation
 
-- [ ] Mise à jour de `docs/agregats/journals.md` et des pages du pipeline qui décrivent les ISSN.
+- [x] Mise à jour de `docs/agregats/journals.md` et des pages du pipeline et des sources qui décrivent les ISSN.
 
 ## Questions ouvertes
 
