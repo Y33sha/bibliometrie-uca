@@ -118,15 +118,23 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Instantané des articles de congrès (`snapshot_conference_papers`), avant la bascule : 12 842 articles, 627 séries (536 à ISSN, 91 sans), 1 198 volumes (1 133 en monographie, 65 dans `journals`), 10 488 articles sans série, 11 070 sans volume.
 - [x] Normalisation cible.
 - [x] Audit de l'écart entre le calcul sur la base et la normalisation, sur 100 notices du raw store par strate (`move_volumes_to_monographs --audit`). Articles de revue, conteneurs datés sans ISSN, livres et parties sans entrée de `journals` : aucun écart. Écarts restants : conteneur sans ISSN d'une partie (ScanR, HAL : 8 sur 100 entrées sans ISSN), monographie créée par l'ancienne lecture des titres Crossref (« Annals of Computer Science and Information Systems »), type brut OpenAlex dépassé.
-- [ ] Instantané avant réhydratation.
-- [ ] Réhydratation du raw store et renormalisation du stock.
-- [ ] Audit avant/après : quantifier chaque type de problème.
-- [ ] Oneshot, puis `publishers_journals` et `publications` ; un second run doit tout laisser en l'état.
-- [ ] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
-- [ ] Mesure finale : instantané après la bascule, comparé au premier (`--compare`).
+- [x] Instantané avant réhydratation (`snapshot_record_containers`, `snapshot_conference_papers`).
+- [x] Réhydratation du raw store et renormalisation du stock.
+- [ ] Audit avant/après : quantifier chaque type de problème. Comparaison par enregistrement, après normalisation (`snapshot_record_containers --compare`) :
+    - changements attendus. 6 325 livres et chapitres gagnent une monographie, surtout chez HAL. 2 439 enregistrements quittent une entrée de `journals` sans ISSN qui décrit un volume ; 1 189 reçoivent une monographie (« ESAFORM 2021 », « LIPIcs, Volume 210, CP 2021 »). La lecture des deux titres Crossref corrige 46 monographies (« Planta Medica » devient « 67th International Congress… »). 112 revues corrigées (« Physical review / C C96(6) » devient « Physical review. C ») ;
+    - collections à ISSN perdues (76) : la notice est sans ISSN, alors que la base connaît la collection et son ISSN (« Goldschmidt Abstracts », « Gut » pour les communications IDDF). 26 articles OpenAlex perdent leur revue à ISSN, cause inconnue ;
+    - titres non latins : « 淡江外語論叢 » créé deux fois (103320, 103324), « Детские чтения », « материалы конференции ». L'entrée 1614 « Παιδαγωγικά ρεύματα στο Αιγαίο » réunissait des documents sans rapport. Hypothèse : un titre dont la normalisation ne garde rien crée une entrée à chaque rencontre ;
+    - cinq livres perdent leur monographie (ScanR, HAL : « Blaise Cendrars, le rire en éclats ») ;
+    - série sans ISSN créée pour un volume : « Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence » (ordinal en toutes lettres) ;
+    - revue recréée sous un nouvel id : « Aristotle's Generation of Animals ».
+- [x] Instantané des articles de congrès après la phase `publications`, comparé à celui d'avant : volumes dans `journals` 65 → 23, en monographie 1 133 → 1 261 ; 9 892 articles sans série ni volume. Les 23 restants : enregistrements Crossref absents du raw store, jamais renormalisés ; articles OpenAlex dont le type brut gardé dans `raw_metadata` est périmé (10 891 enregistrements OpenAlex sur 23 890 dont le type est corrigé).
+- [x] Oneshot sur les 2 424 enregistrements absents du raw store (`move_volumes_to_monographs`), puis `publishers_journals` et `publications`. 24 enregistrements changent de conteneurs. Un second run laisse tout en l'état.
+- [x] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
+- [x] Mesure finale, comparée au premier instantané : 12 802 articles, 632 séries (545 à ISSN, 87 sans), volumes en monographie 1 133 → 1 268, dans `journals` 65 → 11 ; 9 830 articles sans série ni volume. Les 11 restants : 6 conteneurs OpenAlex sans année (« Winter Simulation Conference », « Symposium on Discrete Algorithms »), qui relèvent de la question « Niveau d'un conteneur sans ISSN » ; 5 revues HAL sans ISSN (« Questio »).
 
 ### 8. Administration
 
+- [x] Page Monographies dans les référentiels de l'administration, en lecture seule.
 - [ ] Conversion d'une entrée de `journals` en monographie, et l'inverse. La décision survit à la renormalisation : le classement d'un titre la consulte avant ses règles.
 
 ### 9. Type contredit par la forme du DOI
