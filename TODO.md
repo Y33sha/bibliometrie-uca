@@ -24,6 +24,7 @@
 * [ ] place_name_forms n'a pas de clé étrangère vers countries
 * [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée) / Cf personne 62293
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
+* [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -46,6 +47,7 @@
 * [ ] runs pipeline: les messages d'erreur n'affichent aucune info utile (Can't reconnect until invalid transaction is rolled back. Please rollback() fully before proceeding (Background on this error at: https://sqlalche.me/e/20/8s2b))
 * [ ] admin/person: ne pas proposer d'absorber un homonyme si les deux ont une fiche RH
 * [ ] Référentiels: ajouter Monographies + Conférences
+* [ ] volet latéral pour Editeurs et Revues
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
