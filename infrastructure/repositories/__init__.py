@@ -16,6 +16,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.monograph_repository import MonographRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -27,6 +28,7 @@ from .audit_repository import PgAuditRepository
 from .authorship_repository import PgAuthorshipRepository
 from .config_repository import PgConfigRepository
 from .journal_repository import PgJournalRepository
+from .monograph_repository import PgMonographRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
@@ -52,6 +54,10 @@ def config_repository(conn: Connection) -> ConfigRepository:
 
 def journal_repository(conn: Connection) -> JournalRepository:
     return PgJournalRepository(conn)
+
+
+def monograph_repository(conn: Connection) -> MonographRepository:
+    return PgMonographRepository(conn)
 
 
 def perimeter_repository(conn: Connection) -> PerimeterRepository:

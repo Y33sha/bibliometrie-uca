@@ -497,10 +497,19 @@ _ISSN_SEARCH_RE = re.compile(r"\d{1,8}|\d{7}X", re.ASCII)
 def issn_search_prefix(raw: str) -> str | None:
     """Début d'ISSN que porte un terme de recherche, sans séparateur et `X` en majuscule, ou None quand le terme n'en porte pas.
 
-    Un ISSN s'écrit `NNNN-NNNC`, la clé `C` valant un chiffre ou `X` ; le terme est reconnu sur cette forme, tronquée à droite. La clé de contrôle n'est pas vérifiée : les ISSN rejetés d'une revue sont fautifs pour certains, et restent ainsi cherchables.
+    Un ISSN s'écrit `NNNN-NNNC`, la clé `C` valant un chiffre ou `X` ; le terme est reconnu sur cette forme, tronquée à droite. La clé de contrôle n'est pas vérifiée : les valeurs mal formées d'une revue restent ainsi cherchables.
     """
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION)).upper()
     return cleaned if _ISSN_SEARCH_RE.fullmatch(cleaned) else None
+
+
+_ISBN_SEARCH_RE = re.compile(r"97[89]\d{0,10}", re.ASCII)
+
+
+def isbn_search_prefix(raw: str) -> str | None:
+    """Début d'ISBN-13 que porte un terme de recherche, sans séparateur, ou None quand le terme n'en porte pas. Un ISBN-13 commence par 978 ou 979."""
+    cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION))
+    return cleaned if _ISBN_SEARCH_RE.fullmatch(cleaned) else None
 
 
 def issn_typo_candidates(raw: str) -> frozenset[str]:

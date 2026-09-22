@@ -23,6 +23,7 @@ from application.ports.read_models.entity_labels_queries import EntityLabelQueri
 from application.ports.read_models.feedback_queries import FeedbackQueries
 from application.ports.read_models.hal_problems_queries import HalProblemsQueries
 from application.ports.read_models.journals_queries import JournalQueries
+from application.ports.read_models.monographs_queries import MonographQueries
 from application.ports.read_models.perimeters_queries import PerimetersQueries
 from application.ports.read_models.persons_queries import PersonsQueries
 from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
@@ -36,6 +37,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.monograph_repository import MonographRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -58,6 +60,7 @@ from infrastructure.read_models.entity_labels import PgEntityLabelQueries
 from infrastructure.read_models.feedback import PgFeedbackQueries
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from infrastructure.read_models.journals import PgJournalQueries
+from infrastructure.read_models.monographs import PgMonographQueries
 from infrastructure.read_models.perimeters import PgPerimetersQueries
 from infrastructure.read_models.persons import PgPersonsQueries
 from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
@@ -71,6 +74,7 @@ from infrastructure.repositories import (
     audit_repository,
     authorship_repository,
     journal_repository,
+    monograph_repository,
     perimeter_repository,
     person_repository,
     publication_repository,
@@ -208,6 +212,14 @@ def journal_queries(conn: Connection = Depends(db_conn)) -> JournalQueries:
 
 def journal_repo(conn: Connection = Depends(db_conn)) -> JournalRepository:
     return journal_repository(conn)
+
+
+def monograph_queries(conn: Connection = Depends(db_conn)) -> MonographQueries:
+    return PgMonographQueries(conn)
+
+
+def monograph_repo(conn: Connection = Depends(db_conn)) -> MonographRepository:
+    return monograph_repository(conn)
 
 
 def publisher_queries(conn: Connection = Depends(db_conn)) -> PublisherQueries:
