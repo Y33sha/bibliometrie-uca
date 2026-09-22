@@ -94,6 +94,24 @@ class TestUpsertSourcePublication:
             {"id": sp_id},
         ).scalar_one()
 
+    def test_reimport_clears_the_original_values_of_corrections(self, sa_sync_conn):
+        """Régression : une valeur d'origine gardée d'un import précédent l'emportait sur la valeur fraîche à la correction suivante."""
+        staging_id = _create_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"
+            ),
+            {"raw": '{"doc_type": {"raw": "conference-paper", "corrected_by": "X"}}', "id": sp_id},
+        )
+        _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT raw_metadata FROM source_publications WHERE id = :id"), {"id": sp_id}
+            ).scalar_one()
+            == {}
+        )
+
     def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
         """La colonne est `NOT NULL` et contrainte à un objet JSON."""
         staging_id = _create_staging(sa_sync_conn)
