@@ -5,9 +5,11 @@ Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normali
 `JOURNAL_TYPES` reste synchronisé avec l'enum SQL `journal_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
+
+from domain.journals.issns import JournalIssn
 
 
 class JournalType(StrEnum):
@@ -63,9 +65,7 @@ class Journal:
 
     id: int | None
     title: str
-    issn: str | None = None
-    eissn: str | None = None
-    issnl: str | None = None
+    issns: list[JournalIssn] = field(default_factory=list)
     publisher_id: int | None = None
     openalex_id: str | None = None
     is_in_doaj: bool = False

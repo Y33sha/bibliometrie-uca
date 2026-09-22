@@ -52,7 +52,7 @@
 	}
 
 	function issns(j: Journal): string {
-		return [j.issn, j.eissn].filter(Boolean).join(' / ') || 'sans ISSN';
+		return j.issns.join(' / ') || 'sans ISSN';
 	}
 
 	/** « 32 documents OpenAlex », « 20 documents OpenAlex, 12 HAL ». */

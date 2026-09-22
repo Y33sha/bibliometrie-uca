@@ -11,13 +11,14 @@ from typing import Protocol, TypedDict
 
 from pydantic import BaseModel
 
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import Journal, JournalType, OaModel
 
 
 class SharedTitleJournalPair(TypedDict):
     """Paire de revues homonymes entre deux éditeurs, et leurs identifiants normalisés.
 
-    Rendue par `find_shared_title_journal_pairs` : chaque ligne porte les deux revues et les six valeurs ISSN des deux côtés, pour que le service détecte en une passe les conflits qui empêchent une fusion.
+    Rendue par `find_shared_title_journal_pairs` : chaque ligne porte les deux revues et leurs ISSN, pour que le service détecte en une passe les conflits qui empêchent une fusion.
     """
 
     target_journal_id: int
@@ -26,12 +27,18 @@ class SharedTitleJournalPair(TypedDict):
     source_title: str
     t_title: str
     s_title: str
-    t_issn: str | None
-    s_issn: str | None
-    t_eissn: str | None
-    s_eissn: str | None
-    t_issnl: str | None
-    s_issnl: str | None
+    t_issns: list[JournalIssn]
+    s_issns: list[JournalIssn]
+
+
+class JournalIssnInput(BaseModel):
+    """Un ISSN d'une revue, saisi à l'administration."""
+
+    issn: str
+    support: IssnSupport | None = None
+    linking: bool = False
+    status: IssnStatus = IssnStatus.ACTIVE
+    replaced_by: str | None = None
 
 
 class JournalUpdate(BaseModel):
@@ -43,9 +50,7 @@ class JournalUpdate(BaseModel):
     """
 
     title: str | None = None
-    issn: str | None = None
-    eissn: str | None = None
-    issnl: str | None = None
+    issns: list[JournalIssnInput] | None = None
     oa_model: OaModel | None = None
     journal_type: JournalType | None = None
     is_academic: bool | None = None

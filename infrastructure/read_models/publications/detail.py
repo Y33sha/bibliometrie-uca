@@ -20,6 +20,7 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
+from infrastructure.db.sql_fragments import active_issns
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
@@ -133,11 +134,12 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     Retourne None si la publication n'existe pas (caller = 404).
     """
     pub_row = conn.execute(
-        text("""
+        text(f"""
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                    p.oa_status::text AS oa_status,
                    p.language, p.container_title, d.abstract, d.keywords,
-                   j.id AS journal_id, j.title AS journal_title, j.issn, j.eissn,
+                   j.id AS journal_id, j.title AS journal_title,
+                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS journal_issns,
                    j.apc_amount, j.apc_currency,
                    j.oa_model,
                    pub.id AS publisher_id, pub.name AS publisher_name,
@@ -319,8 +321,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             abstract=pub_row.abstract,
             journal_id=pub_row.journal_id,
             journal_title=pub_row.journal_title,
-            issn=pub_row.issn,
-            eissn=pub_row.eissn,
+            journal_issns=list(pub_row.journal_issns or []),
             apc_amount=pub_row.apc_amount,
             apc_currency=pub_row.apc_currency,
             oa_model=pub_row.oa_model,

@@ -18,6 +18,7 @@ from application.ports.read_models.journals_queries import (
     JournalDuplicateGroup,
     JournalDuplicatesResponse,
     JournalFilters,
+    JournalIssnDetail,
     JournalListItem,
     JournalListResponse,
     JournalQueries,
@@ -44,13 +45,14 @@ from domain.journals.journal import (
 )
 from domain.normalize import normalize_text
 from domain.publications.identifiers import issn_search_prefix
+from infrastructure.db.sql_fragments import active_issns, has_active_issn
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.sources.doaj.urls import resolve_doaj_url
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
-_JOURNAL_LIST_COLUMNS = """
-    j.id, j.title, j.issn, j.eissn,
+_JOURNAL_LIST_COLUMNS = f"""
+    j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS pub_name,
     j.is_in_doaj, j.journal_type, j.pub_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
@@ -60,7 +62,7 @@ _JOURNAL_LIST_COLUMNS = """
 # Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
 _JOURNAL_DETAIL_COLUMNS = f"""
     {_JOURNAL_LIST_COLUMNS},
-    j.issnl, j.openalex_id, j.apc_amount, j.apc_currency,
+    j.openalex_id, j.apc_amount, j.apc_currency,
     j.oa_model, j.is_academic
 """
 
@@ -70,8 +72,7 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
     return JournalListItem(
         id=row.id,
         title=row.title,
-        issn=row.issn,
-        eissn=row.eissn,
+        issns=list(row.issns),
         publisher_id=row.publisher_id,
         pub_name=row.pub_name,
         is_in_doaj=row.is_in_doaj,
@@ -81,15 +82,10 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
     )
 
 
-# Recherche d'un ISSN dans les quatre porteurs d'une revue : les trois colonnes de support et les ISSN rejetés. Les séparateurs sont retirés de part et d'autre, et la casse alignée : les valeurs reçues des sources ne portent pas toutes la forme `NNNN-NNNC`.
-_ISSN_SEARCH_SQL = """(
-        replace(upper(j.issn), '-', '') LIKE :issn_prefix || '%'
-        OR replace(upper(j.eissn), '-', '') LIKE :issn_prefix || '%'
-        OR replace(upper(j.issnl), '-', '') LIKE :issn_prefix || '%'
-        OR EXISTS (
-            SELECT 1 FROM unnest(j.rejected_issns) AS rejected
-            WHERE replace(upper(rejected), '-', '') LIKE :issn_prefix || '%'
-        )
+# Recherche d'un ISSN parmi tous les ISSN d'une revue, quel que soit leur statut. Les séparateurs sont retirés de part et d'autre, et la casse alignée : une valeur mal formée est gardée telle que reçue.
+_ISSN_SEARCH_SQL = """EXISTS (
+        SELECT 1 FROM journal_issns i
+        WHERE i.journal_id = j.id AND replace(upper(i.issn), '-', '') LIKE :issn_prefix || '%'
     )"""
 
 
@@ -152,13 +148,13 @@ _SORT_MAP = {
 
 # Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN. Un titre dont la
 # normalisation ne garde rien (alphabet non latin, symboles) n'en rapproche aucun autre.
-_SAME_TITLE_GROUPS = """
+_SAME_TITLE_GROUPS = f"""
     SELECT title_normalized AS value, array_agg(id) AS ids
-    FROM journals
+    FROM journals j
     WHERE title_normalized <> ''
     GROUP BY title_normalized
     HAVING count(*) > 2
-        OR (count(*) = 2 AND count(*) FILTER (WHERE issn IS NOT NULL OR eissn IS NOT NULL) < 2)
+        OR (count(*) = 2 AND count(*) FILTER (WHERE {has_active_issn("j.id")}) < 2)
 """
 
 # Type brut de chaque document des revues typées `journal`, celui de la source avant correction.
@@ -180,16 +176,12 @@ _RECORDS_WITH_DOI_AND_JOURNAL = """
     WHERE doi IS NOT NULL AND journal_id IS NOT NULL AND NOT raw_metadata ? 'journal_id'
 """
 
-# Revues qui portent le même ISSN dans `issn` ou `eissn`.
+# Revues où le même ISSN est actif.
 _SHARED_ISSN_GROUPS = """
-    WITH colonnes AS (
-        SELECT id, issn AS v FROM journals WHERE issn IS NOT NULL
-        UNION
-        SELECT id, eissn FROM journals WHERE eissn IS NOT NULL
-    )
-    SELECT v AS value, array_agg(id) AS ids
-    FROM colonnes
-    GROUP BY v
+    SELECT issn AS value, array_agg(journal_id) AS ids
+    FROM journal_issns
+    WHERE journal_id IS NOT NULL AND status = 'active'
+    GROUP BY issn
     HAVING count(*) > 1
 """
 
@@ -223,9 +215,7 @@ class PgJournalQueries(JournalQueries):
             )
             for r in rows
         ]
-        items.sort(
-            key=lambda i: (bool(i.journal.issn or i.journal.eissn), -i.records, i.journal.id)
-        )
+        items.sort(key=lambda i: (bool(i.journal.issns), -i.records, i.journal.id))
         return LikelyProceedingsResponse(journals=items)
 
     def doi_namespace_conflicts(self) -> DoiNamespaceConflictsResponse:
@@ -442,7 +432,23 @@ class PgJournalQueries(JournalQueries):
             return None
         return JournalDetailResponse(
             **_journal_list_item(row).model_dump(),
-            issnl=row.issnl,
+            issn_details=[
+                JournalIssnDetail(
+                    issn=i.issn,
+                    support=i.support,
+                    linking=i.linking,
+                    status=i.status,
+                    replaced_by=i.replaced_by,
+                    sudoc_checked_at=i.sudoc_checked_at,
+                )
+                for i in self._conn.execute(
+                    text(
+                        "SELECT issn, support, linking, status, replaced_by, sudoc_checked_at "
+                        "FROM journal_issns WHERE journal_id = :id ORDER BY id"
+                    ),
+                    {"id": journal_id},
+                )
+            ],
             openalex_id=row.openalex_id,
             apc_amount=row.apc_amount,
             apc_currency=row.apc_currency,

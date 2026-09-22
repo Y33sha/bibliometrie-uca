@@ -67,3 +67,16 @@ AUTHORSHIP_IN_PERIMETER_EXPR = """
           AND sa.in_perimeter = TRUE
     )
 """
+
+
+def active_issns(journal: str) -> str:
+    """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
+    return f"""coalesce((
+        SELECT array_agg(i.issn ORDER BY i.id) FROM journal_issns i
+        WHERE i.journal_id = {journal} AND i.status = 'active'
+    ), ARRAY[]::text[])"""
+
+
+def has_active_issn(journal: str) -> str:
+    """Condition vraie quand la revue `journal` porte un ISSN actif."""
+    return f"EXISTS (SELECT 1 FROM journal_issns i WHERE i.journal_id = {journal} AND i.status = 'active')"

@@ -6,10 +6,12 @@ par le pipeline) et les fonctions async (update_journal, update_publisher,
 merge_*).
 """
 
+from types import SimpleNamespace
+
 import pytest
 from sqlalchemy import text
 
-from application.ports.repositories.journal_repository import JournalUpdate
+from application.ports.repositories.journal_repository import JournalIssnInput, JournalUpdate
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.journals.core import (
     find_or_create_journal,
@@ -28,6 +30,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
+from domain.journals.issns import IssnSupport, JournalIssn
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -84,21 +87,61 @@ def _insert_publisher(conn, name="Elsevier", openalex_id=None):
     ).scalar_one()
 
 
-def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
-    return conn.execute(
+def _add_issn(conn, journal_id, issn, *, support=None, linking=False, status="active"):
+    conn.execute(
         text(
-            "INSERT INTO journals (title, title_normalized, issn, eissn, issnl, "
+            "INSERT INTO journal_issns (issn, journal_id, support, linking, status) "
+            "VALUES (:issn, :jid, CAST(:support AS issn_support), :linking, "
+            "        CAST(:status AS issn_status))"
+        ),
+        {"issn": issn, "jid": journal_id, "support": support, "linking": linking, "status": status},
+    )
+
+
+def _mark_checked_in_sudoc(conn, journal_id: int) -> None:
+    conn.execute(
+        text("UPDATE journal_issns SET sudoc_checked_at = now() WHERE journal_id = :id"),
+        {"id": journal_id},
+    )
+
+
+def _columns(conn, journal_id: int) -> SimpleNamespace:
+    """Premier ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
+    rows = conn.execute(
+        text(
+            "SELECT issn, support::text AS support, linking, status::text AS status, "
+            "sudoc_checked_at FROM journal_issns WHERE journal_id = :id ORDER BY id"
+        ),
+        {"id": journal_id},
+    ).all()
+
+    def first(support):
+        return next((r.issn for r in rows if r.status == "active" and r.support == support), None)
+
+    issn, eissn = first("print"), first("electronic")
+    issnl = next((r.issn for r in rows if r.linking), None)
+    checked = [r.sudoc_checked_at for r in rows]
+    return SimpleNamespace(
+        issn=issn,
+        eissn=eissn,
+        issnl=issnl,
+        rejected_issns=sorted(r.issn for r in rows if r.issn not in (issn, eissn, issnl)),
+        sudoc_checked_at=min(checked) if checked and all(checked) else None,
+    )
+
+
+def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
+    journal_id = conn.execute(
+        text(
+            "INSERT INTO journals (title, title_normalized, "
             "                      publisher_id, openalex_id, apc_amount, apc_currency, "
             "                      is_in_doaj, oa_model) "
-            "VALUES (:title, lower(:title), :issn, :eissn, :issnl, "
+            "VALUES (:title, lower(:title), "
             "        :pub_id, :oa_id, :apc_amount, :apc_currency, "
             "        :is_in_doaj, :oa_model) RETURNING id"
         ),
         {
             "title": title,
-            "issn": kwargs.get("issn"),
-            "eissn": kwargs.get("eissn"),
-            "issnl": kwargs.get("issnl"),
             "pub_id": publisher_id,
             "oa_id": kwargs.get("openalex_id"),
             "apc_amount": kwargs.get("apc_amount"),
@@ -107,6 +150,16 @@ def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
             "oa_model": kwargs.get("oa_model"),
         },
     ).scalar_one()
+    issn, eissn, issnl = kwargs.get("issn"), kwargs.get("eissn"), kwargs.get("issnl")
+    if issn:
+        _add_issn(conn, journal_id, issn, support="print", linking=issn == issnl)
+    if eissn and eissn != issn:
+        _add_issn(conn, journal_id, eissn, support="electronic", linking=eissn == issnl)
+    if issnl and issnl not in (issn, eissn):
+        _add_issn(conn, journal_id, issnl, linking=True)
+    for value in kwargs.get("rejected", ()):
+        _add_issn(conn, journal_id, value, status=kwargs.get("rejected_status", "unverified"))
+    return journal_id
 
 
 def _insert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
@@ -168,8 +221,9 @@ class TestJournalFindById:
         assert j is not None
         assert j.title == "PLOS ONE"
         assert j.publisher_id == pub_id
-        assert j.issn == "1932-6203"
-        assert j.eissn == "1932-6203"
+        assert j.issns == [
+            JournalIssn(issn="1932-6203", support=IssnSupport.PRINT, linking=True),
+        ]
         assert j.openalex_id == "S202381698"
         assert j.is_in_doaj is True
         assert j.oa_model == "full_oa"
@@ -240,7 +294,8 @@ class TestFindOrCreateJournal:
 
     def test_creates_new_journal(self, sa_sync_conn, gateway):
         j_id = find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT title, issn FROM journals WHERE id = :id", id=j_id)
+        row = _fetch_one(sa_sync_conn, "SELECT title FROM journals WHERE id = :id", id=j_id)
+        row = SimpleNamespace(title=row.title, issn=_columns(sa_sync_conn, j_id).issn)
         assert row.title == "Nature"
         assert row.issn == "0028-0836"
 
@@ -305,15 +360,16 @@ class TestFindOrCreateJournal:
             publisher_id=pub_id,
             repo=gateway,
         )
-        row = _fetch_one(
-            sa_sync_conn, "SELECT eissn, publisher_id FROM journals WHERE id = :id", id=existing
-        )
+        row = _columns(sa_sync_conn, existing)
+        row.publisher_id = _fetch_one(
+            sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
+        ).publisher_id
         assert row.eissn == "1476-4687"
         assert row.publisher_id == pub_id
 
     def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
         j_id = find_or_create_journal("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j_id)
+        row = _columns(sa_sync_conn, j_id)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
@@ -330,24 +386,18 @@ class TestFindOrCreateJournal:
 
     def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
         j_id = find_or_create_journal("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT issn, eissn, rejected_issns FROM journals WHERE id = :id",
-            id=j_id,
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert row.issn is None
         assert row.eissn == "1476-4687"
         assert row.rejected_issns == ["(Internet)"]
-        assert "ISSN écarté (revue 'Nature') : issn = '(Internet)'" in caplog.text
+        assert "ISSN mal formé (revue 'Nature') : issn = '(Internet)'" in caplog.text
 
     def test_rejected_issns_accumulate_without_duplicates(self, sa_sync_conn, gateway):
         """Les ISSN invalides s'ajoutent à ceux de la revue trouvée, sans doublon."""
         j_id = find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
         find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
         find_or_create_journal("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn, "SELECT rejected_issns FROM journals WHERE id = :id", id=j_id
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert row.rejected_issns == ["1234-5678", "1476-4688"]
 
     def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
@@ -355,11 +405,7 @@ class TestFindOrCreateJournal:
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         find_or_create_journal("Nature", issn="1476-4687", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT issn, eissn, sudoc_checked_at FROM journals WHERE id = :id",
-            id=j_id,
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert row.issn is None
         assert row.eissn == "1476-4687"
         assert row.sudoc_checked_at is not None
@@ -368,23 +414,15 @@ class TestFindOrCreateJournal:
         """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
         j_id = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
         find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT issn, issnl FROM journals WHERE id = :id", id=j_id)
+        row = _columns(sa_sync_conn, j_id)
         assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
 
     def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
         """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
-        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0305-1048")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE journals SET rejected_issns = '{1362-4954}', sudoc_checked_at = now() "
-                "WHERE id = :id"
-            ),
-            {"id": j_id},
-        )
+        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0305-1048", rejected=("1362-4954",))
+        _mark_checked_in_sudoc(sa_sync_conn, j_id)
         found = find_or_create_journal("Other title", eissn="1362-4954", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn, "SELECT eissn, sudoc_checked_at FROM journals WHERE id = :id", id=j_id
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert found == j_id
         assert row.eissn is None
         assert row.sudoc_checked_at is not None
@@ -393,9 +431,7 @@ class TestFindOrCreateJournal:
         j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn, "SELECT issn, sudoc_checked_at FROM journals WHERE id = :id", id=j_id
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert row.issn == "0028-0836"
         assert row.sudoc_checked_at is None
 
@@ -403,19 +439,9 @@ class TestFindOrCreateJournal:
         j_id = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         find_or_create_journal("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT rejected_issns, sudoc_checked_at FROM journals WHERE id = :id",
-            id=j_id,
-        )
+        row = _columns(sa_sync_conn, j_id)
         assert row.rejected_issns == ["1476-4688"]
         assert row.sudoc_checked_at is None
-
-
-def _mark_checked_in_sudoc(conn, journal_id: int) -> None:
-    conn.execute(
-        text("UPDATE journals SET sudoc_checked_at = now() WHERE id = :id"), {"id": journal_id}
-    )
 
 
 # ── update_journal_apc ─────────────────────────────────────────────
@@ -470,23 +496,50 @@ class TestUpdateJournal:
         assert row.title_normalized == "nature medicine"
 
     def test_partial_update(self, sa_sync_conn, repo):
+        """Les ISSN fournis remplacent ceux de la revue ; un ISSN gardé conserve sa date de vérification."""
         j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
-        update_journal(j, update=JournalUpdate(eissn="1476-4687"), repo=repo)
-        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j)
+        _mark_checked_in_sudoc(sa_sync_conn, j)
+        update_journal(
+            j,
+            update=JournalUpdate(
+                issns=[
+                    JournalIssnInput(issn="0028-0836", support=IssnSupport.PRINT),
+                    JournalIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC),
+                ]
+            ),
+            repo=repo,
+        )
+        assert (
+            _fetch_one(
+                sa_sync_conn,
+                "SELECT sudoc_checked_at FROM journal_issns WHERE journal_id = :id AND issn = '0028-0836'",
+                id=j,
+            ).sudoc_checked_at
+            is not None
+        )
+        row = _columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
     def test_normalizes_issn(self, sa_sync_conn, repo):
         j = _insert_journal(sa_sync_conn, "Nature")
-        update_journal(j, update=JournalUpdate(eissn="14764687"), repo=repo)
-        row = _fetch_one(sa_sync_conn, "SELECT eissn FROM journals WHERE id = :id", id=j)
+        update_journal(
+            j,
+            update=JournalUpdate(
+                issns=[JournalIssnInput(issn="14764687", support=IssnSupport.ELECTRONIC)]
+            ),
+            repo=repo,
+        )
+        row = _columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
 
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
         j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
         with pytest.raises(ValidationError):
-            update_journal(j, update=JournalUpdate(issn="1234-5678"), repo=repo)
-        row = _fetch_one(sa_sync_conn, "SELECT issn FROM journals WHERE id = :id", id=j)
+            update_journal(
+                j, update=JournalUpdate(issns=[JournalIssnInput(issn="1234-5678")]), repo=repo
+            )
+        row = _columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
 
 
@@ -649,7 +702,7 @@ class TestMergePublishers:
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
-        row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=jt)
+        row = _columns(sa_sync_conn, jt)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
@@ -870,22 +923,19 @@ class TestMergeJournals:
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
 
-    def test_unites_rejected_issns_and_resets_sudoc_check(
+    def test_unites_malformed_issns_and_resets_sudoc_check(
         self, sa_sync_conn, repo, publication_repo
     ):
-        """La cible reçoit les ISSN invalides de la source et redevient à vérifier dans le Sudoc."""
-        target = _insert_journal(sa_sync_conn, "Target")
-        source = _insert_journal(sa_sync_conn, "Source")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE journals SET rejected_issns = '{1234-5678}', sudoc_checked_at = now() "
-                "WHERE id = :id"
-            ),
-            {"id": target},
+        """La cible reçoit les valeurs mal formées de la source et redevient à vérifier dans le Sudoc."""
+        target = _insert_journal(
+            sa_sync_conn, "Target", rejected=("1234-5678",), rejected_status="malformed"
         )
-        sa_sync_conn.execute(
-            text("UPDATE journals SET rejected_issns = '{1234-5678,(Internet)}' WHERE id = :id"),
-            {"id": source},
+        _mark_checked_in_sudoc(sa_sync_conn, target)
+        source = _insert_journal(
+            sa_sync_conn,
+            "Source",
+            rejected=("1234-5678", "(Internet)"),
+            rejected_status="malformed",
         )
 
         merge_journals(
@@ -897,23 +947,19 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT rejected_issns, sudoc_checked_at FROM journals WHERE id = :id",
-            id=target,
-        )
+        row = _columns(sa_sync_conn, target)
         assert row.rejected_issns == ["(Internet)", "1234-5678"]
         assert row.sudoc_checked_at is None
 
-    def test_source_issns_outside_target_columns_become_rejected(
-        self, sa_sync_conn, repo, publication_repo
-    ):
-        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint les ISSN rejetés, l'ISSN de la cible en sort."""
+    def test_source_issns_join_the_target(self, sa_sync_conn, repo, publication_repo):
+        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint la cible, qui garde son propre ISSN."""
         target = _insert_journal(sa_sync_conn, "BMC Primary Care", eissn="2731-4553")
-        source = _insert_journal(sa_sync_conn, "BMC Family Practice", eissn="1471-2296")
-        sa_sync_conn.execute(
-            text("UPDATE journals SET rejected_issns = '{2731-4553}' WHERE id = :id"),
-            {"id": source},
+        source = _insert_journal(
+            sa_sync_conn,
+            "BMC Family Practice",
+            eissn="1471-2296",
+            rejected=("2731-4553",),
+            rejected_status="related_title",
         )
 
         merge_journals(
@@ -925,11 +971,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT eissn, rejected_issns FROM journals WHERE id = :id",
-            id=target,
-        )
+        row = _columns(sa_sync_conn, target)
         assert row.eissn == "2731-4553"
         assert row.rejected_issns == ["1471-2296"]
 
@@ -948,11 +990,10 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT issn, eissn, is_in_doaj FROM journals WHERE id = :id",
-            id=target,
-        )
+        row = _columns(sa_sync_conn, target)
+        row.is_in_doaj = _fetch_one(
+            sa_sync_conn, "SELECT is_in_doaj FROM journals WHERE id = :id", id=target
+        ).is_in_doaj
         assert row.issn == "1234-5678"
         assert row.eissn == "9999-0000"
         assert row.is_in_doaj is True
@@ -971,7 +1012,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _fetch_one(sa_sync_conn, "SELECT issn FROM journals WHERE id = :id", id=target)
+        row = _columns(sa_sync_conn, target)
         assert row.issn == "0028-0836"
 
     def test_requalifies_absorbed_publications_against_target_type(

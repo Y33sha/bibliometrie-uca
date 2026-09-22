@@ -6,7 +6,7 @@ Sert les contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-o
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 
-from sqlalchemy import Connection, case, func, literal, or_, select, text, update
+from sqlalchemy import Connection, case, delete, exists, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.journals import (
@@ -32,93 +32,88 @@ from application.ports.pipeline.journals import (
     JournalTitleTypeRow,
 )
 from domain.journals.doi_namespaces import DoiNamespace
+from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.types import JsonValue
+from infrastructure.db.journal_issns import issn_values, issns_by_journal
 from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
-from infrastructure.db.tables import journal_doi_namespaces, journal_name_forms, journals
+from infrastructure.db.sql_fragments import active_issns, has_active_issn
+from infrastructure.db.tables import (
+    journal_doi_namespaces,
+    journal_issns,
+    journal_name_forms,
+    journals,
+)
 
-# Revues à vérifier dans le Sudoc, avec les ISSN de leurs enregistrements, toutes sources, absents de leurs ISSN. Les valeurs
-# des enregistrements sont telles que reçues : `find_journals_to_check_in_sudoc` les normalise et écarte les revues dont
-# aucun ISSN normalisé ne manque.
-_JOURNALS_TO_CHECK_IN_SUDOC = text("""
-    WITH paires AS (
-        SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
-        FROM source_publications s
-        CROSS JOIN LATERAL (
-            VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
-        ) AS v(issn)
-        WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
-    ), documents AS (
-        SELECT p.journal_id, array_agg(p.issn ORDER BY p.issn) AS issns
-        FROM paires p
-        JOIN journals j ON j.id = p.journal_id
-        WHERE p.issn <> coalesce(j.issn, '')
-          AND p.issn <> coalesce(j.eissn, '')
-          AND p.issn <> coalesce(j.issnl, '')
-          AND NOT (p.issn = ANY(j.rejected_issns))
-        GROUP BY p.journal_id
-    )
-    SELECT j.id, j.title, j.issn, j.eissn, j.issnl, j.rejected_issns,
-           coalesce(d.issns, ARRAY[]::text[]) AS document_issns,
-           j.journal_type::text AS journal_type,
-           (j.sudoc_checked_at IS NULL
-            AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
-                 OR cardinality(j.rejected_issns) > 0)
-            OR j.id = ANY(:also)) AS queued
-    FROM journals j
-    LEFT JOIN documents d ON d.journal_id = j.id
-    WHERE d.issns IS NOT NULL
-       OR (j.sudoc_checked_at IS NULL
-           AND (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL
-                OR cardinality(j.rejected_issns) > 0))
-       OR j.id = ANY(:also)
-    ORDER BY j.id
+# ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
+_DOCUMENT_ISSNS = text("""
+    SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
+    FROM source_publications s
+    CROSS JOIN LATERAL (
+        VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
+    ) AS v(issn)
+    WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
 """)
 
+# Revues dont un ISSN n'est pas vérifié dans le Sudoc.
+_JOURNALS_WITH_UNCHECKED_ISSNS = text("""
+    SELECT DISTINCT journal_id FROM journal_issns
+    WHERE journal_id IS NOT NULL AND sudoc_checked_at IS NULL
+""")
+
+# Revues vérifiées dans le Sudoc : tous leurs ISSN portent une date de vérification.
+_VERIFIED = """
+    verifiees AS (
+        SELECT journal_id AS id FROM journal_issns
+        WHERE journal_id IS NOT NULL
+        GROUP BY journal_id
+        HAVING bool_and(sudoc_checked_at IS NOT NULL)
+    )
+"""
 
 # Revues vérifiées qui partagent leur ISSN-L, la cible de la fusion en tête de chaque groupe.
-_JOURNALS_SHARING_ISSNL = text("""
-    SELECT issnl, array_agg(id ORDER BY pub_count DESC, id) AS ids
-    FROM journals
-    WHERE issnl IS NOT NULL AND sudoc_checked_at IS NOT NULL
-    GROUP BY issnl
+_JOURNALS_SHARING_ISSNL = text(f"""
+    WITH {_VERIFIED}
+    SELECT i.issn AS issnl, array_agg(j.id ORDER BY j.pub_count DESC, j.id) AS ids
+    FROM journal_issns i
+    JOIN verifiees v ON v.id = i.journal_id
+    JOIN journals j ON j.id = i.journal_id
+    WHERE i.linking
+    GROUP BY i.issn
     HAVING count(*) > 1
-    ORDER BY issnl
+    ORDER BY i.issn
 """)
 
 
-# Revues vérifiées qui portent le même ISSN dans `issn` ou `eissn`, la cible de la fusion en tête.
-_JOURNALS_SHARING_COLUMN_ISSN = text("""
-    WITH colonnes AS (
-        SELECT DISTINCT id, title, pub_count, v AS issn
-        FROM journals, LATERAL (VALUES (issn), (eissn)) AS colonne(v)
-        WHERE v IS NOT NULL AND sudoc_checked_at IS NOT NULL
-    )
-    SELECT issn,
-           array_agg(id ORDER BY pub_count DESC, id) AS ids,
-           array_agg(title ORDER BY pub_count DESC, id) AS titles
-    FROM colonnes
-    GROUP BY issn
+# Revues vérifiées où le même ISSN est actif, la cible de la fusion en tête.
+_JOURNALS_SHARING_ACTIVE_ISSN = text(f"""
+    WITH {_VERIFIED}
+    SELECT i.issn,
+           array_agg(j.id ORDER BY j.pub_count DESC, j.id) AS ids,
+           array_agg(j.title ORDER BY j.pub_count DESC, j.id) AS titles
+    FROM journal_issns i
+    JOIN verifiees v ON v.id = i.journal_id
+    JOIN journals j ON j.id = i.journal_id
+    WHERE i.status = 'active'
+    GROUP BY i.issn
     HAVING count(*) > 1
-    ORDER BY issn
+    ORDER BY i.issn
 """)
 
 
-# Paires de revues vérifiées dont l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses
-# colonnes. La cible de la fusion en tête : la revue dont le premier document est le plus tardif, puis celle
-# qui porte le plus de publications.
-_JOURNALS_SHARING_A_REJECTED_ISSN = text("""
-    WITH verifiees AS (
-        SELECT id, issn, eissn, issnl, rejected_issns
-        FROM journals
-        WHERE sudoc_checked_at IS NOT NULL
-    ), paires AS (
-        SELECT DISTINCT r.issn, least(a.id, b.id) AS x_id, greatest(a.id, b.id) AS y_id
-        FROM verifiees a
-        CROSS JOIN LATERAL unnest(a.rejected_issns) AS r(issn)
-        JOIN verifiees b ON b.id <> a.id AND r.issn IN (b.issn, b.eissn, b.issnl)
+# Paires de revues vérifiées dont l'une porte, inactif, un ISSN actif dans l'autre. La cible de la fusion en tête : la
+# revue dont le premier document est le plus tardif, puis celle qui porte le plus de publications.
+_JOURNALS_SHARING_AN_INACTIVE_ISSN = text(f"""
+    WITH {_VERIFIED}, paires AS (
+        SELECT DISTINCT a.issn, least(a.journal_id, b.journal_id) AS x_id,
+               greatest(a.journal_id, b.journal_id) AS y_id
+        FROM journal_issns a
+        JOIN verifiees va ON va.id = a.journal_id
+        JOIN journal_issns b ON b.issn = a.issn AND b.journal_id <> a.journal_id
+        JOIN verifiees vb ON vb.id = b.journal_id
+        WHERE a.status NOT IN ('active', 'malformed') AND b.status = 'active'
     ), revues AS (
         SELECT j.id, j.pub_count,
                (SELECT min(s.pub_year) FROM source_publications s WHERE s.journal_id = j.id)
@@ -133,11 +128,10 @@ _JOURNALS_SHARING_A_REJECTED_ISSN = text("""
     ORDER BY p.issn
 """)
 
-
 # Paires de revues seules à porter leur titre, dont au moins une sans ISSN, et dont les
 # enregistrements partagent un préfixe DOI. La cible de la fusion en tête. Un titre normalisé vide
 # (alphabet non latin, symboles) ne rapproche aucune revue.
-_SAME_TITLE_DUPLICATES = text("""
+_SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
         SELECT journal_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
         FROM source_publications
@@ -150,7 +144,7 @@ _SAME_TITLE_DUPLICATES = text("""
         HAVING count(*) = 2
     ), revues AS (
         SELECT j.id, j.title_normalized, j.pub_count,
-               (j.issn IS NOT NULL OR j.eissn IS NOT NULL) AS a_issn,
+               {has_active_issn("j.id")} AS a_issn,
                p.pfx
         FROM journals j
         JOIN paires_de_titre USING (title_normalized)
@@ -166,7 +160,7 @@ _SAME_TITLE_DUPLICATES = text("""
 """)
 
 # Paires de revues que les enregistrements d'une même publication portent, les plus partagées en tête.
-_JOURNALS_SHARING_A_PUBLICATION = text("""
+_JOURNALS_SHARING_A_PUBLICATION = text(f"""
     WITH rattachements AS (
         SELECT DISTINCT publication_id, journal_id
         FROM source_publications
@@ -179,36 +173,40 @@ _JOURNALS_SHARING_A_PUBLICATION = text("""
     )
     SELECT p.publications,
            x.id AS first_id, x.title AS first_title, x.pub_count AS first_pub_count,
-           array_remove(ARRAY[x.issn, x.eissn, x.issnl], NULL) AS first_issns,
+           {active_issns("x.id")} AS first_issns,
            y.id AS second_id, y.title AS second_title, y.pub_count AS second_pub_count,
-           array_remove(ARRAY[y.issn, y.eissn, y.issnl], NULL) AS second_issns
+           {active_issns("y.id")} AS second_issns
     FROM paires p
     JOIN journals x ON x.id = p.first_id
     JOIN journals y ON y.id = p.second_id
     ORDER BY p.publications DESC, p.first_id, p.second_id
 """)
 
-_JOURNAL_SUMMARIES = text("""
-    SELECT j.id, j.title, p.name AS publisher, j.issn, j.eissn
+_JOURNAL_SUMMARIES = text(f"""
+    SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
     FROM journals j LEFT JOIN publishers p ON p.id = j.publisher_id
     WHERE j.id = ANY(:ids)
 """)
 
-# Revues sans enregistrement, sans publication, sans monographie et sans paiement APC ; leurs formes de
-# nom partent avec elles (`ON DELETE CASCADE`).
-_DELETE_EMPTY_JOURNALS = text("""
-    WITH supprimees AS (
-        DELETE FROM journals j
-        WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.journal_id = j.id)
-          AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.journal_id = j.id)
-          AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.journal_id = j.id)
-          AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.journal_id = j.id)
-        RETURNING j.id, j.title, j.publisher_id, j.issn, j.eissn
-    )
-    SELECT s.id, s.title, p.name AS publisher, s.issn, s.eissn
-    FROM supprimees s LEFT JOIN publishers p ON p.id = s.publisher_id
-    ORDER BY s.id
+# Revues sans enregistrement, sans publication, sans monographie et sans paiement APC.
+_EMPTY_JOURNALS = text(f"""
+    SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
+    FROM journals j LEFT JOIN publishers p ON p.id = j.publisher_id
+    WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.journal_id = j.id)
+      AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.journal_id = j.id)
+      AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.journal_id = j.id)
+      AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.journal_id = j.id)
+    ORDER BY j.id
 """)
+
+# Un ISSN déjà présent sans revue tient lieu de la ligne de même valeur des revues supprimées ; leurs autres ISSN
+# restent sans revue (`ON DELETE SET NULL`). Les formes de nom partent avec la revue (`ON DELETE CASCADE`).
+_DELETE_ISSNS_KNOWN_WITHOUT_JOURNAL = text("""
+    DELETE FROM journal_issns i
+    WHERE i.journal_id = ANY(:ids)
+      AND EXISTS (SELECT 1 FROM journal_issns o WHERE o.issn = i.issn AND o.journal_id IS NULL)
+""")
+_DELETE_JOURNALS = text("DELETE FROM journals WHERE id = ANY(:ids)")
 
 
 # Type brut de chaque document des revues de type inconnu : celui de la source, avant correction.
@@ -282,7 +280,13 @@ class PgJournalGatewayQueries(
             )
             .where(journal_name_forms.c.form_normalized == form_normalized)
             .order_by(
-                case((journals.c.eissn.is_not(None), 1), else_=0).desc(),
+                exists()
+                .where(
+                    journal_issns.c.journal_id == journals.c.id,
+                    journal_issns.c.status == IssnStatus.ACTIVE,
+                    journal_issns.c.support == IssnSupport.ELECTRONIC,
+                )
+                .desc(),
                 journals.c.id.asc(),
             )
             .limit(1)
@@ -313,29 +317,30 @@ class PgJournalGatewayQueries(
 
     def find_journal_issn_index(self) -> list[JournalIssnRow]:
         return [
-            JournalIssnRow(r.id, r.issn, r.eissn, r.issnl)
+            JournalIssnRow(r.journal_id, r.issn)
             for r in self._conn.execute(
-                select(journals.c.id, journals.c.issn, journals.c.eissn, journals.c.issnl).where(
-                    or_(
-                        journals.c.issn.is_not(None),
-                        journals.c.eissn.is_not(None),
-                        journals.c.issnl.is_not(None),
-                    )
+                select(journal_issns.c.journal_id, journal_issns.c.issn)
+                .where(
+                    journal_issns.c.journal_id.is_not(None),
+                    journal_issns.c.status != IssnStatus.MALFORMED,
                 )
+                .order_by(journal_issns.c.id)
             ).all()
         ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
-        in_columns = or_(
-            journals.c.issn == issn_value,
-            journals.c.eissn == issn_value,
-            journals.c.issnl == issn_value,
-        )
         return self._conn.execute(
-            select(journals.c.id)
-            .where(or_(in_columns, journals.c.rejected_issns.any(issn_value)))
-            # Une revue qui porte l'ISSN dans ses colonnes passe avant une revue qui l'a rejeté.
-            .order_by(case((in_columns, 0), else_=1))
+            select(journal_issns.c.journal_id)
+            .where(
+                journal_issns.c.issn == issn_value,
+                journal_issns.c.journal_id.is_not(None),
+                journal_issns.c.status != IssnStatus.MALFORMED,
+            )
+            # Une revue où l'ISSN est actif passe avant une revue où il ne l'est pas.
+            .order_by(
+                case((journal_issns.c.status == IssnStatus.ACTIVE, 0), else_=1),
+                journal_issns.c.journal_id,
+            )
             .limit(1)
         ).scalar_one_or_none()
 
@@ -343,32 +348,12 @@ class PgJournalGatewayQueries(
         self,
         journal_id: int,
         *,
-        issn: str | None = None,
-        eissn: str | None = None,
         publisher_id: int | None = None,
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        carried = self._conn.execute(
-            select(journals.c.issn, journals.c.eissn, journals.c.rejected_issns).where(
-                journals.c.id == journal_id
-            )
-        ).one_or_none()
-        new_issn = False
-        if carried is not None:
-            # Un ISSN que la revue porte déjà dans `issn` ou `eissn`, ou qu'elle a rejeté, n'est
-            # pas réécrit dans une colonne : la vérification Sudoc a rangé chaque ISSN. `issnl`
-            # reste hors de la comparaison, l'ISSN-L étant lui-même l'ISSN d'un support.
-            known = {v for v in (carried.issn, carried.eissn, *carried.rejected_issns) if v}
-            issn = None if issn in known else issn
-            eissn = None if eissn in known or eissn == issn else eissn
-            new_issn = (issn is not None and carried.issn is None) or (
-                eissn is not None and carried.eissn is None
-            )
         # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
         fillable = (
-            (journals.c.issn, issn),
-            (journals.c.eissn, eissn),
             (journals.c.publisher_id, publisher_id),
             (journals.c.openalex_id, openalex_id),
             (journals.c.oa_model, oa_model),
@@ -376,12 +361,10 @@ class PgJournalGatewayQueries(
         null_targets = [col.is_(None) for col, value in fillable if value is not None]
         if not null_targets:
             return
-        stmt = (
+        self._conn.execute(
             update(journals)
             .where(journals.c.id == journal_id, or_(*null_targets))
             .values(
-                issn=func.coalesce(journals.c.issn, issn),
-                eissn=func.coalesce(journals.c.eissn, eissn),
                 publisher_id=func.coalesce(journals.c.publisher_id, publisher_id),
                 openalex_id=func.coalesce(journals.c.openalex_id, openalex_id),
                 # Le littéral est lié au type de la colonne : `coalesce` ne le lui emprunte pas, et
@@ -389,78 +372,119 @@ class PgJournalGatewayQueries(
                 oa_model=func.coalesce(
                     journals.c.oa_model, literal(oa_model, journals.c.oa_model.type)
                 ),
-                # Un ISSN nouveau remet la revue à vérifier dans le Sudoc.
-                **({"sudoc_checked_at": None} if new_issn else {}),
             )
         )
-        self._conn.execute(stmt)
 
-    def add_rejected_issns(self, journal_id: int, values: Sequence[str]) -> None:
-        if not values:
-            return
-        self._conn.execute(
-            text(
-                "UPDATE journals SET rejected_issns = ARRAY("
-                "SELECT v FROM (SELECT DISTINCT unnest(rejected_issns || CAST(:values AS text[])) AS v) d "
-                'ORDER BY v COLLATE "C"'
-                "), "
-                # Une valeur nouvelle remet la revue à vérifier dans le Sudoc.
-                "sudoc_checked_at = CASE WHEN CAST(:values AS text[]) <@ rejected_issns "
-                "THEN sudoc_checked_at END "
-                "WHERE id = :id"
-            ),
-            {"id": journal_id, "values": list(values)},
-        )
+    def add_journal_issns(self, journal_id: int, issns: Sequence[JournalIssn]) -> None:
+        has_linking = self._conn.execute(
+            select(
+                exists().where(journal_issns.c.journal_id == journal_id, journal_issns.c.linking)
+            )
+        ).scalar_one()
+        for row in issns:
+            linking = row.linking and not has_linking
+            has_linking = has_linking or linking
+            carried = self._conn.execute(
+                update(journal_issns)
+                .where(journal_issns.c.journal_id == journal_id, journal_issns.c.issn == row.issn)
+                .values(
+                    support=func.coalesce(
+                        journal_issns.c.support, literal(row.support, journal_issns.c.support.type)
+                    ),
+                    linking=journal_issns.c.linking | linking,
+                )
+            ).rowcount
+            if carried:
+                continue
+            claimed = self._conn.execute(
+                update(journal_issns)
+                .where(journal_issns.c.journal_id.is_(None), journal_issns.c.issn == row.issn)
+                .values(journal_id=journal_id, linking=linking)
+            ).rowcount
+            if not claimed:
+                self._conn.execute(
+                    pg_insert(journal_issns)
+                    .values(
+                        journal_id=journal_id,
+                        issn=row.issn,
+                        support=row.support,
+                        linking=linking,
+                        status=row.status,
+                        replaced_by=row.replaced_by,
+                    )
+                    .on_conflict_do_nothing()
+                )
 
     def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
-        rows = self._conn.execute(_JOURNALS_TO_CHECK_IN_SUDOC, {"also": list(also)}).all()
-        journals = []
-        for r in rows:
-            own = {r.issn, r.eissn, r.issnl, *r.rejected_issns}
-            documents = tuple(
-                dict.fromkeys(
-                    str(issn)
-                    for raw in r.document_issns
-                    if (issn := ISSN.try_parse(raw)) is not None and str(issn) not in own
+        issns_of = issns_by_journal(self._conn)
+        released = set(
+            self._conn.execute(
+                select(journal_issns.c.issn).where(
+                    journal_issns.c.journal_id.is_(None),
+                    journal_issns.c.sudoc_checked_at.is_not(None),
                 )
+            ).scalars()
+        )
+        documents: dict[int, list[str]] = {}
+        for r in self._conn.execute(_DOCUMENT_ISSNS):
+            issn = ISSN.try_parse(r.issn)
+            own = issns_of.get(r.journal_id, ())
+            if issn is None or str(issn) in released or any(i.issn == str(issn) for i in own):
+                continue
+            values = documents.setdefault(r.journal_id, [])
+            if str(issn) not in values:
+                values.append(str(issn))
+        ids = (
+            set(self._conn.execute(_JOURNALS_WITH_UNCHECKED_ISSNS).scalars())
+            | set(documents)
+            | set(also)
+        )
+        rows = self._conn.execute(
+            select(journals.c.id, journals.c.title, journals.c.journal_type)
+            .where(journals.c.id.in_(ids))
+            .order_by(journals.c.id)
+        ).all()
+        return [
+            JournalSudocRow(
+                r.id,
+                r.title,
+                issns_of.get(r.id, ()),
+                tuple(sorted(documents.get(r.id, ()))),
+                JournalType(r.journal_type),
             )
-            if documents or r.queued:
-                journals.append(
-                    JournalSudocRow(
-                        r.id,
-                        r.title,
-                        r.issn,
-                        r.eissn,
-                        r.issnl,
-                        tuple(r.rejected_issns),
-                        documents,
-                        JournalType(r.journal_type),
-                    )
-                )
-        return journals
+            for r in rows
+        ]
 
     def record_sudoc_check(
         self,
         journal_id: int,
         *,
-        issn: str | None,
-        eissn: str | None,
-        issnl: str | None,
-        rejected_issns: Sequence[str],
+        issns: Sequence[JournalIssn],
+        released: Sequence[JournalIssn],
         checked_at: datetime,
         title: str | None = None,
     ) -> None:
-        values: dict[str, object] = {
-            "issn": issn,
-            "eissn": eissn,
-            "issnl": issnl,
-            "rejected_issns": list(rejected_issns),
-            "sudoc_checked_at": checked_at,
-        }
+        self._conn.execute(delete(journal_issns).where(journal_issns.c.journal_id == journal_id))
+        if issns:
+            self._conn.execute(
+                journal_issns.insert(),
+                [issn_values(row, journal_id=journal_id, checked_at=checked_at) for row in issns],
+            )
+        for row in released:
+            self._conn.execute(
+                pg_insert(journal_issns)
+                .values(issn_values(row, journal_id=None, checked_at=checked_at))
+                .on_conflict_do_update(
+                    constraint="uq_journal_issns_issn_journal",
+                    set_={"sudoc_checked_at": checked_at},
+                )
+            )
         if title:
-            values |= {"title": title, "title_normalized": normalize_text(title)}
-        self._conn.execute(update(journals).where(journals.c.id == journal_id).values(**values))
-        if title:
+            self._conn.execute(
+                update(journals)
+                .where(journals.c.id == journal_id)
+                .values(title=title, title_normalized=normalize_text(title))
+            )
             publisher_id = self._conn.execute(
                 select(journals.c.publisher_id).where(journals.c.id == journal_id)
             ).scalar_one()
@@ -470,10 +494,9 @@ class PgJournalGatewayQueries(
         rows = self._conn.execute(
             select(journals.c.id, journals.c.title, journals.c.journal_type)
             .where(
-                or_(
-                    journals.c.issn.is_not(None),
-                    journals.c.eissn.is_not(None),
-                    journals.c.issnl.is_not(None),
+                exists().where(
+                    journal_issns.c.journal_id == journals.c.id,
+                    journal_issns.c.status == IssnStatus.ACTIVE,
                 )
             )
             .order_by(journals.c.id)
@@ -493,11 +516,12 @@ class PgJournalGatewayQueries(
             select(
                 journals.c.id,
                 journals.c.title,
-                or_(
-                    journals.c.issn.is_not(None),
-                    journals.c.eissn.is_not(None),
-                    journals.c.issnl.is_not(None),
-                ).label("has_issn"),
+                exists()
+                .where(
+                    journal_issns.c.journal_id == journals.c.id,
+                    journal_issns.c.status == IssnStatus.ACTIVE,
+                )
+                .label("has_issn"),
             )
             .where(journals.c.journal_type != JournalType.PROCEEDINGS)
             .order_by(journals.c.id)
@@ -518,10 +542,10 @@ class PgJournalGatewayQueries(
             for r in self._conn.execute(_SAME_TITLE_DUPLICATES).all()
         ]
 
-    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
+    def find_journals_sharing_an_inactive_issn(self) -> list[JournalMergeGroup]:
         return [
             JournalMergeGroup(r.issn, tuple(r.ids))
-            for r in self._conn.execute(_JOURNALS_SHARING_A_REJECTED_ISSN).all()
+            for r in self._conn.execute(_JOURNALS_SHARING_AN_INACTIVE_ISSN).all()
         ]
 
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
@@ -540,31 +564,32 @@ class PgJournalGatewayQueries(
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
         rows = self._conn.execute(_JOURNAL_SUMMARIES, {"ids": list(journal_ids)}).all()
-        return {r.id: JournalSummary(r.id, r.title, r.publisher, r.issn, r.eissn) for r in rows}
+        return {r.id: JournalSummary(r.id, r.title, r.publisher, tuple(r.issns)) for r in rows}
 
     # ── nettoyage ──────────────────────────────────────────────────
 
     def delete_empty_journals(self) -> list[JournalSummary]:
-        return [
-            JournalSummary(r.id, r.title, r.publisher, r.issn, r.eissn)
-            for r in self._conn.execute(_DELETE_EMPTY_JOURNALS).all()
+        empty = [
+            JournalSummary(r.id, r.title, r.publisher, tuple(r.issns))
+            for r in self._conn.execute(_EMPTY_JOURNALS).all()
         ]
+        ids = [j.id for j in empty]
+        self._conn.execute(_DELETE_ISSNS_KNOWN_WITHOUT_JOURNAL, {"ids": ids})
+        self._conn.execute(_DELETE_JOURNALS, {"ids": ids})
+        return empty
 
-    def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
+    def find_journals_sharing_active_issn(self) -> list[JournalIssnGroup]:
         return [
             JournalIssnGroup(
                 r.issn, tuple(JournalTitleRow(i, t) for i, t in zip(r.ids, r.titles, strict=True))
             )
-            for r in self._conn.execute(_JOURNALS_SHARING_COLUMN_ISSN).all()
+            for r in self._conn.execute(_JOURNALS_SHARING_ACTIVE_ISSN).all()
         ]
 
     def create_journal(
         self,
         *,
         title: str,
-        issn: str | None,
-        eissn: str | None,
-        issnl: str | None,
         publisher_id: int | None,
         openalex_id: str | None,
         oa_model: OaModel | None,
@@ -575,9 +600,6 @@ class PgJournalGatewayQueries(
             .values(
                 title=title,
                 title_normalized=normalize_text(title),
-                issn=issn,
-                eissn=eissn,
-                issnl=issnl,
                 publisher_id=publisher_id,
                 openalex_id=openalex_id,
                 oa_model=oa_model,

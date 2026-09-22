@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
 from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
+from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
@@ -186,6 +187,8 @@ publisher_type_enum = PgEnum(*PUBLISHER_TYPES, name="publisher_type", create_typ
 journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
 
 oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
+issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
+issn_status_enum = PgEnum(*ISSN_STATUSES, name="issn_status", create_type=False)
 
 
 structures = Table(
@@ -247,9 +250,6 @@ journals = Table(
     Column("id", Integer, primary_key=True),
     Column("title", Text, nullable=False),
     Column("title_normalized", Text, nullable=False),
-    Column("issn", Text),
-    Column("eissn", Text),
-    Column("issnl", Text),
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
     Column("is_in_doaj", Boolean, server_default="false"),
@@ -265,19 +265,21 @@ journals = Table(
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_pubs` / le tri / l'affichage.
     Column("pub_count", Integer, nullable=False, server_default="0"),
-    Column(
-        "rejected_issns",
-        ARRAY(Text),
-        nullable=False,
-        server_default="{}",
-        comment="ISSN de la revue hors des colonnes issn, eissn et issnl : fautifs, tels que reçus des sources, ou valides (autre support comme le CD-ROM, ISSN annulé, titre précédent ou suivant, supplément). Ils servent au rapprochement et à la fusion des revues ; la vérification dans le Sudoc tente de corriger les fautifs.",
-    ),
-    Column(
-        "sudoc_checked_at",
-        DateTime(timezone=True),
-        comment="Date de la dernière vérification des ISSN de la revue dans le Sudoc. NULL : revue jamais vérifiée.",
-    ),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
+)
+
+
+journal_issns = Table(
+    "journal_issns",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("issn", Text, nullable=False),
+    Column("journal_id", Integer),
+    Column("support", issn_support_enum),
+    Column("linking", Boolean, nullable=False, server_default="false"),
+    Column("status", issn_status_enum, nullable=False, server_default="active"),
+    Column("replaced_by", Text),
+    Column("sudoc_checked_at", DateTime(timezone=True)),
 )
 
 

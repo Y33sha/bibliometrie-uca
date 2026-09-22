@@ -29,6 +29,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
+from domain.journals.issns import issn_conflict
 from domain.normalize import normalize_text, to_plain_text
 from domain.publishers.names import publisher_name_key
 
@@ -154,14 +155,8 @@ def merge_publishers(
             reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
         if source_seen[pair["source_journal_id"]] > 1:
             reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
-        for field, tv, sv in (
-            ("issn", pair["t_issn"], pair["s_issn"]),
-            ("eissn", pair["t_eissn"], pair["s_eissn"]),
-            ("issnl", pair["t_issnl"], pair["s_issnl"]),
-        ):
-            if tv and sv and tv != sv:
-                reasons.append(f"{field.upper()} différents : {tv} (cible) vs {sv} (source)")
-                break
+        if conflict := issn_conflict(pair["t_issns"], pair["s_issns"]):
+            reasons.append(f"{conflict} (cible / source)")
         if reasons:
             blockers.append(
                 BlockingJournal(

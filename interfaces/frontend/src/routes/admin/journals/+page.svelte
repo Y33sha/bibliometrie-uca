@@ -11,6 +11,7 @@
 	import DoiNamespaceConflictsList from './DoiNamespaceConflictsList.svelte';
 	import { mergeJournal } from './mergeJournal';
 	import Modal from '$lib/components/Modal.svelte';
+	import { issnStatusLabels, issnSupportLabels } from '$lib/labels';
 	import { autofocus } from '$lib/actions/focus';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
@@ -77,8 +78,20 @@
 	});
 
 	// Modal édition
+	type EditedIssn = { issn: string; support: string; linking: boolean; status: string; replaced_by: string };
+	const issnSupports = Object.entries(issnSupportLabels);
+	const issnStatuses = Object.entries(issnStatusLabels);
+
+	function addIssn() {
+		editModal?.issns.push({ issn: '', support: '', linking: false, status: 'active', replaced_by: '' });
+	}
+
+	function setLinking(index: number) {
+		editModal?.issns.forEach((row, i) => (row.linking = i === index));
+	}
+
 	let editModal: {
-		id: number; title: string; issn: string; eissn: string; issnl: string;
+		id: number; title: string; issns: EditedIssn[];
 		oa_model: string;
 		journal_type: string; original_journal_type: string;
 		is_academic: boolean; is_in_doaj: boolean;
@@ -98,7 +111,10 @@
 		const jt = detail.journal_type || 'journal';
 		editModal = {
 			id: detail.id, title: detail.title,
-			issn: detail.issn || '', eissn: detail.eissn || '', issnl: detail.issnl || '',
+			issns: detail.issn_details.map((i) => ({
+				issn: i.issn, support: i.support ?? '', linking: i.linking,
+				status: i.status, replaced_by: i.replaced_by ?? '',
+			})),
 			oa_model: detail.oa_model || '',
 			journal_type: jt, original_journal_type: jt,
 			is_academic: detail.is_academic ?? true,
@@ -129,9 +145,12 @@
 
 		const body: Record<string, any> = {};
 		body.title = editModal.title.trim();
-		body.issn = editModal.issn.trim() || null;
-		body.eissn = editModal.eissn.trim() || null;
-		body.issnl = editModal.issnl.trim() || null;
+		body.issns = editModal.issns
+			.filter((i) => i.issn.trim())
+			.map((i) => ({
+				issn: i.issn.trim(), support: i.support || null, linking: i.linking,
+				status: i.status, replaced_by: i.replaced_by.trim() || null,
+			}));
 		body.oa_model = editModal.oa_model || null;
 		body.journal_type = editModal.journal_type;
 		body.is_academic = editModal.is_academic;
@@ -241,13 +260,32 @@
 {/if}
 
 {#if editModal}
-<Modal title="Modifier la revue" maxWidth="520px" onclose={() => editModal = null} onsubmit={saveEdit}>
+<Modal title="Modifier la revue" maxWidth="720px" onclose={() => editModal = null} onsubmit={saveEdit}>
 		<label>Titre <input bind:value={editModal.title} /></label>
-		<div style="display:flex;gap:8px">
-			<div style="flex:1"><label>ISSN <input bind:value={editModal.issn} placeholder="1234-5678" /></label></div>
-			<div style="flex:1"><label>eISSN <input bind:value={editModal.eissn} /></label></div>
-			<div style="flex:1"><label>ISSN-L <input bind:value={editModal.issnl} /></label></div>
-		</div>
+		<fieldset class="issns">
+			<legend>ISSN</legend>
+			<table>
+				<thead><tr><th>Valeur</th><th>Support</th><th>Statut</th><th>ISSN-L</th><th>Successeur</th><th></th></tr></thead>
+				<tbody>
+					{#each editModal.issns as row, index (index)}
+						<tr>
+							<td><input bind:value={row.issn} placeholder="1234-5678" /></td>
+							<td><select bind:value={row.support}>
+								<option value="">(inconnu)</option>
+								{#each issnSupports as [value, label] (value)}<option {value}>{label}</option>{/each}
+							</select></td>
+							<td><select bind:value={row.status}>
+								{#each issnStatuses as [value, label] (value)}<option {value}>{label}</option>{/each}
+							</select></td>
+							<td class="center"><input type="radio" name="issnl" checked={row.linking} onchange={() => setLinking(index)} /></td>
+							<td><input bind:value={row.replaced_by} placeholder="1234-5678" /></td>
+							<td><button type="button" class="btn btn-sm" onclick={() => editModal?.issns.splice(index, 1)}>Retirer</button></td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+			<button type="button" class="btn btn-sm" onclick={addIssn}>Ajouter un ISSN</button>
+		</fieldset>
 		<div style="display:flex;gap:8px">
 			<div style="flex:1">
 				<label>Modèle OA <select bind:value={editModal.oa_model}>
@@ -278,6 +316,12 @@
 {/if}
 
 <style>
+	.issns { border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 8px 0; }
+	.issns table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+	.issns th { font-size: 0.8rem; text-align: left; font-weight: normal; color: var(--muted); }
+	.issns td { padding: 2px 4px 2px 0; }
+	.issns input:not([type="radio"]), .issns select { width: 100%; }
+	.issns .center { text-align: center; }
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 

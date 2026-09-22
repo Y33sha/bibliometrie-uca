@@ -15,6 +15,7 @@ from application.ports.read_models._common import (
     PaginatedResponse,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
+from domain.journals.issns import IssnStatus, IssnSupport
 from domain.journals.journal import JournalType, OaModel
 
 # Vocabulaire de tri de la liste des revues : le champ, puis le sens.
@@ -38,6 +39,17 @@ class JournalFilters:
     with_pubs: bool = False
 
 
+class JournalIssnDetail(BaseModel):
+    """Un ISSN d'une revue : support, ISSN-L, statut, ISSN successeur et date de vérification au Sudoc."""
+
+    issn: str
+    support: IssnSupport | None
+    linking: bool
+    status: IssnStatus
+    replaced_by: str | None
+    sudoc_checked_at: datetime | None
+
+
 class JournalListItem(BaseModel):
     """Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
 
@@ -46,8 +58,8 @@ class JournalListItem(BaseModel):
 
     id: int
     title: str
-    issn: str | None
-    eissn: str | None
+    issns: list[str]
+    """ISSN actifs."""
     publisher_id: int | None
     pub_name: str | None
     is_in_doaj: bool
@@ -66,7 +78,7 @@ class JournalDetailResponse(JournalListItem):
     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
     """
 
-    issnl: str | None
+    issn_details: list[JournalIssnDetail]
     openalex_id: str | None
     apc_amount: float | None
     apc_currency: str | None
@@ -128,7 +140,7 @@ class JournalDuplicateGroup(BaseModel):
     """Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête."""
 
     value: str
-    """Titre normalisé, ou ISSN porté dans `issn` ou `eissn`."""
+    """Titre normalisé, ou ISSN actif dans chacune des revues."""
     journals: list[JournalListItem]
 
 
@@ -190,7 +202,7 @@ class JournalQueries(Protocol):
         ...
 
     def journals_sharing_issn(self) -> JournalDuplicatesResponse:
-        """Revues qui portent le même ISSN dans `issn` ou `eissn`."""
+        """Revues où le même ISSN est actif."""
         ...
 
     def list_journals(

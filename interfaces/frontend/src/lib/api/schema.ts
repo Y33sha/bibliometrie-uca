@@ -2065,7 +2065,7 @@ export interface paths {
         };
         /**
          * Journals Sharing Issn
-         * @description Groupes de revues qui portent le même ISSN dans `issn` ou `eissn`, à fusionner à la main.
+         * @description Groupes de revues où le même ISSN est actif, à fusionner à la main.
          */
         get: operations["journals_sharing_issn_api_journals_shared_issns_get"];
         put?: never;
@@ -3328,6 +3328,18 @@ export interface components {
             root_structure_ids: number[];
         };
         /**
+         * IssnStatus
+         * @description Statut d'un ISSN dans sa revue.
+         * @enum {string}
+         */
+        IssnStatus: "active" | "malformed" | "cancelled" | "related_title" | "supplement" | "unverified";
+        /**
+         * IssnSupport
+         * @description Support d'une publication en série.
+         * @enum {string}
+         */
+        IssnSupport: "print" | "electronic" | "other";
+        /**
          * JournalDashboardResponse
          * @description GET /api/journals/{id}/dashboard : distributions des publications d'une revue.
          *
@@ -3358,10 +3370,8 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
+            /** Issns */
+            issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
             /** Pub Name */
@@ -3373,8 +3383,8 @@ export interface components {
             pub_count: number;
             /** Doaj Url */
             doaj_url: string | null;
-            /** Issnl */
-            issnl: string | null;
+            /** Issn Details */
+            issn_details: components["schemas"]["JournalIssnDetail"][];
             /** Openalex Id */
             openalex_id: string | null;
             /** Apc Amount */
@@ -3410,6 +3420,40 @@ export interface components {
             groups: components["schemas"]["JournalDuplicateGroup"][];
         };
         /**
+         * JournalIssnDetail
+         * @description Un ISSN d'une revue : support, ISSN-L, statut, ISSN successeur et date de vérification au Sudoc.
+         */
+        JournalIssnDetail: {
+            /** Issn */
+            issn: string;
+            support: components["schemas"]["IssnSupport"] | null;
+            /** Linking */
+            linking: boolean;
+            status: components["schemas"]["IssnStatus"];
+            /** Replaced By */
+            replaced_by: string | null;
+            /** Sudoc Checked At */
+            sudoc_checked_at: string | null;
+        };
+        /**
+         * JournalIssnInput
+         * @description Un ISSN d'une revue, saisi à l'administration.
+         */
+        JournalIssnInput: {
+            /** Issn */
+            issn: string;
+            support?: components["schemas"]["IssnSupport"] | null;
+            /**
+             * Linking
+             * @default false
+             */
+            linking: boolean;
+            /** @default active */
+            status: components["schemas"]["IssnStatus"];
+            /** Replaced By */
+            replaced_by?: string | null;
+        };
+        /**
          * JournalListItem
          * @description Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
          *
@@ -3420,10 +3464,8 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
+            /** Issns */
+            issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
             /** Pub Name */
@@ -3491,12 +3533,8 @@ export interface components {
         JournalUpdate: {
             /** Title */
             title?: string | null;
-            /** Issn */
-            issn?: string | null;
-            /** Eissn */
-            eissn?: string | null;
-            /** Issnl */
-            issnl?: string | null;
+            /** Issns */
+            issns?: components["schemas"]["JournalIssnInput"][] | null;
             oa_model?: components["schemas"]["OaModel"] | null;
             journal_type?: components["schemas"]["JournalType"] | null;
             /** Is Academic */
@@ -4259,10 +4297,8 @@ export interface components {
             journal_id: number | null;
             /** Journal Title */
             journal_title: string | null;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
+            /** Journal Issns */
+            journal_issns: string[];
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */

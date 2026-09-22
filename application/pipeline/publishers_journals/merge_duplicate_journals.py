@@ -3,12 +3,12 @@
 Cinq règles désignent la même publication :
 
 1. deux revues vérifiées dans le Sudoc partagent leur ISSN-L ;
-2. elles portent le même ISSN dans une colonne, et les mots d'un titre sont tous dans l'autre (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
-3. vérifiées dans le Sudoc, l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses colonnes : titre précédent ou suivant de la même revue, supplément. La revue dont le premier document est le plus tardif absorbe l'autre : un titre suivant n'a pas de document antérieur à son changement de titre ;
+2. le même ISSN est actif dans les deux, et les mots d'un titre sont tous dans l'autre (« BMJ » et « BMJ-BRITISH MEDICAL JOURNAL ») ;
+3. vérifiées dans le Sudoc, l'une porte, inactif, un ISSN actif dans l'autre : titre précédent ou suivant de la même revue, supplément. La revue dont le premier document est le plus tardif absorbe l'autre : un titre suivant n'a pas de document antérieur à son changement de titre ;
 4. elles sont seules à porter leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements partagent un préfixe DOI ;
 5. des enregistrements d'une même publication les portent, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles n'ont pas chacune des ISSN sans aucun en commun.
 
-L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications et métadonnées passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Les ISSN de la source hors des colonnes de la cible rejoignent ses ISSN rejetés. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
+L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications, métadonnées et ISSN passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 """
 
 import logging
@@ -70,13 +70,13 @@ def run_merge_duplicate_journals(
     )
     shared = [
         (f"ISSN {g.issn}", tuple(j.id for j in g.journals if _nested(g.journals[0], j)))
-        for g in journal_repo.find_journals_sharing_column_issn()
+        for g in journal_repo.find_journals_sharing_active_issn()
     ]
     merge_groups([(label, ids) for label, ids in shared if len(ids) > 1], issn_et_titre)
     merge_groups(
         [
             (f"ISSN rejeté {g.key}", g.journal_ids)
-            for g in journal_repo.find_journals_sharing_a_rejected_issn()
+            for g in journal_repo.find_journals_sharing_an_inactive_issn()
         ],
         titre_successif,
     )

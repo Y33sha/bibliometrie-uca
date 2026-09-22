@@ -33,7 +33,7 @@ class _Repo:
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
         return self._issnl_groups
 
-    def find_journals_sharing_column_issn(self) -> list[JournalIssnGroup]:
+    def find_journals_sharing_active_issn(self) -> list[JournalIssnGroup]:
         return self._issn_groups
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
@@ -42,11 +42,11 @@ class _Repo:
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
         return self._publication_pairs
 
-    def find_journals_sharing_a_rejected_issn(self) -> list[JournalMergeGroup]:
+    def find_journals_sharing_an_inactive_issn(self) -> list[JournalMergeGroup]:
         return self._rejected_issn_groups
 
     def describe_journals(self, journal_ids) -> dict[int, JournalSummary]:
-        return {i: JournalSummary(i, f"Revue {i}", None, None, None) for i in journal_ids}
+        return {i: JournalSummary(i, f"Revue {i}", None, ()) for i in journal_ids}
 
 
 def _run(repo: _Repo):

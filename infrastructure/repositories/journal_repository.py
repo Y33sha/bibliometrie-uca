@@ -5,6 +5,7 @@ L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Le trouv
 Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """
 
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import NamedTuple, cast
 
@@ -15,10 +16,12 @@ from application.ports.repositories.journal_repository import (
     SharedTitleJournalPair,
 )
 from domain.errors import NotFoundError
+from domain.journals.issns import JournalIssn
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
+from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.db.rows import row_as
-from infrastructure.db.tables import journal_name_forms, journals
+from infrastructure.db.tables import journal_issns, journal_name_forms, journals
 from infrastructure.pipeline.authorships.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
@@ -30,9 +33,6 @@ class _JournalRow(NamedTuple):
 
     id: int
     title: str
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
     publisher_id: int | None
     openalex_id: str | None
     is_in_doaj: bool
@@ -43,7 +43,7 @@ class _JournalRow(NamedTuple):
     is_academic: bool | None
 
 
-def _journal_from_row(row: _JournalRow) -> Journal:
+def _journal_from_row(row: _JournalRow, issns: Sequence[JournalIssn]) -> Journal:
     """Mappe une row `journals` SQL vers l'aggregate `Journal`.
 
     Coerce les valeurs vers les types du domaine : `journal_type` et `is_academic`, nullables au schéma, retombent sur leur défaut (`unknown` / `True`). Les enums SQL `journal_type` et `oa_model` reprennent le vocabulaire du domaine, d'où la simple assertion de type.
@@ -51,9 +51,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
     return Journal(
         id=row.id,
         title=row.title,
-        issn=row.issn,
-        eissn=row.eissn,
-        issnl=row.issnl,
+        issns=list(issns),
         publisher_id=row.publisher_id,
         openalex_id=row.openalex_id,
         is_in_doaj=row.is_in_doaj,
@@ -80,9 +78,6 @@ class PgJournalRepository(JournalRepository):
             select(
                 journals.c.id,
                 journals.c.title,
-                journals.c.issn,
-                journals.c.eissn,
-                journals.c.issnl,
                 journals.c.publisher_id,
                 journals.c.openalex_id,
                 journals.c.is_in_doaj,
@@ -95,21 +90,19 @@ class PgJournalRepository(JournalRepository):
         ).first()
         if row is None:
             return None
-        return _journal_from_row(row_as(_JournalRow, row))
+        issns = issns_by_journal(self._conn, [journal_id]).get(journal_id, ())
+        return _journal_from_row(row_as(_JournalRow, row), issns)
 
     # ── Persistance de l'agrégat ───────────────────────────────────
 
     def save(self, journal: Journal) -> None:
-        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`) ne sont pas touchées. Lève `NotFoundError` si l'id est absent."""
+        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API et de ses ISSN. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`) ne sont pas touchées. Un ISSN gardé conserve sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(journals)
             .where(journals.c.id == journal.id)
             .values(
                 title=journal.title,
                 title_normalized=normalize_text(journal.title),
-                issn=journal.issn,
-                eissn=journal.eissn,
-                issnl=journal.issnl,
                 oa_model=journal.oa_model,
                 journal_type=journal.journal_type,
                 is_academic=journal.is_academic,
@@ -119,6 +112,37 @@ class PgJournalRepository(JournalRepository):
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Revue {journal.id} introuvable")
+        self._save_issns(journal.id, journal.issns)
+
+    def _save_issns(self, journal_id: int | None, issns: Sequence[JournalIssn]) -> None:
+        values = [row.issn for row in issns]
+        self._conn.execute(
+            delete(journal_issns).where(
+                journal_issns.c.journal_id == journal_id, journal_issns.c.issn.not_in(values)
+            )
+        )
+        # Le drapeau ISSN-L se retire avant d'être reposé : une revue a au plus un ISSN-L.
+        self._conn.execute(
+            update(journal_issns)
+            .where(journal_issns.c.journal_id == journal_id)
+            .values(linking=False)
+        )
+        for row in issns:
+            fields = {
+                "support": row.support,
+                "linking": row.linking,
+                "status": row.status,
+                "replaced_by": row.replaced_by,
+            }
+            kept = self._conn.execute(
+                update(journal_issns)
+                .where(journal_issns.c.journal_id == journal_id, journal_issns.c.issn == row.issn)
+                .values(**fields)
+            ).rowcount
+            if not kept:
+                self._conn.execute(
+                    journal_issns.insert().values(issn=row.issn, journal_id=journal_id, **fields)
+                )
 
     # ── Fusion ─────────────────────────────────────────────────────
 
@@ -135,18 +159,28 @@ class PgJournalRepository(JournalRepository):
                 js.c.id.label("source_journal_id"),
                 jt.c.title.label("t_title"),
                 js.c.title.label("s_title"),
-                jt.c.issn.label("t_issn"),
-                jt.c.eissn.label("t_eissn"),
-                jt.c.issnl.label("t_issnl"),
-                js.c.issn.label("s_issn"),
-                js.c.eissn.label("s_eissn"),
-                js.c.issnl.label("s_issnl"),
             )
             .select_from(jt.join(js, js.c.title_normalized == jt.c.title_normalized))
             .where(jt.c.publisher_id == target_publisher_id)
             .where(js.c.publisher_id == source_publisher_id)
         )
-        return [cast("SharedTitleJournalPair", dict(r._mapping)) for r in self._conn.execute(stmt)]
+        rows = self._conn.execute(stmt).all()
+        issns = issns_by_journal(
+            self._conn, [r.target_journal_id for r in rows] + [r.source_journal_id for r in rows]
+        )
+        return [
+            SharedTitleJournalPair(
+                target_journal_id=r.target_journal_id,
+                target_title=r.t_title,
+                source_journal_id=r.source_journal_id,
+                source_title=r.s_title,
+                t_title=r.t_title,
+                s_title=r.s_title,
+                t_issns=list(issns.get(r.target_journal_id, ())),
+                s_issns=list(issns.get(r.source_journal_id, ())),
+            )
+            for r in rows
+        ]
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
         # publications, source_publications et apc_payments vivent hors de la MetaData de `tables.py` : accès en `text()`.
@@ -180,41 +214,44 @@ class PgJournalRepository(JournalRepository):
             {"t": target_id, "s": source_id},
         )
 
+        # Les ISSN de la source rejoignent la cible avec leur support et leur statut, à vérifier dans le Sudoc ; un ISSN
+        # que la cible porte déjà reste le sien, et l'ISSN-L de la cible l'emporte.
+        self._conn.execute(
+            text("""
+                DELETE FROM journal_issns s
+                WHERE s.journal_id = :s
+                  AND EXISTS (SELECT 1 FROM journal_issns t WHERE t.journal_id = :t AND t.issn = s.issn)
+            """),
+            {"t": target_id, "s": source_id},
+        )
+        self._conn.execute(
+            text("""
+                UPDATE journal_issns
+                SET journal_id = :t, sudoc_checked_at = NULL,
+                    linking = linking AND NOT EXISTS (
+                        SELECT 1 FROM journal_issns WHERE journal_id = :t AND linking
+                    )
+                WHERE journal_id = :s
+            """),
+            {"t": target_id, "s": source_id},
+        )
+
         # Capture des métadonnées de la source, puis suppression de la source avant l'enrichissement : la cible reprend ensuite ses valeurs (COALESCE) sans conflit sur `UNIQUE(openalex_id)`.
         src = self._conn.execute(
             select(
-                journals.c.issn,
-                journals.c.eissn,
-                journals.c.issnl,
                 journals.c.publisher_id,
                 journals.c.openalex_id,
                 journals.c.is_in_doaj,
                 journals.c.apc_amount,
                 journals.c.apc_currency,
                 journals.c.oa_model,
-                journals.c.rejected_issns,
             ).where(journals.c.id == source_id)
         ).one()
-        target = self._conn.execute(
-            select(
-                journals.c.issn, journals.c.eissn, journals.c.issnl, journals.c.rejected_issns
-            ).where(journals.c.id == target_id)
-        ).one()
-        # Les ISSN de la source hors des colonnes de la cible rejoignent ses ISSN rejetés ; un ISSN de ses colonnes en sort.
-        columns = {target.issn or src.issn, target.eissn or src.eissn, target.issnl or src.issnl}
-        absorbed = {v for v in (src.issn, src.eissn, src.issnl) if v}
-        rejected = (set(target.rejected_issns) | set(src.rejected_issns) | absorbed) - columns
         self._conn.execute(delete(journals).where(journals.c.id == source_id))
         self._conn.execute(
             update(journals)
             .where(journals.c.id == target_id)
             .values(
-                # La cible porte des ISSN absorbés, pas encore vérifiés dans le Sudoc.
-                rejected_issns=sorted(rejected),
-                sudoc_checked_at=None,
-                issn=func.coalesce(journals.c.issn, src.issn),
-                eissn=func.coalesce(journals.c.eissn, src.eissn),
-                issnl=func.coalesce(journals.c.issnl, src.issnl),
                 publisher_id=func.coalesce(journals.c.publisher_id, src.publisher_id),
                 openalex_id=func.coalesce(journals.c.openalex_id, src.openalex_id),
                 is_in_doaj=journals.c.is_in_doaj | src.is_in_doaj,

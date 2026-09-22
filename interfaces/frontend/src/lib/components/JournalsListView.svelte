@@ -159,10 +159,7 @@
 	}
 
 	function formatIssns(j: Journal): string {
-		const parts: string[] = [];
-		if (j.issn) parts.push(j.issn);
-		if (j.eissn) parts.push(j.eissn);
-		return parts.join(' / ');
+		return j.issns.join(' / ');
 	}
 
 	function journalTypeLabel(value: string | null): string {

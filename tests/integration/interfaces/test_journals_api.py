@@ -138,13 +138,16 @@ class TestListJournals:
         titles = {j["title"] for j in r.json()["journals"]}
         assert title in titles
 
-    def test_search_finds_an_issn_in_every_column(self, client):
+    def test_search_finds_every_issn_of_a_journal(self, client):
         journal_id = _seed_journal()
         with owner_pool() as cur:
             cur.execute(
-                "UPDATE journals SET issn = '9990-0018', eissn = '9990-0026', "
-                "issnl = '9990-0034', rejected_issns = ARRAY['9990-0042'] WHERE id = %s",
-                (journal_id,),
+                "INSERT INTO journal_issns (issn, journal_id, support, linking, status) VALUES "
+                "('9990-0018', %(j)s, 'print', false, 'active'), "
+                "('9990-0026', %(j)s, 'electronic', false, 'active'), "
+                "('9990-0034', %(j)s, NULL, true, 'active'), "
+                "('9990-0042', %(j)s, NULL, false, 'related_title')",
+                {"j": journal_id},
             )
         for term in ("9990-0018", "9990-0026", "9990-0034", "9990-0042"):
             r = client.get("/api/journals", params={"search": term, "per_page": 200})
@@ -155,7 +158,10 @@ class TestListJournals:
     def test_search_tolerates_a_missing_hyphen_and_the_case(self, client):
         journal_id = _seed_journal()
         with owner_pool() as cur:
-            cur.execute("UPDATE journals SET issn = '9990-005x' WHERE id = %s", (journal_id,))
+            cur.execute(
+                "INSERT INTO journal_issns (issn, journal_id, support) VALUES ('9990-005X', %s, 'print')",
+                (journal_id,),
+            )
         for term in ("9990005X", "9990-005x", "9990-005X"):
             r = client.get("/api/journals", params={"search": term, "per_page": 200})
             assert r.status_code == 200
@@ -268,9 +274,12 @@ class TestListJournals:
 
 def _set_issns(journal_id: int, issn: str | None, eissn: str | None = None) -> None:
     with owner_pool() as cur:
-        cur.execute(
-            "UPDATE journals SET issn = %s, eissn = %s WHERE id = %s", (issn, eissn, journal_id)
-        )
+        for value, support in ((issn, "print"), (eissn, "electronic")):
+            if value:
+                cur.execute(
+                    "INSERT INTO journal_issns (issn, journal_id, support) VALUES (%s, %s, %s)",
+                    (value, journal_id, support),
+                )
 
 
 class TestJournalsWithSameTitle:
@@ -304,7 +313,7 @@ class TestJournalsWithSameTitle:
 
 
 class TestJournalsSharingIssn:
-    def test_groups_journals_sharing_an_issn_across_columns(self, client):
+    def test_groups_journals_sharing_an_issn_across_supports(self, client):
         a, b = _seed_journal(), _seed_journal()
         _set_issns(a, "2999-1111")
         _set_issns(b, None, "2999-1111")
@@ -870,7 +879,8 @@ class TestTracabiliteEdition:
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
         jid = _seed_journal(_uniq("Audit revue"))
 
-        r = auth_client.put(f"/api/journals/{jid}", json={"issn": "1234-5679"})
+        issns = [{"issn": "1234-5679", "support": "print"}]
+        r = auth_client.put(f"/api/journals/{jid}", json={"issns": issns})
         assert r.status_code == 200, r.text
 
         with owner_pool() as cur:
@@ -882,5 +892,5 @@ class TestTracabiliteEdition:
             evenements = cur.fetchall()
 
         assert len(evenements) == 1
-        assert evenements[0]["payload"] == {"issn": "1234-5679"}
+        assert evenements[0]["payload"] == {"issns": issns}
         assert evenements[0]["user_id"]
