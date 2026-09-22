@@ -273,13 +273,50 @@ journal_issns = Table(
     "journal_issns",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("issn", Text, nullable=False),
+    Column(
+        "issn",
+        Text,
+        nullable=False,
+        comment="Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).",
+    ),
     Column("journal_id", Integer),
-    Column("support", issn_support_enum),
-    Column("linking", Boolean, nullable=False, server_default="false"),
-    Column("status", issn_status_enum, nullable=False, server_default="active"),
-    Column("replaced_by", Text),
-    Column("sudoc_checked_at", DateTime(timezone=True)),
+    Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
+    Column(
+        "linking",
+        Boolean,
+        nullable=False,
+        server_default="false",
+        comment="Vrai pour l'ISSN-L de la revue.",
+    ),
+    Column(
+        "status",
+        issn_status_enum,
+        nullable=False,
+        server_default="active",
+        comment=(
+            "active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre "
+            "précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu)."
+        ),
+    ),
+    Column(
+        "replaced_by",
+        Text,
+        comment="ISSN successeur : titre suivant, forme corrigée d'une valeur mal formée.",
+    ),
+    Column(
+        "sudoc_checked_at",
+        DateTime(timezone=True),
+        comment="Date de la vérification de l'ISSN au Sudoc. NULL : jamais vérifié.",
+    ),
+    UniqueConstraint(
+        "issn",
+        "journal_id",
+        name="uq_journal_issns_issn_journal",
+        postgresql_nulls_not_distinct=True,
+    ),
+    comment=(
+        "ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base."
+    ),
 )
 
 
