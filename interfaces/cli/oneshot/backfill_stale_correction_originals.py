@@ -78,7 +78,10 @@ def main() -> int:
     stale: Counter[tuple[str, str]] = Counter()
     # Lecture par paquets : les lignes ne sont pas chargées d'un coup.
     with engine.connect() as conn:
-        for row in conn.execution_options(stream_results=True, yield_per=2000).execute(_RECORDS):
+        rows = conn.execution_options(stream_results=True, yield_per=2000).execute(_RECORDS)
+        for read, row in enumerate(rows, start=1):
+            if read % 10_000 == 0:
+                log.info("%d notices lues, %d valeurs périmées", read, len(updates))
             try:
                 payload = json.loads(store.get(row.source, row.source_id))
             except KeyError:
