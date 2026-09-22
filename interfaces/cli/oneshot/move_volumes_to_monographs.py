@@ -3,9 +3,12 @@
 
 La description du conteneur de chaque enregistrement se reconstruit à partir des champs en base : son entrée de `journals` telle que la normalisation l'a donnée (avant correction par espace de noms DOI), sa monographie, son type brut et ses ISBN. `find_or_create_containers` en tire la série et le volume, comme à la normalisation.
 
+Le script traite les enregistrements absents du raw store, que la renormalisation laisse en l'état. Il écrit leurs conteneurs et retire la trace `raw_metadata.journal_id`, que `metadata_correction` recalcule. Enchaîner ensuite `run_pipeline --from publishers_journals`.
+
 `--audit N` compare ce calcul à la normalisation, sur N notices du raw store par strate. Pour chaque notice, dans une transaction annulée ensuite, le calcul sur la base résout d'abord les conteneurs, puis la normalisation rejouée sur la notice brute doit retrouver les mêmes entrées.
 
 Usage :
+    python -m interfaces.cli.oneshot.move_volumes_to_monographs [--dry-run]
     python -m interfaces.cli.oneshot.move_volumes_to_monographs --audit 150
 """
 
@@ -335,17 +338,90 @@ def _audit(size: int) -> None:
                     log.info("    [%s] %s", verdict, line)
 
 
+_WRITE = text("""
+    UPDATE source_publications
+    SET journal_id = :journal_id, monograph_id = :monograph_id,
+        raw_metadata = raw_metadata - 'journal_id'
+    WHERE id = :id
+""")
+
+_PROGRESS = 500
+
+
+def _change(record: StoredRecord, containers: Containers) -> str | None:
+    """Nature du changement de conteneurs d'un enregistrement, ou `None` s'il les garde."""
+    journal = "" if containers.journal_id == record.journal_id else "revue"
+    monograph = "" if containers.monograph_id == record.monograph_id else "monographie"
+    return " et ".join(filter(None, (journal, monograph))) or None
+
+
+def _move(dry_run: bool) -> None:
+    store: RawStore = get_raw_store()
+    engine = get_sync_engine()
+    with engine.connect() as conn:
+        records = [StoredRecord(*row) for row in conn.execute(_RECORDS)]
+    stored_keys: dict[str, set[str]] = {}
+    stock: list[StoredRecord] = []
+    for record in records:
+        if record.source not in stored_keys:
+            stored_keys[record.source] = set(store.iter_keys(record.source))
+        if record.source_id not in stored_keys[record.source]:
+            stock.append(record)
+    log.info("%d enregistrements à conteneur absents du raw store", len(stock))
+
+    tally: Counter[tuple[str, str]] = Counter()
+    examples: defaultdict[str, list[str]] = defaultdict(list)
+    with engine.connect() as conn:
+        for done, record in enumerate(stock, 1):
+            containers = resolve_stored(record, conn)
+            change = _change(record, containers)
+            tally[(record.source, change or "inchangé")] += 1
+            if change:
+                conn.execute(
+                    _WRITE,
+                    {
+                        "id": record.id,
+                        "journal_id": containers.journal_id,
+                        "monograph_id": containers.monograph_id,
+                    },
+                )
+                if len(examples[change]) < 10:
+                    examples[change].append(
+                        f"{record.source} {record.source_id} ({record.raw_doc_type}) :"
+                        f" revue {_entry(conn, 'journals', record.journal_id)}"
+                        f" → {_entry(conn, 'journals', containers.journal_id)},"
+                        f" monographie {_entry(conn, 'monographs', record.monograph_id)}"
+                        f" → {_entry(conn, 'monographs', containers.monograph_id)}"
+                    )
+            if done % _PROGRESS == 0:
+                log.info("%d / %d enregistrements traités", done, len(stock))
+        if dry_run:
+            conn.rollback()
+        else:
+            conn.commit()
+
+    log.info("─── Changements de conteneurs%s ───", " (dry-run)" if dry_run else "")
+    for (source, change), n in sorted(tally.items()):
+        log.info("  %-10s %-24s %5d", source, change, n)
+    for change, lines in sorted(examples.items()):
+        for line in lines:
+            log.info("    [%s] %s", change, line)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--audit",
         type=int,
-        required=True,
         metavar="N",
-        help="Notices du raw store auditées par strate.",
+        help="Notices du raw store auditées par strate, sans rien écrire.",
     )
+    parser.add_argument("--dry-run", action="store_true", help="Calcule sans écrire.")
     args = parser.parse_args()
-    _audit(args.audit)
+    if args.audit:
+        _audit(args.audit)
+    else:
+        _move(args.dry_run)
     return 0
 
 
