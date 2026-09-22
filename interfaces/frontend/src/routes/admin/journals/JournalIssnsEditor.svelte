@@ -74,7 +74,7 @@
 						</select></td>
 						<td><label class="linking"><input type="checkbox" bind:checked={editing.draft.linking} /> ISSN-L</label></td>
 						<td class="actions">
-							<button type="button" class="btn btn-sm btn-confirm" onclick={validate}>Valider</button>
+							<button type="button" class="btn btn-sm btn-primary" onclick={validate}>Valider</button>
 							<button type="button" class="btn btn-sm" onclick={cancel}>Annuler</button>
 							{#if !editing.added}<button type="button" class="btn btn-sm btn-danger" onclick={remove}>Retirer</button>{/if}
 						</td>
