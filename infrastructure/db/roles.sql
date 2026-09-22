@@ -122,7 +122,7 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE ON
-    addresses, apc_payments, config, doi_prefixes, persons_rh, source_authorships,
+    addresses, apc_payments, config, doi_prefixes, monographs, persons_rh, source_authorships,
     source_publications
 TO bibliometrie_app;
 
