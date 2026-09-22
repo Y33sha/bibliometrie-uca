@@ -21,7 +21,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 
 ## Données récupérées
 
-- **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISSN, ISBN et eISBN, `isbn-type` donnant le support), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
+- **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
 - **Auteurs** : nom complet, ORCID si présent, affiliation textuelle
 
 ## Exemple de payload

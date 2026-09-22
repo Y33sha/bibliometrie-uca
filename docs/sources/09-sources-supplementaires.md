@@ -51,7 +51,7 @@ Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en lig
 
 Le Sudoc code « électronique » (`182$c = c`) aussi bien une ressource en ligne qu'un CD-ROM : seul `183$a` les distingue. Une notice dont le titre nomme le CD-ROM est lue comme un autre support, quel que soit son codage. L'arrêt du papier au profit de l'en ligne est souvent codé comme un changement de titre (`430`, `440`), sous le même titre. L'ISSN-L des notices papier et en ligne d'une même revue diffère parfois ; la notice porte alors l'ISSN-L d'un titre précédent.
 
-La notice elle-même n'est pas conservée. Ses informations sont écrites dans `journals.issn`, `eissn`, `issnl` et `rejected_issns`, et la date de vérification dans `journals.sudoc_checked_at`.
+La notice elle-même n'est pas conservée. Ses informations sont écrites dans `journal_issns` : support, ISSN-L, statut et date de vérification de chaque ISSN.
 
 ## DOAJ
 
@@ -63,7 +63,7 @@ Source d'enrichissement des revues : « cette revue est-elle un journal open acc
 
 Le dump CSV public, téléchargé depuis https://doaj.org/csv. Aucun identifiant d'accès n'est requis.
 
-L'import indexe les revues par ISSN (`issn`, `eissn`, `issnl`), remet `is_in_doaj` à FALSE partout, puis écrit `doaj_payload`, `doaj_imported_at` et `is_in_doaj` pour chaque ligne appariée. Le dump est retéléchargé quand le dernier import date de plus de trente jours.
+L'import indexe les revues par leurs ISSN valides, remet `is_in_doaj` à FALSE partout, puis écrit `doaj_payload`, `doaj_imported_at` et `is_in_doaj` pour chaque ligne appariée. Le dump est retéléchargé quand le dernier import date de plus de trente jours.
 
 ### Données récupérées
 
