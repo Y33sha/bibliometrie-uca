@@ -25,14 +25,14 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 ### 1. Mesure
 
 - [x] Script d'audit versionné : classement des couples (publication, revue A, revue B) par cause, échantillons.
-- [ ] Mesure en production.
+- [x] Mesure en production : 357 publications, 271 couples de revues. Par cause : 79 couples de revue erronée (111 publications), 32 de dépôt ou preprint, 28 de doublon (69 publications), 4 d'ouvrage, 4 de documents réunis à tort, 2 de titre parasite ; 122 couples indéterminés, dont 5 reviennent sur plusieurs publications.
 
 ### 2. Titres parasites
 
 - [x] Origine : notices DataCite qui ne décrivent pas la version publiée. Ce sont surtout des copies d'articles déposées par les entrepôts GSI, DESY et RWTH, de type `Text` : DataCite découpe mal leur `SeriesInformation`, une citation en texte libre (« Physics letters / B 777 »). S'y ajoutent des notes de version de logiciels Zenodo et des mentions de pagination (« 22 Seiten (2023). »).
 - [x] Normalisation DataCite : le conteneur désigne une revue selon `container_names_a_journal` : type d'article, de communication, de recueil d'actes, de livre, de chapitre ou de data paper, sous sa forme contrôlée ou libre, et conteneur qui ne vient pas d'une citation. Le type seul ne suffit pas : à l'échelle de DataCite, les premiers déposants de `JournalArticle` sont des entrepôts (Zenodo, figshare), et des éditeurs déclarent encore `Text` (E-Periodica, Classiques Garnier).
-- [ ] Stock : oneshot `backfill_detach_datacite_journals`, puis `publishers_journals` pour supprimer les revues vidées.
-- [ ] Autres sources : mesure en production après le nettoyage de DataCite.
+- [x] Stock : la renormalisation de toutes les sources a appliqué la règle. Le oneshot `backfill_detach_datacite_journals` ne trouve plus aucune notice à détacher.
+- [x] Autres sources : la mesure en production ne compte plus que 2 couples de titre parasite, tous deux DataCite, sur des notices absentes du raw store.
 
 ### 3. Doublons restants
 
