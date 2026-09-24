@@ -28,6 +28,11 @@ def test_parse_member_id_from_url():
     assert parse_member_id("https://id.crossref.org/member/297") == 297
 
 
+def test_parse_member_id_from_plain_string():
+    """Une notice rend le membre en chaîne numérique, là où un préfixe le rend en URL."""
+    assert parse_member_id("54812") == 54812
+
+
 def test_parse_member_id_from_int():
     assert parse_member_id(42) == 42
 
@@ -83,7 +88,7 @@ def _router(monkeypatch, routes: dict[str, object]):
 
 
 def test_fetch_crossref_prefix_takes_depositing_member_when_registered_one_is_idle(monkeypatch):
-    """Le préfixe reste enregistré au nom d'un compte sans dépôt : la notice donne le compte vivant."""
+    """Le préfixe reste enregistré au nom d'un compte sans dépôt : la notice donne le compte vivant, dont le nom déclaré l'emporte sur l'imprint de la notice."""
     _router(
         monkeypatch,
         {
@@ -91,10 +96,14 @@ def test_fetch_crossref_prefix_takes_depositing_member_when_registered_one_is_id
                 "name": "Saint Joseph University of Beirut (independent)",
                 "member": "https://id.crossref.org/member/50585",
             },
-            "/members/50585": {"counts": {"total-dois": 0}},
-            "/works/": {
-                "publisher": "Saint Joseph University of Beirut",
-                "member": 54812,
+            "/members/50585": {
+                "primary-name": "Saint Joseph University of Beirut (independent)",
+                "counts": {"total-dois": 0},
+            },
+            "/works/": {"publisher": "Regards", "member": "54812"},
+            "/members/54812": {
+                "primary-name": "Saint Joseph University of Beirut",
+                "counts": {"total-dois": 826},
             },
         },
     )
@@ -109,7 +118,10 @@ def test_fetch_crossref_prefix_keeps_registered_member_when_it_deposits(monkeypa
         monkeypatch,
         {
             "/prefixes/": {"name": "Springer", "member": 297},
-            "/members/297": {"counts": {"total-dois": 18946725}},
+            "/members/297": {
+                "primary-name": "Springer Science and Business Media LLC",
+                "counts": {"total-dois": 18946725},
+            },
         },
     )
     assert fetch_crossref_prefix("10.1007", "10.1007/abc", user_agent="ua") == ("Springer", 297)
