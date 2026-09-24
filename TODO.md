@@ -69,6 +69,7 @@
 * 100685: pourquoi preprint?
 * 138474: 1 seul document alors que le preprint devrait être distinct
 * 206321: pourquoi UNH non reconnue?
+* 221243: pourquoi pas fusionné avec son hal-id?
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
