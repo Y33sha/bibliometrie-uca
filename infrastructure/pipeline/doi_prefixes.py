@@ -63,18 +63,12 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
         result = self._conn.execute(
             text(
                 """
-                SELECT d.prefix, d.ra, d.publisher_name_raw, d.publisher_name_normalized,
-                       s.doi AS sample_doi
-                FROM doi_prefixes d
-                LEFT JOIN LATERAL (
-                    SELECT c.doi FROM candidate_dois c
-                    WHERE split_part(c.doi, '/', 1) = d.prefix
-                    LIMIT 1
-                ) s ON true
-                WHERE d.publisher_id IS NULL
-                  AND d.publisher_checked_at IS NULL
-                  AND d.ra IN ('Crossref', 'DataCite', 'unknown')
-                ORDER BY d.prefix
+                SELECT prefix, ra, publisher_name_raw, publisher_name_normalized
+                FROM doi_prefixes
+                WHERE publisher_id IS NULL
+                  AND publisher_checked_at IS NULL
+                  AND ra IN ('Crossref', 'DataCite', 'unknown')
+                ORDER BY prefix
                 """
             )
         )
@@ -84,7 +78,6 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
                 ra=r.ra,
                 publisher_name_raw=r.publisher_name_raw,
                 publisher_name_normalized=r.publisher_name_normalized,
-                sample_doi=r.sample_doi,
             )
             for r in result
         ]
@@ -126,6 +119,12 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
                 "datacite_client_symbol": datacite_client_symbol,
             },
         )
+
+    def find_doi_with_prefix(self, prefix: str) -> str | None:
+        return self._conn.execute(
+            text("SELECT doi FROM source_publications WHERE doi LIKE :motif LIMIT 1"),
+            {"motif": f"{prefix}/%"},
+        ).scalar()
 
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
         self._conn.execute(

@@ -107,12 +107,14 @@ def _fetch_and_store_publisher_metadata(
     ra = row.ra
     crossref_info: tuple[str, int | None] | None = None
     datacite_info: tuple[str, str, str] | None = None
+    # Le DOI témoin sert au seul cas du compte sans dépôt, mais se lit avant l'appel : la recherche
+    # d'un DOI du préfixe est une requête, l'appel HTTP en est déjà une de plus.
     if ra == "Crossref":
-        crossref_info = fetch_crossref_prefix_fn(row.prefix, row.sample_doi)
+        crossref_info = fetch_crossref_prefix_fn(row.prefix, repo.find_doi_with_prefix(row.prefix))
     elif ra == "DataCite":
         datacite_info = fetch_datacite_prefix_fn(row.prefix)
     else:  # unknown : tente les deux, corrige la RA selon l'endpoint qui répond
-        crossref_info = fetch_crossref_prefix_fn(row.prefix, row.sample_doi)
+        crossref_info = fetch_crossref_prefix_fn(row.prefix, repo.find_doi_with_prefix(row.prefix))
         if crossref_info is not None:
             ra = "Crossref"
         else:

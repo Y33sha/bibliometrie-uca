@@ -3,7 +3,7 @@
 
 Crossref laisse un préfixe au nom d'un compte dormant quand une maison en ouvre un second : le préfixe garde son ancien propriétaire, pendant que le compte vivant dépose sous ce préfixe. La résolution prend alors le nom et le membre du compte mort.
 
-Le script interroge `/members/<id>` pour chaque membre présent dans `doi_prefixes`. Les préfixes d'un membre sans dépôt repassent en attente (`publisher_id` et `publisher_checked_at` remis à NULL). La sous-étape `resolve_publishers` les reprend au run suivant, et retient cette fois le membre déposant, d'après la notice d'un DOI du préfixe.
+Le script interroge `/members/<id>` pour chaque membre présent dans `doi_prefixes`. Les préfixes d'un membre sans dépôt repassent en attente : `publisher_id`, `publisher_checked_at`, `crossref_member_id` et les noms d'éditeur reviennent à NULL, faute de quoi la résolution reprendrait le nom stocké sans réinterroger Crossref. La sous-étape `resolve_publishers` les reprend au run suivant, et retient cette fois le membre déposant, d'après la notice d'un DOI du préfixe.
 
 Usage :
     python -m interfaces.cli.oneshot.reset_idle_crossref_prefixes             # applique
@@ -33,8 +33,12 @@ _MEMBERS = text("""
     GROUP BY 1 ORDER BY 1
 """)
 
+# Le nom et le membre partent avec le reste : la résolution reprend un nom déjà stocké sans
+# réinterroger Crossref.
 _REOPEN = text("""
-    UPDATE doi_prefixes SET publisher_id = NULL, publisher_checked_at = NULL
+    UPDATE doi_prefixes
+    SET publisher_id = NULL, publisher_checked_at = NULL, crossref_member_id = NULL,
+        publisher_name_raw = NULL, publisher_name_normalized = NULL
     WHERE crossref_member_id = ANY(:members)
 """)
 
