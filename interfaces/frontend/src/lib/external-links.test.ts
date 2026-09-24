@@ -31,12 +31,15 @@ const HOTES_AFFICHABLES = new Set([
 	'www.ncbi.nlm.nih.gov',
 	// Fiche de revue en libre accès. Seule adresse qui vienne des données : le serveur la
 	// confronte à cet hôte avant de la servir (`infrastructure/sources/doaj/urls.py`).
-	'doaj.org'
+	'doaj.org',
+	// Rapport de participation d'un membre Crossref, depuis la liste des éditeurs.
+	'www.crossref.org'
 ]);
 
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
-const COMPOSITION = /^(halDocUrl|halPersonUrl|halUrl|halCollectionUrl|scanrPubUrl|rorFullUrl|sourceExternalUrl|exportCsvUrl|relHref)\(/;
+const COMPOSITION =
+	/^(halDocUrl|halPersonUrl|halUrl|halCollectionUrl|scanrPubUrl|rorFullUrl|sourceExternalUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl|accessUrl)$/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. */
