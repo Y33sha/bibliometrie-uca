@@ -14,7 +14,7 @@ from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.rows import row_as
-from infrastructure.db.tables import publisher_name_forms, publishers
+from infrastructure.db.tables import doi_prefixes, publisher_name_forms, publishers
 from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
 
 
@@ -91,6 +91,17 @@ class PgPublisherRepository(PublisherRepository):
             raise NotFoundError(f"Éditeur {publisher.id} introuvable")
 
     # ── Fusion ─────────────────────────────────────────────────────
+
+    def crossref_member_ids(self, publisher_id: int) -> tuple[int, ...]:
+        rows = self._conn.execute(
+            select(doi_prefixes.c.crossref_member_id)
+            .where(
+                doi_prefixes.c.publisher_id == publisher_id,
+                doi_prefixes.c.crossref_member_id.is_not(None),
+            )
+            .distinct()
+        ).scalars()
+        return tuple(sorted(rows))
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
         self._conn.execute(
