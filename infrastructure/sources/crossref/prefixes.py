@@ -2,7 +2,7 @@
 
 `GET /prefixes/<prefix>` renvoie le nom du publisher et l'ID membre Crossref d'un préfixe. Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'Crossref'`. Polite pool via header `User-Agent` (mailto).
 
-Un préfixe reste parfois enregistré au nom d'un compte qui ne dépose plus, pendant qu'un autre compte de la même maison dépose sous ce préfixe. `GET /members/<id>` donne le nombre de DOI déposés par un membre ; à zéro, `GET /works/<doi>` sur un DOI du préfixe rend le membre déposant et son nom, qui font alors foi.
+Un préfixe reste parfois enregistré au nom d'un compte qui ne dépose plus, pendant qu'un autre compte dépose sous ce préfixe : un second compte de la même maison, ou celui du groupe qui l'a rachetée. `GET /members/<id>` donne le nom déclaré d'un membre et son nombre de dépôts ; à zéro, `GET /works/<doi>` sur un DOI du préfixe nomme le membre déposant, dont le nom déclaré fait alors foi.
 """
 
 from __future__ import annotations
@@ -24,15 +24,16 @@ _MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
 
 
 def parse_member_id(member: JsonValue) -> int | None:
-    """Numéro de membre Crossref, extrait de la forme `…/member/10` qu'il prend dans les réponses. Accepte aussi un int brut."""
-    if member is None:
+    """Numéro de membre Crossref, sous les trois formes que prennent les réponses : l'URL `…/member/10` des préfixes, la chaîne `"10"` des notices, ou un entier."""
+    if isinstance(member, bool) or member is None:
         return None
     if isinstance(member, int):
         return member
     if isinstance(member, str):
-        m = _MEMBER_URL_RE.search(member)
-        if m:
+        if m := _MEMBER_URL_RE.search(member):
             return int(m.group(1))
+        if member.isdigit():
+            return int(member)
     return None
 
 
@@ -52,8 +53,8 @@ def _get_message(url: str, *, user_agent: str, label: str) -> Mapping[str, JsonV
     return as_mapping(msg) if isinstance(msg, dict) else None
 
 
-def member_deposits(member_id: int, *, user_agent: str) -> int | None:
-    """Nombre de DOI déposés par un membre Crossref, ou `None` si l'appel échoue."""
+def member_profile(member_id: int, *, user_agent: str) -> tuple[str, int] | None:
+    """`(nom déclaré, nombre de DOI déposés)` d'un membre Crossref, ou `None` si l'appel échoue."""
     msg = _get_message(
         f"{API_BASE_URLS['crossref']}/members/{member_id}",
         user_agent=user_agent,
@@ -61,20 +62,17 @@ def member_deposits(member_id: int, *, user_agent: str) -> int | None:
     )
     if msg is None:
         return None
+    name = msg.get("primary-name")
     total = as_mapping(msg.get("counts")).get("total-dois")
-    return total if isinstance(total, int) else None
+    return (name, total) if isinstance(name, str) and isinstance(total, int) else None
 
 
-def depositing_member(doi: str, *, user_agent: str) -> tuple[str, int] | None:
-    """`(nom, membre)` du compte qui a déposé ce DOI, d'après sa notice Crossref."""
+def depositing_member(doi: str, *, user_agent: str) -> int | None:
+    """Membre Crossref qui a déposé ce DOI, d'après sa notice."""
     msg = _get_message(
         f"{API_BASE_URLS['crossref']}/works/{doi}", user_agent=user_agent, label=f"notice {doi}"
     )
-    if msg is None:
-        return None
-    member = parse_member_id(msg.get("member"))
-    name = msg.get("publisher")
-    return (name, member) if member is not None and isinstance(name, str) and name else None
+    return parse_member_id(msg.get("member")) if msg is not None else None
 
 
 def fetch_crossref_prefix(
@@ -101,13 +99,24 @@ def fetch_crossref_prefix(
     if not isinstance(name, str) or not name:
         return None
     member = parse_member_id(msg.get("member"))
-    if member is not None and sample_doi and member_deposits(member, user_agent=user_agent) == 0:
-        if depositing := depositing_member(sample_doi, user_agent=user_agent):
-            logger.info(
-                "Préfixe %s : le membre %d n'a aucun dépôt, le membre déposant %d prend sa place",
-                cleaned,
-                member,
-                depositing[1],
-            )
-            return depositing
-    return name, member
+    if member is None or not sample_doi:
+        return name, member
+    profile = member_profile(member, user_agent=user_agent)
+    if profile is None or profile[1] > 0:
+        return name, member
+    depositing = depositing_member(sample_doi, user_agent=user_agent)
+    if depositing is None or depositing == member:
+        return name, member
+    # Le nom vient du membre déposant, non de la notice : celle-ci porte l'imprint, qui varie d'un
+    # dépôt à l'autre sous un même compte.
+    deposited_by = member_profile(depositing, user_agent=user_agent)
+    if deposited_by is None:
+        return name, member
+    logger.info(
+        "Préfixe %s : le membre %d n'a aucun dépôt, le membre déposant %d « %s » prend sa place",
+        cleaned,
+        member,
+        depositing,
+        deposited_by[0],
+    )
+    return deposited_by[0], depositing
