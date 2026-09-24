@@ -15,6 +15,8 @@ class PendingPublisherPrefix(NamedTuple):
     ra: str
     publisher_name_raw: str | None
     publisher_name_normalized: str | None
+    sample_doi: str | None = None
+    """Un DOI du préfixe présent dans les données, qui sert à retrouver le membre Crossref déposant."""
 
 
 class DoiPrefixesQueries(Protocol):
