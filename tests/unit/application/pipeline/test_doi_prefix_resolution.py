@@ -46,6 +46,9 @@ class FakeDoiPrefixRepo:
         self.rows[prefix] = _Row(prefix=prefix, ra=ra)
         return True
 
+    def find_doi_with_prefix(self, prefix: str) -> str | None:
+        return f"{prefix}/temoin" if prefix in self.rows else None
+
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
         return list(self.ra_breakdown)
 

@@ -15,8 +15,6 @@ class PendingPublisherPrefix(NamedTuple):
     ra: str
     publisher_name_raw: str | None
     publisher_name_normalized: str | None
-    sample_doi: str | None = None
-    """Un DOI du préfixe présent dans les données, qui sert à retrouver le membre Crossref déposant."""
 
 
 class DoiPrefixesQueries(Protocol):
@@ -51,6 +49,10 @@ class DoiPrefixesQueries(Protocol):
         datacite_client_symbol: str | None,
     ) -> None:
         """Renseigne les métadonnées publisher d'une row après fetch `/prefixes` (et corrige `ra` si elle était `unknown`). N'attache pas le `publisher_id` (cf. `update_publisher_id`) ni ne marque la row vérifiée (cf. `mark_publisher_checked`)."""
+        ...
+
+    def find_doi_with_prefix(self, prefix: str) -> str | None:
+        """Un DOI de ce préfixe porté par un enregistrement, qui sert à retrouver le membre Crossref déposant."""
         ...
 
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
