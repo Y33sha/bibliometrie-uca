@@ -32,6 +32,17 @@ def _seed_publisher(name: str | None = None) -> int:
         return cur.fetchone()["id"]
 
 
+def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
+    prefix = f"10.{uuid.uuid4().int % 100000:05d}"
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id)"
+            " VALUES (%s, 'Crossref', %s, %s)",
+            (prefix, publisher_id, crossref_member_id),
+        )
+    return prefix
+
+
 def _seed_journal(publisher_id: int, title: str | None = None) -> int:
     title = title or _uniq("Journal")
     with owner_pool() as cur:
@@ -435,6 +446,23 @@ class TestMergePublishers:
         assert body["merged"] is True
         assert body["source_id"] == src
         assert body["target_id"] == dst
+
+    def test_refused_on_distinct_crossref_members(self, auth_client):
+        src = _seed_publisher("MembreSrc")
+        dst = _seed_publisher("MembreDst")
+        _seed_doi_prefix(src, crossref_member_id=793)
+        _seed_doi_prefix(dst, crossref_member_id=297)
+        r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": src})
+        assert r.status_code == 409
+        assert "793" in r.json()["detail"]
+
+    def test_merges_when_a_crossref_member_is_shared(self, auth_client):
+        src = _seed_publisher("MembrePartageSrc")
+        dst = _seed_publisher("MembrePartageDst")
+        _seed_doi_prefix(src, crossref_member_id=297)
+        _seed_doi_prefix(dst, crossref_member_id=297)
+        r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": src})
+        assert r.status_code == 200
 
 
 # ── GET /api/publishers/types ───────────────────────────────────

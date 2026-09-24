@@ -25,12 +25,14 @@ from application.services._merge import load_merge_pair
 from application.services.journals.core import merge_journals
 from domain.errors import (
     BlockingJournal,
+    ConflictError,
     NotFoundError,
     PublisherMergeBlockedError,
     ValidationError,
 )
 from domain.journals.issns import issn_conflict
 from domain.normalize import normalize_text, to_plain_text
+from domain.publishers.members import crossref_member_conflict
 from domain.publishers.names import publisher_name_key
 
 
@@ -128,7 +130,7 @@ def merge_publishers(
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
-    Invariant métier : si deux journaux aux titres partagés entre les deux éditeurs portent des ISSN/eISSN/ISSN-L différents, la fusion est refusée (`ConflictError`) — leurs identités sont distinctes.
+    Deux invariants métier refusent la fusion (`ConflictError`), chacun sur une identité déclarée : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
 
     La détection est côté `journal_repo` (requête sur `journals`), la fusion finale côté `publisher_repo` (transferts + delete).
 
@@ -136,7 +138,14 @@ def merge_publishers(
     """
     load_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
 
-    # 1. Détecter les journaux partageant un titre entre les deux éditeurs.
+    # 1. Deux identités Crossref distinctes désignent deux éditeurs : la fusion s'arrête là.
+    if conflict := crossref_member_conflict(
+        publisher_repo.crossref_member_ids(target_id),
+        publisher_repo.crossref_member_ids(source_id),
+    ):
+        raise ConflictError(f"Fusion refusée, {conflict} (cible / source)")
+
+    # 2. Détecter les journaux partageant un titre entre les deux éditeurs.
     #    Collecter toutes les paires bloquantes en une passe pour lever
     #    PublisherMergeBlockedError avec l'ensemble — l'UI les affiche
     #    d'un coup.

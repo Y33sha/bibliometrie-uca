@@ -54,6 +54,10 @@ class PublisherRepository(Protocol):
 
     # ── Fusion ─────────────────────────────────────────────────────
 
+    def crossref_member_ids(self, publisher_id: int) -> tuple[int, ...]:
+        """Membres Crossref de l'éditeur, tirés de ses préfixes DOI."""
+        ...
+
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
         """Fusionne l'éditeur `source_id` dans `target_id` : transfère journaux, monographies, préfixes DOI, formes de nom et paiements APC, enrichit la cible par COALESCE, puis supprime la source. La fusion préalable des journaux à titre partagé relève du service via `find_shared_title_journal_pairs`."""
         ...
