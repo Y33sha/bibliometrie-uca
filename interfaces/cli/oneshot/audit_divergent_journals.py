@@ -35,10 +35,12 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.journals.issns import IssnStatus
 from domain.journals.titles import compatible_titles
 from domain.publishers.names import publisher_name_key
 from infrastructure import PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("audit_divergent_journals", os.path.dirname(__file__))
@@ -176,10 +178,11 @@ def _fetch_journals(conn: Connection) -> dict[int, Journal]:
     name_forms: defaultdict[int, set[str]] = defaultdict(set)
     for row in conn.execute(text("SELECT journal_id, form_normalized FROM journal_name_forms")):
         name_forms[row.journal_id].add(row.form_normalized)
+    active_issns = issns_by_journal(conn)
     journals: dict[int, Journal] = {}
     rows = conn.execute(
         text("""
-            SELECT j.id, j.title, j.title_normalized, j.issn, j.eissn, j.issnl,
+            SELECT j.id, j.title, j.title_normalized,
                    j.journal_type::text AS journal_type, coalesce(p.name, '') AS publisher
             FROM journals j
             LEFT JOIN publishers p ON p.id = j.publisher_id
@@ -189,7 +192,11 @@ def _fetch_journals(conn: Connection) -> dict[int, Journal]:
         journals[row.id] = Journal(
             title=row.title,
             title_normalized=row.title_normalized,
-            issns=frozenset(v for v in (row.issn, row.eissn, row.issnl) if v is not None),
+            issns=frozenset(
+                issn.issn
+                for issn in active_issns.get(row.id, ())
+                if issn.status is IssnStatus.ACTIVE
+            ),
             name_forms=frozenset(name_forms[row.id]),
             publisher=row.publisher,
             publisher_key=publisher_name_key(row.publisher) if row.publisher else "",
