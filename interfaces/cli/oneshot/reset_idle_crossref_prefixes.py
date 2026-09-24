@@ -3,7 +3,7 @@
 
 Crossref laisse un préfixe au nom d'un compte dormant quand une maison en ouvre un second : le préfixe garde son ancien propriétaire, pendant que le compte vivant dépose sous ce préfixe. La résolution prend alors le nom et le membre du compte mort.
 
-Le script interroge `/members/<id>` pour chaque membre présent dans `doi_prefixes`. Les préfixes d'un membre sans dépôt repassent en attente : `publisher_id`, `publisher_checked_at`, `crossref_member_id` et les noms d'éditeur reviennent à NULL, faute de quoi la résolution reprendrait le nom stocké sans réinterroger Crossref. La sous-étape `resolve_publishers` les reprend au run suivant, et retient cette fois le membre déposant, d'après la notice d'un DOI du préfixe.
+Le script lit le profil de chaque membre présent dans `doi_prefixes`. Les préfixes d'un membre sans dépôt repassent en attente : `publisher_id`, `publisher_checked_at`, `crossref_member_id` et les noms d'éditeur reviennent à NULL, faute de quoi la résolution reprendrait le nom stocké sans réinterroger Crossref. La sous-étape `resolve_publishers` les reprend au run suivant, et retient cette fois le membre déposant, d'après la notice d'un DOI du préfixe.
 
 Usage :
     python -m interfaces.cli.oneshot.reset_idle_crossref_prefixes             # applique
@@ -20,7 +20,7 @@ from sqlalchemy import text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.config import get_polite_pool_email
-from infrastructure.sources.crossref.prefixes import member_deposits
+from infrastructure.sources.crossref.prefixes import member_profile
 from infrastructure.sources.polite_pool import build_user_agent
 
 log = setup_logger("reset_idle_crossref_prefixes", os.path.dirname(__file__))
@@ -55,10 +55,10 @@ def _reset(dry_run: bool) -> None:
     idle: list[int] = []
     unreachable = 0
     for done, row in enumerate(members, 1):
-        deposits = member_deposits(row.member, user_agent=user_agent)
-        if deposits is None:
+        profile = member_profile(row.member, user_agent=user_agent)
+        if profile is None:
             unreachable += 1
-        elif deposits == 0:
+        elif profile[1] == 0:
             idle.append(row.member)
             log.info("Membre %d sans dépôt, %d préfixe(s) : %s", row.member, row.prefixes, row.noms)
         if done % _PROGRESS == 0:
