@@ -437,8 +437,8 @@ def _run_resolve_publishers() -> PhaseMetrics:
             log,
             repo=PgDoiPrefixesQueries(conn),
             publisher_repo=PgPublisherGatewayQueries(conn),
-            fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
-                prefix, user_agent=user_agent
+            fetch_crossref_prefix_fn=lambda prefix, sample_doi: fetch_crossref_prefix(
+                prefix, sample_doi, user_agent=user_agent
             ),
             fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
                 prefix, user_agent=user_agent

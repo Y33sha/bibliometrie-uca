@@ -139,7 +139,7 @@ class StubCrossref:
     answers: dict[str, tuple[str, int | None] | None] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
 
-    def __call__(self, prefix: str) -> tuple[str, int | None] | None:
+    def __call__(self, prefix: str, sample_doi: str | None = None) -> tuple[str, int | None] | None:
         self.calls.append(prefix)
         return self.answers.get(prefix)
 

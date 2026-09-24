@@ -21,8 +21,8 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
 
-FetchCrossrefPrefixFn = Callable[[str], tuple[str, int | None] | None]
-"""Signature : `(prefix) -> (publisher_name, member_id) | None`."""
+FetchCrossrefPrefixFn = Callable[[str, str | None], tuple[str, int | None] | None]
+"""Signature : `(prefix, sample_doi) -> (publisher_name, member_id) | None`."""
 
 FetchDataCitePrefixFn = Callable[[str], tuple[str, str, str] | None]
 """Signature : `(prefix) -> (provider_name, client_name, client_symbol) | None`."""
@@ -108,11 +108,11 @@ def _fetch_and_store_publisher_metadata(
     crossref_info: tuple[str, int | None] | None = None
     datacite_info: tuple[str, str, str] | None = None
     if ra == "Crossref":
-        crossref_info = fetch_crossref_prefix_fn(row.prefix)
+        crossref_info = fetch_crossref_prefix_fn(row.prefix, row.sample_doi)
     elif ra == "DataCite":
         datacite_info = fetch_datacite_prefix_fn(row.prefix)
     else:  # unknown : tente les deux, corrige la RA selon l'endpoint qui répond
-        crossref_info = fetch_crossref_prefix_fn(row.prefix)
+        crossref_info = fetch_crossref_prefix_fn(row.prefix, row.sample_doi)
         if crossref_info is not None:
             ra = "Crossref"
         else:

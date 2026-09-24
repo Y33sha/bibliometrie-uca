@@ -63,12 +63,18 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
         result = self._conn.execute(
             text(
                 """
-                SELECT prefix, ra, publisher_name_raw, publisher_name_normalized
-                FROM doi_prefixes
-                WHERE publisher_id IS NULL
-                  AND publisher_checked_at IS NULL
-                  AND ra IN ('Crossref', 'DataCite', 'unknown')
-                ORDER BY prefix
+                SELECT d.prefix, d.ra, d.publisher_name_raw, d.publisher_name_normalized,
+                       s.doi AS sample_doi
+                FROM doi_prefixes d
+                LEFT JOIN LATERAL (
+                    SELECT c.doi FROM candidate_dois c
+                    WHERE split_part(c.doi, '/', 1) = d.prefix
+                    LIMIT 1
+                ) s ON true
+                WHERE d.publisher_id IS NULL
+                  AND d.publisher_checked_at IS NULL
+                  AND d.ra IN ('Crossref', 'DataCite', 'unknown')
+                ORDER BY d.prefix
                 """
             )
         )
@@ -78,6 +84,7 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
                 ra=r.ra,
                 publisher_name_raw=r.publisher_name_raw,
                 publisher_name_normalized=r.publisher_name_normalized,
+                sample_doi=r.sample_doi,
             )
             for r in result
         ]
