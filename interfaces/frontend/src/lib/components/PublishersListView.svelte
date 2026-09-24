@@ -11,6 +11,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources';
 	import type { components } from '$lib/api/schema';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -204,7 +205,19 @@
 		{#each publishers.items as p (p.id)}
 			<tr>
 				<td>
-					<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>				</td>
+					<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>
+					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
+						<a
+							class="crossref-link"
+							href={crossrefMemberUrl(member)}
+							target="_blank"
+							rel="noopener"
+							title="Membre Crossref {member} (nouvel onglet)"
+						>
+							<img src="{base}/icons/crossref.ico" alt="Crossref" width="14" height="14" />
+						</a>
+					{/each}
+				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
 				<td class="prefixes">
@@ -266,6 +279,7 @@
 	}
 	.muted { color: var(--muted); }
 
+	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
 	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
 	.prefix-chip {
 		background: var(--border-subtle);

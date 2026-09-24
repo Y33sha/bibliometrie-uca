@@ -68,3 +68,14 @@ export function sourceExternalUrl(
 ): string {
 	return SOURCES[source]?.externalUrl(sourceId, oaStatus) ?? '#';
 }
+
+/** Rapport de participation d'un membre Crossref : l'identité sous laquelle un éditeur dépose ses DOI. */
+export function crossrefMemberUrl(memberId: number): string {
+	return `https://www.crossref.org/members/prep/${memberId}`;
+}
+
+/** Membres Crossref distincts d'un éditeur, tirés de ses préfixes DOI, dans l'ordre de ses préfixes. */
+export function crossrefMemberIds(doiPrefixes: { crossref_member_id?: number | null }[]): number[] {
+	const members = doiPrefixes.map((p) => p.crossref_member_id).filter((m) => m != null);
+	return [...new Set(members)];
+}
