@@ -74,6 +74,13 @@ def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str 
     return first(None), None
 
 
+def crossref_raw_doc_type(msg: Mapping[str, JsonValue]) -> str | None:
+    """Type brut d'un document Crossref, suivi de son sous-type quand Crossref en donne un (`posted-content_preprint`, `posted-content_other`)."""
+    doc_type = as_str(msg.get("type"))
+    subtype = as_str(msg.get("subtype"))
+    return f"{doc_type}_{subtype}" if doc_type and subtype else doc_type
+
+
 def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Nom et acronyme du congrès dont le document est issu, ou `None`.
 
@@ -117,6 +124,8 @@ def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValu
     conference = extract_crossref_conference(msg)
     if conference:
         meta["conference"] = conference
+    if msg.get("type") == "posted-content" and (group_title := as_str(msg.get("group-title"))):
+        meta["group_title"] = group_title
     refs_count = msg.get("references-count")
     if isinstance(refs_count, int) and refs_count > 0:
         meta["references_count"] = refs_count

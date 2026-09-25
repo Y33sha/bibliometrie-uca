@@ -41,6 +41,7 @@ class UnaryCorrectionRow(NamedTuple):
     declares_conference: bool
     registrant_publisher_type: str | None
     in_proceedings_volume: bool
+    group_title: str | None
 
     def for_correction(self) -> MetadataForCorrection:
         """Projette la ligne vers le contrat d'entrée des règles."""
@@ -58,6 +59,7 @@ class UnaryCorrectionRow(NamedTuple):
             declares_conference=self.declares_conference,
             registrant_publisher_type=self.registrant_publisher_type,
             in_proceedings_volume=self.in_proceedings_volume,
+            group_title=self.group_title,
         )
 
 

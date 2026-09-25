@@ -43,7 +43,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie. Chaque
+# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = """
     SELECT sp.id, sp.source::text AS source,
@@ -57,7 +57,8 @@ _SELECT = """
                AS self_declared_preprint,
            COALESCE(sp.meta ? 'conference', false) AS declares_conference,
            rp.publisher_type::text AS registrant_publisher_type,
-           COALESCE(m.proceedings, false) AS in_proceedings_volume
+           COALESCE(m.proceedings, false) AS in_proceedings_volume,
+           sp.meta->>'group_title' AS group_title
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
     LEFT JOIN monographs m ON m.id = sp.monograph_id
