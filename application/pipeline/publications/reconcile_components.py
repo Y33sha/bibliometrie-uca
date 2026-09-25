@@ -78,7 +78,7 @@ def _create_new_publication(
 class ReconcileStats(NamedTuple):
     """Bilan d'une passe de réconciliation, en vocabulaire lisible (pour le log de `run`).
 
-    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des SP sont rattachées) ; `created` = parmi elles, nouvellement créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = déjà existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = nouvelles publications issues d'une scission (un DOI distinct détaché d'une publication existante).
+    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des SP sont rattachées) ; `created` = parmi elles, nouvellement créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = déjà existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = nouvelles publications issues d'une scission (un DOI distinct détaché d'une publication existante) ; `detached` = `source_publications` rendues orphelines, faute de pouvoir fonder une publication.
     """
 
     processed: int
@@ -87,6 +87,7 @@ class ReconcileStats(NamedTuple):
     existing: int
     merges: int
     splits: int
+    detached: int
     cleared: int
 
 
@@ -157,7 +158,19 @@ def reconcile(
             queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
             survivors.add(target)
 
-        # 2. Dissolutions : les paiements APC passent au successeur, puis
+        # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
+        # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
+        # n'a plus de source.
+        if plan.detached:
+            queries.detach_source_publications(conn, list(plan.detached))
+            for pub_id in sorted(
+                {p for sp in plan.detached if (p := rows_by_sp[sp].publication_id) is not None}
+                - survivors
+            ):
+                with savepoint(conn):
+                    refresh_from_sources(pub_id, repo=publication_repo)
+
+        # 3. Dissolutions : les paiements APC passent au successeur, puis
         # `refresh_from_sources` supprime la publication vidée. Avant les survivants, pour libérer
         # le DOI qu'un survivant reprend — la contrainte unique le refuserait autrement.
         for dissolved in plan.dissolved:
@@ -169,7 +182,7 @@ def reconcile(
 
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
-    # 3. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
+    # 4. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)
     if logger:
         etape(logger, "Recalcul des métadonnées consolidées")
@@ -187,6 +200,7 @@ def reconcile(
         existing=len(survivors) - created,
         merges=len(plan.dissolved),
         splits=splits,
+        detached=len(plan.detached),
         cleared=cleared,
     )
 
