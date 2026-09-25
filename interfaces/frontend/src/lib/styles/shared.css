@@ -131,9 +131,6 @@
 	color: var(--muted);
 }
 .facet-panel {
-	position: absolute;
-	top: calc(100% + 4px);
-	left: 0;
 	min-width: 220px;
 	max-width: 360px;
 	max-height: 320px;
