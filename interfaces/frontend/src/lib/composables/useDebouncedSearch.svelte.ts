@@ -5,7 +5,7 @@
  *
  * Usage minimal :
  *   const search = useDebouncedSearch<Person>({
- *     search: (q) => api(`/api/persons/search?search=${encodeURIComponent(q)}`),
+ *     search: (q, request) => request(`/api/persons/search?search=${encodeURIComponent(q)}`),
  *     minLength: 2,
  *   });
  *
@@ -19,12 +19,14 @@
  *   // Pour nettoyer à la fermeture d'un formulaire :
  *   search.clear();
  *
- * Les requêtes concurrentes sont gérées par `api()` lui-même (option `key`) si on passe un `apiKey`. Sinon on se contente d'ignorer les résultats obsolètes via un compteur interne.
+ * `search` reçoit `request`, le flux de requêtes du composable (`latestRequest`) : chaque recherche annule la précédente encore en vol. Un compteur interne écarte en outre la réponse d'une recherche que `clear` ou une saisie trop courte a rendue caduque.
  */
 
+import { latestRequest } from '$lib/api';
+
 interface DebouncedSearchOptions<R> {
-	/** Fonction de recherche — retourne une promesse avec les résultats. */
-	search: (query: string) => Promise<R[]>;
+	/** Fonction de recherche — retourne une promesse avec les résultats. Ses requêtes passent par `request` pour être annulées par la recherche suivante. */
+	search: (query: string, request: <T>(url: string) => Promise<T>) => Promise<R[]>;
 	/** Longueur minimale avant de déclencher la recherche. Défaut : 2. */
 	minLength?: number;
 	/** Délai de debounce en ms. Défaut : 300. */
@@ -43,6 +45,7 @@ export function useDebouncedSearch<R>(opts: DebouncedSearchOptions<R>) {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	// Compteur pour ignorer les réponses obsolètes (course fenêtrée).
 	let seq = 0;
+	const request = latestRequest();
 
 	function setQuery(q: string) {
 		query = q;
@@ -56,7 +59,7 @@ export function useDebouncedSearch<R>(opts: DebouncedSearchOptions<R>) {
 		const mySeq = ++seq;
 		timer = setTimeout(async () => {
 			try {
-				const raw = await opts.search(q.trim());
+				const raw = await opts.search(q.trim(), request);
 				if (mySeq !== seq) return; // un nouveau input est arrivé entre-temps
 				results = opts.transform ? opts.transform(raw) : raw;
 			} finally {

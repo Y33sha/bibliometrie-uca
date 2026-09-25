@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, api, post, put, patch, del } from './client';
+import { ApiError, api, latestRequest, post, put, patch, del } from './client';
 
 type RequeteEnVol = {
 	url: string;
@@ -156,6 +156,27 @@ describe('annulation par clé', () => {
 		await toursDeBoucle();
 		enVol[1].resoudre(reponseJson({ page: 2 }));
 		expect(await seconde).toEqual({ page: 2 });
+	});
+});
+
+describe('flux de requêtes', () => {
+	it('interrompt la requête précédente du même flux', async () => {
+		const request = latestRequest();
+		void request('/api/stats/pivot?year=2019');
+		await toursDeBoucle();
+		void request('/api/stats/pivot?year=2019,2020');
+		await toursDeBoucle();
+		expect(enVol[0].init?.signal?.aborted).toBe(true);
+		expect(enVol[1].init?.signal?.aborted).toBe(false);
+	});
+
+	it('laisse coexister deux flux', async () => {
+		void latestRequest()('/api/stats/pivot');
+		await toursDeBoucle();
+		void latestRequest()('/api/stats/pivot');
+		await toursDeBoucle();
+		expect(enVol[0].init?.signal?.aborted).toBe(false);
+		expect(enVol[1].init?.signal?.aborted).toBe(false);
 	});
 });
 

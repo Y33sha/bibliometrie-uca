@@ -67,8 +67,8 @@
 	let mergeTargetId: number | null = $state(null);
 	let mergeTargetType = $state('journal');
 	const mergeSearch = useDebouncedSearch<Journal>({
-		search: async (q) => {
-			const data = await api<JournalListResponse>(
+		search: async (q, request) => {
+			const data = await request<JournalListResponse>(
 				// Les revues les plus fournies en publications d'abord, comme pour la fusion d'éditeurs.
 				`/api/journals?search=${encodeURIComponent(q)}&sort=pubs_desc&per_page=10`,
 			);

@@ -3,7 +3,7 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
-  import { api } from "$lib/api";
+  import { latestRequest } from "$lib/api";
   import type { components } from "$lib/api/schema";
   import SubjectGraph from "./SubjectGraph.svelte";
   import PublicationsListView from "$lib/components/PublicationsListView.svelte";
@@ -24,26 +24,22 @@
   let data = $state<SubjectDetailResponse | null>(null);
   let loading = $state(false);
   let error = $state(false);
-  // Compteur incrémenté à chaque appel : on ignore les réponses obsolètes si l'utilisateur a re-cliqué entre-temps.
-  let requestId = 0;
+  // Chaque changement de sujet relance la fiche : la requête précédente, encore en vol, est annulée.
+  const request = latestRequest();
 
   async function loadFor(id: number, limit: number, min: number) {
-    const myId = ++requestId;
     loading = true;
     error = false;
     try {
       const qs = new URLSearchParams();
       qs.set("neighbors_limit", String(limit));
       qs.set("min_cooccurrence", String(min));
-      const result = await api<SubjectDetailResponse>(`/api/subjects/${id}?${qs}`);
-      if (myId === requestId) data = result;
+      data = await request<SubjectDetailResponse>(`/api/subjects/${id}?${qs}`);
     } catch {
-      if (myId === requestId) {
-        error = true;
-        data = null;
-      }
+      error = true;
+      data = null;
     } finally {
-      if (myId === requestId) loading = false;
+      loading = false;
     }
   }
 

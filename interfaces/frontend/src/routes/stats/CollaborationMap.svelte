@@ -6,7 +6,7 @@
 	import world from 'world-atlas/countries-110m.json';
 	import iso from 'i18n-iso-countries';
 	import frLocale from 'i18n-iso-countries/langs/fr.json';
-	import { api } from '$lib/api';
+	import { latestRequest } from '$lib/api';
 	import type { components } from '$lib/api/schema';
 
 	iso.registerLocale(frLocale);
@@ -46,8 +46,11 @@
 		return (alpha2 && iso.getName(alpha2, 'fr')) || fallback;
 	}
 
+	// Chaque changement de filtre relance la carte : la requête précédente, encore en vol, est annulée.
+	const request = latestRequest();
+
 	async function render(query: string) {
-		const res = await api<CollaborationsResponse>('/api/stats/collaborations?' + query);
+		const res = await request<CollaborationsResponse>('/api/stats/collaborations?' + query);
 		// Décomptes indexés par code numérique (comparaison sur `Number`, pour ignorer les zéros de tête : `alpha2ToNumeric` renvoie « 004 » là où la carte porte « 4 »).
 		const byNumeric = new Map<number, number>();
 		for (const row of res.rows) {

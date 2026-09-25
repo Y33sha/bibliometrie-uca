@@ -62,6 +62,18 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 	return res.json();
 }
 
+let streams = 0;
+
+/**
+ * Flux de requêtes dont seule la dernière compte : chaque appel annule la requête précédente du flux encore en vol, qui ne résout ni ne rejette. Chaque appel à `latestRequest` ouvre un flux distinct, à garder le temps de vie de son consommateur (composant, composable).
+ *
+ * Usage : const request = latestRequest(); … const rows = await request<Row[]>('/api/stats/pivot?' + params);
+ */
+export function latestRequest(): <T>(url: string) => Promise<T> {
+	const key = `latest-${++streams}`;
+	return <T>(url: string) => api<T>(url, { key });
+}
+
 type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
