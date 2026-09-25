@@ -7,7 +7,7 @@
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import type { components } from "$lib/api/schema";
   import IdentifiersCell from "./IdentifiersCell.svelte";
-  import MergeSearchCell from "./MergeSearchCell.svelte";
+  import Picker from "$lib/components/Picker.svelte";
   import NameFormsList from "./NameFormsList.svelte";
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
@@ -232,18 +232,52 @@
 
     <section class="drawer-section">
       <h3>Fusion</h3>
-      <MergeSearchCell
-        targetPersonId={person.id}
-        active={mergeActive}
-        {mergeSearch}
-        onopen={onmergeOpen}
-        onclose={onmergeClose}
-        {onmerge}
-      />
+      {#if mergeActive}
+        <Picker
+          floating
+          minLength={2}
+          placeholder="Nom à absorber…"
+          search={mergeSearch.query}
+          onsearch={mergeSearch.setQuery}
+          loading={mergeSearch.loading}
+          results={mergeSearch.results}
+          onpick={(r) => onmerge(person.id, r.id)}
+          onclose={onmergeClose}
+        >
+          {#snippet item(r)}
+            <strong>{r.last_name}</strong>
+            {r.first_name}
+            {#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
+            {#if r.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+          {/snippet}
+        </Picker>
+      {:else}
+        <button class="btn btn-merge-inline" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
+      {/if}
     </section>
 </Drawer>
 
 <style>
+  .btn-merge-inline {
+    padding: 2px 8px;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    background: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: inherit;
+  }
+  .btn-merge-inline:hover {
+    background: var(--warning-light);
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .merge-dept {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
   .person-head {
     display: flex;
     align-items: flex-start;
