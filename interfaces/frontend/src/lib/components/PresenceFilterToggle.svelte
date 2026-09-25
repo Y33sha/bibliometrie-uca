@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { anchored } from '$lib/actions/anchored';
 
 	type ToggleState = 'all' | 'yes' | 'no';
 
@@ -113,7 +114,7 @@
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="facet-panel" onclick={(e) => e.stopPropagation()}>
+		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
 			{#each items as item (item.key)}
 				{@const state = stateOf(item.key)}
 				{@const c = countFor(item.key, state)}

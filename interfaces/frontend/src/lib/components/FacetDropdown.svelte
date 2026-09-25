@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { anchored } from '$lib/actions/anchored';
 
 	export interface FacetOption {
 		value: string;
@@ -133,12 +134,12 @@
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 	{#if showTooltip && tooltip}
-		<div class="facet-tooltip facet-tooltip-below">{tooltip}</div>
+		<div class="facet-tooltip" use:anchored={{ align: 'center', offset: 6 }}>{tooltip}</div>
 	{/if}
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="facet-panel" onclick={(e) => e.stopPropagation()}>
+		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
 			{#if searchable}
 				<input
 					type="text"
@@ -175,10 +176,6 @@
 <style>
 	/* Bouton, panneau et options : styles communs des facettes, dans shared.css. */
 	.facet-tooltip {
-		position: absolute;
-		bottom: calc(100% + 6px);
-		left: 50%;
-		transform: translateX(-50%);
 		background: #333;
 		color: #fff;
 		font-size: 0.78rem;
@@ -193,20 +190,10 @@
 	.facet-tooltip::after {
 		content: '';
 		position: absolute;
-		top: 100%;
+		bottom: 100%;
 		left: 50%;
 		transform: translateX(-50%);
 		border: 5px solid transparent;
-		border-top-color: #333;
-	}
-	.facet-tooltip-below {
-		bottom: auto;
-		top: calc(100% + 6px);
-	}
-	.facet-tooltip-below::after {
-		top: auto;
-		bottom: 100%;
-		border-top-color: transparent;
 		border-bottom-color: #333;
 	}
 

@@ -7,6 +7,7 @@
 	import PublishersListView from '$lib/components/PublishersListView.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import { autofocus } from '$lib/actions/focus';
+	import { anchored } from '$lib/actions/anchored';
 	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
@@ -170,9 +171,9 @@
 					class="merge-input" />
 				<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
 				{#if mergeSearch.loading}
-					<div class="merge-results"><span class="muted">Recherche…</span></div>
+					<div class="merge-results" use:anchored={{ align: 'end', offset: 2 }}><span class="muted">Recherche…</span></div>
 				{:else if mergeSearch.results.length > 0}
-					<div class="merge-results">
+					<div class="merge-results" use:anchored={{ align: 'end', offset: 2 }}>
 						{#each mergeSearch.results as r (r.id)}
 							<button class="merge-result" onclick={() => doMerge(r.id)}>
 								{r.name} <span class="muted">({r.journal_count} revues, {r.pub_count} publis)</span>
@@ -180,7 +181,7 @@
 						{/each}
 					</div>
 				{:else if mergeSearch.query.length >= 2}
-					<div class="merge-results"><span class="muted">Aucun résultat</span></div>
+					<div class="merge-results" use:anchored={{ align: 'end', offset: 2 }}><span class="muted">Aucun résultat</span></div>
 				{/if}
 			</div>
 		{:else}
@@ -219,7 +220,7 @@
 
 	.merge-search { display: inline-block; position: relative; }
 	.merge-input { width: 160px; padding: 3px 6px; font-size: 0.85rem; border: 1px solid var(--accent); border-radius: 3px; font-family: inherit; }
-	.merge-results { position: absolute; right: 0; top: 100%; z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; max-width: 600px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+	.merge-results { z-index: 10; border: 1px solid var(--border); border-radius: 4px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; max-width: 600px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.merge-result:hover, .merge-result:focus-visible { background: var(--accent-light); outline: none; }
 	.muted { color: var(--muted); }
