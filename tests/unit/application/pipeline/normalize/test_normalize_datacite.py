@@ -445,15 +445,15 @@ class TestProcessWork:
     @pytest.mark.parametrize(
         ("raw", "motif"),
         [
-            ({"attributes": "pas un objet"}, "métadonnées illisibles"),
             ({"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}, "sans DOI"),
         ],
     )
-    def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+        """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
         rendu = self._run(raw, queries, staging, logger)
 
         assert rendu is False, motif
-        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
+        assert staging.marked_done == []
         assert queries.upserted_documents == []
 
     def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, queries, staging, logger):
@@ -491,3 +491,20 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
 
     assert normalizer.normalize_record(MagicMock(), row) is True
     assert vus["row"] is row
+
+
+def test_metadonnees_minimales_d_attributs_illisibles():
+    normalizer = DataciteNormalizer(
+        conn=MagicMock(),
+        logger=MagicMock(),
+        staging_queries=MagicMock(),
+        queries=MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
+        publisher_repo_factory=lambda c: MagicMock(),
+        publication_repo_factory=lambda c: MagicMock(),
+        authorship_queries=MagicMock(),
+    )
+    assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
+        None,
+        None,
+    )

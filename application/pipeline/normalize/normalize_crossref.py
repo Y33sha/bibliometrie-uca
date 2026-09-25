@@ -343,7 +343,6 @@ def process_work(
     msg = raw  # CrossRef stocke directement le 'message'
     doi = get_doi(msg)
     if not doi:
-        staging_queries.mark_done(conn, staging_id)
         return False
 
     title = get_title(msg)

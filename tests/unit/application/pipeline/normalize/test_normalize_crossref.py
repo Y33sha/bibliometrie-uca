@@ -645,11 +645,12 @@ class TestProcessWork:
             ({"title": ["T"], "issued": {"date-parts": [[2024]]}}, "sans DOI"),
         ],
     )
-    def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+        """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
         rendu = self._run(raw, queries, staging, logger)
 
         assert rendu is False, motif
-        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
+        assert staging.marked_done == []
         assert queries.upserted_documents == []
 
 

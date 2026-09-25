@@ -579,7 +579,6 @@ def process_work(
     doc = staging_row.raw_data
 
     if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
-        staging_queries.mark_done(conn, staging_id)
         return False
 
     publisher_name = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
