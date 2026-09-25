@@ -19,7 +19,7 @@
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
   const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publications") || isActive("/admin/publishers") || isActive("/admin/journals") || isActive("/admin/monographs"));
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
-  const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/subjects"));
+  const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/monographs") || isActive("/subjects"));
 
   let mobileNavOpen = $state(false);
   // Referme le menu mobile après chaque navigation.
@@ -94,6 +94,7 @@
           <a href="{base}/theses" class:active={isActive("/theses")}>Thèses</a>
           <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
           <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
+          <a href="{base}/monographs" class:active={isActive("/monographs")}>Monographies</a>
           <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
         </div>
       </div>
