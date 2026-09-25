@@ -296,6 +296,16 @@ class TestProcessWorkMinimalMetadata:
         staging.mark_done.assert_called_once_with(ANY, 7)
         assert norm.normalized == []
 
+    def test_notice_refusee_par_la_source(self):
+        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'une notice incomplète."""
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]
+        row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
+        assert norm.process_work(MagicMock(), row) is False
+        staging.discard_source_publication.assert_called_once_with(ANY, 3)
+        staging.mark_done.assert_called_once_with(ANY, 3)
+
     def test_notice_complete_normalisee(self):
         staging = MagicMock()
         norm = _MinimalNorm(staging)

@@ -73,22 +73,29 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Normalise une notice qui porte les métadonnées minimales. Retourne True (ok), None (skip), False (erreur)."""
+        """Normalise une notice qui porte les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (notice refusée, sans rien écrire)."""
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Traite une ligne staging. Retourne True (ok), None (skip), False (notice incomplète ou erreur).
+        """Traite une ligne staging. Retourne True (ok), None (skip), False (notice refusée).
 
-        Une notice vide est sautée. Une notice sans titre ou sans année ne fonde aucune publication : l'enregistrement qu'elle avait produit est supprimé, et elle est comptée incomplète.
+        Une notice vide est sautée. Une notice sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
             self._staging.mark_done(conn, row.id)
             return None
         title, pub_year = self.minimal_metadata(row)
         if not has_minimal_publication_metadata(title, pub_year):
-            self._staging.discard_source_publication(conn, row.id)
-            self._staging.mark_done(conn, row.id)
-            return False
-        return self.normalize_record(conn, row)
+            return self._reject(conn, row)
+        result = self.normalize_record(conn, row)
+        if result is False:
+            return self._reject(conn, row)
+        return result
+
+    def _reject(self, conn: Connection, row: StagingRow) -> bool:
+        """Écarte une notice refusée : l'enregistrement qu'elle avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme notice incomplète."""
+        self._staging.discard_source_publication(conn, row.id)
+        self._staging.mark_done(conn, row.id)
+        return False
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel (ex: struct_cache pour HAL)."""
