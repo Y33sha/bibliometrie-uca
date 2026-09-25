@@ -30,7 +30,7 @@ class MetadataForCorrection:
 
     Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
-    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type` et `in_proceedings_volume` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume` et `group_title` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
@@ -57,6 +57,8 @@ class MetadataForCorrection:
     registrant_publisher_type: str | None
     # Joint à la lecture : la monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
     in_proceedings_volume: bool = False
+    # Lu dans `meta` : forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
+    group_title: str | None = None
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -72,6 +74,8 @@ class MetadataCorrectionRule(StrEnum):
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
     PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER = "PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER"
+    PRESENTATION_ORAL_TO_CONFERENCE = "PRESENTATION_ORAL_TO_CONFERENCE"
+    PRESENTATION_DISPLAY_TO_POSTER = "PRESENTATION_DISPLAY_TO_POSTER"
     DOI_REGISTRANT_MEDIA_TO_MEDIA = "DOI_REGISTRANT_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
@@ -189,6 +193,7 @@ class _AppliesTo(TypedDict, total=False):
     - `declares_conference` : `bool` — `sp.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
     - `registrant_publisher_type` : `str` — équivalence sur `sp.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
     - `in_proceedings_volume` : `bool` — `sp.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
+    - `group_title` : `frozenset[str]` — `sp.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -208,6 +213,7 @@ class _AppliesTo(TypedDict, total=False):
     declares_conference: bool
     registrant_publisher_type: str
     in_proceedings_volume: bool
+    group_title: frozenset[str]
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -282,6 +288,16 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
             "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
+    },
+    # Contenu déposé sans sous-type `preprint`, présenté oralement (`oral`, `pico`) ⇒ `conference`. Copernicus dépose ainsi les résumés de ses réunions (assemblée générale de l'EGU).
+    MetadataCorrectionRule.PRESENTATION_ORAL_TO_CONFERENCE: {
+        "applies_to": {"doc_type": DocType.OTHER, "group_title": frozenset({"oral", "pico"})},
+        "applies_correction": {"doc_type": DocType.CONFERENCE},
+    },
+    # Même contenu présenté en session d'affichage (`display`) ⇒ `poster`.
+    MetadataCorrectionRule.PRESENTATION_DISPLAY_TO_POSTER: {
+        "applies_to": {"doc_type": DocType.OTHER, "group_title": frozenset({"display"})},
+        "applies_correction": {"doc_type": DocType.POSTER},
     },
     # Chapitre qui nomme le congrès dont il est issu ⇒ `conference_paper`. Springer décrit ainsi les actes publiés en livre.
     MetadataCorrectionRule.CONFERENCE_DECLARED_TO_CONFERENCE_PAPER: {
@@ -445,6 +461,7 @@ _SOURCE_ONLY_PREDICATES = frozenset(
         "declares_conference",
         "registrant_publisher_type",
         "in_proceedings_volume",
+        "group_title",
     }
 )
 
@@ -471,6 +488,9 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         "in_proceedings_volume",
     ):
         return bool(getattr(sp, key) == value)
+    if key == "group_title":
+        assert isinstance(value, frozenset)
+        return (sp.group_title or "").lower() in value
     if key == "url_contains":
         assert isinstance(value, str)
         return any(value in (u or "") for u in (sp.urls or ()))

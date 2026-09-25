@@ -2,6 +2,7 @@
 
 from domain.dates import today
 from domain.sources.crossref import (
+    crossref_raw_doc_type,
     extract_crossref_conference,
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -215,6 +216,13 @@ class TestExtractCrossrefMeta:
     def test_returns_none_when_empty(self):
         assert extract_crossref_meta({}) is None
 
+    def test_keeps_group_title_of_posted_content(self):
+        meta = extract_crossref_meta({"type": "posted-content", "group-title": "oral"})
+        assert meta == {"group_title": "oral"}
+
+    def test_ignores_group_title_of_other_types(self):
+        assert extract_crossref_meta({"type": "journal-article", "group-title": "x"}) is None
+
     def test_keeps_conference(self):
         meta = extract_crossref_meta({"event": {"name": "EUROCALL 2022"}})
         assert meta == {"conference": {"name": "EUROCALL 2022"}}
@@ -254,3 +262,13 @@ class TestExtractCrossrefConference:
 
     def test_blank_name_is_ignored(self):
         assert extract_crossref_conference({"event": {"name": "  "}}) is None
+
+
+class TestCrossrefRawDocType:
+    def test_type_suivi_du_sous_type(self):
+        assert crossref_raw_doc_type({"type": "posted-content", "subtype": "other"}) == (
+            "posted-content_other"
+        )
+
+    def test_type_seul(self):
+        assert crossref_raw_doc_type({"type": "journal-article"}) == "journal-article"

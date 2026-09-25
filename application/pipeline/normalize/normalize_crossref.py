@@ -1,7 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 Particularités CrossRef :
-- `doc_type` stocké tel quel depuis `msg["type"]` ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_publications.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
+- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_publications.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 
@@ -41,6 +41,7 @@ from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
     crossref_issns,
+    crossref_raw_doc_type,
     extract_crossref_conference,
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -203,7 +204,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
 
     Un livre porte sa collection dans `container-title`. Un chapitre ou un article de congrès y porte la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
     """
-    raw_type = as_str(msg.get("type"))
+    raw_type = crossref_raw_doc_type(msg)
     conference = extract_crossref_conference(msg)
     titles = _container_titles(msg)
     issns = crossref_issns(msg)
@@ -375,7 +376,7 @@ def process_work(
             external_ids=external_ids,
             title=title,
             pub_year=pub_year,
-            doc_type=as_str(msg.get("type")),
+            doc_type=crossref_raw_doc_type(msg),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
             container_title=get_container_title(msg) if not containers.journal_id else None,
