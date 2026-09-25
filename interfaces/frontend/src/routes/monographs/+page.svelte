@@ -10,7 +10,7 @@
 <h1>Monographies</h1>
 <p class="hint">Livres et volumes d'actes contenant des publications du périmètre {institution.name}.</p>
 
-<MonographsListView apiKey="monographs-list" />
+<MonographsListView apiKey="monographs-list" basePath="/monographs" />
 
 <style>
 	h1 { margin: 0 0 8px; font-size: 1.5rem; }

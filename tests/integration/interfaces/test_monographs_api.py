@@ -50,6 +50,10 @@ class TestListMonographs:
         volume = _seed_monograph(title, proceedings=True)
         assert _ids(client, search=title, kind="book") == [book]
         assert _ids(client, search=title, kind="proceedings") == [volume]
+        assert sorted(_ids(client, search=title, kind="book,proceedings")) == sorted([book, volume])
+
+    def test_unknown_kind_rejected(self, client):
+        assert client.get("/api/monographs", params={"kind": "journal"}).status_code == 422
 
     def test_sorted_by_publications_and_counted(self, client):
         title = _uniq("Recueil")
@@ -59,6 +63,18 @@ class TestListMonographs:
         _seed_publications(many, 3)
         r = client.get("/api/monographs", params={"search": title, "sort": "pubs_desc"})
         assert [(m["id"], m["pub_count"]) for m in r.json()["monographs"]] == [(many, 3), (few, 1)]
+
+
+class TestMonographsFacets:
+    def test_kind_counts_ignore_kind_filter(self, client):
+        title = _uniq("Facette")
+        _seed_monograph(title)
+        _seed_monograph(title)
+        _seed_monograph(title, proceedings=True)
+        r = client.get("/api/monographs/facets", params={"search": title, "kind": "book"})
+        assert r.status_code == 200
+        counts = {o["value"]: o["count"] for o in r.json()["kinds"]}
+        assert counts == {"book": 2, "proceedings": 1}
 
 
 class TestGetMonograph:
