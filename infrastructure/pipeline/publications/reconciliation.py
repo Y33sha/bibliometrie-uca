@@ -173,6 +173,16 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         ).bindparams(bindparam("ids"))
         conn.execute(stmt, {"pid": publication_id, "ids": source_publication_ids})
 
+    def detach_source_publications(
+        self, conn: Connection, source_publication_ids: list[int]
+    ) -> None:
+        if not source_publication_ids:
+            return
+        stmt = text(
+            "UPDATE source_publications SET publication_id = NULL WHERE id = ANY(:ids)"
+        ).bindparams(bindparam("ids"))
+        conn.execute(stmt, {"ids": source_publication_ids})
+
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:

@@ -91,5 +91,6 @@ def _reconcile(
         "created": stats.created if stats else 0,
         "splits": stats.splits if stats else 0,
         "merges": stats.merges if stats else 0,
+        "detached": stats.detached if stats else 0,
     }
     return metrics

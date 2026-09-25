@@ -127,6 +127,30 @@ class TestSplit:
         assert plan.dissolved == ()
 
 
+class TestDetachment:
+    def test_sp_sans_cle_ni_annee_est_detachee(self):
+        """Régression : une SP OpenAlex renvoyée sans DOI ni année perd toutes ses clés ; elle ne peut fonder aucune publication et devient orpheline."""
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, pub_doi="10.1/x", tokens=(), year=None),
+            ]
+        )
+        assert _groups(plan) == {10: (1,)}
+        assert plan.detached == (2,)
+        assert plan.dissolved == ()
+
+    def test_sp_sans_cle_avec_annee_fonde_une_publication(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, pub_doi="10.1/x", tokens=()),
+            ]
+        )
+        assert _groups(plan) == {10: (1,), None: (2,)}
+        assert plan.detached == ()
+
+
 class TestAssignmentOfOrphans:
     """Matrice match / create / skip : les orphelins (`pub_id=None`) traités par le même primitif."""
 
