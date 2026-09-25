@@ -485,6 +485,12 @@ def journal_id_clause(journal_id: int | None) -> WhereClause | None:
     return WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id})
 
 
+def monograph_id_clause(monograph_id: int | None) -> WhereClause | None:
+    if not monograph_id:
+        return None
+    return WhereClause("p.monograph_id = :flt_monograph_id", {"flt_monograph_id": monograph_id})
+
+
 def person_has_identifier_sql(id_type: str) -> str:
     """Prédicat : la personne `p` porte un identifiant `id_type` au statut hors `rejected`.
 

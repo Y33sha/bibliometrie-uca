@@ -86,6 +86,7 @@ class PublicationFilters:
     years: list[int] = field(default_factory=list)
     publisher_id: int | None = None
     journal_id: int | None = None
+    monograph_id: int | None = None
     access: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
     source_values: list[str] = field(default_factory=list)

@@ -62,6 +62,7 @@
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `journal_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
+	// - `/monographs/[id]` (filtre `monograph_id` fixe)
 	// - `/admin/publications` (un clic sur un titre ouvre le volet de l'administration)
 	interface ExternalFilters {
 		subjectId?: number;
@@ -74,6 +75,7 @@
 		personLabel?: string;
 		journalId?: number;
 		publisherId?: number;
+		monographId?: number;
 	}
 	type ApcMode = 'uca' | 'lab' | 'person-uca';
 	let {
@@ -352,7 +354,7 @@
 	);
 
 	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la route fixe une dimension hors de sa portée (personne, sujet).
-	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId);
+	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId && !externalFilters?.monographId);
 	const statsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
 		const { checkbox, entity } = values;
@@ -387,6 +389,7 @@
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
 		if (externalFilters?.personId != null) params.set('person_id', String(externalFilters.personId));
+		if (externalFilters?.monographId != null) params.set('monograph_id', String(externalFilters.monographId));
 		appendFilterParams(FILTERS, values, params);
 		return params;
 	}

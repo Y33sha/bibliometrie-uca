@@ -77,6 +77,24 @@ class TestMonographsFacets:
         assert counts == {"book": 2, "proceedings": 1}
 
 
+class TestMonographPublications:
+    def test_publications_filtered_by_monograph(self, client):
+        mid = _seed_monograph(_uniq("Ouvrage"))
+        other = _seed_monograph(_uniq("Autre"))
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, monograph_id, in_perimeter)"
+                " VALUES ('Chapitre', 2024, %s, true), ('Ailleurs', 2024, %s, true) RETURNING id",
+                (mid, other),
+            )
+            chapter = cur.fetchone()["id"]
+        r = client.get("/api/publications", params={"monograph_id": mid})
+        assert r.status_code == 200
+        assert [p["id"] for p in r.json()["publications"]] == [chapter]
+        facets = client.get("/api/publications/facets", params={"monograph_id": mid})
+        assert facets.status_code == 200
+
+
 class TestGetMonograph:
     def test_detail_and_404(self, client):
         mid = _seed_monograph(_uniq("Fiche"))

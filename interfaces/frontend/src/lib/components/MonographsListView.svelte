@@ -129,7 +129,7 @@
 		<tbody>
 			{#each monographs.items as m (m.id)}
 				<tr>
-					<td>{m.title}</td>
+					<td><a href="{base}/monographs/{m.id}">{m.title}</a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
 					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>
