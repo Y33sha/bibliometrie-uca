@@ -6,9 +6,9 @@ from infrastructure.read_models.publications.list import _plain_text
 
 
 def test_strips_html_tags():
-    # Les balises sont remplacées par un espace (cf. strip_markup, partagé avec
-    # normalize_text) puis le whitespace est collapsé.
-    assert _plain_text("x<sub>2</sub>y") == "x 2 y"
+    # Une balise de mise en forme disparaît, une balise de bloc devient un espace (cf. strip_markup), puis le whitespace est collapsé.
+    assert _plain_text("x<sub>2</sub>y") == "x2y"
+    assert _plain_text("Titre<br/>Sous-titre") == "Titre Sous-titre"
     assert _plain_text("<i>Escherichia coli</i> ST131") == "Escherichia coli ST131"
 
 

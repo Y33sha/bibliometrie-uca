@@ -47,6 +47,14 @@ class TestNormalizeText:
             # Exposant/indice attaché → chiffre collé (comme "x2", "h2o")
             ("x²", "x2"),
             ("H₂O", "h2o"),
+            # Balise de mise en forme au milieu d'un mot : le mot reste entier, comme la graphie sans balise
+            ("CO<sub>2</sub>-rich magmas", "co2 rich magmas"),
+            ("CO<jats:sub>2</jats:sub>", "co2"),
+            ("<scp>Arabidopsis</scp>", "arabidopsis"),
+            ("x<mml:msup><mml:mi>y</mml:mi><mml:mn>2</mml:mn></mml:msup>", "xy2"),
+            # Balise de bloc : un espace sépare les mots
+            ("Titre<br/>Sous-titre", "titre sous titre"),
+            ("<p>Un</p><p>Deux</p>", "un deux"),
             # Ponctuation → espaces
             ("Hello, World!", "hello world"),
             # None-equivalent

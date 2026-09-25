@@ -69,6 +69,17 @@ ALIGNED = [
         'decay <mml:math xmlns:mml="x" display="inline">y</mml:math> rate', id="tag-mathml-attrs"
     ),
     pytest.param("</scp>BAR<scp>", id="tag-scp-closing-first"),
+    # Balise de mise en forme au milieu d'un mot (migration c4a9e1f7d253)
+    pytest.param("CO<sub>2</sub>-rich", id="tag-sub-inside-word"),
+    pytest.param("CO<jats:sub>2</jats:sub>", id="tag-sub-namespaced"),
+    pytest.param("<I>E</I>. coli", id="tag-italic-uppercase"),
+    pytest.param(
+        "x<mml:msup><mml:mi>y</mml:mi><mml:mn>2</mml:mn></mml:msup>", id="tag-mathml-inside-word"
+    ),
+    pytest.param("<sub/>x", id="tag-self-closing"),
+    pytest.param("Titre<br/>Sous-titre", id="tag-block-br"),
+    pytest.param("<p>Un</p><p>Deux</p>", id="tag-block-p"),
+    pytest.param("<subject>x</subject>y", id="tag-name-prefixed-by-inline"),
     # Indices de Miller : pas des balises (1er char chiffre/espace) → préservés
     pytest.param("<111> direction", id="miller-111"),
     pytest.param("{100}<011> slip", id="miller-011"),
