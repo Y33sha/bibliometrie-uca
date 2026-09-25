@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dfKEBRLDGswnS8Fym0sUqstWBz9sTDZzKjto1NmZDBOgBCNYtR0H8gdiBoi0w42
+\restrict 8Bvjo4nfgXPoccsBzRZ8G9w3JatJQlOAvq88h0EZYb4m3fHzcRk3fN4GWku6nwv
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -54,6 +54,7 @@ COMMENT ON EXTENSION unaccent IS 'text search dictionary that removes accents';
 CREATE TYPE public.doc_type AS ENUM (
     'article',
     'conference_paper',
+    'conference',
     'book',
     'book_chapter',
     'thesis',
@@ -268,9 +269,11 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    -- Retrait des balises MathML/HTML (<i>, <sub>, <mml:*> …) en entier.
-    -- Premier caractère = lettre ou '/' : préserve les indices de Miller
-    -- <111>/<110> (cristallographie), qui sont du contenu, pas du markup.
+    -- Retrait des balises MathML/HTML. Une balise de mise en forme (<sub>, <i>, <mml:mi> …)
+    -- disparaît : CO<sub>2</sub> donne CO2. Les autres balises deviennent un espace.
+    -- Premier caractère = lettre ou '/' : les indices de Miller <111>/<110> (cristallographie)
+    -- restent dans le texte.
+    s := regexp_replace(s, '</?([A-Za-z][A-Za-z0-9.-]*:)?(sub|sup|i|b|em|strong|u|span|small|tt|sc|scp|italic|bold|underline|monospace|overline|roman|strike|math|mi|mn|mo|ms|mtext|mrow|msub|msup|msubsup|mfrac|msqrt|mroot|mover|munder|munderover|mstyle|mspace|mpadded|mphantom|mfenced|menclose|semantics|inline-formula)(\s[^>]*|/)?>', '', 'gi');
     s := regexp_replace(s, '</?[A-Za-z][^>]*>', ' ', 'g');
 
     -- I turc avec point : PG lower()+unaccent le perd ("İstanbul" → "stanbul").
@@ -301,8 +304,8 @@ BEGIN
         E'-------\x27\x27\x27\x27""'
     );
 
-    -- Chiffres exposants/indices → chiffres ASCII (attachés). L'exposant moins
-    -- `⁻` n'est plus listé : il tombe dans le passage [^a-z0-9] → espace.
+    -- Chiffres exposants/indices → chiffres ASCII (attachés). L'exposant moins `⁻`
+    -- tombe dans le passage [^a-z0-9] → espace.
     s := translate(s,
         E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉',
         '01234567890123456789'
@@ -3763,5 +3766,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dfKEBRLDGswnS8Fym0sUqstWBz9sTDZzKjto1NmZDBOgBCNYtR0H8gdiBoi0w42
+\unrestrict 8Bvjo4nfgXPoccsBzRZ8G9w3JatJQlOAvq88h0EZYb4m3fHzcRk3fN4GWku6nwv
 

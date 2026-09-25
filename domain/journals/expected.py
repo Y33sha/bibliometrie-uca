@@ -26,10 +26,11 @@ EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE: dict[str, frozenset[str]] = {
             "letter",
             "retraction",
             "peer_review",
+            "conference",
             "other",
         }
     ),
-    "proceedings": frozenset({"conference_paper", "other"}),
+    "proceedings": frozenset({"conference_paper", "conference", "other"}),
     "book_series": frozenset({"book", "book_chapter", "other"}),
     "ebook_platform": frozenset({"book", "book_chapter", "other"}),
     "preprint_server": frozenset({"preprint", "other"}),
@@ -56,6 +57,7 @@ EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE: dict[str, frozenset[str]] = {
             "editorial",
             "peer_review",
             "conference_paper",
+            "conference",
             "other",
         }
     ),
