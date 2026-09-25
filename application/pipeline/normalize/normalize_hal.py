@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Mapping
 from datetime import date
+from functools import lru_cache
 from typing import cast
 from xml.etree.ElementTree import Element, ParseError
 
@@ -44,9 +45,8 @@ from domain.publications.identifiers import (
     normalize_pmcid,
     normalize_pmid,
 )
-from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
-from domain.sources.hal import derive_hal_oa_status, hal_text_field
+from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.types import JsonValue, as_int, as_sequence, as_strs
 
 # =============================================================
@@ -74,21 +74,27 @@ def upsert_publisher(
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN de la notice TEI.
 
-    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : le congrès ne désigne pas un volume.
+    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : seul, le congrès désigne un événement. Quand la notice porte un ISBN, le volume existe : il prend le titre de la source (`source_s`), à défaut celui du congrès.
     """
     journal_title = hal_text_field(doc.get("journalTitle_s"))
+    isbns = tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml"))))
+    book_title = hal_text_field(doc.get("bookTitle_s"))
+    if not book_title and isbns:
+        book_title = hal_text_field(doc.get("source_s")) or hal_text_field(
+            doc.get("conferenceTitle_s")
+        )
     return ContainerDescription(
         source="hal",
         raw_doc_type=hal_text_field(doc.get("docType_s")),
         document_title=get_title(doc),
         journal_title=journal_title,
         collection_title=journal_title,
-        book_title=hal_text_field(doc.get("bookTitle_s")),
+        book_title=book_title,
         issns=source_issns(
             print_issn=hal_text_field(doc.get("journalIssn_s")),
             electronic_issn=hal_text_field(doc.get("journalEissn_s")),
         ),
-        isbns=tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml")))),
+        isbns=isbns,
         year=as_int(doc.get("producedDateY_i")),
     )
 
@@ -199,7 +205,7 @@ def insert_hal_document(
     journal_id, oa_status, language, container_title) viennent toutes de
     `pub_meta`, construit en amont par `extract_pub_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
-    keywords, domaines, biblio, urls).
+    keywords, domaines, biblio, meta, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -266,6 +272,7 @@ def insert_hal_document(
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=biblio_json,
+            meta=extract_hal_meta(doc),
             abstract=abstract,
             keywords=keywords,
             topics=topics,
@@ -285,8 +292,11 @@ def insert_hal_document(
 _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 
 
+@lru_cache(maxsize=1)
 def _parse_tei(label_xml: str) -> Element:
     """Lit le TEI joint à une notice HAL.
+
+    Le cache garde l'arbre de la dernière notice : les lecteurs du TEI (ISBN, embargo, identifiants d'auteurs) reçoivent la même chaîne pendant la normalisation d'une notice, et partagent une seule analyse. Ils ne modifient pas l'arbre.
 
     L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en porte.
     """
@@ -568,14 +578,7 @@ def process_work(
     hal_id = staging_row.source_id
     doc = staging_row.raw_data
 
-    title = get_title(doc)
-    pub_year = as_int(doc.get("producedDateY_i"))
-    if not has_minimal_publication_metadata(title, pub_year):
-        staging_queries.mark_done(conn, staging_id)
-        return False
-
     if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
-        staging_queries.mark_done(conn, staging_id)
         return False
 
     publisher_name = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
@@ -605,7 +608,10 @@ class HalNormalizer(BibliographicNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

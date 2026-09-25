@@ -8,6 +8,7 @@
 	import { docTypeSingular, issnLabel } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import MonographsListView from '$lib/components/MonographsListView.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import { oaStatusColor } from '$lib/components/charts/oaColors';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
@@ -20,10 +21,17 @@
 
 	const journalId = $derived(Number($page.params.id));
 	const activeTab = $derived(
-		$page.url.searchParams.get('tab') === 'publications' ? 'publications' : 'dashboard'
+		(() => {
+			const t = $page.url.searchParams.get('tab');
+			return t === 'publications' || t === 'monographs' ? t : 'dashboard';
+		})()
 	);
 
 	let journal = $state<JournalDetail | null>(null);
+
+	// Onglet des monographies, selon le type de la revue : volumes d'une série d'actes, livres d'une collection.
+	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
+	const monographsTabLabel = $derived(journal?.journal_type ? MONOGRAPHS_TAB_LABELS[journal.journal_type] : undefined);
 	let error = $state(false);
 	let canGoBack = $state(false);
 
@@ -172,6 +180,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
+			...(monographsTabLabel ? [{ id: 'monographs', label: monographsTabLabel }] : []),
 			{ id: 'publications', label: 'Publications' }
 		]}
 		onswitch={onTabSwitch}
@@ -237,6 +246,13 @@
 					{/if}
 				</div>
 			{/if}
+		</div>
+	{/if}
+
+	<!-- Tab: Monographies -->
+	{#if activeTab === 'monographs' && monographsTabLabel}
+		<div class="tab-content">
+			<MonographsListView apiKey={`journal-${journalId}-monographs`} externalFilters={{ journalId }} />
 		</div>
 	{/if}
 

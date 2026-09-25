@@ -8,6 +8,7 @@
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import MonographsListView from '$lib/components/MonographsListView.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import { oaStatusColor } from '$lib/components/charts/oaColors';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
@@ -20,7 +21,7 @@
 
 	const publisherId = $derived(Number($page.params.id));
 
-	const validTabs = ['dashboard', 'journals', 'publications'];
+	const validTabs = ['dashboard', 'journals', 'monographs', 'publications'];
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
@@ -147,6 +148,7 @@
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
 			{ id: 'journals', label: 'Revues' },
+			{ id: 'monographs', label: 'Monographies' },
 			{ id: 'publications', label: 'Publications' }
 		]}
 		onswitch={onTabSwitch}
@@ -198,6 +200,13 @@
 				externalFilters={{ publisherId }}
 				withPubs
 			/>
+		</div>
+	{/if}
+
+	<!-- Tab: Monographies -->
+	{#if activeTab === 'monographs'}
+		<div class="tab-content">
+			<MonographsListView apiKey={`publisher-${publisherId}-monographs`} externalFilters={{ publisherId }} />
 		</div>
 	{/if}
 

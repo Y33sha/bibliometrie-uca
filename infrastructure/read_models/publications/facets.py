@@ -45,6 +45,7 @@ from infrastructure.read_models.filters import (
     journal_id_clause,
     lab_clause,
     language_clause,
+    monograph_id_clause,
     no_lab_clause,
     oa_clause,
     person_clause,
@@ -87,6 +88,7 @@ class _PublicationFacetsBuilder:
         else:
             out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
         out.append(excluded_doc_type_clause(f.excluded_types))
+        out.append(monograph_id_clause(f.monograph_id))
         # Recherche titre/sujet : filtre global (jamais une dimension de facette), appliqué à tous les comptes pour qu'ils suivent le champ de recherche.
         out.append(search_clause(f.search))
         return out

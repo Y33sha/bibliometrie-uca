@@ -12,7 +12,7 @@
 	import { mergeJournal } from './mergeJournal';
 	import Modal from '$lib/components/Modal.svelte';
 	import JournalIssnsEditor, { type EditedIssn } from './JournalIssnsEditor.svelte';
-	import { autofocus } from '$lib/actions/focus';
+	import Picker from '$lib/components/Picker.svelte';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
 
@@ -67,8 +67,8 @@
 	let mergeTargetId: number | null = $state(null);
 	let mergeTargetType = $state('journal');
 	const mergeSearch = useDebouncedSearch<Journal>({
-		search: async (q) => {
-			const data = await api<JournalListResponse>(
+		search: async (q, request) => {
+			const data = await request<JournalListResponse>(
 				// Les revues les plus fournies en publications d'abord, comme pour la fusion d'éditeurs.
 				`/api/journals?search=${encodeURIComponent(q)}&sort=pubs_desc&per_page=10`,
 			);
@@ -218,27 +218,24 @@
 <JournalsListView {apiKey}>
 	{#snippet actionCell(j: Journal)}
 		{#if mergeTargetId === j.id}
-			<div class="merge-search">
-				<input type="search" placeholder="Fusionner avec…" value={mergeSearch.query} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeMerge(); } }}
-					oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
-					class="merge-input" />
-				<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
-				{#if mergeSearch.loading}
-					<div class="merge-results"><span class="muted">Recherche…</span></div>
-				{:else if mergeSearch.results.length > 0}
-					<div class="merge-results">
-						{#each mergeSearch.results as r (r.id)}
-							<button class="merge-result" onclick={() => doMerge(r.id)}>
-								{r.title}
-								{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
-								<span class="muted"> ({r.pub_count} publis)</span>
-							</button>
-						{/each}
-					</div>
-				{:else if mergeSearch.query.length >= 2}
-					<div class="merge-results"><span class="muted">Aucun résultat</span></div>
-				{/if}
-			</div>
+			<Picker
+				floating
+				align="end"
+				minLength={2}
+				placeholder="Fusionner avec…"
+				search={mergeSearch.query}
+				onsearch={mergeSearch.setQuery}
+				loading={mergeSearch.loading}
+				results={mergeSearch.results}
+				onpick={(r) => doMerge(r.id)}
+				onclose={closeMerge}
+			>
+				{#snippet item(r)}
+					{r.title}
+					{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
+					<span class="muted"> ({r.pub_count} publis)</span>
+				{/snippet}
+			</Picker>
 		{:else}
 			<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
 			<button class="btn btn-sm btn-merge" onclick={() => openMerge(j)}>Fusionner…</button>
@@ -284,10 +281,5 @@
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
-	.merge-search { display: inline-block; position: relative; }
-	.merge-input { width: 160px; padding: 3px 6px; font-size: 0.85rem; border: 1px solid var(--accent); border-radius: 3px; font-family: inherit; }
-	.merge-results { position: absolute; right: 0; top: 100%; z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; max-width: 600px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.merge-result:hover, .merge-result:focus-visible { background: var(--accent-light); outline: none; }
 	.muted { color: var(--muted); }
 </style>

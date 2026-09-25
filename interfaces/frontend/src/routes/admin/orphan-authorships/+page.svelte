@@ -8,6 +8,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { titleCase } from '$lib/utils';
 	import { autofocus } from '$lib/actions/focus';
+	import { anchored } from '$lib/actions/anchored';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import type { components } from '$lib/api/schema';
@@ -16,8 +17,11 @@
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
 	type RejectedPair = components['schemas']['RejectedPairItem'];
 
-	async function searchPersons(q: string): Promise<PersonResult[]> {
-		return api<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
+	async function searchPersons(
+		q: string,
+		request: <T>(url: string) => Promise<T>,
+	): Promise<PersonResult[]> {
+		return request<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
 	}
 
 	let search = $state('');
@@ -223,7 +227,7 @@
 		{#if batchSearch.loading}
 			<span class="loading-text">…</span>
 		{:else if batchSearch.results.length}
-			<div class="batch-results">
+			<div class="batch-results" use:anchored>
 				{#each batchSearch.results as r (r.id)}
 					<button class="result-btn" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
@@ -276,7 +280,7 @@
 								{#if assignSearch.loading}
 									<span class="loading-text">…</span>
 								{:else if assignSearch.results.length}
-									<div class="assign-results">
+									<div class="assign-results" use:anchored>
 										{#each assignSearch.results as r (r.id)}
 											<button class="result-btn" onclick={() => assign(o, r.id)}>
 												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
@@ -286,7 +290,7 @@
 										{/each}
 									</div>
 								{:else if assignSearch.query.length >= 2}
-									<div class="assign-results">
+									<div class="assign-results" use:anchored>
 										<span class="loading-text">Aucun résultat</span>
 										<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
 									</div>
@@ -363,12 +367,11 @@
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
 	.pub-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.pub-link:hover { text-decoration: underline; }
-	:global(.data-table) { overflow: visible; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 200px; }
 	.assign-results {
-		position: absolute; top: 100%; left: 0; z-index: 50;
+		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
 		background: white; border: 1px solid #ccc; border-radius: 4px;
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 250px;
@@ -388,7 +391,7 @@
 	}
 	.batch-bar input { padding: 5px 10px; border: 1px solid #90caf9; border-radius: 4px; font-size: 0.85rem; width: 220px; }
 	.batch-results {
-		position: absolute; top: 100%; left: 0; z-index: 50;
+		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
 		background: white; border: 1px solid #ccc; border-radius: 4px;
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;

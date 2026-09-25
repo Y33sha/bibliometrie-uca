@@ -2,13 +2,14 @@
 	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount, tick } from 'svelte';
 	import { base } from '$app/paths';
-	import { api } from '$lib/api';
+	import { api, latestRequest } from '$lib/api';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
+	import { defaultYears } from './defaultYears';
 	import { paramsToQuery } from '$lib/utils';
 	import {
 		oaLabelsMap,
@@ -23,6 +24,9 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
 	Chart.register(...registerables, ChartDataLabels);
+
+	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
+	const pivotRequest = latestRequest();
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
@@ -288,7 +292,7 @@
 		p.set('group', primaryBy);
 		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
 		if (comparison) p.set('group2', comparison);
-		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
+		const res = await pivotRequest<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		pivotRows = res.rows;
 		await tick();
 		renderChart();
@@ -529,11 +533,9 @@
 			selectedDocTypes = [...publicationsDocTypes];
 		}
 
-		// Load facets first, then apply default years if needed, then full refresh
 		await facets.load();
 		if (!initialYearsApplied && selectedYears.length === 0 && facets.options.years.length > 0) {
-			const sorted = facets.options.years.map((o) => o.value).sort().reverse();
-			selectedYears = sorted.slice(0, 5);
+			selectedYears = defaultYears(facets.options.years.map((o) => o.value), new Date().getFullYear());
 			syncUrl();
 		}
 		initialYearsApplied = true;

@@ -442,28 +442,18 @@ class TestProcessWork:
         (document,) = queries.upserted_documents
         assert document.external_ids == {"related_dois": ["10.5281/zenodo.0"]}
 
-    def test_payload_vide_est_passe(self, queries, staging, logger):
-        """Une ligne sans contenu — souche d'un document introuvable — est marquée sans verdict."""
-        rendu = self._run(None, queries, staging, logger)
-
-        assert rendu is None
-        assert staging.marked_done == [42]
-        assert queries.upserted_documents == []
-
     @pytest.mark.parametrize(
         ("raw", "motif"),
         [
-            ({"attributes": "pas un objet"}, "métadonnées illisibles"),
             ({"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}, "sans DOI"),
-            ({"attributes": {"doi": "10.1/a", "publicationYear": 2024}}, "sans titre"),
-            ({"attributes": {"doi": "10.1/a", "titles": [{"title": "T"}]}}, "sans année"),
         ],
     )
-    def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+        """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
         rendu = self._run(raw, queries, staging, logger)
 
         assert rendu is False, motif
-        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
+        assert staging.marked_done == []
         assert queries.upserted_documents == []
 
     def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, queries, staging, logger):
@@ -499,5 +489,22 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     normalizer.preload_caches(MagicMock())  # instancie les repositories sur la connexion
     row = staging_row()
 
-    assert normalizer.process_work(MagicMock(), row) is True
+    assert normalizer.normalize_record(MagicMock(), row) is True
     assert vus["row"] is row
+
+
+def test_metadonnees_minimales_d_attributs_illisibles():
+    normalizer = DataciteNormalizer(
+        conn=MagicMock(),
+        logger=MagicMock(),
+        staging_queries=MagicMock(),
+        queries=MagicMock(),
+        container_repo_factory=lambda c: MagicMock(),
+        publisher_repo_factory=lambda c: MagicMock(),
+        publication_repo_factory=lambda c: MagicMock(),
+        authorship_queries=MagicMock(),
+    )
+    assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
+        None,
+        None,
+    )

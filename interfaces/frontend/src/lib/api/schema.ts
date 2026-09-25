@@ -2288,10 +2288,28 @@ export interface paths {
         /**
          * List Monographs
          * @description Liste paginée des monographies, avec leur éditeur, leur collection et le nombre de publications qu'elles contiennent.
-         *
-         *     `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `kind` restreint aux livres (`book`) ou aux volumes d'actes (`proceedings`).
          */
         get: operations["list_monographs_api_monographs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monographs/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monographs Facets
+         * @description Nombre de monographies par type. Le décompte écarte le filtre de type.
+         */
+        get: operations["monographs_facets_api_monographs_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3695,6 +3713,14 @@ export interface components {
             monographs: components["schemas"]["MonographListItem"][];
             /** Pages */
             readonly pages: number;
+        };
+        /**
+         * MonographsFacetsResponse
+         * @description Facettes de la liste des monographies. Le décompte par type écarte le filtre de type : il annonce le nombre de monographies atteignables si l'option était cochée.
+         */
+        MonographsFacetsResponse: {
+            /** Kinds */
+            kinds: components["schemas"]["FacetOption"][];
         };
         /**
          * NameDuplicatePairOut
@@ -5649,6 +5675,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5700,6 +5727,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5751,6 +5779,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5902,6 +5931,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -9023,7 +9053,9 @@ export interface operations {
                 per_page?: number;
                 sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "pubs_asc" | "pubs_desc";
                 search?: string;
-                kind?: "" | "book" | "proceedings";
+                kind?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -9038,6 +9070,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonographListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    monographs_facets_api_monographs_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                kind?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonographsFacetsResponse"];
                 };
             };
             /** @description Validation Error */

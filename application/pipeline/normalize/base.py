@@ -27,6 +27,7 @@ from application.pipeline.libelles import (
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.progression import progression
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
+from domain.publications.metadata import has_minimal_publication_metadata
 
 
 class NormalizeStats(NamedTuple):
@@ -46,7 +47,8 @@ class SourceNormalizer(ABC):
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
-    - `process_work(conn, row) -> bool | None` : abstrait, logique métier
+    - `minimal_metadata(row)` : abstrait, titre et année de la notice
+    - `normalize_record(conn, row) -> bool | None` : abstrait, logique métier d'une notice complète
     - `preload_caches(conn)` : pré-chargement optionnel
     - `cleanup()` : libération des caches après commit final
     """
@@ -66,8 +68,34 @@ class SourceNormalizer(ABC):
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        """Titre et année de la notice, lus dans son payload."""
+
+    @abstractmethod
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+        """Normalise une notice qui porte les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (notice refusée, sans rien écrire)."""
+
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Traite une ligne staging. Retourne True (ok), None (skip), False (erreur)."""
+        """Traite une ligne staging. Retourne True (ok), None (skip), False (notice refusée).
+
+        Une notice vide est sautée. Une notice sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
+        """
+        if not row.raw_data:
+            self._staging.mark_done(conn, row.id)
+            return None
+        title, pub_year = self.minimal_metadata(row)
+        if not has_minimal_publication_metadata(title, pub_year):
+            return self._reject(conn, row)
+        result = self.normalize_record(conn, row)
+        if result is False:
+            return self._reject(conn, row)
+        return result
+
+    def _reject(self, conn: Connection, row: StagingRow) -> bool:
+        """Écarte une notice refusée : l'enregistrement qu'elle avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme notice incomplète."""
+        self._staging.discard_source_publication(conn, row.id)
+        self._staging.mark_done(conn, row.id)
+        return False
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel (ex: struct_cache pour HAL)."""

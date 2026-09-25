@@ -19,6 +19,7 @@ from application.pipeline.normalize.normalize_hal import (
     HalNormalizer,
     active_embargo_until,
     build_hal_author_records,
+    build_hal_external_ids,
     extract_pub_metadata,
     get_container_facts,
     get_title,
@@ -119,6 +120,28 @@ class TestContainerDescription:
         facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
         assert facts.book_title is None
 
+    def test_communication_a_isbn_nomme_son_volume_par_le_titre_de_source(self):
+        facts = get_container_facts(
+            {
+                "docType_s": "COMM",
+                "conferenceTitle_s": "Diplomacy and Political Communication in the West",
+                "source_s": "Diplomacy and Political Communication in the West (III-I BC)",
+                "label_xml": _embargo_tei('<idno type="isbn">978-84-1324-298-9</idno>'),
+            }
+        )
+        assert facts.book_title == "Diplomacy and Political Communication in the West (III-I BC)"
+        assert facts.isbns == ("9788413242989",)
+
+    def test_communication_a_isbn_sans_titre_de_source_prend_le_congres(self):
+        facts = get_container_facts(
+            {
+                "docType_s": "COMM",
+                "conferenceTitle_s": "IC 2024",
+                "label_xml": _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>'),
+            }
+        )
+        assert facts.book_title == "IC 2024"
+
     def test_sans_conteneur_aucun(self):
         assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
@@ -182,6 +205,23 @@ class TestExtractPubMetadata:
 
 def _embargo_tei(refs: str) -> str:
     return f'<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>{refs}</body></text></TEI>'
+
+
+def test_une_notice_n_est_analysee_qu_une_fois(monkeypatch):
+    """Régression : les lecteurs du TEI (conteneur, identifiants, embargo, auteurs) partagent une seule analyse."""
+    calls = []
+    real = normalize_hal.ET.fromstring
+    monkeypatch.setattr(normalize_hal.ET, "fromstring", lambda x: calls.append(x) or real(x))
+    normalize_hal._parse_tei.cache_clear()
+    doc = {
+        "docType_s": "COMM",
+        "label_xml": _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>'),
+    }
+    get_container_facts(doc)
+    build_hal_external_ids(doc, "hal-1", None)
+    extract_pub_metadata(doc, None)
+    normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
+    assert len(calls) == 1
 
 
 class TestParseTeiIsbns:
@@ -611,23 +651,15 @@ class TestProcessWork:
         assert result is True
         assert sq.marked_done == [1]
 
-    def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps):
+    def test_missing_author_field_is_refused(self, stub_orchestration_deps):
+        """Métadonnées minimales présentes, champ auteurs absent : notice refusée, sans rien écrire (la boucle la marque)."""
         sq = FakeStagingQueries()
-        row = staging_row(staging_id=1, raw={"title_s": []})  # pas de titre / pas d'année
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
-        assert result is False
-        # Marqué traité : un doc sans titre ni année n'a aucune chance d'aboutir.
-        assert sq.marked_done == [1]
-
-    def test_missing_author_field_marks_done(self, stub_orchestration_deps):
-        sq = FakeStagingQueries()
-        # Métadonnées minimales OK mais champ auteurs absent → doc inexploitable.
         row = staging_row(
             staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
         )
         result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
-        assert sq.marked_done == [2]
+        assert sq.marked_done == []
 
     def test_no_publisher_name_no_upsert(self, monkeypatch):
         """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
@@ -695,6 +727,13 @@ def _make_normalizer():
 
 
 class TestHalNormalizerClass:
+    def test_metadonnees_minimales(self):
+        norm = _make_normalizer()
+        assert norm.minimal_metadata(staging_row(raw={"title_s": []})) == ("", None)
+        assert norm.minimal_metadata(
+            staging_row(raw={"title_s": ["T"], "producedDateY_i": 2024})
+        ) == ("T", 2024)
+
     def test_preload_caches_sets_repos(self):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
@@ -706,5 +745,5 @@ class TestHalNormalizerClass:
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
-        result = norm.process_work(MagicMock(), staging_row())
+        result = norm.normalize_record(MagicMock(), staging_row())
         assert result is True

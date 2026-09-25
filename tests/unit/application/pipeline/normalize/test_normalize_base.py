@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
@@ -76,6 +76,12 @@ class _Norm(SourceNormalizer):
         self.processed_rows: list[StagingRow] = []
         self.preload_called = False
         self.cleanup_called = False
+
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return "Titre", 2024
+
+    def normalize_record(self, conn, row: StagingRow) -> bool | None:
+        return True
 
     def process_work(self, conn, row: StagingRow) -> bool | None:
         self.processed_rows.append(row)
@@ -247,3 +253,63 @@ class TestIterRowsSubBatch:
         norm = _SubBatch(staging)
         rows = list(norm._iter_rows(MagicMock()))
         assert rows == [a, b, c]
+
+
+# ── process_work : métadonnées minimales ─────────────────────────
+
+
+class _MinimalNorm(SourceNormalizer):
+    """Normalizer qui lit titre et année dans le payload, pour la méthode de gabarit `process_work`."""
+
+    SOURCE = "test"
+
+    def __init__(self, staging: MagicMock) -> None:
+        super().__init__(
+            conn=MagicMock(), logger=logging.getLogger("test"), staging_queries=staging
+        )
+        self.normalized: list[StagingRow] = []
+
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return row.raw_data.get("title"), row.raw_data.get("year")  # type: ignore[return-value]
+
+    def normalize_record(self, conn, row: StagingRow) -> bool | None:
+        self.normalized.append(row)
+        return True
+
+
+class TestProcessWorkMinimalMetadata:
+    def test_notice_vide_sautee(self):
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
+        assert norm.process_work(MagicMock(), row) is None
+        staging.mark_done.assert_called_once()
+        staging.discard_source_publication.assert_not_called()
+
+    def test_notice_sans_annee_ecartee_et_son_enregistrement_supprime(self):
+        """Régression : une notice qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement qu'elle avait produit disparaît."""
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
+        assert norm.process_work(MagicMock(), row) is False
+        staging.discard_source_publication.assert_called_once_with(ANY, 7)
+        staging.mark_done.assert_called_once_with(ANY, 7)
+        assert norm.normalized == []
+
+    def test_notice_refusee_par_la_source(self):
+        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'une notice incomplète."""
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]
+        row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
+        assert norm.process_work(MagicMock(), row) is False
+        staging.discard_source_publication.assert_called_once_with(ANY, 3)
+        staging.mark_done.assert_called_once_with(ANY, 3)
+
+    def test_notice_complete_normalisee(self):
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        row = StagingRow(id=2, source_id="b", doi=None, raw_data={"title": "T", "year": 2020})
+        assert norm.process_work(MagicMock(), row) is True
+        assert norm.normalized == [row]
+        staging.discard_source_publication.assert_not_called()

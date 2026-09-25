@@ -50,6 +50,36 @@ class TestListMonographs:
         volume = _seed_monograph(title, proceedings=True)
         assert _ids(client, search=title, kind="book") == [book]
         assert _ids(client, search=title, kind="proceedings") == [volume]
+        assert sorted(_ids(client, search=title, kind="book,proceedings")) == sorted([book, volume])
+
+    def test_publisher_and_journal_filters(self, client):
+        title = _uniq("Rattachement")
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            publisher = cur.fetchone()["id"]
+            cur.execute(
+                "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            journal = cur.fetchone()["id"]
+        in_publisher = _seed_monograph(title)
+        in_journal = _seed_monograph(title)
+        _seed_monograph(title)
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE monographs SET publisher_id = %s WHERE id = %s", (publisher, in_publisher)
+            )
+            cur.execute(
+                "UPDATE monographs SET journal_id = %s WHERE id = %s", (journal, in_journal)
+            )
+        assert _ids(client, search=title, publisher_id=publisher) == [in_publisher]
+        assert _ids(client, search=title, journal_id=journal) == [in_journal]
+
+    def test_unknown_kind_rejected(self, client):
+        assert client.get("/api/monographs", params={"kind": "journal"}).status_code == 422
 
     def test_sorted_by_publications_and_counted(self, client):
         title = _uniq("Recueil")
@@ -59,6 +89,36 @@ class TestListMonographs:
         _seed_publications(many, 3)
         r = client.get("/api/monographs", params={"search": title, "sort": "pubs_desc"})
         assert [(m["id"], m["pub_count"]) for m in r.json()["monographs"]] == [(many, 3), (few, 1)]
+
+
+class TestMonographsFacets:
+    def test_kind_counts_ignore_kind_filter(self, client):
+        title = _uniq("Facette")
+        _seed_monograph(title)
+        _seed_monograph(title)
+        _seed_monograph(title, proceedings=True)
+        r = client.get("/api/monographs/facets", params={"search": title, "kind": "book"})
+        assert r.status_code == 200
+        counts = {o["value"]: o["count"] for o in r.json()["kinds"]}
+        assert counts == {"book": 2, "proceedings": 1}
+
+
+class TestMonographPublications:
+    def test_publications_filtered_by_monograph(self, client):
+        mid = _seed_monograph(_uniq("Ouvrage"))
+        other = _seed_monograph(_uniq("Autre"))
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, monograph_id, in_perimeter)"
+                " VALUES ('Chapitre', 2024, %s, true), ('Ailleurs', 2024, %s, true) RETURNING id",
+                (mid, other),
+            )
+            chapter = cur.fetchone()["id"]
+        r = client.get("/api/publications", params={"monograph_id": mid})
+        assert r.status_code == 200
+        assert [p["id"] for p in r.json()["publications"]] == [chapter]
+        facets = client.get("/api/publications/facets", params={"monograph_id": mid})
+        assert facets.status_code == 200
 
 
 class TestGetMonograph:

@@ -468,7 +468,12 @@ class OpenalexNormalizer(BibliographicNormalizer):
     SOURCE = "openalex"
     DEFAULT_BATCH_SIZE = 500
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        work = row.raw_data
+        title = as_str(work.get("title")) or as_str(work.get("display_name"))
+        return title, as_int(work.get("publication_year"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

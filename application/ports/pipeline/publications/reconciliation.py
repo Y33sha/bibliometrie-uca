@@ -66,6 +66,12 @@ class PublicationsReconciliationQueries(Protocol):
         """Rattache un ensemble de `source_publications` à `publication_id` (assignation d'un groupe)."""
         ...
 
+    def detach_source_publications(
+        self, conn: Connection, source_publication_ids: list[int]
+    ) -> None:
+        """Détache un ensemble de `source_publications` de leur publication : elles deviennent orphelines."""
+        ...
+
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
