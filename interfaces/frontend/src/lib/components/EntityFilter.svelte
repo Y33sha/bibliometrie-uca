@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { anchored } from '$lib/actions/anchored';
 	import { api } from '$lib/api';
 	import type { components } from '$lib/api/schema';
 	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '$lib/entityLabels';
@@ -142,7 +143,7 @@
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-		<div class="facet-panel" onclick={(e) => e.stopPropagation()}>
+		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
 			<input type="text" class="facet-search" placeholder="Rechercher..." bind:value={query} oninput={onInput} />
 			<div class="facet-options">
 				<label>

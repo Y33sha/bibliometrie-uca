@@ -1,5 +1,6 @@
 <script lang="ts">
   import { autofocus } from "$lib/actions/focus";
+  import { anchored } from "$lib/actions/anchored";
   import type { PersonSearchResult } from "./types";
 
   let {
@@ -49,9 +50,9 @@
       <button class="btn" onclick={onclose}>&times;</button>
     </div>
     {#if mergeSearch.loading}
-      <div class="merge-results"><span class="loading-text">Recherche…</span></div>
+      <div class="merge-results" use:anchored><span class="loading-text">Recherche…</span></div>
     {:else if mergeSearch.results.length}
-      <div class="merge-results">
+      <div class="merge-results" use:anchored>
         {#each mergeSearch.results as r (r.id)}
           <button class="merge-result" onclick={() => onmerge(targetPersonId, r.id)}>
             <strong>{r.last_name}</strong>
@@ -62,7 +63,7 @@
         {/each}
       </div>
     {:else if mergeSearch.query.trim().length >= 2}
-      <div class="merge-results"><span class="loading-text">Aucun résultat</span></div>
+      <div class="merge-results" use:anchored><span class="loading-text">Aucun résultat</span></div>
     {/if}
   </div>
 {:else}
@@ -106,9 +107,6 @@
     width: 220px;
   }
   .merge-results {
-    position: absolute;
-    top: 100%;
-    left: 0;
     z-index: 10;
     background: white;
     border: 1px solid var(--border);
