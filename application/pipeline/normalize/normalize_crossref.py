@@ -37,7 +37,6 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.publications.identifiers import clean_doi
-from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
     crossref_issns,
@@ -341,11 +340,6 @@ def process_work(
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
-    if not raw:
-        # Stub not_found ou payload vide — devrait déjà être processed=TRUE, par sécurité on marque processed et on passe.
-        staging_queries.mark_done(conn, staging_id)
-        return None
-
     msg = raw  # CrossRef stocke directement le 'message'
     doi = get_doi(msg)
     if not doi:
@@ -354,10 +348,8 @@ def process_work(
 
     title = get_title(msg)
     pub_year = get_pub_year(msg)
-    if not has_minimal_publication_metadata(title, pub_year):
-        staging_queries.mark_done(conn, staging_id)
-        return False
-    assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
+    # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
+    assert isinstance(title, str) and isinstance(pub_year, int)
 
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
     containers = upsert_containers(msg, publisher_id, container_repo=container_repo)
@@ -398,7 +390,10 @@ class CrossrefNormalizer(BibliographicNormalizer):
     SOURCE = "crossref"
     DEFAULT_BATCH_SIZE = 100
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return get_title(row.raw_data), get_pub_year(row.raw_data)
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

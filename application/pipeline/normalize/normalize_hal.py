@@ -45,7 +45,6 @@ from domain.publications.identifiers import (
     normalize_pmcid,
     normalize_pmid,
 )
-from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.types import JsonValue, as_int, as_sequence, as_strs
@@ -579,12 +578,6 @@ def process_work(
     hal_id = staging_row.source_id
     doc = staging_row.raw_data
 
-    title = get_title(doc)
-    pub_year = as_int(doc.get("producedDateY_i"))
-    if not has_minimal_publication_metadata(title, pub_year):
-        staging_queries.mark_done(conn, staging_id)
-        return False
-
     if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
         staging_queries.mark_done(conn, staging_id)
         return False
@@ -616,7 +609,10 @@ class HalNormalizer(BibliographicNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

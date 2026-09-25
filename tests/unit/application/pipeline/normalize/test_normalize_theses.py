@@ -339,14 +339,6 @@ class TestProcessWork:
             "batch_queries": MagicMock(),
         }
 
-    def test_skip_when_no_title(self):
-        sq = FakeStagingQueries()
-        row = staging_row(staging_id=7, source_id="2024CLFAC001", raw={})
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
-        assert result is False
-        # Marquée traitée pour ne pas retenter indéfiniment une thèse sans titre.
-        assert sq.marked_done == [7]
-
     def test_happy_path(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
         sq = FakeStagingQueries()
@@ -382,6 +374,9 @@ def _make_normalizer():
 
 
 class TestThesesNormalizerClass:
+    def test_metadonnees_minimales(self):
+        assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
+
     def test_preload_caches_sets_publication_repo(self):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
@@ -391,5 +386,5 @@ class TestThesesNormalizerClass:
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
-        result = norm.process_work(MagicMock(), staging_row())
+        result = norm.normalize_record(MagicMock(), staging_row())
         assert result is True

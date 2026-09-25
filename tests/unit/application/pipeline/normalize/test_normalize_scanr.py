@@ -473,15 +473,21 @@ class TestProcessWork:
         assert document.title == "Un titre"
 
     @pytest.mark.parametrize(
-        ("raw", "motif"),
-        [({"year": 2024}, "sans titre"), ({"title": {"default": "T"}}, "sans année")],
+        ("raw", "attendu"),
+        [({"year": 2024}, (None, 2024)), ({"title": {"default": "T"}}, ("T", None))],
     )
-    def test_document_refuse_mais_ligne_marquee(self, raw, motif, logger):
-        rendu, queries, staging = self._run(raw, logger)
-
-        assert rendu is False, motif
-        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
-        assert queries.upserted_documents == []
+    def test_metadonnees_minimales(self, raw, attendu):
+        normalizer = ScanrNormalizer(
+            conn=MagicMock(),
+            logger=MagicMock(),
+            staging_queries=MagicMock(),
+            queries=MagicMock(),
+            container_repo_factory=lambda c: MagicMock(),
+            publisher_repo_factory=lambda c: MagicMock(),
+            publication_repo_factory=lambda c: MagicMock(),
+            authorship_queries=MagicMock(),
+        )
+        assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
 
 
 def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
@@ -505,5 +511,5 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     normalizer.preload_caches(MagicMock())
     row = staging_row()
 
-    assert normalizer.process_work(MagicMock(), row) is True
+    assert normalizer.normalize_record(MagicMock(), row) is True
     assert vus["row"] is row

@@ -234,11 +234,6 @@ def process_work(
     theses_id = staging_row.source_id
     these = staging_row.raw_data
 
-    title = these.get("titrePrincipal")
-    if not title:
-        staging_queries.mark_done(conn, staging_id)
-        return False
-
     pub_meta = extract_pub_metadata(these)
 
     source_publication_id = insert_source_document(
@@ -272,7 +267,11 @@ class ThesesNormalizer(SourceNormalizer):
     def preload_caches(self, conn: Connection) -> None:
         self._publication_repo = self._publication_repo_factory(conn)
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        pub_meta = extract_pub_metadata(row.raw_data)
+        return pub_meta.title, pub_meta.pub_year
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         assert self._publication_repo is not None
         return process_work(
             conn,

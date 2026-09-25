@@ -31,7 +31,6 @@ from domain.persons.identifiers import (
 )
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
-from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.scanr import (
     derive_scanr_oa_status,
@@ -346,12 +345,6 @@ def process_work(
     scanr_id = staging_row.source_id
     doc = staging_row.raw_data
 
-    title = get_title(doc)
-    pub_year = as_int(doc.get("year"))
-    if not has_minimal_publication_metadata(title, pub_year):
-        staging_queries.mark_done(conn, staging_id)
-        return False
-
     publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
     containers = upsert_containers(doc, publisher_id, container_repo=container_repo)
 
@@ -372,7 +365,10 @@ class ScanrNormalizer(BibliographicNormalizer):
     SOURCE = "scanr"
     DEFAULT_BATCH_SIZE = 100
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return get_title(row.raw_data), as_int(row.raw_data.get("year"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

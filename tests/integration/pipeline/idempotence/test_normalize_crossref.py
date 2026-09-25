@@ -88,7 +88,7 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from application.pipeline.normalize.normalize_crossref import process_work
+    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from application.ports.pipeline.normalize.staging import StagingRow
     from infrastructure.pipeline.containers import PgContainerGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -103,9 +103,18 @@ def _run_normalize_crossref(conn):
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
-    container_repo = PgContainerGatewayQueries(conn)
-    publisher_repo = PgPublisherGatewayQueries(conn)
-    publication_repo = publication_repository(conn)
+    # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
+    normalizer = CrossrefNormalizer(
+        conn,
+        logger,
+        staging_queries,
+        queries,
+        container_repo_factory=PgContainerGatewayQueries,
+        publisher_repo_factory=PgPublisherGatewayQueries,
+        publication_repo_factory=publication_repository,
+        authorship_queries=authorship_queries,
+    )
+    normalizer.preload_caches(conn)
 
     rows = conn.execute(
         text("""
@@ -118,17 +127,7 @@ def _run_normalize_crossref(conn):
         staging_row = StagingRow(
             id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
         )
-        if process_work(
-            conn,
-            queries,
-            logger,
-            staging_row,
-            container_repo=container_repo,
-            publisher_repo=publisher_repo,
-            publication_repo=publication_repo,
-            staging_queries=staging_queries,
-            authorship_queries=authorship_queries,
-        ):
+        if normalizer.process_work(conn, staging_row):
             processed += 1
     return processed
 

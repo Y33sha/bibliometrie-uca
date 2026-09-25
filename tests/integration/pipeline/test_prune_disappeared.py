@@ -3,9 +3,14 @@
 Un `staging` portant `disappeared_at` perd ses `source_publications`, et celles-ci emportent leurs `source_authorships` par cascade. La ligne de `staging` reste, avec sa marque.
 """
 
+from unittest.mock import MagicMock
+
 from sqlalchemy import text
 
-from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
+from infrastructure.pipeline.normalize.staging import (
+    PgStagingQueries,
+    delete_disappeared_source_publications,
+)
 from infrastructure.repositories import publication_repository
 
 
@@ -152,3 +157,27 @@ def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
 
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 1
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 0
+
+
+def test_une_notice_sans_metadonnees_minimales_perd_son_enregistrement(sa_sync_conn_owner):
+    """Une notice renormalisée sans année supprime l'enregistrement qu'elle avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
+    pub = _publication(sa_sync_conn_owner)
+    staging_id = _staging(sa_sync_conn_owner, "W3131333980", disparu=False)
+    sp_id = _source_publication(sa_sync_conn_owner, staging_id, "W3131333980", publication_id=pub)
+    autre_staging = _staging(sa_sync_conn_owner, "hal-soeur", disparu=False)
+    soeur = _source_publication(sa_sync_conn_owner, autre_staging, "hal-soeur", publication_id=pub)
+
+    PgStagingQueries(raw_store=MagicMock()).discard_source_publication(
+        sa_sync_conn_owner, staging_id
+    )
+
+    restants = (
+        sa_sync_conn_owner.execute(
+            text("SELECT id FROM source_publications WHERE id IN (:a, :b)"),
+            {"a": sp_id, "b": soeur},
+        )
+        .scalars()
+        .all()
+    )
+    assert restants == [soeur]
+    assert _a_reconcilier(sa_sync_conn_owner, soeur)
