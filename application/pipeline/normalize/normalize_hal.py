@@ -74,21 +74,27 @@ def upsert_publisher(
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN de la notice TEI.
 
-    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : le congrès ne désigne pas un volume.
+    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : seul, le congrès désigne un événement. Quand la notice porte un ISBN, le volume existe : il prend le titre de la source (`source_s`), à défaut celui du congrès.
     """
     journal_title = hal_text_field(doc.get("journalTitle_s"))
+    isbns = tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml"))))
+    book_title = hal_text_field(doc.get("bookTitle_s"))
+    if not book_title and isbns:
+        book_title = hal_text_field(doc.get("source_s")) or hal_text_field(
+            doc.get("conferenceTitle_s")
+        )
     return ContainerDescription(
         source="hal",
         raw_doc_type=hal_text_field(doc.get("docType_s")),
         document_title=get_title(doc),
         journal_title=journal_title,
         collection_title=journal_title,
-        book_title=hal_text_field(doc.get("bookTitle_s")),
+        book_title=book_title,
         issns=source_issns(
             print_issn=hal_text_field(doc.get("journalIssn_s")),
             electronic_issn=hal_text_field(doc.get("journalEissn_s")),
         ),
-        isbns=tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml")))),
+        isbns=isbns,
         year=as_int(doc.get("producedDateY_i")),
     )
 
