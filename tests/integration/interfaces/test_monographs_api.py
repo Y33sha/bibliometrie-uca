@@ -52,6 +52,32 @@ class TestListMonographs:
         assert _ids(client, search=title, kind="proceedings") == [volume]
         assert sorted(_ids(client, search=title, kind="book,proceedings")) == sorted([book, volume])
 
+    def test_publisher_and_journal_filters(self, client):
+        title = _uniq("Rattachement")
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            publisher = cur.fetchone()["id"]
+            cur.execute(
+                "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            journal = cur.fetchone()["id"]
+        in_publisher = _seed_monograph(title)
+        in_journal = _seed_monograph(title)
+        _seed_monograph(title)
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE monographs SET publisher_id = %s WHERE id = %s", (publisher, in_publisher)
+            )
+            cur.execute(
+                "UPDATE monographs SET journal_id = %s WHERE id = %s", (journal, in_journal)
+            )
+        assert _ids(client, search=title, publisher_id=publisher) == [in_publisher]
+        assert _ids(client, search=title, journal_id=journal) == [in_journal]
+
     def test_unknown_kind_rejected(self, client):
         assert client.get("/api/monographs", params={"kind": "journal"}).status_code == 422
 
