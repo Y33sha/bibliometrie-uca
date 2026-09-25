@@ -2,11 +2,14 @@
 
 from sqlalchemy import Connection, Row, text
 
+from application.ports.read_models._common import FacetOption
 from application.ports.read_models.monographs_queries import (
+    MONOGRAPH_KINDS,
     MonographFilters,
     MonographListItem,
     MonographListResponse,
     MonographQueries,
+    MonographsFacetsResponse,
     MonographSort,
 )
 from domain.normalize import normalize_text
@@ -34,8 +37,8 @@ _SORT_MAP: dict[MonographSort, str] = {
 }
 
 
-def _where(filters: MonographFilters) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de la liste : titre normalisé, ou début d'ISBN, et type de monographie."""
+def _where(filters: MonographFilters, *, skip_kinds: bool = False) -> tuple[str, dict[str, object]]:
+    """Clause WHERE de la liste : titre normalisé, ou début d'ISBN, et type de monographie. `skip_kinds` écarte le filtre de type, pour le décompte de sa facette."""
     parts: list[str] = []
     binds: dict[str, object] = {}
     if len(filters.search) >= 2:
@@ -45,9 +48,9 @@ def _where(filters: MonographFilters) -> tuple[str, dict[str, object]]:
         elif normalized := normalize_text(filters.search):
             parts.append("m.title_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
-    if filters.kind:
-        parts.append("m.proceedings = :proceedings")
-        binds["proceedings"] = filters.kind == "proceedings"
+    if filters.kinds and not skip_kinds:
+        parts.append("m.proceedings = ANY(:proceedings)")
+        binds["proceedings"] = [kind == "proceedings" for kind in filters.kinds]
     return " AND ".join(parts) or "TRUE", binds
 
 
@@ -78,6 +81,25 @@ class PgMonographQueries(MonographQueries):
         ).all()
         return MonographListResponse(
             total=total, page=page, per_page=per_page, monographs=[_item(r) for r in rows]
+        )
+
+    def monographs_facets(self, *, filters: MonographFilters) -> MonographsFacetsResponse:
+        where, binds = _where(filters, skip_kinds=True)
+        counts = {
+            row.proceedings: row.n
+            for row in self._conn.execute(
+                text(
+                    f"SELECT m.proceedings, count(*) AS n FROM monographs m WHERE {where}"  # noqa: S608
+                    " GROUP BY m.proceedings"
+                ),
+                binds,
+            )
+        }
+        return MonographsFacetsResponse(
+            kinds=[
+                FacetOption(value=kind, count=counts.get(kind == "proceedings", 0))
+                for kind in MONOGRAPH_KINDS
+            ]
         )
 
     def get_monograph(self, monograph_id: int) -> MonographListItem | None:

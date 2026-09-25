@@ -1,20 +1,35 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { autofocus } from '$lib/actions/focus';
+	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type Monograph = components['schemas']['MonographListItem'];
 
-	// Liste de monographies réutilisable, affichée par `/monographs` et `/admin/monographs`.
-	let { apiKey }: { apiKey: string } = $props();
+	// Liste de monographies réutilisable, affichée par `/monographs` et `/admin/monographs`. Les filtres, le tri et la page sont reportés dans l'URL de `basePath`.
+	let { apiKey, basePath }: { apiKey: string; basePath: string } = $props();
+
+	const KIND_LABELS: Record<string, string> = { book: 'Livres', proceedings: "Volumes d'actes" };
 
 	let search = $state('');
-	let kind = $state('');
+	let selectedKinds: string[] = $state([]);
 	let currentSort = $state('pubs_desc');
+
+	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		if (selectedKinds.length) params.set('kind', selectedKinds.join(','));
+		const q = search.trim();
+		if (q) params.set('search', q);
+		return params;
+	}
 
 	const monographs = usePaginatedFetch<Monograph>({
 		endpoint: '/api/monographs',
@@ -22,32 +37,48 @@
 		perPage: 50,
 		apiKey: () => apiKey,
 		buildParams() {
-			const params = new URLSearchParams();
+			const params = buildFilterParams();
 			params.set('sort', currentSort);
-			if (kind) params.set('kind', kind);
-			const q = search.trim();
-			if (q) params.set('search', q);
 			return params;
 		},
 	});
 
-	let searchTimer: ReturnType<typeof setTimeout> | undefined;
-	function onSearchInput() {
-		clearTimeout(searchTimer);
-		searchTimer = setTimeout(() => {
-			monographs.page = 1;
-			monographs.load();
-		}, 300);
+	const facets = useFacets({
+		endpoint: '/api/monographs/facets',
+		apiKey: () => `${apiKey}-facets`,
+		buildParams: buildFilterParams,
+		facets: {
+			kinds: { type: 'label_map', apiKey: 'kinds', labels: KIND_LABELS },
+		},
+	});
+
+	const url = useUrlFilters({
+		basePath: () => basePath,
+		filters: {
+			selectedKinds: { type: 'string_array', urlKey: 'kind' },
+			search: { type: 'single', urlKey: 'search' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
+			currentPage: { type: 'page', urlKey: 'page' },
+		},
+	});
+
+	function syncUrl() {
+		url.syncUrl(() => ({ selectedKinds, search, currentSort, currentPage: monographs.page }));
 	}
 
-	function onKindChange() {
+	function onFilterChange() {
 		monographs.page = 1;
+		syncUrl();
 		monographs.load();
+		facets.load();
 	}
+
+	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function setSort(column: 'title' | 'year' | 'pubs') {
 		currentSort = currentSort === `${column}_desc` ? `${column}_asc` : `${column}_desc`;
 		monographs.page = 1;
+		syncUrl();
 		monographs.load();
 	}
 
@@ -57,7 +88,15 @@
 		return '';
 	}
 
-	onMount(() => monographs.load());
+	onMount(() => {
+		const restored = url.restoreFromUrl($page.url.searchParams);
+		if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
+		if (restored.search) search = restored.search as string;
+		if (restored.currentSort) currentSort = restored.currentSort as string;
+		if (restored.currentPage) monographs.page = restored.currentPage as number;
+		facets.load();
+		monographs.load();
+	});
 </script>
 
 <div class="toolbar toolbar-card toolbar-sticky">
@@ -70,11 +109,7 @@
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
-	<select bind:value={kind} onchange={onKindChange}>
-		<option value="">Livres et actes</option>
-		<option value="book">Livres</option>
-		<option value="proceedings">Volumes d'actes</option>
-	</select>
+	<FacetDropdown label="Types" options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
 	<span class="count">{monographs.total.toLocaleString('fr-FR')} monographie{monographs.total > 1 ? 's' : ''}</span>
 </div>
 
@@ -119,6 +154,7 @@
 	pages={monographs.pages}
 	onchange={(p) => {
 		monographs.page = p;
+		syncUrl();
 		monographs.load();
 	}}
 />

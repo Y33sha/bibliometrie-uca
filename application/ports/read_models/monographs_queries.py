@@ -8,21 +8,21 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.read_models._common import PaginatedResponse
+from application.ports.read_models._common import FacetOption, PaginatedResponse
 
 # Vocabulaire de tri de la liste des monographies : le champ, puis le sens.
 MonographSort = Literal["title_asc", "title_desc", "year_asc", "year_desc", "pubs_asc", "pubs_desc"]
 
-MonographKind = Literal["", "book", "proceedings"]
-"""Livre, volume d'actes, ou les deux (valeur vide)."""
+MONOGRAPH_KINDS = ("book", "proceedings")
+"""Types de monographie : livre, volume d'actes."""
 
 
 @dataclass(frozen=True, slots=True)
 class MonographFilters:
-    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme."""
+    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` retient les types listés ; vide, il retient tous les types."""
 
     search: str = ""
-    kind: MonographKind = ""
+    kinds: tuple[str, ...] = ()
 
 
 class MonographListItem(BaseModel):
@@ -45,11 +45,19 @@ class MonographListResponse(PaginatedResponse):
     monographs: list[MonographListItem]
 
 
+class MonographsFacetsResponse(BaseModel):
+    """Facettes de la liste des monographies. Le décompte par type écarte le filtre de type : il annonce le nombre de monographies atteignables si l'option était cochée."""
+
+    kinds: list[FacetOption]
+
+
 class MonographQueries(Protocol):
     """Opérations de lecture sur les monographies."""
 
     def list_monographs(
         self, *, filters: MonographFilters, sort: MonographSort, page: int, per_page: int
     ) -> MonographListResponse: ...
+
+    def monographs_facets(self, *, filters: MonographFilters) -> MonographsFacetsResponse: ...
 
     def get_monograph(self, monograph_id: int) -> MonographListItem | None: ...
