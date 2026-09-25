@@ -9054,6 +9054,8 @@ export interface operations {
                 sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "pubs_asc" | "pubs_desc";
                 search?: string;
                 kind?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -9086,6 +9088,8 @@ export interface operations {
             query?: {
                 search?: string;
                 kind?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
             };
             header?: never;
             path?: never;

@@ -19,10 +19,12 @@ MONOGRAPH_KINDS = ("book", "proceedings")
 
 @dataclass(frozen=True, slots=True)
 class MonographFilters:
-    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` retient les types listés ; vide, il retient tous les types."""
+    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` retient les types listés ; vide, il retient tous les types. `publisher_id` et `journal_id` restreignent à un éditeur et à une collection."""
 
     search: str = ""
     kinds: tuple[str, ...] = ()
+    publisher_id: int | None = None
+    journal_id: int | None = None
 
 
 class MonographListItem(BaseModel):
