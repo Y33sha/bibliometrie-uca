@@ -442,21 +442,11 @@ class TestProcessWork:
         (document,) = queries.upserted_documents
         assert document.external_ids == {"related_dois": ["10.5281/zenodo.0"]}
 
-    def test_payload_vide_est_passe(self, queries, staging, logger):
-        """Une ligne sans contenu — souche d'un document introuvable — est marquée sans verdict."""
-        rendu = self._run(None, queries, staging, logger)
-
-        assert rendu is None
-        assert staging.marked_done == [42]
-        assert queries.upserted_documents == []
-
     @pytest.mark.parametrize(
         ("raw", "motif"),
         [
             ({"attributes": "pas un objet"}, "métadonnées illisibles"),
             ({"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}, "sans DOI"),
-            ({"attributes": {"doi": "10.1/a", "publicationYear": 2024}}, "sans titre"),
-            ({"attributes": {"doi": "10.1/a", "titles": [{"title": "T"}]}}, "sans année"),
         ],
     )
     def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
@@ -499,5 +489,5 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     normalizer.preload_caches(MagicMock())  # instancie les repositories sur la connexion
     row = staging_row()
 
-    assert normalizer.process_work(MagicMock(), row) is True
+    assert normalizer.normalize_record(MagicMock(), row) is True
     assert vus["row"] is row

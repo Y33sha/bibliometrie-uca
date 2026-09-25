@@ -746,5 +746,5 @@ class TestHalNormalizerClass:
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
-        result = norm.process_work(MagicMock(), staging_row())
+        result = norm.normalize_record(MagicMock(), staging_row())
         assert result is True

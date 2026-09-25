@@ -40,7 +40,6 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.publications.identifiers import clean_doi
-from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.datacite import (
     container_names_a_journal,
@@ -245,11 +244,6 @@ def process_work(
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
-    if not raw:
-        # Stub not_found ou payload vide — devrait déjà être processed=TRUE.
-        staging_queries.mark_done(conn, staging_id)
-        return None
-
     # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `attributes`.
     attributes = raw.get("attributes")
     if not isinstance(attributes, dict):
@@ -263,10 +257,8 @@ def process_work(
 
     title = get_title(attributes)
     pub_year = extract_datacite_pub_year(attributes, max_year=today().year + 1)
-    if not has_minimal_publication_metadata(title, pub_year):
-        staging_queries.mark_done(conn, staging_id)
-        return False
-    assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
+    # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
+    assert isinstance(title, str) and isinstance(pub_year, int)
 
     publisher_id = upsert_publisher(attributes, publisher_repo=publisher_repo)
     containers = upsert_containers(attributes, publisher_id, container_repo=container_repo)
@@ -311,7 +303,15 @@ class DataciteNormalizer(BibliographicNormalizer):
     SOURCE = "datacite"
     DEFAULT_BATCH_SIZE = 100
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        attributes = row.raw_data.get("attributes")
+        if not isinstance(attributes, dict):
+            return None, None
+        return get_title(attributes), extract_datacite_pub_year(
+            attributes, max_year=today().year + 1
+        )
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,

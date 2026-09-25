@@ -563,7 +563,11 @@ class WosNormalizer(BibliographicNormalizer):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        rec = extract_from_api(row.raw_data, row.doi)
+        return as_str(rec.get("title")), as_int(rec.get("pub_year"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_repo, publisher_repo, publication_repo = self._require_repos()
         return process_record(
             conn,
