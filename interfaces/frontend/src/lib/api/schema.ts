@@ -5675,6 +5675,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5726,6 +5727,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5777,6 +5779,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
@@ -5928,6 +5931,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
                 subject_id?: string;
