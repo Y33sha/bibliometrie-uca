@@ -45,6 +45,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(ci)"
+    # Les étapes de CodeQL échangent un fichier de configuration qui porte leur version : une étape
+    # refuse celui d'une autre version. Leurs montées forment donc une seule proposition.
+    groups:
+      codeql:
+        patterns: ["github/codeql-action/*"]
 
   # ---- Images de base des descriptions de construction ----
   # Ces images sont désignées par leur empreinte : une empreinte se fige, et sans suivi elle
