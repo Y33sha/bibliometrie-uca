@@ -1,7 +1,7 @@
 <script lang="ts">
   import { pageTitle } from "$lib/institution.svelte";
   import { onMount } from "svelte";
-  import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
+  import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { STRUCTURE_TYPES } from "$lib/structureTypes";
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import Modal from "$lib/components/Modal.svelte";
@@ -104,12 +104,15 @@
     }
   }
 
+  // Chaque saisie relance la recherche : la requête précédente, encore en vol, est annulée.
+  const structureSearch = latestRequest();
+
   async function perimSearchStructures() {
     if (!perimModal || perimModal.structSearch.length < 2) {
       if (perimModal) perimModal.structResults = [];
       return;
     }
-    perimModal.structResults = await api<StructureListItem[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
+    perimModal.structResults = await structureSearch<StructureListItem[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
   }
 
   function perimAddStruct(s: any) {

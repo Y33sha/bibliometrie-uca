@@ -118,7 +118,8 @@
 
   let activeMergePersonId: number | null = $state(null);
   const mergeSearch = useDebouncedSearch<PersonSearchResult>({
-    search: (q) => api<PersonSearchResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`),
+    search: (q, request) =>
+      request<PersonSearchResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`),
     transform: (results) =>
       activeMergePersonId === null
         ? results
