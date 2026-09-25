@@ -19,6 +19,7 @@ from application.pipeline.normalize.normalize_hal import (
     HalNormalizer,
     active_embargo_until,
     build_hal_author_records,
+    build_hal_external_ids,
     extract_pub_metadata,
     get_container_facts,
     get_title,
@@ -204,6 +205,23 @@ class TestExtractPubMetadata:
 
 def _embargo_tei(refs: str) -> str:
     return f'<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>{refs}</body></text></TEI>'
+
+
+def test_une_notice_n_est_analysee_qu_une_fois(monkeypatch):
+    """Régression : les lecteurs du TEI (conteneur, identifiants, embargo, auteurs) partagent une seule analyse."""
+    calls = []
+    real = normalize_hal.ET.fromstring
+    monkeypatch.setattr(normalize_hal.ET, "fromstring", lambda x: calls.append(x) or real(x))
+    normalize_hal._parse_tei.cache_clear()
+    doc = {
+        "docType_s": "COMM",
+        "label_xml": _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>'),
+    }
+    get_container_facts(doc)
+    build_hal_external_ids(doc, "hal-1", None)
+    extract_pub_metadata(doc, None)
+    normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
+    assert len(calls) == 1
 
 
 class TestParseTeiIsbns:
