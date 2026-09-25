@@ -4,7 +4,7 @@
   import { autofocus } from "$lib/actions/focus";
   import { base } from "$app/paths";
   import { goto } from "$app/navigation";
-  import { api, ApiError, structures as structuresApi } from "$lib/api";
+  import { api, ApiError, latestRequest, structures as structuresApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
   import {
     API_SOURCES,
@@ -52,11 +52,14 @@
   let mHal = $state("");
   let mApiIds: Record<string, string> = $state({});
 
+  // Chaque saisie ou filtre relance la liste : la requête précédente, encore en vol, est annulée.
+  const listRequest = latestRequest();
+
   async function loadList() {
     const params = new URLSearchParams();
     if (typeFilter) params.set("structure_type", typeFilter);
     if (search) params.set("search", search);
-    structures = await api<StructureListItem[]>("/api/structures?" + params);
+    structures = await listRequest<StructureListItem[]>("/api/structures?" + params);
   }
 
   function handleSearch() {

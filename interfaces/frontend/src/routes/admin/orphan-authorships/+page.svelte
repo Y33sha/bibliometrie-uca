@@ -17,8 +17,11 @@
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
 	type RejectedPair = components['schemas']['RejectedPairItem'];
 
-	async function searchPersons(q: string): Promise<PersonResult[]> {
-		return api<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
+	async function searchPersons(
+		q: string,
+		request: <T>(url: string) => Promise<T>,
+	): Promise<PersonResult[]> {
+		return request<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
 	}
 
 	let search = $state('');

@@ -2,7 +2,7 @@
 	import { pageTitle } from '$lib/institution.svelte';
 	import { onMount, tick } from 'svelte';
 	import { base } from '$app/paths';
-	import { api } from '$lib/api';
+	import { api, latestRequest } from '$lib/api';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -24,6 +24,9 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
 	Chart.register(...registerables, ChartDataLabels);
+
+	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
+	const pivotRequest = latestRequest();
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
@@ -289,7 +292,7 @@
 		p.set('group', primaryBy);
 		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
 		if (comparison) p.set('group2', comparison);
-		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
+		const res = await pivotRequest<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		pivotRows = res.rows;
 		await tick();
 		renderChart();

@@ -41,7 +41,7 @@ describe('useDebouncedSearch', () => {
 
 		await vi.advanceTimersByTimeAsync(1);
 		expect(search).toHaveBeenCalledOnce();
-		expect(search).toHaveBeenCalledWith('foo');
+		expect(search).toHaveBeenCalledWith('foo', expect.any(Function));
 		expect(s.results).toEqual(['result']);
 		expect(s.loading).toBe(false);
 	});
@@ -55,7 +55,7 @@ describe('useDebouncedSearch', () => {
 		// Le premier timer est annulé : seul `second` doit déclencher un fetch.
 		await vi.advanceTimersByTimeAsync(300);
 		expect(search).toHaveBeenCalledOnce();
-		expect(search).toHaveBeenCalledWith('second');
+		expect(search).toHaveBeenCalledWith('second', expect.any(Function));
 		expect(s.results).toEqual(['second']);
 	});
 

@@ -58,8 +58,8 @@
 	// Merge state : recherche avec debounce + cible en cours de fusion
 	let mergeTargetId: number | null = $state(null);
 	const mergeSearch = useDebouncedSearch<Publisher>({
-		search: async (q) => {
-			const data = await api<{ publishers: Publisher[] }>(
+		search: async (q, request) => {
+			const data = await request<{ publishers: Publisher[] }>(
 				// Les éditeurs les plus fournis en revues d'abord : la cible d'une fusion est rarement une variante isolée.
 				`/api/publishers?search=${encodeURIComponent(q)}&sort=journals_desc&per_page=10`,
 			);
