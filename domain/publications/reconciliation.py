@@ -28,7 +28,7 @@ class ReconcileMember:
 
     `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de la SP, **`None` si orpheline** (pas encore matérialisée) ; `publication_doi` = DOI canonique de cette publication courante (`None` si orpheline) ; `in_perimeter` = la SP a ≥1 authorship in-périmètre ; `title_normalized` / `pub_year` = métadonnées minimales requises pour matérialiser une pub neuve.
 
-    `in_perimeter`, `title_normalized` et `pub_year` n'ont de rôle que pour la **création** (partition d'orphelins) : ils décident create vs skip. Les SP matérialisées ne touchent jamais cette branche, d'où leurs défauts inoffensifs.
+    `in_perimeter`, `title_normalized` et `pub_year` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
     """
 
     source_publication_id: int
@@ -65,10 +65,14 @@ class DissolvedPublication:
 
 @dataclass(frozen=True, slots=True)
 class ReconcilePlan:
-    """Plan de réconciliation : groupes à matérialiser + publications dissoutes."""
+    """Plan de réconciliation : groupes à matérialiser, publications dissoutes, `source_publications` à détacher de leur publication.
+
+    Une partition détachée a perdu la revendication de sa publication, et aucun de ses membres ne porte d'année : elle ne peut pas fonder une publication neuve. Ses membres deviennent orphelins.
+    """
 
     groups: tuple[WorkGroup, ...]
     dissolved: tuple[DissolvedPublication, ...]
+    detached: tuple[int, ...] = ()
 
 
 def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
@@ -162,8 +166,10 @@ def plan_reconciliation(
     # Attribution gloutonne : revendications de pub existant d'abord (forte, puis min_sp), puis
     # les créations (`preferred=None`). La première à revendiquer un pub le garde ; les suivantes,
     # comme les créations, prennent un nouveau pub (`target=None`).
+    by_id = {m.source_publication_id: m for m in members}
     awarded: set[int] = set()
     groups: list[WorkGroup] = []
+    detached: list[int] = []
     target_of_sp: dict[int, int | None] = {}
     for preferred, _strong, _min_sp, sp_ids in sorted(
         claims, key=lambda c: (c[0] is None, not c[1], c[2])
@@ -173,6 +179,9 @@ def plan_reconciliation(
             target: int | None = preferred
         else:
             target = None  # création, ou pub existant déjà pris → nouveau pub
+            if not any(by_id[sp_id].pub_year for sp_id in sp_ids):
+                detached.extend(sp_ids)
+                continue
         groups.append(WorkGroup(target, sp_ids))
         for sp_id in sp_ids:
             target_of_sp[sp_id] = target
@@ -197,4 +206,4 @@ def plan_reconciliation(
         if successor is not None and successor != pub_id:
             dissolved.append(DissolvedPublication(pub_id, successor))
 
-    return ReconcilePlan(groups=tuple(groups), dissolved=tuple(dissolved))
+    return ReconcilePlan(groups=tuple(groups), dissolved=tuple(dissolved), detached=tuple(detached))
