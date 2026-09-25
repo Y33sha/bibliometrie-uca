@@ -119,6 +119,28 @@ class TestContainerDescription:
         facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
         assert facts.book_title is None
 
+    def test_communication_a_isbn_nomme_son_volume_par_le_titre_de_source(self):
+        facts = get_container_facts(
+            {
+                "docType_s": "COMM",
+                "conferenceTitle_s": "Diplomacy and Political Communication in the West",
+                "source_s": "Diplomacy and Political Communication in the West (III-I BC)",
+                "label_xml": _embargo_tei('<idno type="isbn">978-84-1324-298-9</idno>'),
+            }
+        )
+        assert facts.book_title == "Diplomacy and Political Communication in the West (III-I BC)"
+        assert facts.isbns == ("9788413242989",)
+
+    def test_communication_a_isbn_sans_titre_de_source_prend_le_congres(self):
+        facts = get_container_facts(
+            {
+                "docType_s": "COMM",
+                "conferenceTitle_s": "IC 2024",
+                "label_xml": _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>'),
+            }
+        )
+        assert facts.book_title == "IC 2024"
+
     def test_sans_conteneur_aucun(self):
         assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
 
