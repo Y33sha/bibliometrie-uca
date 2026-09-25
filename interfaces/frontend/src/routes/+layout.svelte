@@ -1,6 +1,7 @@
 <script lang="ts">
   import "$lib/styles/shared.css";
   import "katex/dist/katex.min.css";
+  import "@flaticon/flaticon-uicons/css/regular/rounded.css";
   import { page } from "$app/stores";
   import { goto, afterNavigate } from "$app/navigation";
   import { base } from "$app/paths";
@@ -18,7 +19,7 @@
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
   const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publications") || isActive("/admin/publishers") || isActive("/admin/journals") || isActive("/admin/monographs"));
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
-  const isPublicReferentiels = $derived(isActive("/publishers") || isActive("/journals") || isActive("/subjects"));
+  const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/subjects"));
 
   let mobileNavOpen = $state(false);
   // Referme le menu mobile après chaque navigation.
@@ -83,14 +84,14 @@
       <h1 class="site-title">{siteTitle()}</h1>
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
-      <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}>Statistiques</a>
-      <a href="{base}/publications" class="nav-link" class:active={isActive("/publications")}>Publications</a>
-      <a href="{base}/theses" class="nav-link" class:active={isActive("/theses")}>Thèses</a>
-      <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}>Laboratoires</a>
-      <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}>Personnes</a>
+      <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
+      <a href="{base}/publications" class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
+      <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
+      <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
       <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
         <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
         <div class="nav-dropdown-menu">
+          <a href="{base}/theses" class:active={isActive("/theses")}>Thèses</a>
           <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
           <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
           <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
@@ -245,6 +246,11 @@
   }
   .nav-link:hover {
     color: white;
+  }
+  .nav-icon {
+    display: inline-flex;
+    margin-right: 7px;
+    font-size: 0.9em;
   }
   .nav-link.active {
     color: white;
