@@ -35,7 +35,24 @@ _LATIN_LETTERS = str.maketrans(
 )
 
 
-_MARKUP_RE = re.compile(r"</?[A-Za-z][^<>]*>")
+_MARKUP_RE = re.compile(r"</?([A-Za-z][^\s<>/]*)[^<>]*>")
+
+# Balises de mise en forme (HTML, JATS, MathML), qui s'insèrent dans un mot : `CO<sub>2</sub>`, `<i>E</i>. coli`. Comparées sans préfixe d'espace de noms (`jats:sub`, `mml:mi`).
+_INLINE_TAGS = frozenset(
+    {
+        "sub", "sup", "i", "b", "em", "strong", "u", "span", "small", "tt", "sc", "scp",
+        "italic", "bold", "underline", "monospace", "overline", "roman", "strike",
+        "math", "mi", "mn", "mo", "ms", "mtext", "mrow", "msub", "msup", "msubsup",
+        "mfrac", "msqrt", "mroot", "mover", "munder", "munderover", "mstyle",
+        "mspace", "mpadded", "mphantom", "mfenced", "menclose", "semantics",
+        "inline-formula",
+    }
+)  # fmt: skip
+
+
+def _markup_replacement(match: re.Match[str]) -> str:
+    """Rien pour une balise de mise en forme, un espace pour les autres (paragraphe, saut de ligne)."""
+    return "" if match.group(1).rsplit(":", 1)[-1].lower() in _INLINE_TAGS else " "
 
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -71,18 +88,18 @@ def to_plain_text(text: str | None) -> str:
 
 
 def strip_markup(text: str) -> str:
-    """Retire les balises HTML/MathML `<...>` (remplacées par un espace).
+    """Retire les balises HTML/MathML `<...>`. Une balise de mise en forme disparaît, ce qui garde entier le mot qu'elle coupe (`CO<sub>2</sub>` → `CO2`). Les autres balises deviennent un espace.
 
-    Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
+    Une balise commence par une lettre ou `/` : les indices de Miller `<111>` / `< 110 >` (cristallographie) restent dans le texte.
 
-    Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête ainsi au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
+    Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
 
-    Le retrait se répète jusqu'à ce que le texte ne bouge plus : une balise imbriquée dans une autre (`<ab<aa>a>`) en reconstitue une au retrait de la première, qu'une passe unique laisserait passer. Chaque passe qui change quelque chose consomme au moins un `<`, ce qui borne leur nombre par le compte de `<` du texte reçu.
+    Le retrait se répète jusqu'à stabilisation : le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe consomme au moins un `<`, ce qui borne le nombre de passes.
 
-    Réutilisé par l'export CSV (titre brut) et par `normalize_text` (dédup).
+    Sert à l'export CSV (titre brut) et à `normalize_text` (dédoublonnage).
     """
     for _ in range(text.count("<")):
-        stripped = _MARKUP_RE.sub(" ", text)
+        stripped = _MARKUP_RE.sub(_markup_replacement, text)
         if stripped == text:
             break
         text = stripped
@@ -130,7 +147,7 @@ def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 
     Pipeline :
-      1. retirer les balises (MathML/HTML) `<...>` entièrement
+      1. retirer les balises (MathML/HTML) `<...>` entièrement (`strip_markup`)
       2. minuscules + strip
       3. translittérer les lettres latines autonomes (ß, ø, ł...)
       4. NFKD (décompose les caractères accentués et de compatibilité)
