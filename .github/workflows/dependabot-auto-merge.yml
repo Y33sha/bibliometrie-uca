@@ -1,0 +1,24 @@
+# Fusion automatique des propositions de Dependabot.
+#
+# Le workflow arme la fusion automatique, en squash. GitHub fusionne quand les contrôles exigés par le jeu de règles de la branche par défaut sont verts. Une proposition en échec reste ouverte.
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
