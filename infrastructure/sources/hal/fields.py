@@ -28,6 +28,10 @@ HAL_FIELDS = [
     "bookTitle_s",
     "publisher_s",
     "conferenceTitle_s",
+    # Publication d'une communication : indicateur « avec actes », collections, titre de la source.
+    "proceedings_s",
+    "serie_s",
+    "source_s",
     "openAccess_bool",
     "fileMain_s",
     "linkExtId_s",

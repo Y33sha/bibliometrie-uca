@@ -1,11 +1,31 @@
 from datetime import date
 
-from domain.sources.hal import derive_hal_oa_status, hal_text_field
+from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 
 
 class TestHalTextField:
     def test_non_textual_first_value_is_rendered_as_text(self):
         assert hal_text_field([123, "suite"]) == "123"
+
+
+class TestExtractHalMeta:
+    def test_indicateur_actes_series_et_titre_de_source(self):
+        doc = {
+            "proceedings_s": "1",
+            "serie_s": ["Occidens (3)", " ", "Occidens (3)"],
+            "source_s": "Actes des 8èmes journées scientifiques",
+        }
+        assert extract_hal_meta(doc) == {
+            "proceedings": True,
+            "series": ["Occidens (3)"],
+            "source_title": "Actes des 8èmes journées scientifiques",
+        }
+
+    def test_sans_actes(self):
+        assert extract_hal_meta({"proceedings_s": "0"}) == {"proceedings": False}
+
+    def test_notice_muette(self):
+        assert extract_hal_meta({"title_s": ["Titre"]}) is None
 
 
 class TestDeriveHalOaStatus:

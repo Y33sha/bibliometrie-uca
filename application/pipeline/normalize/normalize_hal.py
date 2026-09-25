@@ -46,7 +46,7 @@ from domain.publications.identifiers import (
 )
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.source_publications.external_ids import ExternalIdType
-from domain.sources.hal import derive_hal_oa_status, hal_text_field
+from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.types import JsonValue, as_int, as_sequence, as_strs
 
 # =============================================================
@@ -199,7 +199,7 @@ def insert_hal_document(
     journal_id, oa_status, language, container_title) viennent toutes de
     `pub_meta`, construit en amont par `extract_pub_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
-    keywords, domaines, biblio, urls).
+    keywords, domaines, biblio, meta, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -266,6 +266,7 @@ def insert_hal_document(
             container_title=pub_meta.container_title,
             language=pub_meta.language,
             biblio=biblio_json,
+            meta=extract_hal_meta(doc),
             abstract=abstract,
             keywords=keywords,
             topics=topics,

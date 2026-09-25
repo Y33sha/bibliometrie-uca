@@ -4,10 +4,10 @@ Interprétation des champs propres au schéma HAL — prédicats et extracteurs 
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 
-from domain.types import JsonValue
+from domain.types import JsonValue, as_strs
 
 # Situation d'une publication vis-à-vis de HAL, du dépôt le plus complet au plus absent.
 # `ok` : déposée dans la collection d'un laboratoire, et son texte y est accessible.
@@ -124,3 +124,20 @@ def hal_text_field(value: JsonValue) -> str | None:
             return None
         return premier if isinstance(premier, str) else str(premier)
     return str(value)
+
+
+def extract_hal_meta(doc: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
+    """Ce que HAL dit de la publication d'une communication, ou `None` si la notice n'en dit rien.
+
+    `proceedings` reprend l'indicateur « avec actes » (`proceedings_s`, saisi par le déposant), `series` les collections (`serie_s`), `source_title` le titre de la source (`source_s`), souvent celui des actes.
+    """
+    meta: dict[str, JsonValue] = {}
+    proceedings = hal_text_field(doc.get("proceedings_s"))
+    if proceedings in ("0", "1"):
+        meta["proceedings"] = proceedings == "1"
+    series = [s.strip() for s in as_strs(doc.get("serie_s")) if s.strip()]
+    if series:
+        meta["series"] = list(dict.fromkeys(series))
+    if source_title := (hal_text_field(doc.get("source_s")) or "").strip():
+        meta["source_title"] = source_title
+    return meta or None
