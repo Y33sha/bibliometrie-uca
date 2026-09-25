@@ -13,8 +13,32 @@
 
 	type Monograph = components['schemas']['MonographListItem'];
 
-	// Liste de monographies réutilisable, affichée par `/monographs` et `/admin/monographs`. Les filtres, le tri et la page sont reportés dans l'URL de `basePath`.
-	let { apiKey, basePath }: { apiKey: string; basePath: string } = $props();
+	// Liste de monographies réutilisable. Utilisée par :
+	// - `/monographs` et `/admin/monographs` (filtres reportés dans l'URL)
+	// - `/publishers/[id]?tab=monographs` (filtre `publisherId` fixe)
+	// - `/journals/[id]?tab=monographs` (filtre `journalId` fixe)
+	interface ExternalFilters {
+		publisherId?: number;
+		journalId?: number;
+	}
+
+	let {
+		apiKey,
+		externalFilters,
+		urlSync = false,
+		basePath = '/monographs',
+	}: {
+		apiKey: string;
+		externalFilters?: ExternalFilters;
+		/** Reporte filtres, tri et page dans l'URL de `basePath`. */
+		urlSync?: boolean;
+		basePath?: string;
+	} = $props();
+
+	// Éditeur ou collection imposés par la page : la colonne porte la même valeur sur toutes les lignes, et est masquée.
+	const publisherFixed = $derived(externalFilters?.publisherId != null);
+	const journalFixed = $derived(externalFilters?.journalId != null);
+	const columnCount = $derived(7 - Number(publisherFixed) - Number(journalFixed));
 
 	const KIND_LABELS: Record<string, string> = { book: 'Livres', proceedings: "Volumes d'actes" };
 
@@ -25,6 +49,8 @@
 	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
+		if (externalFilters?.publisherId != null) params.set('publisher_id', String(externalFilters.publisherId));
+		if (externalFilters?.journalId != null) params.set('journal_id', String(externalFilters.journalId));
 		if (selectedKinds.length) params.set('kind', selectedKinds.join(','));
 		const q = search.trim();
 		if (q) params.set('search', q);
@@ -63,6 +89,7 @@
 	});
 
 	function syncUrl() {
+		if (!urlSync) return;
 		url.syncUrl(() => ({ selectedKinds, search, currentSort, currentPage: monographs.page }));
 	}
 
@@ -89,11 +116,13 @@
 	}
 
 	onMount(() => {
-		const restored = url.restoreFromUrl($page.url.searchParams);
-		if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
-		if (restored.search) search = restored.search as string;
-		if (restored.currentSort) currentSort = restored.currentSort as string;
-		if (restored.currentPage) monographs.page = restored.currentPage as number;
+		if (urlSync) {
+			const restored = url.restoreFromUrl($page.url.searchParams);
+			if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
+			if (restored.search) search = restored.search as string;
+			if (restored.currentSort) currentSort = restored.currentSort as string;
+			if (restored.currentPage) monographs.page = restored.currentPage as number;
+		}
 		facets.load();
 		monographs.load();
 	});
@@ -121,8 +150,8 @@
 				<th>Type</th>
 				<th class="num sortable" onclick={() => setSort('year')}>Année {sortArrow('year')}</th>
 				<th>ISBN</th>
-				<th>Éditeur</th>
-				<th>Collection</th>
+				{#if !publisherFixed}<th>Éditeur</th>{/if}
+				{#if !journalFixed}<th>Collection</th>{/if}
 				<th class="num sortable" onclick={() => setSort('pubs')}>Publis {sortArrow('pubs')}</th>
 			</tr>
 		</thead>
@@ -133,17 +162,21 @@
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
 					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>
-					<td>
-						{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.pub_name}</a>{/if}
-					</td>
-					<td>
-						{#if m.journal_id}<a href="{base}/journals/{m.journal_id}">{m.journal_title}</a>{/if}
-					</td>
+					{#if !publisherFixed}
+						<td>
+							{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.pub_name}</a>{/if}
+						</td>
+					{/if}
+					{#if !journalFixed}
+						<td>
+							{#if m.journal_id}<a href="{base}/journals/{m.journal_id}">{m.journal_title}</a>{/if}
+						</td>
+					{/if}
 					<td class="num">{m.pub_count.toLocaleString('fr-FR')}</td>
 				</tr>
 			{/each}
 			{#if monographs.items.length === 0}
-				<TableStatusRow loading={monographs.loading} colspan={7} emptyText="Aucune monographie ne correspond aux filtres." />
+				<TableStatusRow loading={monographs.loading} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>

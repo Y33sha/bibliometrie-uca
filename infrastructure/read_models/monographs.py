@@ -38,7 +38,7 @@ _SORT_MAP: dict[MonographSort, str] = {
 
 
 def _where(filters: MonographFilters, *, skip_kinds: bool = False) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de la liste : titre normalisé, ou début d'ISBN, et type de monographie. `skip_kinds` écarte le filtre de type, pour le décompte de sa facette."""
+    """Clause WHERE de la liste : titre normalisé, ou début d'ISBN, éditeur, collection et type de monographie. `skip_kinds` écarte le filtre de type, pour le décompte de sa facette."""
     parts: list[str] = []
     binds: dict[str, object] = {}
     if len(filters.search) >= 2:
@@ -48,6 +48,12 @@ def _where(filters: MonographFilters, *, skip_kinds: bool = False) -> tuple[str,
         elif normalized := normalize_text(filters.search):
             parts.append("m.title_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
+    if filters.publisher_id is not None:
+        parts.append("m.publisher_id = :publisher_id")
+        binds["publisher_id"] = filters.publisher_id
+    if filters.journal_id is not None:
+        parts.append("m.journal_id = :journal_id")
+        binds["journal_id"] = filters.journal_id
     if filters.kinds and not skip_kinds:
         parts.append("m.proceedings = ANY(:proceedings)")
         binds["proceedings"] = [kind == "proceedings" for kind in filters.kinds]

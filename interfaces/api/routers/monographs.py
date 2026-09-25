@@ -21,13 +21,20 @@ from interfaces.api.params import SearchTerm
 router = APIRouter(prefix="/api/monographs", tags=["monographs"])
 
 
-def monograph_filters(search: SearchTerm = "", kind: str = "") -> MonographFilters:
+def monograph_filters(
+    search: SearchTerm = "",
+    kind: str = "",
+    publisher_id: int | None = None,
+    journal_id: int | None = None,
+) -> MonographFilters:
     """Filtres partagés par la liste et ses facettes.
 
-    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `kind` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes).
+    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `kind` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `publisher_id` et `journal_id` restreignent à un éditeur et à une collection.
     """
     kinds = parse_vocabulary_csv(kind, allowed=MONOGRAPH_KINDS, param="kind")
-    return MonographFilters(search=search, kinds=tuple(kinds))
+    return MonographFilters(
+        search=search, kinds=tuple(kinds), publisher_id=publisher_id, journal_id=journal_id
+    )
 
 
 @router.get("", response_model=MonographListResponse)

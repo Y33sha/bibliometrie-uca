@@ -7,4 +7,4 @@
 
 <h2>Monographies</h2>
 
-<MonographsListView apiKey="admin-monographs" basePath="/admin/monographs" />
+<MonographsListView apiKey="admin-monographs" urlSync basePath="/admin/monographs" />
