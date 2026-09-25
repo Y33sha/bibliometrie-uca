@@ -977,3 +977,20 @@ class TestEffectiveDocTypeForPublication:
         # Un nom absent d'`_AppliesTo` n'écarterait aucune règle : le filtre deviendrait muet
         # sans rien signaler, et les règles source-only se rejoueraient sur le canonique.
         assert _SOURCE_ONLY_PREDICATES <= set(_AppliesTo.__annotations__)
+
+
+class TestPresentationRules:
+    @pytest.mark.parametrize("group_title", ["oral", "PICO"])
+    def test_presentation_orale_vers_conference(self, group_title: str):
+        corrected = effective_metadata(_view(doc_type="other", group_title=group_title)).doc_type
+        assert corrected is not None
+        assert corrected.value == "conference"
+        assert corrected.rule is MetadataCorrectionRule.PRESENTATION_ORAL_TO_CONFERENCE
+
+    def test_session_d_affichage_vers_poster(self):
+        corrected = effective_metadata(_view(doc_type="other", group_title="display")).doc_type
+        assert corrected is not None
+        assert corrected.value == "poster"
+
+    def test_categorie_de_preprint_ignoree(self):
+        assert effective_metadata(_view(doc_type="preprint", group_title="oral")).doc_type is None
