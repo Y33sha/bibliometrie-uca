@@ -529,10 +529,11 @@
 			selectedDocTypes = [...publicationsDocTypes];
 		}
 
-		// Load facets first, then apply default years if needed, then full refresh
+		// Défaut des années : les cinq dernières années présentes, jusqu'à l'année courante. Les années futures (prépublications datées de l'année suivante) sont exclues.
 		await facets.load();
 		if (!initialYearsApplied && selectedYears.length === 0 && facets.options.years.length > 0) {
-			const sorted = facets.options.years.map((o) => o.value).sort().reverse();
+			const currentYear = String(new Date().getFullYear());
+			const sorted = facets.options.years.map((o) => o.value).filter((y) => y <= currentYear).sort().reverse();
 			selectedYears = sorted.slice(0, 5);
 			syncUrl();
 		}
