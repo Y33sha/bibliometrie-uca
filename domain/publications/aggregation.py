@@ -9,7 +9,7 @@ Règles d'agrégation par type de champ :
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
 - **JSONB `biblio`, `meta`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
-- **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information). Les valeurs lues sont déjà canoniques et corrigées (mapping + corrections persistés en amont sur la `source_publication`).
+- **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`). Les valeurs lues sont déjà canoniques et corrigées (mapping + corrections persistés en amont sur la `source_publication`).
 
 Priorité d'ordre : les enregistrements canoniques passent avant les formes secondaires convergées (`secondary_ids` — pièce, version ou variante dont le DOI a été substitué par celui de l'œuvre canonique), afin que les scalaires descriptifs (titre en tête) viennent de l'enregistrement qui porte nativement le DOI, pas d'une pièce. La priorité de source départage à l'intérieur de chaque groupe.
 
@@ -20,6 +20,7 @@ from collections.abc import Mapping
 from typing import cast
 
 from domain.normalize import normalize_text
+from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import (
@@ -62,7 +63,9 @@ def refresh_from_sources(
     new_title = as_str(first_non_null(sorted_sources, "title"))
     pub.title = new_title if new_title is not None else pub.title
     pub.title_normalized = normalize_text(pub.title) if pub.title else None
-    pub.doc_type = arbitrate_doc_type_with_article_subtype(sorted_sources)
+    pub.doc_type = arbitrate_conference(
+        arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
+    )
     pub.pub_year = as_int(first_non_null(sorted_sources, "pub_year")) or pub.pub_year
 
     new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
