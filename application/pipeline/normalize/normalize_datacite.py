@@ -246,13 +246,11 @@ def process_work(
     raw = staging_row.raw_data
     # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `attributes`.
     attributes = raw.get("attributes")
-    if not isinstance(attributes, dict):
-        staging_queries.mark_done(conn, staging_id)
-        return False
+    # Garanti par `SourceNormalizer.process_work` : `minimal_metadata` rend (None, None) sinon.
+    assert isinstance(attributes, dict)
 
     doi = clean_doi(as_str(attributes.get("doi"))) or staging_row.doi
     if not doi:
-        staging_queries.mark_done(conn, staging_id)
         return False
 
     title = get_title(attributes)
