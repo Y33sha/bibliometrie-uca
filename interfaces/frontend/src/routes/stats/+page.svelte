@@ -9,6 +9,7 @@
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
+	import { defaultYears } from './defaultYears';
 	import { paramsToQuery } from '$lib/utils';
 	import {
 		oaLabelsMap,
@@ -529,12 +530,9 @@
 			selectedDocTypes = [...publicationsDocTypes];
 		}
 
-		// Défaut des années : les cinq dernières années présentes, jusqu'à l'année courante. Les années futures (prépublications datées de l'année suivante) sont exclues.
 		await facets.load();
 		if (!initialYearsApplied && selectedYears.length === 0 && facets.options.years.length > 0) {
-			const currentYear = String(new Date().getFullYear());
-			const sorted = facets.options.years.map((o) => o.value).filter((y) => y <= currentYear).sort().reverse();
-			selectedYears = sorted.slice(0, 5);
+			selectedYears = defaultYears(facets.options.years.map((o) => o.value), new Date().getFullYear());
 			syncUrl();
 		}
 		initialYearsApplied = true;
