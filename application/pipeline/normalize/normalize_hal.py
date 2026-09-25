@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Mapping
 from datetime import date
+from functools import lru_cache
 from typing import cast
 from xml.etree.ElementTree import Element, ParseError
 
@@ -292,8 +293,11 @@ def insert_hal_document(
 _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 
 
+@lru_cache(maxsize=1)
 def _parse_tei(label_xml: str) -> Element:
     """Lit le TEI joint à une notice HAL.
+
+    Le cache garde l'arbre de la dernière notice : les lecteurs du TEI (ISBN, embargo, identifiants d'auteurs) reçoivent la même chaîne pendant la normalisation d'une notice, et partagent une seule analyse. Ils ne modifient pas l'arbre.
 
     L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en porte.
     """
