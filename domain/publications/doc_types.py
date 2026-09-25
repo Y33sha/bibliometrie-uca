@@ -11,6 +11,7 @@ class DocType(StrEnum):
 
     ARTICLE = "article"
     CONFERENCE_PAPER = "conference_paper"
+    CONFERENCE = "conference"
     BOOK = "book"
     BOOK_CHAPTER = "book_chapter"
     THESIS = "thesis"
@@ -55,6 +56,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
         DocType.BOOK_REVIEW,
         DocType.DATA_PAPER,
         DocType.CONFERENCE_PAPER,
+        DocType.CONFERENCE,
         DocType.EDITORIAL,
         DocType.LETTER,
         DocType.ERRATUM,

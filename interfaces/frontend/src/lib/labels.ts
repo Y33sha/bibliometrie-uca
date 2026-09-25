@@ -2,6 +2,7 @@
 export const docTypeSingular: Record<string, string> = {
 	article: 'Article',
 	conference_paper: 'Conference paper',
+	conference: 'Conférence',
 	book: 'Ouvrage',
 	book_chapter: 'Chapitre',
 	thesis: 'Thèse',
@@ -31,6 +32,7 @@ export const docTypeSingular: Record<string, string> = {
 export const docTypePlural: Record<string, string> = {
 	article: 'Articles',
 	conference_paper: 'Conference papers',
+	conference: 'Conférences',
 	book: 'Ouvrages',
 	book_chapter: 'Chapitres',
 	thesis: 'Thèses',
@@ -72,6 +74,7 @@ export const docTypeFamilies: { key: string; label: string; types: string[] }[] 
 		types: [
 			'other',
 			'media',
+			'conference',
 			'poster',
 			'report',
 			'erratum',
