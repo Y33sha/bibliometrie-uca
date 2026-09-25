@@ -176,6 +176,9 @@ class PgStagingQueries(StagingQueries):
         ).all()
         return [_row(r) for r in rows]
 
+    def discard_source_publication(self, conn: Connection, staging_id: int) -> None:
+        _delete_source_publications(conn, "s.id = :staging_id", {"staging_id": staging_id})
+
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).
         row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
@@ -192,29 +195,40 @@ class PgStagingQueries(StagingQueries):
             )
 
 
-def delete_disappeared_source_publications(conn: Connection) -> int:
-    """Supprime les `source_publications` dont le staging porte `disappeared_at`.
+def _delete_source_publications(
+    conn: Connection, staging_filter: str, params: dict[str, object]
+) -> int:
+    """Supprime les `source_publications` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
 
-    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. La ligne de `staging` reste, avec sa marque.
-
-    Balayage ensembliste, idempotent. Rend le nombre de `source_publications` supprimées.
+    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. Rend le nombre de `source_publications` supprimées.
     """
+    # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.
     conn.execute(
-        text("""
+        text(f"""
             UPDATE source_publications soeur
             SET keys_dirty = true
             FROM source_publications sp
             JOIN staging s ON s.id = sp.staging_id
-            WHERE s.disappeared_at IS NOT NULL
+            WHERE {staging_filter}
               AND soeur.publication_id = sp.publication_id
               AND soeur.id <> sp.id
               AND NOT soeur.keys_dirty
-        """)
+        """),  # noqa: S608
+        params,
     )
     return conn.execute(
-        text("""
+        text(f"""
             DELETE FROM source_publications sp
             USING staging s
-            WHERE sp.staging_id = s.id AND s.disappeared_at IS NOT NULL
-        """)
+            WHERE sp.staging_id = s.id AND {staging_filter}
+        """),  # noqa: S608
+        params,
     ).rowcount
+
+
+def delete_disappeared_source_publications(conn: Connection) -> int:
+    """Supprime les `source_publications` dont le staging porte `disappeared_at` (cf. `_delete_source_publications`). La ligne de `staging` reste, avec sa marque.
+
+    Balayage ensembliste, idempotent.
+    """
+    return _delete_source_publications(conn, "s.disappeared_at IS NOT NULL", {})

@@ -44,6 +44,10 @@ class StagingQueries(Protocol):
         """Les lignes `staging` dont l'`id` figure dans la liste donnée."""
         ...
 
+    def discard_source_publication(self, conn: Connection, staging_id: int) -> None:
+        """Supprime la `source_publication` issue de cette ligne, s'il en existe une : la notice ne porte plus les métadonnées minimales d'une publication. Ses enregistrements frères sont marqués à réconcilier."""
+        ...
+
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         """Marque une ligne traitée (`processed = TRUE`) et vide son `raw_data` ; l'adapter en archive le payload au raw store au préalable."""
         ...

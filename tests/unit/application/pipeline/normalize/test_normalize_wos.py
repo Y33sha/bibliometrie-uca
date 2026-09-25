@@ -1113,7 +1113,7 @@ class TestWosNormalizer:
         monkeypatch.setattr(normalize_wos, "process_record", fake_process)
 
         row = staging_row(staging_id=7, source_id="WOS:7")
-        result = norm.process_work(MagicMock(), row)
+        result = norm.normalize_record(MagicMock(), row)
 
         assert result is True
         assert captured["row"] == row

@@ -658,6 +658,11 @@ def _make_normalizer():
 
 
 class TestOpenalexNormalizerClass:
+    def test_metadonnees_minimales_d_un_work_sans_annee(self):
+        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; la notice ne passe pas le filtre de la boucle."""
+        work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
+        assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
+
     def test_preload_caches_sets_repos(self):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
@@ -675,7 +680,7 @@ class TestOpenalexNormalizerClass:
             return True
 
         monkeypatch.setattr(normalize_openalex, "process_work", fake_process)
-        result = norm.process_work(MagicMock(), staging_row())
+        result = norm.normalize_record(MagicMock(), staging_row())
         assert result is True
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {
