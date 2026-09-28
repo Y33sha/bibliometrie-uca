@@ -183,16 +183,26 @@ normalize_name = normalize_text
 normalize_name_form = normalize_text
 
 
-_PAREN_NUMERIC_ID_RE = re.compile(r"\s*\(\d+\)")
+_DIGITS_RE = re.compile(r"\d+")
+# Parenthèses ou crochets que le retrait des chiffres a vidés : « (1278759) », « (1960-2020) ».
+_EMPTY_BRACKETS_RE = re.compile(r"[(\[][^\w()\[\]]*[)\]]")
+# Ponctuation isolée entre deux espaces ou en bord de nom : le tiret de « Wolff, Charlotta 1976- ».
+_FLOATING_PUNCTUATION_RE = re.compile(r"(?:(?<=\s)|^)[^\w\s'’]+(?=\s|$)")
+# Séparateurs en fin de nom : la virgule de « D'Andrea, Carlos, 1973- ». Le point d'une initiale reste.
+_TRAILING_SEPARATORS = ",;:-–—/"
 
 
 def clean_raw_author_name(raw: str) -> str:
-    """Retire d'un nom d'auteur brut les identifiants numériques entre parenthèses.
+    """Nom d'auteur brut sans balisage, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
 
-    Certaines signatures portent un identifiant de source recopié dans le nom lui-même (« Emmanuel Moreau (1278759) »). Un groupe purement numérique entre parenthèses n'a pas de sens dans un nom : laissé en place, il contamine le nom affiché, le nom normalisé (qui sert de clé d'identité au rapprochement cross-source) et les formes de nom dérivées. Ce nettoyage neutralise le parasite à l'entrée, quelle que soit la source.
+    Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé d'identité, et les formes de nom dérivées.
 
-    Le balisage et les entités qu'une source dépose dans une signature sont retirés du même geste : un nom d'auteur s'affiche en texte.
+    Un nom fait seulement de chiffres et de ponctuation (un ORCID recopié à la place du nom) reste tel quel.
     """
     if not raw:
         return raw
-    return re.sub(r" +", " ", _PAREN_NUMERIC_ID_RE.sub(" ", to_plain_text(raw))).strip()
+    text = to_plain_text(raw)
+    cleaned = _EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text))
+    cleaned = _FLOATING_PUNCTUATION_RE.sub(" ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(_TRAILING_SEPARATORS).strip()
+    return cleaned or re.sub(r"\s+", " ", text).strip()
