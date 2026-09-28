@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8Bvjo4nfgXPoccsBzRZ8G9w3JatJQlOAvq88h0EZYb4m3fHzcRk3fN4GWku6nwv
+\restrict TokAzDqjiCSxyfgJsgnJJCavr9do5QPA15XQ68shtBxGMHGdeZMlHCKJwAIFI48
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -674,7 +674,8 @@ CREATE TABLE public.source_authorships (
     countries_dirty boolean DEFAULT true NOT NULL,
     identity_id integer NOT NULL,
     resolution_mode public.resolution_mode,
-    neutralized_identifiers jsonb
+    neutralized_identifiers jsonb,
+    content_hash text
 );
 
 
@@ -683,6 +684,13 @@ CREATE TABLE public.source_authorships (
 --
 
 COMMENT ON COLUMN public.source_authorships.neutralized_identifiers IS 'Identifiants de l''identité que la résolution des personnes ignore pour cette signature, avec leur motif : {"orcid": "shared"}.';
+
+
+--
+-- Name: COLUMN source_authorships.content_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.source_authorships.content_hash IS 'Empreinte des champs écrits par la normalisation, adresses comprises.';
 
 
 --
@@ -2462,7 +2470,7 @@ ALTER TABLE ONLY public.source_authorships
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_pub_pos_key UNIQUE (source_publication_id, author_position);
+    ADD CONSTRAINT source_authorships_pub_pos_key UNIQUE (source_publication_id, author_position) DEFERRABLE;
 
 
 --
@@ -3766,5 +3774,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8Bvjo4nfgXPoccsBzRZ8G9w3JatJQlOAvq88h0EZYb4m3fHzcRk3fN4GWku6nwv
+\unrestrict TokAzDqjiCSxyfgJsgnJJCavr9do5QPA15XQ68shtBxGMHGdeZMlHCKJwAIFI48
 
