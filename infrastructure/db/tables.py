@@ -634,10 +634,18 @@ source_authorships = Table(
         ),
     ),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column(
+        "content_hash",
+        Text,
+        comment="Empreinte des champs écrits par la normalisation, adresses comprises.",
+    ),
+    # Vérifiée en fin d'instruction : la mise à jour des signatures d'une notice permute des positions en une seule instruction.
     UniqueConstraint(
         "source_publication_id",
         "author_position",
         name="source_authorships_pub_pos_key",
+        deferrable=True,
+        initially="IMMEDIATE",
     ),
     # Index couvrant : `person_id` en tête sert les recherches par personne ;
     # `identity_id` en colonne incluse permet l'index-only scan de la projection
