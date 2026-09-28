@@ -1,12 +1,14 @@
 """Router des monographies : liste, facettes et fiche. Sert `/api/monographs/*`.
 
-Le chemin littéral `/facets` précède `/{monograph_id}`, qui l'accepterait sinon comme identifiant.
+Les chemins littéraux `/facets` et `/facets/entities` précèdent `/{monograph_id}`, qui l'accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.monographs_queries import (
     MONOGRAPH_KINDS,
+    MonographEntityKind,
     MonographFilters,
     MonographListItem,
     MonographListResponse,
@@ -15,7 +17,7 @@ from application.ports.read_models.monographs_queries import (
     MonographSort,
 )
 from interfaces.api.deps import monograph_queries
-from interfaces.api.filters import parse_vocabulary_csv
+from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/monographs", tags=["monographs"])
@@ -23,17 +25,22 @@ router = APIRouter(prefix="/api/monographs", tags=["monographs"])
 
 def monograph_filters(
     search: SearchTerm = "",
-    kind: str = "",
+    monograph_type: str = Query("", alias="type"),
+    year: str = "",
     publisher_id: int | None = None,
     journal_id: int | None = None,
 ) -> MonographFilters:
     """Filtres partagés par la liste et ses facettes.
 
-    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `kind` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `publisher_id` et `journal_id` restreignent à un éditeur et à une collection.
+    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `type` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `year` liste les années retenues. `publisher_id` et `journal_id` restreignent à un éditeur et à une collection.
     """
-    kinds = parse_vocabulary_csv(kind, allowed=MONOGRAPH_KINDS, param="kind")
+    kinds = parse_vocabulary_csv(monograph_type, allowed=MONOGRAPH_KINDS, param="type")
     return MonographFilters(
-        search=search, kinds=tuple(kinds), publisher_id=publisher_id, journal_id=journal_id
+        search=search,
+        kinds=tuple(kinds),
+        years=tuple(parse_int_csv(year, param="year")),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
     )
 
 
@@ -54,8 +61,22 @@ def monographs_facets(
     filters: MonographFilters = Depends(monograph_filters),
     queries: MonographQueries = Depends(monograph_queries),
 ) -> MonographsFacetsResponse:
-    """Nombre de monographies par type. Le décompte écarte le filtre de type."""
+    """Nombre de monographies par type et par année. Chaque décompte écarte le filtre de sa dimension."""
     return queries.monographs_facets(filters=filters)
+
+
+@router.get("/facets/entities", response_model=EntityFacetResponse)
+def monographs_entity_facet(
+    kind: MonographEntityKind = Query(...),
+    entity_search: SearchTerm = "",
+    filters: MonographFilters = Depends(monograph_filters),
+    queries: MonographQueries = Depends(monograph_queries),
+) -> EntityFacetResponse:
+    """Facette contextuelle des éditeurs ou des collections : les premiers sous les filtres actifs, avec leur nombre de monographies.
+
+    `entity_search` cherche dans les noms d'éditeur ou les titres de collection, là où `search` filtre les monographies.
+    """
+    return queries.monographs_entity_facet(kind=kind, search=entity_search, filters=filters)
 
 
 @router.get("/{monograph_id}", response_model=MonographListItem)

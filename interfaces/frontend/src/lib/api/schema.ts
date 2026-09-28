@@ -2307,9 +2307,31 @@ export interface paths {
         };
         /**
          * Monographs Facets
-         * @description Nombre de monographies par type. Le décompte écarte le filtre de type.
+         * @description Nombre de monographies par type et par année. Chaque décompte écarte le filtre de sa dimension.
          */
         get: operations["monographs_facets_api_monographs_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monographs/facets/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monographs Entity Facet
+         * @description Facette contextuelle des éditeurs ou des collections : les premiers sous les filtres actifs, avec leur nombre de monographies.
+         *
+         *     `entity_search` cherche dans les noms d'éditeur ou les titres de collection, là où `search` filtre les monographies.
+         */
+        get: operations["monographs_entity_facet_api_monographs_facets_entities_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3716,11 +3738,13 @@ export interface components {
         };
         /**
          * MonographsFacetsResponse
-         * @description Facettes de la liste des monographies. Le décompte par type écarte le filtre de type : il annonce le nombre de monographies atteignables si l'option était cochée.
+         * @description Facettes de la liste des monographies. Chaque décompte écarte le filtre de sa dimension : il annonce le nombre de monographies atteignables si l'option était cochée.
          */
         MonographsFacetsResponse: {
             /** Kinds */
             kinds: components["schemas"]["FacetOption"][];
+            /** Years */
+            years: components["schemas"]["FacetOption"][];
         };
         /**
          * NameDuplicatePairOut
@@ -9057,7 +9081,8 @@ export interface operations {
                 per_page?: number;
                 sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "pubs_asc" | "pubs_desc";
                 search?: string;
-                kind?: string;
+                type?: string;
+                year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
             };
@@ -9091,7 +9116,8 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                kind?: string;
+                type?: string;
+                year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
             };
@@ -9108,6 +9134,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonographsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    monographs_entity_facet_api_monographs_facets_entities_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_search?: string;
+                search?: string;
+                type?: string;
+                year?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFacetResponse"];
                 };
             };
             /** @description Validation Error */
