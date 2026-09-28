@@ -35,9 +35,15 @@
   </div>
   <h1 class="pub-title-main"><PublicationTitle titre={pub.title} /></h1>
 
-  {#if pub.journal_title || pub.container_title}
+  {#if pub.monograph_id || pub.journal_title || pub.container_title}
     <div class="pub-journal-line">
-      {#if pub.journal_id}
+      <!-- Le livre ou le volume d'actes, puis sa collection ; sans monographie, la revue ou le titre brut du conteneur. -->
+      {#if pub.monograph_id}
+        <a href="{base}/monographs/{pub.monograph_id}" class="journal-name">{pub.monograph_title}</a>
+        {#if pub.journal_id}
+          <a href="{base}/journals/{pub.journal_id}" class="collection-name">{pub.journal_title}</a>
+        {/if}
+      {:else if pub.journal_id}
         <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
       {:else}
         <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
@@ -249,6 +255,14 @@
   .journal-name.container {
     color: var(--muted);
     font-weight: 400;
+  }
+  .collection-name {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  a.collection-name:hover {
+    text-decoration: underline;
   }
   a.journal-name:hover {
     text-decoration: underline;
