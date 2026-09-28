@@ -70,13 +70,14 @@ jobs:
         with:
           python-version: ${{ steps.versions.outputs.python }}
 
-      # `--frozen` installe les versions de `uv.lock`, celles-là mêmes que le `Dockerfile`
+      # `--locked` installe les versions de `uv.lock`, celles-là mêmes que le `Dockerfile`
       # embarque : les tests s'exécutent sur l'arbre qui part en production, et l'analyse de
-      # vulnérabilités porte sur lui.
+      # vulnérabilités porte sur lui. Il échoue si `uv.lock` ne suit plus `pyproject.toml` : une
+      # version relevée dans `pyproject.toml` seul serait sinon testée sur l'ancienne.
       - name: Install dependencies
         run: |
           pip install --no-cache-dir uv
-          uv sync --frozen --extra dev
+          uv sync --locked --extra dev
 
       - name: Dependency hygiene (deptry)
         run: uv run deptry .
@@ -212,7 +213,7 @@ jobs:
       - name: schema.ts suit le contrat OpenAPI
         run: |
           pip install --no-cache-dir uv
-          uv sync --frozen --no-dev
+          uv sync --locked --no-dev
           uv run python -m interfaces.cli.dev.dump_openapi /tmp/openapi.json
           ( cd interfaces/frontend && npx openapi-typescript /tmp/openapi.json -o /tmp/schema.ts )
           diff -q interfaces/frontend/src/lib/api/schema.ts /tmp/schema.ts \

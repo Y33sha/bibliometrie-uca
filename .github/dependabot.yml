@@ -6,7 +6,8 @@
 version: 2
 updates:
   # ---- Backend Python (pyproject.toml + uv.lock à la racine) ----
-  - package-ecosystem: "pip"
+  # L'écosystème `uv` met à jour les deux fichiers ensemble.
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
