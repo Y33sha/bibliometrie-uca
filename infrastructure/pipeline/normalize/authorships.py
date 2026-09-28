@@ -3,7 +3,7 @@
 Implémente `application.ports.pipeline.normalize.authorships.AuthorshipsBatchQueries`.
 Les colonnes de `source_authorships` sont identiques pour toutes les sources, seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule** requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`.
 
-Consommé par le writer partagé `write_source_authorships` ; le `clear` en amont (DELETE, qui cascade sur le pivot) garantit qu'aucune authorship ni lien ne préexiste — d'où l'absence d'`ON CONFLICT` sur l'INSERT des `source_authorships` et du pivot. L'upsert des identités (`author_identifying_keys`, table partagée non vidée) et celui des `addresses` conservent leur `ON CONFLICT`.
+Consommé par le writer partagé `write_source_authorships`. L'INSERT des `source_authorships` et du pivot reçoit seulement des signatures absentes de la base, ou dont les liens pivot sont supprimés au préalable : il se passe d'`ON CONFLICT`. L'upsert des identités (`author_identifying_keys`, table partagée) et celui des `addresses` gardent leur `ON CONFLICT`.
 """
 
 import hashlib
@@ -16,6 +16,8 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipAddressItem,
     AuthorshipsBatchQueries,
     SourceAuthorshipItem,
+    SourceAuthorshipUpdate,
+    StoredSourceAuthorship,
 )
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
@@ -49,14 +51,15 @@ _INSERT_AUTHORSHIP_SQL = text(
     """
     INSERT INTO source_authorships
         (source, source_publication_id, author_position,
-         is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers)
+         is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers,
+         content_hash)
     VALUES (:source, :source_publication_id, :author_position,
             :is_corresponding, :roles, :raw_author_name,
             (SELECT id FROM author_identifying_keys
              WHERE key_hash = """
     + key_hash_sql(":author_name_normalized", ":person_identifiers")
     + """),
-            :neutralized_identifiers)
+            :neutralized_identifiers, :content_hash)
     RETURNING id
 """
 ).bindparams(
@@ -113,6 +116,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 "raw_author_name": v["raw_author_name"],
                 "person_identifiers": v["person_identifiers"],
                 "neutralized_identifiers": v["neutralized_identifiers"],
+                "content_hash": v["content_hash"],
             }
             for v in values
         ]
@@ -134,13 +138,16 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             """
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers)
+                 is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers,
+                 content_hash)
             SELECT :source, :spid, t.author_position,
-                   t.is_corresponding, t.roles, t.raw_author_name, aik.id, t.neutralized_identifiers
+                   t.is_corresponding, t.roles, t.raw_author_name, aik.id, t.neutralized_identifiers,
+                   t.content_hash
             FROM jsonb_to_recordset(:payload) AS t(
                 author_position smallint, author_name_normalized text,
                 is_corresponding boolean, roles text[],
-                raw_author_name text, person_identifiers jsonb, neutralized_identifiers jsonb)
+                raw_author_name text, person_identifiers jsonb, neutralized_identifiers jsonb,
+                content_hash text)
             JOIN author_identifying_keys aik
               ON aik.key_hash = """
             + key_hash_sql("t.author_name_normalized", "t.person_identifiers")
@@ -153,6 +160,71 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 "payload": payload,
             },
         )
+
+    def fetch_stored_source_authorships(
+        self, conn: Connection, source_publication_id: int
+    ) -> list[StoredSourceAuthorship]:
+        rows = conn.execute(
+            text("""
+                SELECT sa.id, sa.author_position, aik.author_name_normalized,
+                       aik.person_identifiers, sa.content_hash
+                FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE sa.source_publication_id = :spid
+            """),
+            {"spid": source_publication_id},
+        ).all()
+        return [StoredSourceAuthorship(*r) for r in rows]
+
+    def delete_source_authorships(self, conn: Connection, ids: list[int]) -> None:
+        if ids:
+            conn.execute(text("DELETE FROM source_authorships WHERE id = ANY(:ids)"), {"ids": ids})
+
+    def update_source_authorships_batch(
+        self, conn: Connection, values: list[SourceAuthorshipUpdate]
+    ) -> None:
+        # Une seule instruction : la contrainte `(source_publication_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
+        if not values:
+            return
+        payload = [
+            {
+                "id": v["id"],
+                "author_position": v["author_position"],
+                "is_corresponding": v["is_corresponding"],
+                "roles": v["roles"],
+                "raw_author_name": v["raw_author_name"],
+                "neutralized_identifiers": v["neutralized_identifiers"],
+                "content_hash": v["content_hash"],
+            }
+            for v in values
+        ]
+        conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET author_position = t.author_position,
+                    is_corresponding = t.is_corresponding,
+                    roles = t.roles,
+                    raw_author_name = t.raw_author_name,
+                    neutralized_identifiers = t.neutralized_identifiers,
+                    content_hash = t.content_hash,
+                    countries_dirty = true
+                FROM jsonb_to_recordset(:payload) AS t(
+                    id integer, author_position smallint, is_corresponding boolean,
+                    roles text[], raw_author_name text, neutralized_identifiers jsonb,
+                    content_hash text)
+                WHERE sa.id = t.id
+            """).bindparams(bindparam("payload", type_=Jsonb)),
+            {"payload": payload},
+        )
+
+    def delete_source_authorship_addresses(self, conn: Connection, ids: list[int]) -> None:
+        if ids:
+            conn.execute(
+                text(
+                    "DELETE FROM source_authorship_addresses WHERE source_authorship_id = ANY(:ids)"
+                ),
+                {"ids": ids},
+            )
 
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
         # Même mécanisme que le batch (upsert de l'identité, puis résolution de `identity_id` par `key_hash`) pour une seule ligne, dont l'id est rendu par `RETURNING`. Pas d'`ON CONFLICT` : le `clear` en amont vide le document.

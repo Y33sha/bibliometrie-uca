@@ -206,6 +206,7 @@ def process_authorships(
                 "raw_author_name": clean_name,
                 "person_identifiers": a.person_identifiers if a.person_identifiers else None,
                 "neutralized_identifiers": None,
+                "content_hash": None,
             },
         )
         sa_addresses.append((sa_id, shared_addresses))

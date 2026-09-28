@@ -605,11 +605,11 @@ class TestBuildHalAuthorRecords:
 
 
 class TestProcessAuthors:
-    def test_clears_then_writes_even_when_empty(self):
+    def test_synchronises_even_when_empty(self):
+        """Sans auteur, le writer synchronise quand même : les signatures en base sont supprimées."""
         authorship_queries = FakeAuthorshipsBatchQueries()
         normalize_hal.process_authorships(MagicMock(), authorship_queries, {}, 10)
-        # Le writer clear toujours, même sans auteur (re-traitement → table blanche).
-        assert authorship_queries.cleared_for == [10]
+        assert authorship_queries.synced_for == [10]
 
 
 # ── process_work ─────────────────────────────────────────────────
