@@ -984,8 +984,8 @@ class TestProcessRecord:
         )
 
         assert result is True
-        # Cleanup (via le writer partagé) avant insert.
-        authorship_queries.clear_source_authorships_for_publication.assert_called_once()
+        # Synchronisation des signatures (via le writer partagé).
+        authorship_queries.fetch_stored_source_authorships.assert_called_once()
         # `mark_done` appelée avec le bon staging_id.
         staging_queries.mark_done.assert_called_once_with(None, 1)
 

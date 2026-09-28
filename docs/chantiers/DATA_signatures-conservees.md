@@ -31,8 +31,9 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 
 ### Phase 2 — Synchronisation des signatures
 
-- [ ] Domaine : plan de synchronisation pur (rapprochement par identité puis par position ; mises à jour, insertions, suppressions ; empreinte)
-- [ ] Writer `write_source_authorships` : une instruction par catégorie, adresses réécrites pour les seules signatures modifiées
+- [x] Domaine : plan de synchronisation pur (rapprochement par identité puis par position ; mises à jour, insertions, suppressions ; empreinte) (`3b9a17bd8`)
+- [x] Writer `write_source_authorships` : une instruction par catégorie, adresses réécrites pour les seules signatures modifiées
+- [ ] Normaliseur des thèses : synchronisation des signatures, dont les non-auteurs à position nulle
 - [ ] Mesure du temps de normalisation avant et après, sur une année
 
 ### Phase 3 — Épinglage

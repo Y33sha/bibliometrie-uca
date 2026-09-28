@@ -7,7 +7,7 @@ Ce port regroupe les opérations d'écriture communes (batchs `executemany`), pa
 """
 
 from collections.abc import Mapping
-from typing import Protocol, TypedDict
+from typing import NamedTuple, Protocol, TypedDict
 
 from sqlalchemy import Connection
 
@@ -33,6 +33,24 @@ class SourceAuthorshipItem(TypedDict):
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None
     """Identifiants de `person_identifiers` que la résolution des personnes ignore pour cette signature, avec leur motif (`IdentifierNeutralization`)."""
+    content_hash: str | None
+    """Empreinte des champs écrits (`signature_content_hash`), adresses comprises."""
+
+
+class SourceAuthorshipUpdate(SourceAuthorshipItem):
+    """Une signature en base, réécrite en place : son identifiant, puis les champs de la signature entrante qui lui est rapprochée."""
+
+    id: int
+
+
+class StoredSourceAuthorship(NamedTuple):
+    """Une signature en base d'une notice : identifiant, position, identité et empreinte."""
+
+    id: int
+    author_position: int | None
+    author_name_normalized: str | None
+    person_identifiers: JsonValue
+    content_hash: str | None
 
 
 class AddressBatchItem(TypedDict):
@@ -65,10 +83,30 @@ class AuthorshipsBatchQueries(Protocol):
         """Supprime toutes les `source_authorships` d'une `source_publication` (pré-normalisation, avant réécriture du document)."""
         ...
 
+    def fetch_stored_source_authorships(
+        self, conn: Connection, source_publication_id: int
+    ) -> list[StoredSourceAuthorship]:
+        """Les signatures en base d'une notice, avec leur identité."""
+        ...
+
+    def delete_source_authorships(self, conn: Connection, ids: list[int]) -> None:
+        """Supprime des signatures ; leurs adresses liées et leurs épinglages suivent par cascade."""
+        ...
+
     def upsert_source_authorships_batch(
         self, conn: Connection, values: list[SourceAuthorshipItem]
     ) -> None:
-        """Batch UPSERT des signatures d'un document dans `source_authorships` (`source` par ligne), avec upsert des identités dédupliquées d'`author_identifying_keys`."""
+        """Batch INSERT des signatures d'un document dans `source_authorships` (`source` par ligne), avec upsert des identités dédupliquées d'`author_identifying_keys`."""
+        ...
+
+    def update_source_authorships_batch(
+        self, conn: Connection, values: list[SourceAuthorshipUpdate]
+    ) -> None:
+        """Réécrit en place des signatures rapprochées, en une instruction : identifiant, identité, personne et épinglage restent. Les positions peuvent s'y permuter. Leurs pays sont marqués à recalculer."""
+        ...
+
+    def delete_source_authorship_addresses(self, conn: Connection, ids: list[int]) -> None:
+        """Supprime les liens d'adresse de signatures réécrites, avant leur réécriture."""
         ...
 
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:

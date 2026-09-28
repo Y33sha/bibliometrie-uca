@@ -39,17 +39,24 @@ class FakeStagingQueries:
 
 
 class FakeAuthorshipsBatchQueries:
-    """Port `AuthorshipsBatchQueries` : retient les documents dont les signatures sont réécrites.
+    """Port `AuthorshipsBatchQueries` : retient les documents dont les signatures sont synchronisées.
 
-    Le writer partagé efface les signatures du document avant de les réécrire, puis relit les identifiants posés pour y rattacher les adresses. Rien n'étant écrit ici, ces relectures rendent des tables vides.
+    Le writer partagé lit les signatures en base du document, puis les identifiants posés pour y rattacher les adresses. Rien n'étant écrit ici, ces lectures rendent des tables vides.
     """
 
     def __init__(self) -> None:
-        self.cleared_for: list[int] = []
+        self.synced_for: list[int] = []
         self.upserted_batches: list[list] = []
 
-    def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
-        self.cleared_for.append(source_publication_id)
+    def fetch_stored_source_authorships(self, conn, source_publication_id: int) -> list:
+        self.synced_for.append(source_publication_id)
+        return []
+
+    def delete_source_authorships(self, conn, ids) -> None: ...
+
+    def update_source_authorships_batch(self, conn, values) -> None: ...
+
+    def delete_source_authorship_addresses(self, conn, ids) -> None: ...
 
     def upsert_source_authorships_batch(self, conn, values) -> None:
         self.upserted_batches.append(list(values))

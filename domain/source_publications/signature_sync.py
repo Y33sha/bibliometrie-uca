@@ -17,7 +17,7 @@ class StoredSignature(NamedTuple):
     """Signature en base : identifiant, position, identité (nom normalisé et identifiants) et empreinte."""
 
     id: int
-    position: int
+    position: int | None
     identity: Hashable
     content_hash: str | None
 
