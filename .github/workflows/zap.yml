@@ -81,7 +81,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --no-cache-dir uv
-          uv sync --frozen --extra dev
+          uv sync --locked --extra dev
 
       - name: Appliquer les migrations
         run: uv run alembic upgrade head
