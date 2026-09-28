@@ -42,6 +42,11 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
         "monographies rattachées à leur collection",
     ),
     "monographs_merged": ("monographie fusionnée", "monographies fusionnées"),
+    "monographs_to_books": ("volume d'actes retypé livre", "volumes d'actes retypés livres"),
+    "monographs_to_proceedings": (
+        "livre retypé volume d'actes",
+        "livres retypés volumes d'actes",
+    ),
     "no_publisher": ("sans éditeur", "sans éditeur"),
     "not_found": "introuvable",
     "publisher_created": ("éditeur créé", "éditeurs créés"),
