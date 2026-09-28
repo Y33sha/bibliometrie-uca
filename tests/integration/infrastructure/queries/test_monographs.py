@@ -1,8 +1,13 @@
 """Tests d'intégration de `PgMonographGatewayQueries`."""
 
+import logging
+
 import pytest
 from sqlalchemy import text
 
+from application.pipeline.publishers_journals.type_proceedings_volumes import (
+    run_type_proceedings_volumes,
+)
 from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 
 _PAPER = "9783030580803"
@@ -174,3 +179,27 @@ def test_isbn_d_une_autre_monographie_hors_des_colonnes(repo, sa_sync_conn):
     )
     assert tuple(_row(sa_sync_conn, other))[:2] == (_PAPER, None)
     assert tuple(_row(sa_sync_conn, holder))[:2] == (None, _ELECTRONIC)
+
+
+def test_nature_recalculee_dans_les_deux_sens(repo, sa_sync_conn):
+    """Un volume LNCS marqué livre devient volume d'actes par sa collection ; un livre marqué volume d'actes sans aucun signal redevient livre."""
+    series = _journal(sa_sync_conn, "Lecture notes test proceedings")
+    sa_sync_conn.execute(
+        text("UPDATE journals SET journal_type = 'proceedings' WHERE id = :j"), {"j": series}
+    )
+    lncs = _create(repo, "Fun with Algorithms", journal_id=series)
+    livre = _create(repo, "Un livre", proceedings=True)
+    for source_id, mid in (("c-lncs", lncs), ("c-livre", livre)):
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, monograph_id, doc_type)"
+                " VALUES ('crossref', :sid, 'Chapitre', :mid, 'book-chapter')"
+            ),
+            {"sid": source_id, "mid": mid},
+        )
+
+    metrics = run_type_proceedings_volumes(logging.getLogger("test"), monograph_repo=repo)
+
+    assert tuple(_row(sa_sync_conn, lncs))[3] is True
+    assert tuple(_row(sa_sync_conn, livre))[3] is False
+    assert metrics.extras == {"monographs_to_proceedings": 1, "monographs_to_books": 1}

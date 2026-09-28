@@ -1,6 +1,6 @@
 """Adapter PostgreSQL de la table `monographs` pour le pipeline (`application/ports/pipeline/monographs.py`)."""
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
 
 from application.ports.pipeline.monographs import (
     MonographCleanupQueries,
@@ -8,9 +8,12 @@ from application.ports.pipeline.monographs import (
     MonographFindOrCreateQueries,
     MonographJournalCandidates,
     MonographMergeQueries,
+    MonographProceedingsFacts,
+    MonographProceedingsQueries,
     MonographTitleGroup,
 )
 from domain.monographs.matching import MonographCandidate
+from domain.monographs.proceedings import MonographRecord
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.sql_fragments import has_active_issn
 
@@ -102,12 +105,39 @@ _JOURNAL_CANDIDATES = text(f"""
 
 _SET_JOURNAL = text("UPDATE monographs SET journal_id = :journal_id WHERE id = :id")
 
+_PROCEEDINGS_FACTS = text("""
+    SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
+           coalesce(
+               array_agg(sp.source::text ORDER BY sp.id) FILTER (WHERE sp.id IS NOT NULL), '{}'
+           ) AS sources,
+           coalesce(
+               array_agg(coalesce(sp.raw_metadata->'doc_type'->>'raw', sp.doc_type) ORDER BY sp.id)
+                   FILTER (WHERE sp.id IS NOT NULL),
+               '{}'
+           ) AS raw_doc_types,
+           coalesce(
+               array_agg(coalesce(sp.meta ? 'conference', false) ORDER BY sp.id)
+                   FILTER (WHERE sp.id IS NOT NULL),
+               '{}'
+           ) AS declares
+    FROM monographs m
+    LEFT JOIN journals j ON j.id = m.journal_id
+    LEFT JOIN source_publications sp ON sp.monograph_id = m.id
+    GROUP BY m.id, j.journal_type
+    ORDER BY m.id
+""")
+
+_SET_PROCEEDINGS = text(
+    "UPDATE monographs SET proceedings = :proceedings WHERE id = ANY(:ids)"
+).bindparams(bindparam("ids"))
+
 
 class PgMonographGatewayQueries(
     MonographFindOrCreateQueries,
     MonographMergeQueries,
     MonographCollectionQueries,
     MonographCleanupQueries,
+    MonographProceedingsQueries,
 ):
     """Accès PostgreSQL à `monographs` pour le pipeline, via une `Connection` SQLAlchemy."""
 
@@ -160,6 +190,25 @@ class PgMonographGatewayQueries(
 
     def set_monograph_journal(self, monograph_id: int, journal_id: int | None) -> None:
         self._conn.execute(_SET_JOURNAL, {"id": monograph_id, "journal_id": journal_id})
+
+    def find_monograph_proceedings_facts(self) -> list[MonographProceedingsFacts]:
+        return [
+            MonographProceedingsFacts(
+                r.id,
+                r.title,
+                r.proceedings,
+                r.collection_type,
+                tuple(
+                    MonographRecord(*fields)
+                    for fields in zip(r.sources, r.raw_doc_types, r.declares, strict=True)
+                ),
+            )
+            for r in self._conn.execute(_PROCEEDINGS_FACTS)
+        ]
+
+    def set_monographs_proceedings(self, monograph_ids: list[int], proceedings: bool) -> None:
+        if monograph_ids:
+            self._conn.execute(_SET_PROCEEDINGS, {"ids": monograph_ids, "proceedings": proceedings})
 
     def delete_empty_monographs(self) -> list[tuple[int, str]]:
         return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))

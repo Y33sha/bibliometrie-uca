@@ -3,6 +3,7 @@
 from typing import NamedTuple, Protocol
 
 from domain.monographs.matching import MonographCandidate
+from domain.monographs.proceedings import MonographRecord
 
 
 class MonographTitleGroup(NamedTuple):
@@ -45,6 +46,28 @@ class MonographCollectionQueries(Protocol):
 
     def set_monograph_journal(self, monograph_id: int, journal_id: int | None) -> None:
         """Pose le `journal_id` d'une monographie."""
+        ...
+
+
+class MonographProceedingsFacts(NamedTuple):
+    """Une monographie, sa nature en base, le type de sa collection et ses enregistrements."""
+
+    monograph_id: int
+    title: str
+    proceedings: bool
+    collection_type: str | None
+    records: tuple[MonographRecord, ...]
+
+
+class MonographProceedingsQueries(Protocol):
+    """Nature des monographies : volume d'actes ou livre."""
+
+    def find_monograph_proceedings_facts(self) -> list[MonographProceedingsFacts]:
+        """Chaque monographie, avec le type de sa collection et ses enregistrements."""
+        ...
+
+    def set_monographs_proceedings(self, monograph_ids: list[int], proceedings: bool) -> None:
+        """Pose la nature d'un ensemble de monographies."""
         ...
 
 
