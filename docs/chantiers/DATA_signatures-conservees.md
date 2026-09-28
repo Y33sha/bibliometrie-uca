@@ -14,7 +14,10 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 ## Décisions
 
 - La normalisation d'une notice rapproche ses signatures entrantes de celles en base, au lieu de les recréer. Une signature rapprochée garde son identifiant, sa personne et son épinglage.
-- Le rapprochement se fait par identité (nom normalisé et identifiants, `identity_id`). La position départage les signatures de même identité dans une notice.
+- Le rapprochement se fait par identité (nom normalisé et identifiants, `identity_id`) :
+    - une identité unique dans la notice rapproche la signature entrante de la signature en base ;
+    - une identité portée par plusieurs signatures de la notice rapproche les signatures de même position ;
+    - une identité différente, ou une identité répétée sans position commune, ne rapproche rien.
 - Une signature entrante sans correspondant est insérée. Une signature en base sans correspondant est supprimée, avec son épinglage.
 - Une empreinte des champs écrits (position, rôles, auteur correspondant, nom brut, identifiants neutralisés, adresses) évite de réécrire une signature rapprochée inchangée.
 - La contrainte d'unicité `(source_publication_id, author_position)` devient `DEFERRABLE INITIALLY IMMEDIATE` : vérifiée en fin d'instruction, elle admet une permutation de positions faite en une seule instruction.
@@ -40,7 +43,3 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 
 - [ ] Les attributions perdues aux réimports précédents se refont à la main : aucune table ne les a gardées.
 - [ ] Mise à jour de la documentation
-
-## Questions ouvertes
-
-- Une signature rapprochée dont l'identité change de nom normalisé (correction du nettoyage des noms) perd son rapprochement : le nom fait partie de l'identité. Faut-il un rapprochement de repli par position quand l'identité diffère ?
