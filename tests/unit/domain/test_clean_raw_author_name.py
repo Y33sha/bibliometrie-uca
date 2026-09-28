@@ -31,6 +31,18 @@ class TestCleanRawAuthorName:
             # Balisage et entités déposés dans la signature : retirés.
             ("<i>Emmanuel Moreau</i>", "Emmanuel Moreau"),
             ("Fran&ccedil;ois Durand", "François Durand"),
+            # Année de naissance d'une forme d'autorité, et la ponctuation qu'elle laisse isolée.
+            ("Candoni, Jean-François 1964-", "Candoni, Jean-François"),
+            ("D'Andrea, Carlos, 1973-", "D'Andrea, Carlos"),
+            ("Dupont, Jean (1920-2004)", "Dupont, Jean"),
+            # Chiffre collé au nom ou en tête : renvoi d'affiliation.
+            ("Sarhang Qadir Ibrahim1", "Sarhang Qadir Ibrahim"),
+            ("2 Jean Dumont", "Jean Dumont"),
+            # Tiret, apostrophe et point d'initiale d'un nom légitime : préservés.
+            ("Al- Hadithi, T. S.", "Al- Hadithi, T. S."),
+            ("O'Neill, J.-P.", "O'Neill, J.-P."),
+            # Nom fait seulement de chiffres (ORCID recopié) : inchangé.
+            ("0000-0003-4887-7373", "0000-0003-4887-7373"),
         ],
     )
     def test_clean(self, raw: str, expected: str) -> None:

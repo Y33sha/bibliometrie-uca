@@ -27,6 +27,13 @@ class TestSimpleName:
         assert "bensoussan n" in forms
 
 
+def test_annee_de_naissance_retiree():
+    """Cas réel : une fiche créée d'après une forme d'autorité porte l'année de naissance."""
+    forms = compute_person_name_forms("Chométy", "Philippe 1973-")
+    assert "philippe chomety" in forms
+    assert not any(c.isdigit() for form in forms for c in form)
+
+
 class TestCompoundFirstName:
     def test_hyphenated(self):
         """Jean-Michel Blanquer → 6 formes."""
