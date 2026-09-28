@@ -31,6 +31,11 @@ def test_revue_d_une_societe_savante(title):
     assert not names_proceedings(title)
 
 
+def test_procedure_judiciaire():
+    """Cas réel de la table monographs : un ouvrage de droit."""
+    assert not names_proceedings("Third Parties in Criminal Proceedings")
+
+
 # Cas réels de la table journals.
 @pytest.mark.parametrize(
     "title",

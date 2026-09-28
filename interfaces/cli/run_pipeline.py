@@ -389,6 +389,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         link_monographs_to_collections=_run_link_monographs_to_collections,
         delete_empty_publishers=_run_delete_empty_publishers,
         type_proceedings=_run_type_proceedings_journals,
+        type_proceedings_volumes=_run_type_proceedings_volumes,
         learn_doi_namespaces=_run_learn_journal_doi_namespaces,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
@@ -881,6 +882,19 @@ def _run_delete_empty_publishers() -> PhaseMetrics:
 
     with get_sync_engine().connect() as conn:
         metrics = run_delete_empty_publishers(log, publisher_repo=PgPublisherGatewayQueries(conn))
+        conn.commit()
+    return metrics
+
+
+def _run_type_proceedings_volumes() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.type_proceedings_volumes import (
+        run_type_proceedings_volumes,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+
+    with get_sync_engine().connect() as conn:
+        metrics = run_type_proceedings_volumes(log, monograph_repo=PgMonographGatewayQueries(conn))
         conn.commit()
     return metrics
 

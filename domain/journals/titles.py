@@ -17,14 +17,22 @@ _YEAR_RANGE = re.compile(r"(\d{4})\s*[-–]\s*(\d{4})")
 _JOURNAL = re.compile(r"\bjournal\b", re.IGNORECASE)
 _PROCEEDINGS = re.compile(r"\bproceedings\b", re.IGNORECASE)
 _LEARNED_BODY = re.compile(r"\b(?:societ(?:y|ies)|academ(?:y|ies)|institutions?)\b", re.IGNORECASE)
+_LEGAL_PROCEEDINGS = re.compile(
+    r"\b(?:criminal|civil|legal|judicial|court|insolvency|bankruptcy|arbitral|arbitration|administrative|disciplinary)\s+proceedings\b",
+    re.IGNORECASE,
+)
 
 
 def names_proceedings(title: str) -> bool:
     """Indique si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
 
-    Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas.
+    Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas, pas plus qu'une procédure judiciaire : « Third Parties in Criminal Proceedings ».
     """
-    return bool(_PROCEEDINGS.search(title)) and not _LEARNED_BODY.search(title)
+    return (
+        bool(_PROCEEDINGS.search(title))
+        and not _LEARNED_BODY.search(title)
+        and not _LEGAL_PROCEEDINGS.search(title)
+    )
 
 
 def names_a_dated_event(title: str) -> bool:
