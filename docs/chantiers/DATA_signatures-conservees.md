@@ -27,7 +27,7 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 
 ### Phase 1 — Schéma
 
-- [ ] Migration : contrainte `source_authorships_pub_pos_key` différable, colonne d'empreinte sur `source_authorships`
+- [x] Migration : contrainte `source_authorships_pub_pos_key` différable, colonne d'empreinte `content_hash` sur `source_authorships` (`167e4d092`)
 
 ### Phase 2 — Synchronisation des signatures
 
