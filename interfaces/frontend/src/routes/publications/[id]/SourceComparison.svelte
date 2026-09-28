@@ -426,13 +426,6 @@
     margin-left: 4px;
     letter-spacing: 0.5px;
   }
-  .sg-author-link {
-    text-decoration: none;
-    color: var(--accent);
-  }
-  .sg-author-link:hover {
-    text-decoration: underline;
-  }
   .sg-uca {
     font-weight: 600;
   }
@@ -485,13 +478,6 @@
   }
   .uca-row {
     background: #f8fcf9;
-  }
-  .author-link {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .author-link:hover {
-    text-decoration: underline;
   }
   .raw-affil {
     font-size: 0.8rem;

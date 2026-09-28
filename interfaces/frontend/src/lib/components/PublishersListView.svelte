@@ -291,7 +291,6 @@
 		white-space: nowrap;
 	}
 
-	.publisher-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.publisher-link:hover { text-decoration: underline; }
+	.publisher-link { font-weight: 500; }
 	.actions { white-space: nowrap; position: relative; }
 </style>

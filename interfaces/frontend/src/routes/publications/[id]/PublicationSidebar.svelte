@@ -188,12 +188,7 @@
   }
   .doi-link {
     font-size: 0.85rem;
-    color: var(--accent);
-    text-decoration: none;
     word-break: break-all;
-  }
-  .doi-link:hover {
-    text-decoration: underline;
   }
   .sidebar-sources {
     display: flex;

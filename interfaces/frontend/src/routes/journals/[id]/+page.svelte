@@ -288,10 +288,8 @@
 		text-transform: uppercase; letter-spacing: 0.3px;
 	}
 	.id-badge { margin-right: 8px; }
-	.publisher-link {
-		color: var(--muted); font-size: 0.95rem; text-decoration: none;
-	}
-	a.publisher-link:hover { text-decoration: underline; }
+	.publisher-link { font-size: 0.95rem; }
+	span.publisher-link { color: var(--muted); }
 	.type-tag {
 		background: var(--border-subtle); color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
