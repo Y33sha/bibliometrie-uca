@@ -334,10 +334,7 @@
 	}
 	.muted { color: var(--muted); }
 
-	.journal-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.journal-link:hover { text-decoration: underline; }
-	.publisher-link { color: var(--muted); text-decoration: none; }
-	:global(a.publisher-link:hover) { text-decoration: underline; }
+	.journal-link { font-weight: 500; }
 
 	.badge-doaj {
 		font-size: 0.7rem;

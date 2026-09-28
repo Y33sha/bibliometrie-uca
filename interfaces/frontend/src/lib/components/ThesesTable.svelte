@@ -235,13 +235,6 @@
 	.theses-table tbody tr:hover {
 		background: var(--surface-hover);
 	}
-	.theses-table td a:not(.lab-tag, .source-tag) {
-		color: var(--accent);
-		text-decoration: none;
-	}
-	.theses-table td a:not(.lab-tag, .source-tag):hover {
-		text-decoration: underline;
-	}
 
 	.col-author {
 		width: 160px;

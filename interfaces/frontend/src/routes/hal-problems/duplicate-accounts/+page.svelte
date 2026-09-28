@@ -134,12 +134,7 @@
     vertical-align: top;
   }
   .person-link {
-    color: var(--accent);
-    text-decoration: none;
     font-weight: 500;
-  }
-  .person-link:hover {
-    text-decoration: underline;
   }
   .hal-accounts {
     display: flex;

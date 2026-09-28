@@ -166,13 +166,6 @@
   th.right {
     text-align: right;
   }
-  a {
-    color: #075985;
-    text-decoration: none;
-  }
-  a:hover {
-    text-decoration: underline;
-  }
   .loading {
     color: var(--muted);
   }

@@ -1028,12 +1028,7 @@
 		margin-top: 2px;
 	}
 	.pub-meta-inline a {
-		color: var(--accent);
-		text-decoration: none;
 		margin-left: 6px;
-	}
-	.pub-meta-inline a:hover {
-		text-decoration: underline;
 	}
 
 	/* Buttons (page-specific) */

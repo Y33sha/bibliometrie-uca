@@ -249,31 +249,20 @@
   }
   .journal-name {
     font-weight: 500;
-    color: var(--text);
-    text-decoration: none;
   }
-  .journal-name.container {
+  span.journal-name {
+    color: var(--text);
+  }
+  span.journal-name.container {
     color: var(--muted);
     font-weight: 400;
   }
-  .collection-name {
-    font-size: 0.85rem;
-    color: var(--muted);
-    text-decoration: none;
-  }
-  a.collection-name:hover {
-    text-decoration: underline;
-  }
-  a.journal-name:hover {
-    text-decoration: underline;
-  }
+  .collection-name,
   .publisher-name {
     font-size: 0.85rem;
-    color: var(--muted);
-    text-decoration: none;
   }
-  a.publisher-name:hover {
-    text-decoration: underline;
+  span.publisher-name {
+    color: var(--muted);
   }
   .publisher-sep {
     font-size: 0.85rem;
