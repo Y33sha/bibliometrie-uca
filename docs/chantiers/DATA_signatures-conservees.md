@@ -4,12 +4,9 @@
 
 La normalisation d'une notice supprime ses `source_authorships`, puis les recrée (`clear_source_authorships_for_publication`). Chaque signature change donc d'identifiant à chaque réimport.
 
-Deux décisions manuelles disparaissent avec elle :
+L'attribution manuelle d'une signature orpheline pose `person_id` et un épinglage (`confirmed_authorships`). Les deux disparaissent avec la signature, l'épinglage par cascade. Le journal d'audit recense 828 signatures attribuées à la main ; 4 subsistent.
 
-- **l'attribution d'une signature orpheline**, qui pose seulement `person_id` sur la signature ;
-- **l'épinglage** (`confirmed_authorships`), supprimé en cascade avec la signature. Il en reste 4 en base.
-
-La phase `persons` rattache ensuite les signatures recréées par leur forme de nom. Une forme partagée par plusieurs personnes reste orpheline. « z xu » désigne quatre personnes (Zhilu, Zehua, Zijun et Zhihao Xu) : 6 229 signatures « Z. Xu » sont orphelines après réimport, alors qu'elles avaient été attribuées à la main.
+La phase `persons` rattache ensuite les signatures recréées par leur forme de nom. Une forme partagée par plusieurs personnes reste orpheline. « z xu » désigne quatre personnes (Zhilu, Zehua, Zijun et Zhihao Xu) : 6 229 signatures « Z. Xu » sont orphelines.
 
 ## Décisions
 
@@ -21,7 +18,6 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 - Une signature entrante sans correspondant est insérée. Une signature en base sans correspondant est supprimée, avec son épinglage.
 - Une empreinte des champs écrits (position, rôles, auteur correspondant, nom brut, identifiants neutralisés, adresses) évite de réécrire une signature rapprochée inchangée.
 - La contrainte d'unicité `(source_publication_id, author_position)` devient `DEFERRABLE INITIALLY IMMEDIATE` : vérifiée en fin d'instruction, elle admet une permutation de positions faite en une seule instruction.
-- L'attribution d'une signature orpheline écrit un épinglage.
 
 ## Phasage
 
@@ -33,14 +29,10 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 
 - [x] Domaine : plan de synchronisation pur (rapprochement par identité puis par position ; mises à jour, insertions, suppressions ; empreinte) (`3b9a17bd8`)
 - [x] Writer `write_source_authorships` : une instruction par catégorie, adresses réécrites pour les seules signatures modifiées
-- [ ] Normaliseur des thèses : synchronisation des signatures, dont les non-auteurs à position nulle
+- [x] Normaliseur des thèses : audit préalable. Il garde la suppression puis réinsertion. Une thèse est renormalisée seulement si son contenu brut change, et ses signatures portent 1 épinglage. Seuls les docteurs figurent dans la file des orphelines.
 - [ ] Mesure du temps de normalisation avant et après, sur une année
 
-### Phase 3 — Épinglage
+### Phase 3 — Stock
 
-- [ ] Attribution d'une signature orpheline : écriture dans `confirmed_authorships`
-
-### Phase 4 — Stock
-
-- [ ] Les attributions perdues aux réimports précédents se refont à la main : aucune table ne les a gardées.
+- [ ] Les attributions perdues aux réimports précédents se refont à la main. Le journal d'audit garde seulement les identifiants des signatures supprimées.
 - [ ] Mise à jour de la documentation
