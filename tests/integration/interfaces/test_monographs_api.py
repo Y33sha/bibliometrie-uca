@@ -48,9 +48,9 @@ class TestListMonographs:
         title = _uniq("Volume")
         book = _seed_monograph(title)
         volume = _seed_monograph(title, proceedings=True)
-        assert _ids(client, search=title, kind="book") == [book]
-        assert _ids(client, search=title, kind="proceedings") == [volume]
-        assert sorted(_ids(client, search=title, kind="book,proceedings")) == sorted([book, volume])
+        assert _ids(client, search=title, type="book") == [book]
+        assert _ids(client, search=title, type="proceedings") == [volume]
+        assert sorted(_ids(client, search=title, type="book,proceedings")) == sorted([book, volume])
 
     def test_publisher_and_journal_filters(self, client):
         title = _uniq("Rattachement")
@@ -79,7 +79,7 @@ class TestListMonographs:
         assert _ids(client, search=title, journal_id=journal) == [in_journal]
 
     def test_unknown_kind_rejected(self, client):
-        assert client.get("/api/monographs", params={"kind": "journal"}).status_code == 422
+        assert client.get("/api/monographs", params={"type": "journal"}).status_code == 422
 
     def test_sorted_by_publications_and_counted(self, client):
         title = _uniq("Recueil")
@@ -97,10 +97,51 @@ class TestMonographsFacets:
         _seed_monograph(title)
         _seed_monograph(title)
         _seed_monograph(title, proceedings=True)
-        r = client.get("/api/monographs/facets", params={"search": title, "kind": "book"})
+        r = client.get("/api/monographs/facets", params={"search": title, "type": "book"})
         assert r.status_code == 200
         counts = {o["value"]: o["count"] for o in r.json()["kinds"]}
         assert counts == {"book": 2, "proceedings": 1}
+
+    def test_annees_filtrees_et_comptees(self, client):
+        title = _uniq("Annee")
+        m2019 = _seed_monograph(title)
+        m2020 = _seed_monograph(title)
+        with owner_pool() as cur:
+            cur.execute("UPDATE monographs SET year = 2019 WHERE id = %s", (m2019,))
+            cur.execute("UPDATE monographs SET year = 2020 WHERE id = %s", (m2020,))
+        assert _ids(client, search=title, year="2019") == [m2019]
+        r = client.get("/api/monographs/facets", params={"search": title, "year": "2019"})
+        assert r.json()["years"] == [
+            {"value": "2020", "label": None, "count": 1},
+            {"value": "2019", "label": None, "count": 1},
+        ]
+
+    def test_facette_des_editeurs_et_des_collections(self, client):
+        title = _uniq("Entite")
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            publisher = cur.fetchone()["id"]
+            cur.execute(
+                "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
+                (title, title.lower()),
+            )
+            journal = cur.fetchone()["id"]
+        mid = _seed_monograph(title)
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE monographs SET publisher_id = %s, journal_id = %s WHERE id = %s",
+                (publisher, journal, mid),
+            )
+        for kind, entity in (("publisher", publisher), ("journal", journal)):
+            r = client.get(
+                "/api/monographs/facets/entities",
+                params={"kind": kind, "entity_search": title, "search": title},
+            )
+            assert r.status_code == 200
+            assert r.json()["entities"] == [{"id": entity, "label": title, "count": 1}]
 
 
 class TestMonographPublications:

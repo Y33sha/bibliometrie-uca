@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { autofocus } from '$lib/actions/focus';
+	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
@@ -44,14 +45,20 @@
 
 	let search = $state('');
 	let selectedKinds: string[] = $state([]);
+	let selectedYears: string[] = $state([]);
+	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
+	let selectedJournal: string[] = $state([]); // 0 ou 1 identifiant de collection
 	let currentSort = $state('pubs_desc');
 
 	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
-		if (externalFilters?.publisherId != null) params.set('publisher_id', String(externalFilters.publisherId));
-		if (externalFilters?.journalId != null) params.set('journal_id', String(externalFilters.journalId));
-		if (selectedKinds.length) params.set('kind', selectedKinds.join(','));
+		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : selectedPublisher[0];
+		if (publisherId) params.set('publisher_id', publisherId);
+		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : selectedJournal[0];
+		if (journalId) params.set('journal_id', journalId);
+		if (selectedKinds.length) params.set('type', selectedKinds.join(','));
+		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
@@ -75,13 +82,17 @@
 		buildParams: buildFilterParams,
 		facets: {
 			kinds: { type: 'label_map', apiKey: 'kinds', labels: KIND_LABELS },
+			years: { type: 'simple', apiKey: 'years' },
 		},
 	});
 
 	const url = useUrlFilters({
 		basePath: () => basePath,
 		filters: {
-			selectedKinds: { type: 'string_array', urlKey: 'kind' },
+			selectedKinds: { type: 'string_array', urlKey: 'type' },
+			selectedYears: { type: 'string_array', urlKey: 'year' },
+			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
+			selectedJournal: { type: 'string_array', urlKey: 'journal_id' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
@@ -90,7 +101,15 @@
 
 	function syncUrl() {
 		if (!urlSync) return;
-		url.syncUrl(() => ({ selectedKinds, search, currentSort, currentPage: monographs.page }));
+		url.syncUrl(() => ({
+			selectedKinds,
+			selectedYears,
+			selectedPublisher,
+			selectedJournal,
+			search,
+			currentSort,
+			currentPage: monographs.page,
+		}));
 	}
 
 	function onFilterChange() {
@@ -119,6 +138,9 @@
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
 			if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
+			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
+			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
+			if (restored.selectedJournal) selectedJournal = restored.selectedJournal as string[];
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) monographs.page = restored.currentPage as number;
@@ -139,6 +161,27 @@
 		oninput={onSearchInput}
 	/>
 	<FacetDropdown label="Types" options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
+	<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+	{#if !publisherFixed}
+		<EntityFilter
+			label="Éditeur"
+			endpoint="/api/monographs/facets"
+			kind="publisher"
+			buildParams={buildFilterParams}
+			selected={selectedPublisher}
+			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+		/>
+	{/if}
+	{#if !journalFixed}
+		<EntityFilter
+			label="Collection"
+			endpoint="/api/monographs/facets"
+			kind="journal"
+			buildParams={buildFilterParams}
+			selected={selectedJournal}
+			onchange={(ids) => { selectedJournal = ids; onFilterChange(); }}
+		/>
+	{/if}
 	<span class="count">{monographs.total.toLocaleString('fr-FR')} monographie{monographs.total > 1 ? 's' : ''}</span>
 </div>
 
