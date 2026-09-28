@@ -49,6 +49,31 @@ class TestGetPublicationDetail:
     def test_returns_none_for_missing(self, sa_sync_conn):
         assert get_publication_detail(sa_sync_conn, 999_999) is None
 
+    def test_monographie_et_son_editeur(self, sa_sync_conn):
+        """Une publication sans revue prend l'éditeur de sa monographie."""
+        publisher = sa_sync_conn.execute(
+            text(
+                "INSERT INTO publishers (name, name_normalized) VALUES ('Dykinson', 'dykinson') RETURNING id"
+            )
+        ).scalar_one()
+        monograph = sa_sync_conn.execute(
+            text(
+                "INSERT INTO monographs (title, title_normalized, proceedings, publisher_id)"
+                " VALUES ('Diplomacy', 'diplomacy', true, :p) RETURNING id"
+            ),
+            {"p": publisher},
+        ).scalar_one()
+        pub = _create_pub(sa_sync_conn, doc_type="conference_paper")
+        sa_sync_conn.execute(
+            text("UPDATE publications SET monograph_id = :m WHERE id = :id"),
+            {"m": monograph, "id": pub},
+        )
+        detail = get_publication_detail(sa_sync_conn, pub)
+        assert detail is not None
+        core = detail.publication
+        assert (core.monograph_id, core.monograph_title) == (monograph, "Diplomacy")
+        assert (core.publisher_id, core.publisher_name) == (publisher, "Dykinson")
+
     def test_returns_full_detail(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
         pub = _create_pub(sa_sync_conn, title="Test Pub", doi="10.1/abc")

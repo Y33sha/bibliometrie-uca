@@ -209,7 +209,11 @@ class PublicationDetailCore(BaseModel):
     apc_amount: float | None
     apc_currency: str | None
     oa_model: str | None
+    monograph_id: int | None
+    """Livre ou volume d'actes qui contient la publication."""
+    monograph_title: str | None
     publisher_id: int | None
+    """Éditeur de la revue, à défaut celui de la monographie."""
     publisher_name: str | None
 
 

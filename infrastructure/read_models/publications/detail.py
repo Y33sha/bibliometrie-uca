@@ -142,12 +142,14 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
                    CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS journal_issns,
                    j.apc_amount, j.apc_currency,
                    j.oa_model,
+                   m.id AS monograph_id, m.title AS monograph_title,
                    pub.id AS publisher_id, pub.name AS publisher_name,
                    dp.ra AS doi_ra
             FROM publications p
             LEFT JOIN publications_detail d ON d.publication_id = p.id
             LEFT JOIN journals j ON j.id = p.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN monographs m ON m.id = p.monograph_id
+            LEFT JOIN publishers pub ON pub.id = COALESCE(j.publisher_id, m.publisher_id)
             LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
             WHERE p.id = :pid
         """),
@@ -325,6 +327,8 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             apc_amount=pub_row.apc_amount,
             apc_currency=pub_row.apc_currency,
             oa_model=pub_row.oa_model,
+            monograph_id=pub_row.monograph_id,
+            monograph_title=pub_row.monograph_title,
             publisher_id=pub_row.publisher_id,
             publisher_name=pub_row.publisher_name,
         ),

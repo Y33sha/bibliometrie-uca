@@ -4416,6 +4416,10 @@ export interface components {
             apc_currency: string | null;
             /** Oa Model */
             oa_model: string | null;
+            /** Monograph Id */
+            monograph_id: number | null;
+            /** Monograph Title */
+            monograph_title: string | null;
             /** Publisher Id */
             publisher_id: number | null;
             /** Publisher Name */
