@@ -38,6 +38,11 @@ class TestCleanRawAuthorName:
             # Chiffre collé au nom ou en tête : renvoi d'affiliation.
             ("Sarhang Qadir Ibrahim1", "Sarhang Qadir Ibrahim"),
             ("2 Jean Dumont", "Jean Dumont"),
+            # Parenthèse détachée de son contenu par le retrait des chiffres.
+            (
+                "Laboratoire de Recherche sur le Langage (EA 999)",
+                "Laboratoire de Recherche sur le Langage (EA)",
+            ),
             # Tiret, apostrophe et point d'initiale d'un nom légitime : préservés.
             ("Al- Hadithi, T. S.", "Al- Hadithi, T. S."),
             ("O'Neill, J.-P.", "O'Neill, J.-P."),

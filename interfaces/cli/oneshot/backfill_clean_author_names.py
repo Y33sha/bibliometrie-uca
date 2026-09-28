@@ -1,17 +1,17 @@
-# STATUS: oneshot (2026-08-24)
-"""Corrige en place le stock où un identifiant numérique parenthésé subsiste dans un nom d'auteur.
+# STATUS: oneshot (2026-09-28)
+"""Corrige en place le stock où un nom d'auteur porte un chiffre.
 
-Certaines signatures OpenAlex portent un identifiant de source recopié dans le nom (« Emmanuel Moreau (1278759) »). `clean_raw_author_name` neutralise ce parasite à l'entrée du pipeline ; ce script corrige les trois traces qu'il laisse dans le stock déjà normalisé.
+`clean_raw_author_name` retire à l'entrée du pipeline les chiffres d'un nom d'auteur (année de naissance « Candoni, Jean-François 1964- », identifiant de source « Emmanuel Moreau (1278759) », renvoi d'affiliation « Ibrahim1 ») et la ponctuation qu'ils laissent isolée. Ce script corrige les trois traces que ces chiffres laissent dans le stock déjà normalisé, sans renormaliser les notices.
 
 1. `source_authorships` : `raw_author_name` re-nettoyé et `identity_id` repointé sur l'identité propre, résolue via l'upsert du writer (`_UPSERT_IDENTITY_SQL` + `key_hash_sql`). Les identités devenues orphelines sont purgées. Le nom normalisé de l'identité sert de clé de rapprochement cross-source, d'où l'intérêt de le nettoyer.
-2. `persons` : `last_name`/`first_name` et leurs formes normalisées recalculés pour les personnes dont le nom de famille est l'identifiant parenthésé. Le pipeline fige le nom d'une personne à sa création, ce que ce backfill complète.
+2. `persons` : `last_name`/`first_name` et leurs formes normalisées re-nettoyés. Le pipeline fige le nom d'une personne à sa création, ce que ce backfill complète.
 3. `person_name_forms` : régénérées par `populate` (diff-sync global, idempotent) une fois `persons` et les identités corrigées.
 
 Les liens `person_id` restent en l'état ; le rapprochement des signatures propres avec leur personne suit au prochain run de la phase `persons`.
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_strip_author_name_ids            # exécution
-    python -m interfaces.cli.oneshot.backfill_strip_author_name_ids --dry-run  # rapport seul
+    python -m interfaces.cli.oneshot.backfill_clean_author_names            # exécution
+    python -m interfaces.cli.oneshot.backfill_clean_author_names --dry-run  # rapport seul
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from sqlalchemy import Connection, bindparam, text
 
 from application.pipeline.persons.populate_person_name_forms import populate
 from domain.normalize import clean_raw_author_name, normalize_name, normalize_name_form
-from domain.persons.name_matching import parse_raw_author_name
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
@@ -34,10 +33,10 @@ from infrastructure.pipeline.normalize.authorships import (
 )
 from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
-log = setup_logger("backfill_strip_author_name_ids", os.path.dirname(__file__))
+log = setup_logger("backfill_clean_author_names", os.path.dirname(__file__))
 
-# Toute signature dont le nom brut porte un identifiant numérique parenthésé.
-_POLLUTED_PREDICATE = r"raw_author_name ~ '\(\d+\)'"
+# Toute signature dont le nom brut porte un chiffre.
+_POLLUTED_PREDICATE = r"raw_author_name ~ '\d'"
 
 _REPOINT_SIGNATURE_SQL = text(
     """
@@ -67,7 +66,7 @@ def _repoint_polluted_identities(conn: Connection, apply: bool) -> None:
     for r in rows:
         clean_raw = clean_raw_author_name(r.raw)
         if clean_raw == r.raw:
-            continue  # parenthèse non numérique captée par le pré-filtre : rien à corriger
+            continue  # nom fait seulement de chiffres (ORCID recopié), laissé tel quel
         n += 1
         if not apply:
             continue
@@ -91,20 +90,20 @@ def _repoint_polluted_identities(conn: Connection, apply: bool) -> None:
 
 
 def _fix_person_names(conn: Connection, apply: bool) -> None:
-    """Recalcule le nom des personnes dont le nom de famille est un identifiant parenthésé."""
+    """Re-nettoie le nom et le prénom des personnes qui portent un chiffre."""
     rows = conn.execute(
-        text(r"SELECT id, last_name, first_name FROM persons WHERE last_name ~ '^\(\d+\)$'")
+        text(
+            r"SELECT id, last_name, first_name FROM persons WHERE last_name ~ '\d' OR first_name ~ '\d'"
+        )
     ).all()
 
     upd: list[dict[str, int | str | None]] = []
     for r in rows:
-        # Reconstitue le nom brut d'origine (prénom + identifiant capté comme nom) puis re-parse
-        # avec le parser, qui écarte l'identifiant parenthésé.
-        reconstructed = f"{r.first_name or ''} {r.last_name}".strip()
-        last, first = parse_raw_author_name(reconstructed)
-        if not last:
-            log.warning("person %d : nom vide après nettoyage (%r), ignorée", r.id, reconstructed)
+        last = clean_raw_author_name(r.last_name or "")
+        first = clean_raw_author_name(r.first_name or "")
+        if (last, first) == (r.last_name or "", r.first_name or ""):
             continue
+        log.info("person %d : %r %r → %r %r", r.id, r.first_name, r.last_name, first, last)
         upd.append(
             {
                 "id": r.id,

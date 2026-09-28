@@ -9,7 +9,7 @@ Trois temps :
 
 2. **Doublons fusionnés** — deux revues (ou deux éditeurs) que le recalcul réunit sous la même clé désignent la même entité, séparée par le seul encodage de son nom. La fusion passe par le service métier, qui transfère les publications, requalifie ce qui doit l'être et journalise l'événement. Survit la ligne qui porte le plus de publications, puis celle dont les métadonnées sont les plus complètes ; les autres y sont absorbées.
 
-3. **Signalé sans être traité** — les identités d'auteur dont le nom normalisé reste périmé. Les repointer demande de recalculer leur empreinte et de purger les orphelines (cf. `backfill_strip_author_name_ids`) ; le script les nomme pour qu'on décide.
+3. **Signalé sans être traité** — les identités d'auteur dont le nom normalisé reste périmé. Les repointer demande de recalculer leur empreinte et de purger les orphelines (cf. `backfill_clean_author_names`) ; le script les nomme pour qu'on décide.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_renormalize_after_strip_markup            # exécution

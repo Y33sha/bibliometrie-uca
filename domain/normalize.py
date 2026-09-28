@@ -203,6 +203,8 @@ def clean_raw_author_name(raw: str) -> str:
         return raw
     text = to_plain_text(raw)
     cleaned = _EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text))
+    # Parenthèse que le retrait des chiffres a détachée de son contenu : « (EA 999) » → « (EA) ».
+    cleaned = re.sub(r"\s+([)\]])", r"\1", cleaned)
     cleaned = _FLOATING_PUNCTUATION_RE.sub(" ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(_TRAILING_SEPARATORS).strip()
     return cleaned or re.sub(r"\s+", " ", text).strip()
