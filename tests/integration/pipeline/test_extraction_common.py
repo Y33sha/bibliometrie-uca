@@ -4,43 +4,44 @@ import pytest
 from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
-from infrastructure.pipeline.change_detection import change_detection_hash, compute_hash
+from infrastructure.fingerprint import fingerprint
+from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.pipeline.extract.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
-# ── compute_hash ─────────────────────────────────────────────────
+# ── fingerprint ─────────────────────────────────────────────────
 
 
 class TestComputeHash:
     def test_deterministic(self):
         data = {"title": "Test", "year": 2024}
-        assert compute_hash(data) == compute_hash(data)
+        assert fingerprint(data) == fingerprint(data)
 
     def test_key_order_independent(self):
         """Le hash ne dépend pas de l'ordre des clés."""
         a = {"z": 1, "a": 2}
         b = {"a": 2, "z": 1}
-        assert compute_hash(a) == compute_hash(b)
+        assert fingerprint(a) == fingerprint(b)
 
     def test_different_data_different_hash(self):
         a = {"title": "Foo"}
         b = {"title": "Bar"}
-        assert compute_hash(a) != compute_hash(b)
+        assert fingerprint(a) != fingerprint(b)
 
     def test_unicode(self):
         """Les caractères accentués sont gérés correctement."""
         data = {"title": "Étude des phénomènes"}
-        h = compute_hash(data)
+        h = fingerprint(data)
         assert isinstance(h, str) and len(h) == 32
 
     def test_nested_structures(self):
         data = {"authors": [{"name": "Dupont"}, {"name": "Durand"}]}
-        h = compute_hash(data)
+        h = fingerprint(data)
         assert isinstance(h, str) and len(h) == 32
 
     def test_empty_dict(self):
-        assert compute_hash({}) == compute_hash({})
+        assert fingerprint({}) == fingerprint({})
 
 
 # ── change_detection_hash / normalisation HAL ────────────────────
@@ -83,7 +84,7 @@ class TestChangeDetectionHash:
         """Sans normaliseur, l'empreinte est celle du payload fidèle — la
         neutralisation est propre à la source, pas au champ."""
         payload = {"id": "W1", "label_xml": _tei(when="2026-01-01T00:00:00+02:00")}
-        assert change_detection_hash("openalex", payload) == compute_hash(payload)
+        assert change_detection_hash("openalex", payload) == fingerprint(payload)
 
 
 class TestStripVolatileForHash:

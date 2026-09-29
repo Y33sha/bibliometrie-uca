@@ -30,6 +30,7 @@ from application.pipeline.normalize.normalize_openalex import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -596,6 +597,7 @@ class TestProcessWork:
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": MagicMock(),
+            "sync_settings": SYNC_SETTINGS,
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -654,6 +656,7 @@ def _make_normalizer():
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
+        sync_settings=SYNC_SETTINGS,
     )
 
 

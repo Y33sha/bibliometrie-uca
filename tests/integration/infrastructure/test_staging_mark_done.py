@@ -1,11 +1,10 @@
 """`mark_done` archive le `raw_data` au raw store puis le vide."""
 
-import hashlib
 import json
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.change_detection import canonical_json_bytes, compute_hash
+from infrastructure.fingerprint import stable_json_bytes
 from infrastructure.pipeline.normalize.staging import PgStagingQueries
 from infrastructure.raw_store.local import LocalFileRawStore
 
@@ -35,10 +34,8 @@ class TestMarkDoneArchivesRaw:
         assert rd == {}
         assert processed is True
 
-        # contenu raw store = JSON canonique, et son md5 == compute_hash (== raw_hash)
-        content = store.get("openalex", "W1")
-        assert content == canonical_json_bytes(raw)
-        assert hashlib.md5(content).hexdigest() == compute_hash(raw)
+        # Le raw store contient la sérialisation stable du payload.
+        assert store.get("openalex", "W1") == stable_json_bytes(raw)
 
     def test_empty_raw_data_not_archived(self, sa_sync_conn, tmp_path):
         sid = _insert(sa_sync_conn, "{}", processed=True)

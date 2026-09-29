@@ -58,6 +58,11 @@ class FakeAuthorshipsBatchQueries:
 
     def delete_source_authorship_addresses(self, conn, ids) -> None: ...
 
+    def fetch_authors_hash(self, conn, source_publication_id: int) -> None:
+        return None
+
+    def set_authors_hash(self, conn, source_publication_id: int, authors_hash: str) -> None: ...
+
     def upsert_source_authorships_batch(self, conn, values) -> None:
         self.upserted_batches.append(list(values))
 

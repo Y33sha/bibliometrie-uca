@@ -1,12 +1,15 @@
-"""Synchronisation des signatures d'une notice renormalisée (`write_source_authorships`)."""
+"""Synchronisation des signatures d'une notice renormalisée (`sync_source_authorships`, `write_source_authorships`)."""
 
 from sqlalchemy import text
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
     AuthorRecord,
+    SignatureSyncSettings,
+    sync_source_authorships,
     write_source_authorships,
 )
+from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 
 _Q = PgAuthorshipsBatchQueries()
@@ -22,7 +25,7 @@ def _source_publication(conn) -> int:
 
 
 def _write(conn, sp: int, records: list[AuthorRecord]) -> None:
-    write_source_authorships(conn, _Q, "crossref", sp, records)
+    write_source_authorships(conn, _Q, fingerprint, "crossref", sp, records)
 
 
 def _signatures(conn, sp: int) -> dict[int, tuple[int, str]]:
@@ -194,3 +197,55 @@ def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
         is False
     )
     assert _addresses(conn, sa_id) == ["Labo A"]
+
+
+def _build(block) -> list[AuthorRecord]:
+    return [AuthorRecord(i, name) for i, name in enumerate(block["names"])]
+
+
+def _build_upper(block) -> list[AuthorRecord]:
+    """Construction selon une règle de normalisation modifiée : noms en majuscules."""
+    return [AuthorRecord(i, name.upper()) for i, name in enumerate(block["names"])]
+
+
+def _sync(conn, sp: int, names: list[str], build=_build, *, normalize_full: bool = False) -> None:
+    settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=normalize_full)
+    sync_source_authorships(conn, _Q, settings, "crossref", sp, {"names": names}, build)
+
+
+def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
+    """Une règle modifiée reste sans effet tant que le bloc auteurs est inchangé."""
+    conn = sa_sync_conn
+    sp = _source_publication(conn)
+    _sync(conn, sp, ["Dupont, Jean"])
+
+    _sync(conn, sp, ["Dupont, Jean"], _build_upper)
+
+    assert _signatures(conn, sp)[0][1] == "Dupont, Jean"
+
+
+def test_normalize_full_applique_une_regle_modifiee(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _source_publication(conn)
+    _sync(conn, sp, ["Dupont, Jean"])
+    sa_id = _signatures(conn, sp)[0][0]
+
+    _sync(conn, sp, ["Dupont, Jean"], _build_upper, normalize_full=True)
+
+    assert _signatures(conn, sp)[0] == (sa_id, "DUPONT, JEAN")
+
+
+def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _source_publication(conn)
+    _sync(conn, sp, ["Dupont, Jean"])
+
+    _sync(conn, sp, ["Dupont, Jean", "Martin, Paul"])
+
+    assert [name for _, name in sorted(_signatures(conn, sp).values())] == [
+        "Dupont, Jean",
+        "Martin, Paul",
+    ]
+    assert _Q.fetch_authors_hash(conn, sp) == fingerprint(
+        {"names": ["Dupont, Jean", "Martin, Paul"]}
+    )

@@ -1,5 +1,7 @@
 """Idempotence : normalisation Web of Science."""
 
+from tests.helpers.signature_sync import SYNC_SETTINGS
+
 WOS_STAGING_DOCS = [
     {
         "ut": "WOS:999000001",
@@ -95,6 +97,7 @@ def run_normalize_wos(conn):
             publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
+            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

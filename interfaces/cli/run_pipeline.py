@@ -115,6 +115,7 @@ class RunOptions:
     rebuild_authorships: bool = False
     rebuild_subjects: bool = False
     raw_store: bool = False
+    normalize_full: bool = False
 
 
 def _open_tx() -> "AbstractContextManager[Connection]":
@@ -307,7 +308,7 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
     """
     from application.pipeline.normalize.phase import run
 
-    registry = _normalize_builders(archive=options.raw_store)
+    registry = _normalize_builders(archive=options.raw_store, full=options.normalize_full)
 
     def normalize_one(source: str) -> dict[str, object]:
         return _run_normalize(source, registry[source])
@@ -625,8 +626,11 @@ def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dic
     }
 
 
-def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
+def _normalize_builders(
+    *, archive: bool = True, full: bool = False
+) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
+    from application.pipeline.normalize._authorships_batch import SignatureSyncSettings
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
     from application.pipeline.normalize.normalize_hal import HalNormalizer
@@ -634,6 +638,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
+    from infrastructure.fingerprint import fingerprint
     from infrastructure.pipeline.containers import PgContainerGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.pipeline.normalize.source_publications import (
@@ -645,6 +650,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     from infrastructure.repositories import publication_repository
 
     raw_store = get_raw_store() if archive else NullRawStore()
+    sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)
 
     def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
         return lambda conn: cls(
@@ -656,6 +662,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             publisher_repo_factory=PgPublisherGatewayQueries,
             publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),
+            sync_settings=sync_settings,
         )
 
     return {
@@ -1431,6 +1438,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "au lieu de réinterroger les sources.",
     )
     parser.add_argument(
+        "--normalize-full",
+        action="store_true",
+        help="À la phase normalize, synchronise les signatures de chaque notice même si son bloc "
+        "auteurs est inchangé, pour appliquer une règle de normalisation des auteurs modifiée.",
+    )
+    parser.add_argument(
         "--rebuild-subjects",
         action="store_true",
         help="À la phase subjects, ré-ingère toutes les publications (pas seulement les "
@@ -1572,6 +1585,7 @@ def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, Phase]]) -> 
             (args.rebuild_authorships, "signatures reconstruites"),
             (args.rebuild_subjects, "sujets reconstruits"),
             (args.raw_store, "archivage des données brutes"),
+            (args.normalize_full, "signatures resynchronisées"),
         )
         if drapeau
     ]
@@ -1616,6 +1630,7 @@ def _run_one_phase(
                     rebuild_authorships=args.rebuild_authorships,
                     rebuild_subjects=args.rebuild_subjects,
                     raw_store=args.raw_store,
+                    normalize_full=args.normalize_full,
                 )
             )
         except KeyboardInterrupt:

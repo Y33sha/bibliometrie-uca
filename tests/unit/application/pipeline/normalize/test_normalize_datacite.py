@@ -22,6 +22,7 @@ from application.pipeline.normalize.normalize_datacite import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -272,9 +273,9 @@ class TestProcessAuthorships:
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_datacite,
-            "write_source_authorships",
-            lambda conn, queries, source, spid, records: vus.update(
-                source=source, spid=spid, records=records
+            "sync_source_authorships",
+            lambda conn, queries, settings, source, spid, block, build: vus.update(
+                source=source, spid=spid, records=build(block)
             ),
         )
         attrs = {
@@ -284,7 +285,7 @@ class TestProcessAuthorships:
             ]
         }
 
-        process_authorships(MagicMock(), MagicMock(), attrs, 555)
+        process_authorships(MagicMock(), MagicMock(), attrs, 555, sync_settings=SYNC_SETTINGS)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
         assert [r.raw_name for r in vus["records"]] == ["Doe, J."]
@@ -391,6 +392,7 @@ class TestProcessWork:
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries,
             "authorship_queries": MagicMock(),
+            "sync_settings": SYNC_SETTINGS,
         }
 
     @pytest.fixture(autouse=True)
@@ -485,6 +487,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
+        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())  # instancie les repositories sur la connexion
     row = staging_row()
@@ -503,6 +506,7 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
+        sync_settings=SYNC_SETTINGS,
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,

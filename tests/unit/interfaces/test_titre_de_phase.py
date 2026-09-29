@@ -112,6 +112,7 @@ def _args(**modifications) -> argparse.Namespace:
         "rebuild_authorships": False,
         "rebuild_subjects": False,
         "raw_store": False,
+        "normalize_full": False,
     }
     return argparse.Namespace(**{**defauts, **modifications})
 

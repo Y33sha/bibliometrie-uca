@@ -6,11 +6,12 @@ from application.pipeline.normalize._authorships_batch import (
     AuthorRecord,
     write_source_authorships,
 )
+from infrastructure.fingerprint import fingerprint
 
 
 def _items_written(records: list[AuthorRecord]) -> list[dict]:
     queries = MagicMock()
-    write_source_authorships(MagicMock(), queries, "crossref", 1, records)
+    write_source_authorships(MagicMock(), queries, fingerprint, "crossref", 1, records)
     return queries.upsert_source_authorships_batch.call_args.args[1]
 
 

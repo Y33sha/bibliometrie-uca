@@ -1,6 +1,6 @@
 """Writer batch partagé pour les `source_authorships` (toutes sources).
 
-Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_publications` / `source_authorships` / `addresses` / `source_authorship_addresses` sont partagées. Chaque normaliseur parse son payload en `list[AuthorRecord]` puis délègue ici.
+Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_publications` / `source_authorships` / `addresses` / `source_authorship_addresses` sont partagées. Chaque normaliseur isole le bloc auteurs de son payload et fournit la construction des `AuthorRecord` depuis ce bloc (`sync_source_authorships`).
 
 Coût : un nombre constant d'allers-retours Python↔PG par document.
 """
@@ -8,11 +8,12 @@ Coût : un nombre constant d'allers-retours Python↔PG par document.
 from __future__ import annotations
 
 import json
-from collections.abc import Hashable
+from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.fingerprint import Fingerprinter
 from application.ports.pipeline.normalize.authorships import (
     AddressCountryItem,
     AuthorshipAddressItem,
@@ -30,7 +31,7 @@ from domain.source_publications.signature_sync import (
     IncomingSignature,
     StoredSignature,
     plan_signature_sync,
-    signature_content_hash,
+    signature_content,
 )
 from domain.types import JsonValue
 
@@ -63,9 +64,47 @@ class AuthorRecord:
     addresses: list[AddressRecord] = field(default_factory=list)
 
 
+AuthorBlock = Mapping[str, JsonValue]
+"""Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'une notice."""
+
+
+@dataclass(frozen=True, slots=True)
+class SignatureSyncSettings:
+    """Réglages de la synchronisation des signatures : fonction d'empreinte, et `normalize_full`, qui synchronise même un bloc auteurs inchangé pour appliquer une règle de normalisation modifiée."""
+
+    fingerprint: Fingerprinter
+    normalize_full: bool = False
+
+
+def sync_source_authorships(
+    conn: Connection,
+    queries: AuthorshipsBatchQueries,
+    settings: SignatureSyncSettings,
+    source: str,
+    source_publication_id: int,
+    block: AuthorBlock,
+    build: Callable[[AuthorBlock], list[AuthorRecord]],
+) -> None:
+    """Synchronise les signatures d'une notice depuis le bloc auteurs de son payload.
+
+    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état, sauf avec `normalize_full`.
+    """
+    block_hash = settings.fingerprint(dict(block))
+    if (
+        not settings.normalize_full
+        and queries.fetch_authors_hash(conn, source_publication_id) == block_hash
+    ):
+        return
+    write_source_authorships(
+        conn, queries, settings.fingerprint, source, source_publication_id, build(block)
+    )
+    queries.set_authors_hash(conn, source_publication_id, block_hash)
+
+
 def write_source_authorships(
     conn: Connection,
     queries: AuthorshipsBatchQueries,
+    fingerprint: Fingerprinter,
     source: str,
     source_publication_id: int,
     records: list[AuthorRecord],
@@ -93,16 +132,18 @@ def write_source_authorships(
             "raw_author_name": clean_name,
             "person_identifiers": rec.person_identifiers,
             "neutralized_identifiers": neutralized,
-            "content_hash": signature_content_hash(
-                position=rec.position,
-                raw_author_name=clean_name,
-                is_corresponding=rec.is_corresponding,
-                roles=rec.roles,
-                neutralized_identifiers=neutralized,
-                addresses=[
-                    (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
-                    for a in rec.addresses
-                ],
+            "content_hash": fingerprint(
+                signature_content(
+                    position=rec.position,
+                    raw_author_name=clean_name,
+                    is_corresponding=rec.is_corresponding,
+                    roles=rec.roles,
+                    neutralized_identifiers=neutralized,
+                    addresses=[
+                        (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
+                        for a in rec.addresses
+                    ],
+                )
             ),
         }
 

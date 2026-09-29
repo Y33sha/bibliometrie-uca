@@ -848,6 +848,11 @@ source_publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("keys_dirty", Boolean, nullable=False, server_default="true"),
+    Column(
+        "authors_hash",
+        Text,
+        comment="Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.",
+    ),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",

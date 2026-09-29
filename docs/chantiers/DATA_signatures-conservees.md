@@ -17,7 +17,10 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
     - une identité différente, ou une identité répétée sans position commune, ne rapproche rien.
 - Une signature entrante sans correspondant est insérée. Une signature en base sans correspondant est supprimée, avec son épinglage.
 - Une empreinte des champs écrits (position, rôles, auteur correspondant, nom brut, identifiants neutralisés, adresses) évite de réécrire une signature rapprochée inchangée.
+- Les empreintes de détection de changement sont calculées en infrastructure (`infrastructure/fingerprint.py`), derrière le port `Fingerprinter`. Changer d'algorithme change tous les `raw_hash` : l'extraction suivante repasse tout le staging en attente.
 - La contrainte d'unicité `(source_publication_id, author_position)` devient `DEFERRABLE INITIALLY IMMEDIATE` : vérifiée en fin d'instruction, elle admet une permutation de positions faite en une seule instruction.
+- Chaque source isole la partie auteurs de son payload en un bloc, seule entrée de la construction des `AuthorRecord`. Pour HAL, le bloc porte les identifiants déjà extraits du TEI. L'empreinte du bloc est stockée sur la notice (`source_publications.authors_hash`). Une empreinte inchangée laisse les signatures en l'état, sans construction ni rapprochement.
+- `run_pipeline --normalize-full` ignore l'empreinte du bloc, pour appliquer une règle de normalisation des auteurs modifiée.
 
 ## Phasage
 
@@ -30,7 +33,10 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 - [x] Domaine : plan de synchronisation pur (rapprochement par identité puis par position ; mises à jour, insertions, suppressions ; empreinte) (`3b9a17bd8`)
 - [x] Writer `write_source_authorships` : une instruction par catégorie, adresses réécrites pour les seules signatures modifiées
 - [x] Normaliseur des thèses : audit préalable. Il garde la suppression puis réinsertion. Une thèse est renormalisée seulement si son contenu brut change, et ses signatures portent 1 épinglage. Seuls les docteurs figurent dans la file des orphelines.
-- [ ] Mesure du temps de normalisation avant et après, sur une année
+- [x] Mesure du temps de normalisation, seconde passe sur tout le stock. Notices par seconde : Crossref 16,5 → 37, HAL 25 → 41, OpenAlex 15 → 39.
+- [x] Migration : colonne `authors_hash` sur `source_publications`
+- [x] Bloc auteurs par source, empreinte du bloc, option `--normalize-full`, empreintes XXH3 128 bits sur une sérialisation `orjson` à clés triées
+- [ ] Mesure du temps de normalisation avec l'empreinte du bloc
 
 ### Phase 3 — Stock
 

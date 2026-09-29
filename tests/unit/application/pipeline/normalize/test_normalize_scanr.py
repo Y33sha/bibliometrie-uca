@@ -32,6 +32,7 @@ from application.pipeline.normalize.normalize_scanr import (
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -424,13 +425,15 @@ class TestProcessAuthorships:
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_scanr,
-            "write_source_authorships",
-            lambda conn, queries, source, spid, records: vus.update(
-                source=source, spid=spid, records=records
+            "sync_source_authorships",
+            lambda conn, queries, settings, source, spid, block, build: vus.update(
+                source=source, spid=spid, records=build(block)
             ),
         )
 
-        process_authorships(MagicMock(), MagicMock(), {"authors": []}, 555)
+        process_authorships(
+            MagicMock(), MagicMock(), {"authors": []}, 555, sync_settings=SYNC_SETTINGS
+        )
 
         assert (vus["source"], vus["spid"]) == ("scanr", 555)
 
@@ -457,6 +460,7 @@ class TestProcessWork:
             publication_repo=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
         return rendu, queries, staging
 
@@ -486,6 +490,7 @@ class TestProcessWork:
             publisher_repo_factory=lambda c: MagicMock(),
             publication_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
         assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
 
@@ -507,6 +512,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
+        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())
     row = staging_row()

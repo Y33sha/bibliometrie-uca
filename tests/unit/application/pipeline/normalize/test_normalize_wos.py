@@ -40,6 +40,7 @@ from application.pipeline.normalize.normalize_wos import (
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     staging_row,
 )
@@ -981,6 +982,7 @@ class TestProcessRecord:
             publication_repo=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
+            sync_settings=SYNC_SETTINGS,
         )
 
         assert result is True
@@ -1034,6 +1036,7 @@ class TestProcessRecord:
             publication_repo=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
 
         assert captured["ut"] == "WOS:fallback"
@@ -1058,6 +1061,7 @@ class TestProcessRecord:
                 publication_repo=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
+                sync_settings=SYNC_SETTINGS,
             )
 
 
@@ -1078,6 +1082,7 @@ class TestWosNormalizer:
             publisher_repo_factory=publisher_factory,
             publication_repo_factory=pub_factory,
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
 
         conn2 = MagicMock()
@@ -1100,6 +1105,7 @@ class TestWosNormalizer:
             publisher_repo_factory=lambda c: MagicMock(),
             publication_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
         norm.preload_caches(MagicMock())
 
@@ -1124,4 +1130,5 @@ class TestWosNormalizer:
             "publication_repo",
             "staging_queries",
             "authorship_queries",
+            "sync_settings",
         }

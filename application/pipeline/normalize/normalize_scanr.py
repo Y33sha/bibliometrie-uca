@@ -7,8 +7,10 @@ from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
+    AuthorBlock,
     AuthorRecord,
-    write_source_authorships,
+    SignatureSyncSettings,
+    sync_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
@@ -313,15 +315,29 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     return records
 
 
+def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un document ScanR : `authors`."""
+    return {"authors": doc.get("authors")}
+
+
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     doc: Mapping[str, JsonValue],
     source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
 ) -> None:
-    """Parse les auteurs ScanR puis écrit les authorships en batch."""
-    records = build_scanr_author_records(doc)
-    write_source_authorships(conn, authorship_queries, "scanr", source_publication_id, records)
+    """Synchronise les signatures ScanR de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "scanr",
+        source_publication_id,
+        extract_scanr_author_block(doc),
+        build_scanr_author_records,
+    )
 
 
 # =============================================================
@@ -340,6 +356,7 @@ def process_work(
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> bool:
     staging_id = staging_row.id
     scanr_id = staging_row.source_id
@@ -355,7 +372,9 @@ def process_work(
     source_publication_id = insert_scanr_document(
         conn, queries, doc, staging_id, scanr_id, pub_meta
     )
-    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    process_authorships(
+        conn, authorship_queries, doc, source_publication_id, sync_settings=sync_settings
+    )
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -380,4 +399,5 @@ class ScanrNormalizer(BibliographicNormalizer):
             publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
         )

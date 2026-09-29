@@ -10,6 +10,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
+from application.pipeline.normalize._authorships_batch import SignatureSyncSettings
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.containers import ContainerFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
@@ -32,6 +33,7 @@ class BibliographicNormalizer(SourceNormalizer):
         publisher_repo_factory: Callable[[Connection], PublisherFindOrCreateQueries],
         publication_repo_factory: Callable[[Connection], PublicationRepository],
         authorship_queries: AuthorshipsBatchQueries,
+        sync_settings: SignatureSyncSettings,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -42,6 +44,7 @@ class BibliographicNormalizer(SourceNormalizer):
         self._publication_repo_factory = publication_repo_factory
         self._publication_repo: PublicationRepository | None = None
         self._authorship_queries = authorship_queries
+        self._sync_settings = sync_settings
 
     def preload_caches(self, conn: Connection) -> None:
         """Instancie les repositories sur la connexion prête, une fois avant la boucle de traitement."""

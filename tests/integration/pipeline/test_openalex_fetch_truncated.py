@@ -15,7 +15,7 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 from sqlalchemy import bindparam, text
 
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.pipeline.change_detection import compute_hash
+from infrastructure.fingerprint import fingerprint
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
 _adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
@@ -82,7 +82,7 @@ def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
             "source_id": source_id,
             "doi": full_work["doi"].replace("https://doi.org/", ""),
             "raw_data": full_work,
-            "raw_hash": compute_hash(bulk_payload),
+            "raw_hash": fingerprint(bulk_payload),
             "processed": processed,
         },
     )
@@ -106,7 +106,7 @@ class TestRawHashUpsert:
 
         row = _get_staging(sa_sync_conn, "W001")
         assert len(row.raw_data["authorships"]) == 50
-        assert row.raw_hash == compute_hash(work)
+        assert row.raw_hash == fingerprint(work)
         assert row.processed is False
 
     def test_bulk_unchanged_no_op(self, sa_sync_conn):

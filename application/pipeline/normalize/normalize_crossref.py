@@ -14,8 +14,10 @@ from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
+    AuthorBlock,
     AuthorRecord,
-    write_source_authorships,
+    SignatureSyncSettings,
+    sync_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.ports.pipeline.containers import ContainerFindOrCreateQueries
@@ -310,15 +312,29 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
     return records
 
 
+def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un message Crossref : `author`."""
+    return {"author": msg.get("author")}
+
+
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     msg: Mapping[str, JsonValue],
     source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
 ) -> None:
-    """Parse les auteurs Crossref puis écrit les authorships en batch."""
-    records = build_crossref_author_records(msg)
-    write_source_authorships(conn, authorship_queries, "crossref", source_publication_id, records)
+    """Synchronise les signatures Crossref de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "crossref",
+        source_publication_id,
+        extract_crossref_author_block(msg),
+        build_crossref_author_records,
+    )
 
 
 # =============================================================
@@ -337,6 +353,7 @@ def process_work(
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -380,7 +397,9 @@ def process_work(
             meta=meta,
         ),
     )
-    process_authorships(conn, authorship_queries, msg, source_publication_id)
+    process_authorships(
+        conn, authorship_queries, msg, source_publication_id, sync_settings=sync_settings
+    )
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -404,4 +423,5 @@ class CrossrefNormalizer(BibliographicNormalizer):
             publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
         )

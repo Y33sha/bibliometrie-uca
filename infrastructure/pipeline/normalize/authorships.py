@@ -217,6 +217,20 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             {"payload": payload},
         )
 
+    def fetch_authors_hash(self, conn: Connection, source_publication_id: int) -> str | None:
+        return conn.execute(
+            text("SELECT authors_hash FROM source_publications WHERE id = :id"),
+            {"id": source_publication_id},
+        ).scalar_one_or_none()
+
+    def set_authors_hash(
+        self, conn: Connection, source_publication_id: int, authors_hash: str
+    ) -> None:
+        conn.execute(
+            text("UPDATE source_publications SET authors_hash = :h WHERE id = :id"),
+            {"h": authors_hash, "id": source_publication_id},
+        )
+
     def delete_source_authorship_addresses(self, conn: Connection, ids: list[int]) -> None:
         if ids:
             conn.execute(

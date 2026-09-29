@@ -13,8 +13,10 @@ from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
+    AuthorBlock,
     AuthorRecord,
-    write_source_authorships,
+    SignatureSyncSettings,
+    sync_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
@@ -47,7 +49,7 @@ from domain.publications.identifiers import (
 )
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
-from domain.types import JsonValue, as_int, as_sequence, as_strs
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
 # UTILITAIRES
@@ -452,6 +454,23 @@ def parse_author_structures(
     return form_structs
 
 
+_HAL_AUTHOR_FIELDS = (
+    "authFullNameFormIDPersonIDIDHal_fs",
+    "authQuality_s",
+    "authIdHasPrimaryStructure_fs",
+    "authIdHasStructure_fs",
+)
+
+
+def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants par auteur extraits du TEI (`tei_author_identifiers`)."""
+    block: dict[str, JsonValue] = {field: doc.get(field) for field in _HAL_AUTHOR_FIELDS}
+    block["tei_author_identifiers"] = cast(
+        "JsonValue", parse_tei_author_identifiers(hal_text_field(doc.get("label_xml")))
+    )
+    return block
+
+
 def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
 
@@ -460,8 +479,8 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de structures).
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
-    # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul champ HAL qui les attache proprement à chaque position d'auteur.
-    tei_ids = parse_tei_author_identifiers(hal_text_field(doc.get("label_xml")))
+    # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
+    tei_ids = [as_mapping(e) for e in as_sequence(doc.get("tei_author_identifiers"))]
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
@@ -500,9 +519,9 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     ids_by_position = [
         compact_identifiers(
-            orcid=(tei_ids[pos].get("orcid") if pos < len(tei_ids) else None),
-            idref=(tei_ids[pos].get("idref") if pos < len(tei_ids) else None),
-            idhal=(tei_ids[pos].get("idhal") if pos < len(tei_ids) else None),
+            orcid=(as_str(tei_ids[pos].get("orcid")) if pos < len(tei_ids) else None),
+            idref=(as_str(tei_ids[pos].get("idref")) if pos < len(tei_ids) else None),
+            idhal=(as_str(tei_ids[pos].get("idhal")) if pos < len(tei_ids) else None),
             hal_person_id=hal_person_id_by_pos.get(pos),
         )
         for pos in range(len(names))
@@ -550,10 +569,19 @@ def process_authorships(
     authorship_queries: AuthorshipsBatchQueries,
     doc: Mapping[str, JsonValue],
     source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
 ) -> None:
-    """Parse les auteurs HAL puis écrit les authorships en batch."""
-    records = build_hal_author_records(doc)
-    write_source_authorships(conn, authorship_queries, "hal", source_publication_id, records)
+    """Synchronise les signatures HAL de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "hal",
+        source_publication_id,
+        extract_hal_author_block(doc),
+        build_hal_author_records,
+    )
 
 
 # =============================================================
@@ -572,6 +600,7 @@ def process_work(
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     staging_id = staging_row.id
@@ -598,7 +627,9 @@ def process_work(
         hal_id,
         pub_meta,
     )
-    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    process_authorships(
+        conn, authorship_queries, doc, source_publication_id, sync_settings=sync_settings
+    )
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -623,4 +654,5 @@ class HalNormalizer(BibliographicNormalizer):
             publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
         )
