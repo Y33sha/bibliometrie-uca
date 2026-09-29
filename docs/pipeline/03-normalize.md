@@ -1,6 +1,6 @@
 #  Normalisation
 
-*À jour le 2026-09-06.*
+*À jour le 2026-09-29.*
 
 ```mermaid
 flowchart LR
@@ -24,6 +24,14 @@ Chaque normaliseur reporte dans `source_authorships` ce que sa source fournit po
 En fin de phase, les `source_publications` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_authorships` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
 Conservés en base, les payloads bruts la font grossir hors de proportion avec les données normalisées qu'on en tire. En fin de phase, le `raw_data` du staging est donc vidé, puis un `VACUUM` récupère l'espace.
+
+## Synchronisation des signatures
+
+Chaque signature entrante est rapprochée d'une signature en base de même identité (nom normalisé et identifiants), puis de même position si l'identité est répétée. Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
+
+Une notice dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses signatures en l'état, sauf avec `--normalize-full`.
+
+Les signatures des thèses sont supprimées puis recréées à chaque normalisation.
 
 ## Archivage du payload brut
 
