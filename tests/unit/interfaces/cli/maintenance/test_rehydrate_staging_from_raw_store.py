@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from infrastructure.raw_store import UnreadablePayloadError
 from interfaces.cli.maintenance import rehydrate_staging_from_raw_store as module
 from interfaces.cli.maintenance.rehydrate_staging_from_raw_store import (
     _doi_for,
@@ -44,6 +45,10 @@ class TestDoiFor:
         assert _doi_for("hal", "hal-1", {"doiId_s": "10.1/a"}) == "10.1/a"
 
 
+_ILLISIBLE = object()
+"""Payload d'archive corrompue : sa lecture lève `UnreadablePayloadError`."""
+
+
 class _FakeStore:
     def __init__(self, payloads: dict[str, dict[str, dict]]) -> None:
         self._payloads = payloads
@@ -52,7 +57,10 @@ class _FakeStore:
         return iter(self._payloads.get(source, {}))
 
     def get(self, source: str, key: str) -> str:
-        return json.dumps(self._payloads[source][key])
+        payload = self._payloads[source][key]
+        if payload is _ILLISIBLE:
+            raise UnreadablePayloadError(f"{source}/{key}")
+        return json.dumps(payload)
 
 
 class _FakeConnection:
@@ -166,3 +174,19 @@ def test_transaction_close_par_lots(lancer, monkeypatch):
     resultat = lancer({"hal": cles}, "--sources", "hal", lignes_presentes=set(cles))
 
     assert resultat.conn.commits == 3  # deux lots pleins, puis la fermeture
+
+
+def test_payload_illisible_signale_sans_interrompre(lancer, caplog):
+    """Une archive corrompue laisse sa ligne de staging inchangée ; les autres clés sont réinjectées."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        resultat = lancer(
+            {"hal": {"hal-1": _ILLISIBLE, "hal-2": {}}},
+            "--sources",
+            "hal",
+            lignes_presentes={"hal-2"},
+        )
+
+    assert resultat.mises_a_jour == [("hal", "hal-2")]
+    assert "hal/hal-1 : payload illisible" in caplog.text

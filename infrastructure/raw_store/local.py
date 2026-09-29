@@ -1,14 +1,19 @@
 """Implémentation `RawStore` sur le système de fichiers local.
 
-Layout : `{root}/{source}/{source_id_url_encoded}.json.gz`. Le `source_id` est URL-encodé (`quote(safe="")`) pour neutraliser les caractères non sûrs en système de fichiers (`/` des ids ScanR, `:` des ids WoS). Payload gzippé à l'écriture, décompressé à la lecture — transparent pour l'appelant (`put`/`get` manipulent des bytes JSON bruts).
+Layout : `{root}/{source}/{source_id_url_encoded}.json.gz`. Le `source_id` est URL-encodé (`quote(safe="")`) pour neutraliser les caractères non sûrs en système de fichiers (`/` des ids ScanR, `:` des ids WoS). Payload gzippé à l'écriture, décompressé à la lecture — transparent pour l'appelant (`put`/`get` manipulent des bytes JSON bruts). L'écriture passe par un fichier temporaire du même répertoire, renommé une fois complet : une écriture interrompue laisse la version précédente intacte.
 """
 
 from __future__ import annotations
 
 import gzip
+import os
+import tempfile
 import urllib.parse
+import zlib
 from collections.abc import Iterator
 from pathlib import Path
+
+from infrastructure.raw_store.base import UnreadablePayloadError
 
 _SUFFIX = ".json.gz"
 
@@ -26,8 +31,14 @@ class LocalFileRawStore:
     def put(self, source: str, source_id: str, payload: bytes) -> None:
         path = self._path(source, source_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with gzip.open(path, "wb") as f:
-            f.write(payload)
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as raw, gzip.open(raw, "wb") as f:
+                f.write(payload)
+            os.replace(tmp_name, path)
+        except BaseException:
+            os.unlink(tmp_name)
+            raise
 
     def get(self, source: str, source_id: str) -> bytes:
         try:
@@ -35,6 +46,8 @@ class LocalFileRawStore:
                 return f.read()
         except FileNotFoundError as e:
             raise KeyError(f"{source}/{source_id}") from e
+        except (OSError, EOFError, zlib.error) as e:
+            raise UnreadablePayloadError(f"{source}/{source_id}") from e
 
     def exists(self, source: str, source_id: str) -> bool:
         return self._path(source, source_id).is_file()

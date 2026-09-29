@@ -36,7 +36,7 @@ from infrastructure.pipeline.normalize.staging import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )
-from infrastructure.raw_store import get_raw_store
+from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from infrastructure.sources.hal.extract_hal import extract_doi as hal_extract_doi
 from infrastructure.sources.openalex.parsing import extract_doi as openalex_extract_doi
 from infrastructure.sources.scanr.extract_scanr import extract_doi as scanr_extract_doi
@@ -128,9 +128,19 @@ def main() -> None:
             inserted = 0
             updated = 0
             orphans = 0
+            unreadable = 0
             seen = 0
             for source_id in keys(source):
-                raw_data = json.loads(store.get(source, source_id))
+                try:
+                    raw_data = json.loads(store.get(source, source_id))
+                except (UnreadablePayloadError, ValueError):
+                    unreadable += 1
+                    log.warning(
+                        "%s/%s : payload illisible au raw store (ligne staging inchangée)",
+                        source,
+                        source_id,
+                    )
+                    continue
                 if args.full:
                     doi = _doi_for(source, source_id, raw_data)
                     if rehydrate_or_create_staging_row(conn, source, source_id, doi, raw_data):
@@ -153,14 +163,19 @@ def main() -> None:
             conn.commit()
             if args.full:
                 log.info(
-                    "%s : %d insérés, %d mis à jour (processed=FALSE)", source, inserted, updated
+                    "%s : %d insérés, %d mis à jour (processed=FALSE), %d illisibles",
+                    source,
+                    inserted,
+                    updated,
+                    unreadable,
                 )
             else:
                 log.info(
-                    "%s : %d mis à jour (processed=FALSE), %d orphelins ignorés",
+                    "%s : %d mis à jour (processed=FALSE), %d orphelins ignorés, %d illisibles",
                     source,
                     updated,
                     orphans,
+                    unreadable,
                 )
 
     log.info(
