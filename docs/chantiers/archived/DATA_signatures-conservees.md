@@ -36,9 +36,8 @@ La phase `persons` rattache ensuite les signatures recréées par leur forme de 
 - [x] Mesure du temps de normalisation, seconde passe sur tout le stock. Notices par seconde : Crossref 16,5 → 37, HAL 25 → 41, OpenAlex 15 → 39.
 - [x] Migration : colonne `authors_hash` sur `source_publications`
 - [x] Bloc auteurs par source, empreinte du bloc, option `--normalize-full`, empreintes XXH3 128 bits sur une sérialisation `orjson` à clés triées
-- [ ] Mesure du temps de normalisation avec l'empreinte du bloc
+- [x] Mesure du temps de normalisation avec l'empreinte du bloc, seconde passe DataCite : 35 → 176 notices par seconde.
 
-### Phase 3 — Stock
+### Phase 3 — Documentation
 
-- [ ] Les attributions perdues aux réimports précédents se refont à la main. Le journal d'audit garde seulement les identifiants des signatures supprimées.
-- [ ] Mise à jour de la documentation
+- [x] Mise à jour de la documentation
