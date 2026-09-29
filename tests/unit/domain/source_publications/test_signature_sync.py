@@ -5,7 +5,7 @@ from domain.source_publications.signature_sync import (
     SignatureSyncPlan,
     StoredSignature,
     plan_signature_sync,
-    signature_content_hash,
+    signature_content,
 )
 
 
@@ -65,7 +65,7 @@ class TestPlanSignatureSync:
         assert plan.updates == ((10, 0),)
 
 
-class TestSignatureContentHash:
+class TestSignatureContent:
     _BASE = {
         "position": 0,
         "raw_author_name": "Dupont, Jean",
@@ -76,7 +76,7 @@ class TestSignatureContentHash:
     }
 
     def test_stable(self):
-        assert signature_content_hash(**self._BASE) == signature_content_hash(**self._BASE)
+        assert signature_content(**self._BASE) == signature_content(**self._BASE)
 
     def test_change_avec_chaque_champ_ecrit(self):
         variantes = [
@@ -88,6 +88,6 @@ class TestSignatureContentHash:
             {"addresses": [("Université Clermont Auvergne", ["FR"], ["FR"])]},
             {"addresses": []},
         ]
-        base = signature_content_hash(**self._BASE)
+        base = signature_content(**self._BASE)
         for variante in variantes:
-            assert signature_content_hash(**{**self._BASE, **variante}) != base, variante
+            assert signature_content(**{**self._BASE, **variante}) != base, variante

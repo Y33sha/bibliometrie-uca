@@ -1,5 +1,6 @@
 """Idempotence : normalisation ScanR."""
 
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import create_all_publications
 
 SCANR_STAGING_DOCS = [
@@ -188,6 +189,7 @@ def run_normalize_scanr(conn):
         publisher_repo_factory=PgPublisherGatewayQueries,
         publication_repo_factory=publication_repository,
         authorship_queries=authorship_queries,
+        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(conn)
 

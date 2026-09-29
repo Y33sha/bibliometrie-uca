@@ -20,6 +20,7 @@ from application.pipeline.normalize.normalize_hal import (
     active_embargo_until,
     build_hal_author_records,
     build_hal_external_ids,
+    extract_hal_author_block,
     extract_pub_metadata,
     get_container_facts,
     get_title,
@@ -34,6 +35,7 @@ from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.sources.hal import hal_text_field
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeAuthorshipsBatchQueries,
     FakeSourcePublicationQueries,
@@ -534,7 +536,7 @@ class TestBuildHalAuthorRecords:
             ],
             "label_xml": label_xml,
         }
-        assert build_hal_author_records(doc)[0].person_identifiers == {
+        assert build_hal_author_records(extract_hal_author_block(doc))[0].person_identifiers == {
             "idhal": "marie-dupont",
             "hal_person_id": 749496,
         }
@@ -577,7 +579,7 @@ class TestBuildHalAuthorRecords:
             ],
             "label_xml": label_xml,
         }
-        records = build_hal_author_records(doc)
+        records = build_hal_author_records(extract_hal_author_block(doc))
         assert records[0].person_identifiers == {"hal_person_id": 749496, "idref": "111111111"}
         assert records[1].person_identifiers == {"hal_person_id": 749496, "idref": "111111111"}
         assert records[2].person_identifiers == {"hal_person_id": 555}
@@ -608,7 +610,9 @@ class TestProcessAuthors:
     def test_synchronises_even_when_empty(self):
         """Sans auteur, le writer synchronise quand même : les signatures en base sont supprimées."""
         authorship_queries = FakeAuthorshipsBatchQueries()
-        normalize_hal.process_authorships(MagicMock(), authorship_queries, {}, 10)
+        normalize_hal.process_authorships(
+            MagicMock(), authorship_queries, {}, 10, sync_settings=SYNC_SETTINGS
+        )
         assert authorship_queries.synced_for == [10]
 
 
@@ -637,6 +641,7 @@ class TestProcessWork:
             "publication_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": FakeAuthorshipsBatchQueries(),
+            "sync_settings": SYNC_SETTINGS,
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -723,6 +728,7 @@ def _make_normalizer():
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
+        sync_settings=SYNC_SETTINGS,
     )
 
 

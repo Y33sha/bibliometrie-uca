@@ -16,7 +16,8 @@ from application.ports.pipeline.normalize.staging import (
 )
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.pipeline.change_detection import canonical_json_bytes, change_detection_hash
+from infrastructure.fingerprint import stable_json_bytes
+from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.raw_store import RawStore, get_raw_store
 
 logger = logging.getLogger(__name__)
@@ -185,7 +186,7 @@ class PgStagingQueries(StagingQueries):
         if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
             return
         try:
-            self._raw_store.put(row.source, row.source_id, canonical_json_bytes(row.raw_data))
+            self._raw_store.put(row.source, row.source_id, stable_json_bytes(row.raw_data))
         except Exception:
             logger.warning(
                 "raw_store.put a échoué pour %s/%s (payload non archivé)",

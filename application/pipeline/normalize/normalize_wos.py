@@ -2,13 +2,16 @@
 
 import logging
 from collections.abc import Mapping, Sequence
+from functools import partial
 
 from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
+    AuthorBlock,
     AuthorRecord,
-    write_source_authorships,
+    SignatureSyncSettings,
+    sync_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
@@ -507,16 +510,30 @@ def build_wos_author_records(
     return list(by_position.values())
 
 
+def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un record WoS : `authors`, et `ut` pour le signalement d'auteurs inexploitables."""
+    return {"ut": rec.get("ut"), "authors": rec.get("authors")}
+
+
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     logger: logging.Logger,
     rec: Mapping[str, JsonValue],
     source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
 ) -> None:
-    """Parse les authorships WoS puis écrit en batch via le writer partagé."""
-    records = build_wos_author_records(rec, logger)
-    write_source_authorships(conn, authorship_queries, "wos", source_publication_id, records)
+    """Synchronise les signatures WoS de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "wos",
+        source_publication_id,
+        extract_wos_author_block(rec),
+        partial(build_wos_author_records, logger=logger),
+    )
 
 
 # =============================================================
@@ -535,6 +552,7 @@ def process_record(
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     staging_id = staging_row.id
@@ -554,7 +572,9 @@ def process_record(
     pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
 
     source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
-    process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
+    process_authorships(
+        conn, authorship_queries, logger, rec, source_publication_id, sync_settings=sync_settings
+    )
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -579,4 +599,5 @@ class WosNormalizer(BibliographicNormalizer):
             publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
         )

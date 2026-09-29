@@ -45,6 +45,7 @@ from application.pipeline.normalize.normalize_crossref import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -572,13 +573,19 @@ class TestProcessAuthorships:
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_crossref,
-            "write_source_authorships",
-            lambda conn, queries, source, spid, records: vus.update(
-                source=source, spid=spid, records=records
+            "sync_source_authorships",
+            lambda conn, queries, settings, source, spid, block, build: vus.update(
+                source=source, spid=spid, records=build(block)
             ),
         )
 
-        process_authorships(MagicMock(), MagicMock(), {"author": [{"family": "Dupont"}]}, 555)
+        process_authorships(
+            MagicMock(),
+            MagicMock(),
+            {"author": [{"family": "Dupont"}]},
+            555,
+            sync_settings=SYNC_SETTINGS,
+        )
 
         assert (vus["source"], vus["spid"]) == ("crossref", 555)
         assert [r.raw_name for r in vus["records"]] == ["Dupont"]
@@ -625,6 +632,7 @@ class TestProcessWork:
             publication_repo=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
+            sync_settings=SYNC_SETTINGS,
         )
 
     def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
@@ -671,6 +679,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
+        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())
     row = staging_row()

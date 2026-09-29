@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TokAzDqjiCSxyfgJsgnJJCavr9do5QPA15XQ68shtBxGMHGdeZMlHCKJwAIFI48
+\restrict lVgSzitzdhaFWKdaaVv2VGIWg2u7sJOUQMI0WQqsR17NdRamfA1NBB67KdE3eVy
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -821,9 +821,17 @@ CREATE TABLE public.source_publications (
     keys_dirty boolean DEFAULT true NOT NULL,
     embargo_until date,
     monograph_id integer,
+    authors_hash text,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
+
+
+--
+-- Name: COLUMN source_publications.authors_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
 
 
 --
@@ -3774,5 +3782,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TokAzDqjiCSxyfgJsgnJJCavr9do5QPA15XQ68shtBxGMHGdeZMlHCKJwAIFI48
+\unrestrict lVgSzitzdhaFWKdaaVv2VGIWg2u7sJOUQMI0WQqsR17NdRamfA1NBB67KdE3eVy
 

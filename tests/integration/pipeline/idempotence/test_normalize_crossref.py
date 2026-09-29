@@ -15,6 +15,7 @@ Vérifie :
 
 from __future__ import annotations
 
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import create_all_publications
 
 CROSSREF_STAGING_DOCS = [
@@ -113,6 +114,7 @@ def _run_normalize_crossref(conn):
         publisher_repo_factory=PgPublisherGatewayQueries,
         publication_repo_factory=publication_repository,
         authorship_queries=authorship_queries,
+        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(conn)
 

@@ -105,6 +105,16 @@ class AuthorshipsBatchQueries(Protocol):
         """Réécrit en place des signatures rapprochées, en une instruction : identifiant, identité, personne et épinglage restent. Les positions peuvent s'y permuter. Leurs pays sont marqués à recalculer."""
         ...
 
+    def fetch_authors_hash(self, conn: Connection, source_publication_id: int) -> str | None:
+        """Empreinte du bloc auteurs à la dernière synchronisation des signatures de la notice (`source_publications.authors_hash`)."""
+        ...
+
+    def set_authors_hash(
+        self, conn: Connection, source_publication_id: int, authors_hash: str
+    ) -> None:
+        """Enregistre l'empreinte du bloc auteurs de la notice."""
+        ...
+
     def delete_source_authorship_addresses(self, conn: Connection, ids: list[int]) -> None:
         """Supprime les liens d'adresse de signatures réécrites, avant leur réécriture."""
         ...

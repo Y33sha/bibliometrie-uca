@@ -13,6 +13,7 @@ from sqlalchemy import bindparam, text
 
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories import publication_repository
+from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
     create_all_publications,
@@ -100,6 +101,7 @@ def _run_normalize_hal(conn):
             publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
+            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

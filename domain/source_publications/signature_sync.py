@@ -3,8 +3,6 @@
 La renormalisation d'une notice rapproche ses signatures entrantes de ses signatures en base. Une signature rapprochée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
 """
 
-import hashlib
-import json
 from collections import defaultdict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
@@ -78,7 +76,7 @@ def plan_signature_sync(
     )
 
 
-def signature_content_hash(
+def signature_content(
     *,
     position: int,
     raw_author_name: str,
@@ -86,9 +84,9 @@ def signature_content_hash(
     roles: Sequence[str] | None,
     neutralized_identifiers: JsonValue,
     addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None]],
-) -> str:
-    """Empreinte des champs qu'écrit la normalisation d'une signature. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source."""
-    payload = {
+) -> JsonValue:
+    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source."""
+    return {
         "position": position,
         "raw_author_name": raw_author_name,
         "is_corresponding": is_corresponding,
@@ -99,5 +97,3 @@ def signature_content_hash(
             for text, countries, suggested in addresses
         ],
     }
-    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode()).hexdigest()
