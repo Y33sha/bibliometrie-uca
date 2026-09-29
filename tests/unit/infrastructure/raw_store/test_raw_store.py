@@ -4,6 +4,8 @@ import gzip
 
 import pytest
 
+from infrastructure.raw_store import local as local_module
+from infrastructure.raw_store.base import UnreadablePayloadError
 from infrastructure.raw_store.factory import get_raw_store
 from infrastructure.raw_store.local import LocalFileRawStore
 
@@ -77,6 +79,30 @@ class TestLocalFileRawStore:
         store.put("scanr", "doi10.1002/abc", b"{}")
         assert store.delete("scanr", "doi10.1002/abc") is True
         assert store.exists("scanr", "doi10.1002/abc") is False
+
+    def test_get_truncated_file_raises_unreadable(self, tmp_path):
+        """Un gzip tronqué, laissé par une écriture interrompue, est signalé comme illisible."""
+        store = LocalFileRawStore(tmp_path)
+        store.put("hal", "hal-1", b'{"x": 1}' * 1000)
+        path = tmp_path / "hal" / "hal-1.json.gz"
+        path.write_bytes(path.read_bytes()[:20])
+        with pytest.raises(UnreadablePayloadError):
+            store.get("hal", "hal-1")
+
+    def test_interrupted_put_keeps_previous_payload(self, tmp_path, monkeypatch):
+        """Une écriture interrompue laisse la version précédente intacte, sans fichier temporaire."""
+        store = LocalFileRawStore(tmp_path)
+        store.put("hal", "hal-1", b'{"v": 1}')
+
+        def _interrupt(*args):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(local_module.os, "replace", _interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            store.put("hal", "hal-1", b'{"v": 2}')
+
+        assert store.get("hal", "hal-1") == b'{"v": 1}'
+        assert [p.name for p in (tmp_path / "hal").iterdir()] == ["hal-1.json.gz"]
 
 
 class TestFactory:

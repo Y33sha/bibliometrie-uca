@@ -11,6 +11,10 @@ from collections.abc import Iterator
 from typing import Protocol
 
 
+class UnreadablePayloadError(Exception):
+    """Le payload stocké pour une clé est illisible : fichier tronqué ou corrompu."""
+
+
 class RawStore(Protocol):
     """Contrat d'un store de payloads bruts, indexé par `(source, source_id)`."""
 
@@ -18,7 +22,7 @@ class RawStore(Protocol):
         """Écrit (ou écrase) le payload brut de `(source, source_id)`."""
 
     def get(self, source: str, source_id: str) -> bytes:
-        """Retourne le payload brut. Lève `KeyError` si absent."""
+        """Retourne le payload brut. Lève `KeyError` si absent, `UnreadablePayloadError` si illisible."""
 
     def exists(self, source: str, source_id: str) -> bool:
         """True si un payload est stocké pour `(source, source_id)`."""
