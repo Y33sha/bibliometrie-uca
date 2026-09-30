@@ -11,7 +11,7 @@ import sys
 from contextlib import nullcontext
 
 import pytest
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.phase_order import EXTRA_PHASES
@@ -92,6 +92,13 @@ class TestSelectPhasesToRun:
         assert "persons" in capsys.readouterr().err
 
 
+def _masquant(origine: BaseException) -> PendingRollbackError:
+    """L'erreur que lève l'annulation d'une transaction sur une connexion perdue, `origine` étant l'exception en cours de traitement."""
+    erreur = PendingRollbackError("Can't reconnect until invalid transaction is rolled back")
+    erreur.__context__ = origine
+    return erreur
+
+
 class TestRunOnePhase:
     def _executer(self, fn, recorder=None, args=None):
         recorder = recorder or _FakeRecorder()
@@ -134,6 +141,36 @@ class TestRunOnePhase:
 
         assert sortie.value.code == 130
         assert "run_pipeline --from persons" in caplog.text
+
+    def test_interruption_masquee_par_le_nettoyage(self):
+        """Un Ctrl+C en pleine requête invalide la connexion, et le nettoyage lève une erreur SQLAlchemy à la place : la phase se consigne quand même comme interrompue."""
+
+        def _interrompue(options):
+            raise _masquant(KeyboardInterrupt())
+
+        recorder = _FakeRecorder()
+        with pytest.raises(SystemExit) as sortie:
+            self._executer(_interrompue, recorder=recorder)
+
+        assert sortie.value.code == 130
+        (record,) = recorder.records
+        assert record["status"] == "warning"
+        assert record["signals"][0]["code"] == "interrupted"
+
+    def test_echec_consigne_avec_son_erreur_d_origine(self):
+        """L'erreur levée par le nettoyage masque celle d'origine : le message consigné donne les deux."""
+
+        def _en_echec(options):
+            raise _masquant(ValueError("colonne inconnue"))
+
+        recorder = _FakeRecorder()
+        with pytest.raises(SystemExit) as sortie:
+            self._executer(_en_echec, recorder=recorder)
+
+        assert sortie.value.code == 1
+        message = recorder.records[0]["signals"][0]["message"]
+        assert message.startswith("ValueError : colonne inconnue")
+        assert "PendingRollbackError" in message
 
     def test_echec_de_phase(self, caplog):
         def _en_echec(options):
