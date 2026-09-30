@@ -58,18 +58,22 @@ def select_target_pub_ids(conn: Connection, cutoff: int) -> list[int]:
 
 def count_dependents(conn: Connection, pub_ids: list[int]) -> tuple[int, int]:
     """Nombre de source_publications et de source_authorships rattachés aux publications cibles."""
-    sp_count = conn.execute(
-        text("SELECT COUNT(*) FROM source_publications WHERE publication_id = ANY(:ids)"),
-        {"ids": pub_ids},
-    ).scalar_one()
-    sa_count = conn.execute(
-        text("""
-            SELECT COUNT(*) FROM source_authorships sa
-            JOIN source_publications sp ON sp.id = sa.source_publication_id
-            WHERE sp.publication_id = ANY(:ids)
-        """),
-        {"ids": pub_ids},
-    ).scalar_one()
+    sp_count = scalar_int(
+        conn.execute(
+            text("SELECT COUNT(*) FROM source_publications WHERE publication_id = ANY(:ids)"),
+            {"ids": pub_ids},
+        )
+    )
+    sa_count = scalar_int(
+        conn.execute(
+            text("""
+                SELECT COUNT(*) FROM source_authorships sa
+                JOIN source_publications sp ON sp.id = sa.source_publication_id
+                WHERE sp.publication_id = ANY(:ids)
+            """),
+            {"ids": pub_ids},
+        )
+    )
     return sp_count, sa_count
 
 

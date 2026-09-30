@@ -3,7 +3,7 @@
 `get_missing_dois` bâtit la liste des DOI présents ailleurs mais absents de la cible.
 """
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, ScalarResult, text
 
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
@@ -71,6 +71,6 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
     params: dict[str, str] = {"target": target}
     if target_ra:
         params["target_ra"] = target_ra
-    rows = conn.execute(text(query), params).scalars()
+    rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
     # Re-nettoyage des candidats (idempotent) : `staging.doi` peut porter des DOI non normalisés ; `dict.fromkeys` dédoublonne en préservant l'ordre.
     return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))

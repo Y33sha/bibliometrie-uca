@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
-from sqlalchemy import Connection, Table, text
+from sqlalchemy import Column, Connection, Table, text
+from sqlalchemy.sql.base import ReadOnlyColumnCollection
 
 from domain.config import INSTITUTION_CONFIG_KEYS
 from domain.types import JsonValue
@@ -32,8 +33,12 @@ _DB_DIR = PROJECT_ROOT / "infrastructure" / "db"
 EXCLUDED_COLUMNS = frozenset({"created_at"})
 
 
+type SeedTable = Table[ReadOnlyColumnCollection[str, Column[object]]]
+"""Table du schéma, quelles que soient ses colonnes."""
+
+
 class _TableExportee(TypedDict):
-    table: Table
+    table: SeedTable
 
 
 class TableSpec(_TableExportee, total=False):
@@ -58,7 +63,7 @@ class SeedSpec:
 class SeedSection:
     """Lignes d'une table à écrire dans un seed, valeurs dans l'ordre de `exported_columns`. `where` restreint les lignes supprimées au chargement."""
 
-    table: Table
+    table: SeedTable
     rows: list[tuple[JsonValue, ...]]
     where: str | None = None
 
@@ -93,7 +98,7 @@ INSTITUTION_SEED = SeedSpec(
 )
 
 
-def exported_columns(table: Table) -> list[str]:
+def exported_columns(table: SeedTable) -> list[str]:
     """Colonnes exportées de `table`, dans l'ordre de sa définition."""
     return [c.name for c in table.columns if c.name not in EXCLUDED_COLUMNS]
 

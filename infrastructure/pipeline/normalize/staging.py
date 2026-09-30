@@ -8,7 +8,7 @@ La table `staging` stocke les raw_data téléchargées par les extracteurs, avec
 import logging
 from collections.abc import Mapping
 
-from sqlalchemy import Connection, Row, bindparam, text
+from sqlalchemy import Connection, Row, ScalarResult, bindparam, text
 
 from application.ports.pipeline.normalize.staging import (
     StagingQueries,
@@ -46,7 +46,7 @@ _MARK_DONE_SQL = text(
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
     """Set des `source_id` déjà présents en staging pour une source."""
-    rows = conn.execute(
+    rows: ScalarResult[str] = conn.execute(
         text("SELECT source_id FROM staging WHERE source = :source"),
         {"source": source},
     ).scalars()
