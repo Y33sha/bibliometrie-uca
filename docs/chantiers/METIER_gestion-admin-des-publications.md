@@ -16,7 +16,7 @@
 - Détecteur de fusions suspectes : recouvrement d'auteurs faible ou nul, titre court ou générique, `container_title` divergent pour les chapitres, groupe anormalement gros.
 - Verdicts ancrés sur les `source_publications`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion forcée (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
 
-La fiche [Preprints fusionnés avec leur article par substitution de DOI](DATA_fusions-preprints-par-doi.md) renvoie un cas de fusion erronée à « l'outil admin de dédoublonnage ».
+La fiche [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md) renvoie un cas de fusion erronée à « l'outil admin de dédoublonnage ».
 
 **Volumétrie des quatre détecteurs**, mesurée sur 63 164 publications et 255 267 notices sources, dont 60 257 groupes de deux notices ou plus.
 

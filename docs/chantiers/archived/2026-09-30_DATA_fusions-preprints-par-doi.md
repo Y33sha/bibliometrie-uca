@@ -2,7 +2,7 @@
 
 ## Contexte
 
-La phase `metadata_correction` fait converger les formes secondaires d'une œuvre sur son DOI principal. Deux relations DataCite déclenchent cette substitution ([shared_doi.py](../../domain/source_publications/metadata_correction/shared_doi.py)) :
+La phase `metadata_correction` fait converger les formes secondaires d'une œuvre sur son DOI principal. Deux relations DataCite déclenchent cette substitution ([shared_doi.py](../../../domain/source_publications/metadata_correction/shared_doi.py)) :
 
 - `IsVersionOf` : version → concept ;
 - `IsVariantFormOf` : forme variante → version publiée.
@@ -22,7 +22,7 @@ Exemples de publications fusionnées : 2, 7, 8, 9, 14 (preprint arXiv et article
 
 La substitution fausse aussi la revue. L'étape qui déduit la revue du préfixe DOI lit le DOI substitué : 1 327 notices DataCite arXiv portent la revue de l'article publié.
 
-La phase `relations` écarte les relations de même œuvre, qu'elle laisse à la déduplication ([relations.py](../../domain/publications/relations.py)). Elle type déjà une relation d'après le couple de types de documents : un preprint face à un article donne `is_preprint_of`.
+La phase `relations` écarte les relations de même œuvre, qu'elle laisse à la déduplication ([relations.py](../../../domain/publications/relations.py)). Elle type déjà une relation d'après le couple de types de documents : un preprint face à un article donne `is_preprint_of`.
 
 La revue ArXiv.org porte le type `preprint_server` et le préfixe `10.48550`. La règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` type donc en `preprint` toute notice qui lui est rattachée.
 
@@ -66,9 +66,8 @@ L'audit des 735 publications de copies CERN, RWTH et GSI montre des notices de r
 - [x] `meme_oeuvre_declaree` : une copie `IsVariantFormOf` converge sur la forme publiée quel que soit le préfixe, sauf une notice `preprint`.
 - [x] Tests : copie de l'article convergente, copie de preprint distincte et reliée par `is_preprint_of`.
 - [x] La règle lit le type de la notice DataCite qui mentionne la cible, et ignore celui des autres notices au même DOI. Une notice qui mentionne plusieurs cibles converge sur la version plutôt que sur la variante.
-- [ ] Run et contrôle : les publications de copies rejoignent leur article.
+- [x] Run et contrôle : 1 022 copies ont rejoint la publication de leur article (GSI 236, RWTH 120, CERN 666). Les copies typées `preprint` restent à part.
 
 ## Questions ouvertes
 
 - **Déclaration erronée.** `10.3204/pubdb-2019-03026`, copie d'un article sur les squarks bottom, déclare `IsVariantFormOf` vers un article sur W±Z. La fusion la rattache à tort : cas à défaire dans l'outil admin de dédoublonnage.
-- **Revue « II ».** 51 copies typées `preprint` sont rattachées à une revue intitulée « II ». Origine non recherchée.
