@@ -43,6 +43,10 @@ class ThesesExtractAdapter(Protocol):
 
     def extract_id(self, these: Mapping[str, JsonValue]) -> str: ...
 
+    def is_ongoing(self, these: Mapping[str, JsonValue]) -> bool:
+        """Vrai pour une thèse en cours, qui n'a ni soutenance ni NNT."""
+        ...
+
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page(self, query: str, *, debut: int, nombre: int) -> Mapping[str, JsonValue]: ...

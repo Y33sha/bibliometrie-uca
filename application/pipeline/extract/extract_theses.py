@@ -40,7 +40,7 @@ def extract_theses(
 ) -> tuple[int, int, int, int]:
     """Extrait toutes les thèses des établissements (par PPN).
 
-    Si `year` est fourni, ne conserve que les thèses dont le NNT commence par cette année (filtre post-fetch ; ne ramène pas les en-cours qui n'ont pas d'année dans leur id). `avancement` compte les thèses parcourues, et retient celles que le filtre garde.
+    Si `year` est fourni, conserve les thèses soutenues cette année-là (NNT commençant par l'année) et toutes les thèses en cours. `avancement` compte les thèses parcourues, et retient celles que le filtre garde.
 
     Retourne (total, nouveaux, mis à jour, inchangés).
     """
@@ -72,7 +72,11 @@ def extract_theses(
             if not theses_id:
                 continue
 
-            if year is not None and not theses_id.startswith(str(year)):
+            if (
+                year is not None
+                and not adapter.is_ongoing(these)
+                and not theses_id.startswith(str(year))
+            ):
                 continue
 
             outcome = adapter.upsert_these(conn, these)
@@ -128,11 +132,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
         else:
             # `total` porte toutes les thèses des établissements ; le filtre par année
             # n'en retient qu'une partie, et le bilan porte sur celles-là.
-            self._ecrit_bilan(
-                stats,
-                trouves=inserted + updated + unchanged,
-                participe=(f"soutenue en {args.year}", f"soutenues en {args.year}"),
-            )
+            self._ecrit_bilan(stats, trouves=inserted + updated + unchanged)
         return stats
 
 

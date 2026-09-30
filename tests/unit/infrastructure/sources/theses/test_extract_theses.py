@@ -41,6 +41,14 @@ class TestExtractId:
         assert adapter.extract_id({}) == ""
 
 
+class TestIsOngoing:
+    def test_status_en_cours(self, adapter):
+        assert adapter.is_ongoing({"id": "s367812", "status": "enCours"}) is True
+
+    def test_defended_thesis(self, adapter):
+        assert adapter.is_ongoing({"id": "2021UCFAC022", "status": "soutenue"}) is False
+
+
 class TestExtractDoi:
     def test_returns_stripped_doi(self, adapter):
         assert adapter.extract_doi({"doi": "  10.1000/abc  "}) == "10.1000/abc"

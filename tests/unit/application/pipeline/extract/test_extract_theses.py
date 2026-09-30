@@ -29,6 +29,7 @@ def _adapter(pages: list[list[dict]], *, total: int | None = None) -> MagicMock:
     a.build_query.return_value = "q"
     a.per_page.return_value = 100
     a.extract_id.side_effect = lambda these: these.get("id", "")
+    a.is_ongoing.side_effect = lambda these: these.get("status") == "enCours"
     a.upsert_these.side_effect = lambda conn, these: these["_route"]
 
     total_hits = total if total is not None else sum(len(p) for p in pages)
@@ -114,7 +115,15 @@ def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(caplog):
     adapter = _adapter([[_these("2020A"), _these("2021A")]])
     with caplog.at_level(logging.INFO, logger=_LOGGER.name):
         _extracteur(adapter, ["PPN1"]).run(argparse.Namespace(year=2021))
-    assert "1 thèse soutenue en 2021 : 1 nouvelle, 0 mise à jour, 0 inchangée" in caplog.text
+    assert "1 thèse trouvée : 1 nouvelle, 0 mise à jour, 0 inchangée" in caplog.text
+
+
+def test_une_annee_retient_aussi_les_theses_en_cours():
+    """Une thèse en cours n'a pas d'année dans son identifiant : elle est retenue quelle que soit l'année demandée."""
+    adapter = _adapter(
+        [[_these("2020A"), _these("2021A"), {**_these("s367812"), "status": "enCours"}]]
+    )
+    assert _extraire(adapter, year=2021) == (3, 2, 0, 0)
 
 
 def test_run_sans_ppn_configure_refuse():
