@@ -17,8 +17,8 @@ Justifications :
 - `memoir` : essentiellement DUMAS (Master), étudiants pas membres permanents — les
   inclure polluerait `persons` de comptes éphémères.
 
-Deux points d'application : la réconciliation ne crée pas de publication pour un groupe dont
-tous les enregistrements typés sont hors périmètre (`domain/publications/reconciliation.py`), et
-`refresh_from_sources` supprime la publication dont le type résolu l'est. Retirer un type de cet
+Deux points d'application : un enregistrement de l'un de ces types ne fonde pas de publication
+à la réconciliation (`domain/publications/reconciliation.py`), et `refresh_from_sources` supprime
+la publication dont le type résolu est de cet ensemble. Retirer un type de cet
 ensemble suffit à le réintégrer à la matérialisation.
 """

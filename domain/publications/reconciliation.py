@@ -103,16 +103,16 @@ type _Claim = tuple[int | None, bool, int, tuple[int, ...]]
 
 
 def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> _Claim | None:
-    """Revendication d'ancre d'une partition, ou `None` si **skip** (orphelins hors-périmètre).
+    """Revendication d'ancre d'une partition, ou `None` si **skip** (orphelins dont aucun ne peut fonder une publication).
 
     - Partition contenant ≥1 SP matérialisée → revendique un pub existant : porteur du DOI
       (revendication **forte**, départage `min`), sinon le pub du plus petit `source_publication_id`
       *parmi les SP matérialisées* (**faible**).
     - Partition d'orphelins (aucune SP matérialisée) → `preferred = None` (**create**) si ≥1 membre
-      in-périmètre **et** ≥1 membre matérialisable (titre + année — gate `has_minimal_publication_metadata`,
-      sinon `pub_year NOT NULL` ferait échouer la création) ; sinon `None` (**skip**, les SP restent orphelines).
-      Une partition dont tous les membres typés sont hors périmètre métier (`OUT_OF_SCOPE_DOC_TYPES`) est
-      aussi en **skip** : son type résolu serait hors périmètre quel que soit l'arbitrage.
+      peut fonder une publication (in-périmètre et d'un type du périmètre métier, cf.
+      `_can_found_publication`) **et** ≥1 membre est matérialisable (titre + année — gate
+      `has_minimal_publication_metadata`, sinon `pub_year NOT NULL` ferait échouer la création) ;
+      sinon `None` (**skip**, les SP restent orphelines).
 
     Porteur du DOI **hors voisinage** (`existing_pub_by_doi`) : une publication existante porte
     déjà le DOI de la partition sans qu'aucune SP du voisinage n'y soit rattachée (orpheline après
@@ -142,11 +142,14 @@ def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> 
     if external_carrier is not None:
         return external_carrier, True, min_sp, sp_ids
     creatable = any(m.title_normalized and m.pub_year for m in part)
-    doc_types = {m.doc_type for m in part if m.doc_type}
-    out_of_scope = bool(doc_types) and doc_types <= OUT_OF_SCOPE_DOC_TYPES
-    if creatable and not out_of_scope and any(m.in_perimeter for m in part):
+    if creatable and any(_can_found_publication(m) for m in part):
         return None, False, min_sp, sp_ids  # create
     return None  # skip
+
+
+def _can_found_publication(member: ReconcileMember) -> bool:
+    """Une SP fonde une publication si elle est in-périmètre et d'un type du périmètre métier."""
+    return member.in_perimeter and member.doc_type not in OUT_OF_SCOPE_DOC_TYPES
 
 
 def plan_reconciliation(
