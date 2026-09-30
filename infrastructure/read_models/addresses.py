@@ -16,6 +16,7 @@ from application.ports.read_models.addresses_queries import (
     AddressStructureSummary,
     StructureLinkState,
 )
+from domain.types import JsonValue
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (
@@ -224,7 +225,7 @@ class PgAddressesQueries(AddressesQueries):
         ]
 
     def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]:
-        structures_json = self._conn.execute(
+        structures_json: list[JsonValue] | None = self._conn.execute(
             text(address_structures_json(":id")), {"id": addr_id}
         ).scalar_one_or_none()
         return [AddressStructureSummary.model_validate(s) for s in (structures_json or [])]

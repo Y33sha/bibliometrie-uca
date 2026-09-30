@@ -23,6 +23,7 @@ from sqlalchemy import Connection, text
 from application.services.persons.core import RhImportOutcome, import_rh_person
 from domain.normalize import sanitize_optional_text
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository
 
@@ -265,7 +266,7 @@ def main() -> None:
         inserted = import_persons(conn, records, export_date=args.export_date)
         log.info("\n=== Terminé : %s personnes insérées ===", inserted)
 
-        total = conn.execute(text("SELECT COUNT(*) AS n FROM persons")).scalar_one()
+        total = scalar_int(conn.execute(text("SELECT COUNT(*) AS n FROM persons")))
         log.info("  Total en base : %s personnes", total)
 
     finally:

@@ -67,7 +67,7 @@ def pipeline_lock() -> Iterator[None]:
         conn.execute(
             text("SELECT set_config('application_name', :nom, false)"), {"nom": _identite()}
         )
-        pris = conn.execute(
+        pris: bool = conn.execute(
             text("SELECT pg_try_advisory_lock(:cle)"), {"cle": PIPELINE_LOCK_KEY}
         ).scalar_one()
         if not pris:

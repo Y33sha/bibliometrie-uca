@@ -417,7 +417,7 @@ class PgJournalGatewayQueries(
 
     def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
         issns_of = issns_by_journal(self._conn)
-        released = set(
+        released: set[str] = set(
             self._conn.execute(
                 select(journal_issns.c.issn).where(
                     journal_issns.c.journal_id.is_(None),
@@ -485,7 +485,7 @@ class PgJournalGatewayQueries(
                 .where(journals.c.id == journal_id)
                 .values(title=title, title_normalized=normalize_text(title))
             )
-            publisher_id = self._conn.execute(
+            publisher_id: int | None = self._conn.execute(
                 select(journals.c.publisher_id).where(journals.c.id == journal_id)
             ).scalar_one()
             self.add_journal_name_form(journal_id, normalize_text(title), publisher_id)

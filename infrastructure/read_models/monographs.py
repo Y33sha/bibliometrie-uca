@@ -21,6 +21,7 @@ from application.ports.read_models.monographs_queries import (
 )
 from domain.normalize import normalize_text
 from domain.publications.identifiers import isbn_search_prefix
+from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.entity_facet import entity_name_clause
 
 _COLUMNS = """
@@ -91,10 +92,12 @@ class PgMonographQueries(MonographQueries):
         self, *, filters: MonographFilters, sort: MonographSort, page: int, per_page: int
     ) -> MonographListResponse:
         where, binds = _where(filters)
-        total = self._conn.execute(
-            text(f"SELECT count(*) FROM monographs m WHERE {where}"),  # noqa: S608
-            binds,
-        ).scalar_one()
+        total = scalar_int(
+            self._conn.execute(
+                text(f"SELECT count(*) FROM monographs m WHERE {where}"),  # noqa: S608
+                binds,
+            )
+        )
         rows = self._conn.execute(
             text(
                 f"SELECT {_COLUMNS} {_FROM} WHERE {where}"  # noqa: S608

@@ -7,7 +7,7 @@ La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion d'édit
 
 from typing import NamedTuple
 
-from sqlalchemy import Connection, delete, func, select, text, update
+from sqlalchemy import Connection, ScalarResult, delete, func, select, text, update
 
 from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.errors import NotFoundError
@@ -93,7 +93,7 @@ class PgPublisherRepository(PublisherRepository):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def crossref_member_ids(self, publisher_id: int) -> tuple[int, ...]:
-        rows = self._conn.execute(
+        rows: ScalarResult[int] = self._conn.execute(
             select(doi_prefixes.c.crossref_member_id)
             .where(
                 doi_prefixes.c.publisher_id == publisher_id,
