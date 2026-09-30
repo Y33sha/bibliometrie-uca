@@ -20,15 +20,16 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.entity_resolution import connected_components
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 
 
 @dataclass(frozen=True, slots=True)
 class ReconcileMember:
     """Une `source_publication` du voisinage de réconciliation.
 
-    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de la SP, **`None` si orpheline** (pas encore matérialisée) ; `publication_doi` = DOI canonique de cette publication courante (`None` si orpheline) ; `in_perimeter` = la SP a ≥1 authorship in-périmètre ; `title_normalized` / `pub_year` = métadonnées minimales requises pour matérialiser une pub neuve.
+    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de la SP, **`None` si orpheline** (pas encore matérialisée) ; `publication_doi` = DOI canonique de cette publication courante (`None` si orpheline) ; `in_perimeter` = la SP a ≥1 authorship in-périmètre ; `title_normalized` / `pub_year` = métadonnées minimales requises pour matérialiser une pub neuve ; `doc_type` = type de la SP.
 
-    `in_perimeter`, `title_normalized` et `pub_year` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
+    `in_perimeter`, `title_normalized`, `pub_year` et `doc_type` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
     """
 
     source_publication_id: int
@@ -39,6 +40,7 @@ class ReconcileMember:
     in_perimeter: bool = False
     title_normalized: str | None = None
     pub_year: int | None = None
+    doc_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +111,8 @@ def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> 
     - Partition d'orphelins (aucune SP matérialisée) → `preferred = None` (**create**) si ≥1 membre
       in-périmètre **et** ≥1 membre matérialisable (titre + année — gate `has_minimal_publication_metadata`,
       sinon `pub_year NOT NULL` ferait échouer la création) ; sinon `None` (**skip**, les SP restent orphelines).
+      Une partition dont tous les membres typés sont hors périmètre métier (`OUT_OF_SCOPE_DOC_TYPES`) est
+      aussi en **skip** : son type résolu serait hors périmètre quel que soit l'arbitrage.
 
     Porteur du DOI **hors voisinage** (`existing_pub_by_doi`) : une publication existante porte
     déjà le DOI de la partition sans qu'aucune SP du voisinage n'y soit rattachée (orpheline après
@@ -138,7 +142,9 @@ def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> 
     if external_carrier is not None:
         return external_carrier, True, min_sp, sp_ids
     creatable = any(m.title_normalized and m.pub_year for m in part)
-    if creatable and any(m.in_perimeter for m in part):
+    doc_types = {m.doc_type for m in part if m.doc_type}
+    out_of_scope = bool(doc_types) and doc_types <= OUT_OF_SCOPE_DOC_TYPES
+    if creatable and not out_of_scope and any(m.in_perimeter for m in part):
         return None, False, min_sp, sp_ids  # create
     return None  # skip
 
