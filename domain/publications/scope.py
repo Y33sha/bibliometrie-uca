@@ -17,6 +17,8 @@ Justifications :
 - `memoir` : essentiellement DUMAS (Master), étudiants pas membres permanents — les
   inclure polluerait `persons` de comptes éphémères.
 
-Point d'application unique : le gate de `refresh_from_sources`. Retirer un type de cet
+Deux points d'application : la réconciliation ne crée pas de publication pour un groupe dont
+tous les enregistrements typés sont hors périmètre (`domain/publications/reconciliation.py`), et
+`refresh_from_sources` supprime la publication dont le type résolu l'est. Retirer un type de cet
 ensemble suffit à le réintégrer à la matérialisation.
 """

@@ -11,7 +11,18 @@ from domain.publications.reconciliation import (
 )
 
 
-def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False, tn="t", year=2024):
+def _m(
+    sp_id,
+    pub_id,
+    *,
+    pub_doi=None,
+    doi=None,
+    tokens=(),
+    in_perimeter=False,
+    tn="t",
+    year=2024,
+    doc_type=None,
+):
     return ReconcileMember(
         source_publication_id=sp_id,
         publication_id=pub_id,
@@ -21,6 +32,7 @@ def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False, 
         in_perimeter=in_perimeter,
         title_normalized=tn,
         pub_year=year,
+        doc_type=doc_type,
     )
 
 
@@ -198,6 +210,29 @@ class TestAssignmentOfOrphans:
     def test_lone_orphan_out_of_perimeter_skipped(self):
         plan = plan_reconciliation([_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")])])
         assert plan.groups == ()
+
+    def test_orphans_all_out_of_scope_skipped(self):
+        """Un groupe dont tous les enregistrements typés sont hors périmètre métier ne crée pas de publication : son type résolu serait hors périmètre."""
+        key = [("hal_id", "dumas-01234567")]
+        plan = plan_reconciliation(
+            [
+                _m(1, None, tokens=key, in_perimeter=True, doc_type="memoir"),
+                _m(2, None, tokens=key, in_perimeter=True, doc_type="memoir"),
+                _m(3, None, tokens=key, in_perimeter=True, doc_type=None),
+            ]
+        )
+        assert plan.groups == ()
+
+    def test_orphans_with_one_in_scope_type_created(self):
+        """Un enregistrement d'un type du périmètre suffit : l'arbitrage du type revient au recalcul des métadonnées."""
+        key = [("hal_id", "dumas-01234567")]
+        plan = plan_reconciliation(
+            [
+                _m(1, None, tokens=key, in_perimeter=True, doc_type="memoir"),
+                _m(2, None, tokens=key, in_perimeter=True, doc_type="article"),
+            ]
+        )
+        assert len(plan.groups) == 1
 
     def test_create_gated_by_missing_metadata(self):
         """Orphelin in-périmètre mais sans titre/année → pas de create (skip), comme le gate

@@ -52,10 +52,11 @@ Ces fusions rendent aussi le type de la publication instable. La publication pre
 
 ### 3. Run et contrôle
 
-- [ ] `run_pipeline --from publications --rebuild-publications`.
-- [ ] Publications scindées, et relations créées entre elles.
-- [ ] Publications 140244, 22606 et 11084 : une publication par dépôt HAL.
-- [ ] Publications dont la source la plus prioritaire porte deux types : décompte restant.
+- [x] `run_pipeline --from publications --rebuild-publications`.
+- [x] Publications scindées : la base passe de 65 869 à 66 927 publications.
+- [ ] Relations créées entre les publications scindées : à relever après la phase `relations`.
+- [x] Publications 140244 et 22606 : une publication par dépôt HAL. La publication 11084 garde ses quatre dépôts : trois communications de même titre et de même année, et un poster que deux notices ScanR typées `other`, de même titre et de même année, relient aux communications.
+- [x] Publications dont la source la plus prioritaire porte deux types : 67, contre 425.
 
 ### 4. Documentation
 

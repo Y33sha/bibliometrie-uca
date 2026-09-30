@@ -52,6 +52,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         pub_year=row.pub_year,
+        doc_type=row.doc_type,
     )
 
 
