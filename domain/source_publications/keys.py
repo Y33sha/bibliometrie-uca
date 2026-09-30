@@ -2,7 +2,7 @@
 
 Une *clé de confirmation* est un attribut cross-source par lequel deux `source_publications` attestent du même document. Deux familles :
 
-- **Identifiants** : DOI, NNT, HAL ID, PMID, arXiv ID — égalité directe.
+- **Identifiants** : DOI, NNT, HAL ID, PMID, arXiv ID — égalité directe. Une notice qui liste plusieurs identifiants HAL a pour clé le premier : le sien pour une notice HAL, le dépôt dont elle est tirée pour une notice ScanR, sa première localisation pour une notice OpenAlex.
 - **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<pub_year>")`, pour **tout** `doc_type` (empiriquement ~99 % de même-œuvre par type au-delà du seuil de longueur de titre). Le `doc_type` dans la clé impose l'égalité de type (« DOI = identité » étendue au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; `thesis` et `ongoing_thesis` ne co-bloquent jamais (leurs années diffèrent — inscription vs soutenance). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur), qui exigeraient un second accord pairwise, relèvent d'un mécanisme distinct.
 
 La projection est l'unique définition des clés que porte une `source_publication`, consommée par la passe d'assignation et de réconciliation des composantes (`reconcile_components`) — aucun autre site ne ré-encode son extraction.
@@ -23,7 +23,7 @@ CONFIRMATION_ID_TYPES = (
     ExternalIdType.PMID,
     ExternalIdType.NNT,
 )
-# Clés de confirmation à valeur unique, comparées par égalité directe. `hal_id` est une liste.
+# Clés de confirmation stockées en valeur unique dans `external_ids`, comparées par égalité directe. `hal_id` y est une liste.
 SCALAR_CONFIRMATION_ID_TYPES = tuple(
     t for t in CONFIRMATION_ID_TYPES if t not in MULTIVALUED_ID_TYPES
 )
@@ -39,14 +39,14 @@ DISCRIMINANT_TITLE_MIN_LENGTH = 30
 class ConfirmationKeys:
     """Clés de confirmation portées par une `source_publication`, normalisées.
 
-    `hal_ids` est multivalué (une `source_publication` peut référencer plusieurs dépôts HAL) ; les autres clés sont au plus unitaires. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour toute `source_publication` à `doc_type` présent et titre assez long. Une clé absente vaut `None` (tuple vide pour `hal_ids`).
+    Chaque clé est au plus unitaire ; `hal_id` est le premier identifiant HAL que liste la `source_publication`. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour toute `source_publication` à `doc_type` présent et titre assez long. Une clé absente vaut `None`.
     """
 
     doi: str | None
     nnt: str | None
     pmid: str | None
     arxiv_id: str | None
-    hal_ids: tuple[str, ...]
+    hal_id: str | None
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
@@ -65,7 +65,8 @@ class ConfirmationKeys:
             toks.add((ExternalIdType.ARXIV_ID, self.arxiv_id))
         if self.metadata_block:
             toks.add(("metadata_block", self.metadata_block))
-        toks.update((ExternalIdType.HAL_ID, hal) for hal in self.hal_ids)
+        if self.hal_id:
+            toks.add((ExternalIdType.HAL_ID, self.hal_id))
         return frozenset(toks)
 
 
@@ -94,11 +95,8 @@ def project_confirmation_keys(
     arxiv_vo = ArxivId.try_parse(arxiv_raw) if isinstance(arxiv_raw, str) else None
 
     raw_hal = ids.get(ExternalIdType.HAL_ID)
-    hal_ids = tuple(
-        str(hal_vo)
-        for hal in (raw_hal if isinstance(raw_hal, list) else [])
-        if isinstance(hal, str) and (hal_vo := HALId.try_parse(hal)) is not None
-    )
+    first_hal = raw_hal[0] if isinstance(raw_hal, list) and raw_hal else None
+    hal_vo = HALId.try_parse(first_hal) if isinstance(first_hal, str) else None
 
     metadata_block = (
         f"{doc_type}|{title_normalized}|{pub_year}"
@@ -114,6 +112,6 @@ def project_confirmation_keys(
         nnt=str(nnt_vo) if nnt_vo else None,
         pmid=str(pmid_vo) if pmid_vo else None,
         arxiv_id=str(arxiv_vo) if arxiv_vo else None,
-        hal_ids=hal_ids,
+        hal_id=str(hal_vo) if hal_vo else None,
         metadata_block=metadata_block,
     )

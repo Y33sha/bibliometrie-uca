@@ -62,19 +62,20 @@ class TestArxivId:
         assert _keys(None, {"pmid": "12345"}).arxiv_id is None
 
 
-class TestHalIds:
-    def test_hal_ids_list_normalized(self):
-        """`hal_id` est multivalué : chaque élément est normalisé (sans version)."""
+class TestHalId:
+    def test_first_listed_hal_id_normalized(self):
+        """La clé HAL est le premier identifiant listé, normalisé (sans version). Les suivants ne fusionnent rien."""
         keys = _keys(None, {"hal_id": ["hal-04123456v2", "tel-00112233"]})
-        assert keys.hal_ids == ("hal-04123456", "tel-00112233")
+        assert keys.hal_id == "hal-04123456"
+        assert ("hal_id", "tel-00112233") not in keys.tokens()
 
-    def test_hal_id_invalid_element_dropped(self):
-        keys = _keys(None, {"hal_id": ["hal-04123456", "bogus"]})
-        assert keys.hal_ids == ("hal-04123456",)
+    def test_invalid_first_element_gives_no_key(self):
+        """Seul le premier élément compte : malformé, il ne donne aucune clé HAL."""
+        assert _keys(None, {"hal_id": ["bogus", "hal-04123456"]}).hal_id is None
 
     def test_hal_id_not_a_list_ignored(self):
         """`hal_id` non-liste (forme inattendue) → ignoré, pas de crash."""
-        assert _keys(None, {"hal_id": "hal-04123456"}).hal_ids == ()
+        assert _keys(None, {"hal_id": "hal-04123456"}).hal_id is None
 
 
 class TestMetadataBlock:
@@ -118,14 +119,14 @@ class TestMetadataBlock:
 class TestMalformedExternalIds:
     def test_none_external_ids(self):
         assert _keys("10.1/x") == ConfirmationKeys(
-            doi="10.1/x", nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
+            doi="10.1/x", nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
         )
 
     def test_non_str_values_ignored(self):
         """`external_ids` peut porter des listes (issn/isbn) ou None : ignorés sans crash."""
         keys = _keys(None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"})
         assert keys == ConfirmationKeys(
-            doi=None, nnt=None, pmid="12345", arxiv_id=None, hal_ids=(), metadata_block=None
+            doi=None, nnt=None, pmid="12345", arxiv_id=None, hal_id=None, metadata_block=None
         )
 
 
@@ -136,7 +137,7 @@ class TestTokens:
             nnt="n",
             pmid="p",
             arxiv_id="a",
-            hal_ids=("h1", "h2"),
+            hal_id="h1",
             metadata_block="conference_paper|titre|2020",
         )
         assert keys.tokens() == frozenset(
@@ -146,19 +147,18 @@ class TestTokens:
                 ("pmid", "p"),
                 ("arxiv_id", "a"),
                 ("hal_id", "h1"),
-                ("hal_id", "h2"),
                 ("metadata_block", "conference_paper|titre|2020"),
             }
         )
 
     def test_absent_keys_produce_no_token(self):
         keys = ConfirmationKeys(
-            doi="d", nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
+            doi="d", nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
         )
         assert keys.tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
         empty = ConfirmationKeys(
-            doi=None, nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
+            doi=None, nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
         )
         assert empty.tokens() == frozenset()

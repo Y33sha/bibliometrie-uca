@@ -114,6 +114,13 @@ class TestUniverse:
         )
         assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
+    def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
+        """La clé HAL d'une notice est le premier identifiant qu'elle liste : les suivants ne relient rien."""
+        conn = sa_sync_conn
+        dirty = _seed_sp(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
+        _seed_sp(conn, source_id="b", external_ids={"hal_id": ["hal-1", "hal-2"]}, keys_dirty=False)
+        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty}
+
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
         """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
         conn = sa_sync_conn
@@ -684,3 +691,36 @@ class TestStaleMembership:
         assert (preprint_dirty, published_dirty) == (False, False)
         assert _distinct_dois(conn, preprint_pub) == {self.PREPRINT_DOI}
         assert _distinct_dois(conn, published_pub) == {self.PUBLISHED_DOI}
+
+
+class TestFirstHalIdKey:
+    """Une notice qui liste deux dépôts HAL rejoint la publication du premier, et laisse les deux dépôts distincts."""
+
+    def test_bridge_notice_joins_first_listed_deposit_only(self, sa_sync_conn):
+        conn = sa_sync_conn
+        pub = _seed_pub(conn)
+        first = _seed_sp(
+            conn,
+            source_id="hal-01234567",
+            publication_id=pub,
+            external_ids={"hal_id": ["hal-01234567"]},
+            doc_type="conference_paper",
+        )
+        second = _seed_sp(
+            conn,
+            source_id="hal-07654321",
+            publication_id=pub,
+            external_ids={"hal_id": ["hal-07654321"]},
+            doc_type="book_chapter",
+        )
+        bridge = _seed_sp(
+            conn,
+            source_id="W1",
+            publication_id=pub,
+            external_ids={"hal_id": ["hal-01234567", "hal-07654321"]},
+        )
+
+        reconcile(conn, _Q, publication_repo=publication_repository(conn))
+
+        assert _sp_state(conn, bridge)[0] == _sp_state(conn, first)[0]
+        assert _sp_state(conn, second)[0] != _sp_state(conn, first)[0]

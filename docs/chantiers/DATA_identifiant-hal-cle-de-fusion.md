@@ -11,7 +11,7 @@ Des publications réunissent à tort des documents distincts, qui ont chacun leu
 
 La fusion vient d'OpenAlex ou de ScanR, qui rapprochent ces dépôts : leur notice liste plusieurs identifiants HAL. Chaque identifiant listé est une clé de fusion ([keys.py](../../domain/source_publications/keys.py)). La notice réunit donc dans une même publication des notices HAL qui n'ont entre elles aucune clé commune.
 
-Une notice OpenAlex ou ScanR est le seul lien de 2 581 paires de notices HAL, dans 1 790 publications.
+Une notice OpenAlex ou ScanR relie 2 581 paires de notices HAL qui n'ont aucun identifiant commun (DOI, NNT, PMID), dans 1 790 publications. Les paires de même type, même titre et même année restent réunies par cette clé. En simulation, la règle retenue scinde 915 publications : 845 en deux, 70 en trois ou plus.
 
 | Types des deux notices HAL | Paires | Même titre | Même année | Même conteneur |
 |---|---|---|---|---|
@@ -39,8 +39,10 @@ Ces fusions rendent aussi le type de la publication instable. La publication pre
 
 ### 1. Clé de fusion HAL
 
-- [ ] `project_confirmation_keys` : seul le premier identifiant HAL listé donne un token de fusion.
-- [ ] Tests : une notice OpenAlex listant deux notices HAL rejoint la première, et les deux notices HAL forment deux publications.
+- [x] `project_confirmation_keys` : seul le premier identifiant HAL listé donne un token de fusion.
+- [x] Requête de voisinage de la réconciliation : égalité sur le premier identifiant HAL.
+- [x] Migration : index btree sur le premier identifiant HAL, à la place de l'index GIN sur le tableau.
+- [x] Tests : une notice OpenAlex listant deux notices HAL rejoint la première, et les deux notices HAL forment deux publications.
 
 ### 2. Relations entre publications à clé partagée
 
