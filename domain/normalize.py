@@ -35,7 +35,7 @@ _LATIN_LETTERS = str.maketrans(
 )
 
 
-_MARKUP_RE = re.compile(r"</?([A-Za-z][^\s<>/]*)[^<>]*>")
+_MARKUP_RE = re.compile(r"</?([A-Za-z][^\s<>/]*)(?:[\s/][^<>]*)?>")
 
 # Balises de mise en forme (HTML, JATS, MathML), qui s'insèrent dans un mot : `CO<sub>2</sub>`, `<i>E</i>. coli`. Comparées sans préfixe d'espace de noms (`jats:sub`, `mml:mi`).
 _INLINE_TAGS = frozenset(
@@ -55,7 +55,19 @@ def _markup_replacement(match: re.Match[str]) -> str:
     return "" if match.group(1).rsplit(":", 1)[-1].lower() in _INLINE_TAGS else " "
 
 
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+def _strip_comments(text: str) -> str:
+    """Remplace chaque commentaire `<!-- ... -->` par un espace. Une ouverture sans fermeture reste dans le texte."""
+    parts: list[str] = []
+    position = 0
+    while (start := text.find("<!--", position)) != -1:
+        end = text.find("-->", start + 4)
+        if end == -1:
+            break
+        parts += (text[position:start], " ")
+        position = end + 3
+    parts.append(text[position:])
+    return "".join(parts)
+
 
 # Nombre de passes de décodage des entités. Chaque passe raccourcit strictement la chaîne, donc
 # la stabilisation vient d'elle-même ; la borne évite d'en dépendre.
@@ -83,8 +95,12 @@ def to_plain_text(text: str | None) -> str:
     """
     if not text:
         return ""
-    without_comments = _COMMENT_RE.sub(" ", _unescape_fully(text))
+    without_comments = _strip_comments(_unescape_fully(text))
     return " ".join(strip_markup(without_comments).split())
+
+
+# Profondeur d'imbrication de balises que `strip_markup` retire. Chaque passe coûte un parcours du texte.
+_MAX_MARKUP_PASSES = 8
 
 
 def strip_markup(text: str) -> str:
@@ -94,11 +110,11 @@ def strip_markup(text: str) -> str:
 
     Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
 
-    Le retrait se répète jusqu'à stabilisation : le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe consomme au moins un `<`, ce qui borne le nombre de passes.
+    Le retrait se répète jusqu'à stabilisation, au plus `_MAX_MARKUP_PASSES` fois : le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre.
 
     Sert à l'export CSV (titre brut) et à `normalize_text` (dédoublonnage).
     """
-    for _ in range(text.count("<")):
+    for _ in range(_MAX_MARKUP_PASSES):
         stripped = _MARKUP_RE.sub(_markup_replacement, text)
         if stripped == text:
             break
@@ -186,8 +202,8 @@ normalize_name_form = normalize_text
 _DIGITS_RE = re.compile(r"\d+")
 # Parenthèses ou crochets que le retrait des chiffres a vidés : « (1278759) », « (1960-2020) ».
 _EMPTY_BRACKETS_RE = re.compile(r"[(\[][^\w()\[\]]*[)\]]")
-# Ponctuation isolée entre deux espaces ou en bord de nom : le tiret de « Wolff, Charlotta 1976- ».
-_FLOATING_PUNCTUATION_RE = re.compile(r"(?:(?<=\s)|^)[^\w\s'’]+(?=\s|$)")
+# Mot fait de ponctuation seule : le tiret de « Wolff, Charlotta 1976- », isolé par le retrait des chiffres.
+_PUNCTUATION_ONLY_RE = re.compile(r"[^\w\s'’]+")
 # Séparateurs en fin de nom : la virgule de « D'Andrea, Carlos, 1973- ». Le point d'une initiale reste.
 _TRAILING_SEPARATORS = ",;:-–—/"
 
@@ -202,9 +218,9 @@ def clean_raw_author_name(raw: str) -> str:
     if not raw:
         return raw
     text = to_plain_text(raw)
-    cleaned = _EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text))
+    cleaned = " ".join(_EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text)).split())
     # Parenthèse que le retrait des chiffres a détachée de son contenu : « (EA 999) » → « (EA) ».
-    cleaned = re.sub(r"\s+([)\]])", r"\1", cleaned)
-    cleaned = _FLOATING_PUNCTUATION_RE.sub(" ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(_TRAILING_SEPARATORS).strip()
-    return cleaned or re.sub(r"\s+", " ", text).strip()
+    cleaned = cleaned.replace(" )", ")").replace(" ]", "]")
+    words = [word for word in cleaned.split(" ") if not _PUNCTUATION_ONLY_RE.fullmatch(word)]
+    cleaned = " ".join(words).rstrip(_TRAILING_SEPARATORS).strip()
+    return cleaned or " ".join(text.split())

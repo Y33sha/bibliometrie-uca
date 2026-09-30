@@ -5,6 +5,8 @@ Certaines signatures OpenAlex portent un identifiant de source recopié dans le 
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from domain.normalize import clean_raw_author_name
@@ -56,3 +58,21 @@ class TestCleanRawAuthorName:
     def test_parse_ignores_parenthesized_id(self) -> None:
         # Sans nettoyage, le token « (1278759) » deviendrait le nom de famille.
         assert parse_raw_author_name("Emmanuel Moreau (1278759)") == ("Moreau", "Emmanuel")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "a" + " " * 100_000 + "b",
+        "a " + "!" * 100_000 + "b",
+        "<A" + "!" * 100_000,
+        "<!--" * 25_000,
+        "<ab" * 25_000 + ">" * 25_000,
+    ],
+    ids=["espaces", "ponctuation", "balise ouverte", "commentaires ouverts", "balises imbriquées"],
+)
+def test_long_input_cleaned_in_linear_time(raw: str) -> None:
+    """Une entrée longue et répétitive se nettoie en temps linéaire : un temps quadratique dépasserait largement la borne."""
+    start = time.perf_counter()
+    clean_raw_author_name(raw)
+    assert time.perf_counter() - start < 2
