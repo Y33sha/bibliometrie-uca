@@ -37,7 +37,7 @@ _SCALAR_KEY_ROWS = "".join(
     for k in SCALAR_CONFIRMATION_ID_TYPES
 )
 
-# Paires de publications distinctes (DOI distincts) partageant une clé de confirmation (`source_publications.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
+# Paires de publications distinctes partageant une clé de confirmation (`source_publications.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
         SELECT sp.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
@@ -54,8 +54,6 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     JOIN pub_keys k2 ON k1.ktype = k2.ktype AND k1.kval = k2.kval AND k1.pid < k2.pid
     JOIN publications p1 ON p1.id = k1.pid
     JOIN publications p2 ON p2.id = k2.pid
-    WHERE p1.doi IS NOT NULL AND p2.doi IS NOT NULL
-      AND lower(p1.doi) <> lower(p2.doi)
 """)
 
 # Signal #3 — rapprochement par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.

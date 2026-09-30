@@ -219,11 +219,11 @@ DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
 def infer_shared_key_relation(
     doc_type_a: str | None, doc_type_b: str | None
 ) -> tuple[RelationType, str] | None:
-    """Infère la relation entre deux publications **distinctes** (DOI distincts) qui partagent une clé de confirmation, depuis leur couple de `doc_type`.
+    """Infère la relation entre deux publications **distinctes** qui partagent une clé de confirmation, depuis leur couple de `doc_type`.
 
     Renvoie `(type, sujet)` où `sujet` désigne le bout porteur de la relation dirigée : `"a"` (sujet = A), `"b"` (sujet = B), ou `"sym"` pour `is_related_to` (symétrique — le caller oriente par convention). Renvoie `None` si la paire est hors scope (peer-review).
 
-    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et dirigée ; tout autre couple — y compris deux exemplaires d'une même œuvre à DOI distincts non encore fusionnés — donne `is_related_to`, en attendant d'être qualifié."""
+    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et dirigée ; tout autre couple donne `is_related_to`, en attendant d'être qualifié."""
     if "peer_review" in (doc_type_a, doc_type_b):
         return None
     for dependent, relation in DEPENDENT_DOC_TYPE_RELATIONS.items():

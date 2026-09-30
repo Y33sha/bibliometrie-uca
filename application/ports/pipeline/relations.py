@@ -44,14 +44,14 @@ class RelationEdge(NamedTuple):
 
 
 class SharedKeyPair(NamedTuple):
-    """Deux publications distinctes (DOI distincts) partageant une clé de confirmation (hal_id, arXiv, PMID, NNT). `a_id < b_id` par construction. Le type de relation se déduit du couple de `doc_type` (`domain.publications.relations.infer_shared_key_relation`)."""
+    """Deux publications distinctes partageant une clé de confirmation (hal_id, arXiv, PMID, NNT). `a_id < b_id` par construction. Le type de relation se déduit du couple de `doc_type` (`domain.publications.relations.infer_shared_key_relation`)."""
 
     a_id: int
     a_doc_type: str | None
-    a_doi: str
+    a_doi: str | None
     b_id: int
     b_doc_type: str | None
-    b_doi: str
+    b_doi: str | None
 
 
 class TitleMatch(NamedTuple):
