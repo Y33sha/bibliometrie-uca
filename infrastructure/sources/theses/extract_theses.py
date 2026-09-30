@@ -80,6 +80,9 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
         """
         return as_str(these.get("id")) or ""
 
+    def is_ongoing(self, these: Mapping[str, JsonValue]) -> bool:
+        return as_str(these.get("status")) == "enCours"
+
     def extract_doi(self, these: Mapping[str, JsonValue]) -> str | None:
         """Extrait le DOI s'il est présent et non vide, sinon `None`."""
         return extract_doi(these)

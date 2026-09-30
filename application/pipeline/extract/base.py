@@ -156,11 +156,10 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         metrics: PhaseMetrics,
         *,
         trouves: int | None = None,
-        participe: Formes | None = None,
     ) -> None:
         """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
 
-        `trouves` et `participe` donnent le nombre et le mot du bilan quand un filtre retient une partie des documents parcourus.
+        `trouves` donne le nombre du bilan quand un filtre retient une partie des documents parcourus.
         """
         trouve, nouveau, mis_a_jour, inchange = _FORMES_DU_BILAN[self.FEMININ]
         n = metrics.total if trouves is None else trouves
@@ -168,7 +167,7 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
             "%s%s %s : %s, %s, %s",
             SUITE_DE_BRANCHE,
             accord(n, self.DOCUMENT),
-            forme(n, *(participe or trouve)),
+            forme(n, *trouve),
             accord(metrics.new, *nouveau),
             accord(metrics.updated, *mis_a_jour),
             accord(metrics.unchanged, *inchange),
