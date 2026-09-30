@@ -8,9 +8,10 @@ Le parent est désigné par son `publication_id` ; son DOI peut être absent (ci
 
 import json
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from application.ports.pipeline.relations import DoiPublication, RelationEdge
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
 
@@ -366,3 +367,26 @@ class TestRebuildRelations:
 
         assert rebuild.added_by_type == []
         assert rebuild.removed == 1
+
+
+class TestFetchSharedKeyPairs:
+    def _notice(self, conn, publication_id, source, source_id, hal_ids):
+        conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, publication_id, external_ids) "
+                "VALUES (:source, :sid, 't', :pid, :ids)"
+            ).bindparams(bindparam("ids", type_=Jsonb)),
+            {"source": source, "sid": source_id, "pid": publication_id, "ids": {"hal_id": hal_ids}},
+        )
+
+    def test_publications_sans_doi_partageant_un_identifiant_hal(self, sa_sync_conn):
+        """Deux publications distinctes qui partagent une clé forment une paire, avec ou sans DOI."""
+        a = _pub(sa_sync_conn, doc_type="conference_paper", title_normalized="t-a", doi=None)
+        b = _pub(sa_sync_conn, doc_type="poster", title_normalized="t-b", doi=None)
+        self._notice(sa_sync_conn, a, "hal", "hal-skp-1", ["hal-skp-1"])
+        self._notice(sa_sync_conn, b, "hal", "hal-skp-2", ["hal-skp-2"])
+        self._notice(sa_sync_conn, a, "openalex", "W-skp", ["hal-skp-1", "hal-skp-2"])
+
+        pairs = [p for p in _Q.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
+
+        assert [(p.a_id, p.a_doi, p.b_id, p.b_doi) for p in pairs] == [(a, None, b, None)]

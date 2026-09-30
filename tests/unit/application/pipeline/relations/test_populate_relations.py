@@ -32,6 +32,17 @@ class TestBuildSharedKeyEdges:
         assert edges[0].from_publication_id == 20  # le preprint est sujet
         assert edges[0].relation_type == "is_preprint_of"
         assert edges[0].target_doi == "10.1/10"
+        assert edges[0].target_publication_id == 10
+
+    def test_pair_without_doi_related_by_publication_id(self):
+        """Deux publications sans DOI qui partagent une clé sont reliées : la cible est désignée par son identifiant."""
+        edges = _build_shared_key_edges(
+            [SharedKeyPair(30, "conference_paper", None, 40, "poster", None)], declared_pairs=set()
+        )
+        assert [
+            (e.from_publication_id, e.relation_type, e.target_doi, e.target_publication_id)
+            for e in edges
+        ] == [(30, "is_related_to", None, 40)]
 
     def test_unexpected_couple_is_related_to(self):
         edges = _build_shared_key_edges([_pair(30, "article", 40, "article")], declared_pairs=set())

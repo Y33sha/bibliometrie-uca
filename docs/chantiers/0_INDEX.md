@@ -2,6 +2,10 @@
 
 ## Chantiers non archivés
 
+### En cours
+
+- [Dépôts HAL distincts fusionnés par une notice OpenAlex ou ScanR](DATA_identifiant-hal-cle-de-fusion.md)
+
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)

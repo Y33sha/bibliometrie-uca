@@ -5,7 +5,7 @@ Tourne après `publications` : les `source_publications` sont rattachées à leu
 Trois signaux peuplent la table :
 
 - **Signal #1 — relations déclarées par les sources** : DataCite `meta.related_identifiers` et Crossref `meta.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
-- **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts) qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
+- **Signal #2 — clés de confirmation partagées** : deux publications distinctes qui partagent une clé (hal_id, arXiv, PMID, NNT) sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
 Les relations de même œuvre (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Quand `IsVersionOf` ou `IsVariantFormOf` relient deux œuvres (cf. `meme_oeuvre_declaree`), le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
@@ -106,7 +106,7 @@ def _build_distinct_work_edges(
 def _build_shared_key_edges(
     pairs: list[SharedKeyPair], declared_pairs: set[frozenset[int]]
 ) -> list[RelationEdge]:
-    """Une arête dirigée par paire partageant une clé. `infer_shared_key_relation` donne le type et le sujet (`"a"`, `"b"`, ou `"sym"` symétrique — orienté depuis A, le plus petit id). Les paires hors scope (peer-review) sont écartées, ainsi que les `is_related_to` (type vague « à qualifier ») sur une paire déjà typée précisément par le signal #1 — sinon doublon redondant."""
+    """Une arête dirigée par paire partageant une clé. La cible est désignée par son `publication_id`, avec son DOI quand elle en a un. `infer_shared_key_relation` donne le type et le sujet (`"a"`, `"b"`, ou `"sym"` symétrique — orienté depuis A, le plus petit id). Les paires hors scope (peer-review) sont écartées, ainsi que les `is_related_to` (type vague « à qualifier ») sur une paire déjà typée précisément par le signal #1 — sinon doublon redondant."""
     edges: list[RelationEdge] = []
     for pair in pairs:
         inferred = infer_shared_key_relation(pair.a_doc_type, pair.b_doc_type)
@@ -119,12 +119,18 @@ def _build_shared_key_edges(
         ):
             continue
         if subject == "b":
-            from_id, target = pair.b_id, pair.a_doi
+            from_id, target_id, target_doi = pair.b_id, pair.a_id, pair.a_doi
         else:  # "a" ou "sym" : A est le sujet (a_id < b_id rend l'orientation stable)
-            from_id, target = pair.a_id, pair.b_doi
-        cleaned = clean_doi(target)
-        if cleaned:
-            edges.append(RelationEdge(from_id, relation.value, cleaned, "shared_key"))
+            from_id, target_id, target_doi = pair.a_id, pair.b_id, pair.b_doi
+        edges.append(
+            RelationEdge(
+                from_id,
+                relation.value,
+                clean_doi(target_doi) if target_doi else None,
+                "shared_key",
+                target_publication_id=target_id,
+            )
+        )
     return edges
 
 
