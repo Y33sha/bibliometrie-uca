@@ -19,6 +19,11 @@ def _uniq(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
+def _uniq_name(prefix: str) -> str:
+    """Nom de personne unique, en lettres seules : le nettoyage des noms bruts retire les chiffres."""
+    return prefix + uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnop"))
+
+
 def _upsert_identity(cur, raw_author_name: str) -> int:
     """Upsert de l'identité (nom normalisé `lower(raw)`, sans identifiants) et
     renvoi de son id, sur le curseur psycopg du seed."""
@@ -183,7 +188,7 @@ class TestOrphanAuthorships:
 
     def test_returns_last_name_first_name_from_comma_form(self, client):
         """Format "Last, First" : parsé en last_name="Last", first_name="First"."""
-        marker = _uniq("Marker").replace("_", "")
+        marker = _uniq_name("Marker")
         _seed_orphan_authorship(f"{marker}, Jane")
 
         r = client.get("/api/authorships/orphans", params={"search": marker})
@@ -197,7 +202,7 @@ class TestOrphanAuthorships:
 
     def test_returns_last_name_first_name_from_space_form(self, client):
         """Format "First Last" : parsé en last_name=dernier mot, first_name=reste."""
-        marker = _uniq("Marker").replace("_", "")
+        marker = _uniq_name("Marker")
         _seed_orphan_authorship(f"Jane Marie {marker}")
 
         r = client.get("/api/authorships/orphans", params={"search": marker})

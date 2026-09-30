@@ -585,7 +585,7 @@ class TestJournalDashboard:
         by_dt = {d["doc_type"]: d for d in body["doc_types"]}
         assert by_dt["article"]["expected"] is False
         assert by_dt["conference_paper"]["expected"] is True
-        assert body["expected_doc_types"] == sorted(["conference_paper", "other"])
+        assert body["expected_doc_types"] == sorted(["conference", "conference_paper", "other"])
 
     def test_expected_flags_oa_statuses_against_oa_model(self, client):
         jid = _seed_journal()
