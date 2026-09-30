@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lVgSzitzdhaFWKdaaVv2VGIWg2u7sJOUQMI0WQqsR17NdRamfA1NBB67KdE3eVy
+\restrict GvEDwOZEUSknsp6YbvpMRIg7DH6TCyT6Yk5HV7vddgZepjpbzIGm5yI4mqBnscf
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -3153,17 +3153,17 @@ CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gi
 
 
 --
+-- Name: idx_source_pubs_first_hal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_first_hal_id ON public.source_publications USING btree ((((external_ids -> 'hal_id'::text) ->> 0))) WHERE (((external_ids -> 'hal_id'::text) ->> 0) IS NOT NULL);
+
+
+--
 -- Name: idx_source_pubs_hal_collections; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
-
-
---
--- Name: idx_source_pubs_hal_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING gin (((external_ids -> 'hal_id'::text)));
 
 
 --
@@ -3782,5 +3782,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lVgSzitzdhaFWKdaaVv2VGIWg2u7sJOUQMI0WQqsR17NdRamfA1NBB67KdE3eVy
+\unrestrict GvEDwOZEUSknsp6YbvpMRIg7DH6TCyT6Yk5HV7vddgZepjpbzIGm5yI4mqBnscf
 

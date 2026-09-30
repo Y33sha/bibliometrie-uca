@@ -27,6 +27,9 @@ _COLS = (
     "WHERE sa.source_publication_id = {a}.id AND sa.in_perimeter) AS in_perimeter"
 )
 
+# Premier identifiant HAL que liste une `source_publication` : sa clé de fusion HAL.
+_FIRST_HAL_ID = "(({a}.external_ids -> '" + ExternalIdType.HAL_ID + "') ->> 0)"
+
 # Un bras UNION par clé de confirmation scalaire d'`external_ids` : égalité directe (index btree). `hal_id` (array) a son propre bras.
 _SCALAR_KEY_ARMS = "".join(
     f"""
@@ -59,18 +62,13 @@ _UNIVERSE_SQL = text(f"""
     WHERE d.doi IS NOT NULL
     {_SCALAR_KEY_ARMS}
     UNION
-    -- hal_id : chaque identifiant est cherché par l'index GIN `idx_source_pubs_hal_id`. `OFFSET 0` garde la sous-requête
-    -- latérale telle quelle ; aplatie en jointure, elle laisse le planificateur comparer chaque identifiant à toute la table.
+    -- hal_id : la clé est le premier identifiant HAL listé, comparé par égalité directe (index btree
+    -- `idx_source_pubs_first_hal_id`).
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> '{ExternalIdType.HAL_ID}') AS dh(hal)
-    CROSS JOIN LATERAL (
-        SELECT * FROM source_publications s
-        WHERE s.external_ids -> '{ExternalIdType.HAL_ID}' @> jsonb_build_array(dh.hal)
-        OFFSET 0
-    ) o
+    JOIN source_publications o ON {_FIRST_HAL_ID.format(a="o")} = {_FIRST_HAL_ID.format(a="d")}
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE jsonb_typeof(d.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
+    WHERE {_FIRST_HAL_ID.format(a="d")} IS NOT NULL
     UNION
     -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
     SELECT {_COLS.format(a="o")}
