@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         AsyncFetchMissingDoiAdapter,
     )
 
+from application.pipeline.exception_chain import failure_message, is_user_interruption
 from application.pipeline.libelles import accord, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
@@ -1633,36 +1634,36 @@ def _run_one_phase(
                     normalize_full=args.normalize_full,
                 )
             )
-        except KeyboardInterrupt:
-            log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
-            log.info("Pour reprendre : run_pipeline --from %s", name)
+        except (KeyboardInterrupt, RuntimeError, SQLAlchemyError) as e:
+            # Une interruption en pleine requête invalide la connexion : le nettoyage qui suit lève une erreur SQLAlchemy à la place du `KeyboardInterrupt`, que la chaîne des exceptions garde.
+            interrupted = is_user_interruption(e)
+            if interrupted:
+                message = "Interrompu par l'utilisateur (action contrôlée)"
+                log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
+            else:
+                message = failure_message(e)
+                log.error("Pipeline interrompu à la phase '%s' : %s", name, message)
+                log.error("Trace de l'échec", exc_info=e, extra={"detail": True})
+            log.log(
+                logging.INFO if interrupted else logging.ERROR,
+                "Pour reprendre : run_pipeline --from %s",
+                name,
+            )
             recorder.record(
                 phase=name,
                 started_at=phase_started_at,
-                status="warning",
+                status="warning" if interrupted else "error",
                 metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
                 signals=[
                     {
-                        "level": "warning",
-                        "code": "interrupted",
-                        "message": "Interrompu par l'utilisateur (action contrôlée)",
+                        "level": "warning" if interrupted else "error",
+                        "code": "interrupted" if interrupted else "exception",
+                        "message": message,
                     }
                 ],
                 details={},
             )
-            sys.exit(130)
-        except (RuntimeError, SQLAlchemyError) as e:
-            log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
-            log.error("Pour reprendre : run_pipeline --from %s", name)
-            recorder.record(
-                phase=name,
-                started_at=phase_started_at,
-                status="error",
-                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
-                signals=[{"level": "error", "code": "exception", "message": str(e)}],
-                details={},
-            )
-            sys.exit(1)
+            sys.exit(130 if interrupted else 1)
 
         duration = time.time() - t0_phase
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()

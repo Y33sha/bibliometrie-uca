@@ -13,6 +13,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
+from application.pipeline._savepoint import rollback_unless_invalidated
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.repositories.publisher_repository import PublisherRepository
 
@@ -136,10 +137,10 @@ def run_enrich_publishers_from_openalex(
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
         # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
         # re-raise pour laisser l'appelant (CLI maintenance) s'arrêter proprement.
-        conn.rollback()
+        rollback_unless_invalidated(conn)
         logger.warning("Interruption — batches déjà committés conservés.")
         raise
     except Exception as e:
-        conn.rollback()
+        rollback_unless_invalidated(conn)
         logger.error("Erreur fatale : %s", e)
         raise

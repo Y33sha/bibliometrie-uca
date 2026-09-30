@@ -69,7 +69,9 @@ class _Norm(SourceNormalizer):
         raises_on: set[str] | None = None,
     ) -> None:
         super().__init__(
-            conn=MagicMock(), logger=logging.getLogger("test"), staging_queries=staging
+            conn=MagicMock(invalidated=False),
+            logger=logging.getLogger("test"),
+            staging_queries=staging,
         )
         self.results = results or []
         self.raises_on = raises_on or set()
@@ -214,6 +216,21 @@ class TestRunKeyboardInterrupt:
         assert "Interruption" in caplog.text
         norm.conn.rollback.assert_called()
 
+    def test_connexion_invalidee_laisse_remonter_l_interruption(self):
+        """Un Ctrl+C en pleine requête invalide la connexion : son `rollback()` lèverait `PendingRollbackError` à la place du `KeyboardInterrupt`."""
+        staging = _FakeStaging()
+        staging.count_returns = 1
+        staging.pending_rows = [_row("a")]
+
+        class _Kb(_Norm):
+            def process_work(self, conn, row):
+                self.conn.invalidated = True
+                self.conn.rollback.side_effect = RuntimeError("Can't reconnect until invalid")
+                raise KeyboardInterrupt
+
+        with pytest.raises(KeyboardInterrupt):
+            _Kb(staging, results=[True]).run()
+
 
 # ── Exception fatale ──────────────────────────────────────────────
 
@@ -265,7 +282,9 @@ class _MinimalNorm(SourceNormalizer):
 
     def __init__(self, staging: MagicMock) -> None:
         super().__init__(
-            conn=MagicMock(), logger=logging.getLogger("test"), staging_queries=staging
+            conn=MagicMock(invalidated=False),
+            logger=logging.getLogger("test"),
+            staging_queries=staging,
         )
         self.normalized: list[StagingRow] = []
 

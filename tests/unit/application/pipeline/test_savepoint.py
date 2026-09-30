@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline._savepoint import savepoint
+from application.pipeline._savepoint import rollback_unless_invalidated, savepoint
 
 
 def test_success_commits_savepoint():
@@ -38,3 +38,25 @@ def test_rollback_failure_triggers_fallback():
     with pytest.raises(RuntimeError, match="boom"), savepoint(conn, on_rollback_failure=fallback):
         raise RuntimeError("boom")
     fallback.assert_called_once()
+
+
+def test_fallback_failure_keeps_original_exception():
+    """Sur une connexion perdue, le rollback de secours échoue lui aussi : l'exception d'origine remonte quand même."""
+    conn = MagicMock()
+    conn.begin_nested.return_value.rollback.side_effect = RuntimeError("savepoint rollback fails")
+    fallback = MagicMock(side_effect=RuntimeError("Can't reconnect until invalid transaction"))
+    with (
+        pytest.raises(ValueError, match="cause d'origine"),
+        savepoint(conn, on_rollback_failure=fallback),
+    ):
+        raise ValueError("cause d'origine")
+
+
+def test_rollback_unless_invalidated():
+    conn = MagicMock(invalidated=False)
+    rollback_unless_invalidated(conn)
+    conn.rollback.assert_called_once()
+
+    lost = MagicMock(invalidated=True)
+    rollback_unless_invalidated(lost)
+    lost.rollback.assert_not_called()

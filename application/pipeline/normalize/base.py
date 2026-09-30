@@ -18,7 +18,7 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
-from application.pipeline._savepoint import savepoint
+from application.pipeline._savepoint import rollback_unless_invalidated, savepoint
 from application.pipeline.libelles import (
     SUITE_DE_BRANCHE,
     accord,
@@ -188,10 +188,10 @@ class SourceNormalizer(ABC):
             # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est alors avortée et `commit()` lèverait `PendingRollbackError`.
             # On rollback (le batch en cours, incomplet, est jeté ; les batches committés tous les `batch_size` sont durables) puis on re-raise pour laisser `run_pipeline.main()` faire l'arrêt propre (rapport partiel + exit 130).
             # Sans le `raise`, la phase « réussirait » et le pipeline enchaînerait sur la source suivante.
-            self.conn.rollback()
+            rollback_unless_invalidated(self.conn)
             slog.warning("Interruption — batches déjà committés conservés.")
             raise
         except Exception as e:
-            self.conn.rollback()
+            rollback_unless_invalidated(self.conn)
             slog.error(f"Erreur fatale : {e}")
             raise
