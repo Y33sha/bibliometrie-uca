@@ -54,13 +54,9 @@ Ces fusions rendent aussi le type de la publication instable. La publication pre
 
 - [x] `run_pipeline --from publications --rebuild-publications`.
 - [x] Publications scindées : la base passe de 65 869 à 66 927 publications.
-- [ ] Relations créées entre les publications scindées : à relever après la phase `relations`.
+- [x] Relations entre les publications scindées : les 1 110 paires de publications séparées par la règle sont reliées. Les relations par clé partagée passent de 510 à 1 494, dont 1 121 `is_related_to`, 331 `is_preprint_of` et 29 `is_part_of`.
 - [x] Publications 140244 et 22606 : une publication par dépôt HAL. La publication 11084 garde ses quatre dépôts : trois communications de même titre et de même année, et un poster que deux notices ScanR typées `other`, de même titre et de même année, relient aux communications.
 - [x] Publications dont la source la plus prioritaire porte deux types : 67, contre 425.
-
-### 4. Documentation
-
-- [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
