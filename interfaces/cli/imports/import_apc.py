@@ -1,172 +1,197 @@
 # STATUS: recurring (imports)
-"""Importe les données de paiement APC (frais de publication) depuis des fichiers CSV vers la table `apc_payments`.
+"""Importe un fichier de frais de publication dans `apc_payments`.
 
-La colonne `institution` désigne l'établissement **payeur**, qui est le plus souvent un organisme tiers cofinançant une copublication — CNRS, INSERM, INRAE et d'autres. Les paiements de l'université elle-même y sont minoritaires ; ce sont eux, et eux seuls, que le jeu de données Open APC recense (cf. `import_openapc`).
+Deux formats, reconnus aux colonnes du fichier : le jeu de données Open APC (frais d'open access) et le fichier « frais hors OA » de l'enquête nationale (autres frais de publication). Sont importés les seuls paiements dont le DOI désigne une publication de la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
 
 Usage :
-    python -m interfaces.cli.imports.import_apc
+    python -m interfaces.cli.imports.import_apc data/apc_de.csv
+    python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --dry-run
 """
 
+import argparse
 import csv
+import os
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from sqlalchemy import Connection, text
 
 from domain.normalize import sanitize_optional_text
+from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.observability.log import setup_logger
 
-# `parents[3]` remonte interfaces/cli/imports/ → racine du dépôt ; les CSV d'import vivent sous data/.
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+log = setup_logger("import_apc", os.path.dirname(__file__))
 
-INSERT_APC_PAYMENT = text("""
+type Payment = dict[str, JsonValue]
+
+
+class FileFormat(StrEnum):
+    """Format d'un fichier de frais de publication."""
+
+    OPEN_APC = "open_apc"
+    NON_OA_FEES = "non_oa_fees"
+
+
+# Colonne propre à chaque format, qui le désigne.
+_FORMAT_MARKERS = {
+    "euro": FileFormat.OPEN_APC,
+    "Montant payé en EURHT": FileFormat.NON_OA_FEES,
+}
+
+_INSERT = text("""
     INSERT INTO apc_payments (
-        lab_name, publisher_name, publisher_type, journal_name, issn,
-        journal_type, doi, article_title, amount_eur_ht, billing_year,
-        pub_year, budget, institution, institution_type, coman_id,
-        all_surveys_answered, shared_payment, source_file, expense_type, remarks
+        doi, amount_eur_ht, billing_year, pub_year, publisher_name, journal_name, issn,
+        institution, budget, coman_id, lab_name, remarks, open_access_fee,
+        source_file, publication_id
     ) VALUES (
-        :lab_name, :publisher_name, :publisher_type, :journal_name, :issn,
-        :journal_type, :doi, :article_title, :amount_eur_ht, :billing_year,
-        :pub_year, :budget, :institution, :institution_type, :coman_id,
-        :all_surveys_answered, :shared_payment, :source_file, :expense_type, :remarks
+        :doi, :amount_eur_ht, :billing_year, :pub_year, :publisher_name, :journal_name, :issn,
+        :institution, :budget, :coman_id, :lab_name, :remarks, :open_access_fee,
+        :source_file, :publication_id
     )
+    ON CONFLICT ON CONSTRAINT apc_payments_payment_key DO NOTHING
+    RETURNING id
 """)
 
 
-def parse_amount(s: str) -> float | None:
-    """Parse un montant EUR HT au format français (espace insécable, virgule décimale)."""
-    if not s or s.strip().lower() in ("", "na", "non identifié"):
-        return None
-    s = s.replace("\xa0", "").replace(" ", "").replace(",", ".")
+def clean(cell: str | None) -> str | None:
+    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle ne porte rien."""
+    return sanitize_optional_text(cell)
+
+
+def parse_amount(cell: str | None) -> float | None:
+    """Montant en euros, au format français (espaces, virgule décimale) ou anglais. None faute de valeur lisible."""
+    value = (cell or "").replace("\xa0", "").replace(" ", "").replace(" ", "").replace(",", ".")
     try:
-        return float(s)
+        return round(float(value), 2)
     except ValueError:
         return None
 
 
-def parse_year(s: str) -> int | None:
-    if not s or not s.strip().isdigit():
+def parse_year(cell: str | None) -> int | None:
+    """Année entre 1990 et 2100, ou None."""
+    value = (cell or "").strip()
+    if not value.isdigit():
         return None
-    y = int(s.strip())
-    return y if 1990 <= y <= 2100 else None
+    year = int(value)
+    return year if 1990 <= year <= 2100 else None
 
 
-def clean(s: str | None) -> str | None:
-    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle ne porte rien."""
-    return sanitize_optional_text(s)
+def detect_format(columns: list[str]) -> FileFormat:
+    """Format d'un fichier, d'après ses colonnes. Lève `ValueError` pour un fichier d'un autre format."""
+    for marker, file_format in _FORMAT_MARKERS.items():
+        if marker in columns:
+            return file_format
+    raise ValueError("Format inconnu : ni fichier Open APC, ni fichier des frais hors OA")
 
 
-def import_main_file(conn: Connection) -> int:
-    """Importe le fichier principal APC."""
-    matches = sorted(DATA_DIR.glob("APC*.csv"))
-    if not matches:
-        print("Fichier principal APC introuvable")
-        return 0
+def open_apc_payment(row: Mapping[str, str]) -> Payment:
+    """Paiement d'une ligne Open APC.
 
-    path = matches[0]
-    with open(path, encoding="utf-8-sig") as f:
+    La période déclarée tient lieu d'année de facturation et de publication. L'ISSN retenu est celui de la revue, à défaut son ISSN de liaison. La mention `hybrid` signale une revue sur abonnement dont cet article est ouvert.
+    """
+    period = parse_year(row.get("period"))
+    return {
+        "doi": clean_doi(row.get("doi")),
+        "amount_eur_ht": parse_amount(row.get("euro")),
+        "billing_year": period,
+        "pub_year": period,
+        "publisher_name": clean(row.get("publisher")),
+        "journal_name": clean(row.get("journal_full_title")),
+        "issn": clean(row.get("issn")) or clean(row.get("issn_l")),
+        "institution": clean(row.get("institution")),
+        "budget": None,
+        "coman_id": None,
+        "lab_name": None,
+        "remarks": "hybrid" if (row.get("is_hybrid") or "").upper() == "TRUE" else None,
+        "open_access_fee": True,
+    }
+
+
+def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
+    """Paiement d'une ligne du fichier des frais hors OA. Le payeur est la colonne « Budget »."""
+    coman_id = (row.get("CoMan Id.") or "").strip()
+    budget = clean(row.get("Budget"))
+    return {
+        "doi": clean_doi(row.get("DOI")),
+        "amount_eur_ht": parse_amount(row.get("Montant payé en EURHT")),
+        "billing_year": parse_year(row.get("Année de facturation")),
+        "pub_year": parse_year(row.get("Année de publication")),
+        "publisher_name": clean(row.get("Editeur")),
+        "journal_name": clean(row.get("Revue")),
+        "issn": clean(row.get("ISSN")),
+        "institution": budget,
+        "budget": budget,
+        "coman_id": int(coman_id) if coman_id.isdigit() else None,
+        "lab_name": clean(row.get("Laboratoire")),
+        "remarks": clean(row.get("Remarques")),
+        "open_access_fee": False,
+    }
+
+
+_MAPPERS: dict[FileFormat, Callable[[Mapping[str, str]], Payment]] = {
+    FileFormat.OPEN_APC: open_apc_payment,
+    FileFormat.NON_OA_FEES: non_oa_fee_payment,
+}
+
+
+def read_payments(path: Path) -> tuple[FileFormat, list[Payment]]:
+    """Format du fichier et paiements de ses lignes."""
+    with path.open(encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        rows = []
-        for r in reader:
-            doi = clean(r.get("DOI", ""))
-            if doi and doi.lower() in ("non identifié", "na"):
-                doi = None
-            rows.append(
-                {
-                    "lab_name": clean(r.get("Laboratoire")),
-                    "publisher_name": clean(r.get("Editeur")),
-                    "publisher_type": clean(r.get("TypeEditeur")),
-                    "journal_name": clean(r.get("Revue")),
-                    "issn": clean(r.get("Issn_l")),
-                    "journal_type": clean(r.get("TypeRevue")),
-                    "doi": doi,
-                    "article_title": clean(r.get("TitreArticle")),
-                    "amount_eur_ht": parse_amount(r.get("MontantEURHT", "")),
-                    "billing_year": parse_year(r.get("AnneeFacturation", "")),
-                    "pub_year": parse_year(r.get("AnneePublication", "")),
-                    "budget": clean(r.get("Budget")),
-                    "institution": clean(r.get("Etablissement")),
-                    "institution_type": clean(r.get("TypeEtablissement")),
-                    "coman_id": int(r["CoManId"])
-                    if r.get("CoManId", "").strip().isdigit()
-                    else None,
-                    "all_surveys_answered": clean(
-                        r.get("EtablissementsRepondantsAToutesLesEnquetes")
-                    ),
-                    "shared_payment": clean(r.get("PaiementPartage")),
-                    "source_file": "enquete_apc",
-                    "expense_type": None,
-                    "remarks": clean(r.get("Remarques")),
-                }
-            )
-
-    conn.execute(INSERT_APC_PAYMENT, rows)
-    return len(rows)
+        file_format = detect_format(list(reader.fieldnames or []))
+        mapper = _MAPPERS[file_format]
+        return file_format, [mapper(row) for row in reader]
 
 
-def import_fp_hors_oa(conn: Connection) -> int:
-    """Importe FP hors OA."""
-    path = DATA_DIR / "FP hors OA.csv"
-    if not path.exists():
-        return 0
+@dataclass(frozen=True, slots=True)
+class ImportStats:
+    """Bilan d'un import : lignes lues, lignes à DOI de la base, paiements insérés."""
 
-    with open(path, encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        rows = []
-        for r in reader:
-            doi = clean(r.get("DOI", ""))
-            if doi and doi.lower() in ("non identifié", "na"):
-                doi = None
-            rows.append(
-                {
-                    "lab_name": clean(r.get("Laboratoire")),
-                    "publisher_name": clean(r.get("Editeur")),
-                    "publisher_type": clean(r.get("Type d'éditeur*")),
-                    "journal_name": clean(r.get("Revue")),
-                    "issn": clean(r.get("ISSN")),
-                    "journal_type": clean(r.get("Type de revue*")),
-                    "doi": doi,
-                    "article_title": None,
-                    "amount_eur_ht": parse_amount(r.get("Montant payé en EURHT", "")),
-                    "billing_year": parse_year(r.get("Année de facturation", "")),
-                    "pub_year": parse_year(r.get("Année de publication", "")),
-                    "budget": clean(r.get("Budget")),
-                    # Pas de colonne dédiée institution : budget = institution
-                    "institution": None,
-                    "institution_type": clean(r.get("Type d'établissement")),
-                    "coman_id": int(r["CoMan Id."])
-                    if r.get("CoMan Id.", "").strip().isdigit()
-                    else None,
-                    "all_surveys_answered": clean(
-                        r.get("Etablissement ayant répondu à toutes les enquêtes\ndepuis 2017")
-                    ),
-                    "shared_payment": None,
-                    "source_file": "fp_hors_oa",
-                    "expense_type": clean(r.get("Nature de la dépense*")),
-                    "remarks": clean(r.get("Remarques")),
-                }
-            )
-
-    conn.execute(INSERT_APC_PAYMENT, rows)
-    return len(rows)
+    read: int
+    in_base: int
+    inserted: int
 
 
-def map_dois(conn: Connection) -> int:
-    """Mappe les DOI vers publication_id."""
+def import_payments(conn: Connection, payments: list[Payment], source_file: str) -> ImportStats:
+    """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues et éditeurs."""
+    publication_by_doi = {
+        row.doi: row.id
+        for row in conn.execute(
+            text("SELECT lower(doi) AS doi, id FROM publications WHERE doi IS NOT NULL")
+        )
+    }
+    in_base = [
+        {**p, "source_file": source_file, "publication_id": publication_by_doi[doi]}
+        for p in payments
+        if isinstance(doi := p["doi"], str) and doi in publication_by_doi
+    ]
+    inserted = sum(1 for p in in_base if conn.execute(_INSERT, p).first() is not None)
+    map_publications(conn)
+    map_journals(conn)
+    map_publishers(conn)
+    return ImportStats(read=len(payments), in_base=len(in_base), inserted=inserted)
+
+
+def map_publications(conn: Connection) -> int:
+    """Rattache à leur publication les paiements dont le DOI désigne une publication de la base."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
             SET publication_id = p.id
             FROM publications p
             WHERE ap.doi IS NOT NULL
-              AND LOWER(ap.doi) = LOWER(p.doi)
+              AND ap.doi = lower(p.doi)
               AND ap.publication_id IS NULL
         """)
     ).rowcount
 
 
 def map_journals(conn: Connection) -> int:
-    """Mappe les ISSN vers journal_id."""
+    """Rattache à leur revue les paiements dont l'ISSN désigne un ISSN actif d'une revue."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
@@ -182,53 +207,39 @@ def map_journals(conn: Connection) -> int:
 
 
 def map_publishers(conn: Connection) -> int:
-    """Mappe les noms d'éditeurs vers publisher_id."""
+    """Rattache à leur éditeur les paiements dont le nom d'éditeur est celui d'un éditeur de la base."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
             SET publisher_id = pub.id
             FROM publishers pub
             WHERE ap.publisher_name IS NOT NULL
-              AND LOWER(ap.publisher_name) = LOWER(pub.name)
+              AND lower(ap.publisher_name) = lower(pub.name)
               AND ap.publisher_id IS NULL
         """)
     ).rowcount
 
 
 def main() -> None:
-    engine = get_sync_engine()
-    with engine.connect() as conn, conn.begin():
-        # Vider la table avant import (ré-importable)
-        conn.execute(text("TRUNCATE apc_payments RESTART IDENTITY"))
+    parser = argparse.ArgumentParser(description="Import d'un fichier de frais de publication")
+    parser.add_argument("csv_file", type=Path, help="Fichier CSV Open APC ou des frais hors OA")
+    parser.add_argument("--dry-run", action="store_true", help="Compter sans écrire")
+    args = parser.parse_args()
 
-        n1 = import_main_file(conn)
-        print(f"Fichier principal: {n1} lignes importées")
-
-        n2 = import_fp_hors_oa(conn)
-        print(f"FP hors OA: {n2} lignes importées")
-
-        m_doi = map_dois(conn)
-        print(f"DOI mappés → publication_id: {m_doi}")
-
-        m_j = map_journals(conn)
-        print(f"ISSN mappés → journal_id: {m_j}")
-
-        m_p = map_publishers(conn)
-        print(f"Éditeurs mappés → publisher_id: {m_p}")
-
-        s = conn.execute(
-            text("""
-                SELECT COUNT(*) AS total,
-                       COUNT(publication_id) AS with_pub,
-                       COUNT(journal_id) AS with_journal,
-                       COUNT(publisher_id) AS with_publisher
-                FROM apc_payments
-            """)
-        ).one()
-        print(f"\nTotal: {s.total} lignes")
-        print(f"  avec publication_id: {s.with_pub}")
-        print(f"  avec journal_id: {s.with_journal}")
-        print(f"  avec publisher_id: {s.with_publisher}")
+    file_format, payments = read_payments(args.csv_file)
+    log.info("%s : format %s, %d lignes", args.csv_file.name, file_format.value, len(payments))
+    with get_sync_engine().connect() as conn:
+        stats = import_payments(conn, payments, args.csv_file.name)
+        if args.dry_run:
+            conn.rollback()
+        else:
+            conn.commit()
+    log.info(
+        "%d lignes à DOI de la base, %d paiements %s",
+        stats.in_base,
+        stats.inserted,
+        "à insérer (simulation)" if args.dry_run else "insérés",
+    )
 
 
 if __name__ == "__main__":

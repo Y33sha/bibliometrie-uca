@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GvEDwOZEUSknsp6YbvpMRIg7DH6TCyT6Yk5HV7vddgZepjpbzIGm5yI4mqBnscf
+\restrict t4JJMVVOKQvARy07CBgYIF428YNtS0MI1HCHae1unYoiwFadkzVe0ZJd6OK3QBl
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -433,31 +433,32 @@ CREATE TABLE public.apc_payments (
     id integer NOT NULL,
     lab_name text,
     publisher_name text,
-    publisher_type text,
     journal_name text,
     issn text,
-    journal_type text,
     doi text,
-    article_title text,
     amount_eur_ht numeric(12,2),
     billing_year smallint,
     pub_year smallint,
     budget text,
     institution text,
-    institution_type text,
     coman_id integer,
-    all_surveys_answered text,
-    shared_payment text,
     source_file text,
-    expense_type text,
     remarks text,
     publication_id integer,
     journal_id integer,
     publisher_id integer,
     created_at timestamp with time zone DEFAULT now(),
     budget_structure_id integer,
-    lab_structure_id integer
+    lab_structure_id integer,
+    open_access_fee boolean NOT NULL
 );
+
+
+--
+-- Name: COLUMN apc_payments.open_access_fee; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.apc_payments.open_access_fee IS 'Vrai pour un frais d''open access (Open APC), faux pour un autre frais de publication (enquête, frais hors OA).';
 
 
 --
@@ -2090,6 +2091,14 @@ ALTER TABLE ONLY public.alembic_version
 
 
 --
+-- Name: apc_payments apc_payments_payment_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apc_payments
+    ADD CONSTRAINT apc_payments_payment_key UNIQUE (doi, institution, amount_eur_ht, open_access_fee);
+
+
+--
 -- Name: apc_payments apc_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2684,13 +2693,6 @@ CREATE INDEX idx_addresses_normalized_text_trgm ON public.addresses USING gin (n
 
 
 --
--- Name: idx_apc_billing_year; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_apc_billing_year ON public.apc_payments USING btree (billing_year);
-
-
---
 -- Name: idx_apc_budget_struct; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2702,13 +2704,6 @@ CREATE INDEX idx_apc_budget_struct ON public.apc_payments USING btree (budget_st
 --
 
 CREATE INDEX idx_apc_doi ON public.apc_payments USING btree (lower(doi)) WHERE (doi IS NOT NULL);
-
-
---
--- Name: idx_apc_institution; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_apc_institution ON public.apc_payments USING btree (institution);
 
 
 --
@@ -3782,5 +3777,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GvEDwOZEUSknsp6YbvpMRIg7DH6TCyT6Yk5HV7vddgZepjpbzIGm5yI4mqBnscf
+\unrestrict t4JJMVVOKQvARy07CBgYIF428YNtS0MI1HCHae1unYoiwFadkzVe0ZJd6OK3QBl
 

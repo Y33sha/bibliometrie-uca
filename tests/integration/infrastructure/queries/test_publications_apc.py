@@ -28,8 +28,9 @@ def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
     for budget in (inside, outside, None):
         sa_sync_conn.execute(
             text(
-                "INSERT INTO apc_payments (publication_id, amount_eur_ht, budget_structure_id) "
-                "VALUES (:p, 100, :b)"
+                "INSERT INTO apc_payments"
+                " (publication_id, amount_eur_ht, budget_structure_id, open_access_fee)"
+                " VALUES (:p, 100, :b, true)"
             ),
             {"p": pub_id, "b": budget},
         )
