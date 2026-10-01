@@ -43,19 +43,14 @@ class TestValeursAdmises:
         assert client.get(chemin, params=params).status_code == 200
 
 
-class TestOrigineApcLieeAuxLaboratoires:
-    """`this_lab` et `other_uca` situent le paiement par rapport aux laboratoires demandés, et exigent donc une sélection de laboratoires."""
+class TestOrigineApc:
+    """L'origine du paiement se prend dans son vocabulaire, avec ou sans sélection de laboratoires."""
 
-    @pytest.mark.parametrize("origine", ["this_lab", "other_uca"])
-    def test_refusee_sans_laboratoire(self, client, origine):
-        r = client.get("/api/publications", params={"has_apc": origine})
-        assert r.status_code == 422
-        assert origine in r.json()["detail"]
-        assert "lab_id" in r.json()["detail"]
-
-    def test_admise_avec_un_laboratoire(self, client):
-        r = client.get("/api/publications", params={"has_apc": "this_lab", "lab_id": "1"})
+    @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/facets"])
+    def test_admise_avec_un_laboratoire(self, client, chemin):
+        r = client.get(chemin, params={"has_apc": "uca,none", "lab_id": "1"})
         assert r.status_code == 200
 
-    def test_les_autres_origines_ne_demandent_pas_de_laboratoire(self, client):
-        assert client.get("/api/publications", params={"has_apc": "uca,none"}).status_code == 200
+    def test_origine_inconnue_refusee(self, client):
+        r = client.get("/api/publications", params={"has_apc": "this_lab", "lab_id": "1"})
+        assert r.status_code == 422

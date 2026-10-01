@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
+    APC_ORIGINS,
     EXPORT_COLUMNS,
     PublicationDetailResponse,
     PublicationFilters,
@@ -30,7 +31,6 @@ from domain.sources.registry import SOURCE_FILTER_VALUES
 from interfaces.api.deps import publications_queries
 from interfaces.api.filters import (
     TOGGLE_VALUES,
-    parse_apc_origins,
     parse_int_csv,
     parse_ints,
     parse_str_csv,
@@ -109,7 +109,7 @@ class PublicationFilterParams:
             is_corresponding=parse_vocabulary_csv(
                 self.is_corresponding, allowed=TOGGLE_VALUES, param="is_corresponding"
             ),
-            has_apc=parse_apc_origins(self.has_apc, lab_ids=lab_ids),
+            has_apc=parse_vocabulary_csv(self.has_apc, allowed=APC_ORIGINS, param="has_apc"),
             country_values=parse_str_csv(self.country),
             language_codes=parse_str_csv(self.language),
             hal_status_values=parse_vocabulary_csv(

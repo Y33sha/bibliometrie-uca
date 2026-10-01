@@ -281,7 +281,6 @@
 				basePath={`/laboratories/${labId}`}
 				showFilterBanner={false}
 				showHalStatusColumn
-				apcMode="lab"
 				perPage={50}
 			/>
 		</div>

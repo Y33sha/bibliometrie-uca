@@ -77,7 +77,7 @@
 		publisherId?: number;
 		monographId?: number;
 	}
-	type ApcMode = 'uca' | 'lab' | 'person-uca';
+	type ApcMode = 'uca' | 'person-uca';
 	let {
 		apiKey = 'pub-list',
 		externalFilters,
@@ -110,7 +110,6 @@
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
 		 *  - 'uca' : paiements sur un budget du périmètre de l'établissement (défaut)
-		 *  - 'lab' : filtre par lab_id === externalFilters.labId
 		 *  - 'person-uca' : 'uca' + classe `apc-other` si !is_corresponding */
 		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
@@ -671,31 +670,17 @@
 					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
-							{#if apcMode === 'lab'}
-								{@const thisLabApc = p.apc.filter(a => a.lab_id === externalFilters?.labId)}
-								{@const otherApc = p.apc.filter(a => a.lab_id !== externalFilters?.labId)}
-								{#if thisLabApc.length > 0}
-									<span class="apc-tag" title={thisLabApc.map(a => `${a.amount?.toLocaleString('fr-FR')} €`).join('\n')}>
-										{Math.round(thisLabApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-									</span>
-								{:else if otherApc.length > 0}
-									<span class="apc-tag apc-other" title={otherApc.map(a => `sur budget ${a.lab_acronym || a.institution || '?'}`).join('\n')}>
-										{Math.round(otherApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-									</span>
-								{/if}
+							{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
+							{@const isPersonNonCorr = apcMode === 'person-uca' && !p.is_corresponding}
+							{#if ucaApc.length > 0}
+								<span class="apc-tag" class:apc-other={isPersonNonCorr}
+									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								</span>
 							{:else}
-								{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
-								{@const isPersonNonCorr = apcMode === 'person-uca' && !p.is_corresponding}
-								{#if ucaApc.length > 0}
-									<span class="apc-tag" class:apc-other={isPersonNonCorr}
-										title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
-										{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-									</span>
-								{:else}
-									<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
-										{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
-									</span>
-								{/if}
+								<span class="apc-tag apc-other" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
+									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								</span>
 							{/if}
 						{/if}
 					</td>{/if}
