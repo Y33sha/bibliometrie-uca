@@ -92,6 +92,7 @@ class MetadataCorrectionRule(StrEnum):
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
     EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
     HYBRID_FULL_OA_TO_GOLD = "HYBRID_FULL_OA_TO_GOLD"
+    SCANR_FROM_HAL_TO_HAL_TYPE = "SCANR_FROM_HAL_TO_HAL_TYPE"
 
 
 class Correction[T](NamedTuple):
@@ -588,3 +589,12 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
         else:
             result.pop(ExternalIdType.HAL_ID, None)
     return result
+
+
+def origin_doc_type_correction(
+    doc_type: str | None, origin_doc_type: str | None
+) -> Correction[str] | None:
+    """Une notice ScanR issue d'un dépôt HAL prend le type corrigé de ce dépôt. `origin_doc_type` : type corrigé du dépôt HAL, `None` si la notice n'en est pas issue ou si le dépôt est absent."""
+    if origin_doc_type is None or origin_doc_type == doc_type:
+        return None
+    return Correction(origin_doc_type, MetadataCorrectionRule.SCANR_FROM_HAL_TO_HAL_TYPE)

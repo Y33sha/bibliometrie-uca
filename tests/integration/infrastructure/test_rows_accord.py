@@ -31,6 +31,13 @@ class TestRelevesRendantUneListe:
         queries = PgMetadataCorrectionQueries()
         assert queries.fetch_for_unary_correction_by_journal(sa_sync_conn_owner, 1) == []
 
+    def test_les_depots_hal_d_origine_s_accordent(self, sa_sync_conn_owner):
+        queries = PgMetadataCorrectionQueries()
+        assert (
+            queries.fetch_for_unary_correction_by_hal_ids(sa_sync_conn_owner, ["hal-01234567"])
+            == []
+        )
+
     def test_les_espaces_de_noms_doi_des_revues_s_accordent(self, sa_sync_conn_owner):
         assert PgMetadataCorrectionQueries().fetch_journal_doi_namespaces(sa_sync_conn_owner) == []
 

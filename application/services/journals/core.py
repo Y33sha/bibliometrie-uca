@@ -13,7 +13,10 @@ from collections.abc import Sequence
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.pipeline.metadata_correction.correct_unary import compute_update
+from application.pipeline.metadata_correction.correct_unary import (
+    compute_updates,
+    hal_origin_ids,
+)
 from application.ports.pipeline.journals import (
     JournalFindOrCreateQueries,
     JournalOpenAlexEnrichmentQueries,
@@ -194,8 +197,12 @@ def _correct_for_journal(
     À enchaîner avec `refresh_from_sources` des publications du journal, qui repart de la colonne `source_publication` rafraîchie ici.
     """
     rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
+    hal_rows = {
+        row.source_id: row
+        for row in queries.fetch_for_unary_correction_by_hal_ids(conn, hal_origin_ids(rows))
+    }
     language_forms = queries.fetch_language_forms(conn)
-    updates = [u for row in rows if (u := compute_update(row, language_forms)) is not None]
+    updates = compute_updates(rows, hal_rows, language_forms)
     return queries.persist_corrections(conn, updates)
 
 

@@ -46,7 +46,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = """
-    SELECT sp.id, sp.source::text AS source,
+    SELECT sp.id, sp.source::text AS source, sp.source_id,
            sp.title, sp.doc_type, sp.doi,
            sp.journal_id, sp.oa_status, sp.language,
            sp.urls, sp.external_ids,
@@ -124,6 +124,17 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         self, conn: Connection, journal_id: int
     ) -> list[UnaryCorrectionRow]:
         rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
+        return rows_as(UnaryCorrectionRow, rows)
+
+    def fetch_for_unary_correction_by_hal_ids(
+        self, conn: Connection, hal_ids: list[str]
+    ) -> list[UnaryCorrectionRow]:
+        if not hal_ids:
+            return []
+        rows = conn.execute(
+            text(_SELECT + " WHERE sp.source = 'hal' AND sp.source_id = ANY(:ids)"),
+            {"ids": hal_ids},
+        )
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_language_forms(self, conn: Connection) -> dict[str, str]:

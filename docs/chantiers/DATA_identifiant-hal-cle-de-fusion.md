@@ -58,6 +58,13 @@ Ces fusions rendent aussi le type de la publication instable. La publication pre
 - [x] Publications 140244 et 22606 : une publication par dépôt HAL. La publication 11084 garde ses quatre dépôts : trois communications de même titre et de même année, et un poster que deux notices ScanR typées `other`, de même titre et de même année, relient aux communications.
 - [x] Publications dont la source la plus prioritaire porte deux types : 67, contre 425.
 
+### 4. Type des notices ScanR issues de HAL
+
+Une notice ScanR issue de HAL porte souvent un type générique : 11 647 des 26 646 notices dont le dépôt HAL est en base ont un type différent du sien (8 393 communications et 1 865 posters typés `other`, des recensions et des synthèses typées `article`). Deux notices ScanR `other` de même titre et de même année relient alors deux dépôts HAL de types différents. Environ 37 des 67 publications dont la source décisive porte encore deux types sont dans ce cas.
+
+- [x] Correction unaire : une notice ScanR issue de HAL prend le type corrigé de son dépôt HAL, calculé depuis la notice HAL.
+- [ ] Run et contrôle : notices ScanR retypées, publications dont la source décisive porte deux types.
+
 ## Questions ouvertes
 
 - **Arbitrage du type par consensus.** Le type d'une publication vient de la première source qui en porte un, dans l'ordre de priorité. Piste : un consensus des sources indépendantes, ScanR étant écarté quand sa notice est issue de HAL.
