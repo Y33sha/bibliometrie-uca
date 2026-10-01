@@ -143,7 +143,9 @@ async def refresh(
             await asyncio.sleep(request_delay)
         return outcome
 
-    with progression(total, branche_de_source(adapter.source_key), slog) as avancement:
+    with progression(
+        total, branche_de_source(adapter.source_key), slog, compte_retenus=True
+    ) as avancement:
 
         def _write(conn: Connection, row: StaleRow, outcome: FetchOutcome) -> None:
             nonlocal processed
@@ -156,6 +158,7 @@ async def refresh(
                 assert isinstance(outcome, FetchedRecord)
                 changed = adapter.save_refreshed(conn, row.source_id, outcome)
                 metrics.add(updated=1) if changed else metrics.add(unchanged=1)
+                avancement.retient()
             processed += 1
             avancement.avance()
 
