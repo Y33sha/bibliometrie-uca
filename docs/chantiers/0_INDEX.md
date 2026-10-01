@@ -2,10 +2,6 @@
 
 ## Chantiers non archivés
 
-### En cours
-
-- [Dépôts HAL distincts fusionnés par une notice OpenAlex ou ScanR](DATA_identifiant-hal-cle-de-fusion.md)
-
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
@@ -25,6 +21,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-01 — [Dépôts HAL distincts fusionnés par une notice OpenAlex ou ScanR](archived/2026-10-01_DATA_identifiant-hal-cle-de-fusion.md)
 - 2026-09-30 — [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md)
 - 2026-09-30 — [Signatures conservées à la renormalisation](archived/2026-09-30_DATA_signatures-conservees.md)
 - 2026-09-22 — [Revues : ISSN vérifiés, doublons et préfixes DOI](archived/2026-09-22_DATA_revues-issn-et-doublons.md)
