@@ -7,6 +7,8 @@ from application.pipeline.metadata_correction.correct_unary import (
     DOC_TYPE_MAP_MARKER,
     LANGUAGE_MAP_MARKER,
     compute_update,
+    compute_updates,
+    hal_origin_ids,
     run,
     tally_corrections,
 )
@@ -71,6 +73,7 @@ def _sp(**overrides: object) -> UnaryCorrectionRow:
     base: dict[str, object] = {
         "id": 1,
         "source": "openalex",
+        "source_id": "W1",
         "title": "Un titre quelconque",
         "doc_type": "article",
         "doi": None,
@@ -305,3 +308,38 @@ def test_language_already_mapped_is_idempotent_noop():
         raw_metadata={"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}},
     )
     assert _update(sp) is None
+
+
+# ── Notices ScanR issues d'un dépôt HAL ─────────────────────────────
+
+
+def test_scanr_from_hal_takes_corrected_hal_type():
+    """Une notice ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis la notice HAL."""
+    hal = _sp(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
+    scanr = _sp(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
+
+    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, {})
+
+    (scanr_update,) = [u for u in updates if u.id == 2]
+    assert scanr_update.doc_type == "poster"
+    assert scanr_update.raw_metadata["doc_type"]["corrected_by"] == "SCANR_FROM_HAL_TO_HAL_TYPE"
+
+
+def test_scanr_without_hal_deposit_keeps_its_type():
+    scanr = _sp(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
+    assert compute_updates([scanr], {}, {}) == []
+
+
+def test_scanr_from_another_origin_keeps_its_type():
+    scanr = _sp(id=2, source="scanr", source_id="doi10.1/x", doc_type="other")
+    hal = _sp(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
+    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, {})] == []
+
+
+def test_hal_origin_ids():
+    rows = [
+        _sp(source="scanr", source_id="halhal-04565713"),
+        _sp(source="scanr", source_id="doi10.1/x"),
+        _sp(source="hal", source_id="hal-04501427"),
+    ]
+    assert hal_origin_ids(rows) == ["hal-04565713"]
