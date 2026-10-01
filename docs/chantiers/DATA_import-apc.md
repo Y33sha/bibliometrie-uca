@@ -56,7 +56,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - **Rattachement aux structures par les formes de noms** (`structure_name_forms`), avec le matcher des adresses d'affiliation. Un libellé sans structure appelle une forme de nom.
   - Payeur (`budget_structure_id`) : le libellé `institution`, parmi les universités, écoles, organismes et CHU.
   - Laboratoire (`lab_structure_id`) d'un frais hors OA : le libellé `lab_name`, lu avec le payeur pour contexte, parmi les laboratoires.
-  - Laboratoire d'un frais d'open access : déduit des auteurs correspondants de la publication.
+- **Page d'un laboratoire** : les APC de ses publications payées par l'établissement, quel que soit le laboratoire payeur.
 - **Colonnes conservées** :
   - ce qui sert au rattachement et à son contrôle a posteriori : `lab_name`, `budget`, `institution`, `coman_id`, `issn`, `journal_name`, `publisher_name` ;
   - `journal_id` et `publisher_id`, pour des agrégats par revue ou par éditeur ;
@@ -87,7 +87,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 
 - [x] Payeur et laboratoire des frais hors OA rattachés par les formes de noms, à chaque import ; le script liste les libellés sans structure.
 - [ ] Formes de noms manquantes ajoutées d'après cette liste.
-- [ ] Frais d'open access : laboratoire des auteurs correspondants.
+- [x] Filtre et facette APC : catégories « ce laboratoire » et « autres de l'établissement » supprimées ; la page d'un laboratoire affiche en vert les APC payées par l'établissement.
 
 ### 5. Établissement
 
@@ -99,5 +99,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [ ] `docs/sources/10-imports-manuels.md`, `docs/donnees/02-structures.md`, `docs/donnees/07-index-des-tables.md`.
 
 ## Questions ouvertes
+
+- **Laboratoire d'un frais d'open access**, reporté. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `authorships`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
 
 - **Clé d'unicité des lignes hors OA sans DOI** (étape de l'établissement). Une ligne sans DOI n'a ni DOI ni titre : 11 paiements identiques de 940 € du CNRS en 2017 restent indiscernables. Le nom du fichier change d'une mise à jour à l'autre et ne peut pas entrer dans la clé. Proposition : contenu de la ligne et rang parmi les lignes identiques du fichier.

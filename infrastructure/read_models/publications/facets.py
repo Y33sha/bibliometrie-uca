@@ -115,7 +115,7 @@ class _PublicationFacetsBuilder:
         if skip != "source":
             clauses.append(source_clause(f.source_values))
         if skip != "apc":
-            clauses.append(apc_clause(f.has_apc, self.perimeter_structure_ids, f.lab_ids))
+            clauses.append(apc_clause(f.has_apc, self.perimeter_structure_ids))
         if skip != "publisher":
             clauses.append(publisher_id_clause(f.publisher_id))
         if skip != "journal":
@@ -288,66 +288,8 @@ class _PublicationFacetsBuilder:
         }
 
     def _facet_apc(self) -> list[FacetOption]:
-        """APC : variante à 4 catégories si un labo est sélectionné, sinon 3."""
-        where_sql, binds = self._clauses_skipping("apc")
-        if self.filters.lab_ids:
-            return self._facet_apc_with_lab(where_sql, binds)
-        return self._facet_apc_without_lab(where_sql, binds)
-
-    def _facet_apc_with_lab(self, where: str, binds: dict[str, object]) -> list[FacetOption]:
-        lab_ids = self.filters.lab_ids
-        r = self.conn.execute(
-            text(f"""
-                SELECT
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.lab_structure_id = ANY(CAST(:apc_facet_lab_ids AS int[]))
-                    )) AS apc_this_lab,
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
-                    ) AND NOT EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.lab_structure_id = ANY(CAST(:apc_facet_lab_ids AS int[]))
-                    )) AS apc_other_uca,
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-                    ) AND NOT EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
-                    )) AS apc_non_uca,
-                    COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-                    )) AS apc_none
-                FROM publications p
-                WHERE {where}
-            """),
-            {
-                **binds,
-                "apc_facet_lab_ids": lab_ids,
-                "apc_facet_root_ids": self.perimeter_structure_ids,
-            },
-        ).one()
-        label_row = self.conn.execute(
-            text("SELECT COALESCE(acronym, name) AS label FROM structures WHERE id = :id"),
-            {"id": lab_ids[0]},
-        ).one_or_none()
-        lab_label = label_row.label if label_row else "ce labo"
-        institution = get_persons_perimeter_name(self.conn)
-        return [
-            FacetOption(value="this_lab", label=f"APC — {lab_label}", count=r.apc_this_lab),
-            FacetOption(
-                value="other_uca", label=f"APC — autres {institution}", count=r.apc_other_uca
-            ),
-            FacetOption(value="non_uca", label=f"APC hors {institution}", count=r.apc_non_uca),
-            FacetOption(value="none", label="Sans APC", count=r.apc_none),
-        ]
-
-    def _facet_apc_without_lab(self, where: str, binds: dict[str, object]) -> list[FacetOption]:
+        """APC : payées par le périmètre, payées hors périmètre, sans paiement connu."""
+        where, binds = self._clauses_skipping("apc")
         r = self.conn.execute(
             text(f"""
                 SELECT
