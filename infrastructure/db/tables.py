@@ -891,23 +891,16 @@ apc_payments = Table(
     Column("id", Integer, primary_key=True),
     Column("lab_name", Text),
     Column("publisher_name", Text),
-    Column("publisher_type", Text),
     Column("journal_name", Text),
     Column("issn", Text),
-    Column("journal_type", Text),
     Column("doi", Text),
-    Column("article_title", Text),
     Column("amount_eur_ht", Numeric(12, 2)),
     Column("billing_year", SmallInteger),
     Column("pub_year", SmallInteger),
     Column("budget", Text),
     Column("institution", Text),
-    Column("institution_type", Text),
     Column("coman_id", Integer),
-    Column("all_surveys_answered", Text),
-    Column("shared_payment", Text),
     Column("source_file", Text),
-    Column("expense_type", Text),
     Column("remarks", Text),
     Column("publication_id", Integer),
     Column("journal_id", Integer),
@@ -915,6 +908,10 @@ apc_payments = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),
     Column("lab_structure_id", Integer),
+    Column("open_access_fee", Boolean, nullable=False),
+    UniqueConstraint(
+        "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
+    ),
     # Index sur expression lower(doi) — complété à la main.
 )
 

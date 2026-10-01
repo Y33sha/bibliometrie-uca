@@ -296,7 +296,8 @@ class TestSudocCheck:
         _create_record(sa_sync_conn, with_record, doi="10.9999/d")
         with_payment = _create_journal(sa_sync_conn, title="Revue test avec paiement")
         sa_sync_conn.execute(
-            text("INSERT INTO apc_payments (journal_id) VALUES (:jid)"), {"jid": with_payment}
+            text("INSERT INTO apc_payments (journal_id, open_access_fee) VALUES (:jid, true)"),
+            {"jid": with_payment},
         )
         deleted = {j.id: j for j in repo.delete_empty_journals()}
         assert deleted[empty].title == "Revue test vide"
