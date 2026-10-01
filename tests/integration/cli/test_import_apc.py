@@ -73,6 +73,45 @@ def test_reimport_sans_doublon(sa_sync_conn):
     assert _count(sa_sync_conn) == 1
 
 
+def test_laboratoire_et_payeur_rattaches_par_les_formes_de_noms(sa_sync_conn):
+    """Le payeur sert de contexte à une forme de laboratoire valable seulement en présence de son établissement."""
+    _publication(sa_sync_conn, "10.9/apc-d")
+    university, lab = (
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO structures (code, name, structure_type)"
+                " VALUES (:c, :n, CAST(:t AS structure_type)) RETURNING id"
+            ),
+            {"c": code, "n": name, "t": kind},
+        ).scalar_one()
+        for code, name, kind in (
+            ("TEST_APC_U", "Université test APC", "universite"),
+            ("TEST_APC_L", "Labo test APC", "labo"),
+        )
+    )
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary, requires_context_of)"
+            " VALUES (:u, 'universite test apc', false, NULL), (:l, 'ltapc', true, ARRAY[:u])"
+        ),
+        {"u": university, "l": lab},
+    )
+    payment = {
+        **_payment("10.9/apc-d", institution="Université Test APC", open_access_fee=False),
+        "lab_name": "LTAPC",
+    }
+
+    stats = import_payments(sa_sync_conn, [payment], "f.csv")
+
+    row = sa_sync_conn.execute(
+        text(
+            "SELECT lab_structure_id, budget_structure_id FROM apc_payments WHERE doi = '10.9/apc-d'"
+        )
+    ).one()
+    assert (row.lab_structure_id, row.budget_structure_id) == (lab, university)
+    assert all(u.label not in ("LTAPC", "Université Test APC") for u in stats.unresolved)
+
+
 def test_frais_d_open_access_et_hors_oa_distincts(sa_sync_conn):
     _publication(sa_sync_conn, "10.9/apc-c")
 

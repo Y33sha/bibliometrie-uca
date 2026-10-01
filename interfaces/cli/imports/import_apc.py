@@ -3,6 +3,8 @@
 
 Deux formats, reconnus aux colonnes du fichier : le jeu de données Open APC (frais d'open access) et le fichier « frais hors OA » de l'enquête nationale (autres frais de publication). Sont importés les seuls paiements dont le DOI désigne une publication de la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
 
+Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms des structures, comme les adresses d'affiliation. Le script liste les libellés sans structure.
+
 Usage :
     python -m interfaces.cli.imports.import_apc data/apc_de.csv
     python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --dry-run
@@ -18,11 +20,15 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import sanitize_optional_text
+from application.pipeline.affiliations.resolve_addresses import AddressMatcher
+from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
+from domain.normalize import normalize_text, sanitize_optional_text
 from domain.publications.identifiers import clean_doi
+from domain.structures.structure import StructureType
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
 
 log = setup_logger("import_apc", os.path.dirname(__file__))
 
@@ -147,17 +153,103 @@ def read_payments(path: Path) -> tuple[FileFormat, list[Payment]]:
         return file_format, [mapper(row) for row in reader]
 
 
+LAB_TYPES = frozenset({StructureType.LABO})
+PAYER_TYPES = frozenset(
+    {StructureType.UNIVERSITE, StructureType.ECOLE, StructureType.ONR, StructureType.CHU}
+)
+
+
+class StructureResolver:
+    """Structure désignée par un libellé, reconnue par le matcher des adresses d'affiliation."""
+
+    def __init__(self, forms: list[StructureNameForm]) -> None:
+        self._matcher = AddressMatcher(forms)
+        self._types = {f.structure_id: f.structure_type for f in forms}
+
+    def resolve(
+        self, label: str, types: frozenset[StructureType], context: str | None = None
+    ) -> int | None:
+        """Seule structure reconnue dans `label` parmi les `types` donnés. None si aucune ou plusieurs.
+
+        `context` : libellé lu avec `label`, qui satisfait les formes de noms valables seulement en présence d'une autre structure.
+        """
+        ids = {
+            m.structure_id
+            for m in self._matcher.resolve(normalize_text(f"{label} / {context or ''}"))
+            if self._types[m.structure_id] in types
+        }
+        return ids.pop() if len(ids) == 1 else None
+
+
+@dataclass(frozen=True, slots=True)
+class UnresolvedLabel:
+    """Libellé sans structure : colonne d'origine, texte, contexte, nombre de paiements."""
+
+    column: str
+    label: str
+    context: str | None
+    payments: int
+
+
+# Colonne du libellé, colonne de son contexte, colonne de la structure, types de structure admis.
+# Le payeur sert de contexte au laboratoire : il nomme souvent l'établissement de tutelle.
+_LINKS = (
+    ("lab_name", "institution", "lab_structure_id", LAB_TYPES),
+    ("institution", "NULL::text", "budget_structure_id", PAYER_TYPES),
+)
+
+
+def map_structures(conn: Connection, resolver: StructureResolver) -> list[UnresolvedLabel]:
+    """Rattache chaque paiement à son laboratoire et à son payeur, d'après leurs libellés.
+
+    Recalcule tous les rattachements, donc reflète l'état courant des formes de noms. Rend les libellés sans structure, du plus fréquent au plus rare.
+    """
+    unresolved: list[UnresolvedLabel] = []
+    for label_column, context_column, structure_column, types in _LINKS:
+        counts = conn.execute(
+            text(f"""
+                SELECT {label_column} AS label, {context_column} AS context, count(*) AS n
+                FROM apc_payments WHERE {label_column} IS NOT NULL GROUP BY 1, 2
+            """)
+        ).all()
+        links = [
+            {
+                "label": r.label,
+                "context": r.context,
+                "sid": resolver.resolve(r.label, types, r.context),
+            }
+            for r in counts
+        ]
+        if links:
+            conn.execute(
+                text(f"""
+                    UPDATE apc_payments SET {structure_column} = CAST(:sid AS integer)
+                    WHERE {label_column} = :label
+                      AND {context_column} IS NOT DISTINCT FROM CAST(:context AS text)
+                      AND {structure_column} IS DISTINCT FROM CAST(:sid AS integer)
+                """),
+                links,
+            )
+        unresolved += [
+            UnresolvedLabel(label_column, r.label, r.context, r.n)
+            for r, link in zip(counts, links, strict=True)
+            if link["sid"] is None
+        ]
+    return sorted(unresolved, key=lambda u: (u.column, -u.payments, u.label))
+
+
 @dataclass(frozen=True, slots=True)
 class ImportStats:
-    """Bilan d'un import : lignes lues, lignes à DOI de la base, paiements insérés."""
+    """Bilan d'un import : lignes lues, lignes à DOI de la base, paiements insérés, libellés sans structure."""
 
     read: int
     in_base: int
     inserted: int
+    unresolved: list[UnresolvedLabel]
 
 
 def import_payments(conn: Connection, payments: list[Payment], source_file: str) -> ImportStats:
-    """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues et éditeurs."""
+    """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues, éditeurs et structures."""
     publication_by_doi = {
         row.doi: row.id
         for row in conn.execute(
@@ -173,7 +265,11 @@ def import_payments(conn: Connection, payments: list[Payment], source_file: str)
     map_publications(conn)
     map_journals(conn)
     map_publishers(conn)
-    return ImportStats(read=len(payments), in_base=len(in_base), inserted=inserted)
+    resolver = StructureResolver(PgAddressResolutionQueries().load_name_forms(conn))
+    unresolved = map_structures(conn, resolver)
+    return ImportStats(
+        read=len(payments), in_base=len(in_base), inserted=inserted, unresolved=unresolved
+    )
 
 
 def map_publications(conn: Connection) -> int:
@@ -240,6 +336,11 @@ def main() -> None:
         stats.inserted,
         "à insérer (simulation)" if args.dry_run else "insérés",
     )
+    for u in stats.unresolved:
+        context = f" [{u.context}]" if u.context else ""
+        log.info(
+            "sans structure (%s) : %s%s — %d paiements", u.column, u.label, context, u.payments
+        )
 
 
 if __name__ == "__main__":
