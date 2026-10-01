@@ -95,7 +95,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 
 ### 6. Lectures et documentation
 
-- [ ] Totaux et filtres : frais d'open access et frais hors OA distingués.
+- [ ] Page stats : mesure « Montant des APC » (somme de `amount_eur_ht`), à côté du nombre de publications, croisable avec toutes les dimensions (année, laboratoire, éditeur, revue…). La mesure s'ajoute au registre `MEASURES` de `domain/stats.py` et à son agrégat SQL dans `infrastructure/read_models/stats/pivot.py`.
 - [ ] `docs/sources/10-imports-manuels.md`, `docs/donnees/02-structures.md`, `docs/donnees/07-index-des-tables.md`.
 
 ## Questions ouvertes
