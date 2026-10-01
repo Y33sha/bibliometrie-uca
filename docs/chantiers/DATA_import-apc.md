@@ -53,7 +53,10 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - **Un fichier CSV par import.** `source_file` porte le nom du fichier d'origine.
 - **Réimport libre.** Un fichier se réimporte sans créer de doublon. La table n'est jamais vidée.
 - **Périmètre** : les paiements dont le DOI est en base. Une étape ultérieure ajoute ceux de l'établissement, nommé en argument du script : Open APC le désigne par son nom, sans ROR ; le fichier hors OA, par son `coman_id`.
-- **Laboratoire** : pour un frais d'open access, déduit des auteurs correspondants de la publication ; pour un frais hors OA, celui que déclare l'enquête (`lab_name`), par une table de correspondance que l'import réapplique.
+- **Rattachement aux structures par les formes de noms** (`structure_name_forms`), avec le matcher des adresses d'affiliation. Un libellé sans structure appelle une forme de nom.
+  - Payeur (`budget_structure_id`) : le libellé `institution`, parmi les universités, écoles, organismes et CHU.
+  - Laboratoire (`lab_structure_id`) d'un frais hors OA : le libellé `lab_name`, lu avec le payeur pour contexte, parmi les laboratoires.
+  - Laboratoire d'un frais d'open access : déduit des auteurs correspondants de la publication.
 - **Colonnes conservées** :
   - ce qui sert au rattachement et à son contrôle a posteriori : `lab_name`, `budget`, `institution`, `coman_id`, `issn`, `journal_name`, `publisher_name` ;
   - `journal_id` et `publisher_id`, pour des agrégats par revue ou par éditeur ;
@@ -80,10 +83,11 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [x] Tests : `tests/unit/interfaces/cli/imports/`, `tests/integration/cli/`.
 - [ ] Reprise : réimport d'Open APC et des frais hors OA ; suppression des lignes du fichier APC de l'enquête.
 
-### 4. Laboratoire
+### 4. Structures
 
+- [x] Payeur et laboratoire des frais hors OA rattachés par les formes de noms, à chaque import ; le script liste les libellés sans structure.
+- [ ] Formes de noms manquantes ajoutées d'après cette liste.
 - [ ] Frais d'open access : laboratoire des auteurs correspondants.
-- [ ] Frais hors OA : table de correspondance `lab_name` → laboratoire, réappliquée à l'import.
 
 ### 5. Établissement
 

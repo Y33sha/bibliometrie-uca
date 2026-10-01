@@ -5,8 +5,13 @@ Les tests portent sur ce que la lecture tire de chaque format — montants, ann�
 
 import pytest
 
+from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
+from domain.structures.structure import StructureType
 from interfaces.cli.imports.import_apc import (
+    LAB_TYPES,
+    PAYER_TYPES,
     FileFormat,
+    StructureResolver,
     detect_format,
     non_oa_fee_payment,
     open_apc_payment,
@@ -109,6 +114,38 @@ class TestNonOaFeePayment:
     @pytest.mark.parametrize("mention", ["inconnu", "pas de doi", "non publié"])
     def test_mention_d_absence_ne_vaut_pas_un_doi(self, mention):
         assert non_oa_fee_payment({**self._ROW, "DOI": mention})["doi"] is None
+
+
+class TestStructureResolver:
+    _UCA, _LMV, _CNRS = 1, 2, 3
+    _FORMS = [
+        StructureNameForm(
+            1, _UCA, "universite clermont auvergne", False, None, False, StructureType.UNIVERSITE
+        ),
+        StructureNameForm(2, _LMV, "lmv", True, [_UCA], False, StructureType.LABO),
+        StructureNameForm(
+            3, _LMV, "laboratoire magmas et volcans", False, None, False, StructureType.LABO
+        ),
+        StructureNameForm(4, _CNRS, "cnrs", True, None, False, StructureType.ONR),
+    ]
+
+    def test_laboratoire_reconnu_par_son_nom(self):
+        resolver = StructureResolver(self._FORMS)
+        assert resolver.resolve("Laboratoire Magmas et Volcans / LMV", LAB_TYPES) == self._LMV
+
+    def test_le_payeur_satisfait_le_contexte_d_une_forme(self):
+        resolver = StructureResolver(self._FORMS)
+        assert resolver.resolve("LMV", LAB_TYPES) is None
+        assert resolver.resolve("LMV", LAB_TYPES, "Université Clermont Auvergne") == self._LMV
+
+    def test_seuls_les_types_demandes_comptent(self):
+        resolver = StructureResolver(self._FORMS)
+        assert resolver.resolve("CNRS - Centre national", PAYER_TYPES) == self._CNRS
+        assert resolver.resolve("CNRS - Centre national", LAB_TYPES) is None
+
+    def test_plusieurs_structures_ne_designent_aucune(self):
+        resolver = StructureResolver(self._FORMS)
+        assert resolver.resolve("CNRS / Université Clermont Auvergne", PAYER_TYPES) is None
 
 
 def test_read_payments_reconnait_le_format(tmp_path):
