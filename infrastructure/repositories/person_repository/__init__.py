@@ -4,7 +4,7 @@ Implémente le port `application.ports.repositories.person_repository.PersonRepo
 
 Usage :
     repo = PgPersonRepository(conn)
-    repo.set_rejected(person_id, True)
+    repo.set_exclusion(person_id, PersonExclusion.NOT_A_PERSON)
 """
 
 from typing import TYPE_CHECKING
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
         NameFormStatusRow,
     )
     from domain.persons.identifier_attribution import IdentifierAttribution
-    from domain.persons.person import Person
+    from domain.persons.person import Person, PersonExclusion
 
 
 class PgPersonRepository(PersonRepository):
@@ -45,8 +45,8 @@ class PgPersonRepository(PersonRepository):
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         _core.update_name(self._conn, person_id, last_name, first_name)
 
-    def set_rejected(self, person_id: int, rejected: bool) -> None:
-        _core.set_rejected(self._conn, person_id, rejected)
+    def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
+        _core.set_exclusion(self._conn, person_id, exclusion)
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────
 

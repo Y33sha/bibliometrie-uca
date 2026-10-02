@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict t4JJMVVOKQvARy07CBgYIF428YNtS0MI1HCHae1unYoiwFadkzVe0ZJd6OK3QBl
+\restrict lnpEoz7A9E3IcjFVhCqzXyU7Bh3WZV7eXZkRa82cIBI3jPuHvYrqd3KKKVGQImC
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -168,6 +168,16 @@ CREATE TYPE public.oa_type AS ENUM (
     'unknown',
     'diamond',
     'embargoed'
+);
+
+
+--
+-- Name: person_exclusion; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.person_exclusion AS ENUM (
+    'not_a_person',
+    'out_of_perimeter'
 );
 
 
@@ -1305,8 +1315,15 @@ CREATE TABLE public.persons (
     last_name_normalized text NOT NULL,
     first_name_normalized text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    rejected boolean DEFAULT false
+    exclusion public.person_exclusion
 );
+
+
+--
+-- Name: COLUMN persons.exclusion; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.persons.exclusion IS 'Motif d''exclusion décidé à la main : not_a_person (fausse entité), out_of_perimeter (personne réelle rattachée au périmètre par erreur). Nul pour une personne retenue.';
 
 
 --
@@ -3777,5 +3794,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict t4JJMVVOKQvARy07CBgYIF428YNtS0MI1HCHae1unYoiwFadkzVe0ZJd6OK3QBl
+\unrestrict lnpEoz7A9E3IcjFVhCqzXyU7Bh3WZV7eXZkRa82cIBI3jPuHvYrqd3KKKVGQImC
 

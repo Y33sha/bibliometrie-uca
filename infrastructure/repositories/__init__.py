@@ -5,8 +5,8 @@ La couche application importe ces fonctions plutôt que les classes concrètes P
 Usage :
     from infrastructure.repositories import person_repository
 
-    def set_rejected(cur, person_id, rejected):
-        person_repository(cur).set_rejected(person_id, rejected)
+    def set_exclusion(conn, person_id, exclusion):
+        person_repository(conn).set_exclusion(person_id, exclusion)
 """
 
 from sqlalchemy import Connection

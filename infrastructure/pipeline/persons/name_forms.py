@@ -22,7 +22,7 @@ class PgPersonNameFormsQueries(PersonNameFormsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.persons.name_forms.PersonNameFormsQueries`."""
 
     def fetch_persons_names(self, conn: Connection) -> list[PersonNameRow]:
-        """Inclut les `rejected = TRUE` : leurs name_forms doivent rester présentes dans `person_name_forms` pour servir d'ancre au matching et empêcher la re-création en boucle des entités douteuses (artefacts de parsing source, noms d'organisations, etc.) à chaque run pipeline."""
+        """Inclut les personnes exclues : leurs name_forms restent dans `person_name_forms` comme ancres du matching, donc le pipeline ne les recrée pas à chaque run."""
         rows = conn.execute(
             text("""
                 SELECT id,

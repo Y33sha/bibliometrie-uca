@@ -101,7 +101,7 @@ class PersonsMatchingQueries(Protocol):
         ...
 
     def fetch_namesakes(self, conn: Connection) -> list[Namesake]:
-        """Les personnes non rejetées, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
+        """Les personnes non exclues, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
         ...
 
     def fetch_linked_signature_names(

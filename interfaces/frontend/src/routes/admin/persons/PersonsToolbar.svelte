@@ -4,6 +4,8 @@
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
   import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "$lib/filterItems";
+  import { personExclusionLabels } from "$lib/labels";
+  import type { ExclusionFilter } from "./types";
 
   type IdState = "all" | "yes" | "no";
 
@@ -12,6 +14,7 @@
     selectedDepts = $bindable(),
     selectedRoles = $bindable(),
     selectedRh = $bindable(),
+    exclusionFilter = $bindable(),
     idStates = $bindable(),
     pendingStates = $bindable(),
     deptOptions,
@@ -27,6 +30,7 @@
     selectedDepts: string[];
     selectedRoles: string[];
     selectedRh: string[];
+    exclusionFilter: ExclusionFilter;
     idStates: Record<string, IdState>;
     pendingStates: Record<string, IdState>;
     deptOptions: FacetOption[];
@@ -83,6 +87,19 @@
     counts={pendingCounts}
     onchange={onfilterchange}
   />
+  <select
+    class="exclusion-filter"
+    aria-label="Exclusion"
+    bind:value={exclusionFilter}
+    onchange={onfilterchange}
+  >
+    <option value="">Toutes les personnes</option>
+    <option value="retained">Retenues</option>
+    <option value="excluded">Exclues</option>
+    {#each Object.entries(personExclusionLabels) as [value, label] (value)}
+      <option {value}>Exclues : {label.toLowerCase()}</option>
+    {/each}
+  </select>
   <span class="count">{totalCount} personnes</span>
 </div>
 

@@ -101,7 +101,7 @@ class TestEmitEvent:
     def test_default_payload_is_empty_object(self, sa_sync_conn):
         token = set_current_user("admin")
         try:
-            emit_event(audit_repository(sa_sync_conn), "person.rejected", "person", 42)
+            emit_event(audit_repository(sa_sync_conn), "person.exclusion", "person", 42)
             payload = sa_sync_conn.execute(
                 text("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
             ).scalar_one()
@@ -159,16 +159,17 @@ class TestEndToEndServiceIntegration:
             )
         ).one()
 
-    def test_set_rejected_emits_event(self, sa_sync_conn):
-        from application.services.persons.core import set_rejected
+    def test_set_exclusion_emits_event(self, sa_sync_conn):
+        from application.services.persons.core import set_exclusion
+        from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
         token = set_current_user("admin")
         try:
-            set_rejected(
+            set_exclusion(
                 person_id,
-                True,
+                PersonExclusion.OUT_OF_PERIMETER,
                 repo=person_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
@@ -181,21 +182,22 @@ class TestEndToEndServiceIntegration:
                 "FROM audit_log ORDER BY id DESC LIMIT 1"
             )
         ).one()
-        assert row.event_type == "person.rejected"
+        assert row.event_type == "person.exclusion"
         assert row.aggregate_id == person_id
-        assert row.payload == {"rejected": True}
+        assert row.payload == {"exclusion": "out_of_perimeter"}
         assert row.user_id == "admin"
 
-    def test_set_rejected_without_context_no_event(self, sa_sync_conn):
+    def test_set_exclusion_without_context_no_event(self, sa_sync_conn):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from application.services.persons.core import set_rejected
+        from application.services.persons.core import set_exclusion
+        from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
-        set_rejected(
+        set_exclusion(
             person_id,
-            True,
+            PersonExclusion.NOT_A_PERSON,
             repo=person_repository(sa_sync_conn),
             audit_repo=audit_repository(sa_sync_conn),
         )

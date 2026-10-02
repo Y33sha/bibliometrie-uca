@@ -38,8 +38,8 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
 
 
 def name_form_holder(form: str, person: str) -> str:
-    """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non rejetée."""
-    return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND NOT {person}.rejected"
+    """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non exclue."""
+    return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND {person}.exclusion IS NULL"
 
 
 def other_name_form_holders(name_form: str, person_id: str) -> str:

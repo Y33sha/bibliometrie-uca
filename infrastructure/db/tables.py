@@ -38,6 +38,7 @@ from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
+from domain.persons.person import PersonExclusion
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
@@ -183,6 +184,12 @@ structure_type_enum = PgEnum(
 )
 
 publisher_type_enum = PgEnum(*PUBLISHER_TYPES, name="publisher_type", create_type=False)
+
+person_exclusion_enum = PgEnum(
+    *(e.value for e in PersonExclusion),
+    name="person_exclusion",
+    create_type=False,
+)
 
 journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
 
@@ -688,7 +695,7 @@ persons = Table(
     Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("rejected", Boolean, server_default="false"),
+    Column("exclusion", person_exclusion_enum),
 )
 
 

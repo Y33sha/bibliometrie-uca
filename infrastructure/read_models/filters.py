@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
+from domain.persons.person import PersonExclusion
 from domain.publications.metadata import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
@@ -58,8 +59,8 @@ def publication_in_perimeter(alias: str = "p") -> str:
     le périmètre.
 
     Lit le flag matérialisé `publications.in_perimeter` (= au moins un authorship
-    in-perimeter d'une personne non rejetée), maintenu en phase `authorships`
-    (`refresh_publications_in_perimeter`) et à l'action de rejet de personne.
+    in-perimeter d'une personne non exclue), maintenu en phase `authorships`
+    (`refresh_publications_in_perimeter`) et à l'exclusion d'une personne.
     Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
     par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
     quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
@@ -533,11 +534,18 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
-def person_rejected_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne est (ou n'est pas) écartée par la curation."""
-    if value is None:
+def person_exclusion_clause(
+    excluded: bool | None, exclusion: PersonExclusion | None
+) -> WhereClause | None:
+    """Filtre : la personne est exclue (ou retenue) ; avec `exclusion`, exclue pour ce motif."""
+    if exclusion is not None:
+        return WhereClause(
+            "p.exclusion = CAST(:flt_person_exclusion AS person_exclusion)",
+            {"flt_person_exclusion": exclusion.value},
+        )
+    if excluded is None:
         return None
-    return WhereClause("p.rejected = :flt_person_rejected", {"flt_person_rejected": value})
+    return WhereClause("p.exclusion IS NOT NULL" if excluded else "p.exclusion IS NULL", {})
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:

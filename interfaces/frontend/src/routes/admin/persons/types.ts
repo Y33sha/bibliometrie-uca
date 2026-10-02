@@ -13,6 +13,17 @@ export type Person = components["schemas"]["PersonOut"];
 export type PersonListResponse = components["schemas"]["PersonListResponse"];
 export type OtherPerson = components["schemas"]["OtherPersonOut"];
 export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
+export type PersonExclusion = components["schemas"]["PersonExclusion"];
+
+/** Filtre de la liste sur l'exclusion : toutes les personnes (""), les retenues, les exclues, ou les exclues pour un motif. */
+export type ExclusionFilter = "" | "retained" | "excluded" | PersonExclusion;
+
+/** Paramètres de requête `/api/persons` qui traduisent un filtre d'exclusion. */
+export function setExclusionParams(params: URLSearchParams, filter: ExclusionFilter): void {
+  if (filter === "retained") params.set("excluded", "false");
+  else if (filter === "excluded") params.set("excluded", "true");
+  else if (filter) params.set("exclusion", filter);
+}
 
 // ── Extensions UI (champs ajoutés côté front) ──
 type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];

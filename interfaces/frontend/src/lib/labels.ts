@@ -1,3 +1,7 @@
+import type { components } from './api/schema';
+
+type PersonExclusion = components['schemas']['PersonExclusion'];
+
 /** Libellés FR (singulier) des types de documents, codés en dur. Source de vérité de la liste canonique : l'enum PG `doc_type` / `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée par un test pytest (tests/unit/domain/source_publications/test_doc_types.py) qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
 export const docTypeSingular: Record<string, string> = {
 	article: 'Article',
@@ -201,6 +205,12 @@ export const identifierStatusClasses: Record<string, string> = {
 	confirmed: 'id-confirmed',
 	rejected: 'id-rejected',
 	pending: 'id-pending'
+};
+
+/** Libellés FR des motifs d'exclusion d'une personne — enum PG `person_exclusion`. */
+export const personExclusionLabels: Record<PersonExclusion, string> = {
+	not_a_person: 'Fausse entité',
+	out_of_perimeter: 'Hors périmètre'
 };
 
 /** Classes CSS associées aux statuts de détection d'une structure dans le tableau de bord feedback. Le statut est dérivé de `is_confirmed` + `is_detected` via `deriveStructDetectionStatus`. */

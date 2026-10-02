@@ -1264,7 +1264,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/reject": {
+    "/api/persons/{person_id}/exclusion": {
         parameters: {
             query?: never;
             header?: never;
@@ -1278,12 +1278,12 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Reject Person
-         * @description Marque/démarque une personne comme rejetée.
+         * Set Person Exclusion
+         * @description Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
          *
-         *     Renvoie 404 sur une personne introuvable (`set_rejected`).
+         *     Renvoie 404 sur une personne introuvable (`set_exclusion`).
          */
-        patch: operations["reject_person_api_persons__person_id__reject_patch"];
+        patch: operations["set_person_exclusion_api_persons__person_id__exclusion_patch"];
         trace?: never;
     };
     "/api/persons/{person_id}/name": {
@@ -4082,6 +4082,12 @@ export interface components {
             oa: components["schemas"]["DashboardOa"];
         };
         /**
+         * PersonExclusion
+         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching.
+         * @enum {string}
+         */
+        PersonExclusion: "not_a_person" | "out_of_perimeter";
+        /**
          * PersonIdentifierOut
          * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
          */
@@ -4138,8 +4144,7 @@ export interface components {
             end_date: string | null;
             /** Has Rh */
             has_rh: boolean;
-            /** Rejected */
-            rejected: boolean;
+            exclusion: components["schemas"]["PersonExclusion"] | null;
             /** Signature Count */
             signature_count: number;
             /** Signature Count As Author */
@@ -4717,14 +4722,6 @@ export interface components {
             /** Person Id */
             person_id: number;
         };
-        /** RejectPerson */
-        RejectPerson: {
-            /**
-             * Rejected
-             * @default true
-             */
-            rejected: boolean;
-        };
         /**
          * RejectedPairItem
          * @description Paire (publication, personne) déjà rejetée, qui bloque une réassignation.
@@ -4862,6 +4859,10 @@ export interface components {
         SetCountry: {
             /** Countries */
             countries?: string[] | null;
+        };
+        /** SetPersonExclusion */
+        SetPersonExclusion: {
+            exclusion: components["schemas"]["PersonExclusion"] | null;
         };
         /**
          * SharingPersonOut
@@ -6928,7 +6929,8 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                rejected?: boolean | null;
+                excluded?: boolean | null;
+                exclusion?: components["schemas"]["PersonExclusion"] | null;
                 lab_id?: number | null;
             };
             header?: never;
@@ -6969,7 +6971,8 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                rejected?: boolean | null;
+                excluded?: boolean | null;
+                exclusion?: components["schemas"]["PersonExclusion"] | null;
                 lab_id?: number | null;
             };
             header?: never;
@@ -7578,7 +7581,7 @@ export interface operations {
             };
         };
     };
-    reject_person_api_persons__person_id__reject_patch: {
+    set_person_exclusion_api_persons__person_id__exclusion_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -7589,7 +7592,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RejectPerson"];
+                "application/json": components["schemas"]["SetPersonExclusion"];
             };
         };
         responses: {

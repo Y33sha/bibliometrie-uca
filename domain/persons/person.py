@@ -12,10 +12,20 @@ La logique métier touchant à une personne (fusion, matching cross-source, cré
 """
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from domain.errors import ConflictError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.name_forms import PersonNameForm
+
+
+class PersonExclusion(StrEnum):
+    """Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching."""
+
+    # Fausse entité : nom d'équipe, plusieurs noms dans un même champ…
+    NOT_A_PERSON = "not_a_person"
+    # Personne réelle, rattachée au périmètre par erreur.
+    OUT_OF_PERIMETER = "out_of_perimeter"
 
 
 @dataclass(slots=True)
@@ -27,7 +37,7 @@ class Person:
     first_name: str
     last_name_normalized: str
     first_name_normalized: str
-    rejected: bool = False
+    exclusion: PersonExclusion | None = None
     identifiers: tuple[IdentifierAttribution, ...] = field(default=())
     name_forms: tuple[PersonNameForm, ...] = field(default=())
 

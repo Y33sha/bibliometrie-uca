@@ -42,7 +42,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         label="pe.first_name || ' ' || pe.last_name",
         join=(
             "JOIN authorships au ON au.publication_id = p.id AND au.roles && ARRAY['author']::text[] "
-            "JOIN persons pe ON pe.id = au.person_id AND pe.rejected IS NOT TRUE"
+            "JOIN persons pe ON pe.id = au.person_id AND pe.exclusion IS NULL"
         ),
     ),
     "subject": EntitySql(

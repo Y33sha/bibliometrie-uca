@@ -80,7 +80,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
         cur.execute(
             "UPDATE publications p SET in_perimeter = EXISTS ("
             "SELECT 1 FROM authorships a JOIN persons pe "
-            "ON pe.id = a.person_id AND pe.rejected = FALSE "
+            "ON pe.id = a.person_id AND pe.exclusion IS NULL "
             "WHERE a.publication_id = p.id AND a.in_perimeter = TRUE) "
             "WHERE p.journal_id = %s",
             (journal_id,),

@@ -12,7 +12,7 @@ from infrastructure.db.sql_fragments import case_priority
 
 
 def refresh_publications_in_perimeter(conn: Connection, person_id: int | None = None) -> int:
-    """Matérialise `publications.in_perimeter` : vrai quand une authorship `in_perimeter` relie la publication à une personne non rejetée. Avec `person_id`, seules les publications de cette personne sont recalculées. Idempotent."""
+    """Matérialise `publications.in_perimeter` : vrai quand une authorship `in_perimeter` relie la publication à une personne non exclue. Avec `person_id`, seules les publications de cette personne sont recalculées. Idempotent."""
     scope = (
         "IN (SELECT publication_id FROM authorships WHERE person_id = :pid)"
         if person_id is not None
@@ -23,7 +23,7 @@ def refresh_publications_in_perimeter(conn: Connection, person_id: int | None = 
             WITH perim AS (
                 SELECT DISTINCT a.publication_id AS id
                 FROM authorships a
-                JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
+                JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
                 WHERE a.in_perimeter = TRUE AND a.publication_id {scope}
             )
             UPDATE publications p

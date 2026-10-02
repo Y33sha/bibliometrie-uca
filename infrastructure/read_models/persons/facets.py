@@ -13,13 +13,13 @@ from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
     person_department_clause,
+    person_exclusion_clause,
     person_has_identifier_clause,
     person_has_identifier_sql,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
-    person_rejected_clause,
     person_role_clause,
     person_search_clause,
 )
@@ -39,9 +39,9 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo, recherche nom et rejet délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
+        # Scope labo, recherche nom et exclusion délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
         out: list[WhereClause | None] = [
-            person_rejected_clause(filters.rejected),
+            person_exclusion_clause(filters.excluded, filters.exclusion),
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]

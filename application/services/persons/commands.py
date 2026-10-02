@@ -15,6 +15,7 @@ from application.ports.repositories.person_repository import (
 from application.services.persons import core as persons_service
 from application.services.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
 from domain.persons.identifiers import IdentifierOrigin
+from domain.persons.person import PersonExclusion
 
 # ── Identifiants ──────────────────────────────────────────────────
 
@@ -68,19 +69,19 @@ def reassign_identifier(
     conn.commit()
 
 
-# ── Rejet / renommage / fusion ────────────────────────────────────
+# ── Exclusion / renommage / fusion ────────────────────────────────
 
 
-def set_rejected(
+def set_exclusion(
     conn: Connection,
     person_id: int,
-    rejected: bool,
+    exclusion: PersonExclusion | None,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Marque/démarque une personne comme rejetée."""
-    persons_service.set_rejected(person_id, rejected, repo=repo, audit_repo=audit_repo)
+    """Exclut ou retient une personne."""
+    persons_service.set_exclusion(person_id, exclusion, repo=repo, audit_repo=audit_repo)
     conn.commit()
 
 

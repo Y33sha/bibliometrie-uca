@@ -28,7 +28,7 @@ from application.services.persons.core import (
     mark_distinct,
     merge_person,
     reassign_identifier,
-    set_rejected,
+    set_exclusion,
     update_identifier_status,
     update_name,
     update_name_form_status,
@@ -40,6 +40,7 @@ from domain.errors import (
     RejectedPairError,
     ValidationError,
 )
+from domain.persons.person import PersonExclusion
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.repositories import (
     authorship_repository,
@@ -327,32 +328,36 @@ class TestReassignIdentifier:
             reassign_identifier(999999, p, repo=repo)
 
 
-class TestSetRejected:
-    def test_marks_rejected(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
-        set_rejected(p, True, repo=repo)
-        assert _scalar(sa_sync_conn, "SELECT rejected FROM persons WHERE id = :p", p=p) is True
+class TestSetExclusion:
+    def _exclusion(self, conn, p):
+        return _scalar(conn, "SELECT exclusion::text FROM persons WHERE id = :p", p=p)
 
-    def test_unmarks(self, sa_sync_conn, repo):
+    def test_excludes(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
-        set_rejected(p, True, repo=repo)
-        set_rejected(p, False, repo=repo)
-        assert _scalar(sa_sync_conn, "SELECT rejected FROM persons WHERE id = :p", p=p) is False
+        set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER, repo=repo)
+        assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
+        assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
+
+    def test_retains(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        set_exclusion(p, PersonExclusion.NOT_A_PERSON, repo=repo)
+        set_exclusion(p, None, repo=repo)
+        assert self._exclusion(sa_sync_conn, p) is None
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            set_rejected(999999, True, repo=repo)
+            set_exclusion(999999, PersonExclusion.NOT_A_PERSON, repo=repo)
 
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
-        rejected = _insert_person(sa_sync_conn, "Rejet", "Ée")
+        excluded = _insert_person(sa_sync_conn, "Exclue", "Ée")
         other = _insert_person(sa_sync_conn, "Autre", "Personne")
         alone = _insert_publication(sa_sync_conn, "seule")
         shared = _insert_publication(sa_sync_conn, "partagée")
-        # Valeur périmée, hors des publications de la personne rejetée : le recalcul ciblé la laisse en place.
+        # Valeur périmée, hors des publications de la personne exclue : le recalcul ciblé la laisse en place.
         unrelated = _insert_publication(sa_sync_conn, "sans lien")
         for pub, pid in (
-            (alone, rejected),
-            (shared, rejected),
+            (alone, excluded),
+            (shared, excluded),
             (shared, other),
             (unrelated, other),
         ):
@@ -373,10 +378,10 @@ class TestSetRejected:
                 sa_sync_conn, "SELECT in_perimeter FROM publications WHERE id = :p", p=pub
             )
 
-        set_rejected(rejected, True, repo=repo)
+        set_exclusion(excluded, PersonExclusion.OUT_OF_PERIMETER, repo=repo)
         assert (flag(alone), flag(shared), flag(unrelated)) == (False, True, False)
 
-        set_rejected(rejected, False, repo=repo)
+        set_exclusion(excluded, None, repo=repo)
         assert flag(alone) is True
 
 

@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Protocol, TypedDict
 
 from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.person import Person
+from domain.persons.person import Person, PersonExclusion
 
 
 class AuthenticateOrcidOutcome(StrEnum):
@@ -49,8 +49,8 @@ class PersonRepository(Protocol):
         """Met à jour le nom d'une personne. Lève `NotFoundError` si elle est introuvable."""
         ...
 
-    def set_rejected(self, person_id: int, rejected: bool) -> None:
-        """Pose le drapeau `rejected` d'une personne et recalcule `publications.in_perimeter` pour ses publications (une personne rejetée en est exclue). Lève `NotFoundError` si la personne est introuvable."""
+    def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
+        """Pose le motif d'exclusion d'une personne (`None` la retient) et recalcule `publications.in_perimeter` pour ses publications. Lève `NotFoundError` si la personne est introuvable."""
         ...
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.person import PersonExclusion
 from interfaces.api.models.authorships import SourceAuthorshipRef
 
 # ----- Corps des requêtes -----
@@ -27,8 +28,8 @@ class ReassignIdentifier(BaseModel):
     person_id: int
 
 
-class RejectPerson(BaseModel):
-    rejected: bool = True
+class SetPersonExclusion(BaseModel):
+    exclusion: PersonExclusion | None
 
 
 class UpdatePersonName(BaseModel):

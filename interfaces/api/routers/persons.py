@@ -33,6 +33,7 @@ from application.ports.repositories.authorship_repository import AuthorshipRepos
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import commands as person_commands
 from application.services.persons.core import AddIdentifierOutcome
+from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
     audit_repo,
     authorship_repo,
@@ -54,7 +55,7 @@ from interfaces.api.models import (
     NameFormStatusResponse,
     OkResponse,
     ReassignIdentifier,
-    RejectPerson,
+    SetPersonExclusion,
     TotalCountResponse,
     UpdateIdentifierStatus,
     UpdateNameFormStatus,
@@ -84,12 +85,13 @@ def person_filters(
     has_rh: bool | None = Query(None),
     has_pending_forms: bool | None = Query(None),
     has_pending_identifiers: bool | None = Query(None),
-    rejected: bool | None = Query(None),
+    excluded: bool | None = Query(None),
+    exclusion: PersonExclusion | None = Query(None),
     lab_id: int | None = Query(None),
 ) -> PersonFilters:
     """Filtres communs à la liste des personnes et à ses facettes.
 
-    `department` et `role` acceptent plusieurs valeurs séparées par des virgules. `rejected` omis laisse passer les personnes écartées par la curation ; l'annuaire public pose `rejected=false`. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
+    `department` et `role` acceptent plusieurs valeurs séparées par des virgules. `excluded` omis laisse passer les personnes exclues ; l'annuaire public pose `excluded=false`. `exclusion` restreint aux personnes exclues pour ce motif. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
     """
     return PersonFilters(
         search=search,
@@ -101,7 +103,8 @@ def person_filters(
         has_rh=has_rh,
         has_pending_forms=has_pending_forms,
         has_pending_identifiers=has_pending_identifiers,
-        rejected=rejected,
+        excluded=excluded,
+        exclusion=exclusion,
         lab_id=lab_id,
     )
 
@@ -391,22 +394,22 @@ def add_person_identifier(
     )
 
 
-# ── Une personne : rejet, renommage, fusion, détachement ─────────
+# ── Une personne : exclusion, renommage, fusion, détachement ─────
 
 
-@router.patch("/{person_id}/reject", response_model=OkResponse)
-def reject_person(
+@router.patch("/{person_id}/exclusion", response_model=OkResponse)
+def set_person_exclusion(
     person_id: int,
-    body: RejectPerson,
+    body: SetPersonExclusion,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Marque/démarque une personne comme rejetée.
+    """Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
 
-    Renvoie 404 sur une personne introuvable (`set_rejected`).
+    Renvoie 404 sur une personne introuvable (`set_exclusion`).
     """
-    person_commands.set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
+    person_commands.set_exclusion(conn, person_id, body.exclusion, repo=repo, audit_repo=audit)
     return OkResponse()
 
 

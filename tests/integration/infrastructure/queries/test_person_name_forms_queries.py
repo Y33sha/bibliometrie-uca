@@ -8,15 +8,16 @@ _Q = PgPersonNameFormsQueries()
 from tests.integration.helpers.authorships import upsert_identity
 
 
-def _create_person(conn, last="Dupont", first="Jean", rejected=False):
+def _create_person(conn, last="Dupont", first="Jean", exclusion=None):
     return conn.execute(
         text("""
             INSERT INTO persons
-                (last_name, first_name, last_name_normalized, first_name_normalized, rejected)
-            VALUES (:last, :first, lower(:last), lower(:first), :rejected)
+                (last_name, first_name, last_name_normalized, first_name_normalized, exclusion)
+            VALUES (:last, :first, lower(:last), lower(:first),
+                    CAST(:exclusion AS person_exclusion))
             RETURNING id
         """),
-        {"last": last, "first": first, "rejected": rejected},
+        {"last": last, "first": first, "exclusion": exclusion},
     ).scalar_one()
 
 
@@ -78,17 +79,14 @@ def _fetch_pnf_for(conn, person_id):
 
 
 class TestFetchPersonsNames:
-    def test_includes_rejected(self, sa_sync_conn):
-        """Les rejected sont conservés pour servir d'ancre de matching
-        (entités douteuses, artefacts de parsing) et empêcher la
-        re-création en boucle au prochain run pipeline."""
+    def test_includes_excluded(self, sa_sync_conn):
+        """Les personnes exclues, pour l'un ou l'autre motif, restent des ancres du matching."""
         active = _create_person(sa_sync_conn, last="A")
-        rejected = _create_person(sa_sync_conn, last="B", rejected=True)
+        not_a_person = _create_person(sa_sync_conn, last="B", exclusion="not_a_person")
+        out_of_perimeter = _create_person(sa_sync_conn, last="C", exclusion="out_of_perimeter")
 
-        rows = _Q.fetch_persons_names(sa_sync_conn)
-        ids = [r.id for r in rows]
-        assert active in ids
-        assert rejected in ids
+        ids = [r.id for r in _Q.fetch_persons_names(sa_sync_conn)]
+        assert {active, not_a_person, out_of_perimeter} <= set(ids)
 
     def test_trims_names(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn, last="  Dupond", first="Jean  ")
