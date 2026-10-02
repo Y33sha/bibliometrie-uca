@@ -11,6 +11,30 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.db.sql_fragments import case_priority
 
 
+def refresh_publications_in_perimeter(conn: Connection, person_id: int | None = None) -> int:
+    """Matérialise `publications.in_perimeter` : vrai quand une authorship `in_perimeter` relie la publication à une personne non rejetée. Avec `person_id`, seules les publications de cette personne sont recalculées. Idempotent."""
+    scope = (
+        "IN (SELECT publication_id FROM authorships WHERE person_id = :pid)"
+        if person_id is not None
+        else "IS NOT NULL"
+    )
+    return conn.execute(
+        text(f"""
+            WITH perim AS (
+                SELECT DISTINCT a.publication_id AS id
+                FROM authorships a
+                JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
+                WHERE a.in_perimeter = TRUE AND a.publication_id {scope}
+            )
+            UPDATE publications p
+            SET in_perimeter = (p.id IN (SELECT id FROM perim))
+            WHERE p.id {scope}
+              AND p.in_perimeter IS DISTINCT FROM (p.id IN (SELECT id FROM perim))
+        """),
+        {"pid": person_id},
+    ).rowcount
+
+
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.authorships.build.AuthorshipsBuildQueries`."""
 
@@ -132,19 +156,7 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
         )
 
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:
-        return conn.execute(
-            text("""
-                WITH perim AS (
-                    SELECT DISTINCT a.publication_id AS id
-                    FROM authorships a
-                    JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
-                    WHERE a.in_perimeter = TRUE
-                )
-                UPDATE publications p
-                SET in_perimeter = (p.id IN (SELECT id FROM perim))
-                WHERE p.in_perimeter IS DISTINCT FROM (p.id IN (SELECT id FROM perim))
-            """)
-        ).rowcount
+        return refresh_publications_in_perimeter(conn)
 
     # ── Variantes par lot pour l'attribution admin d'orphelines ────
 

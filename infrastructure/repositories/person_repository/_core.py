@@ -9,6 +9,7 @@ from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person
 from infrastructure.db.scalars import scalar_int
+from infrastructure.pipeline.authorships.build import refresh_publications_in_perimeter
 from infrastructure.repositories.person_repository import _name_forms
 
 
@@ -110,24 +111,8 @@ def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
     )
     if result.rowcount == 0:
         raise NotFoundError(f"Personne {person_id} introuvable")
-    # Le flag matérialisé `publications.in_perimeter` exclut les personnes rejetées (cf. `publication_in_perimeter`). Recalcule-le pour les publications de cette personne : son rejet/dé-rejet peut faire basculer leur appartenance.
-    conn.execute(
-        text("""
-            UPDATE publications p
-            SET in_perimeter = EXISTS (
-                SELECT 1 FROM authorships a
-                JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
-                WHERE a.publication_id = p.id AND a.in_perimeter = TRUE
-            )
-            WHERE p.id IN (SELECT publication_id FROM authorships WHERE person_id = :id)
-              AND p.in_perimeter IS DISTINCT FROM EXISTS (
-                SELECT 1 FROM authorships a
-                JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
-                WHERE a.publication_id = p.id AND a.in_perimeter = TRUE
-              )
-        """),
-        {"id": person_id},
-    )
+    # Le rejet d'une personne fait basculer l'appartenance de ses publications au périmètre.
+    refresh_publications_in_perimeter(conn, person_id)
 
 
 def find_rh_person_duplicate(
