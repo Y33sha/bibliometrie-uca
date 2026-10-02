@@ -123,8 +123,12 @@ class PersonRepository(Protocol):
         """Change le statut d'un identifiant et retourne la ligne. Lève `NotFoundError` s'il est absent."""
         ...
 
+    def hal_account_peers(self, ident_ids: list[int]) -> dict[int, set[int]]:
+        """Pour chaque identifiant de `ident_ids`, les identifiants `pending` de la même personne que portent ses comptes HAL : les signatures HAL de la personne qui portent l'identifiant désignent les comptes, et les signatures HAL de ces comptes désignent les identifiants. Un identifiant sans pair est absent du résultat."""
+        ...
+
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
-        """Pose `status` sur les identifiants `pending` de la même personne que portent les comptes HAL de l'identifiant `ident_id` : ses signatures HAL qui portent cet identifiant désignent les comptes, et les signatures HAL de ces comptes désignent les identifiants. Retourne le nombre d'identifiants modifiés."""
+        """Pose `status` sur les identifiants de `hal_account_peers` de l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:

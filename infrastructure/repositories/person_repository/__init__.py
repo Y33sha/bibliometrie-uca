@@ -112,6 +112,9 @@ class PgPersonRepository(PersonRepository):
     def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
         return _identifiers.update_identifier_status(self._conn, ident_id, status)
 
+    def hal_account_peers(self, ident_ids: list[int]) -> dict[int, set[int]]:
+        return _identifiers.hal_account_peers(self._conn, ident_ids)
+
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
         return _identifiers.propagate_status_to_hal_accounts(self._conn, ident_id, status)
 
