@@ -175,14 +175,30 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         FROM person_identifiers
         WHERE status = '{AttributionStatus.PENDING.value}'
     ),
-    bearers AS (
-        SELECT DISTINCT sa.person_id, p.id_type, p.id_value
+    pending_identities AS MATERIALIZED (
+        SELECT aik.id, k.k, p.id_type, p.id_value
         FROM author_identifying_keys aik
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
-        JOIN source_authorships sa ON sa.identity_id = aik.id
+    ),
+    -- Couples (personne, identité) lus sur l'index `idx_sa_person`, sans accès à la table.
+    person_identities AS MATERIALIZED (
+        SELECT DISTINCT sa.person_id, sa.identity_id
+        FROM source_authorships sa
         WHERE sa.person_id IS NOT NULL
-          AND NOT {identifier_neutralized("k.k")}
+          AND sa.identity_id IN (SELECT id FROM pending_identities)
+    ),
+    bearers AS (
+        SELECT DISTINCT pi.person_id, p.id_type, p.id_value
+        FROM person_identities pi
+        JOIN pending_identities p ON p.id = pi.identity_id
+        -- Une signature du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
+        CROSS JOIN LATERAL (
+            SELECT 1 FROM source_authorships sa
+            WHERE sa.person_id = pi.person_id AND sa.identity_id = pi.identity_id
+              AND NOT {identifier_neutralized("p.k")}
+            LIMIT 1
+        ) kept
     ),
     person_identifier_keys AS (
         SELECT b.* FROM bearers b
@@ -253,12 +269,11 @@ def identifier_conflicts(
     conn: Connection, *, page: int, per_page: int
 ) -> IdentifierConflictsResponse:
     """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
-    total = identifier_conflicts_count(conn)
+    # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
+    all_rows = conn.execute(text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")).all()
+    total = len(all_rows)
     offset = (page - 1) * per_page
-    rows = conn.execute(
-        text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b LIMIT :lim OFFSET :off"),
-        {"lim": per_page, "off": offset},
-    ).all()
+    rows = all_rows[offset : offset + per_page]
     ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
     persons = _curation_persons(conn, ids)
     pairs = [
