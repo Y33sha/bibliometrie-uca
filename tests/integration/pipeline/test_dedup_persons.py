@@ -194,6 +194,29 @@ class TestPasseDeCreation:
         assert _get_person_id(sa_sync_conn, signature) is not None
 
 
+class TestIdentifierPromotion:
+    def test_every_identifier_type_of_the_signature_is_promoted(self, sa_sync_conn):
+        """Chaque type d'identifiant que porte la signature, idhal compris, passe sur la personne qu'elle crée."""
+        pub = _insert_publication(sa_sync_conn)
+        sp = _insert_source_document(sa_sync_conn, "hal", "hal-promo", pub)
+        identifiers = {
+            "orcid": "0000-0002-1633-8730",
+            "idref": "181370662",
+            "hal_person_id": 11581,
+            "idhal": "nina-radosevic-robin",
+        }
+        signature = _insert_authorship(
+            sa_sync_conn, "hal", sp, "Radosevic-Robin Nina", identifiers=identifiers
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        person_id = _get_person_id(sa_sync_conn, signature)
+        assert _get_person_identifiers(sa_sync_conn, person_id) == {
+            (id_type, str(value)) for id_type, value in identifiers.items()
+        }
+
+
 class TestCascadeRun:
     def test_cross_source_links_and_imports_identifiers(self, sa_sync_conn):
         """Cross-source : authorship OA non-rattachée + HAL rattachée même position
