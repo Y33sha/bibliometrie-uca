@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ysZJiyjWeY6PxqboB9nq1gEpCO4cyaikYMD3reWXnrqCAzQ7pmMcLHFZnwgUPxT
+\restrict Ca3Dkqyn40cNEUDjgtffMCDwlHhkhzkTKcgSJqfm0r3gsOMOgyPqC9QXUu4KoUI
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -3112,6 +3112,13 @@ CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (sourc
 
 
 --
+-- Name: idx_sa_orphan_in_perimeter; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_orphan_in_perimeter ON public.source_authorships USING btree (id) WHERE ((person_id IS NULL) AND in_perimeter);
+
+
+--
 -- Name: idx_sa_person; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3797,5 +3804,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ysZJiyjWeY6PxqboB9nq1gEpCO4cyaikYMD3reWXnrqCAzQ7pmMcLHFZnwgUPxT
+\unrestrict Ca3Dkqyn40cNEUDjgtffMCDwlHhkhzkTKcgSJqfm0r3gsOMOgyPqC9QXUu4KoUI
 
