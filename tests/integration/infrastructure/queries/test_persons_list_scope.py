@@ -1,6 +1,6 @@
 """Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `authorship_structures`, et que le filtre d'exclusion porte de la même façon sur la liste et sur ses facettes.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `authorship_structures`, et le filtre d'exclusion.
 """
 
 from sqlalchemy import text
@@ -125,75 +125,65 @@ class TestListLabScope:
 
 
 class TestExclusionFilter:
-    """Le filtre d'exclusion porte de la même façon sur la liste et sur ses facettes."""
+    """Le filtre d'exclusion porte de la même façon sur la liste et sur ses facettes. Les personnes sont isolées par une recherche sur leur nom."""
 
-    def test_list_and_facets_follow_exclusion(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-REJ")
-        p_ok = _person(sa_sync_conn, "Active")
-        _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
-        p_rej = _person(sa_sync_conn, "Rejected")
-        _authorship_in_lab(sa_sync_conn, p_rej, lab_id=lab)
-        sa_sync_conn.execute(
-            text("UPDATE persons SET exclusion = 'not_a_person' WHERE id = :id"), {"id": p_rej}
-        )
+    SEARCH = "zzexcl"
 
-        q = PgPersonsQueries(sa_sync_conn)
-        kept = q.list_persons(
-            filters=PersonFilters(lab_id=lab, exclusions=[None]),
-            page=1,
-            per_page=50,
-            sort="name_asc",
-        )
-        assert {p.id for p in kept.persons} == {p_ok}
-        assert q.persons_facets(filters=PersonFilters(lab_id=lab, exclusions=[None])).rh.no == 1
-
-    def test_filters_by_exclusion_reason(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-EXCL")
+    def _persons(self, conn):
         ids = {}
         for name, reason in (
             ("Retenue", None),
             ("Fausse", "not_a_person"),
             ("Externe", "out_of_perimeter"),
         ):
-            ids[name] = _person(sa_sync_conn, name)
-            _authorship_in_lab(sa_sync_conn, ids[name], lab_id=lab)
-            sa_sync_conn.execute(
+            ids[name] = _person(conn, f"{self.SEARCH}{name}")
+            conn.execute(
                 text("UPDATE persons SET exclusion = CAST(:r AS person_exclusion) WHERE id = :id"),
                 {"r": reason, "id": ids[name]},
             )
+        return ids
 
-        q = PgPersonsQueries(sa_sync_conn)
+    def _listed(self, conn, *exclusions):
+        page = PgPersonsQueries(conn).list_persons(
+            filters=PersonFilters(search=self.SEARCH, exclusions=list(exclusions)),
+            page=1,
+            per_page=50,
+            sort="name_asc",
+        )
+        return {p.id for p in page.persons}
 
-        def listed(*exclusions):
-            page = q.list_persons(
-                filters=PersonFilters(lab_id=lab, exclusions=list(exclusions)),
-                page=1,
-                per_page=50,
-                sort="name_asc",
-            )
-            return {p.id for p in page.persons}
-
+    def test_filters_by_exclusion_reason(self, sa_sync_conn):
+        ids = self._persons(sa_sync_conn)
         nap, oop = PersonExclusion.NOT_A_PERSON, PersonExclusion.OUT_OF_PERIMETER
-        assert listed(nap, oop) == {ids["Fausse"], ids["Externe"]}
-        assert listed(oop) == {ids["Externe"]}
-        assert listed(None, oop) == {ids["Retenue"], ids["Externe"]}
+        assert self._listed(sa_sync_conn) == set(ids.values())
+        assert self._listed(sa_sync_conn, None) == {ids["Retenue"]}
+        assert self._listed(sa_sync_conn, nap, oop) == {ids["Fausse"], ids["Externe"]}
+        assert self._listed(sa_sync_conn, oop) == {ids["Externe"]}
+        assert self._listed(sa_sync_conn, None, oop) == {ids["Retenue"], ids["Externe"]}
 
-    def test_unfiltered_keeps_both(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-REJ2")
+    def test_facets_follow_exclusion(self, sa_sync_conn):
+        self._persons(sa_sync_conn)
+        q = PgPersonsQueries(sa_sync_conn)
+        assert q.persons_facets(filters=PersonFilters(search=self.SEARCH)).rh.no == 3
+        retained = PersonFilters(search=self.SEARCH, exclusions=[None])
+        assert q.persons_facets(filters=retained).rh.no == 1
+
+    def test_excluded_person_leaves_the_lab(self, sa_sync_conn):
+        """Une personne exclue n'appartient à aucun laboratoire, dès que les matviews de structures sont rafraîchies."""
+        lab = _structure(sa_sync_conn, "LAB-EXCL")
         p_ok = _person(sa_sync_conn, "Active")
         _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
-        p_rej = _person(sa_sync_conn, "Rejected")
-        _authorship_in_lab(sa_sync_conn, p_rej, lab_id=lab)
+        p_excl = _person(sa_sync_conn, "Exclue")
         sa_sync_conn.execute(
-            text("UPDATE persons SET exclusion = 'not_a_person' WHERE id = :id"), {"id": p_rej}
+            text("UPDATE persons SET exclusion = 'out_of_perimeter' WHERE id = :id"),
+            {"id": p_excl},
         )
+        _authorship_in_lab(sa_sync_conn, p_excl, lab_id=lab)
 
-        q = PgPersonsQueries(sa_sync_conn)
-        res = q.list_persons(
+        res = PgPersonsQueries(sa_sync_conn).list_persons(
             filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
-        assert {p.id for p in res.persons} == {p_ok, p_rej}
-        assert q.persons_facets(filters=PersonFilters(lab_id=lab)).rh.no == 2
+        assert {p.id for p in res.persons} == {p_ok}
 
 
 class TestPendingFacets:
