@@ -106,47 +106,68 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
     return cast(IdentifierStatusRow, dict(row._mapping))
 
 
+_HAL = PersonIdentifierType.HAL_PERSON_ID.value
+
+# Comptes HAL d'un identifiant : `hal_person_id` des signatures HAL de sa personne qui le portent.
+# Groupe : identifiants que portent les signatures HAL de la personne sous ces comptes.
+# Un identifiant neutralisé par sa signature n'entre ni dans l'un ni dans l'autre.
+_HAL_ACCOUNT_PEERS_SQL = text(f"""
+    WITH src AS (
+        SELECT id AS src_id, person_id, id_type, id_value
+        FROM person_identifiers WHERE id = ANY(:ids)
+    ),
+    hal_identities AS (
+        SELECT DISTINCT sa.person_id, sa.neutralized_identifiers, aik.person_identifiers
+        FROM (SELECT DISTINCT person_id FROM src) p
+        JOIN source_authorships sa ON sa.person_id = p.person_id AND sa.source = 'hal'
+        JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+        WHERE aik.person_identifiers ? '{_HAL}'
+    ),
+    accounts AS (
+        SELECT DISTINCT src.src_id, src.person_id, sa.person_identifiers->>'{_HAL}' AS hal
+        FROM src
+        JOIN hal_identities sa
+          ON sa.person_id = src.person_id
+         AND sa.person_identifiers->>src.id_type = src.id_value
+        WHERE NOT {identifier_neutralized("src.id_type")}
+    ),
+    bundle AS (
+        SELECT DISTINCT accounts.src_id, accounts.person_id,
+               k.id_type, sa.person_identifiers->>k.id_type AS id_value
+        FROM accounts
+        JOIN hal_identities sa
+          ON sa.person_id = accounts.person_id
+         AND sa.person_identifiers->>'{_HAL}' = accounts.hal
+        CROSS JOIN LATERAL jsonb_object_keys(sa.person_identifiers) AS k(id_type)
+        WHERE NOT {identifier_neutralized("k.id_type")}
+    )
+    SELECT bundle.src_id, pi.id AS peer_id
+    FROM bundle
+    JOIN person_identifiers pi
+      ON pi.person_id = bundle.person_id
+     AND pi.id_type = bundle.id_type
+     AND pi.id_value = bundle.id_value
+    WHERE pi.status = '{AttributionStatus.PENDING.value}'
+      AND pi.id <> bundle.src_id
+""")
+
+
+def hal_account_peers(conn: Connection, ident_ids: list[int]) -> dict[int, set[int]]:
+    peers: dict[int, set[int]] = {}
+    for r in conn.execute(_HAL_ACCOUNT_PEERS_SQL, {"ids": ident_ids}):
+        peers.setdefault(r.src_id, set()).add(r.peer_id)
+    return peers
+
+
 def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: str) -> int:
-    # Comptes HAL : `hal_person_id` des signatures HAL de la personne qui portent l'identifiant.
-    # Groupe : identifiants que portent les signatures HAL de la personne sous ces comptes.
-    # Un identifiant neutralisé par sa signature n'entre ni dans l'un ni dans l'autre.
+    peer_ids = hal_account_peers(conn, [ident_id]).get(ident_id, set())
+    if not peer_ids:
+        return 0
     return conn.execute(
-        text(f"""
-            WITH src AS (
-                SELECT person_id, id_type, id_value
-                FROM person_identifiers WHERE id = :id
-            ),
-            hal_identities AS (
-                SELECT sa.neutralized_identifiers, aik.person_identifiers
-                FROM src
-                JOIN source_authorships sa ON sa.person_id = src.person_id AND sa.source = 'hal'
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                WHERE aik.person_identifiers ? '{PersonIdentifierType.HAL_PERSON_ID.value}'
-            ),
-            accounts AS (
-                SELECT DISTINCT person_identifiers->>'{PersonIdentifierType.HAL_PERSON_ID.value}' AS hal
-                FROM hal_identities sa, src
-                WHERE person_identifiers->>src.id_type = src.id_value
-                  AND NOT {identifier_neutralized("src.id_type")}
-            ),
-            bundle AS (
-                SELECT DISTINCT k.id_type, sa.person_identifiers->>k.id_type AS id_value
-                FROM hal_identities sa
-                JOIN accounts
-                  ON sa.person_identifiers->>'{PersonIdentifierType.HAL_PERSON_ID.value}' = accounts.hal
-                CROSS JOIN LATERAL jsonb_object_keys(sa.person_identifiers) AS k(id_type)
-                WHERE NOT {identifier_neutralized("k.id_type")}
-            )
-            UPDATE person_identifiers pi
-            SET status = CAST(:st AS identifier_status)
-            FROM src, bundle
-            WHERE pi.person_id = src.person_id
-              AND pi.id_type = bundle.id_type
-              AND pi.id_value = bundle.id_value
-              AND pi.status = '{AttributionStatus.PENDING.value}'
-              AND pi.id <> :id
-        """),
-        {"id": ident_id, "st": status},
+        text(
+            "UPDATE person_identifiers SET status = CAST(:st AS identifier_status) WHERE id = ANY(:ids)"
+        ),
+        {"st": status, "ids": list(peer_ids)},
     ).rowcount
 
 
