@@ -3921,6 +3921,8 @@ export interface components {
             pub_title: string;
             /** Pub Year */
             pub_year: number | null;
+            /** Labs */
+            labs: components["schemas"]["PubLabItem"][];
         };
         /** OrphanAuthorshipsResponse */
         OrphanAuthorshipsResponse: {
