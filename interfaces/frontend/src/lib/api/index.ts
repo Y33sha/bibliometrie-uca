@@ -7,7 +7,7 @@
  * Règle : aucun `fetch()` direct dans `src/routes/*` ni dans `src/lib/*`. Toute nouvelle API doit passer par un endpoint typé ici.
  */
 
-export { api, latestRequest, post, put, patch, del, ApiError } from './client';
+export { api, cancel, latestRequest, post, put, patch, del, ApiError } from './client';
 
 export * as auth from './auth';
 export * as persons from './persons';
