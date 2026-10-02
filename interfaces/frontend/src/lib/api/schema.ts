@@ -1029,7 +1029,7 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -3393,13 +3393,15 @@ export interface components {
         };
         /**
          * IdentifierStatusResponse
-         * @description Identifiant après changement de statut : son id et son statut.
+         * @description Identifiant après changement de statut : son id, son statut, et le nombre d'identifiants de ses comptes HAL qui ont reçu le même statut.
          */
         IdentifierStatusResponse: {
             /** Id */
             id: number;
             /** Status */
             status: string;
+            /** Propagated */
+            propagated: number;
         };
         /**
          * InstitutionOut

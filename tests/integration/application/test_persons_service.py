@@ -100,13 +100,20 @@ def _insert_source_authorship(
     author_position=0,
     person_id=None,
     author_name_normalized="jean dupont",
+    person_identifiers=None,
+    neutralized_identifiers=None,
 ):
-    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
+    identity_id = upsert_identity(
+        conn,
+        author_name_normalized=author_name_normalized,
+        person_identifiers=person_identifiers,
+    )
     return conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
-            "                                author_position, person_id, identity_id) "
-            "VALUES (:s, :spid, :pos, :pid, :iid) RETURNING id"
+            "                                author_position, person_id, identity_id, "
+            "                                neutralized_identifiers) "
+            "VALUES (:s, :spid, :pos, :pid, :iid, CAST(:neutralized AS jsonb)) RETURNING id"
         ),
         {
             "s": source,
@@ -114,6 +121,9 @@ def _insert_source_authorship(
             "pos": author_position,
             "pid": person_id,
             "iid": identity_id,
+            "neutralized": json.dumps(neutralized_identifiers)
+            if neutralized_identifiers is not None
+            else None,
         },
     ).scalar_one()
 
@@ -279,13 +289,103 @@ class TestUpdateIdentifierStatus:
             {"p": p},
         ).scalar_one()
 
-        row = update_identifier_status(ident_id, "confirmed", repo=repo)
+        result = update_identifier_status(ident_id, "confirmed", repo=repo)
 
-        assert row["status"] == "confirmed"
+        assert result.status == "confirmed"
+        assert result.propagated == 0
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
             update_identifier_status(999999, "confirmed", repo=repo)
+
+
+class TestIdentifierStatusPropagation:
+    """Une décision sur un identifiant s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL."""
+
+    ORCID = "0000-0002-1633-8730"
+    HAL_ACCOUNT = {"hal_person_id": 11581, "idhal": "nina-radosevic-robin", "orcid": ORCID}
+
+    def _ident(self, conn, person_id, id_type, value, status="pending"):
+        return conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:p, :t, :v, 'auto', "
+                "CAST(:s AS identifier_status)) RETURNING id"
+            ),
+            {"p": person_id, "t": id_type, "v": value, "s": status},
+        ).scalar_one()
+
+    def _status(self, conn, ident_id):
+        return _scalar(
+            conn, "SELECT status::text FROM person_identifiers WHERE id = :i", i=ident_id
+        )
+
+    def _signature(self, conn, person_id, source, source_id, identifiers, **kw):
+        sp = _insert_source_publication(
+            conn, _insert_publication(conn), source=source, source_id=source_id
+        )
+        _insert_source_authorship(
+            conn, sp, source=source, person_id=person_id, person_identifiers=identifiers, **kw
+        )
+
+    def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        self._signature(sa_sync_conn, p, "hal", "hal-a", {**self.HAL_ACCOUNT, "idref": "181370662"})
+        # Même compte, sans l'ORCID : son idHAL suit le compte.
+        self._signature(sa_sync_conn, p, "hal", "hal-b", {"hal_person_id": 11581, "idhal": "nr2"})
+        # ScanR associe l'ORCID à un autre IdRef : cette association n'entre pas dans le groupe.
+        self._signature(sa_sync_conn, p, "scanr", "scanr-a", {"orcid": self.ORCID, "idref": "999"})
+        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
+        account = self._ident(sa_sync_conn, p, "hal_person_id", "11581")
+        idhal = self._ident(sa_sync_conn, p, "idhal", "nina-radosevic-robin")
+        idhal_2 = self._ident(sa_sync_conn, p, "idhal", "nr2")
+        idref_confirmed = self._ident(sa_sync_conn, p, "idref", "181370662", status="confirmed")
+        idref_scanr = self._ident(sa_sync_conn, p, "idref", "999")
+
+        result = update_identifier_status(orcid, "rejected", repo=repo)
+
+        assert result.propagated == 3
+        assert {self._status(sa_sync_conn, i) for i in (orcid, account, idhal, idhal_2)} == {
+            "rejected"
+        }
+        assert self._status(sa_sync_conn, idref_confirmed) == "confirmed"
+        assert self._status(sa_sync_conn, idref_scanr) == "pending"
+
+    def test_other_persons_are_untouched(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        other = _insert_person(sa_sync_conn, "Autre", "Personne")
+        self._signature(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
+        self._signature(sa_sync_conn, other, "hal", "hal-b", {"hal_person_id": 11581})
+        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
+        other_account = self._ident(sa_sync_conn, other, "idhal", "nina-radosevic-robin")
+
+        update_identifier_status(orcid, "confirmed", repo=repo)
+
+        assert self._status(sa_sync_conn, other_account) == "pending"
+
+    def test_neutralized_identifier_does_not_designate_the_account(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        self._signature(
+            sa_sync_conn,
+            p,
+            "hal",
+            "hal-a",
+            self.HAL_ACCOUNT,
+            neutralized_identifiers={"orcid": "shared"},
+        )
+        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
+        account = self._ident(sa_sync_conn, p, "hal_person_id", "11581")
+
+        assert update_identifier_status(orcid, "rejected", repo=repo).propagated == 0
+        assert self._status(sa_sync_conn, account) == "pending"
+
+    def test_back_to_pending_is_not_propagated(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        self._signature(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
+        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID, status="rejected")
+        self._ident(sa_sync_conn, p, "hal_person_id", "11581")
+
+        assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
 
 
 class TestReassignIdentifier:

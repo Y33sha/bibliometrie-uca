@@ -72,10 +72,11 @@ class AddIdentifierResponse(BaseModel):
 
 
 class IdentifierStatusResponse(BaseModel):
-    """Identifiant après changement de statut : son id et son statut."""
+    """Identifiant après changement de statut : son id, son statut, et le nombre d'identifiants de ses comptes HAL qui ont reçu le même statut."""
 
     id: int
     status: str
+    propagated: int
 
 
 class NameFormStatusResponse(BaseModel):

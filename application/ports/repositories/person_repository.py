@@ -123,6 +123,10 @@ class PersonRepository(Protocol):
         """Change le statut d'un identifiant et retourne la ligne. Lève `NotFoundError` s'il est absent."""
         ...
 
+    def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
+        """Pose `status` sur les identifiants `pending` de la même personne que portent les comptes HAL de l'identifiant `ident_id` : ses signatures HAL qui portent cet identifiant désignent les comptes, et les signatures HAL de ces comptes désignent les identifiants. Retourne le nombre d'identifiants modifiés."""
+        ...
+
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
         """Réattribue un identifiant à une autre personne, statut repassé à `pending`. Lève `NotFoundError` s'il est absent."""
         ...

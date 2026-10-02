@@ -242,14 +242,16 @@ def update_identifier_status(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
-    """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
 
     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
     """
-    row = person_commands.update_identifier_status(
+    result = person_commands.update_identifier_status(
         conn, ident_id, body.status, repo=repo, audit_repo=audit
     )
-    return IdentifierStatusResponse(id=row["id"], status=row["status"])
+    return IdentifierStatusResponse(
+        id=result.id, status=result.status, propagated=result.propagated
+    )
 
 
 @router.patch("/identifiers/{ident_id}/reassign", response_model=IdentifierReassignResponse)
