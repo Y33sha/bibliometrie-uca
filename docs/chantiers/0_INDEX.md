@@ -12,10 +12,12 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
+- [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
+- [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
