@@ -15,10 +15,6 @@ _ROUTES = PROJECT_ROOT / "interfaces" / "api" / "routers"
 _APPEL = re.compile(r"parse_str_csv\(\s*([^),]+?)\s*\)")
 
 LISTES_LIBRES: dict[tuple[str, str], str] = {
-    ("publications.py", "lab_id"): (
-        "Découpage préalable : la sentinelle `none` est mise de côté, et ce qui reste passe par "
-        "`parse_ints`, qui refuse ce qui n'est pas un identifiant."
-    ),
     ("publications.py", "self.country"): (
         "Codes pays présents dans les données, non énumérables dans le code. La valeur est liée "
         "à une comparaison de tableaux : une valeur inconnue ne rend aucune ligne, au lieu "

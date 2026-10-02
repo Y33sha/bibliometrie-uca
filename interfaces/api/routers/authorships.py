@@ -11,8 +11,10 @@ from sqlalchemy import Connection
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.read_models.authorships_queries import (
     AuthorshipsQueries,
+    OrphanAuthorshipsFacetsResponse,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
+    OrphanFilters,
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -26,6 +28,7 @@ from interfaces.api.deps import (
     db_conn,
     person_repo,
 )
+from interfaces.api.filters import parse_lab_id
 from interfaces.api.models import (
     AssignOrphanAuthorship,
     BatchAssignOrphanAuthorships,
@@ -50,15 +53,30 @@ def orphan_authorships_count(
     return queries.orphan_authorships_count()
 
 
+def orphan_filters(search: SearchTerm = "", lab_id: str = Query("")) -> OrphanFilters:
+    """Filtres communs à la liste des signatures orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les signatures sans laboratoire."""
+    lab_ids, lab_none = parse_lab_id(lab_id)
+    return OrphanFilters(search=search, lab_ids=lab_ids, lab_none=lab_none)
+
+
 @router.get("/orphans", response_model=OrphanAuthorshipsResponse)
 def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: SearchTerm = "",
+    filters: OrphanFilters = Depends(orphan_filters),
     queries: AuthorshipsQueries = Depends(authorships_queries),
 ) -> OrphanAuthorshipsResponse:
     """Liste les signatures du périmètre qu'aucune personne ne porte."""
-    return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
+    return queries.list_orphan_authorships(filters=filters, page=page, per_page=per_page)
+
+
+@router.get("/orphans/facets", response_model=OrphanAuthorshipsFacetsResponse)
+def orphan_authorships_facets(
+    filters: OrphanFilters = Depends(orphan_filters),
+    queries: AuthorshipsQueries = Depends(authorships_queries),
+) -> OrphanAuthorshipsFacetsResponse:
+    """Facette laboratoires des signatures orphelines."""
+    return queries.orphan_authorships_facets(filters=filters)
 
 
 @router.post(

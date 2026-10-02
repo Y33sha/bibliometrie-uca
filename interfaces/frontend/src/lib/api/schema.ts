@@ -1412,6 +1412,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/authorships/orphans/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Orphan Authorships Facets
+         * @description Facette laboratoires des signatures orphelines.
+         */
+        get: operations["orphan_authorships_facets_api_authorships_orphans_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/authorships/orphans/assign": {
         parameters: {
             query?: never;
@@ -3925,6 +3945,16 @@ export interface components {
             pub_year: number | null;
             /** Labs */
             labs: components["schemas"]["PubLabItem"][];
+        };
+        /**
+         * OrphanAuthorshipsFacetsResponse
+         * @description Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire.
+         */
+        OrphanAuthorshipsFacetsResponse: {
+            /** Labs */
+            labs: components["schemas"]["FacetOption"][];
+            /** No Lab Count */
+            no_lab_count: number;
         };
         /** OrphanAuthorshipsResponse */
         OrphanAuthorshipsResponse: {
@@ -7784,6 +7814,7 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 search?: string;
+                lab_id?: string;
             };
             header?: never;
             path?: never;
@@ -7798,6 +7829,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrphanAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    orphan_authorships_facets_api_authorships_orphans_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                lab_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrphanAuthorshipsFacetsResponse"];
                 };
             };
             /** @description Validation Error */

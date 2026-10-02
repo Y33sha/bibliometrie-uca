@@ -3,11 +3,12 @@
 Implémenté par `infrastructure.read_models.authorships.PgAuthorshipsQueries`. La file des signatures orphelines lit `source_authorships` un cran sous les signatures consolidées : elle appartient donc aux authorships, non aux personnes qu'elle sert à rattacher.
 """
 
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from pydantic import BaseModel
 
-from application.ports.read_models._common import PaginatedResponse
+from application.ports.read_models._common import FacetOption, PaginatedResponse
 from application.ports.read_models.publications_queries import PubLabItem
 
 
@@ -32,6 +33,25 @@ class OrphanAuthorshipsResponse(PaginatedResponse):
     authorships: list[OrphanAuthorshipOut]
 
 
+@dataclass(frozen=True, slots=True)
+class OrphanFilters:
+    """Filtres de la file des signatures orphelines.
+
+    `search` porte sur le nom de la signature. `lab_ids` et `lab_none` se combinent en OU : signatures dont les adresses désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
+    """
+
+    search: str = ""
+    lab_ids: list[int] = field(default_factory=list)
+    lab_none: bool = False
+
+
+class OrphanAuthorshipsFacetsResponse(BaseModel):
+    """Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire."""
+
+    labs: list[FacetOption]
+    no_lab_count: int
+
+
 class AuthorshipsQueries(Protocol):
     """Lectures sync pour `/api/authorships/*`."""
 
@@ -40,7 +60,13 @@ class AuthorshipsQueries(Protocol):
         ...
 
     def list_orphan_authorships(
-        self, *, search: str, page: int, per_page: int
+        self, *, filters: OrphanFilters, page: int, per_page: int
     ) -> OrphanAuthorshipsResponse:
         """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
+        ...
+
+    def orphan_authorships_facets(
+        self, *, filters: OrphanFilters
+    ) -> OrphanAuthorshipsFacetsResponse:
+        """Facette laboratoires des signatures orphelines. Le filtre de recherche s'applique ; le filtre laboratoires, objet de la facette, ne s'applique pas."""
         ...

@@ -41,6 +41,15 @@ def parse_int_csv(s: str, *, param: str) -> list[int]:
     return parse_ints(parse_str_csv(s), param=param)
 
 
+def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
+    """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
+
+    La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient ce que le laboratoire 12 signe et ce qu'aucun laboratoire ne signe.
+    """
+    parts = parse_str_csv(lab_id)
+    return parse_ints([v for v in parts if v != "none"], param="lab_id"), "none" in parts
+
+
 TOGGLE_VALUES: frozenset[str] = frozenset({"yes", "no"})
 """Vocabulaire d'une facette à deux états, telle que la query string la porte.
 
