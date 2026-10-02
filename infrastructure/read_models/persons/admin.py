@@ -168,7 +168,7 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes distinctes au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
+# Paires de personnes non exclues au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH pending AS (
         SELECT DISTINCT id_type::text AS id_type, id_value
@@ -181,8 +181,8 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
         JOIN source_authorships sa ON sa.identity_id = aik.id
-        WHERE sa.person_id IS NOT NULL
-          AND NOT {identifier_neutralized("k.k")}
+        JOIN persons pe ON pe.id = sa.person_id AND pe.exclusion IS NULL
+        WHERE NOT {identifier_neutralized("k.k")}
     ),
     pairs AS (
         SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
@@ -273,9 +273,11 @@ def identifier_conflicts(
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
 
-# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens), résidus filtrés à l'œil. Exclut les paires déjà distinctes et celles dont les deux membres ont une fiche RH (deux titulaires ne fusionnent pas).
-_DUP_NOT_EXISTS = """
-    WHERE NOT EXISTS (
+# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens).
+# Écarte les personnes exclues, les paires distinctes et les paires de deux fiches RH.
+_DUP_WHERE = """
+    WHERE p1.exclusion IS NULL AND p2.exclusion IS NULL
+    AND NOT EXISTS (
         SELECT 1 FROM distinct_persons dp
         WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
     )
@@ -297,7 +299,7 @@ PERSON_DUP_QUERIES = [
           AND (LENGTH(p1.first_name_normalized) = 1 OR LENGTH(p2.first_name_normalized) = 1)
           AND LENGTH(p1.first_name_normalized) >= 1
           AND LENGTH(p2.first_name_normalized) >= 1
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -321,7 +323,7 @@ PERSON_DUP_QUERIES = [
               OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
               OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
           )
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -333,7 +335,7 @@ PERSON_DUP_QUERIES = [
           AND p1.last_name_normalized <> ''
           AND p1.first_name_normalized <> ''
           AND p1.last_name_normalized <> p1.first_name_normalized
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -350,7 +352,7 @@ PERSON_DUP_QUERIES = [
               OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
               OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
           )
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
 ]
 

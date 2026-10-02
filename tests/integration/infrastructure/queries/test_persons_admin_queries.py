@@ -269,6 +269,16 @@ class TestIdentifierConflicts:
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
+    def test_excluded_person_excluded(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
+        p2 = _create_person(sa_sync_conn, last="Lee", first="A", exclusion="out_of_perimeter")
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
+
+        assert identifier_conflicts_count(sa_sync_conn) == 0
+
 
 class TestNameDuplicates:
     """Paires aux noms compatibles, classées par recouvrement de réseau."""
@@ -301,6 +311,19 @@ class TestNameDuplicates:
             pair.overlaps.labs,
             pair.overlaps.journals,
         ) == (0, 0, 0, 0)
+
+    def test_compound_first_name_pairs_with_its_first_word(self, sa_sync_conn):
+        a = _create_person(sa_sync_conn, last="Ferrand", first="Ludovic")
+        b = _create_person(sa_sync_conn, last="Ferrand", first="Ludovic S.")
+
+        self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+
+    def test_excluded_person_excluded(self, sa_sync_conn):
+        a = _create_person(sa_sync_conn, last="Bekono", first="Nina")
+        b = _create_person(sa_sync_conn, last="Bekono", first="N", exclusion="not_a_person")
+
+        res = name_duplicates(sa_sync_conn, page=1, per_page=50)
+        assert all({p.person_a.person_id, p.person_b.person_id} != {a, b} for p in res.pairs)
 
 
 class TestAmbiguousNameForms:
