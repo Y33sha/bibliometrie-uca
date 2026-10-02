@@ -62,6 +62,11 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 	return res.json();
 }
 
+/** Annule la requête en vol de clé `key`, qui ne résout ni ne rejette. Sans effet si aucune n'est en vol. */
+export function cancel(key: string): void {
+	controllers.get(key)?.abort();
+}
+
 let streams = 0;
 
 /**

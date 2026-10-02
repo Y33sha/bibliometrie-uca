@@ -1,4 +1,4 @@
-import { api } from '$lib/api';
+import { api, cancel } from '$lib/api';
 import { dropPageParam, isPageOutOfRange } from '$lib/pagination';
 
 /**
@@ -77,6 +77,11 @@ export function usePaginatedFetch<T, R = Record<string, unknown>>(opts: Paginate
 	$effect(() => {
 		const key = currentKey();
 		if (loaded && key !== lastKey) load();
+	});
+
+	// Le composant qui porte la liste disparaît (changement d'onglet, de page) : sa requête en vol est annulée.
+	$effect(() => () => {
+		if (lastKey) cancel(lastKey);
 	});
 
 	function goToPage(p: number) {
