@@ -25,9 +25,8 @@ class BareUnlinkedAuthorship(NamedTuple):
     source: str
     full_name: str
     author_name_normalized: str | None
-    orcid: str | None
-    hal_person_id: str | None
-    idref: str | None
+    # `{id_type: valeur}` des identifiants de l'identité, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la signature.
+    identifiers: dict[str, str]
     roles: list[str] | None
     publication_id: int | None
     author_position: int
