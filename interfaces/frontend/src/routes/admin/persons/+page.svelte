@@ -15,12 +15,10 @@
     DetachPublication,
     IdFormState,
     OtherPerson,
-    ExclusionFilter,
     Person,
     PersonExclusion,
     PersonSearchResult,
   } from "./types";
-  import { setExclusionParams } from "./types";
   import type { components } from "$lib/api/schema";
   type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
@@ -55,7 +53,7 @@
   let selectedDepts: string[] = $state([]);
   let selectedRoles: string[] = $state([]);
   let selectedRh: string[] = $state([]);
-  let exclusionFilter: ExclusionFilter = $state("");
+  let selectedExclusions: string[] = $state([]);
   let idStates = $state<Record<string, IdState>>({});
 
   let deptOptions: FacetOption[] = $state([]);
@@ -145,14 +143,14 @@
       if (v === "yes" || v === "no") params.set(qk, v);
     }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
-    setExclusionParams(params, exclusionFilter);
+    if (selectedExclusions.length) params.set("exclusion", selectedExclusions.join(","));
     return params;
   }
 
   async function loadFacets() {
     const params = buildFilterParams();
     // Sans filtre d'exclusion, les décomptes de facettes portent sur les personnes retenues.
-    if (!exclusionFilter) setExclusionParams(params, "retained");
+    if (!selectedExclusions.length) params.set("exclusion", "none");
     const data = await api<{
       departments: { value: string; count: number }[];
       roles: { value: string; count: number }[];
@@ -213,7 +211,7 @@
     setOrDel("dept", selectedDepts.length === 1 ? selectedDepts[0] : "");
     setOrDel("role", selectedRoles.length === 1 ? selectedRoles[0] : "");
     setOrDel("rh", selectedRh.length === 1 ? selectedRh[0] : "");
-    setOrDel("exclusion", exclusionFilter);
+    setOrDel("exclusion", selectedExclusions.join(","));
     const idFilter = Object.entries(idStates)
       .filter(([, v]) => v === "yes" || v === "no")
       .map(([k, v]) => `${k}_${v}`)
@@ -236,7 +234,7 @@
     if (p.get("dept")) selectedDepts = [p.get("dept")!];
     if (p.get("role")) selectedRoles = [p.get("role")!];
     if (p.get("rh")) selectedRh = [p.get("rh")!];
-    if (p.get("exclusion")) exclusionFilter = p.get("exclusion") as ExclusionFilter;
+    if (p.get("exclusion")) selectedExclusions = p.get("exclusion")!.split(",");
     const idFilter = p.get("id_filter");
     if (idFilter) {
       const states: Record<string, IdState> = {};
@@ -546,7 +544,7 @@
   bind:selectedDepts
   bind:selectedRoles
   bind:selectedRh
-  bind:exclusionFilter
+  bind:selectedExclusions
   bind:idStates
   bind:pendingStates
   {deptOptions}

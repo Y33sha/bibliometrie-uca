@@ -42,7 +42,7 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonS
     search_clause = person_search_clause(search)
     if search_clause is None:
         return []
-    where_sql, binds = assemble_where([person_exclusion_clause(False, None), search_clause])
+    where_sql, binds = assemble_where([person_exclusion_clause([None]), search_clause])
     rows = conn.execute(
         text(f"""
             SELECT p.id, p.last_name, p.first_name, prh.department_name,
@@ -103,7 +103,7 @@ def list_persons(
         person_has_rh_clause(filters.has_rh),
         person_has_pending_name_forms_clause(filters.has_pending_forms),
         person_has_pending_identifiers_clause(filters.has_pending_identifiers),
-        person_exclusion_clause(filters.excluded, filters.exclusion),
+        person_exclusion_clause(filters.exclusions),
         person_in_lab_clause(filters.lab_id),
     ]
 

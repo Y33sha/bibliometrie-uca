@@ -139,10 +139,13 @@ class TestExclusionFilter:
 
         q = PgPersonsQueries(sa_sync_conn)
         kept = q.list_persons(
-            filters=PersonFilters(lab_id=lab, excluded=False), page=1, per_page=50, sort="name_asc"
+            filters=PersonFilters(lab_id=lab, exclusions=[None]),
+            page=1,
+            per_page=50,
+            sort="name_asc",
         )
         assert {p.id for p in kept.persons} == {p_ok}
-        assert q.persons_facets(filters=PersonFilters(lab_id=lab, excluded=False)).rh.no == 1
+        assert q.persons_facets(filters=PersonFilters(lab_id=lab, exclusions=[None])).rh.no == 1
 
     def test_filters_by_exclusion_reason(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-EXCL")
@@ -161,14 +164,19 @@ class TestExclusionFilter:
 
         q = PgPersonsQueries(sa_sync_conn)
 
-        def listed(**kw):
+        def listed(*exclusions):
             page = q.list_persons(
-                filters=PersonFilters(lab_id=lab, **kw), page=1, per_page=50, sort="name_asc"
+                filters=PersonFilters(lab_id=lab, exclusions=list(exclusions)),
+                page=1,
+                per_page=50,
+                sort="name_asc",
             )
             return {p.id for p in page.persons}
 
-        assert listed(excluded=True) == {ids["Fausse"], ids["Externe"]}
-        assert listed(exclusion=PersonExclusion.OUT_OF_PERIMETER) == {ids["Externe"]}
+        nap, oop = PersonExclusion.NOT_A_PERSON, PersonExclusion.OUT_OF_PERIMETER
+        assert listed(nap, oop) == {ids["Fausse"], ids["Externe"]}
+        assert listed(oop) == {ids["Externe"]}
+        assert listed(None, oop) == {ids["Retenue"], ids["Externe"]}
 
     def test_unfiltered_keeps_both(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-REJ2")

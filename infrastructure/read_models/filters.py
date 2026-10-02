@@ -534,18 +534,15 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
-def person_exclusion_clause(
-    excluded: bool | None, exclusion: PersonExclusion | None
-) -> WhereClause | None:
-    """Filtre : la personne est exclue (ou retenue) ; avec `exclusion`, exclue pour ce motif."""
-    if exclusion is not None:
-        return WhereClause(
-            "p.exclusion = CAST(:flt_person_exclusion AS person_exclusion)",
-            {"flt_person_exclusion": exclusion.value},
-        )
-    if excluded is None:
+def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereClause | None:
+    """Filtre : le motif d'exclusion de la personne figure dans `exclusions`, `None` désignant une personne retenue."""
+    if not exclusions:
         return None
-    return WhereClause("p.exclusion IS NOT NULL" if excluded else "p.exclusion IS NULL", {})
+    reasons = [e.value for e in exclusions if e is not None]
+    parts = ["p.exclusion = ANY(CAST(:flt_person_exclusions AS person_exclusion[]))"]
+    if None in exclusions:
+        parts.append("p.exclusion IS NULL")
+    return WhereClause(f"({' OR '.join(parts)})", {"flt_person_exclusions": reasons})
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:

@@ -43,7 +43,7 @@ PersonSort = Literal[
 class PersonFilters:
     """Filtres des lectures de personnes — liste et facettes.
 
-    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas — y compris `excluded`, qui laisse alors passer les personnes exclues. `exclusion` restreint aux personnes exclues pour ce motif.
+    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas. `exclusions` retient les personnes dont le motif d'exclusion figure dans la liste, `None` désignant les personnes retenues ; vide, il laisse tout passer.
 
     `lab_id` n'est pas un filtre mais un scope : il restreint aux personnes du laboratoire et y restreint aussi leurs dénombrements.
     """
@@ -58,8 +58,7 @@ class PersonFilters:
     # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
-    excluded: bool | None = None
-    exclusion: PersonExclusion | None = None
+    exclusions: list[PersonExclusion | None] = field(default_factory=list)
     lab_id: int | None = None
 
 

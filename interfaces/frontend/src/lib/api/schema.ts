@@ -6931,8 +6931,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                excluded?: boolean | null;
-                exclusion?: components["schemas"]["PersonExclusion"] | null;
+                exclusion?: string;
                 lab_id?: number | null;
             };
             header?: never;
@@ -6973,8 +6972,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                excluded?: boolean | null;
-                exclusion?: components["schemas"]["PersonExclusion"] | null;
+                exclusion?: string;
                 lab_id?: number | null;
             };
             header?: never;
