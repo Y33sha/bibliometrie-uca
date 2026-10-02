@@ -343,6 +343,42 @@ class TestSetRejected:
         with pytest.raises(NotFoundError):
             set_rejected(999999, True, repo=repo)
 
+    def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
+        rejected = _insert_person(sa_sync_conn, "Rejet", "Ée")
+        other = _insert_person(sa_sync_conn, "Autre", "Personne")
+        alone = _insert_publication(sa_sync_conn, "seule")
+        shared = _insert_publication(sa_sync_conn, "partagée")
+        # Valeur périmée, hors des publications de la personne rejetée : le recalcul ciblé la laisse en place.
+        unrelated = _insert_publication(sa_sync_conn, "sans lien")
+        for pub, pid in (
+            (alone, rejected),
+            (shared, rejected),
+            (shared, other),
+            (unrelated, other),
+        ):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO authorships (publication_id, person_id, in_perimeter) "
+                    "VALUES (:pub, :pid, TRUE)"
+                ),
+                {"pub": pub, "pid": pid},
+            )
+        sa_sync_conn.execute(
+            text("UPDATE publications SET in_perimeter = (id <> :u) WHERE id IN (:a, :s, :u)"),
+            {"a": alone, "s": shared, "u": unrelated},
+        )
+
+        def flag(pub):
+            return _scalar(
+                sa_sync_conn, "SELECT in_perimeter FROM publications WHERE id = :p", p=pub
+            )
+
+        set_rejected(rejected, True, repo=repo)
+        assert (flag(alone), flag(shared), flag(unrelated)) == (False, True, False)
+
+        set_rejected(rejected, False, repo=repo)
+        assert flag(alone) is True
+
 
 class TestUpdateName:
     def test_updates_name_and_refreshes_forms(self, sa_sync_conn, repo):
