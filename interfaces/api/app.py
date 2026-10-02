@@ -16,7 +16,7 @@ import anyio.to_thread
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -199,6 +199,24 @@ async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"detail": "La requête porte une valeur que la base ne peut pas représenter."},
+    )
+
+
+# SQLSTATE d'une requête interrompue par Postgres, ici par le plafond `statement_timeout`.
+_QUERY_CANCELED = "57014"
+
+
+@app.exception_handler(OperationalError)
+async def operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
+    """Traduit en 503 une lecture interrompue par le plafond de durée (`api_read_statement_timeout_s`), et laisse le reste en 500."""
+    if getattr(exc.orig, "sqlstate", None) != _QUERY_CANCELED:
+        raise exc
+    logger.warning(
+        "Requête interrompue (durée maximale dépassée) sur %s %s", request.method, request.url.path
+    )
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "La requête a dépassé la durée maximale autorisée."},
     )
 
 

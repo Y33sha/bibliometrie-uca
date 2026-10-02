@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     # lifespan de l'API fixe la taille à cette valeur. `db_pool_max` doit la couvrir, faute de
     # quoi des threads attendent une connexion.
     api_threadpool_size: int = 40
+    # Durée maximale d'une requête SQL servant une lecture de l'API (GET), en secondes. Postgres
+    # interrompt la requête au-delà. L'export complet des publications prend une dizaine de secondes.
+    api_read_statement_timeout_s: int = 30
 
     # ----- Pool de connexions -----
     # `db_pool_min` : connexions tenues ouvertes en permanence. Le différentiel jusqu'à
