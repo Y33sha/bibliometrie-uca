@@ -175,14 +175,18 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         FROM person_identifiers
         WHERE status = '{AttributionStatus.PENDING.value}'
     ),
-    person_identifier_keys AS (
+    bearers AS (
         SELECT DISTINCT sa.person_id, p.id_type, p.id_value
         FROM author_identifying_keys aik
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
         JOIN source_authorships sa ON sa.identity_id = aik.id
-        JOIN persons pe ON pe.id = sa.person_id AND pe.exclusion IS NULL
-        WHERE NOT {identifier_neutralized("k.k")}
+        WHERE sa.person_id IS NOT NULL
+          AND NOT {identifier_neutralized("k.k")}
+    ),
+    person_identifier_keys AS (
+        SELECT b.* FROM bearers b
+        JOIN persons pe ON pe.id = b.person_id AND pe.exclusion IS NULL
     ),
     pairs AS (
         SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
@@ -306,6 +310,9 @@ PERSON_DUP_QUERIES = [
                p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
         FROM persons p1
         JOIN persons p2 ON p1.id < p2.id
+          -- Un nom qui en prolonge un autre en partage le premier mot : l'égalité permet la jointure par hachage.
+          AND SPLIT_PART(REPLACE(p1.last_name_normalized, '-', ' '), ' ', 1)
+            = SPLIT_PART(REPLACE(p2.last_name_normalized, '-', ' '), ' ', 1)
           AND REPLACE(p1.last_name_normalized, '-', ' ') <> REPLACE(p2.last_name_normalized, '-', ' ')
           AND p1.last_name_normalized <> ''
           AND p2.last_name_normalized <> ''
