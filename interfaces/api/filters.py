@@ -7,11 +7,6 @@ from collections.abc import Collection
 
 from fastapi import HTTPException
 
-from application.ports.read_models.publications_queries import (
-    APC_ORIGINS,
-    APC_ORIGINS_NEEDING_LAB,
-)
-
 
 def parse_str_csv(s: str) -> list[str]:
     """Parse une chaîne CSV de strings."""
@@ -46,6 +41,15 @@ def parse_int_csv(s: str, *, param: str) -> list[int]:
     return parse_ints(parse_str_csv(s), param=param)
 
 
+def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
+    """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
+
+    La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient ce que le laboratoire 12 signe et ce qu'aucun laboratoire ne signe.
+    """
+    parts = parse_str_csv(lab_id)
+    return parse_ints([v for v in parts if v != "none"], param="lab_id"), "none" in parts
+
+
 TOGGLE_VALUES: frozenset[str] = frozenset({"yes", "no"})
 """Vocabulaire d'une facette à deux états, telle que la query string la porte.
 
@@ -69,27 +73,6 @@ def parse_vocabulary_csv(s: str, *, allowed: Collection[str], param: str) -> lis
             detail=(
                 f"Valeurs inconnues pour `{param}` : {', '.join(unknown)}. "
                 f"Attendu parmi : {', '.join(sorted(allowed))}."
-            ),
-        )
-    return values
-
-
-def parse_apc_origins(s: str, *, lab_ids: list[int]) -> list[str]:
-    """Origines du paiement des frais de publication demandées, prises dans leur vocabulaire.
-
-    Deux d'entre elles situent le paiement par rapport aux laboratoires sélectionnés : sans sélection, elles ne désignent rien et la clause SQL les laisse tomber. Les refuser dit à l'appelant ce qui manque, là où les ignorer rendrait une liste plus large que celle qu'il croit avoir demandée.
-    """
-    values = parse_vocabulary_csv(s, allowed=APC_ORIGINS, param="has_apc")
-    if lab_ids:
-        return values
-    orphelines = sorted(set(values) & APC_ORIGINS_NEEDING_LAB)
-    if orphelines:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Valeurs de `has_apc` sans laboratoire sélectionné : {', '.join(orphelines)}. "
-                "Elles situent le paiement par rapport aux laboratoires demandés ; renseigner "
-                "`lab_id`, ou les retirer."
             ),
         )
     return values

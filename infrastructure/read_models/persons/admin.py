@@ -168,21 +168,41 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes distinctes au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
+# Paires de personnes non exclues au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH pending AS (
         SELECT DISTINCT id_type::text AS id_type, id_value
         FROM person_identifiers
         WHERE status = '{AttributionStatus.PENDING.value}'
     ),
-    person_identifier_keys AS (
-        SELECT DISTINCT sa.person_id, p.id_type, p.id_value
+    pending_identities AS MATERIALIZED (
+        SELECT aik.id, k.k, p.id_type, p.id_value
         FROM author_identifying_keys aik
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
-        JOIN source_authorships sa ON sa.identity_id = aik.id
+    ),
+    -- Couples (personne, identité) lus sur l'index `idx_sa_person`, sans accès à la table.
+    person_identities AS MATERIALIZED (
+        SELECT DISTINCT sa.person_id, sa.identity_id
+        FROM source_authorships sa
         WHERE sa.person_id IS NOT NULL
-          AND NOT {identifier_neutralized("k.k")}
+          AND sa.identity_id IN (SELECT id FROM pending_identities)
+    ),
+    bearers AS (
+        SELECT DISTINCT pi.person_id, p.id_type, p.id_value
+        FROM person_identities pi
+        JOIN pending_identities p ON p.id = pi.identity_id
+        -- Une signature du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
+        CROSS JOIN LATERAL (
+            SELECT 1 FROM source_authorships sa
+            WHERE sa.person_id = pi.person_id AND sa.identity_id = pi.identity_id
+              AND NOT {identifier_neutralized("p.k")}
+            LIMIT 1
+        ) kept
+    ),
+    person_identifier_keys AS (
+        SELECT b.* FROM bearers b
+        JOIN persons pe ON pe.id = b.person_id AND pe.exclusion IS NULL
     ),
     pairs AS (
         SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
@@ -249,12 +269,11 @@ def identifier_conflicts(
     conn: Connection, *, page: int, per_page: int
 ) -> IdentifierConflictsResponse:
     """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
-    total = identifier_conflicts_count(conn)
+    # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
+    all_rows = conn.execute(text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")).all()
+    total = len(all_rows)
     offset = (page - 1) * per_page
-    rows = conn.execute(
-        text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b LIMIT :lim OFFSET :off"),
-        {"lim": per_page, "off": offset},
-    ).all()
+    rows = all_rows[offset : offset + per_page]
     ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
     persons = _curation_persons(conn, ids)
     pairs = [
@@ -273,9 +292,11 @@ def identifier_conflicts(
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
 
-# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens), résidus filtrés à l'œil. Exclut les paires déjà distinctes et celles dont les deux membres ont une fiche RH (deux titulaires ne fusionnent pas).
-_DUP_NOT_EXISTS = """
-    WHERE NOT EXISTS (
+# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens).
+# Écarte les personnes exclues, les paires distinctes et les paires de deux fiches RH.
+_DUP_WHERE = """
+    WHERE p1.exclusion IS NULL AND p2.exclusion IS NULL
+    AND NOT EXISTS (
         SELECT 1 FROM distinct_persons dp
         WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
     )
@@ -297,13 +318,16 @@ PERSON_DUP_QUERIES = [
           AND (LENGTH(p1.first_name_normalized) = 1 OR LENGTH(p2.first_name_normalized) = 1)
           AND LENGTH(p1.first_name_normalized) >= 1
           AND LENGTH(p2.first_name_normalized) >= 1
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
                p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
         FROM persons p1
         JOIN persons p2 ON p1.id < p2.id
+          -- Un nom qui en prolonge un autre en partage le premier mot : l'égalité permet la jointure par hachage.
+          AND SPLIT_PART(REPLACE(p1.last_name_normalized, '-', ' '), ' ', 1)
+            = SPLIT_PART(REPLACE(p2.last_name_normalized, '-', ' '), ' ', 1)
           AND REPLACE(p1.last_name_normalized, '-', ' ') <> REPLACE(p2.last_name_normalized, '-', ' ')
           AND p1.last_name_normalized <> ''
           AND p2.last_name_normalized <> ''
@@ -321,7 +345,7 @@ PERSON_DUP_QUERIES = [
               OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
               OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
           )
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -333,7 +357,7 @@ PERSON_DUP_QUERIES = [
           AND p1.last_name_normalized <> ''
           AND p1.first_name_normalized <> ''
           AND p1.last_name_normalized <> p1.first_name_normalized
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
                p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
@@ -350,7 +374,7 @@ PERSON_DUP_QUERIES = [
               OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
               OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
           )
-        {_DUP_NOT_EXISTS}
+        {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
 ]
 

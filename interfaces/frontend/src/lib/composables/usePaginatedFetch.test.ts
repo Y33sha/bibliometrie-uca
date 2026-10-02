@@ -6,7 +6,11 @@ import type { PaginatedFetchOptions } from './usePaginatedFetch.svelte';
 let apiResponse: Record<string, unknown> = {};
 // `(..._args: unknown[])` plutôt que `()` : permet à TS de typer `apiSpy.mock.calls[0][0]` lors des assertions.
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
-vi.mock('$lib/api', () => ({ api: (...args: unknown[]) => apiSpy(...args) }));
+const cancelSpy = vi.fn((_key: string) => {});
+vi.mock('$lib/api', () => ({
+	api: (...args: unknown[]) => apiSpy(...args),
+	cancel: (key: string) => cancelSpy(key),
+}));
 const gotoSpy = vi.fn(async (..._args: unknown[]) => {});
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => gotoSpy(...args) }));
 
@@ -43,6 +47,22 @@ describe('usePaginatedFetch', () => {
 		expect(f.page).toBe(1);
 		expect(f.pages).toBe(1);
 		expect(f.loaded).toBe(false);
+	});
+
+	it('annule sa requête quand son scope disparaît', async () => {
+		apiResponse = { items: [], total: 0, page: 1, pages: 1 };
+		const { value: f, cleanup } = runInEffectRoot(() =>
+			usePaginatedFetch<number>({
+				endpoint: '/api/x',
+				itemsKey: 'items',
+				apiKey: 'onglet',
+				buildParams: () => new URLSearchParams(),
+			}),
+		);
+		await f.load();
+		cancelSpy.mockClear();
+		cleanup();
+		expect(cancelSpy).toHaveBeenCalledWith('onglet');
 	});
 
 	it('loading vaut true à la création, false après load()', async () => {

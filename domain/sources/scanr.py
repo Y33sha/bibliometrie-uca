@@ -7,6 +7,7 @@ Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (f
 
 from collections.abc import Mapping
 
+from domain.publications.identifiers import HALId
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, que ScanR détecte dans le texte, et les mots-clés sont des mots-clés libres.
@@ -37,6 +38,17 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     if scanr_id and scanr_id.startswith("these"):
         return scanr_id[len("these") :].upper()
     return None
+
+
+def extract_hal_id_from_scanr_id(scanr_id: str | None) -> str | None:
+    """Identifiant du dépôt HAL dont une notice ScanR est issue, ou `None`.
+
+    ScanR encode une notice issue de HAL sous la forme `hal<identifiant HAL>` (ex. `halhal-04501427` → `hal-04501427`, `haltel-01234567` → `tel-01234567`).
+    """
+    if not scanr_id or not scanr_id.startswith("hal"):
+        return None
+    hal_id = HALId.try_parse(scanr_id[len("hal") :])
+    return str(hal_id) if hal_id else None
 
 
 def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:

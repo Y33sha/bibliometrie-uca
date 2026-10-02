@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Protocol, TypedDict
 
 from domain.persons.identifier_attribution import IdentifierAttribution
-from domain.persons.person import Person
+from domain.persons.person import Person, PersonExclusion
 
 
 class AuthenticateOrcidOutcome(StrEnum):
@@ -49,8 +49,8 @@ class PersonRepository(Protocol):
         """Met à jour le nom d'une personne. Lève `NotFoundError` si elle est introuvable."""
         ...
 
-    def set_rejected(self, person_id: int, rejected: bool) -> None:
-        """Pose le drapeau `rejected` d'une personne et recalcule `publications.in_perimeter` pour ses publications (une personne rejetée en est exclue). Lève `NotFoundError` si la personne est introuvable."""
+    def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
+        """Pose le motif d'exclusion d'une personne (`None` la retient) et recalcule `publications.in_perimeter` pour ses publications. Lève `NotFoundError` si la personne est introuvable."""
         ...
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────
@@ -121,6 +121,14 @@ class PersonRepository(Protocol):
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:
         """Change le statut d'un identifiant et retourne la ligne. Lève `NotFoundError` s'il est absent."""
+        ...
+
+    def hal_account_peers(self, ident_ids: list[int]) -> dict[int, set[int]]:
+        """Pour chaque identifiant de `ident_ids`, les identifiants `pending` de la même personne que portent ses comptes HAL : les signatures HAL de la personne qui portent l'identifiant désignent les comptes, et les signatures HAL de ces comptes désignent les identifiants. Un identifiant sans pair est absent du résultat."""
+        ...
+
+    def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
+        """Pose `status` sur les identifiants de `hal_account_peers` de l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:

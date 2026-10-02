@@ -11,11 +11,14 @@
 	import { anchored } from '$lib/actions/anchored';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
+	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
 	type RejectedPair = components['schemas']['RejectedPairItem'];
+	type OrphanFacets = components['schemas']['OrphanAuthorshipsFacetsResponse'];
 
 	async function searchPersons(
 		q: string,
@@ -25,16 +28,44 @@
 	}
 
 	let search = $state('');
+	let selectedLabs: string[] = $state([]);
+	let labOptions: FacetOption[] = $state([]);
+
+	function filterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		if (search.trim()) params.set('search', search.trim());
+		if (selectedLabs.length) params.set('lab_id', selectedLabs.join(','));
+		return params;
+	}
+
 	const list = usePaginatedFetch<OrphanAuthorship>({
 		endpoint: '/api/authorships/orphans',
 		itemsKey: 'authorships',
 		apiKey: 'orphans',
-		buildParams() {
-			const params = new URLSearchParams();
-			if (search.trim()) params.set('search', search.trim());
-			return params;
-		},
+		buildParams: filterParams,
 	});
+
+	async function loadFacets() {
+		const data = await api<OrphanFacets>('/api/authorships/orphans/facets?' + filterParams(), {
+			key: 'orphans-facets',
+		});
+		labOptions = [
+			{ value: 'none', text: '— Aucun labo —', count: data.no_lab_count },
+			...data.labs.map((l) => ({ value: l.value, text: l.label ?? l.value, count: l.count })),
+		];
+	}
+
+	function onLabsChange() {
+		list.page = 1;
+		syncUrl();
+		list.load();
+	}
+
+	/** Recharge la liste et la facette après une attribution, qui retire des signatures de la file. */
+	function reload() {
+		list.load();
+		loadFacets();
+	}
 	const orphans = $derived(list.items);
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
@@ -100,7 +131,7 @@
 				force,
 			});
 			closeAssign();
-			list.load();
+			reload();
 		});
 	}
 
@@ -138,7 +169,7 @@
 			});
 			selectedIds = new Set();
 			batchSearch.clear();
-			list.load();
+			reload();
 		});
 	}
 
@@ -173,13 +204,14 @@
 		createModal = null;
 		selectedIds = new Set();
 		batchSearch.clear();
-		list.load();
+		reload();
 	}
 
 	function syncUrl() {
 		const p = new URLSearchParams();
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
+		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
 		const qs = p.toString();
 		replaceState(`${base}/admin/orphan-authorships` + (qs ? '?' + qs : ''), {});
 	}
@@ -187,14 +219,16 @@
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	function onSearchInput() {
 		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => { list.page = 1; syncUrl(); list.load(); }, 400);
+		debounceTimer = setTimeout(() => { list.page = 1; syncUrl(); list.load(); loadFacets(); }, 400);
 	}
 
 	onMount(() => {
 		const params = new URLSearchParams(window.location.search);
 		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
 		if (params.get('search')) search = params.get('search')!;
+		if (params.get('lab')) selectedLabs = params.get('lab')!.split(',');
 		list.load();
+		loadFacets();
 	});
 </script>
 
@@ -215,6 +249,13 @@
 	<input type="search" placeholder="Filtrer par nom…" bind:value={search}
 		use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput} autocomplete="off" />
+	<FacetDropdown
+		label="Laboratoires"
+		options={labOptions}
+		searchable
+		bind:selected={selectedLabs}
+		onchange={onLabsChange}
+	/>
 </div>
 
 {#if selectedIds.size > 0}
@@ -244,7 +285,7 @@
 	{#if list.loading}
 		<p class="loading-msg">Chargement des résultats en cours…</p>
 	{:else}
-		<p class="empty">Aucune authorship orpheline{search.trim() ? ' pour ce filtre' : ''}.</p>
+		<p class="empty">Aucune authorship orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.</p>
 	{/if}
 {:else}
 	<table class="data-table">
@@ -254,6 +295,7 @@
 				<th>Source</th>
 				<th>Nom</th>
 				<th>Publication</th>
+				<th>Labo(s)</th>
 				<th>Action</th>
 			</tr>
 		</thead>
@@ -267,6 +309,11 @@
 						<a href="{base}/publications/{o.publication_id}" class="pub-link">
 							{o.pub_year ?? '?'} — {o.pub_title?.slice(0, 80)}{(o.pub_title?.length ?? 0) > 80 ? '…' : ''}
 						</a>
+					</td>
+					<td>
+						{#each o.labs as lab (lab.id)}
+							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
+						{/each}
 					</td>
 					<td>
 						{#if activeAssignIdx === i}

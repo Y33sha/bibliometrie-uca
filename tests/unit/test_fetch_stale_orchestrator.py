@@ -82,3 +82,43 @@ def test_empty_is_noop():
     metrics = _run(adapter)
     assert metrics.total == 0
     assert adapter.saved == []
+
+
+def test_progress_counter_counts_documents_found_at_the_source(monkeypatch):
+    """Le compteur de la barre porte les documents retrouvés à la source ; une disparition ou une erreur fait seulement avancer la barre."""
+    from contextlib import contextmanager
+
+    from application.pipeline.extract import fetch_stale
+
+    class _Spy:
+        avances = 0
+        retenus = 0
+
+        def avance(self, n=1):
+            self.avances += n
+
+        def retient(self, n=1):
+            self.retenus += n
+
+    spy = _Spy()
+    options = {}
+
+    @contextmanager
+    def _progression(total, libelle, logger, **kwargs):
+        options.update(kwargs)
+        yield spy
+
+    monkeypatch.setattr(fetch_stale, "progression", _progression)
+    _run(
+        _FakeAdapter(
+            {
+                "A": FetchedRecord(doi="10.1/a", raw_data={"changed": True}),
+                "B": FetchedRecord(doi="10.1/b", raw_data={"changed": False}),
+                "C": NOT_FOUND,
+                "D": None,
+            }
+        )
+    )
+
+    assert options.get("compte_retenus") is True
+    assert (spy.avances, spy.retenus) == (4, 2)

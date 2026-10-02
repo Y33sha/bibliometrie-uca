@@ -49,7 +49,9 @@ class TestConnexionSousPrefixe:
 
     def test_les_ecritures_restent_gardees(self, client_prefixe):
         """Le préfixe ne desserre rien : hors de la connexion, une écriture sans session est refusée comme ailleurs."""
-        r = client_prefixe.patch(f"{PREFIXE}/api/persons/1/reject", json={"rejected": True})
+        r = client_prefixe.patch(
+            f"{PREFIXE}/api/persons/1/exclusion", json={"exclusion": "not_a_person"}
+        )
         assert r.status_code == 401
         assert r.json()["detail"] == "Non authentifié"
 

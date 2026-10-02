@@ -119,7 +119,7 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 - [x] Crossref : sous-type des `posted-content` et forme de présentation des résumés Copernicus (`5d22d3fb0`).
 - [x] Arbitrage entre communication et texte d'actes, dans l'agrégation (`9b86794d2`).
 - [x] Une communication HAL qui porte un ISBN reçoit son volume d'actes, titré par la source ou le congrès (`eb990381d`).
-- [ ] Ré-extraction HAL complète, renormalisation Crossref, puis mesure.
+- [x] Ré-extraction HAL complète, renormalisation Crossref, puis mesure. 4 472 publications `conference_paper`, dont 2 494 à DOI, 1 975 rattachées à une revue et 2 053 à un volume d'actes ; 9 415 `conference`, dont 431 à DOI. Sur 2017-2025, entre 320 et 530 textes d'actes et entre 490 et 1 300 communications par an. Recalcul du type des 15 431 publications de congrès : une seule diffère du type en base.
 
 ## Questions ouvertes
 

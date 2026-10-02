@@ -7,6 +7,7 @@ Toute écriture éditoriale passe par ce service, pipeline compris (`create_pers
 
 import logging
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
@@ -15,7 +16,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
     AuthenticateOrcidOutcome,
-    IdentifierStatusRow,
     NameFormStatusRow,
     PersonRepository,
 )
@@ -31,6 +31,7 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.person import PersonExclusion
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
@@ -74,19 +75,25 @@ def create_person(last_name: str, first_name: str = "", *, repo: PersonRepositor
     return person_id
 
 
-def set_rejected(
+def set_exclusion(
     person_id: int,
-    rejected: bool,
+    exclusion: PersonExclusion | None,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque ou démarque une personne comme rejetée (fausse entité).
+    """Exclut une personne pour le motif `exclusion`, ou la retient si `exclusion` est `None`.
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    repo.set_rejected(person_id, rejected)
-    emit_event(audit_repo, "person.rejected", "person", person_id, {"rejected": rejected})
+    repo.set_exclusion(person_id, exclusion)
+    emit_event(
+        audit_repo,
+        "person.exclusion",
+        "person",
+        person_id,
+        {"exclusion": exclusion.value if exclusion else None},
+    )
 
 
 def update_name(
@@ -296,27 +303,46 @@ def add_identifier(
     )
 
 
+class IdentifierStatusResult(NamedTuple):
+    """Identifiant après changement de statut, et nombre d'identifiants de ses comptes HAL qui ont reçu le même statut."""
+
+    id: int
+    status: str
+    person_id: int
+    propagated: int
+
+
+# Statuts qu'une décision sur un identifiant étend aux identifiants de ses comptes HAL.
+_PROPAGATED_STATUSES = frozenset(
+    {AttributionStatus.CONFIRMED.value, AttributionStatus.REJECTED.value}
+)
+
+
 def update_identifier_status(
     ident_id: int,
     status: str,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
-) -> IdentifierStatusRow:
+) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Retourne la ligne {id, status, person_id} mise à jour.
-    Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
+    propagated = (
+        repo.propagate_status_to_hal_accounts(ident_id, status)
+        if status in _PROPAGATED_STATUSES
+        else 0
+    )
     emit_event(
         audit_repo,
         "person_identifier.status_changed",
         "person",
         row["person_id"],
-        {"ident_id": ident_id, "status": status},
+        {"ident_id": ident_id, "status": status, "propagated": propagated},
     )
-    return row
+    return IdentifierStatusResult(row["id"], row["status"], row["person_id"], propagated)
 
 
 def reassign_identifier(
@@ -369,15 +395,15 @@ class IdentifierConflict(NamedTuple):
 
 def add_identifiers_from_authorships(
     person_id: int,
-    authorships: list[dict[str, JsonValue]],
+    authorships: Sequence[Mapping[str, JsonValue]],
     *,
     repo: PersonRepository,
 ) -> None:
-    """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
+    """Promotion en batch : pour chaque authorship source, donnée par ses identifiants observés `{id_type: valeur}`, extrait les identifiants et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
     Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
 
-    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`IdentifierOrigin.AUTO`).
+    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`. La `source` enregistrée garde sa valeur par défaut (`IdentifierOrigin.AUTO`).
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:

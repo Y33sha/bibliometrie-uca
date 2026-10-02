@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.person import PersonExclusion
 from interfaces.api.models.authorships import SourceAuthorshipRef
 
 # ----- Corps des requêtes -----
@@ -27,8 +28,8 @@ class ReassignIdentifier(BaseModel):
     person_id: int
 
 
-class RejectPerson(BaseModel):
-    rejected: bool = True
+class SetPersonExclusion(BaseModel):
+    exclusion: PersonExclusion | None
 
 
 class UpdatePersonName(BaseModel):
@@ -71,10 +72,11 @@ class AddIdentifierResponse(BaseModel):
 
 
 class IdentifierStatusResponse(BaseModel):
-    """Identifiant après changement de statut : son id et son statut."""
+    """Identifiant après changement de statut : son id, son statut, et le nombre d'identifiants de ses comptes HAL qui ont reçu le même statut."""
 
     id: int
     status: str
+    propagated: int
 
 
 class NameFormStatusResponse(BaseModel):

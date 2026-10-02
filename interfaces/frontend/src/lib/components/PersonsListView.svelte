@@ -46,8 +46,8 @@
 	};
 
 	function buildFilterParams(): URLSearchParams {
-		// L'annuaire ne montre pas les personnes que la curation a écartées.
-		const params = new URLSearchParams({ rejected: 'false' });
+		// L'annuaire montre seulement les personnes retenues.
+		const params = new URLSearchParams({ exclusion: 'none' });
 		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
 		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		for (const [key, qk] of Object.entries(idQueryKey)) {

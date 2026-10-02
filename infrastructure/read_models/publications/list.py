@@ -138,7 +138,7 @@ def _build_list_clauses(
 
     if filters.person_id:
         clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
-    clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids, filters.lab_ids))
+    clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids))
     clauses.append(_hal_status_clause(conn, filters))
     clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
     return assemble_where(clauses)

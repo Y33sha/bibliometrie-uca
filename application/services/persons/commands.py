@@ -8,13 +8,18 @@ from sqlalchemy import Connection
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
-    IdentifierStatusRow,
     NameFormStatusRow,
     PersonRepository,
 )
 from application.services.persons import core as persons_service
-from application.services.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
+from application.services.persons.core import (
+    AddIdentifierResult,
+    AuthorshipRef,
+    DetachResult,
+    IdentifierStatusResult,
+)
 from domain.persons.identifiers import IdentifierOrigin
+from domain.persons.person import PersonExclusion
 
 # ── Identifiants ──────────────────────────────────────────────────
 
@@ -44,13 +49,13 @@ def update_identifier_status(
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository,
-) -> IdentifierStatusRow:
-    """Met à jour le statut d'un identifiant. Retourne la ligne {id, status, person_id}."""
-    row = persons_service.update_identifier_status(
+) -> IdentifierStatusResult:
+    """Met à jour le statut d'un identifiant, et celui des identifiants de ses comptes HAL."""
+    result = persons_service.update_identifier_status(
         ident_id, status, repo=repo, audit_repo=audit_repo
     )
     conn.commit()
-    return row
+    return result
 
 
 def reassign_identifier(
@@ -68,19 +73,19 @@ def reassign_identifier(
     conn.commit()
 
 
-# ── Rejet / renommage / fusion ────────────────────────────────────
+# ── Exclusion / renommage / fusion ────────────────────────────────
 
 
-def set_rejected(
+def set_exclusion(
     conn: Connection,
     person_id: int,
-    rejected: bool,
+    exclusion: PersonExclusion | None,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Marque/démarque une personne comme rejetée."""
-    persons_service.set_rejected(person_id, rejected, repo=repo, audit_repo=audit_repo)
+    """Exclut ou retient une personne."""
+    persons_service.set_exclusion(person_id, exclusion, repo=repo, audit_repo=audit_repo)
     conn.commit()
 
 

@@ -58,7 +58,6 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
         "séries renommées d'après leur titre de référence",
     ),
     "skipped": "sauté",
-    "stale": ("à rafraîchir", "à rafraîchir"),
     "sudoc_found": ("présente dans le Sudoc", "présentes dans le Sudoc"),
     "unmatched": "non rapproché",
     "unresolved": "non résolu",

@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
+    APC_ORIGINS,
     EXPORT_COLUMNS,
     PublicationDetailResponse,
     PublicationFilters,
@@ -30,9 +31,8 @@ from domain.sources.registry import SOURCE_FILTER_VALUES
 from interfaces.api.deps import publications_queries
 from interfaces.api.filters import (
     TOGGLE_VALUES,
-    parse_apc_origins,
     parse_int_csv,
-    parse_ints,
+    parse_lab_id,
     parse_str_csv,
     parse_vocabulary_csv,
 )
@@ -40,15 +40,6 @@ from interfaces.api.params import SearchTerm
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
-
-
-def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
-    """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
-
-    La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient les publications que le laboratoire 12 signe et celles qu'aucun laboratoire ne signe.
-    """
-    parts = parse_str_csv(lab_id)
-    return parse_ints([v for v in parts if v != "none"], param="lab_id"), "none" in parts
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +76,7 @@ class PublicationFilterParams:
 
     def to_filters(self) -> PublicationFilters:
         """Traduit la query string en filtres du port."""
-        lab_ids, lab_none = _parse_lab_id(self.lab_id)
+        lab_ids, lab_none = parse_lab_id(self.lab_id)
         return PublicationFilters(
             search=self.search,
             lab_ids=lab_ids,
@@ -109,7 +100,7 @@ class PublicationFilterParams:
             is_corresponding=parse_vocabulary_csv(
                 self.is_corresponding, allowed=TOGGLE_VALUES, param="is_corresponding"
             ),
-            has_apc=parse_apc_origins(self.has_apc, lab_ids=lab_ids),
+            has_apc=parse_vocabulary_csv(self.has_apc, allowed=APC_ORIGINS, param="has_apc"),
             country_values=parse_str_csv(self.country),
             language_codes=parse_str_csv(self.language),
             hal_status_values=parse_vocabulary_csv(
@@ -212,7 +203,7 @@ def export_theses_csv(
 
     La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
     """
-    lab_ids, lab_none = _parse_lab_id(lab_id)
+    lab_ids, lab_none = parse_lab_id(lab_id)
     filters = PublicationFilters(
         search=search,
         lab_ids=lab_ids,

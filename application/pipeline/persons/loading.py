@@ -24,9 +24,7 @@ class EnrichedAuthorship(NamedTuple):
     source: str
     full_name: str
     author_name_normalized: str | None
-    orcid: str | None
-    hal_person_id: str | None
-    idref: str | None
+    identifiers: dict[str, str]
     roles: list[str] | None
     publication_id: int | None
     author_position: int
@@ -51,9 +49,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         source=row.source,
         full_name=row.full_name,
         author_name_normalized=row.author_name_normalized,
-        orcid=row.orcid,
-        hal_person_id=row.hal_person_id,
-        idref=row.idref,
+        identifiers=row.identifiers,
         roles=row.roles,
         publication_id=row.publication_id,
         author_position=row.author_position,

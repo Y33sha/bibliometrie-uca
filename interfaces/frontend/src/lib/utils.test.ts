@@ -41,6 +41,10 @@ describe('sanitizeTitle', () => {
 		expect(sanitizeTitle('Hello <b>World</b>')).toContain('World');
 	});
 
+	it('retire le gras et garde son texte', () => {
+		expect(sanitizeTitle('Phys. Rev. D <b>108</b>, <i>E. coli</i>')).toBe('Phys. Rev. D 108, <i>E. coli</i>');
+	});
+
 	it('rend le LaTeX inline', () => {
 		const result = sanitizeTitle('Energy $E=mc^2$ formula');
 		expect(result).toContain('katex');
@@ -186,6 +190,10 @@ describe('sanitizeAbstract', () => {
 
 	it('garde les sauts de ligne', () => {
 		expect(sanitizeAbstract('Avant<br>Après')).toContain('<br>');
+	});
+
+	it('garde les intertitres en gras', () => {
+		expect(sanitizeAbstract('<b>Background:</b> Texte')).toContain('<b>Background:</b>');
 	});
 
 	it('retire les balises hors liste blanche en gardant leur texte', () => {

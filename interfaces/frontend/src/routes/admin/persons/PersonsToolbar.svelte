@@ -4,6 +4,13 @@
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
   import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "$lib/filterItems";
+  import { personExclusionLabels } from "$lib/labels";
+
+  // `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
+  const exclusionOptions: FacetOption[] = [
+    { value: "none", text: "Retenue" },
+    ...Object.entries(personExclusionLabels).map(([value, text]) => ({ value, text })),
+  ];
 
   type IdState = "all" | "yes" | "no";
 
@@ -12,6 +19,7 @@
     selectedDepts = $bindable(),
     selectedRoles = $bindable(),
     selectedRh = $bindable(),
+    selectedExclusions = $bindable(),
     idStates = $bindable(),
     pendingStates = $bindable(),
     deptOptions,
@@ -27,6 +35,7 @@
     selectedDepts: string[];
     selectedRoles: string[];
     selectedRh: string[];
+    selectedExclusions: string[];
     idStates: Record<string, IdState>;
     pendingStates: Record<string, IdState>;
     deptOptions: FacetOption[];
@@ -81,6 +90,13 @@
     items={PENDING_ITEMS}
     bind:states={pendingStates}
     counts={pendingCounts}
+    onchange={onfilterchange}
+  />
+  <FacetDropdown
+    label="Exclusion"
+    options={exclusionOptions}
+    allLabel="Toutes"
+    bind:selected={selectedExclusions}
     onchange={onfilterchange}
   />
   <span class="count">{totalCount} personnes</span>

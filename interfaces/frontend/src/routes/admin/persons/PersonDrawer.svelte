@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import { api } from "$lib/api";
   import { titleCase } from "$lib/utils";
+  import { personExclusionLabels } from "$lib/labels";
   import { autofocus } from "$lib/actions/focus";
   import Drawer from "$lib/components/Drawer.svelte";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
@@ -12,6 +13,7 @@
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
   type NameFormSummary = components["schemas"]["NameFormSummaryOut"];
+  type PersonExclusion = components["schemas"]["PersonExclusion"];
 
   let {
     person,
@@ -20,7 +22,7 @@
     mergeSearch,
     onclose,
     onrename,
-    onToggleReject,
+    onsetExclusion,
     onaddIdentifier,
     ontoggleIdForm,
     onsetIdentifierStatus,
@@ -44,7 +46,7 @@
     onclose: () => void;
     /** Renvoie true si le renommage a réussi (sinon l'édition reste ouverte). */
     onrename: (personId: number, lastName: string, firstName: string) => Promise<boolean>;
-    onToggleReject: (personId: number, rejected: boolean) => void | Promise<void>;
+    onsetExclusion: (personId: number, exclusion: PersonExclusion | null) => void | Promise<void>;
     onaddIdentifier: (personId: number) => void | Promise<void>;
     ontoggleIdForm: (personId: number) => void;
     onsetIdentifierStatus: (identId: number, status: string) => void | Promise<void>;
@@ -132,7 +134,7 @@
         >
       </form>
     {:else}
-      <div class="drawer-title" class:rejected={person.rejected}>
+      <div class="drawer-title" class:excluded={!!person.exclusion}>
         <a
           class="drawer-name-link"
           href="{base}/persons/{person.id}"
@@ -149,15 +151,23 @@
         <button class="icon-btn" title="Modifier le nom" aria-label="Modifier le nom" onclick={startEdit}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
         </button>
-        <button
-          class="icon-btn"
-          class:rejected={person.rejected}
-          title={person.rejected ? "Restaurer la personne" : "Rejeter (fausse entité)"}
-          aria-label={person.rejected ? "Restaurer la personne" : "Rejeter la personne"}
-          onclick={() => onToggleReject(person.id, !person.rejected)}
+        <select
+          class="exclusion-select"
+          class:excluded={!!person.exclusion}
+          title="Exclusion de la personne"
+          aria-label="Exclusion de la personne"
+          value={person.exclusion ?? ""}
+          onchange={(e) =>
+            onsetExclusion(
+              person.id,
+              ((e.currentTarget as HTMLSelectElement).value || null) as PersonExclusion | null,
+            )}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-        </button>
+          <option value="">Retenue</option>
+          {#each Object.entries(personExclusionLabels) as [value, label] (value)}
+            <option {value}>{label}</option>
+          {/each}
+        </select>
       </div>
     {/if}
   </div>
@@ -166,7 +176,7 @@
     <div class="drawer-meta">
       <span>{person.signature_count ?? 0} signatures</span>
       <span>{person.in_perimeter_signature_count ?? 0} dans le périmètre</span>
-      {#if person.rejected}<span class="tag tag-rejected">rejetée</span>{/if}
+      {#if person.exclusion}<span class="tag tag-excluded">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>
 
     {#if person.has_rh}
@@ -284,7 +294,7 @@
     justify-content: space-between;
     gap: 12px;
   }
-  .drawer-title.rejected {
+  .drawer-title.excluded {
     text-decoration: line-through;
     opacity: 0.7;
   }
@@ -338,7 +348,12 @@
     color: var(--accent, #1976d2);
     background: #f0f0f0;
   }
-  .icon-btn.rejected {
+  .exclusion-select {
+    font-size: 0.8rem;
+    padding: 2px 4px;
+    color: #555;
+  }
+  .exclusion-select.excluded {
     color: var(--danger, #c0392b);
   }
   .drawer-meta {
@@ -407,7 +422,7 @@
     border-radius: 10px;
     font-weight: 500;
   }
-  .tag-rejected {
+  .tag-excluded {
     background: #fdecea;
     color: #b71c1c;
   }

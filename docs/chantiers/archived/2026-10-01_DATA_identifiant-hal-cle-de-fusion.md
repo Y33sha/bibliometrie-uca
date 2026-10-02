@@ -9,7 +9,7 @@ Des publications réunissent à tort des documents distincts, qui ont chacun leu
 - plusieurs chapitres d'un même livre ;
 - un livre et l'un de ses chapitres.
 
-La fusion vient d'OpenAlex ou de ScanR, qui rapprochent ces dépôts : leur notice liste plusieurs identifiants HAL. Chaque identifiant listé est une clé de fusion ([keys.py](../../domain/source_publications/keys.py)). La notice réunit donc dans une même publication des notices HAL qui n'ont entre elles aucune clé commune.
+La fusion vient d'OpenAlex ou de ScanR, qui rapprochent ces dépôts : leur notice liste plusieurs identifiants HAL. Chaque identifiant listé est une clé de fusion ([keys.py](../../../domain/source_publications/keys.py)). La notice réunit donc dans une même publication des notices HAL qui n'ont entre elles aucune clé commune.
 
 Une notice OpenAlex ou ScanR relie 2 581 paires de notices HAL qui n'ont aucun identifiant commun (DOI, NNT, PMID), dans 1 790 publications. Les paires de même type, même titre et même année restent réunies par cette clé. En simulation, la règle retenue scinde 915 publications : 845 en deux, 70 en trois ou plus.
 
@@ -57,6 +57,13 @@ Ces fusions rendent aussi le type de la publication instable. La publication pre
 - [x] Relations entre les publications scindées : les 1 110 paires de publications séparées par la règle sont reliées. Les relations par clé partagée passent de 510 à 1 494, dont 1 121 `is_related_to`, 331 `is_preprint_of` et 29 `is_part_of`.
 - [x] Publications 140244 et 22606 : une publication par dépôt HAL. La publication 11084 garde ses quatre dépôts : trois communications de même titre et de même année, et un poster que deux notices ScanR typées `other`, de même titre et de même année, relient aux communications.
 - [x] Publications dont la source la plus prioritaire porte deux types : 67, contre 425.
+
+### 4. Type des notices ScanR issues de HAL
+
+Une notice ScanR issue de HAL porte souvent un type générique : 11 647 des 26 646 notices dont le dépôt HAL est en base ont un type différent du sien (8 393 communications et 1 865 posters typés `other`, des recensions et des synthèses typées `article`). Deux notices ScanR `other` de même titre et de même année relient alors deux dépôts HAL de types différents. Environ 37 des 67 publications dont la source décisive porte encore deux types sont dans ce cas.
+
+- [x] Correction unaire : une notice ScanR issue de HAL prend le type corrigé de son dépôt HAL, calculé depuis la notice HAL.
+- [x] Run et contrôle : 11 635 notices ScanR retypées, aucune ne diverge de son dépôt HAL. La base passe de 66 927 à 67 137 publications ; le poster de la publication 11084 forme la publication 248395. Les publications dont la source décisive porte deux types passent de 67 à 31.
 
 ## Questions ouvertes
 

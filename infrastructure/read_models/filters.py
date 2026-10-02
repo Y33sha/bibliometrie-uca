@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
+from domain.persons.person import PersonExclusion
 from domain.publications.metadata import (
     ACCESS_LEVELS,
     OA_CLOSED_STATUSES,
@@ -58,8 +59,8 @@ def publication_in_perimeter(alias: str = "p") -> str:
     le périmètre.
 
     Lit le flag matérialisé `publications.in_perimeter` (= au moins un authorship
-    in-perimeter d'une personne non rejetée), maintenu en phase `authorships`
-    (`refresh_publications_in_perimeter`) et à l'action de rejet de personne.
+    in-perimeter d'une personne non exclue), maintenu en phase `authorships`
+    (`refresh_publications_in_perimeter`) et à l'exclusion d'une personne.
     Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
     par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
     quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
@@ -344,24 +345,15 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
     )
 
 
-def apc_clause(
-    has_apc: list[str], perimeter_structure_ids: list[int], lab_ids: list[int] | None = None
-) -> WhereClause | None:
+def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
     """Filtre des publications par origine du paiement APC.
 
-    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters
-    résolvent et qui tiennent lieu de structures « internes » : une publication APC est
-    classée "uca" quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
-
-    Tous les usages partagent le bind `:flt_apc_root_ids` ; ceux de
-    `lab_ids` partagent `:flt_apc_lab_ids`.
+    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters résolvent et qui tiennent lieu de structures « internes » : une publication APC est classée "uca" quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
     """
     if not has_apc:
         return None
-    lab_ids = lab_ids or []
     parts: list[str] = []
     needs_root = False
-    needs_lab = False
     for v in has_apc:
         if v == "uca":
             parts.append(
@@ -382,31 +374,9 @@ def apc_clause(
             parts.append(
                 "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)"
             )
-        elif v == "this_lab" and lab_ids:
-            parts.append(
-                "EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id "
-                "AND ap.lab_structure_id = ANY(CAST(:flt_apc_lab_ids AS int[])))"
-            )
-            needs_lab = True
-        elif v == "other_uca" and lab_ids:
-            parts.append(
-                "(EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id "
-                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[]))) "
-                "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id "
-                "AND ap.lab_structure_id = ANY(CAST(:flt_apc_lab_ids AS int[]))))"
-            )
-            needs_root = True
-            needs_lab = True
     if not parts:
         return None
-    binds: dict[str, object] = {}
-    if needs_root:
-        binds["flt_apc_root_ids"] = perimeter_structure_ids
-    if needs_lab:
-        binds["flt_apc_lab_ids"] = lab_ids
+    binds: dict[str, object] = {"flt_apc_root_ids": perimeter_structure_ids} if needs_root else {}
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)
@@ -564,11 +534,15 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
-def person_rejected_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne est (ou n'est pas) écartée par la curation."""
-    if value is None:
+def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereClause | None:
+    """Filtre : le motif d'exclusion de la personne figure dans `exclusions`, `None` désignant une personne retenue."""
+    if not exclusions:
         return None
-    return WhereClause("p.rejected = :flt_person_rejected", {"flt_person_rejected": value})
+    reasons = [e.value for e in exclusions if e is not None]
+    parts = ["p.exclusion = ANY(CAST(:flt_person_exclusions AS person_exclusion[]))"]
+    if None in exclusions:
+        parts.append("p.exclusion IS NULL")
+    return WhereClause(f"({' OR '.join(parts)})", {"flt_person_exclusions": reasons})
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:

@@ -15,10 +15,6 @@ _ROUTES = PROJECT_ROOT / "interfaces" / "api" / "routers"
 _APPEL = re.compile(r"parse_str_csv\(\s*([^),]+?)\s*\)")
 
 LISTES_LIBRES: dict[tuple[str, str], str] = {
-    ("publications.py", "lab_id"): (
-        "Découpage préalable : la sentinelle `none` est mise de côté, et ce qui reste passe par "
-        "`parse_ints`, qui refuse ce qui n'est pas un identifiant."
-    ),
     ("publications.py", "self.country"): (
         "Codes pays présents dans les données, non énumérables dans le code. La valeur est liée "
         "à une comparaison de tableaux : une valeur inconnue ne rend aucune ligne, au lieu "
@@ -90,11 +86,3 @@ class TestVocabulairesFermes:
         from domain.sources.registry import ALL_SOURCES_SET, SOURCE_FILTER_PREFIXES
 
         assert {s.value for s in SOURCE_FILTER_PREFIXES.values()} <= ALL_SOURCES_SET
-
-    def test_les_origines_apc_exigeant_un_laboratoire_font_partie_du_vocabulaire(self):
-        from application.ports.read_models.publications_queries import (
-            APC_ORIGINS,
-            APC_ORIGINS_NEEDING_LAB,
-        )
-
-        assert APC_ORIGINS_NEEDING_LAB < APC_ORIGINS

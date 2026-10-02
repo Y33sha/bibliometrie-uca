@@ -1029,7 +1029,7 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -1264,7 +1264,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/reject": {
+    "/api/persons/{person_id}/exclusion": {
         parameters: {
             query?: never;
             header?: never;
@@ -1278,12 +1278,12 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Reject Person
-         * @description Marque/démarque une personne comme rejetée.
+         * Set Person Exclusion
+         * @description Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
          *
-         *     Renvoie 404 sur une personne introuvable (`set_rejected`).
+         *     Renvoie 404 sur une personne introuvable (`set_exclusion`).
          */
-        patch: operations["reject_person_api_persons__person_id__reject_patch"];
+        patch: operations["set_person_exclusion_api_persons__person_id__exclusion_patch"];
         trace?: never;
     };
     "/api/persons/{person_id}/name": {
@@ -1404,6 +1404,26 @@ export interface paths {
          * @description Liste les signatures du périmètre qu'aucune personne ne porte.
          */
         get: operations["list_orphan_authorships_api_authorships_orphans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/authorships/orphans/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Orphan Authorships Facets
+         * @description Facette laboratoires des signatures orphelines.
+         */
+        get: operations["orphan_authorships_facets_api_authorships_orphans_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3393,13 +3413,15 @@ export interface components {
         };
         /**
          * IdentifierStatusResponse
-         * @description Identifiant après changement de statut : son id et son statut.
+         * @description Identifiant après changement de statut : son id, son statut, et le nombre d'identifiants de ses comptes HAL qui ont reçu le même statut.
          */
         IdentifierStatusResponse: {
             /** Id */
             id: number;
             /** Status */
             status: string;
+            /** Propagated */
+            propagated: number;
         };
         /**
          * InstitutionOut
@@ -3921,6 +3943,18 @@ export interface components {
             pub_title: string;
             /** Pub Year */
             pub_year: number | null;
+            /** Labs */
+            labs: components["schemas"]["PubLabItem"][];
+        };
+        /**
+         * OrphanAuthorshipsFacetsResponse
+         * @description Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire.
+         */
+        OrphanAuthorshipsFacetsResponse: {
+            /** Labs */
+            labs: components["schemas"]["FacetOption"][];
+            /** No Lab Count */
+            no_lab_count: number;
         };
         /** OrphanAuthorshipsResponse */
         OrphanAuthorshipsResponse: {
@@ -4082,6 +4116,12 @@ export interface components {
             oa: components["schemas"]["DashboardOa"];
         };
         /**
+         * PersonExclusion
+         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching.
+         * @enum {string}
+         */
+        PersonExclusion: "not_a_person" | "out_of_perimeter";
+        /**
          * PersonIdentifierOut
          * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
          */
@@ -4138,8 +4178,7 @@ export interface components {
             end_date: string | null;
             /** Has Rh */
             has_rh: boolean;
-            /** Rejected */
-            rejected: boolean;
+            exclusion: components["schemas"]["PersonExclusion"] | null;
             /** Signature Count */
             signature_count: number;
             /** Signature Count As Author */
@@ -4717,14 +4756,6 @@ export interface components {
             /** Person Id */
             person_id: number;
         };
-        /** RejectPerson */
-        RejectPerson: {
-            /**
-             * Rejected
-             * @default true
-             */
-            rejected: boolean;
-        };
         /**
          * RejectedPairItem
          * @description Paire (publication, personne) déjà rejetée, qui bloque une réassignation.
@@ -4862,6 +4893,10 @@ export interface components {
         SetCountry: {
             /** Countries */
             countries?: string[] | null;
+        };
+        /** SetPersonExclusion */
+        SetPersonExclusion: {
+            exclusion: components["schemas"]["PersonExclusion"] | null;
         };
         /**
          * SharingPersonOut
@@ -6928,7 +6963,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                rejected?: boolean | null;
+                exclusion?: string;
                 lab_id?: number | null;
             };
             header?: never;
@@ -6969,7 +7004,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                rejected?: boolean | null;
+                exclusion?: string;
                 lab_id?: number | null;
             };
             header?: never;
@@ -7578,7 +7613,7 @@ export interface operations {
             };
         };
     };
-    reject_person_api_persons__person_id__reject_patch: {
+    set_person_exclusion_api_persons__person_id__exclusion_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -7589,7 +7624,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RejectPerson"];
+                "application/json": components["schemas"]["SetPersonExclusion"];
             };
         };
         responses: {
@@ -7779,6 +7814,7 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 search?: string;
+                lab_id?: string;
             };
             header?: never;
             path?: never;
@@ -7793,6 +7829,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrphanAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    orphan_authorships_facets_api_authorships_orphans_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                lab_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrphanAuthorshipsFacetsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -186,6 +186,15 @@ class TestOrphanAuthorships:
         r = client.get("/api/authorships/orphans", params={"search": "foo"})
         assert r.status_code == 200
 
+    def test_list_and_facets_with_lab_filter(self, client):
+        for path in ("/api/authorships/orphans", "/api/authorships/orphans/facets"):
+            r = client.get(path, params={"lab_id": "1,none"})
+            assert r.status_code == 200, path
+
+    def test_malformed_lab_id_is_422(self, client):
+        r = client.get("/api/authorships/orphans", params={"lab_id": "abc"})
+        assert r.status_code == 422
+
     def test_returns_last_name_first_name_from_comma_form(self, client):
         """Format "Last, First" : parsé en last_name="Last", first_name="First"."""
         marker = _uniq_name("Marker")

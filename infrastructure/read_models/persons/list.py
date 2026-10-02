@@ -16,12 +16,12 @@ from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
     person_department_clause,
+    person_exclusion_clause,
     person_has_identifier_clause,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
-    person_rejected_clause,
     person_role_clause,
     person_search_clause,
     persons_sort_clause,
@@ -38,11 +38,11 @@ _LAB_SCOPED_SIGNATURES = (
 
 
 def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonSearchResult]:
-    """Recherche rapide (autocomplete) parmi les personnes non rejetées, par la règle de l'annuaire (`person_search_clause`)."""
+    """Recherche rapide (autocomplete) parmi les personnes non exclues, par la règle de l'annuaire (`person_search_clause`)."""
     search_clause = person_search_clause(search)
     if search_clause is None:
         return []
-    where_sql, binds = assemble_where([WhereClause("p.rejected = FALSE", {}), search_clause])
+    where_sql, binds = assemble_where([person_exclusion_clause([None]), search_clause])
     rows = conn.execute(
         text(f"""
             SELECT p.id, p.last_name, p.first_name, prh.department_name,
@@ -103,7 +103,7 @@ def list_persons(
         person_has_rh_clause(filters.has_rh),
         person_has_pending_name_forms_clause(filters.has_pending_forms),
         person_has_pending_identifiers_clause(filters.has_pending_identifiers),
-        person_rejected_clause(filters.rejected),
+        person_exclusion_clause(filters.exclusions),
         person_in_lab_clause(filters.lab_id),
     ]
 
@@ -123,7 +123,7 @@ def list_persons(
         text(f"""
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh, p.rejected,
+                (prh.id IS NOT NULL) AS has_rh, p.exclusion,
                 {_signature_counts_sql(lab_scoped=filters.lab_id is not None)}
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
@@ -151,7 +151,7 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
         start_date=row.start_date,
         end_date=row.end_date,
         has_rh=row.has_rh,
-        rejected=row.rejected,
+        exclusion=row.exclusion,
         signature_count=row.signature_count,
         signature_count_as_author=row.signature_count_as_author,
         in_perimeter_signature_count=row.in_perimeter_signature_count,
@@ -204,7 +204,7 @@ def person_curation(conn: Connection, person_id: int) -> PersonOut | None:
         text(f"""
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh, p.rejected,
+                (prh.id IS NOT NULL) AS has_rh, p.exclusion,
                 {_signature_counts_sql(lab_scoped=False)}
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id

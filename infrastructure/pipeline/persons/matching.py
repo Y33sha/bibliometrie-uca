@@ -50,9 +50,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
         source=r.source,
         full_name=r.full_name,
         author_name_normalized=r.author_name_normalized,
-        orcid=r.orcid,
-        hal_person_id=r.hal_person_id,
-        idref=r.idref,
+        identifiers=r.identifiers,
         roles=r.roles,
         publication_id=r.publication_id,
         author_position=r.author_position,
@@ -63,15 +61,14 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
 
 # Colonnes communes des projections d'authorship non-liée (`BareUnlinkedAuthorship`).
 # Chaque requête y ajoute ses deux colonnes finales `in_perimeter` et `current_person_id`.
-# Un identifiant que la signature neutralise vaut NULL.
+# `identifiers` porte un objet jsonb par type de `PersonIdentifierType`, sans les identifiants absents ou neutralisés par la signature.
+_IDENTIFIERS_OBJECT = ", ".join(f"'{t.value}', {_usable(t.value)}" for t in PersonIdentifierType)
 _BARE_PROJECTION_HEAD = f"""
     sa_auth.id AS authorship_id,
     sa_auth.source::text AS source,
     sa_auth.raw_author_name AS full_name,
     aik.author_name_normalized,
-    {_usable("orcid")} AS orcid,
-    {_usable("hal_person_id")} AS hal_person_id,
-    {_usable("idref")} AS idref,
+    jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
     sa_auth.roles,
     sd.publication_id,
     sa_auth.author_position"""
@@ -153,7 +150,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         """Colonnes de la projection des `source_authorships` in-perimeter non liés :
 
-        - `orcid`, `hal_person_id`, `idref` : lus sur les identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` n'est porté que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
+        - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` et `idhal` ne sont portés que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
         - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
 
         Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`. Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
@@ -301,7 +298,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
             text("""
                 SELECT id, last_name, COALESCE(first_name, '') AS first_name
                 FROM persons
-                WHERE NOT rejected
+                WHERE exclusion IS NULL
                 ORDER BY id
             """)
         ).all()

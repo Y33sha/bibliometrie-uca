@@ -18,13 +18,14 @@ from domain.types import JsonValue
 class UnaryCorrectionRow(NamedTuple):
     """Une `source_publication` candidate à la correction unaire, jointe à son journal.
 
-    Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+    Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'une notice ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
     L'adapter construit les lignes par appariement de noms : chaque champ porte le nom de la colonne qui l'alimente.
     """
 
     id: int
     source: str
+    source_id: str
     title: str
     doc_type: str | None
     doi: str | None
@@ -132,6 +133,12 @@ class MetadataCorrectionQueries(Protocol):
         """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
 
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_publications` voient leur correction journal-dépendante bouger."""
+        ...
+
+    def fetch_for_unary_correction_by_hal_ids(
+        self, conn: Connection, hal_ids: list[str]
+    ) -> list[UnaryCorrectionRow]:
+        """Les `source_publications` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des notices ScanR d'une correction ciblée."""
         ...
 
     def fetch_language_forms(self, conn: Connection) -> dict[str, str]:

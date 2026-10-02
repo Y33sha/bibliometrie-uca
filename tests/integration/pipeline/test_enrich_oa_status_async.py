@@ -118,7 +118,7 @@ async def test_happy_path_updates_each_pub(logger, http_mock):
     assert metrics.updated == 2
     assert metrics.unchanged == 1
     assert metrics.extras["not_found"] == 0
-    assert metrics.extras["stale"] == 42
+    assert "stale" not in metrics.extras
     summary = metrics.details["summary"]
     assert summary["stale"] == 42
     assert summary["checked"] == 3

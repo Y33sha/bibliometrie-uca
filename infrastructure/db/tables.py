@@ -38,6 +38,7 @@ from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
+from domain.persons.person import PersonExclusion
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
@@ -183,6 +184,12 @@ structure_type_enum = PgEnum(
 )
 
 publisher_type_enum = PgEnum(*PUBLISHER_TYPES, name="publisher_type", create_type=False)
+
+person_exclusion_enum = PgEnum(
+    *(e.value for e in PersonExclusion),
+    name="person_exclusion",
+    create_type=False,
+)
 
 journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
 
@@ -533,7 +540,8 @@ authorships = Table(
 
 # `authorship_structures` est une MATERIALIZED VIEW (DDL via migration
 # a2c6e4f8b1d7), pas une table : dérivée des `source_authorship_structures` des
-# `source_authorships` reliées à une authorship. Pas modélisée dans le metadata
+# `source_authorships` reliées à une authorship, hors authorships d'une personne
+# exclue. Pas modélisée dans le metadata
 # SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 #
@@ -688,7 +696,7 @@ persons = Table(
     Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("rejected", Boolean, server_default="false"),
+    Column("exclusion", person_exclusion_enum),
 )
 
 
@@ -891,23 +899,16 @@ apc_payments = Table(
     Column("id", Integer, primary_key=True),
     Column("lab_name", Text),
     Column("publisher_name", Text),
-    Column("publisher_type", Text),
     Column("journal_name", Text),
     Column("issn", Text),
-    Column("journal_type", Text),
     Column("doi", Text),
-    Column("article_title", Text),
     Column("amount_eur_ht", Numeric(12, 2)),
     Column("billing_year", SmallInteger),
     Column("pub_year", SmallInteger),
     Column("budget", Text),
     Column("institution", Text),
-    Column("institution_type", Text),
     Column("coman_id", Integer),
-    Column("all_surveys_answered", Text),
-    Column("shared_payment", Text),
     Column("source_file", Text),
-    Column("expense_type", Text),
     Column("remarks", Text),
     Column("publication_id", Integer),
     Column("journal_id", Integer),
@@ -915,6 +916,10 @@ apc_payments = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),
     Column("lab_structure_id", Integer),
+    Column("open_access_fee", Boolean, nullable=False),
+    UniqueConstraint(
+        "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
+    ),
     # Index sur expression lower(doi) — complété à la main.
 )
 

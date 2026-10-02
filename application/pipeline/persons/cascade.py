@@ -51,6 +51,7 @@ from application.services.persons.core import (
     update_name,
 )
 from domain.normalize import normalize_name
+from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
@@ -173,21 +174,27 @@ class _Cascade:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         form = a.author_name_normalized
+        idref = a.identifiers.get(PersonIdentifierType.IDREF)
+        hal_person_id = a.identifiers.get(PersonIdentifierType.HAL_PERSON_ID)
         idref_decision = decide_match_by_identifier(
-            a.idref, self._idref_map, a.full_name, form, self._name_form_status
+            idref, self._idref_map, a.full_name, form, self._name_form_status
         )
         hal_decision = decide_match_by_identifier(
-            a.hal_person_id, self._hal_account_map, a.full_name, form, self._name_form_status
+            hal_person_id, self._hal_account_map, a.full_name, form, self._name_form_status
         )
         # ORCID comme signal seulement depuis les sources à dépôt auteur (`ORCID_MATCH_SOURCES`) ; les autres restent enregistrés sur person_identifiers via add_identifiers.
-        orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
+        orcid_signal = (
+            a.identifiers.get(PersonIdentifierType.ORCID)
+            if a.source in ORCID_MATCH_SOURCES
+            else None
+        )
         orcid_decision = decide_match_by_identifier(
             orcid_signal, self._orcid_map, a.full_name, form, self._name_form_status
         )
         for id_type, id_value, id_decision in (
             ("orcid", orcid_signal, orcid_decision),
-            ("hal_person_id", a.hal_person_id, hal_decision),
-            ("idref", a.idref, idref_decision),
+            ("hal_person_id", hal_person_id, hal_decision),
+            ("idref", idref, idref_decision),
         ):
             if id_decision.rejection is not None:
                 self.corroboration_rejected += 1
@@ -242,8 +249,8 @@ class _Cascade:
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
         add_name_form(pid, a.full_name, repo=self._person_repo)
-        # `add_identifiers` reste une API batch (dict) partagée avec les CLI de maintenance ; conversion via `_asdict()` au boundary. Identifiants ajoutés en `pending` quelle que soit la source du match.
-        add_identifiers(pid, [a._asdict()], repo=self._person_repo)
+        # Identifiants ajoutés en `pending` quelle que soit la source du match.
+        add_identifiers(pid, [a.identifiers], repo=self._person_repo)
         self._complete_first_name(pid, a)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
@@ -265,7 +272,7 @@ class _Cascade:
         link_authorship(
             marker, a.source, a.authorship_id, repo=self._authorship_repo, resolution_mode="name"
         )
-        add_identifiers(marker, [a._asdict()], repo=self._person_repo)
+        add_identifiers(marker, [a.identifiers], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.

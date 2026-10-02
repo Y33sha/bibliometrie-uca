@@ -4,7 +4,7 @@ Implémente le port `application.ports.repositories.person_repository.PersonRepo
 
 Usage :
     repo = PgPersonRepository(conn)
-    repo.set_rejected(person_id, True)
+    repo.set_exclusion(person_id, PersonExclusion.NOT_A_PERSON)
 """
 
 from typing import TYPE_CHECKING
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
         NameFormStatusRow,
     )
     from domain.persons.identifier_attribution import IdentifierAttribution
-    from domain.persons.person import Person
+    from domain.persons.person import Person, PersonExclusion
 
 
 class PgPersonRepository(PersonRepository):
@@ -45,8 +45,8 @@ class PgPersonRepository(PersonRepository):
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         _core.update_name(self._conn, person_id, last_name, first_name)
 
-    def set_rejected(self, person_id: int, rejected: bool) -> None:
-        _core.set_rejected(self._conn, person_id, rejected)
+    def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
+        _core.set_exclusion(self._conn, person_id, exclusion)
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────
 
@@ -111,6 +111,12 @@ class PgPersonRepository(PersonRepository):
 
     def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
         return _identifiers.update_identifier_status(self._conn, ident_id, status)
+
+    def hal_account_peers(self, ident_ids: list[int]) -> dict[int, set[int]]:
+        return _identifiers.hal_account_peers(self._conn, ident_ids)
+
+    def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
+        return _identifiers.propagate_status_to_hal_accounts(self._conn, ident_id, status)
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
         _identifiers.reassign_identifier(self._conn, ident_id, target_person_id)
