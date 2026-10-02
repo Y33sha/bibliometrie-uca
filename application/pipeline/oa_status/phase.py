@@ -65,7 +65,6 @@ async def run(
             updated=progress["updated"],
             unchanged=progress["skipped"],
             not_found=progress["not_found"],
-            stale=stale_total,
         )
         after_dist = queries.count_publications_by_oa_status(conn)
         statuses = sorted(
