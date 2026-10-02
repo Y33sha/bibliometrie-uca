@@ -16,16 +16,15 @@ export function paramsToQuery(params: URLSearchParams): string {
  * ────────────────────────────────────────────────────────────── */
 
 const TITLE_ALLOWED_TAGS = new Set([
-	'sub', 'sup', 'i', 'b', 'em',
+	'sub', 'sup', 'i', 'em',
 	'math', 'msup', 'msub', 'msubsup', 'mi', 'mn', 'mo', 'mrow',
 	'msqrt', 'mfrac', 'mspace', 'mover', 'munder', 'munderover',
 	'mtext', 'mpadded', 'mphantom', 'mtable', 'mtr', 'mtd',
 	'menclose', 'mstyle', 'merror'
 ]);
 
-/* Le résumé porte en plus la structure de paragraphe que les sources y déposent (JATS, Crossref).
- * La perdre collerait tout le texte en un bloc. */
-const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br']);
+/* Le résumé porte en plus la structure que les sources y déposent (JATS, Crossref) : paragraphes et intertitres en gras (« Background: »). Dans un titre, le gras est un formatage d'éditeur sans valeur : DOMPurify retire la balise et garde son texte. */
+const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br', 'b']);
 
 const TITLE_ALLOWED_ATTRS = new Set(['mathvariant', 'display']);
 
