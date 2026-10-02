@@ -233,10 +233,10 @@ class TestPersonList:
     def test_public_directory_call(self, client):
         """L'appel de l'annuaire public : personnes retenues, tri sur les signatures d'auteur."""
         r = client.get(
-            "/api/persons", params={"rejected": "false", "sort": "signatures_as_author_desc"}
+            "/api/persons", params={"excluded": "false", "sort": "signatures_as_author_desc"}
         )
         assert r.status_code == 200
-        assert all(not p["rejected"] for p in r.json()["persons"])
+        assert all(p["exclusion"] is None for p in r.json()["persons"])
 
     def test_unknown_sort_rejected(self, client):
         r = client.get("/api/persons", params={"sort": "pub_count_desc"})
@@ -419,16 +419,23 @@ class TestReassignIdentifier:
 # ── Reject / update name / merge ────────────────────────────────
 
 
-class TestRejectPerson:
+class TestSetPersonExclusion:
     def test_requires_admin(self, client):
-        r = client.patch("/api/persons/1/reject", json={"rejected": True})
+        r = client.patch("/api/persons/1/exclusion", json={"exclusion": "not_a_person"})
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
         pid = _seed_person()
-        r = auth_client.patch(f"/api/persons/{pid}/reject", json={"rejected": True})
+        r = auth_client.patch(
+            f"/api/persons/{pid}/exclusion", json={"exclusion": "out_of_perimeter"}
+        )
         assert r.status_code == 200
         assert r.json()["ok"] is True
+
+    def test_unknown_reason_is_422(self, auth_client):
+        pid = _seed_person()
+        r = auth_client.patch(f"/api/persons/{pid}/exclusion", json={"exclusion": "autre"})
+        assert r.status_code == 422
 
 
 class TestUpdatePersonName:

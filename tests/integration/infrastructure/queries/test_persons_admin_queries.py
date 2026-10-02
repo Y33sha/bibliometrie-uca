@@ -28,14 +28,14 @@ def _create_authorship(conn, pub_id, person_id):
     )
 
 
-def _create_person(conn, last="A", first="Z", rejected=False):
+def _create_person(conn, last="A", first="Z", exclusion=None):
     row = conn.execute(
         text(
             "INSERT INTO persons "
-            "(last_name, first_name, last_name_normalized, first_name_normalized, rejected) "
-            "VALUES (:l, :f, lower(:l), lower(:f), :r) RETURNING id"
+            "(last_name, first_name, last_name_normalized, first_name_normalized, exclusion) "
+            "VALUES (:l, :f, lower(:l), lower(:f), CAST(:e AS person_exclusion)) RETURNING id"
         ),
-        {"l": last, "f": first, "r": rejected},
+        {"l": last, "f": first, "e": exclusion},
     ).one()
     return row.id
 
@@ -142,7 +142,7 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
     pid = _create_person(sa_sync_conn, last="Dupond")
     porteur = _create_person(sa_sync_conn, last="Martin")
     forme_rejetee = _create_person(sa_sync_conn, last="Durand")
-    personne_rejetee = _create_person(sa_sync_conn, last="Bernard", rejected=True)
+    personne_rejetee = _create_person(sa_sync_conn, last="Bernard", exclusion="not_a_person")
     sa_sync_conn.execute(
         text(
             "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -346,7 +346,7 @@ class TestAmbiguousNameForms:
 
     def test_personne_rejetee_ne_compte_pas(self, sa_sync_conn):
         a = _create_person(sa_sync_conn, last="Martin")
-        b = _create_person(sa_sync_conn, last="Durand", rejected=True)
+        b = _create_person(sa_sync_conn, last="Durand", exclusion="out_of_perimeter")
         self._form(sa_sync_conn, "j martin", a)
         self._form(sa_sync_conn, "j martin", b)
         assert "j martin" not in self._forms(sa_sync_conn)

@@ -15,9 +15,12 @@
     DetachPublication,
     IdFormState,
     OtherPerson,
+    ExclusionFilter,
     Person,
+    PersonExclusion,
     PersonSearchResult,
   } from "./types";
+  import { setExclusionParams } from "./types";
   import type { components } from "$lib/api/schema";
   type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
@@ -52,6 +55,7 @@
   let selectedDepts: string[] = $state([]);
   let selectedRoles: string[] = $state([]);
   let selectedRh: string[] = $state([]);
+  let exclusionFilter: ExclusionFilter = $state("");
   let idStates = $state<Record<string, IdState>>({});
 
   let deptOptions: FacetOption[] = $state([]);
@@ -141,13 +145,14 @@
       if (v === "yes" || v === "no") params.set(qk, v);
     }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
+    setExclusionParams(params, exclusionFilter);
     return params;
   }
 
   async function loadFacets() {
     const params = buildFilterParams();
-    // Les décomptes de facettes portent sur les personnes que la curation retient.
-    params.set("rejected", "false");
+    // Sans filtre d'exclusion, les décomptes de facettes portent sur les personnes retenues.
+    if (!exclusionFilter) setExclusionParams(params, "retained");
     const data = await api<{
       departments: { value: string; count: number }[];
       roles: { value: string; count: number }[];
@@ -208,6 +213,7 @@
     setOrDel("dept", selectedDepts.length === 1 ? selectedDepts[0] : "");
     setOrDel("role", selectedRoles.length === 1 ? selectedRoles[0] : "");
     setOrDel("rh", selectedRh.length === 1 ? selectedRh[0] : "");
+    setOrDel("exclusion", exclusionFilter);
     const idFilter = Object.entries(idStates)
       .filter(([, v]) => v === "yes" || v === "no")
       .map(([k, v]) => `${k}_${v}`)
@@ -230,6 +236,7 @@
     if (p.get("dept")) selectedDepts = [p.get("dept")!];
     if (p.get("role")) selectedRoles = [p.get("role")!];
     if (p.get("rh")) selectedRh = [p.get("rh")!];
+    if (p.get("exclusion")) exclusionFilter = p.get("exclusion") as ExclusionFilter;
     const idFilter = p.get("id_filter");
     if (idFilter) {
       const states: Record<string, IdState> = {};
@@ -370,8 +377,8 @@
     return true;
   }
 
-  async function togglePersonReject(personId: number, rejected: boolean) {
-    await personsApi.setRejected(personId, rejected);
+  async function setPersonExclusion(personId: number, exclusion: PersonExclusion | null) {
+    await personsApi.setExclusion(personId, exclusion);
     await loadTable();
     await refreshSelected();
   }
@@ -539,6 +546,7 @@
   bind:selectedDepts
   bind:selectedRoles
   bind:selectedRh
+  bind:exclusionFilter
   bind:idStates
   bind:pendingStates
   {deptOptions}
@@ -578,7 +586,7 @@
     </thead>
     <tbody>
       {#each persons as p (p.id)}
-        <tr class:rejected={p.rejected}>
+        <tr class:excluded={!!p.exclusion}>
           <td class="td-name">
             <button
               type="button"
@@ -628,7 +636,7 @@
     {mergeSearch}
     onclose={closeDrawer}
     onrename={renamePerson}
-    onToggleReject={togglePersonReject}
+    onsetExclusion={setPersonExclusion}
     onaddIdentifier={addIdentifier}
     ontoggleIdForm={toggleIdForm}
     onsetIdentifierStatus={setIdentifierStatus}
@@ -688,14 +696,14 @@
   .person-last {
     font-weight: 600;
   }
-  /* ── Rejected persons ── */
-  tr.rejected {
+  /* ── Excluded persons ── */
+  tr.excluded {
     opacity: 0.45;
   }
-  tr.rejected:hover {
+  tr.excluded:hover {
     opacity: 0.7;
   }
-  tr.rejected .person-name {
+  tr.excluded .person-name {
     text-decoration: line-through;
   }
   /* ── Orphans ── */

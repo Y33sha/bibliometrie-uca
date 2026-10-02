@@ -31,6 +31,7 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.person import PersonExclusion
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
@@ -74,19 +75,25 @@ def create_person(last_name: str, first_name: str = "", *, repo: PersonRepositor
     return person_id
 
 
-def set_rejected(
+def set_exclusion(
     person_id: int,
-    rejected: bool,
+    exclusion: PersonExclusion | None,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque ou démarque une personne comme rejetée (fausse entité).
+    """Exclut une personne pour le motif `exclusion`, ou la retient si `exclusion` est `None`.
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    repo.set_rejected(person_id, rejected)
-    emit_event(audit_repo, "person.rejected", "person", person_id, {"rejected": rejected})
+    repo.set_exclusion(person_id, exclusion)
+    emit_event(
+        audit_repo,
+        "person.exclusion",
+        "person",
+        person_id,
+        {"exclusion": exclusion.value if exclusion else None},
+    )
 
 
 def update_name(

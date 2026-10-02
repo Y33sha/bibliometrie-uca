@@ -301,7 +301,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
             text("""
                 SELECT id, last_name, COALESCE(first_name, '') AS first_name
                 FROM persons
-                WHERE NOT rejected
+                WHERE exclusion IS NULL
                 ORDER BY id
             """)
         ).all()

@@ -32,7 +32,7 @@ _SINGLE_VALUED = ("orcid", "idref", "idhal")
 
 
 def _groups(conn: Connection) -> list[list[Row[tuple[object, ...]]]]:
-    """Groupes d'au moins deux personnes non rejetées aux nom et prénom plein normalisés identiques, chacun trié par id."""
+    """Groupes d'au moins deux personnes non exclues aux nom et prénom plein normalisés identiques, chacun trié par id."""
     rows = conn.execute(
         text("""
             SELECT p.id, p.last_name, COALESCE(p.first_name, '') AS first_name,
@@ -40,7 +40,7 @@ def _groups(conn: Connection) -> list[list[Row[tuple[object, ...]]]]:
                    (SELECT COUNT(*) FROM source_authorships sa
                     WHERE sa.person_id = p.id) AS signatures
             FROM persons p
-            WHERE NOT p.rejected
+            WHERE p.exclusion IS NULL
             ORDER BY p.id
         """)
     ).all()

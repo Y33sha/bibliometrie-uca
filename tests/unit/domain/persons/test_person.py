@@ -23,7 +23,7 @@ class TestPersonConstruction:
     def test_accepts_minimal_args(self):
         p = _make_person()
         assert p.id == 1
-        assert p.rejected is False
+        assert p.exclusion is None
         assert p.identifiers == ()
         assert p.name_forms == ()
 

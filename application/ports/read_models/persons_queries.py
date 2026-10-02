@@ -19,6 +19,7 @@ from application.ports.read_models._common import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.persons.identifiers import AttributionStatus
+from domain.persons.person import PersonExclusion
 
 # Vocabulaire de tri : le champ, puis le sens. Les trois dénombrements sont triables, comme
 # la fonction et le département.
@@ -42,7 +43,7 @@ PersonSort = Literal[
 class PersonFilters:
     """Filtres des lectures de personnes — liste et facettes.
 
-    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas — y compris `rejected`, qui laisse alors passer les personnes écartées par la curation comme les autres.
+    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas — y compris `excluded`, qui laisse alors passer les personnes exclues. `exclusion` restreint aux personnes exclues pour ce motif.
 
     `lab_id` n'est pas un filtre mais un scope : il restreint aux personnes du laboratoire et y restreint aussi leurs dénombrements.
     """
@@ -57,7 +58,8 @@ class PersonFilters:
     # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
-    rejected: bool | None = None
+    excluded: bool | None = None
+    exclusion: PersonExclusion | None = None
     lab_id: int | None = None
 
 
@@ -120,7 +122,7 @@ class PersonOut(BaseModel):
     start_date: date | None
     end_date: date | None
     has_rh: bool
-    rejected: bool
+    exclusion: PersonExclusion | None
     signature_count: int
     """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse."""
     signature_count_as_author: int

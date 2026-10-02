@@ -7,7 +7,7 @@ from domain.normalize import normalize_name
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
-from domain.persons.person import Person
+from domain.persons.person import Person, PersonExclusion
 from infrastructure.db.scalars import scalar_int
 from infrastructure.pipeline.authorships.build import refresh_publications_in_perimeter
 from infrastructure.repositories.person_repository import _name_forms
@@ -17,7 +17,7 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
     row = conn.execute(
         text("""
             SELECT id, last_name, first_name,
-                   last_name_normalized, first_name_normalized, rejected
+                   last_name_normalized, first_name_normalized, exclusion
             FROM persons WHERE id = :id
         """),
         {"id": person_id},
@@ -61,7 +61,7 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
         first_name=row.first_name,
         last_name_normalized=row.last_name_normalized,
         first_name_normalized=row.first_name_normalized,
-        rejected=row.rejected,
+        exclusion=PersonExclusion(row.exclusion) if row.exclusion else None,
         identifiers=identifiers,
         name_forms=name_forms,
     )
@@ -104,14 +104,14 @@ def update_name(conn: Connection, person_id: int, last_name: str, first_name: st
         raise NotFoundError(f"Personne {person_id} introuvable")
 
 
-def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
+def set_exclusion(conn: Connection, person_id: int, exclusion: PersonExclusion | None) -> None:
     result = conn.execute(
-        text("UPDATE persons SET rejected = :r WHERE id = :id"),
-        {"r": rejected, "id": person_id},
+        text("UPDATE persons SET exclusion = CAST(:e AS person_exclusion) WHERE id = :id"),
+        {"e": exclusion.value if exclusion else None, "id": person_id},
     )
     if result.rowcount == 0:
         raise NotFoundError(f"Personne {person_id} introuvable")
-    # Le rejet d'une personne fait basculer l'appartenance de ses publications au périmètre.
+    # L'exclusion d'une personne fait basculer l'appartenance de ses publications au périmètre.
     refresh_publications_in_perimeter(conn, person_id)
 
 

@@ -8,6 +8,7 @@ type MergeResponse = components['schemas']['MergeResponse'];
 type OkResponse = components['schemas']['OkResponse'];
 type NameFormStatusResponse = components['schemas']['NameFormStatusResponse'];
 type DetachAuthorshipsResponse = components['schemas']['DetachAuthorshipsResponse'];
+export type PersonExclusion = components['schemas']['PersonExclusion'];
 
 export function merge(targetId: number, sourceId: number): Promise<MergeResponse> {
 	return post<MergeResponse>(`/api/persons/${targetId}/merge`, { source_id: sourceId });
@@ -24,8 +25,11 @@ export function rename(
 	});
 }
 
-export function setRejected(personId: number, rejected: boolean): Promise<OkResponse> {
-	return patch<OkResponse>(`/api/persons/${personId}/reject`, { rejected });
+export function setExclusion(
+	personId: number,
+	exclusion: PersonExclusion | null
+): Promise<OkResponse> {
+	return patch<OkResponse>(`/api/persons/${personId}/exclusion`, { exclusion });
 }
 
 export function detachAuthorships(
