@@ -5,7 +5,12 @@
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
   import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "$lib/filterItems";
   import { personExclusionLabels } from "$lib/labels";
-  import type { ExclusionFilter } from "./types";
+
+  // `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
+  const exclusionOptions: FacetOption[] = [
+    { value: "none", text: "Retenue" },
+    ...Object.entries(personExclusionLabels).map(([value, text]) => ({ value, text })),
+  ];
 
   type IdState = "all" | "yes" | "no";
 
@@ -14,7 +19,7 @@
     selectedDepts = $bindable(),
     selectedRoles = $bindable(),
     selectedRh = $bindable(),
-    exclusionFilter = $bindable(),
+    selectedExclusions = $bindable(),
     idStates = $bindable(),
     pendingStates = $bindable(),
     deptOptions,
@@ -30,7 +35,7 @@
     selectedDepts: string[];
     selectedRoles: string[];
     selectedRh: string[];
-    exclusionFilter: ExclusionFilter;
+    selectedExclusions: string[];
     idStates: Record<string, IdState>;
     pendingStates: Record<string, IdState>;
     deptOptions: FacetOption[];
@@ -87,19 +92,13 @@
     counts={pendingCounts}
     onchange={onfilterchange}
   />
-  <select
-    class="exclusion-filter"
-    aria-label="Exclusion"
-    bind:value={exclusionFilter}
+  <FacetDropdown
+    label="Exclusion"
+    options={exclusionOptions}
+    allLabel="Toutes"
+    bind:selected={selectedExclusions}
     onchange={onfilterchange}
-  >
-    <option value="">Toutes les personnes</option>
-    <option value="retained">Retenues</option>
-    <option value="excluded">Exclues</option>
-    {#each Object.entries(personExclusionLabels) as [value, label] (value)}
-      <option {value}>Exclues : {label.toLowerCase()}</option>
-    {/each}
-  </select>
+  />
   <span class="count">{totalCount} personnes</span>
 </div>
 

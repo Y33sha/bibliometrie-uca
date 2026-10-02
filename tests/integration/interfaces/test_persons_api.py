@@ -233,10 +233,14 @@ class TestPersonList:
     def test_public_directory_call(self, client):
         """L'appel de l'annuaire public : personnes retenues, tri sur les signatures d'auteur."""
         r = client.get(
-            "/api/persons", params={"excluded": "false", "sort": "signatures_as_author_desc"}
+            "/api/persons", params={"exclusion": "none", "sort": "signatures_as_author_desc"}
         )
         assert r.status_code == 200
         assert all(p["exclusion"] is None for p in r.json()["persons"])
+
+    def test_unknown_exclusion_is_422(self, client):
+        r = client.get("/api/persons", params={"exclusion": "none,autre"})
+        assert r.status_code == 422
 
     def test_unknown_sort_rejected(self, client):
         r = client.get("/api/persons", params={"sort": "pub_count_desc"})

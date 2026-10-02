@@ -41,7 +41,7 @@ from interfaces.api.deps import (
     person_repo,
     persons_queries,
 )
-from interfaces.api.filters import parse_str_csv
+from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     AddIdentifier,
     AddIdentifierResponse,
@@ -74,6 +74,9 @@ router = APIRouter(prefix="/api/persons", tags=["persons"])
 
 # ── Listes et facettes ───────────────────────────────────────────
 
+# Valeur du filtre `exclusion` qui désigne les personnes retenues.
+RETAINED = "none"
+
 
 def person_filters(
     search: SearchTerm = "",
@@ -85,13 +88,12 @@ def person_filters(
     has_rh: bool | None = Query(None),
     has_pending_forms: bool | None = Query(None),
     has_pending_identifiers: bool | None = Query(None),
-    excluded: bool | None = Query(None),
-    exclusion: PersonExclusion | None = Query(None),
+    exclusion: str = Query(""),
     lab_id: int | None = Query(None),
 ) -> PersonFilters:
     """Filtres communs à la liste des personnes et à ses facettes.
 
-    `department` et `role` acceptent plusieurs valeurs séparées par des virgules. `excluded` omis laisse passer les personnes exclues ; l'annuaire public pose `excluded=false`. `exclusion` restreint aux personnes exclues pour ce motif. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
+    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
     """
     return PersonFilters(
         search=search,
@@ -103,8 +105,14 @@ def person_filters(
         has_rh=has_rh,
         has_pending_forms=has_pending_forms,
         has_pending_identifiers=has_pending_identifiers,
-        excluded=excluded,
-        exclusion=exclusion,
+        exclusions=[
+            None if v == RETAINED else PersonExclusion(v)
+            for v in parse_vocabulary_csv(
+                exclusion,
+                allowed={RETAINED, *(e.value for e in PersonExclusion)},
+                param="exclusion",
+            )
+        ],
         lab_id=lab_id,
     )
 

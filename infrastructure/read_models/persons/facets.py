@@ -41,7 +41,7 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
         # Scope labo, recherche nom et exclusion délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
         out: list[WhereClause | None] = [
-            person_exclusion_clause(filters.excluded, filters.exclusion),
+            person_exclusion_clause(filters.exclusions),
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]
