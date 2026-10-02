@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lnpEoz7A9E3IcjFVhCqzXyU7Bh3WZV7eXZkRa82cIBI3jPuHvYrqd3KKKVGQImC
+\restrict ysZJiyjWeY6PxqboB9nq1gEpCO4cyaikYMD3reWXnrqCAzQ7pmMcLHFZnwgUPxT
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -600,6 +600,22 @@ ALTER SEQUENCE public.author_identifying_keys_id_seq OWNED BY public.author_iden
 
 
 --
+-- Name: authorships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.authorships (
+    id integer NOT NULL,
+    publication_id integer NOT NULL,
+    person_id integer,
+    author_position smallint,
+    in_perimeter boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now(),
+    is_corresponding boolean,
+    roles text[]
+);
+
+
+--
 -- Name: config; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -635,6 +651,28 @@ CREATE TABLE public.perimeters (
     created_at timestamp with time zone DEFAULT now(),
     root_structure_ids integer[] DEFAULT '{}'::integer[] CONSTRAINT perimeters_structure_ids_not_null NOT NULL
 );
+
+
+--
+-- Name: persons; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.persons (
+    id integer NOT NULL,
+    last_name text NOT NULL,
+    first_name text NOT NULL,
+    last_name_normalized text NOT NULL,
+    first_name_normalized text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    exclusion public.person_exclusion
+);
+
+
+--
+-- Name: COLUMN persons.exclusion; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.persons.exclusion IS 'Motif d''exclusion décidé à la main : not_a_person (fausse entité), out_of_perimeter (personne réelle rattachée au périmètre par erreur). Nul pour une personne retenue.';
 
 
 --
@@ -711,26 +749,13 @@ COMMENT ON COLUMN public.source_authorships.content_hash IS 'Empreinte des champ
 CREATE MATERIALIZED VIEW public.authorship_structures AS
  SELECT DISTINCT sa.authorship_id,
     sas.structure_id
-   FROM (public.source_authorship_structures sas
+   FROM ((public.source_authorship_structures sas
      JOIN public.source_authorships sa ON ((sa.id = sas.source_authorship_id)))
-  WHERE (sa.authorship_id IS NOT NULL)
+     JOIN public.authorships a ON ((a.id = sa.authorship_id)))
+  WHERE (NOT (EXISTS ( SELECT 1
+           FROM public.persons pe
+          WHERE ((pe.id = a.person_id) AND (pe.exclusion IS NOT NULL)))))
   WITH NO DATA;
-
-
---
--- Name: authorships; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.authorships (
-    id integer NOT NULL,
-    publication_id integer NOT NULL,
-    person_id integer,
-    author_position smallint,
-    in_perimeter boolean DEFAULT false,
-    created_at timestamp with time zone DEFAULT now(),
-    is_corresponding boolean,
-    roles text[]
-);
 
 
 --
@@ -1302,28 +1327,6 @@ CREATE TABLE public.person_name_forms (
     created_at timestamp with time zone DEFAULT now(),
     status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
 );
-
-
---
--- Name: persons; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.persons (
-    id integer NOT NULL,
-    last_name text NOT NULL,
-    first_name text NOT NULL,
-    last_name_normalized text NOT NULL,
-    first_name_normalized text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    exclusion public.person_exclusion
-);
-
-
---
--- Name: COLUMN persons.exclusion; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.persons.exclusion IS 'Motif d''exclusion décidé à la main : not_a_person (fausse entité), out_of_perimeter (personne réelle rattachée au périmètre par erreur). Nul pour une personne retenue.';
 
 
 --
@@ -3794,5 +3797,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lnpEoz7A9E3IcjFVhCqzXyU7Bh3WZV7eXZkRa82cIBI3jPuHvYrqd3KKKVGQImC
+\unrestrict ysZJiyjWeY6PxqboB9nq1gEpCO4cyaikYMD3reWXnrqCAzQ7pmMcLHFZnwgUPxT
 

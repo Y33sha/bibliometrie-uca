@@ -329,6 +329,54 @@ class TestThesesExport:
         assert "theses.fr/2024NNT" in line
 
 
+class TestExcludedPersonLab:
+    """La signature d'une personne exclue ne rattache pas sa publication au laboratoire de cette signature."""
+
+    def test_lab_of_excluded_person_drops_the_publication(self, sa_sync_conn):
+        lab_excluded, lab_kept = (
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO structures (code, name, structure_type) "
+                    "VALUES (:c, :c, 'labo'::structure_type) RETURNING id"
+                ),
+                {"c": code},
+            ).scalar_one()
+            for code in ("LAB-EXCLUE", "LAB-RETENUE")
+        )
+        pub = _create_pub(sa_sync_conn, "Copublication")
+        for exclusion, lab in (("out_of_perimeter", lab_excluded), (None, lab_kept)):
+            person = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO persons (last_name, first_name, last_name_normalized, "
+                    "first_name_normalized, exclusion) "
+                    "VALUES ('X', 'Y', 'x', 'y', CAST(:e AS person_exclusion)) RETURNING id"
+                ),
+                {"e": exclusion},
+            ).scalar_one()
+            aid = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+                    "VALUES (:pub, :pe, TRUE, ARRAY['author']::text[]) RETURNING id"
+                ),
+                {"pub": pub, "pe": person},
+            ).scalar_one()
+            add_authorship_structure(sa_sync_conn, aid, lab)
+
+        def listed(lab):
+            res = list_publications(
+                sa_sync_conn,
+                filters=PublicationFilters(lab_ids=[lab]),
+                perimeter_structure_ids=[],
+                page=1,
+                per_page=50,
+                sort="year_desc",
+            )
+            return pub in {p.id for p in res.publications}
+
+        assert not listed(lab_excluded)
+        assert listed(lab_kept)
+
+
 class TestExportsRunTheirQueryBeforeStreaming:
     """Les exports rendent des blocs, mais interrogent la base à l'appel.
 

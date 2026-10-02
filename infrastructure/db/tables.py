@@ -540,7 +540,8 @@ authorships = Table(
 
 # `authorship_structures` est une MATERIALIZED VIEW (DDL via migration
 # a2c6e4f8b1d7), pas une table : dérivée des `source_authorship_structures` des
-# `source_authorships` reliées à une authorship. Pas modélisée dans le metadata
+# `source_authorships` reliées à une authorship, hors authorships d'une personne
+# exclue. Pas modélisée dans le metadata
 # SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 #
