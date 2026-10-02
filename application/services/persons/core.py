@@ -16,7 +16,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
     AuthenticateOrcidOutcome,
-    IdentifierStatusRow,
     NameFormStatusRow,
     PersonRepository,
 )
@@ -304,27 +303,46 @@ def add_identifier(
     )
 
 
+class IdentifierStatusResult(NamedTuple):
+    """Identifiant après changement de statut, et nombre d'identifiants de ses comptes HAL qui ont reçu le même statut."""
+
+    id: int
+    status: str
+    person_id: int
+    propagated: int
+
+
+# Statuts qu'une décision sur un identifiant étend aux identifiants de ses comptes HAL.
+_PROPAGATED_STATUSES = frozenset(
+    {AttributionStatus.CONFIRMED.value, AttributionStatus.REJECTED.value}
+)
+
+
 def update_identifier_status(
     ident_id: int,
     status: str,
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
-) -> IdentifierStatusRow:
+) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Retourne la ligne {id, status, person_id} mise à jour.
-    Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
+    propagated = (
+        repo.propagate_status_to_hal_accounts(ident_id, status)
+        if status in _PROPAGATED_STATUSES
+        else 0
+    )
     emit_event(
         audit_repo,
         "person_identifier.status_changed",
         "person",
         row["person_id"],
-        {"ident_id": ident_id, "status": status},
+        {"ident_id": ident_id, "status": status, "propagated": propagated},
     )
-    return row
+    return IdentifierStatusResult(row["id"], row["status"], row["person_id"], propagated)
 
 
 def reassign_identifier(

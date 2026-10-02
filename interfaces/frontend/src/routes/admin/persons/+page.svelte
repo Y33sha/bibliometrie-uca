@@ -319,7 +319,12 @@
   }
 
   async function setIdentifierStatus(identId: number, status: string) {
-    await personsApi.setIdentifierStatus(identId, status);
+    const { propagated } = await personsApi.setIdentifierStatus(identId, status);
+    if (propagated > 0) {
+      toast(
+        `${propagated} identifiant${propagated > 1 ? "s" : ""} du même compte HAL ${propagated > 1 ? "ont" : "a"} reçu le même statut`,
+      );
+    }
     await loadTable();
     await refreshSelected();
   }
