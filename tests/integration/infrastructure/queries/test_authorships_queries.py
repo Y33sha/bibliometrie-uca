@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.structures import add_source_authorship_structure
 
 
 def _create_person(conn, last="A", first="Z"):
@@ -125,3 +126,33 @@ class TestListOrphanAuthorships:
             search="Special", page=1, per_page=50
         )
         assert sa_match in [a.source_authorship_id for a in res.authorships]
+
+    def test_lists_labs_detected_in_the_signature(self, sa_sync_conn):
+        """Seuls les laboratoires de la signature apparaissent, pas ceux des autres signatures de la publication ni les autres types de structure."""
+        lab, other_lab, team = (
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO structures (code, name, acronym, structure_type) "
+                    "VALUES (:c, :c, :a, CAST(:t AS structure_type)) RETURNING id"
+                ),
+                {"c": code, "a": acronym, "t": stype},
+            ).scalar_one()
+            for code, acronym, stype in (
+                ("ORPH-LAB", "LAB", "labo"),
+                ("ORPH-OTHER", "AUTRE", "labo"),
+                ("ORPH-TEAM", "EQ", "equipe"),
+            )
+        )
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub)
+        sa = _create_sa(sa_sync_conn, sd, author_position=0, raw_author_name="Zzorph Avec")
+        other = _create_sa(sa_sync_conn, sd, author_position=1, raw_author_name="Zzorph Autre")
+        add_source_authorship_structure(sa_sync_conn, sa, lab)
+        add_source_authorship_structure(sa_sync_conn, sa, team)
+        add_source_authorship_structure(sa_sync_conn, other, other_lab)
+
+        res = PgAuthorshipsQueries(sa_sync_conn).list_orphan_authorships(
+            search="Zzorph Avec", page=1, per_page=50
+        )
+        (row,) = res.authorships
+        assert [(lab_item.id, lab_item.label) for lab_item in row.labs] == [(lab, "LAB")]

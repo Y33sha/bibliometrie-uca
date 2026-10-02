@@ -8,8 +8,10 @@ from application.ports.read_models.authorships_queries import (
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
 )
+from application.ports.read_models.publications_queries import PubLabItem
 from domain.persons.name_matching import parse_raw_author_name
 from domain.sources.registry import AUTHOR_SOURCES
+from domain.structures.structure import StructureType
 from infrastructure.db.sql_fragments import in_clause
 
 # Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
@@ -67,7 +69,17 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
                 SELECT sa.source, sa.id AS source_authorship_id,
                        sa.raw_author_name AS full_name,
                        sd.publication_id,
-                       p.title AS pub_title, p.pub_year
+                       p.title AS pub_title, p.pub_year,
+                       COALESCE((
+                           SELECT json_agg(lab ORDER BY lab.label)
+                           FROM (
+                               SELECT s.id, COALESCE(s.acronym, s.name) AS label
+                               FROM source_authorship_structures sas
+                               JOIN structures s ON s.id = sas.structure_id
+                                AND s.structure_type = '{StructureType.LABO.value}'
+                               WHERE sas.source_authorship_id = sa.id
+                           ) lab
+                       ), '[]') AS labs
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 JOIN publications p ON p.id = sd.publication_id
@@ -92,6 +104,7 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
                     publication_id=row.publication_id,
                     pub_title=row.pub_title,
                     pub_year=row.pub_year,
+                    labs=[PubLabItem(**lab) for lab in row.labs],
                 )
             )
 

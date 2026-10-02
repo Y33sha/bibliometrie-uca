@@ -49,6 +49,12 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
         ),
         {"sp": sp_id, "aid": authorship_id, "iid": identity_id},
     ).scalar_one()
+    add_source_authorship_structure(conn, sa_id, structure_id)
+
+
+def add_source_authorship_structure(conn, sa_id: int, structure_id: int) -> None:
+    """Lie la signature `sa_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
+    n = next(_seq)
     addr_id = conn.execute(
         text("INSERT INTO addresses (raw_text, normalized_text) VALUES (:t, :t) RETURNING id"),
         {"t": f"as-test-addr-{n}"},

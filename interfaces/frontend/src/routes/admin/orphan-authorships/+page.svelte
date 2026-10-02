@@ -254,6 +254,7 @@
 				<th>Source</th>
 				<th>Nom</th>
 				<th>Publication</th>
+				<th>Labo(s)</th>
 				<th>Action</th>
 			</tr>
 		</thead>
@@ -267,6 +268,11 @@
 						<a href="{base}/publications/{o.publication_id}" class="pub-link">
 							{o.pub_year ?? '?'} — {o.pub_title?.slice(0, 80)}{(o.pub_title?.length ?? 0) > 80 ? '…' : ''}
 						</a>
+					</td>
+					<td>
+						{#each o.labs as lab (lab.id)}
+							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
+						{/each}
 					</td>
 					<td>
 						{#if activeAssignIdx === i}
