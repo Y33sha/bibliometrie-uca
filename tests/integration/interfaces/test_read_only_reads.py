@@ -63,6 +63,29 @@ def test_ecriture_admise_sur_une_methode_d_ecriture(db_conn_for):
         conn.rollback()
 
 
+QUERY_CANCELED = "57014"
+
+
+class TestDureeMaximaleDesLectures:
+    """Une lecture porte un plafond de durée par requête SQL ; une écriture n'en porte pas."""
+
+    def test_plafond_pose_sur_une_lecture(self, db_conn_for, monkeypatch):
+        monkeypatch.setattr(deps.settings, "api_read_statement_timeout_s", 30)
+        with db_conn_for("GET") as conn:
+            assert conn.execute(text("SHOW statement_timeout")).scalar() == "30s"
+
+    def test_requete_trop_longue_interrompue(self, db_conn_for, monkeypatch):
+        monkeypatch.setattr(deps.settings, "api_read_statement_timeout_s", 1)
+        with db_conn_for("GET") as conn, pytest.raises(DBAPIError) as refus:
+            conn.execute(text("SELECT pg_sleep(2)"))
+        assert refus.value.orig.sqlstate == QUERY_CANCELED
+
+    def test_pas_de_plafond_sur_une_ecriture(self, db_conn_for):
+        with db_conn_for("POST") as conn:
+            assert conn.execute(text("SHOW statement_timeout")).scalar() == "0"
+            conn.rollback()
+
+
 class TestConnectionFactory:
     """Connexions supplémentaires d'une lecture parallélisée — les facettes de publications.
 
