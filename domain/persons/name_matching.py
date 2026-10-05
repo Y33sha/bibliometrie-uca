@@ -85,6 +85,12 @@ def first_name_initials(first_name: str) -> tuple[str, ...] | None:
     return None
 
 
+def normalize_first_name(first_name: str) -> str:
+    """Prénom normalisé. Un prénom réduit à des initiales (`first_name_initials`) donne ses initiales séparées : « JP » et « J.-P. » donnent « j p »."""
+    initials = first_name_initials(first_name)
+    return " ".join(initials) if initials is not None else normalize_name(first_name)
+
+
 def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
     """Vrai si `initials` commencent la suite des initiales de `first_name`, dans l'ordre : (« a »,) s'étend à « Abdul-Majeed », (« d »,) à « Denis M. », mais (« h »,) pas à « Bo-Hyung »."""
     own = first_name_initials(first_name) or tuple(
