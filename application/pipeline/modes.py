@@ -40,7 +40,7 @@ MODES: dict[str, ModePolicy] = {
     ),
     "full": ModePolicy(
         # WoS exclu par défaut (opt-in `--include-wos`) ; theses inclus.
-        extract_sources=frozenset({"hal", "openalex", "scanr", "theses"}),
+        extract_sources=frozenset({"hal", "openalex", "scanr", "theses", "datacite"}),
         year_selection="full",
         vacuum_full=True,
         fetch_stale=True,

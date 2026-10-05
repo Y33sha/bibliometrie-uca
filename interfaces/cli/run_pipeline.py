@@ -1053,7 +1053,21 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
         adapter = PgThesesExtractAdapter(base_url=API_BASE_URLS["theses"])
         return ThesesExtractor(conn, source_log, adapter)
 
-    return {"hal": hal, "openalex": openalex, "wos": wos, "scanr": scanr, "theses": theses}
+    def datacite(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from application.pipeline.extract.extract_datacite import DataciteExtractor
+        from infrastructure.sources.datacite.extract_datacite import PgDataciteExtractAdapter
+
+        adapter = PgDataciteExtractAdapter(base_url=API_BASE_URLS["datacite"])
+        return DataciteExtractor(conn, source_log, adapter)
+
+    return {
+        "hal": hal,
+        "openalex": openalex,
+        "wos": wos,
+        "scanr": scanr,
+        "theses": theses,
+        "datacite": datacite,
+    }
 
 
 def _run_extract(

@@ -40,9 +40,9 @@ ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
 GetLastDailyExtractDate = Callable[[], date | None]
 
 # Ordre de construction des tâches parallèles (les rows de la table suivent l'ordre d'achèvement).
-_PARALLEL_SOURCES = ("openalex", "hal", "wos", "scanr", "theses")
+_PARALLEL_SOURCES = ("openalex", "hal", "wos", "scanr", "theses", "datacite")
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
-_YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr"})
+_YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr", "datacite"})
 
 
 def _extractor_args(
