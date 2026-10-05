@@ -1,6 +1,6 @@
 # Moissonnage
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-05.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
@@ -8,7 +8,7 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 
 **Critères de requête**:
 - **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
-- **affiliation** des publications ([périmètre configurable](../guide-utilisateur/03-workflow-admin.md#périmètres) dans `admin/config`). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures.
+- **affiliation** des publications ([périmètre configurable](../guide-utilisateur/03-workflow-admin.md#périmètres) dans `admin/config`). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures. DataCite, dont les affiliations sont du texte libre, s'interroge par mots-clés saisis pour chaque structure.
 
 En mode `daily`, seul HAL est moissonné : les notices modifiées depuis la dernière extraction quotidienne terminée sans signal, ou depuis 30 jours à défaut.
 

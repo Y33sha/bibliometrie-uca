@@ -17,6 +17,7 @@ Le moissonnage nécessite des **structures** :
     * N° SIREN pour la source [ScanR](../glossaire.md#scanr) (ex. `130028061`)
     * forme de nom standardisée [WoS](../glossaire.md#web-of-science-wos) (ex.: `Univ Clermont Auvergne`)
     * nom de [collection HAL](../glossaire.md#collection-hal) (ex.: `PRES_CLERMONT`)
+    * mots-clés cherchés dans les affiliations DataCite (ex.: `Clermont, Auvergne`)
 
     Chaque champ peut contenir plusieurs identifiants séparés par des virgules.
 
