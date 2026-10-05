@@ -54,7 +54,7 @@
 
 A jour au 2026-09-06
 
-`extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses
+`extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses/DataCite
 `resolve_ra` — Résolution Registration Agency des DOI
 `fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
 `fetch_stale` — Rafraîchissement des docs stale

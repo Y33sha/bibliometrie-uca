@@ -1,6 +1,6 @@
 # DataCite
 
-*À jour le 2026-09-07.*
+*À jour le 2026-10-05.*
 
 https://datacite.org/
 
@@ -10,11 +10,19 @@ Documentation API :
 
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
-Le pipeline interroge DataCite pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). Le pool de DOI candidats est filtré par agence d'enregistrement : seuls les DOI rattachés à DataCite sont soumis, ce qui évite les requêtes sans réponse sur des DOI Crossref. DataCite sert d'autorité sur les métadonnées déposées au moment de l'enregistrement du DOI.
+Le pipeline interroge DataCite de deux façons :
+- [moissonnage](../pipeline/02-extract.md#moissonnage-extract), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ « DataCite » de l'admin des structures) ;
+- [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources.
+
+Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent seulement par la seconde voie.
 
 ## API utilisée
 
-**DOIs API** (`https://api.datacite.org/dois/{doi}`) — interrogation unitaire par DOI, réponse au format JSON:API (les métadonnées sont dans `data.attributes`).
+**DOIs API** — réponse au format JSON:API (les métadonnées sont dans `data.attributes`) :
+- `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnage, `fetch_missing_doi`) ;
+- `https://api.datacite.org/dois/{doi}` : interrogation unitaire (`fetch_stale`).
+
+Les deux routes rendent un même DOI sous deux formes. Le hash de détection de changement ignore ces différences et les compteurs de consultation.
 
 - *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Pas de quota contractuel. L'adaptateur reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
