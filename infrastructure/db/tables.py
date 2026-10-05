@@ -696,7 +696,15 @@ persons = Table(
     Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("exclusion", person_exclusion_enum),
+    Column(
+        "exclusion",
+        person_exclusion_enum,
+        comment=(
+            "Motif d'exclusion décidé à la main : not_a_person (fausse entité), "
+            "out_of_perimeter (personne réelle rattachée au périmètre par erreur). "
+            "Nul pour une personne retenue."
+        ),
+    ),
 )
 
 
@@ -916,7 +924,15 @@ apc_payments = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),
     Column("lab_structure_id", Integer),
-    Column("open_access_fee", Boolean, nullable=False),
+    Column(
+        "open_access_fee",
+        Boolean,
+        nullable=False,
+        comment=(
+            "Vrai pour un frais d'open access (Open APC), faux pour un autre frais de "
+            "publication (enquête, frais hors OA)."
+        ),
+    ),
     UniqueConstraint(
         "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
     ),
