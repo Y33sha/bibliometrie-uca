@@ -44,14 +44,15 @@ Mesure sur les signatures du périmètre rattachées à une personne du référe
 
 La synchronisation des signatures d'une notice renormalisée rapproche les signatures par identité. Un oneshot remplit donc les nouvelles colonnes en place avant toute renormalisation, pour que les signatures gardent leur identifiant, leur personne et leur épinglage.
 
-- [ ] Objet valeur du nom fourni par la source : nom et prénom, ou chaîne brute ; découpage retenu et forme « Prénom Nom ».
-- [ ] Migration : `raw_last_name` et `raw_first_name` sur `source_authorships` ; nom et prénom normalisés dans la clé d'identité de `author_identifying_keys`.
-- [ ] Normaliseurs Crossref, DataCite, WoS et theses.fr : champs natifs. DataCite sans `givenName` : chaîne brute.
-- [ ] Normaliseur HAL : `forename` et `surname` du TEI, équivalents au nom Solr sur tout le raw store.
-- [ ] Normaliseurs OpenAlex et ScanR : chaîne brute, découpée par le parseur.
-- [ ] Oneshot : nouvelles colonnes des signatures existantes, relues dans le raw store, et rattachement à leur nouvelle identité.
-- [ ] Migration : clé d'identité réduite au nom, au prénom et aux identifiants.
-- [ ] Matching et affichage : lecture du nom et du prénom découpés.
+- [x] Objet valeur du nom fourni par la source (`SignatureName`) : nom et prénom, ou chaîne brute ; découpage retenu et forme « Prénom Nom ».
+- [x] Prénom réduit à des initiales normalisé en initiales séparées : « JP » et « J.-P. » donnent « j p ».
+- [x] Migration : `raw_last_name` et `raw_first_name` sur `source_authorships` ; nom et prénom normalisés dans la clé d'identité de `author_identifying_keys`.
+- [x] Normaliseurs Crossref, DataCite, WoS et theses.fr : champs natifs. DataCite sans `givenName` : chaîne brute.
+- [x] Normaliseur HAL : `forename` et `surname` du TEI, équivalents au nom Solr sur tout le raw store.
+- [x] Normaliseurs OpenAlex et ScanR : chaîne brute, découpée par le parseur.
+- [x] Oneshot : nouvelles colonnes des signatures existantes, relues dans le raw store, et rattachement à leur nouvelle identité. Appliqué puis supprimé.
+- [x] Migration : clé d'identité réduite au nom, au prénom et aux identifiants ; `author_name_normalized` calculé.
+- [x] Matching et affichage : lecture du nom et du prénom découpés.
 
 ### Phase 3 — Correction des inversions entre sources
 
@@ -60,7 +61,7 @@ La synchronisation des signatures d'une notice renormalisée rapproche les signa
 
 ### Phase 4 — Matching des personnes
 
-- [ ] `name_matching`, formes de nom (`person_name_forms`) et corroboration par le nom : nom et prénom découpés en entrée.
+- [ ] Formes de nom (`person_name_forms`) en deux colonnes, et matching par forme de nom sur le nom et le prénom découpés.
 - [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 
 ### Phase 5 — Interface

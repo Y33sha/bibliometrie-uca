@@ -194,7 +194,7 @@ def write_source_authorships(
 
 
 def signature_name_fields(name: SignatureName) -> SignatureNameFields:
-    """Colonnes de nom d'une signature : nom fourni par la source, découpage retenu normalisé, et forme normalisée « prénom nom »."""
+    """Colonnes de nom d'une signature : nom fourni par la source, et découpage retenu normalisé."""
     last, first = name.normalized()
     return {
         "raw_author_name": name.raw,
@@ -202,7 +202,6 @@ def signature_name_fields(name: SignatureName) -> SignatureNameFields:
         "raw_first_name": name.first_name,
         "last_name_normalized": last,
         "first_name_normalized": first,
-        "author_name_normalized": " ".join(part for part in (first, last) if part),
     }
 
 

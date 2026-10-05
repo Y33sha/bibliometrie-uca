@@ -561,19 +561,28 @@ rejected_authorships = Table(
 )
 
 
-# Identités d'auteur dédupliquées : la clé (forme normalisée « prénom nom », nom
-# et prénom normalisés, identifiants) est extraite des signatures
-# `source_authorships` (une identité pour ~25 signatures). L'unique est
-# `NULLS NOT DISTINCT` : les signatures sans identifiant collapsent sur leur seul
-# nom, sans recourir à un sentinel `'{}'`.
+# Identités d'auteur dédupliquées : la clé (nom et prénom normalisés,
+# identifiants) est extraite des signatures `source_authorships` (une identité
+# pour ~35 signatures). L'unique est `NULLS NOT DISTINCT` : les signatures sans
+# identifiant collapsent sur leur seul nom, sans recourir à un sentinel `'{}'`.
 author_identifying_keys = Table(
     "author_identifying_keys",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("author_name_normalized", Text),
-    Column("last_name_normalized", Text),
+    Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text),
     Column("person_identifiers", Jsonb),
+    # Forme normalisée « prénom nom », parties vides omises.
+    Column(
+        "author_name_normalized",
+        Text,
+        Computed(
+            "CASE WHEN coalesce(first_name_normalized, '') = '' THEN last_name_normalized"
+            " WHEN last_name_normalized = '' THEN first_name_normalized"
+            " ELSE first_name_normalized || ' ' || last_name_normalized END",
+            persisted=True,
+        ),
+    ),
     # Hash de la clé d'identité, chemin de lookup indexé et NULL-safe (un `=` ne
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
@@ -583,15 +592,13 @@ author_identifying_keys = Table(
         "key_hash",
         Text,
         Computed(
-            r"md5(coalesce((author_name_normalized)::text, E'\x01') || E'\x1f' "
-            r"|| coalesce((last_name_normalized)::text, E'\x01') || E'\x1f' "
+            r"md5(coalesce((last_name_normalized)::text, E'\x01') || E'\x1f' "
             r"|| coalesce((first_name_normalized)::text, E'\x01') || E'\x1f' "
             r"|| coalesce((person_identifiers)::text, E'\x01'))",
             persisted=True,
         ),
     ),
     UniqueConstraint(
-        "author_name_normalized",
         "last_name_normalized",
         "first_name_normalized",
         "person_identifiers",

@@ -17,7 +17,7 @@ from domain.types import JsonValue
 class SignatureNameFields(TypedDict):
     """Colonnes de nom d'une signature (`signature_name_fields`).
 
-    Sur `source_authorships`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`author_identifying_keys`), le découpage retenu normalisé, et la forme normalisée « prénom nom » (`author_name_normalized`).
+    Sur `source_authorships`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`author_identifying_keys`), le découpage retenu normalisé.
     """
 
     raw_author_name: str | None
@@ -25,7 +25,6 @@ class SignatureNameFields(TypedDict):
     raw_first_name: str | None
     last_name_normalized: str
     first_name_normalized: str | None
-    author_name_normalized: str
 
 
 class SourceAuthorshipItem(SignatureNameFields):
