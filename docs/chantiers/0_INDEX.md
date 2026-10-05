@@ -14,6 +14,7 @@
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
+- [Nom et prénom scindés dès la normalisation](DATA_noms-prenoms-scindes.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
