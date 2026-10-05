@@ -121,16 +121,16 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
 )
 
 
-# Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids`
-# (identifiants d'organisation côté sources externes). Crossref absent :
-# pas de notion d'identifiant structure côté Crossref. Sert de whitelist
-# stricte au modèle JSONB `StructureApiIds` côté infra.
+# Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids` : identifiants
+# d'organisation côté sources externes, ou chaînes d'affiliation interrogées en texte (WoS,
+# mots-clés DataCite). Sert de whitelist stricte au modèle JSONB `StructureApiIds` côté infra.
 STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
     Source.WOS,
     Source.SCANR,
     Source.THESES,
     Source.HAL,
+    Source.DATACITE,
 )
 STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
 
