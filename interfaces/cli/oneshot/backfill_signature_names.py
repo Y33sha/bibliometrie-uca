@@ -24,6 +24,7 @@ import os
 import time
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
+from functools import lru_cache
 from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
@@ -60,7 +61,11 @@ from infrastructure.raw_store.factory import get_raw_store
 log = setup_logger("backfill_signature_names", os.path.dirname(__file__))
 
 _SOURCES = ("crossref", "datacite", "wos", "hal", "theses", "openalex", "scanr")
-_BATCH_NOTICES = 500
+# Lignes lues par aller-retour du flux, et signatures écrites par paquet.
+_STREAM_ROWS = 20_000
+_WRITE_ROWS = 20_000
+# Noms distincts gardés en cache.
+_NAME_CACHE = 2_000_000
 
 _PayloadNames = Callable[
     [Mapping[str, JsonValue], str | None], list[tuple[int | None, SignatureName]]
@@ -101,6 +106,8 @@ class _RepointItem(SignatureNameFields):
 class _StoredSignature(NamedTuple):
     id: int
     source_publication_id: int
+    source_id: str
+    doi: str | None
     author_position: int | None
     raw_author_name: str | None
     raw_last_name: str | None
@@ -108,6 +115,13 @@ class _StoredSignature(NamedTuple):
     person_identifiers: JsonValue
 
 
+@lru_cache(maxsize=_NAME_CACHE)
+def _name_fields(name: SignatureName) -> SignatureNameFields:
+    """`signature_name_fields`, mis en cache : un même nom revient d'une notice à l'autre."""
+    return signature_name_fields(name)
+
+
+@lru_cache(maxsize=_NAME_CACHE)
 def _words(name: SignatureName) -> frozenset[str]:
     return frozenset(normalize_name_form(clean_raw_author_name(name.display())).split())
 
@@ -130,23 +144,34 @@ def _match(
     return same[0][1] if len(same) == 1 else None
 
 
-def _notice_batches(conn: Connection, source: str) -> Iterator[list[_Notice]]:
-    last_id = 0
-    while True:
-        rows = conn.execute(
-            text("""
-                SELECT sp.id, sp.source_id, sp.doi FROM source_publications sp
-                WHERE sp.source = :source AND sp.id > :last
-                  AND EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.source_publication_id = sp.id)
-                ORDER BY sp.id LIMIT :lim
-            """),
-            {"source": source, "last": last_id, "lim": _BATCH_NOTICES},
-        ).all()
-        notices = [_Notice(*r) for r in rows]
-        if not notices:
-            return
-        yield notices
-        last_id = notices[-1].id
+def _notices(conn: Connection, source: str) -> Iterator[tuple[_Notice, list[_StoredSignature]]]:
+    """Signatures de la source, notice par notice, lues en un seul flux trié par notice."""
+    rows = conn.execute(
+        text("""
+            SELECT sa.id, sa.source_publication_id, sp.source_id, sp.doi, sa.author_position,
+                   sa.raw_author_name, sa.raw_last_name, sa.raw_first_name, aik.person_identifiers
+            FROM source_authorships sa
+            JOIN source_publications sp ON sp.id = sa.source_publication_id
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+            WHERE sa.source = :source
+            ORDER BY sa.source_publication_id
+        """),
+        {"source": source},
+        execution_options={"stream_results": True, "yield_per": _STREAM_ROWS},
+    )
+    signatures: list[_StoredSignature] = []
+    for row in rows:
+        signature = _StoredSignature(*row)
+        if signatures and signature.source_publication_id != signatures[0].source_publication_id:
+            yield _notice_of(signatures[0]), signatures
+            signatures = []
+        signatures.append(signature)
+    if signatures:
+        yield _notice_of(signatures[0]), signatures
+
+
+def _notice_of(signature: _StoredSignature) -> _Notice:
+    return _Notice(signature.source_publication_id, signature.source_id, signature.doi)
 
 
 def _payload_authors(
@@ -198,8 +223,14 @@ _REPOINT_SQL = text(
 ).bindparams(bindparam("payload", type_=Jsonb))
 
 
+def _write(conn: Connection, items: list[_RepointItem]) -> None:
+    conn.execute(_UPSERT_IDENTITIES_SQL, {"payload": items})
+    conn.execute(_REPOINT_SQL, {"payload": items})
+
+
 def backfill_source(
-    conn: Connection,
+    read_conn: Connection,
+    write_conn: Connection,
     raw_store: RawStore,
     source: str,
     *,
@@ -208,16 +239,17 @@ def backfill_source(
 ) -> Counter[str]:
     """Rattache les signatures d'une source à leur identité découpée. Retourne les comptes.
 
-    `commit` valide chaque lot de notices écrit.
+    `read_conn` porte le flux de lecture des signatures, `write_conn` les écritures. `commit` valide chaque paquet écrit.
     """
     stats: Counter[str] = Counter()
-    total: int = conn.execute(
+    total: int = read_conn.execute(
         text("SELECT count(*) FROM source_publications WHERE source = :source"),
         {"source": source},
     ).scalar_one()
     log.info("%s : %d notices", source, total)
     next_milestone = time.monotonic() + JALON_INTERVALLE_S
-    for notices in _notice_batches(conn, source):
+    pending: list[_RepointItem] = []
+    for notice, signatures in _notices(read_conn, source):
         if time.monotonic() >= next_milestone:
             next_milestone = time.monotonic() + JALON_INTERVALLE_S
             log.info(
@@ -227,36 +259,27 @@ def backfill_source(
                 total,
                 stats["signatures"],
             )
-        stats["notices"] += len(notices)
-        authors = {n.id: _payload_authors(raw_store, source, n, stats) for n in notices}
-        rows = conn.execute(
-            text("""
-                SELECT sa.id, sa.source_publication_id, sa.author_position, sa.raw_author_name,
-                       sa.raw_last_name, sa.raw_first_name, aik.person_identifiers
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                WHERE sa.source_publication_id = ANY(:ids)
-            """),
-            {"ids": list(authors)},
-        ).all()
-        signatures = [_StoredSignature(*r) for r in rows]
-        payload: list[_RepointItem] = []
+        stats["notices"] += 1
+        authors = _payload_authors(raw_store, source, notice, stats)
         for s in signatures:
             stored = _stored_name(s)
-            name = _match(stored, s.author_position, authors[s.source_publication_id])
+            name = _match(stored, s.author_position, authors)
             stats["signatures"] += 1
             stats["nom de la source relu" if name is not None else "chaîne stockée découpée"] += 1
-            payload.append(
+            pending.append(
                 {
                     "sa_id": s.id,
-                    **signature_name_fields(name if name is not None else stored),
+                    **_name_fields(name if name is not None else stored),
                     "person_identifiers": s.person_identifiers,
                 }
             )
-        if apply and payload:
-            conn.execute(_UPSERT_IDENTITIES_SQL, {"payload": payload})
-            conn.execute(_REPOINT_SQL, {"payload": payload})
+        if apply and len(pending) >= _WRITE_ROWS:
+            _write(write_conn, pending)
             commit()
+            pending = []
+    if apply and pending:
+        _write(write_conn, pending)
+        commit()
     log.info("%s : %s", source, dict(stats))
     return stats
 
@@ -274,12 +297,15 @@ def main() -> int:
 
     engine = get_sync_engine()
     raw_store = get_raw_store()
-    with engine.connect() as conn:
+    with engine.connect() as read_conn, engine.connect() as write_conn:
         for source in [args.source] if args.source else _SOURCES:
-            backfill_source(conn, raw_store, source, apply=apply, commit=conn.commit)
+            backfill_source(
+                read_conn, write_conn, raw_store, source, apply=apply, commit=write_conn.commit
+            )
+            read_conn.rollback()
         if apply:
-            log.info("identités orphelines purgées : %d", delete_orphan_identities(conn))
-            conn.commit()
+            log.info("identités orphelines purgées : %d", delete_orphan_identities(write_conn))
+            write_conn.commit()
             log.info("✓ backfill appliqué")
     return 0
 
