@@ -57,6 +57,43 @@ class TestSplit:
         assert SignatureName(raw="Alison da Silva").split() == ("da Silva", "Alison")
 
 
+class TestFromColumns:
+    def test_nom_et_prenom(self):
+        assert SignatureName.from_columns(None, "Dupont", "Marie") == SignatureName(
+            last_name="Dupont", first_name="Marie"
+        )
+
+    def test_chaine_brute(self):
+        assert SignatureName.from_columns("Marie Dupont", None, None) == SignatureName(
+            raw="Marie Dupont"
+        )
+
+
+class TestSplits:
+    def test_chaine_brute_tous_les_decoupages(self):
+        assert SignatureName(raw="Florence Caldefie Chezet").splits() == [
+            ("Caldefie Chezet", "Florence"),
+            ("Chezet", "Florence Caldefie"),
+        ]
+
+    def test_noms_separes_un_seul_decoupage(self):
+        name = SignatureName(last_name="Caldefie Chezet", first_name="Florence")
+        assert name.splits() == [("Caldefie Chezet", "Florence")]
+
+
+class TestFirstNameFor:
+    def test_chaine_brute(self):
+        name = SignatureName(raw="Florence Caldefie Chezet")
+        assert name.first_name_for("Caldefie-Chezet") == "Florence"
+        assert name.first_name_for("Chezet") == "Florence Caldefie"
+        assert name.first_name_for("Martin") is None
+
+    def test_noms_separes(self):
+        name = SignatureName(last_name="Caldefie Chezet", first_name="Florence")
+        assert name.first_name_for("Caldefie-Chezet") == "Florence"
+        assert name.first_name_for("Chezet") is None
+
+
 class TestNormalized:
     def test_nom_et_prenom_normalises(self):
         name = SignatureName(last_name="Guérin", first_name="Jean-Pierre")

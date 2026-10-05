@@ -65,7 +65,7 @@ from domain.persons.matching import (
     decide_person_match,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.name_matching import first_name_for, first_name_initials, initials_extend
+from domain.persons.name_matching import first_name_initials, initials_extend
 
 # ---------------------------------------------------------------------------
 # Passe de cascade
@@ -158,7 +158,7 @@ class _Cascade:
         """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
         norm = a.author_name_normalized
         person_ids = self._name_form_map.get(norm) if norm else None
-        compatible = compatible_persons(a.full_name, self._namesakes) if person_ids is None else []
+        compatible = compatible_persons(a.name, self._namesakes) if person_ids is None else []
         return decide_name_form_outcome(
             person_ids,
             a.allow_create,
@@ -177,10 +177,10 @@ class _Cascade:
         idref = a.identifiers.get(PersonIdentifierType.IDREF)
         hal_person_id = a.identifiers.get(PersonIdentifierType.HAL_PERSON_ID)
         idref_decision = decide_match_by_identifier(
-            idref, self._idref_map, a.full_name, form, self._name_form_status
+            idref, self._idref_map, a.name, form, self._name_form_status
         )
         hal_decision = decide_match_by_identifier(
-            hal_person_id, self._hal_account_map, a.full_name, form, self._name_form_status
+            hal_person_id, self._hal_account_map, a.name, form, self._name_form_status
         )
         # ORCID comme signal seulement depuis les sources à dépôt auteur (`ORCID_MATCH_SOURCES`) ; les autres restent enregistrés sur person_identifiers via add_identifiers.
         orcid_signal = (
@@ -189,7 +189,7 @@ class _Cascade:
             else None
         )
         orcid_decision = decide_match_by_identifier(
-            orcid_signal, self._orcid_map, a.full_name, form, self._name_form_status
+            orcid_signal, self._orcid_map, a.name, form, self._name_form_status
         )
         for id_type, id_value, id_decision in (
             ("orcid", orcid_signal, orcid_decision),
@@ -248,7 +248,7 @@ class _Cascade:
             repo=self._authorship_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
-        add_name_form(pid, a.full_name, repo=self._person_repo)
+        add_name_form(pid, a.name.display(), repo=self._person_repo)
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
         add_identifiers(pid, [a.identifiers], repo=self._person_repo)
         self._complete_first_name(pid, a)
@@ -266,14 +266,14 @@ class _Cascade:
         if a.current_person_id is not None:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.authorship_id)
-        last = a.last_name or a.full_name
+        last = a.last_name or a.name.display()
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
         link_authorship(
             marker, a.source, a.authorship_id, repo=self._authorship_repo, resolution_mode="name"
         )
         add_identifiers(marker, [a.identifiers], repo=self._person_repo)
-        add_name_form(marker, a.full_name, repo=self._person_repo)
+        add_name_form(marker, a.name.display(), repo=self._person_repo)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
         if a.publication_id is not None:
@@ -304,7 +304,7 @@ class _Cascade:
         if namesake is None or namesake.conflicting:
             return
         initials = first_name_initials(namesake.first_name)
-        first_name = first_name_for(a.full_name, namesake.last_name)
+        first_name = a.name.first_name_for(namesake.last_name)
         if (
             initials is None
             or first_name is None

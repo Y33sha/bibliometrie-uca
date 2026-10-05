@@ -28,6 +28,7 @@ from domain.persons.matching import (
     ResolutionMode,
 )
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.persons.signature_name import SignatureName
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.sql_fragments import identifier_neutralized, usable_identifier
 
@@ -48,7 +49,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
     return BareUnlinkedAuthorship(
         authorship_id=r.authorship_id,
         source=r.source,
-        full_name=r.full_name,
+        name=SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
         author_name_normalized=r.author_name_normalized,
         identifiers=r.identifiers,
         roles=r.roles,
@@ -66,7 +67,9 @@ _IDENTIFIERS_OBJECT = ", ".join(f"'{t.value}', {_usable(t.value)}" for t in Pers
 _BARE_PROJECTION_HEAD = f"""
     sa_auth.id AS authorship_id,
     sa_auth.source::text AS source,
-    sa_auth.raw_author_name AS full_name,
+    sa_auth.raw_author_name,
+    sa_auth.raw_last_name,
+    sa_auth.raw_first_name,
     aik.author_name_normalized,
     jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
     sa_auth.roles,
@@ -78,12 +81,11 @@ _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     NULL::integer AS current_person_id"""
 
 # Conditions communes à toutes les branches : SA orpheline hors-périmètre,
-# rattachée à une publication active (les hors périmètre ne sont pas matérialisées), avec un nom.
+# rattachée à une publication active (les hors périmètre ne sont pas matérialisées).
 _OOP_COMMON_WHERE = """
     sa_auth.person_id IS NULL
     AND sa_auth.in_perimeter = FALSE
     AND sd.publication_id IS NOT NULL
-    AND sa_auth.raw_author_name IS NOT NULL
 """
 
 
@@ -152,8 +154,6 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
         - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` et `idhal` ne sont portés que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
         - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
-
-        Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`. Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
         """
         rows = conn.execute(
             text(f"""
@@ -167,7 +167,6 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                 WHERE sa_auth.person_id IS NULL
                   AND sa_auth.in_perimeter = TRUE
                   AND sd.publication_id IS NOT NULL
-                  AND sa_auth.raw_author_name IS NOT NULL
                 ORDER BY sa_auth.id
             """)
         ).all()
@@ -184,12 +183,12 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         return [_to_bare(r) for r in rows]
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
-        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Ramène `raw_author_name` ; le caller parse via `parse_raw_author_name` uniformément."""
+        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre."""
         rows = conn.execute(
             text(f"""
                 SELECT sa_auth.person_id, sa_auth.author_position,
                        sd.publication_id,
-                       sa_auth.raw_author_name AS full_name,
+                       sa_auth.raw_author_name, sa_auth.raw_last_name, sa_auth.raw_first_name,
                        sa_auth.source::text AS source
                 FROM source_authorships sa_auth
                 JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
@@ -203,7 +202,9 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                 person_id=r.person_id,
                 author_position=r.author_position,
                 publication_id=r.publication_id,
-                full_name=r.full_name,
+                name=SignatureName.from_columns(
+                    r.raw_author_name, r.raw_last_name, r.raw_first_name
+                ),
                 source=r.source,
             )
             for r in rows
@@ -221,7 +222,6 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                 JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
                 WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
                   AND sd.publication_id IS NOT NULL
-                  AND sa_auth.raw_author_name IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa_auth.id
                   )
@@ -306,20 +306,22 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
     def fetch_linked_signature_names(
         self, conn: Connection, person_ids: list[int]
-    ) -> dict[int, list[str]]:
+    ) -> dict[int, list[SignatureName]]:
         if not person_ids:
             return {}
         rows = conn.execute(
             text("""
-                SELECT person_id, raw_author_name
+                SELECT person_id, raw_author_name, raw_last_name, raw_first_name
                 FROM source_authorships
-                WHERE person_id = ANY(:ids) AND raw_author_name IS NOT NULL
+                WHERE person_id = ANY(:ids)
             """),
             {"ids": person_ids},
         ).all()
-        names: dict[int, list[str]] = {}
+        names: dict[int, list[SignatureName]] = {}
         for r in rows:
-            names.setdefault(r.person_id, []).append(r.raw_author_name)
+            names.setdefault(r.person_id, []).append(
+                SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name)
+            )
         return names
 
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:

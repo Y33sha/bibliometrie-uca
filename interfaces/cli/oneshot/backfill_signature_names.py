@@ -127,10 +127,7 @@ def _words(name: SignatureName) -> frozenset[str]:
 
 
 def _stored_name(row: _StoredSignature) -> SignatureName:
-    """Nom stocké d'une signature : nom et prénom de la source s'ils sont déjà écrits, sinon la chaîne brute."""
-    if row.raw_last_name is not None:
-        return SignatureName(last_name=row.raw_last_name, first_name=row.raw_first_name)
-    return SignatureName(raw=row.raw_author_name)
+    return SignatureName.from_columns(row.raw_author_name, row.raw_last_name, row.raw_first_name)
 
 
 def _match(

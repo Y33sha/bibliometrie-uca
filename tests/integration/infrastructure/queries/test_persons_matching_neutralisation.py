@@ -76,7 +76,7 @@ def _carte(conn, signature_id):
 
 def _orcid_projete(conn):
     rows = PgPersonsMatchingQueries().fetch_unlinked_authorships(conn)
-    [row] = [r for r in rows if r.full_name == "Jean Neutralisation"]
+    [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
     return row.identifiers.get("orcid")
 
 

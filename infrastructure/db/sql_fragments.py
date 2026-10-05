@@ -37,6 +37,14 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
     )
 
 
+def signature_display_name(signature: str = "sa") -> str:
+    """Nom de la signature aliasée `signature` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`SignatureName.display`)."""
+    return (
+        f"coalesce({signature}.raw_author_name,"
+        f" concat_ws(' ', {signature}.raw_first_name, {signature}.raw_last_name))"
+    )
+
+
 def name_form_holder(form: str, person: str) -> str:
     """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non exclue."""
     return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND {person}.exclusion IS NULL"

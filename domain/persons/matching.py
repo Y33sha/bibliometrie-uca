@@ -8,13 +8,11 @@ from typing import Literal, NamedTuple
 
 from domain.normalize import normalize_name
 from domain.persons.name_matching import (
-    family_name_splits,
-    first_name_for,
     first_name_initials,
     initials_extend,
     names_compatible,
-    parse_raw_author_name,
 )
+from domain.persons.signature_name import SignatureName
 
 
 class IdentifiedPerson(NamedTuple):
@@ -112,14 +110,14 @@ def compatible_namesakes(signature_first_name: str, namesakes: Sequence[Namesake
 
 
 def compatible_persons(
-    signature: str, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
+    signature: SignatureName, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
 ) -> list[int]:
-    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`family_name_splits`).
+    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`SignatureName.splits`).
 
     `namesakes_by_last_name` indexe les personnes par nom de famille normalisé. Chaque personne figure une fois, dans l'ordre de découverte.
     """
     found: list[int] = []
-    for last, first in family_name_splits(signature):
+    for last, first in signature.splits():
         namesakes = namesakes_by_last_name.get(normalize_name(last), ())
         for person_id in compatible_namesakes(first, namesakes):
             if person_id not in found:
@@ -128,15 +126,15 @@ def compatible_persons(
 
 
 def attested_full_first_names(
-    last_name: str, initials: tuple[str, ...], signature_names: Iterable[str]
+    last_name: str, initials: tuple[str, ...], signature_names: Iterable[SignatureName]
 ) -> dict[str, str]:
     """Prénoms pleins que des signatures donnent à une personne au prénom réduit, indexés par leur forme normalisée.
 
-    Retient les signatures dont un découpage donne le même nom de famille (`first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
+    Retient les signatures dont un découpage donne le même nom de famille (`SignatureName.first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
     """
     spellings: dict[str, Counter[str]] = {}
-    for raw in signature_names:
-        sig_first = first_name_for(raw, last_name)
+    for name in signature_names:
+        sig_first = name.first_name_for(last_name)
         if sig_first is None or first_name_initials(sig_first) is not None:
             continue
         if not initials_extend(initials, sig_first):
@@ -242,7 +240,7 @@ class IdentifierMatch:
 def decide_match_by_identifier(
     value: str | None,
     identifier_map: Mapping[str, IdentifiedPerson],
-    signature: str,
+    signature: SignatureName,
     signature_form: str | None,
     name_form_status: Mapping[tuple[str, int], str],
 ) -> IdentifierMatch:
@@ -272,7 +270,7 @@ def decide_match_by_identifier(
             rejection=(person_id, f"{target.first_name} {target.last_name}".strip())
         )
 
-    sig_last, sig_first = parse_raw_author_name(signature)
+    sig_last, sig_first = signature.split()
     if names_compatible(sig_last, sig_first, target.last_name, target.first_name):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))

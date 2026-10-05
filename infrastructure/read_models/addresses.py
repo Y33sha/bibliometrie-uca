@@ -17,6 +17,7 @@ from application.ports.read_models.addresses_queries import (
     StructureLinkState,
 )
 from domain.types import JsonValue
+from infrastructure.db.sql_fragments import signature_display_name
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (
@@ -192,12 +193,12 @@ class PgAddressesQueries(AddressesQueries):
 
     def get_address_publications(self, addr_id: int, limit: int) -> list[AddressPublicationItem]:
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT DISTINCT ON (p.id)
                     p.id, p.title, p.pub_year, p.doi,
                     p.doc_type::text AS doc_type,
                     j.title AS journal_title,
-                    sa.raw_author_name AS author_name,
+                    {signature_display_name()} AS author_name,
                     sd.source_id
                 FROM source_authorship_addresses saa
                 JOIN source_authorships sa ON sa.id = saa.source_authorship_id
