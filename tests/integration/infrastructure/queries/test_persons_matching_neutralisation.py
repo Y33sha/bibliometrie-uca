@@ -77,7 +77,7 @@ def _carte(conn, signature_id):
 def _orcid_projete(conn):
     rows = PgPersonsMatchingQueries().fetch_unlinked_authorships(conn)
     [row] = [r for r in rows if r.full_name == "Jean Neutralisation"]
-    return row.orcid
+    return row.identifiers.get("orcid")
 
 
 def test_orcid_neutralise_absent_de_la_projection(sa_sync_conn):
