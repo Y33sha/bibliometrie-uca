@@ -53,8 +53,8 @@ def _signature_state(conn, sa_id: int):
     ).one()
 
 
-def _backfill(conn, source: str, store: _RawStore) -> None:
-    backfill_source(conn, store, source, apply=True, commit=lambda: None)
+def _backfill(conn, source: str, store: _RawStore):
+    return backfill_source(conn, conn, store, source, apply=True, commit=lambda: None)
 
 
 def test_nom_de_la_source_relu_dans_le_payload(sa_sync_conn):
@@ -114,7 +114,7 @@ def test_chaine_brute_decoupee_par_le_parseur(sa_sync_conn):
 
 def test_payload_absent_chaine_stockee_decoupee(sa_sync_conn):
     _, sa = _signature(sa_sync_conn, "wos", "WOS:1", "Doe, Jane", None)
-    stats = backfill_source(sa_sync_conn, _RawStore({}), "wos", apply=True, commit=lambda: None)
+    stats = _backfill(sa_sync_conn, "wos", _RawStore({}))
 
     assert stats["notices sans payload"] == 1
     assert tuple(_signature_state(sa_sync_conn, sa))[:5] == ("Doe, Jane", None, None, "doe", "jane")
