@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
 from typing import NamedTuple
@@ -39,6 +40,7 @@ from application.pipeline.normalize.normalize_wos import (
     extract_from_api,
     extract_wos_author_block,
 )
+from application.pipeline.progression import JALON_INTERVALLE_S
 from application.ports.pipeline.normalize.authorships import SignatureNameFields
 from domain.normalize import clean_raw_author_name, normalize_name_form
 from domain.persons.signature_name import SignatureName
@@ -59,7 +61,6 @@ log = setup_logger("backfill_signature_names", os.path.dirname(__file__))
 
 _SOURCES = ("crossref", "datacite", "wos", "hal", "theses", "openalex", "scanr")
 _BATCH_NOTICES = 500
-_BATCHES_PER_MILESTONE = 10
 
 _PayloadNames = Callable[
     [Mapping[str, JsonValue], str | None], list[tuple[int | None, SignatureName]]
@@ -215,8 +216,10 @@ def backfill_source(
         {"source": source},
     ).scalar_one()
     log.info("%s : %d notices", source, total)
-    for batch, notices in enumerate(_notice_batches(conn, source), start=1):
-        if batch % _BATCHES_PER_MILESTONE == 0:
+    next_milestone = time.monotonic() + JALON_INTERVALLE_S
+    for notices in _notice_batches(conn, source):
+        if time.monotonic() >= next_milestone:
+            next_milestone = time.monotonic() + JALON_INTERVALLE_S
             log.info(
                 "%s : %d notices sur %d, %d signatures",
                 source,
