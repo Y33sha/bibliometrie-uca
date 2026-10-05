@@ -59,6 +59,7 @@ log = setup_logger("backfill_signature_names", os.path.dirname(__file__))
 
 _SOURCES = ("crossref", "datacite", "wos", "hal", "theses", "openalex", "scanr")
 _BATCH_NOTICES = 500
+_BATCHES_PER_MILESTONE = 10
 
 _PayloadNames = Callable[
     [Mapping[str, JsonValue], str | None], list[tuple[int | None, SignatureName]]
@@ -209,7 +210,21 @@ def backfill_source(
     `commit` valide chaque lot de notices écrit.
     """
     stats: Counter[str] = Counter()
-    for notices in _notice_batches(conn, source):
+    total: int = conn.execute(
+        text("SELECT count(*) FROM source_publications WHERE source = :source"),
+        {"source": source},
+    ).scalar_one()
+    log.info("%s : %d notices", source, total)
+    for batch, notices in enumerate(_notice_batches(conn, source), start=1):
+        if batch % _BATCHES_PER_MILESTONE == 0:
+            log.info(
+                "%s : %d notices sur %d, %d signatures",
+                source,
+                stats["notices"],
+                total,
+                stats["signatures"],
+            )
+        stats["notices"] += len(notices)
         authors = {n.id: _payload_authors(raw_store, source, n, stats) for n in notices}
         rows = conn.execute(
             text("""
