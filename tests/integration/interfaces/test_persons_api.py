@@ -36,13 +36,14 @@ def _upsert_identity(cur, raw_author_name: str) -> int:
     """Upsert de l'identité (nom normalisé `lower(raw)`, sans identifiants) et
     renvoi de son id, sur le curseur psycopg du seed."""
     cur.execute(
-        "INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers) "
+        "INSERT INTO author_identifying_keys (last_name_normalized, person_identifiers) "
         "VALUES (lower(%s), NULL) ON CONFLICT DO NOTHING",
         (raw_author_name,),
     )
     cur.execute(
         "SELECT id FROM author_identifying_keys "
-        "WHERE author_name_normalized IS NOT DISTINCT FROM lower(%s) AND person_identifiers IS NULL",
+        "WHERE last_name_normalized = lower(%s) AND first_name_normalized IS NULL"
+        "  AND person_identifiers IS NULL",
         (raw_author_name,),
     )
     return cur.fetchone()["id"]

@@ -61,8 +61,8 @@ def _source_publication(
 def _signature(conn, source_publication_id: int) -> None:
     identity_id = conn.execute(
         text("""
-            INSERT INTO author_identifying_keys (author_name_normalized)
-            VALUES ('dupont jean') RETURNING id
+            INSERT INTO author_identifying_keys (last_name_normalized, first_name_normalized)
+            VALUES ('dupont', 'jean') RETURNING id
         """)
     ).scalar_one()
     conn.execute(

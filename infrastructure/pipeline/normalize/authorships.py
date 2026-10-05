@@ -30,12 +30,7 @@ _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
 # Colonnes de la clé d'identité d'`author_identifying_keys`, dans l'ordre du `key_hash`.
-IDENTITY_KEY_COLUMNS = (
-    "author_name_normalized",
-    "last_name_normalized",
-    "first_name_normalized",
-    "person_identifiers",
-)
+IDENTITY_KEY_COLUMNS = ("last_name_normalized", "first_name_normalized", "person_identifiers")
 
 
 def key_hash_sql(exprs: Sequence[str]) -> str:
@@ -51,8 +46,7 @@ _KEY_COLUMNS_SQL = ", ".join(IDENTITY_KEY_COLUMNS)
 
 _UPSERT_IDENTITY_SQL = text(f"""
     INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
-    VALUES (:author_name_normalized, :last_name_normalized, :first_name_normalized,
-            :person_identifiers)
+    VALUES (:last_name_normalized, :first_name_normalized, :person_identifiers)
     ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
 """).bindparams(bindparam("person_identifiers", type_=Jsonb))
 
@@ -119,7 +113,6 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
         payload = [
             {
                 "author_position": v["author_position"],
-                "author_name_normalized": v["author_name_normalized"],
                 "last_name_normalized": v["last_name_normalized"],
                 "first_name_normalized": v["first_name_normalized"],
                 "is_corresponding": v["is_corresponding"],
@@ -137,11 +130,11 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
         conn.execute(
             text(f"""
                 INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
-                SELECT DISTINCT t.author_name_normalized, t.last_name_normalized,
-                       t.first_name_normalized, t.person_identifiers
+                SELECT DISTINCT t.last_name_normalized, t.first_name_normalized,
+                       t.person_identifiers
                 FROM jsonb_to_recordset(:payload) AS t(
-                    author_name_normalized text, last_name_normalized text,
-                    first_name_normalized text, person_identifiers jsonb)
+                    last_name_normalized text, first_name_normalized text,
+                    person_identifiers jsonb)
                 ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
@@ -159,8 +152,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                    t.is_corresponding, t.roles, t.raw_author_name, t.raw_last_name,
                    t.raw_first_name, aik.id, t.neutralized_identifiers, t.content_hash
             FROM jsonb_to_recordset(:payload) AS t(
-                author_position smallint, author_name_normalized text,
-                last_name_normalized text, first_name_normalized text,
+                author_position smallint, last_name_normalized text, first_name_normalized text,
                 is_corresponding boolean, roles text[],
                 raw_author_name text, raw_last_name text, raw_first_name text,
                 person_identifiers jsonb, neutralized_identifiers jsonb, content_hash text)

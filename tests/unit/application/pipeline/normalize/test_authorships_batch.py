@@ -47,7 +47,6 @@ class TestSignatureNameFields:
             "raw_first_name": "Katia",
             "last_name_normalized": "guerin",
             "first_name_normalized": "katia",
-            "author_name_normalized": "katia guerin",
         }
 
     def test_chaine_brute_decoupee_par_le_parseur(self):
@@ -57,12 +56,8 @@ class TestSignatureNameFields:
             "raw_first_name": None,
             "last_name_normalized": "dupont",
             "first_name_normalized": "marie",
-            "author_name_normalized": "marie dupont",
         }
 
     def test_sans_prenom(self):
         fields = signature_name_fields(SignatureName(last_name="Dupont"))
-        assert (fields["first_name_normalized"], fields["author_name_normalized"]) == (
-            None,
-            "dupont",
-        )
+        assert (fields["last_name_normalized"], fields["first_name_normalized"]) == ("dupont", None)
