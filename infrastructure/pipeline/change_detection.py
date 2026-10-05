@@ -7,12 +7,15 @@ from collections.abc import Callable, Mapping
 
 from domain.types import JsonValue
 from infrastructure.fingerprint import fingerprint
-from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
+from infrastructure.sources.datacite import hash_normalize as datacite_hash
+from infrastructure.sources.hal import hash_normalize as hal_hash
 
 # Neutralisation, par source, du bruit volatil avant calcul du hash de détection de changement. Une source absente n'est pas normalisée (hash sur le payload fidèle).
 # HAL : horodatage de génération enfoui dans le TEI `label_xml`.
+# DataCite : champs propres à la route de lecture, dates d'enregistrement et compteurs.
 _HASH_NORMALIZERS: dict[str, Callable[[Mapping[str, JsonValue]], Mapping[str, JsonValue]]] = {
-    "hal": strip_volatile_for_hash,
+    "hal": hal_hash.strip_volatile_for_hash,
+    "datacite": datacite_hash.strip_volatile_for_hash,
 }
 
 
