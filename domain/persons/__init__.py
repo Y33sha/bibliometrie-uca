@@ -5,6 +5,7 @@ Sous-modules :
 - `identifier_attribution` : aggregate `IdentifierAttribution` (identité naturelle `(id_type, id_value)`)
 - `identifiers` : VOs ORCID/IdHAL/IdRef + helpers de normalisation
 - `name_forms` : VO `PersonNameForm`
+- `signature_name` : VO `SignatureName`, nom d'auteur tel qu'une source le donne (nom et prénom, ou chaîne brute)
 - `name_matching` : compatibilité de noms entre signatures (`names_compatible`, `parse_raw_author_name`)
 - `matching` : cascade pure de matching authorship → personne (`decide_person_match`, `decide_cross_source_match`, `decide_name_form_outcome`)
 - `creation` : politique de création de personne depuis les sources (`allow_person_creation`)
