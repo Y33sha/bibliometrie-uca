@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from application.services.authorships.assign_orphans import assign_orphan_authorship
 from application.services.authorships.core import reject_pair
+from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -84,6 +85,32 @@ def test_detach_unpins(sa_sync_conn):
     reject_pair(pub, pid, repo=authorship_repository(sa_sync_conn))
     assert _pin(sa_sync_conn, sa) is None
     assert _sa_person(sa_sync_conn, sa) is None
+
+
+def test_name_form_rejection_spares_pinned_signatures(sa_sync_conn):
+    """Rejeter une forme de nom détache les signatures qui la portent, sauf celles que l'admin a épinglées sur la personne."""
+    pid = _person(sa_sync_conn, last="Durand", first="Paul")
+    pinned, _ = _orphan_sa(sa_sync_conn)
+    matched, _ = _orphan_sa(sa_sync_conn)
+    persons, authorships = person_repository(sa_sync_conn), authorship_repository(sa_sync_conn)
+    assign_orphan_authorship(pid, pinned, repo=persons, authorship_repo=authorships)
+    sa_sync_conn.execute(
+        text("UPDATE source_authorships SET person_id = :p WHERE id = :s"), {"p": pid, "s": matched}
+    )
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+            "VALUES ('jean martin', :p, ARRAY['hal'], 'pending') ON CONFLICT DO NOTHING"
+        ),
+        {"p": pid},
+    )
+
+    update_name_form_status(
+        pid, "jean martin", "rejected", repo=persons, authorship_repo=authorships
+    )
+
+    assert (_sa_person(sa_sync_conn, pinned), _pin(sa_sync_conn, pinned)) == (pid, pid)
+    assert _sa_person(sa_sync_conn, matched) is None
 
 
 def test_enforce_restores_pinned_signature(sa_sync_conn):
