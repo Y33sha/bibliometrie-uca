@@ -28,16 +28,8 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import (
     record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import get_polite_pool_email
+from infrastructure.sources.datacite.nodes import api_headers, record_doi
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.polite_pool import build_user_agent
-
-
-def _record_doi(record: Mapping[str, JsonValue]) -> str | None:
-    """DOI canonique d'un nœud JSON:API `data` : `attributes.doi`, sinon `id` (les deux portent le DOI). Passé par `clean_doi` (normalisation partagée). `None` si aucun des deux n'est présent ou exploitable."""
-    attributes = record.get("attributes")
-    doi_raw = as_str(as_mapping(attributes).get("doi")) or as_str(record.get("id")) or ""
-    return clean_doi(doi_raw)
 
 
 class DataciteFetchMissingDoiAdapter:
@@ -55,11 +47,7 @@ class DataciteFetchMissingDoiAdapter:
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["datacite"]
-        email = get_polite_pool_email()
-        self.headers = {
-            "User-Agent": build_user_agent(email),
-            "Accept": "application/vnd.api+json",
-        }
+        self.headers = api_headers()
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]
@@ -90,7 +78,7 @@ class DataciteFetchMissingDoiAdapter:
         # DOI demandés non retournés = confirmés absents de DataCite. insert() les inscrit dans failed_lookups.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for rec in records:
-            if doi := _record_doi(as_mapping(rec)):
+            if doi := record_doi(as_mapping(rec)):
                 found[doi] = as_mapping(rec)
         out: list[Mapping[str, JsonValue]] = list(found.values())
         out.extend(not_found_marker(d) for d in dois if clean_doi(d) not in found)
@@ -110,7 +98,7 @@ class DataciteFetchMissingDoiAdapter:
             return False
 
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.
-        doi = _record_doi(record)
+        doi = record_doi(record)
         if not doi:
             return False
         inserted, _ = upsert_staging(

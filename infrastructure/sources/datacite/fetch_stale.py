@@ -17,11 +17,9 @@ from application.ports.pipeline.extract.fetch_stale import (
 )
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import get_polite_pool_email
-from infrastructure.sources.datacite.fetch_missing_doi import _record_doi
+from infrastructure.sources.datacite.nodes import api_headers, record_doi
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.polite_pool import build_user_agent
 
 
 class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
@@ -35,11 +33,7 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["datacite"]
-        email = get_polite_pool_email()
-        self.headers = {
-            "User-Agent": build_user_agent(email),
-            "Accept": "application/vnd.api+json",
-        }
+        self.headers = api_headers()
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/dois/{urllib.parse.quote(source_id, safe='/()')}"
@@ -61,4 +55,4 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
         node = data.get("data")
         if not isinstance(node, dict):
             return None
-        return FetchedRecord(doi=_record_doi(node), raw_data=node)
+        return FetchedRecord(doi=record_doi(node), raw_data=node)
