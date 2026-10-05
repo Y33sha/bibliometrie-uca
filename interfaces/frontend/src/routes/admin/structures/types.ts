@@ -24,13 +24,14 @@ export interface EditFormState {
 
 // ── Constantes ──
 
-export const API_SOURCES = ["openalex", "wos", "scanr", "theses"] as const;
+export const API_SOURCES = ["openalex", "wos", "scanr", "theses", "datacite"] as const;
 
 export const API_SOURCE_LABELS: Record<string, string> = {
   openalex: "OpenAlex (institution lineage IDs)",
   wos: "WoS (Organization-Enhanced)",
   scanr: "ScanR (SIREN)",
   theses: "theses.fr (PPN IdRef)",
+  datacite: "DataCite (mots-clés d'affiliation)",
 };
 
 // Longueur (caractères) au-dessous de laquelle une forme de nom exige une frontière de mot. Alignée sur `domain.structures.name_forms.SHORT_FORM_MAX_LENGTH` (invariant verrouillé côté base par une contrainte CHECK).

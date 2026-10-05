@@ -22,8 +22,9 @@ class StructureApiIds(JsonbModel):
     scanr: list[str] | None = None
     theses: list[str] | None = None  # PPN IdRef des établissements
     hal: list[str] | None = None  # collections HAL
+    datacite: list[str] | None = None  # mots-clés cherchés dans les affiliations des créateurs
 
-    @field_validator("openalex", "wos", "scanr", "theses", "hal", mode="before")
+    @field_validator("openalex", "wos", "scanr", "theses", "hal", "datacite", mode="before")
     @classmethod
     def _ensure_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Tolère un string unique en entrée en le wrappant en liste. Le résultat est toujours `list[str]` (ou None)."""
