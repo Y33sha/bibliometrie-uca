@@ -29,8 +29,9 @@ def _sa_for_pub(conn, pub_id, source_id):
     ).scalar_one()
     return conn.execute(
         text(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, identity_id) "
-            "VALUES ('hal', :sd_id, 0, :iid) RETURNING id"
+            "INSERT INTO source_authorships"
+            " (source, source_publication_id, author_position, identity_id, raw_author_name) "
+            "VALUES ('hal', :sd_id, 0, :iid, 'X') RETURNING id"
         ),
         {"sd_id": sd_id, "iid": upsert_identity(conn)},
     ).scalar_one()
@@ -101,8 +102,9 @@ class TestRecomputePubCount:
         ).scalar_one()
         sa_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO source_authorships (source, source_publication_id, author_position, identity_id) "
-                "VALUES ('hal', :sd, 0, :iid) RETURNING id"
+                "INSERT INTO source_authorships"
+                " (source, source_publication_id, author_position, identity_id, raw_author_name) "
+                "VALUES ('hal', :sd, 0, :iid, 'X') RETURNING id"
             ),
             {"sd": sd_id, "iid": upsert_identity(sa_sync_conn)},
         ).scalar_one()

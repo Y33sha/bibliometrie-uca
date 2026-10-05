@@ -29,6 +29,7 @@ def upsert_identity(conn, author_name_normalized=None, person_identifiers=None) 
         text(
             "SELECT id FROM author_identifying_keys "
             "WHERE author_name_normalized IS NOT DISTINCT FROM :anf "
+            "  AND last_name_normalized IS NULL AND first_name_normalized IS NULL "
             "  AND person_identifiers IS NOT DISTINCT FROM CAST(:ids AS jsonb)"
         ),
         {"anf": author_name_normalized, "ids": ids_json},

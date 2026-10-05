@@ -7,6 +7,7 @@ Consommé par le writer partagé `write_source_authorships`. L'INSERT des `sourc
 """
 
 import hashlib
+from collections.abc import Sequence
 
 from sqlalchemy import Connection, bindparam, text
 
@@ -22,42 +23,50 @@ from application.ports.pipeline.normalize.authorships import (
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 
-# Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash`
-# (migration `author_identity_key_hash`) : `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les deux
-# champs — des octets de contrôle absents des vraies valeurs. Un test d'intégration garde
-# l'alignement avec la colonne générée.
+# Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash` :
+# `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les champs — des octets de contrôle absents des
+# vraies valeurs. Un test d'intégration garde l'alignement avec la colonne générée.
 _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
+# Colonnes de la clé d'identité d'`author_identifying_keys`, dans l'ordre du `key_hash`.
+IDENTITY_KEY_COLUMNS = (
+    "author_name_normalized",
+    "last_name_normalized",
+    "first_name_normalized",
+    "person_identifiers",
+)
 
-def key_hash_sql(name_expr: str, ids_expr: str) -> str:
-    """Expression SQL du `key_hash` d'une identité (md5 nom + identifiants), pour le lookup indexé.
 
-    `name_expr` / `ids_expr` : expressions SQL des deux champs (colonnes de table ou bind params).
+def key_hash_sql(exprs: Sequence[str]) -> str:
+    """Expression SQL du `key_hash` d'une identité, pour le lookup indexé.
+
+    `exprs` : expressions SQL des champs de la clé (colonnes de table ou bind params), dans l'ordre de `IDENTITY_KEY_COLUMNS`.
     """
-    return (
-        f"md5(coalesce({name_expr}, {_KEY_HASH_NULL}) || {_KEY_HASH_SEP}"
-        f" || coalesce(({ids_expr})::text, {_KEY_HASH_NULL}))"
-    )
+    parts = [f"coalesce(({e})::text, {_KEY_HASH_NULL})" for e in exprs]
+    return "md5(" + f" || {_KEY_HASH_SEP} || ".join(parts) + ")"
 
 
-_UPSERT_IDENTITY_SQL = text("""
-    INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
-    VALUES (:author_name_normalized, :person_identifiers)
-    ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+_KEY_COLUMNS_SQL = ", ".join(IDENTITY_KEY_COLUMNS)
+
+_UPSERT_IDENTITY_SQL = text(f"""
+    INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
+    VALUES (:author_name_normalized, :last_name_normalized, :first_name_normalized,
+            :person_identifiers)
+    ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
 """).bindparams(bindparam("person_identifiers", type_=Jsonb))
 
 _INSERT_AUTHORSHIP_SQL = text(
     """
     INSERT INTO source_authorships
         (source, source_publication_id, author_position,
-         is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers,
-         content_hash)
+         is_corresponding, roles, raw_author_name, raw_last_name, raw_first_name,
+         identity_id, neutralized_identifiers, content_hash)
     VALUES (:source, :source_publication_id, :author_position,
-            :is_corresponding, :roles, :raw_author_name,
+            :is_corresponding, :roles, :raw_author_name, :raw_last_name, :raw_first_name,
             (SELECT id FROM author_identifying_keys
              WHERE key_hash = """
-    + key_hash_sql(":author_name_normalized", ":person_identifiers")
+    + key_hash_sql([f":{c}" for c in IDENTITY_KEY_COLUMNS])
     + """),
             :neutralized_identifiers, :content_hash)
     RETURNING id
@@ -98,10 +107,10 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     def upsert_source_authorships_batch(
         self, conn: Connection, values: list[SourceAuthorshipItem]
     ) -> None:
-        """L'identité de l'auteur (`author_name_normalized`, `person_identifiers`) vit sur la table dédupliquée `author_identifying_keys` ; la signature porte seulement une FK `identity_id`. Deux requêtes dans la transaction du writer :
+        """L'identité de l'auteur (`IDENTITY_KEY_COLUMNS`) vit sur la table dédupliquée `author_identifying_keys` ; la signature porte seulement une FK `identity_id`. Deux requêtes dans la transaction du writer :
 
         1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les identités du document, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque identité récurrente à chaque document).
-        2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_publication_id`, invariants au sein d'un document, sont hoistés. Le nom normalisé est fourni pré-calculé (`author_name_normalized`, via `normalize_name_form` côté Python).
+        2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_publication_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`signature_name_fields`).
 
         Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `author_identifying_keys` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
         """
@@ -111,9 +120,13 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             {
                 "author_position": v["author_position"],
                 "author_name_normalized": v["author_name_normalized"],
+                "last_name_normalized": v["last_name_normalized"],
+                "first_name_normalized": v["first_name_normalized"],
                 "is_corresponding": v["is_corresponding"],
                 "roles": v["roles"],
                 "raw_author_name": v["raw_author_name"],
+                "raw_last_name": v["raw_last_name"],
+                "raw_first_name": v["raw_first_name"],
                 "person_identifiers": v["person_identifiers"],
                 "neutralized_identifiers": v["neutralized_identifiers"],
                 "content_hash": v["content_hash"],
@@ -122,12 +135,14 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
         ]
         # 1. Upsert des identités du lot (dédup par clé, sans churn).
         conn.execute(
-            text("""
-                INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
-                SELECT DISTINCT t.author_name_normalized, t.person_identifiers
+            text(f"""
+                INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
+                SELECT DISTINCT t.author_name_normalized, t.last_name_normalized,
+                       t.first_name_normalized, t.person_identifiers
                 FROM jsonb_to_recordset(:payload) AS t(
-                    author_name_normalized text, person_identifiers jsonb)
-                ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+                    author_name_normalized text, last_name_normalized text,
+                    first_name_normalized text, person_identifiers jsonb)
+                ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
@@ -138,19 +153,20 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             """
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 is_corresponding, roles, raw_author_name, identity_id, neutralized_identifiers,
-                 content_hash)
+                 is_corresponding, roles, raw_author_name, raw_last_name, raw_first_name,
+                 identity_id, neutralized_identifiers, content_hash)
             SELECT :source, :spid, t.author_position,
-                   t.is_corresponding, t.roles, t.raw_author_name, aik.id, t.neutralized_identifiers,
-                   t.content_hash
+                   t.is_corresponding, t.roles, t.raw_author_name, t.raw_last_name,
+                   t.raw_first_name, aik.id, t.neutralized_identifiers, t.content_hash
             FROM jsonb_to_recordset(:payload) AS t(
                 author_position smallint, author_name_normalized text,
+                last_name_normalized text, first_name_normalized text,
                 is_corresponding boolean, roles text[],
-                raw_author_name text, person_identifiers jsonb, neutralized_identifiers jsonb,
-                content_hash text)
+                raw_author_name text, raw_last_name text, raw_first_name text,
+                person_identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
             JOIN author_identifying_keys aik
               ON aik.key_hash = """
-            + key_hash_sql("t.author_name_normalized", "t.person_identifiers")
+            + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
         ).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(
             stmt,
@@ -166,8 +182,8 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     ) -> list[StoredSourceAuthorship]:
         rows = conn.execute(
             text("""
-                SELECT sa.id, sa.author_position, aik.author_name_normalized,
-                       aik.person_identifiers, sa.content_hash
+                SELECT sa.id, sa.author_position, aik.last_name_normalized,
+                       aik.first_name_normalized, aik.person_identifiers, sa.content_hash
                 FROM source_authorships sa
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sa.source_publication_id = :spid
@@ -193,6 +209,8 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 "is_corresponding": v["is_corresponding"],
                 "roles": v["roles"],
                 "raw_author_name": v["raw_author_name"],
+                "raw_last_name": v["raw_last_name"],
+                "raw_first_name": v["raw_first_name"],
                 "neutralized_identifiers": v["neutralized_identifiers"],
                 "content_hash": v["content_hash"],
             }
@@ -205,13 +223,15 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                     is_corresponding = t.is_corresponding,
                     roles = t.roles,
                     raw_author_name = t.raw_author_name,
+                    raw_last_name = t.raw_last_name,
+                    raw_first_name = t.raw_first_name,
                     neutralized_identifiers = t.neutralized_identifiers,
                     content_hash = t.content_hash,
                     countries_dirty = true
                 FROM jsonb_to_recordset(:payload) AS t(
                     id integer, author_position smallint, is_corresponding boolean,
-                    roles text[], raw_author_name text, neutralized_identifiers jsonb,
-                    content_hash text)
+                    roles text[], raw_author_name text, raw_last_name text,
+                    raw_first_name text, neutralized_identifiers jsonb, content_hash text)
                 WHERE sa.id = t.id
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},

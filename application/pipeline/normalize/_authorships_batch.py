@@ -18,15 +18,12 @@ from application.ports.pipeline.normalize.authorships import (
     AddressCountryItem,
     AuthorshipAddressItem,
     AuthorshipsBatchQueries,
+    SignatureNameFields,
     SourceAuthorshipItem,
 )
-from domain.normalize import (
-    clean_raw_author_name,
-    normalize_name_form,
-    normalize_text,
-    sanitize_raw_text,
-)
+from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.identifiers import shared_identifier_neutralizations
+from domain.persons.signature_name import SignatureName
 from domain.source_publications.signature_sync import (
     IncomingSignature,
     StoredSignature,
@@ -57,7 +54,7 @@ class AuthorRecord:
     """
 
     position: int
-    raw_name: str
+    name: SignatureName
     is_corresponding: bool = False
     roles: list[str] | None = None
     person_identifiers: dict[str, JsonValue] | None = None
@@ -119,23 +116,20 @@ def write_source_authorships(
     record_by_position: dict[int, AuthorRecord] = {}
     item_by_position: dict[int, SourceAuthorshipItem] = {}
     for rec, neutralized in zip(records, neutralizations, strict=True):
-        # Nom nettoyé une fois : sert de nom brut stocké et de base au nom normalisé (clé d'identité), pour qu'aucun parasite ne franchisse le writer.
-        clean_name = clean_raw_author_name(rec.raw_name)
         record_by_position[rec.position] = rec
         item_by_position[rec.position] = {
             "source": source,
             "source_publication_id": source_publication_id,
             "author_position": rec.position,
-            "author_name_normalized": normalize_name_form(clean_name),
+            **signature_name_fields(rec.name),
             "is_corresponding": rec.is_corresponding,
             "roles": rec.roles,
-            "raw_author_name": clean_name,
             "person_identifiers": rec.person_identifiers,
             "neutralized_identifiers": neutralized,
             "content_hash": fingerprint(
                 signature_content(
                     position=rec.position,
-                    raw_author_name=clean_name,
+                    name=(rec.name.raw, rec.name.last_name, rec.name.first_name),
                     is_corresponding=rec.is_corresponding,
                     roles=rec.roles,
                     neutralized_identifiers=neutralized,
@@ -153,7 +147,7 @@ def write_source_authorships(
             StoredSignature(
                 s.id,
                 s.author_position,
-                _identity(s.author_name_normalized, s.person_identifiers),
+                _identity(s.last_name_normalized, s.first_name_normalized, s.person_identifiers),
                 s.content_hash,
             )
             for s in stored
@@ -161,7 +155,11 @@ def write_source_authorships(
         [
             IncomingSignature(
                 position,
-                _identity(item["author_name_normalized"], item["person_identifiers"]),
+                _identity(
+                    item["last_name_normalized"],
+                    item["first_name_normalized"],
+                    item["person_identifiers"],
+                ),
                 item["content_hash"] or "",
             )
             for position, item in item_by_position.items()
@@ -195,10 +193,25 @@ def write_source_authorships(
     )
 
 
-def _identity(name_normalized: str | None, person_identifiers: object) -> Hashable:
-    """Clé d'identité d'une signature : nom normalisé et identifiants, comme `author_identifying_keys`."""
+def signature_name_fields(name: SignatureName) -> SignatureNameFields:
+    """Colonnes de nom d'une signature : nom fourni par la source, découpage retenu normalisé, et forme normalisée « prénom nom »."""
+    last, first = name.normalized()
+    return {
+        "raw_author_name": name.raw,
+        "raw_last_name": name.last_name,
+        "raw_first_name": name.first_name,
+        "last_name_normalized": last,
+        "first_name_normalized": first,
+        "author_name_normalized": " ".join(part for part in (first, last) if part),
+    }
+
+
+def _identity(
+    last_name_normalized: str | None, first_name_normalized: str | None, person_identifiers: object
+) -> Hashable:
+    """Clé d'identité d'une signature : nom et prénom normalisés, et identifiants, comme `author_identifying_keys`."""
     ids = json.dumps(person_identifiers, sort_keys=True) if person_identifiers is not None else None
-    return (name_normalized, ids)
+    return (last_name_normalized, first_name_normalized, ids)
 
 
 def write_addresses(

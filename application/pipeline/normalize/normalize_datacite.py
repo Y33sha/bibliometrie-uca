@@ -41,6 +41,7 @@ from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
+from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.datacite import (
@@ -145,13 +146,13 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
 # =============================================================
 
 
-def _creator_full_name(creator: Mapping[str, JsonValue]) -> str:
+def _creator_name(creator: Mapping[str, JsonValue]) -> SignatureName | None:
+    """Nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés. Sinon la chaîne brute : `familyName` seul porte souvent le nom complet."""
     given = (as_str(creator.get("givenName")) or "").strip()
     family = (as_str(creator.get("familyName")) or "").strip()
     if given and family:
-        return f"{given} {family}"
-    name = (as_str(creator.get("name")) or "").strip()
-    return name or family or given or ""
+        return SignatureName.from_parts(family, given)
+    return SignatureName.from_raw(as_str(creator.get("name")) or family or given)
 
 
 def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
@@ -199,14 +200,14 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
             continue
         if creator.get("nameType") == "Organizational":
             continue
-        full_name = _creator_full_name(creator)
-        if not full_name:
+        name = _creator_name(creator)
+        if name is None:
             continue
         ids = ids_by_position[position]
         records.append(
             AuthorRecord(
                 position=position,
-                raw_name=full_name,
+                name=name,
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=[

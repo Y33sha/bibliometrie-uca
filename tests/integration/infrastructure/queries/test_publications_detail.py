@@ -91,8 +91,8 @@ class TestGetPublicationDetail:
             text("""
                 INSERT INTO source_authorships
                     (source, source_publication_id, author_position,
-                     person_id, authorship_id, identity_id)
-                VALUES ('hal', :sd, 0, :pid, :auth, :iid)
+                     person_id, authorship_id, identity_id, raw_author_name)
+                VALUES ('hal', :sd, 0, :pid, :auth, :iid, 'X')
             """),
             {"sd": sd, "pid": pid, "auth": auth_id, "iid": identity_id},
         )

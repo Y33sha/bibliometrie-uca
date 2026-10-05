@@ -478,8 +478,8 @@ class TestPropagateCountriesToPublications:
         sa_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO source_authorships "
-                "(source, source_publication_id, author_position, identity_id) "
-                "VALUES ('hal', :sp, 0, :iid) RETURNING id"
+                "(source, source_publication_id, author_position, identity_id, raw_author_name) "
+                "VALUES ('hal', :sp, 0, :iid, 'X') RETURNING id"
             ),
             {"sp": sp_id, "iid": identity_id},
         ).scalar_one()

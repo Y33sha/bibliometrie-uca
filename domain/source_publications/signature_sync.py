@@ -79,16 +79,16 @@ def plan_signature_sync(
 def signature_content(
     *,
     position: int,
-    raw_author_name: str,
+    name: tuple[str | None, str | None, str | None],
     is_corresponding: bool,
     roles: Sequence[str] | None,
     neutralized_identifiers: JsonValue,
     addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None]],
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source."""
+    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source."""
     return {
         "position": position,
-        "raw_author_name": raw_author_name,
+        "name": list(name),
         "is_corresponding": is_corresponding,
         "roles": list(roles) if roles is not None else None,
         "neutralized_identifiers": neutralized_identifiers,

@@ -31,6 +31,7 @@ from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
+from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
@@ -284,8 +285,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
     records: list[AuthorRecord] = []
     for position, author_data in enumerate(authors):
-        author_full_name = as_str(author_data.get("fullName"))
-        if not author_full_name:
+        signature_name = SignatureName.from_raw(as_str(author_data.get("fullName")))
+        if signature_name is None:
             continue
 
         ids = ids_by_position[position]
@@ -306,7 +307,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         records.append(
             AuthorRecord(
                 position=position,
-                raw_name=author_full_name,
+                name=signature_name,
                 roles=roles or None,
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=part, countries=countries) for part in addr_parts],

@@ -9,10 +9,15 @@ from application.pipeline.normalize._authorships_batch import (
     sync_source_authorships,
     write_source_authorships,
 )
+from domain.persons.signature_name import SignatureName
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 
 _Q = PgAuthorshipsBatchQueries()
+
+
+def _rec(position: int, raw: str, **fields) -> AuthorRecord:
+    return AuthorRecord(position, SignatureName(raw=raw), **fields)
 
 
 def _source_publication(conn) -> int:
@@ -76,7 +81,7 @@ def _pin(conn, sa_id: int) -> int:
 def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
     conn = sa_sync_conn
     sp = _source_publication(conn)
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean"), AuthorRecord(1, "Xu, Z.")])
+    _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     xu_id = _signatures(conn, sp)[1][0]
     person = _pin(conn, xu_id)
 
@@ -84,9 +89,9 @@ def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
         conn,
         sp,
         [
-            AuthorRecord(0, "Martin, Paul"),
-            AuthorRecord(1, "Dupont, Jean"),
-            AuthorRecord(2, "Xu, Z."),
+            _rec(0, "Martin, Paul"),
+            _rec(1, "Dupont, Jean"),
+            _rec(2, "Xu, Z."),
         ],
     )
 
@@ -110,10 +115,10 @@ def test_permutation_de_positions(sa_sync_conn):
     """Deux signatures échangent leur position en une instruction (contrainte différable)."""
     conn = sa_sync_conn
     sp = _source_publication(conn)
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean"), AuthorRecord(1, "Xu, Z.")])
+    _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     before = _signatures(conn, sp)
 
-    _write(conn, sp, [AuthorRecord(0, "Xu, Z."), AuthorRecord(1, "Dupont, Jean")])
+    _write(conn, sp, [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean")])
 
     after = _signatures(conn, sp)
     assert after[0][0] == before[1][0]
@@ -126,7 +131,7 @@ def test_identite_repetee_departagee_par_position(sa_sync_conn):
     _write(
         conn,
         sp,
-        [AuthorRecord(0, "Xu, Z."), AuthorRecord(1, "Dupont, Jean"), AuthorRecord(2, "Xu, Z.")],
+        [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean"), _rec(2, "Xu, Z.")],
     )
     before = _signatures(conn, sp)
 
@@ -134,10 +139,10 @@ def test_identite_repetee_departagee_par_position(sa_sync_conn):
         conn,
         sp,
         [
-            AuthorRecord(0, "Xu, Z."),
-            AuthorRecord(1, "Dupont, Jean"),
-            AuthorRecord(2, "Xu, Z."),
-            AuthorRecord(3, "Martin, Paul"),
+            _rec(0, "Xu, Z."),
+            _rec(1, "Dupont, Jean"),
+            _rec(2, "Xu, Z."),
+            _rec(3, "Martin, Paul"),
         ],
     )
 
@@ -149,11 +154,11 @@ def test_identite_repetee_departagee_par_position(sa_sync_conn):
 def test_auteur_disparu_supprime_avec_son_epinglage(sa_sync_conn):
     conn = sa_sync_conn
     sp = _source_publication(conn)
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean"), AuthorRecord(1, "Xu, Z.")])
+    _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     xu_id = _signatures(conn, sp)[1][0]
     _pin(conn, xu_id)
 
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean")])
+    _write(conn, sp, [_rec(0, "Dupont, Jean")])
 
     assert set(_signatures(conn, sp)) == {0}
     assert (
@@ -168,10 +173,10 @@ def test_auteur_disparu_supprime_avec_son_epinglage(sa_sync_conn):
 def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     conn = sa_sync_conn
     sp = _source_publication(conn)
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
+    _write(conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
     sa_id = _signatures(conn, sp)[0][0]
 
-    _write(conn, sp, [AuthorRecord(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")])])
+    _write(conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")])])
 
     assert _signatures(conn, sp)[0][0] == sa_id
     assert _addresses(conn, sa_id) == ["Labo B"]
@@ -181,7 +186,7 @@ def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
     """Une signature inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
     conn = sa_sync_conn
     sp = _source_publication(conn)
-    records = [AuthorRecord(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
+    records = [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
     _write(conn, sp, records)
     sa_id = _signatures(conn, sp)[0][0]
     conn.execute(
@@ -200,12 +205,12 @@ def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
 
 
 def _build(block) -> list[AuthorRecord]:
-    return [AuthorRecord(i, name) for i, name in enumerate(block["names"])]
+    return [_rec(i, name) for i, name in enumerate(block["names"])]
 
 
 def _build_upper(block) -> list[AuthorRecord]:
     """Construction selon une règle de normalisation modifiée : noms en majuscules."""
-    return [AuthorRecord(i, name.upper()) for i, name in enumerate(block["names"])]
+    return [_rec(i, name.upper()) for i, name in enumerate(block["names"])]
 
 
 def _sync(conn, sp: int, names: list[str], build=_build, *, normalize_full: bool = False) -> None:

@@ -32,6 +32,7 @@ from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
+from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.openalex import (
@@ -380,8 +381,8 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
     records: list[AuthorRecord] = []
     for position, authorship in enumerate(authorships):
-        raw_author_name = as_str(authorship.get("raw_author_name"))
-        if not raw_author_name:
+        name = SignatureName.from_raw(as_str(authorship.get("raw_author_name")))
+        if name is None:
             # Sans nom, l'authorship est inexploitable pour le matching personnes.
             continue
 
@@ -402,7 +403,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
         records.append(
             AuthorRecord(
                 position=position,
-                raw_name=raw_author_name,
+                name=name,
                 is_corresponding=bool(authorship.get("is_corresponding")),
                 roles=["author"],
                 person_identifiers=ids if ids else None,

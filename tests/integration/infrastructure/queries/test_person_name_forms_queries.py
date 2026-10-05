@@ -44,8 +44,8 @@ def _create_sa(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, identity_id)
-            VALUES (:source, :sd, :pos, :person_id, :iid) RETURNING id
+                 person_id, identity_id, raw_author_name)
+            VALUES (:source, :sd, :pos, :person_id, :iid, 'X') RETURNING id
         """),
         {
             "source": source,

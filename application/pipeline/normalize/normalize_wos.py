@@ -29,6 +29,7 @@ from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.identifiers import compact_identifiers
+from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_publications.external_ids import ExternalIdType
@@ -462,6 +463,15 @@ def insert_wos_document(
 # Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (author_identifying_keys.person_identifiers).
 
 
+def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
+    """`last_name` et `first_name` du payload, sinon `full_name`."""
+    if as_str(author.get("last_name")):
+        return SignatureName.from_parts(
+            as_str(author.get("last_name")), as_str(author.get("first_name"))
+        )
+    return SignatureName.from_raw(as_str(author.get("full_name")))
+
+
 def build_wos_author_records(
     rec: Mapping[str, JsonValue], logger: logging.Logger
 ) -> list[AuthorRecord]:
@@ -487,11 +497,14 @@ def build_wos_author_records(
 
     records: list[AuthorRecord] = []
     for idx, author in enumerate(authors_kept):
+        name = _author_name(author)
+        if name is None:
+            continue
         ids = ids_by_position[idx]
         records.append(
             AuthorRecord(
                 position=as_int(author.get("position")) or 0,
-                raw_name=as_str(author.get("full_name")) or "",
+                name=name,
                 is_corresponding=bool(author.get("is_corresponding")),
                 roles=[role for e in as_sequence(author.get("roles")) if (role := as_str(e))]
                 or None,

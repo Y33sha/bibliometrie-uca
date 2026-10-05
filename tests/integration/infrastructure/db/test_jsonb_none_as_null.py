@@ -52,7 +52,8 @@ def test_identite_sans_identifiant_ne_se_dedouble_pas(sa_sync_conn):
         text("""
             INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
             VALUES (:nom, :p)
-            ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+            ON CONFLICT (author_name_normalized, last_name_normalized, first_name_normalized,
+                         person_identifiers) DO NOTHING
         """).bindparams(bindparam("p", type_=Jsonb)),
         {"nom": "durand j", "p": None},
     )
@@ -66,6 +67,6 @@ def test_identite_sans_identifiant_ne_se_dedouble_pas(sa_sync_conn):
 
     lookup = text(
         "SELECT count(*) FROM author_identifying_keys WHERE key_hash = "
-        + key_hash_sql(":nom", ":p")
+        + key_hash_sql([":nom", "NULL", "NULL", ":p"])
     ).bindparams(bindparam("p", type_=Jsonb))
     assert sa_sync_conn.execute(lookup, {"nom": "durand j", "p": None}).scalar_one() == 1

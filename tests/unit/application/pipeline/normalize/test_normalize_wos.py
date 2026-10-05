@@ -40,6 +40,7 @@ from application.pipeline.normalize.normalize_wos import (
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
+from domain.persons.signature_name import SignatureName
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     staging_row,
@@ -886,6 +887,24 @@ class TestBuildWosAuthorRecords:
         assert records == []
         assert any("aucun exploitable" in r.getMessage() for r in caplog.records)
 
+    def test_nom_et_prenom_separes(self, logger):
+        rec = {
+            "ut": "WOS:2",
+            "authors": [
+                {
+                    "position": 0,
+                    "full_name": "Doe, Jane",
+                    "last_name": "Doe",
+                    "first_name": "Jane",
+                    "daisng_id": "DAIS-2",
+                    "roles": ["author"],
+                },
+            ],
+        }
+        assert build_wos_author_records(rec, logger)[0].name == SignatureName(
+            last_name="Doe", first_name="Jane"
+        )
+
     def test_builds_record_fields(self, logger):
         rec = {
             "ut": "WOS:1",
@@ -905,7 +924,7 @@ class TestBuildWosAuthorRecords:
         }
         rec0 = build_wos_author_records(rec, logger)[0]
         assert rec0.position == 0
-        assert rec0.raw_name == "Jane Doe"
+        assert rec0.name == SignatureName(raw="Jane Doe")
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
         # `researcher_id` porté ; l'ORCID WoS en entrée est ignoré (non moissonné).
