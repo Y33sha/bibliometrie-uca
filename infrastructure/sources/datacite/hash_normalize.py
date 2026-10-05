@@ -1,6 +1,6 @@
 """Neutralisation, pour la détection de changement, de ce qui varie dans un nœud DataCite sans que la notice change.
 
-Un même DOI se lit par deux routes : la liste (`/dois?query=…`, extraction et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute la notice XML encodée (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, rend `[]` là où la liste rend `None`, et donne les dates à la milliseconde. Les compteurs de consultation et de citation (`…Count`, `…OverTime`) bougent d'une lecture à l'autre.
+Un même DOI se lit par deux routes : la liste (`/dois?query=…`, extraction et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute la notice XML encodée (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, rend `[]` là où la liste rend `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans le hash.
 
 `strip_volatile_for_hash` renvoie une copie du nœud sans ces champs, à seule fin de calculer le hash. Les métadonnées lues par la normalisation restent dans le hash : une modification réelle de la notice reste détectée. Le payload stocké reste fidèle à la source.
 """
@@ -13,12 +13,16 @@ from domain.types import JsonValue
 _ROUTE_OR_REGISTRATION = frozenset(
     {"xml", "prefix", "suffix", "published", "created", "registered", "updated"}
 )
-# Suffixes des compteurs de consultation, de téléchargement et de citation.
+# Suffixes des compteurs (consultations, téléchargements, références, versions…).
 _COUNTER_SUFFIXES = ("Count", "OverTime")
+# Compteur que la normalisation lit : il reste dans le hash.
+_READ_COUNTERS = frozenset({"citationCount"})
 
 
 def _kept(key: str, value: JsonValue) -> bool:
-    if key in _ROUTE_OR_REGISTRATION or key.endswith(_COUNTER_SUFFIXES):
+    if key in _ROUTE_OR_REGISTRATION:
+        return False
+    if key.endswith(_COUNTER_SUFFIXES) and key not in _READ_COUNTERS:
         return False
     return value not in (None, [])
 
