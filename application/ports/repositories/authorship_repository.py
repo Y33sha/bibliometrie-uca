@@ -71,7 +71,7 @@ class AuthorshipRepository(Protocol):
         ...
 
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Détache (person_id → NULL) les signatures d'une personne portant une forme de nom donnée. Retourne le nombre de signatures détachées."""
+        """Détache (person_id → NULL) les signatures d'une personne portant une forme de nom donnée, sauf celles que l'admin a épinglées sur elle. Retourne le nombre de signatures détachées."""
         ...
 
     # ── authorships ────────────────────────────────────────────────
@@ -114,10 +114,6 @@ class AuthorshipRepository(Protocol):
 
     def unpin_authorships_for_pair(self, publication_id: int, person_id: int) -> int:
         """Retire les épinglages des signatures de la paire (publication, personne) — détachement admin. Retourne le nombre d'épinglages retirés."""
-        ...
-
-    def unpin_authorships_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Retire les épinglages des signatures d'une personne portant une forme de nom donnée — rejet de forme. Retourne le nombre d'épinglages retirés."""
         ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────

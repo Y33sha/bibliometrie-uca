@@ -174,7 +174,9 @@ class PgAuthorshipRepository(AuthorshipRepository):
                 "UPDATE source_authorships sa SET person_id = NULL "
                 "FROM author_identifying_keys aik "
                 "WHERE sa.person_id = :pid AND aik.id = sa.identity_id "
-                "AND aik.author_name_normalized = :nf"
+                "AND aik.author_name_normalized = :nf "
+                "AND NOT EXISTS (SELECT 1 FROM confirmed_authorships ca "
+                "WHERE ca.source_authorship_id = sa.id AND ca.person_id = :pid)"
             ),
             {"pid": person_id, "nf": name_form},
         ).rowcount
@@ -280,20 +282,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
                   AND ca.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},
-        )
-        return result.rowcount
-
-    def unpin_authorships_for_name_form(self, person_id: int, name_form: str) -> int:
-        result = self._conn.execute(
-            text("""
-                DELETE FROM confirmed_authorships ca
-                USING source_authorships sa, author_identifying_keys aik
-                WHERE ca.source_authorship_id = sa.id
-                  AND sa.identity_id = aik.id
-                  AND ca.person_id = :pid
-                  AND aik.author_name_normalized = :form
-            """),
-            {"pid": person_id, "form": name_form},
         )
         return result.rowcount
 
