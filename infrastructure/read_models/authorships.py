@@ -12,11 +12,11 @@ from application.ports.read_models.authorships_queries import (
     OrphanFilters,
 )
 from application.ports.read_models.publications_queries import PubLabItem
-from domain.persons.name_matching import parse_raw_author_name
+from domain.persons.signature_name import SignatureName
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.sql_fragments import in_clause
+from infrastructure.db.sql_fragments import in_clause, signature_display_name
 
 # Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
@@ -46,7 +46,9 @@ def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dic
     binds: dict[str, object] = {}
     if filters.search.strip():
         binds["search_pat"] = f"%{filters.search.strip()}%"
-        conditions.append("unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(:search_pat))")
+        conditions.append(
+            f"unaccent(lower({signature_display_name()})) LIKE unaccent(lower(:search_pat))"
+        )
     if with_labs and (filters.lab_ids or filters.lab_none):
         lab_conditions = []
         if filters.lab_ids:
@@ -84,7 +86,7 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
         rows = self._conn.execute(
             text(f"""
                 SELECT sa.source, sa.id AS source_authorship_id,
-                       sa.raw_author_name AS full_name,
+                       sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
                        sd.publication_id,
                        p.title AS pub_title, p.pub_year,
                        COALESCE((
@@ -95,20 +97,22 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
                            ) lab
                        ), '[]') AS labs
                 {from_where}
-                ORDER BY sa.raw_author_name, p.pub_year DESC
+                ORDER BY {signature_display_name()}, p.pub_year DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
-        # Décompose `raw_author_name` en last_name/first_name via `parse_raw_author_name`, la règle de parsing unique du domaine.
         authorships: list[OrphanAuthorshipOut] = []
         for row in rows:
-            last_name, first_name = parse_raw_author_name(row.full_name)
+            name = SignatureName.from_columns(
+                row.raw_author_name, row.raw_last_name, row.raw_first_name
+            )
+            last_name, first_name = name.split()
             authorships.append(
                 OrphanAuthorshipOut(
                     source=row.source,
                     source_authorship_id=row.source_authorship_id,
-                    full_name=row.full_name,
+                    full_name=name.display(),
                     last_name=last_name,
                     first_name=first_name,
                     publication_id=row.publication_id,

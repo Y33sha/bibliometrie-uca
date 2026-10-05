@@ -60,15 +60,6 @@ def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
     return [(" ".join(words[k:]), " ".join(words[:k])) for k in range(1, len(words))]
 
 
-def first_name_for(raw_name: str | None, last_name: str) -> str | None:
-    """Prénom d'une signature dont un découpage donne le nom de famille `last_name`, `None` sinon."""
-    target = normalize_name(last_name)
-    for last, first in family_name_splits(raw_name):
-        if normalize_name(last) == target:
-            return first
-    return None
-
-
 def first_name_initials(first_name: str) -> tuple[str, ...] | None:
     """Initiales d'un prénom réduit à des initiales, `None` pour un prénom plein ou vide.
 

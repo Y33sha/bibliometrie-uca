@@ -12,17 +12,16 @@ from application.ports.pipeline.persons.matching import (
     BareUnlinkedAuthorship,
     PersonsMatchingQueries,
 )
-from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
-from domain.persons.name_matching import parse_raw_author_name
+from domain.persons.signature_name import SignatureName
 
 
 class EnrichedAuthorship(NamedTuple):
-    """`BareUnlinkedAuthorship` enrichie côté Python : nom parsé, normalisations, flag de création autorisée."""
+    """`BareUnlinkedAuthorship` enrichie côté Python : nom découpé, normalisations, flag de création autorisée."""
 
     authorship_id: int
     source: str
-    full_name: str
+    name: SignatureName
     author_name_normalized: str | None
     identifiers: dict[str, str]
     roles: list[str] | None
@@ -38,16 +37,15 @@ class EnrichedAuthorship(NamedTuple):
 
 
 def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
-    """Parse le nom, normalise, calcule le flag de création autorisée."""
-    last_name, first_name = parse_raw_author_name(row.full_name)
-    last_norm = normalize_name(last_name)
-    first_norm = normalize_name(first_name)
+    """Découpe et normalise le nom, calcule le flag de création autorisée."""
+    last_name, first_name = row.name.split()
+    last_norm, first_norm = row.name.normalized()
     allow_create = allow_person_creation(row.source, row.roles or [])
 
     return EnrichedAuthorship(
         authorship_id=row.authorship_id,
         source=row.source,
-        full_name=row.full_name,
+        name=row.name,
         author_name_normalized=row.author_name_normalized,
         identifiers=row.identifiers,
         roles=row.roles,
@@ -58,7 +56,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         last_name=last_name,
         first_name=first_name,
         last_norm=last_norm,
-        first_norm=first_norm,
+        first_norm=first_norm or "",
         allow_create=allow_create,
     )
 
@@ -66,7 +64,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
 def get_all_unlinked_authorships(
     conn: Connection, queries: PersonsMatchingQueries
 ) -> list[EnrichedAuthorship]:
-    """Charge les authorships in-périmètre sans person_id (toutes sources) et les enrichit (parsing noms, flag allow_create)."""
+    """Charge les authorships in-périmètre sans person_id (toutes sources) et les enrichit (noms découpés, flag allow_create)."""
     return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
 
 
@@ -95,8 +93,7 @@ def load_linked_authorships_by_pub(
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
     for r in queries.fetch_linked_authorships(conn):
-        last, first = parse_raw_author_name(r.full_name)
-        ln, fn = normalize_name(last), normalize_name(first)
-        index[(r.publication_id, r.author_position)].append((r.person_id, ln, fn, r.source))
+        ln, fn = r.name.normalized()
+        index[(r.publication_id, r.author_position)].append((r.person_id, ln, fn or "", r.source))
 
     return index

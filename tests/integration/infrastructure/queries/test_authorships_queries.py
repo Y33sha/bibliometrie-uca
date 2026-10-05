@@ -47,6 +47,8 @@ def _create_sa(
     person_id=None,
     in_perimeter=True,
     raw_author_name="X",
+    raw_last_name=None,
+    raw_first_name=None,
     roles=None,
 ):
     identity_id = upsert_identity(conn, author_name_normalized=None)
@@ -54,8 +56,9 @@ def _create_sa(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, in_perimeter, identity_id, raw_author_name, roles)
-            VALUES (:src, :sd, :pos, :pid, :inp, :iid, :raw,
+                 person_id, in_perimeter, identity_id, raw_author_name, raw_last_name,
+                 raw_first_name, roles)
+            VALUES (:src, :sd, :pos, :pid, :inp, :iid, :raw, :last, :first,
                     COALESCE(:roles, ARRAY['author']::text[]))
             RETURNING id
         """),
@@ -67,6 +70,8 @@ def _create_sa(
             "inp": in_perimeter,
             "iid": identity_id,
             "raw": raw_author_name,
+            "last": raw_last_name,
+            "first": raw_first_name,
             "roles": roles,
         },
     ).scalar_one()
@@ -118,6 +123,24 @@ class TestListOrphanAuthorships:
         res = _list(sa_sync_conn)
         assert res.total >= 1
         assert any(a.source_authorship_id == sa for a in res.authorships)
+
+    def test_nom_et_prenom_separes_par_la_source(self, sa_sync_conn):
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sa = _create_sa(
+            sa_sync_conn,
+            sd,
+            raw_author_name=None,
+            raw_last_name="Caldefie Chezet",
+            raw_first_name="Zorphine",
+        )
+
+        res = _list(sa_sync_conn, search="zorphine caldefie")
+        [orphan] = [a for a in res.authorships if a.source_authorship_id == sa]
+        assert (orphan.full_name, orphan.last_name, orphan.first_name) == (
+            "Zorphine Caldefie Chezet",
+            "Caldefie Chezet",
+            "Zorphine",
+        )
 
     def test_filters_by_search(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)

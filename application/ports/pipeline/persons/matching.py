@@ -11,6 +11,7 @@ from typing import NamedTuple, Protocol
 from sqlalchemy import Connection
 
 from domain.persons.matching import IdentifiedPerson, Namesake, PersonNameForms
+from domain.persons.signature_name import SignatureName
 
 
 class BareUnlinkedAuthorship(NamedTuple):
@@ -23,7 +24,7 @@ class BareUnlinkedAuthorship(NamedTuple):
 
     authorship_id: int
     source: str
-    full_name: str
+    name: SignatureName
     author_name_normalized: str | None
     # `{id_type: valeur}` des identifiants de l'identité, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la signature.
     identifiers: dict[str, str]
@@ -41,7 +42,7 @@ class LinkedAuthorshipRow(NamedTuple):
     person_id: int
     author_position: int
     publication_id: int
-    full_name: str
+    name: SignatureName
     source: str
 
 
@@ -105,8 +106,8 @@ class PersonsMatchingQueries(Protocol):
 
     def fetch_linked_signature_names(
         self, conn: Connection, person_ids: list[int]
-    ) -> dict[int, list[str]]:
-        """`{person_id: [raw_author_name, ...]}` — les noms bruts des signatures rattachées à chacune des personnes."""
+    ) -> dict[int, list[SignatureName]]:
+        """`{person_id: [nom, ...]}` — les noms des signatures rattachées à chacune des personnes, tels que les sources les donnent."""
         ...
 
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:

@@ -20,7 +20,7 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
-from infrastructure.db.sql_fragments import active_issns
+from infrastructure.db.sql_fragments import active_issns, signature_display_name
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
@@ -86,8 +86,8 @@ def _fetch_biblio_source_authorships(
     `raw_affiliation` concatène les `addresses.raw_text` liées via `source_authorship_addresses`. `countries` est dérivé à la volée de ces mêmes adresses (union de leurs pays).
     """
     rows = conn.execute(
-        text("""
-            SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
+        text(f"""
+            SELECT sa.id, sa.author_position, {signature_display_name()} AS full_name, sa.person_id,
                    sa.in_perimeter,
                    (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
                     FROM source_authorship_structures sas
@@ -231,7 +231,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
 
     theses_rows = conn.execute(
         text(f"""
-            SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
+            SELECT sa.id, sa.author_position, {signature_display_name()} AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_authorships sa
             WHERE sa.source_publication_id = (
@@ -240,7 +240,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
                 ORDER BY created_at DESC
                 LIMIT 1
             )
-            ORDER BY sa.author_position NULLS LAST, sa.raw_author_name
+            ORDER BY sa.author_position NULLS LAST, full_name
         """),
         {"pid": pub_id},
     ).all()

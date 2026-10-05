@@ -27,7 +27,7 @@ from application.ports.read_models.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
-from infrastructure.db.sql_fragments import usable_identifier
+from infrastructure.db.sql_fragments import signature_display_name, usable_identifier
 from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
@@ -131,7 +131,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                     SELECT
                         sa.person_id,
                         ({_HAL_PERSON_ID})::int AS hal_person_id,
-                        MIN(sa.raw_author_name) AS full_name,
+                        MIN({signature_display_name()}) AS full_name,
                         MIN({_ORCID}) AS orcid,
                         MIN({_IDHAL}) AS idhal,
                         MIN({_IDREF}) AS idref,

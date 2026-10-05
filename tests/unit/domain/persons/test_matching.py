@@ -17,6 +17,15 @@ from domain.persons.matching import (
     full_namesakes,
     identifier_misplaced,
 )
+from domain.persons.signature_name import SignatureName
+
+
+def _sig(raw: str) -> SignatureName:
+    return SignatureName(raw=raw)
+
+
+def _sigs(*raws: str) -> list[SignatureName]:
+    return [_sig(raw) for raw in raws]
 
 
 class TestConsensusName:
@@ -320,18 +329,23 @@ class TestCompatiblePersons:
     def test_double_family_name_without_particle(self):
         """« Florence Caldefie Chezet » : le découpage au dernier mot donne « Chezet », celui aux deux derniers mots trouve « Caldefie-Chezet F. »."""
         index = {"caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")]}
-        assert compatible_persons("Florence Caldefie Chezet", index) == [1]
+        assert compatible_persons(_sig("Florence Caldefie Chezet"), index) == [1]
 
     def test_candidates_of_every_split_add_up(self):
         index = {
             "caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")],
             "chezet": [Namesake(2, "Chezet", "F.")],
         }
-        assert compatible_persons("Florence Caldefie Chezet", index) == [1, 2]
+        assert compatible_persons(_sig("Florence Caldefie Chezet"), index) == [1, 2]
 
     def test_comma_format_keeps_its_single_split(self):
         index = {"chezet": [Namesake(2, "Chezet", "F.")]}
-        assert compatible_persons("Caldefie Chezet, Florence", index) == []
+        assert compatible_persons(_sig("Caldefie Chezet, Florence"), index) == []
+
+    def test_source_split_keeps_its_single_split(self):
+        index = {"chezet": [Namesake(2, "Chezet", "F.")]}
+        name = SignatureName(last_name="Caldefie Chezet", first_name="Florence")
+        assert compatible_persons(name, index) == []
 
 
 class TestFullNamesakes:
@@ -349,24 +363,24 @@ class TestFullNamesakes:
 
 class TestAttestedFullFirstNames:
     def test_keeps_compatible_full_first_names_of_the_same_family_name(self):
-        names = ["Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont"]
+        names = _sigs("Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont")
         assert attested_full_first_names("Tnourji", ("a",), names) == {"abdellah": "Abdellah"}
 
     def test_double_family_name_without_comma(self):
-        names = ["Florence Caldefie Chezet"]
+        names = _sigs("Florence Caldefie Chezet")
         assert attested_full_first_names("Caldefie-Chezet", ("f",), names) == {
             "florence": "Florence"
         }
 
     def test_incompatible_first_name_is_ignored(self):
-        assert attested_full_first_names("Tnourji", ("a",), ["Karim Tnourji"]) == {}
+        assert attested_full_first_names("Tnourji", ("a",), _sigs("Karim Tnourji")) == {}
 
     def test_most_frequent_spelling_wins(self):
-        names = ["Stephane Monteil", "Stéphane Monteil", "Stéphane Monteil"]
+        names = _sigs("Stephane Monteil", "Stéphane Monteil", "Stéphane Monteil")
         assert attested_full_first_names("Monteil", ("s",), names) == {"stephane": "Stéphane"}
 
     def test_several_distinct_first_names(self):
-        names = ["Jean Martin", "Julien Martin"]
+        names = _sigs("Jean Martin", "Julien Martin")
         assert attested_full_first_names("Martin", ("j",), names).keys() == {"jean", "julien"}
 
 
@@ -374,7 +388,7 @@ class TestDecideMatchByIdentifier:
     def test_compatible_name_returns_person_id(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, "Jean Dupont", "jean dupont", {}
+            "252404955", idref_map, _sig("Jean Dupont"), "jean dupont", {}
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -383,7 +397,7 @@ class TestDecideMatchByIdentifier:
         """Sans verdict, nom incompatible → match refusé (test de tokens), rejet journalisé."""
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, "Paul Martin", "paul martin", {}
+            "252404955", idref_map, _sig("Paul Martin"), "paul martin", {}
         )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
@@ -394,7 +408,7 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "maneval", "axelle")}
         status = {("van lander axelle", 42): "confirmed"}
         result = decide_match_by_identifier(
-            "x", idref_map, "Van Lander Axelle", "van lander axelle", status
+            "x", idref_map, _sig("Van Lander Axelle"), "van lander axelle", status
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -403,30 +417,32 @@ class TestDecideMatchByIdentifier:
         """Forme rejetée pour la personne → refus même si les tokens seraient compatibles."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
-        result = decide_match_by_identifier("x", idref_map, "Jean Dupont", "jean dupont", status)
+        result = decide_match_by_identifier(
+            "x", idref_map, _sig("Jean Dupont"), "jean dupont", status
+        )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
 
     def test_value_absent_returns_empty(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("999999999", idref_map, "X", "x", {})
+        result = decide_match_by_identifier("999999999", idref_map, _sig("X"), "x", {})
         assert result.person_id is None
         assert result.rejection is None
 
     def test_falsy_value_returns_empty(self):
         """Pas de tentative de lookup si la valeur est vide/None."""
         m = {"foo": IdentifiedPerson(1, "a", "b")}
-        assert decide_match_by_identifier(None, m, "X", "x", {}).person_id is None
-        assert decide_match_by_identifier("", m, "X", "x", {}).person_id is None
+        assert decide_match_by_identifier(None, m, _sig("X"), "x", {}).person_id is None
+        assert decide_match_by_identifier("", m, _sig("X"), "x", {}).person_id is None
 
     def test_empty_map(self):
-        assert decide_match_by_identifier("anything", {}, "X", "x", {}).person_id is None
+        assert decide_match_by_identifier("anything", {}, _sig("X"), "x", {}).person_id is None
 
     def test_surname_only_signature_not_rejected(self):
         """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
         donc pas de refus — on s'abstient plutôt que de rejeter."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("x", idref_map, "Dupont", "dupont", {})
+        result = decide_match_by_identifier("x", idref_map, _sig("Dupont"), "dupont", {})
         assert result.person_id == 42
         assert result.rejection is None
 
@@ -434,7 +450,7 @@ class TestDecideMatchByIdentifier:
         """La fonction est générique : même contrat pour IdRef et ORCID."""
         orcid_map = {"0000-0001-2345-6789": IdentifiedPerson(7, "curie", "marie")}
         result = decide_match_by_identifier(
-            "0000-0001-2345-6789", orcid_map, "Marie Curie", "marie curie", {}
+            "0000-0001-2345-6789", orcid_map, _sig("Marie Curie"), "marie curie", {}
         )
         assert result.person_id == 7
 
@@ -442,7 +458,9 @@ class TestDecideMatchByIdentifier:
         """Variante de graphie du propriétaire (faute de frappe) : corrobore et se
         rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
         idref_map = {"x": IdentifiedPerson(42, "khalil", "toufik")}
-        result = decide_match_by_identifier("x", idref_map, "Toufic Khalil", "toufic khalil", {})
+        result = decide_match_by_identifier(
+            "x", idref_map, _sig("Toufic Khalil"), "toufic khalil", {}
+        )
         assert result.person_id == 42
         assert result.rejection is None
 
@@ -450,7 +468,9 @@ class TestDecideMatchByIdentifier:
         """Même patronyme, prénom franchement autre : reste rejeté (pas de fausse
         corroboration par graphie)."""
         idref_map = {"x": IdentifiedPerson(42, "chanal", "helene")}
-        result = decide_match_by_identifier("x", idref_map, "Herve Chanal", "herve chanal", {})
+        result = decide_match_by_identifier(
+            "x", idref_map, _sig("Herve Chanal"), "herve chanal", {}
+        )
         assert result.person_id is None
         assert result.rejection == (42, "helene chanal")
 
