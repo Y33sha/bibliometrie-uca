@@ -59,6 +59,13 @@ def test_un_changement_de_notice_change_l_empreinte():
     assert change_detection_hash("datacite", retitled) != change_detection_hash("datacite", _LISTED)
 
 
+def test_une_citation_nouvelle_change_l_empreinte():
+    """Le nombre de citations, lu par la normalisation, reste dans l'empreinte, à la différence des consultations."""
+    cited = copy.deepcopy(_LISTED)
+    cited["attributes"]["citationCount"] = 4
+    assert change_detection_hash("datacite", cited) != change_detection_hash("datacite", _LISTED)
+
+
 def test_un_isbn_ajoute_change_l_empreinte():
     """`alternateIdentifiers` vide est ignoré ; renseigné, il compte (la normalisation y cherche les ISBN)."""
     with_isbn = copy.deepcopy(_LISTED)
