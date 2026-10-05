@@ -94,8 +94,9 @@ def _create_source_authorship(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, "
-            "                                authorship_id, in_perimeter, identity_id) "
-            "VALUES (:s, :spid, :pos, :pid, :aid, :ip, :iid) RETURNING id"
+            "                                authorship_id, in_perimeter, identity_id, "
+            "                                raw_author_name) "
+            "VALUES (:s, :spid, :pos, :pid, :aid, :ip, :iid, 'X') RETURNING id"
         ),
         {
             "s": source,

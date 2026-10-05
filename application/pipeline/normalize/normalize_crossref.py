@@ -38,6 +38,7 @@ from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
+from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.crossref import (
@@ -254,12 +255,8 @@ def upsert_containers(
 # =============================================================
 
 
-def _author_full_name(author: Mapping[str, JsonValue]) -> str:
-    given = (as_str(author.get("given")) or "").strip()
-    family = (as_str(author.get("family")) or "").strip()
-    if given and family:
-        return f"{given} {family}"
-    return family or given or ""
+def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
+    return SignatureName.from_parts(as_str(author.get("family")), as_str(author.get("given")))
 
 
 def _author_affiliation_strings(author: Mapping[str, JsonValue]) -> list[str]:
@@ -274,7 +271,7 @@ def _author_affiliation_strings(author: Mapping[str, JsonValue]) -> list[str]:
 def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
 
-    - nom reconstruit via `_author_full_name` ;
+    - nom et prénom séparés (`family`, `given`) ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
@@ -295,15 +292,15 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
         if not isinstance(author, dict):
             continue
 
-        full_name = _author_full_name(author)
-        if not full_name:
+        name = _author_name(author)
+        if name is None:
             continue
 
         ids = ids_by_position[position]
         records.append(
             AuthorRecord(
                 position=position,
-                raw_name=full_name,
+                name=name,
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=aff) for aff in _author_affiliation_strings(author)],

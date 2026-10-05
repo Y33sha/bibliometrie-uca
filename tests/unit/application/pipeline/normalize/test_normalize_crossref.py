@@ -3,7 +3,7 @@
 Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`,
 `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`,
-`get_external_ids`, `get_biblio`, `_author_full_name`,
+`get_external_ids`, `get_biblio`, `_author_name`,
 `_author_affiliation_strings`.
 
 Les délégations vers `domain.sources.crossref` (`extract_crossref_meta`,
@@ -22,7 +22,7 @@ from application.pipeline.normalize import normalize_crossref
 from application.pipeline.normalize.normalize_crossref import (
     CrossrefNormalizer,
     _author_affiliation_strings,
-    _author_full_name,
+    _author_name,
     build_crossref_author_records,
     get_abstract,
     get_biblio,
@@ -45,6 +45,7 @@ from application.pipeline.normalize.normalize_crossref import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
+from domain.persons.signature_name import SignatureName
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
@@ -323,30 +324,29 @@ class TestGetMeta:
         assert result is None or isinstance(result, dict)
 
 
-class TestAuthorFullName:
+class TestAuthorName:
     def test_given_and_family(self):
-        assert _author_full_name({"given": "Jean", "family": "Dupont"}) == "Jean Dupont"
+        assert _author_name({"given": "Jean", "family": "Dupont"}) == SignatureName(
+            last_name="Dupont", first_name="Jean"
+        )
 
     def test_family_only(self):
-        assert _author_full_name({"family": "Dupont"}) == "Dupont"
+        assert _author_name({"family": "Dupont"}) == SignatureName(last_name="Dupont")
 
     def test_given_only(self):
-        # Rare : auteur avec un prénom mais pas de nom de famille (anglo-saxon
-        # avec mononymie, ou erreur d'ingestion).
-        assert _author_full_name({"given": "Jean"}) == "Jean"
+        # Rare : auteur avec un prénom mais pas de nom de famille (mononymie, ou erreur d'ingestion).
+        assert _author_name({"given": "Jean"}) == SignatureName(raw="Jean")
 
     def test_strips_whitespace(self):
-        assert _author_full_name({"given": "  Jean  ", "family": "  Dupont  "}) == "Jean Dupont"
+        assert _author_name({"given": "  Jean  ", "family": "  Dupont  "}) == SignatureName(
+            last_name="Dupont", first_name="Jean"
+        )
 
-    def test_empty_when_both_absent(self):
-        assert _author_full_name({}) == ""
+    def test_none_when_both_absent(self):
+        assert _author_name({}) is None
 
-    def test_empty_when_both_blank(self):
-        assert _author_full_name({"given": "  ", "family": "  "}) == ""
-
-    def test_none_treated_as_empty(self):
-        # `author.get("given")` peut être None ; `(None or "").strip()` = "".
-        assert _author_full_name({"given": None, "family": "Dupont"}) == "Dupont"
+    def test_none_when_both_blank(self):
+        assert _author_name({"given": "  ", "family": "  "}) is None
 
 
 class TestAuthorAffiliationStrings:
@@ -405,7 +405,7 @@ class TestBuildCrossrefAuthorRecords:
             ]
         }
         rec = build_crossref_author_records(msg)[0]
-        assert rec.raw_name == "Jean Dupont"
+        assert rec.name == SignatureName(last_name="Dupont", first_name="Jean")
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]
         assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
@@ -560,12 +560,12 @@ class TestAuteursIllisibles:
     def test_auteur_qui_n_est_pas_un_objet(self):
         recs = build_crossref_author_records({"author": ["Dupont, J.", {"family": "Roe"}]})
 
-        assert [r.raw_name for r in recs] == ["Roe"]
+        assert [r.name.display() for r in recs] == ["Roe"]
 
     def test_auteur_sans_nom_ignore(self):
         recs = build_crossref_author_records({"author": [{"ORCID": "x"}, {"family": "Roe"}]})
 
-        assert [r.raw_name for r in recs] == ["Roe"]
+        assert [r.name.display() for r in recs] == ["Roe"]
 
 
 class TestProcessAuthorships:
@@ -588,7 +588,7 @@ class TestProcessAuthorships:
         )
 
         assert (vus["source"], vus["spid"]) == ("crossref", 555)
-        assert [r.raw_name for r in vus["records"]] == ["Dupont"]
+        assert [r.name.display() for r in vus["records"]] == ["Dupont"]
 
 
 def _message(**surcharges) -> dict:

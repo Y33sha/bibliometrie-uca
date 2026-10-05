@@ -34,6 +34,7 @@ from application.pipeline.normalize.normalize_hal import (
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
+from domain.persons.signature_name import SignatureName
 from domain.sources.hal import hal_text_field
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
@@ -508,7 +509,7 @@ class TestBuildHalAuthorRecords:
             }
         )
         assert len(records) == 1
-        assert records[0].raw_name == "Marie Dupont"
+        assert records[0].name == SignatureName(raw="Marie Dupont")
 
     def test_composite_extracts_name_and_hal_person_id(self):
         # Le composite fournit le nom et le hal_person_id (2e segment). L'idhal
@@ -519,9 +520,25 @@ class TestBuildHalAuthorRecords:
             ],
         }
         record = build_hal_author_records(doc)[0]
-        assert record.raw_name == "Marie Dupont"
-        # Pas de TEI → pas d'idhal (le 3e segment du composite est ignoré).
+        # Pas de TEI → nom Solr en chaîne brute, pas d'idhal (le 3e segment du composite est ignoré).
+        assert record.name == SignatureName(raw="Marie Dupont")
         assert record.person_identifiers == {"hal_person_id": 749496}
+
+    def test_nom_et_prenom_viennent_du_tei(self):
+        label_xml = (
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
+            "<author><persName><forename>Marie</forename><surname>Caldefie Chezet</surname>"
+            "</persName></author></titleStmt></biblFull></TEI>"
+        )
+        doc = {
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Marie Caldefie Chezet_FacetSep_49236-749496_FacetSep_"
+            ],
+            "label_xml": label_xml,
+        }
+        assert build_hal_author_records(extract_hal_author_block(doc))[0].name == SignatureName(
+            last_name="Caldefie Chezet", first_name="Marie"
+        )
 
     def test_idhal_comes_from_tei(self):
         # L'idhal slug vient du TEI (notation="string"), aligné par position.

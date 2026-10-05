@@ -44,8 +44,9 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
     sa_id = conn.execute(
         text(
             "INSERT INTO source_authorships "
-            "(source, source_publication_id, author_position, authorship_id, identity_id) "
-            "VALUES ('hal', :sp, 0, :aid, :iid) RETURNING id"
+            "(source, source_publication_id, author_position, authorship_id, identity_id,"
+            " raw_author_name) "
+            "VALUES ('hal', :sp, 0, :aid, :iid, 'X') RETURNING id"
         ),
         {"sp": sp_id, "aid": authorship_id, "iid": identity_id},
     ).scalar_one()

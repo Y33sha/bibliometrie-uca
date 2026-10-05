@@ -22,6 +22,7 @@ from application.pipeline.normalize.normalize_datacite import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from domain.persons.signature_name import SignatureName
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
@@ -130,15 +131,22 @@ class TestAuthorRecords:
             ]
         }
         recs = build_datacite_author_records(attrs)
-        assert [r.raw_name for r in recs] == ["A B"]
+        assert [r.name.display() for r in recs] == ["A B"]
 
-    def test_name_reconstruction_prefers_given_family(self):
+    def test_given_family_prioritaires(self):
         attrs = {"creators": [{"name": "Doe, Jane", "givenName": "Jane", "familyName": "Doe"}]}
-        assert build_datacite_author_records(attrs)[0].raw_name == "Jane Doe"
+        assert build_datacite_author_records(attrs)[0].name == SignatureName(
+            last_name="Doe", first_name="Jane"
+        )
 
     def test_name_fallback_to_name_field(self):
         attrs = {"creators": [{"name": "Cher"}]}
-        assert build_datacite_author_records(attrs)[0].raw_name == "Cher"
+        assert build_datacite_author_records(attrs)[0].name == SignatureName(raw="Cher")
+
+    def test_family_name_sans_given_name_reste_chaine_brute(self):
+        # `familyName` seul porte souvent le nom complet.
+        attrs = {"creators": [{"familyName": "Mathieu Durand"}]}
+        assert build_datacite_author_records(attrs)[0].name == SignatureName(raw="Mathieu Durand")
 
     def test_affiliation_string_and_object(self):
         attrs = {
@@ -192,11 +200,11 @@ class TestCreatorsIllisibles:
 
     def test_creator_qui_n_est_pas_un_objet(self):
         attrs = {"creators": ["Doe, J.", {"name": "Roe, R."}]}
-        assert [r.raw_name for r in build_datacite_author_records(attrs)] == ["Roe, R."]
+        assert [r.name.display() for r in build_datacite_author_records(attrs)] == ["Roe, R."]
 
     def test_creator_sans_nom_ignore(self):
         attrs = {"creators": [{"nameType": "Personal"}, {"name": "Roe, R."}]}
-        assert [r.raw_name for r in build_datacite_author_records(attrs)] == ["Roe, R."]
+        assert [r.name.display() for r in build_datacite_author_records(attrs)] == ["Roe, R."]
 
     def test_identifiant_qui_n_est_pas_un_objet_ignore(self):
         attrs = {"creators": [{"name": "Doe, J.", "nameIdentifiers": ["0000-0002-1825-0097"]}]}
@@ -288,7 +296,7 @@ class TestProcessAuthorships:
         process_authorships(MagicMock(), MagicMock(), attrs, 555, sync_settings=SYNC_SETTINGS)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
-        assert [r.raw_name for r in vus["records"]] == ["Doe, J."]
+        assert [r.name.display() for r in vus["records"]] == ["Doe, J."]
 
 
 class TestUpsertPublisher:

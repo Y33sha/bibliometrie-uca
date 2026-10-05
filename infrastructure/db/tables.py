@@ -561,32 +561,39 @@ rejected_authorships = Table(
 )
 
 
-# Identités d'auteur dédupliquées : la clé `(author_name_normalized,
-# person_identifiers)` est extraite des signatures `source_authorships` (une
-# identité pour ~25 signatures). L'unique est `NULLS NOT DISTINCT` : les
-# signatures sans identifiant collapsent sur leur seul nom normalisé, sans
-# recourir à un sentinel `'{}'`.
+# Identités d'auteur dédupliquées : la clé (forme normalisée « prénom nom », nom
+# et prénom normalisés, identifiants) est extraite des signatures
+# `source_authorships` (une identité pour ~25 signatures). L'unique est
+# `NULLS NOT DISTINCT` : les signatures sans identifiant collapsent sur leur seul
+# nom, sans recourir à un sentinel `'{}'`.
 author_identifying_keys = Table(
     "author_identifying_keys",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("author_name_normalized", Text),
+    Column("last_name_normalized", Text),
+    Column("first_name_normalized", Text),
     Column("person_identifiers", Jsonb),
     # Hash de la clé d'identité, chemin de lookup indexé et NULL-safe (un `=` ne
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
+    # Aligné sur `key_hash_sql` (infrastructure/pipeline/normalize/authorships.py).
     Column(
         "key_hash",
         Text,
         Computed(
-            r"md5(coalesce(author_name_normalized, E'\x01') || E'\x1f' "
-            r"|| coalesce(person_identifiers::text, E'\x01'))",
+            r"md5(coalesce((author_name_normalized)::text, E'\x01') || E'\x1f' "
+            r"|| coalesce((last_name_normalized)::text, E'\x01') || E'\x1f' "
+            r"|| coalesce((first_name_normalized)::text, E'\x01') || E'\x1f' "
+            r"|| coalesce((person_identifiers)::text, E'\x01'))",
             persisted=True,
         ),
     ),
     UniqueConstraint(
         "author_name_normalized",
+        "last_name_normalized",
+        "first_name_normalized",
         "person_identifiers",
         name="author_identifying_keys_key",
         postgresql_nulls_not_distinct=True,
@@ -627,7 +634,11 @@ source_authorships = Table(
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     Column("authorship_id", Integer),
+    # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute
+    # (contrainte `source_authorships_name_form`).
     Column("raw_author_name", Text),
+    Column("raw_last_name", Text),
+    Column("raw_first_name", Text),
     # FK vers `author_identifying_keys` (identité dédupliquée : nom normalisé +
     # identifiants observés de la signature). La contrainte FK n'est pas
     # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
@@ -646,6 +657,11 @@ source_authorships = Table(
         "content_hash",
         Text,
         comment="Empreinte des champs écrits par la normalisation, adresses comprises.",
+    ),
+    CheckConstraint(
+        "num_nonnulls(raw_author_name, raw_last_name) = 1"
+        " AND (raw_first_name IS NULL OR raw_last_name IS NOT NULL)",
+        name="source_authorships_name_form",
     ),
     # Vérifiée en fin d'instruction : la mise à jour des signatures d'une notice permute des positions en une seule instruction.
     UniqueConstraint(

@@ -67,8 +67,8 @@ def _setup_affiliations_test_data(conn):
         text("""
             INSERT INTO source_authorships
                 (id, source, source_publication_id, author_position,
-                 in_perimeter, identity_id)
-            VALUES (80001, 'hal', 80001, 0, FALSE, :iid)
+                 in_perimeter, identity_id, raw_author_name)
+            VALUES (80001, 'hal', 80001, 0, FALSE, :iid, 'Alice Dupont')
         """),
         {"iid": alice},
     )
@@ -77,8 +77,8 @@ def _setup_affiliations_test_data(conn):
         text("""
             INSERT INTO source_authorships
                 (id, source, source_publication_id, author_position,
-                 in_perimeter, identity_id)
-            VALUES (80002, 'openalex', 80002, 0, FALSE, :iid)
+                 in_perimeter, identity_id, raw_author_name)
+            VALUES (80002, 'openalex', 80002, 0, FALSE, :iid, 'Alice Dupont')
         """),
         {"iid": alice},
     )
@@ -239,8 +239,8 @@ class TestPopulateAffiliationsTheses:
             text("""
                 INSERT INTO source_authorships
                     (id, source, source_publication_id, author_position,
-                     in_perimeter, identity_id, roles)
-                VALUES (80003, 'theses', 80003, 0, FALSE, :iid, ARRAY['author'])
+                     in_perimeter, identity_id, roles, raw_author_name)
+                VALUES (80003, 'theses', 80003, 0, FALSE, :iid, ARRAY['author'], 'Alice Dupont')
             """),
             {"iid": alice},
         )

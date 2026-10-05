@@ -14,10 +14,24 @@ from sqlalchemy import Connection
 from domain.types import JsonValue
 
 
-class SourceAuthorshipItem(TypedDict):
+class SignatureNameFields(TypedDict):
+    """Colonnes de nom d'une signature (`signature_name_fields`).
+
+    Sur `source_authorships`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`author_identifying_keys`), le découpage retenu normalisé, et la forme normalisée « prénom nom » (`author_name_normalized`).
+    """
+
+    raw_author_name: str | None
+    raw_last_name: str | None
+    raw_first_name: str | None
+    last_name_normalized: str
+    first_name_normalized: str | None
+    author_name_normalized: str
+
+
+class SourceAuthorshipItem(SignatureNameFields):
     """Une signature à écrire dans `source_authorships` (toutes sources).
 
-    `author_name_normalized` est calculé en Python (`normalize_name_form`) par le writer. `person_identifiers` est nullable selon ce que la source fournit.
+    `person_identifiers` est nullable selon ce que la source fournit.
 
     `author_position` est nul pour les signatures qui n'occupent pas de rang d'auteur — les rôles non-auteur d'une thèse (direction, rapport, jury, présidence). La contrainte `(source_publication_id, author_position)` les tolère, les `NULL` étant distincts entre eux.
     """
@@ -25,10 +39,8 @@ class SourceAuthorshipItem(TypedDict):
     source: str
     source_publication_id: int
     author_position: int | None
-    author_name_normalized: str
     is_corresponding: bool
     roles: list[str] | None
-    raw_author_name: str
     person_identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None
@@ -48,7 +60,8 @@ class StoredSourceAuthorship(NamedTuple):
 
     id: int
     author_position: int | None
-    author_name_normalized: str | None
+    last_name_normalized: str | None
+    first_name_normalized: str | None
     person_identifiers: JsonValue
     content_hash: str | None
 

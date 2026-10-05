@@ -30,6 +30,7 @@ from application.pipeline.normalize.normalize_openalex import (
 )
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from domain.persons.signature_name import SignatureName
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
@@ -498,7 +499,7 @@ class TestBuildOpenalexAuthorRecords:
             ]
         }
         rec = build_openalex_author_records(work)[0]
-        assert rec.raw_name == "DUPONT Marie"
+        assert rec.name == SignatureName(raw="DUPONT Marie")
         assert rec.is_corresponding is True
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]

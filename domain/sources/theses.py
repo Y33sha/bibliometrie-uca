@@ -2,12 +2,13 @@
 
 Interprétation des champs propres au schéma theses.fr — prédicats et extracteurs qui encapsulent la connaissance de la sémantique theses.fr pour le reste du pipeline.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller (notamment pour extraire les identifiants et le `raw_author_name` portés sur la `source_authorship`).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import THESES_FIELD_ROLES, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
@@ -31,7 +32,7 @@ class ThesisAuthorship:
 
     person: Mapping[str, JsonValue]
     roles: list[str]
-    raw_author_name: str
+    name: SignatureName
     author_position: int | None
     person_identifiers: dict[str, str] | None
     is_author: bool
@@ -69,10 +70,11 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAutho
     out: list[ThesisAuthorship] = []
     position = 0
     for key, person in personnes.items():
+        name = SignatureName.from_parts(as_str(person.get("nom")), as_str(person.get("prenom")))
+        if name is None:
+            continue
         merged = merge_roles([roles_par_personne[key]])
         is_author = "author" in merged
-        prenom = as_str(person.get("prenom")) or ""
-        raw_author_name = (prenom + " " + (as_str(person.get("nom")) or "")).strip()
         ppn = as_str(person.get("ppn"))
         person_identifiers = {"idref": ppn} if ppn else None
 
@@ -80,7 +82,7 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAutho
             ThesisAuthorship(
                 person=person,
                 roles=merged,
-                raw_author_name=raw_author_name,
+                name=name,
                 author_position=position if is_author else None,
                 person_identifiers=person_identifiers,
                 is_author=is_author,

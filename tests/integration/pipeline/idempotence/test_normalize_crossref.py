@@ -193,7 +193,8 @@ class TestNormalizeCrossrefIdempotence:
 
         rows = sa_sync_conn.execute(
             text("""
-                SELECT sa.raw_author_name, aik.person_identifiers
+                SELECT sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
+                       aik.last_name_normalized, aik.person_identifiers
                 FROM source_authorships sa
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sa.source = 'crossref'
@@ -202,13 +203,18 @@ class TestNormalizeCrossrefIdempotence:
         ).all()
         assert len(rows) == 2
 
-        # Premier auteur : ORCID.
-        assert rows[0].raw_author_name == "Alice Curie"
+        # Premier auteur : nom et prénom séparés par Crossref, ORCID.
+        assert (rows[0].raw_author_name, rows[0].raw_last_name, rows[0].raw_first_name) == (
+            None,
+            "Curie",
+            "Alice",
+        )
+        assert rows[0].last_name_normalized == "curie"
         assert rows[0].person_identifiers is not None
         assert rows[0].person_identifiers.get("orcid") == "0000-0002-1825-0097"
 
         # Deuxième auteur : pas d'ORCID.
-        assert rows[1].raw_author_name == "Bob Pasteur"
+        assert (rows[1].raw_last_name, rows[1].raw_first_name) == ("Pasteur", "Bob")
         assert rows[1].person_identifiers is None
 
         # Les affiliations sont routées vers addresses + source_authorship_addresses.

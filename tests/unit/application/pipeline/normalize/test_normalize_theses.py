@@ -23,6 +23,7 @@ from application.pipeline.normalize.normalize_theses import (
     process_work,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
+from domain.persons.signature_name import SignatureName
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -255,7 +256,7 @@ def _addr_texts(sa_addresses):
 
 class _Author:
     def __init__(self, name="X", pos=0, roles=None, ids=None):
-        self.raw_author_name = name
+        self.name = SignatureName(raw=name)
         self.author_position = pos
         self.roles = roles or ["author"]
         self.person_identifiers = ids

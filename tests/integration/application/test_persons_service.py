@@ -112,8 +112,8 @@ def _insert_source_authorship(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, identity_id, "
-            "                                neutralized_identifiers) "
-            "VALUES (:s, :spid, :pos, :pid, :iid, CAST(:neutralized AS jsonb)) RETURNING id"
+            "                                neutralized_identifiers, raw_author_name) "
+            "VALUES (:s, :spid, :pos, :pid, :iid, CAST(:neutralized AS jsonb), 'X') RETURNING id"
         ),
         {
             "s": source,

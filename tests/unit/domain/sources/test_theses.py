@@ -1,3 +1,4 @@
+from domain.persons.signature_name import SignatureName
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
@@ -23,7 +24,7 @@ class TestAggregateThesisPersons:
         assert a.is_author is True
         assert a.author_position == 0
         assert a.roles == ["author"]
-        assert a.raw_author_name == "Jean Dupont"
+        assert a.name == SignatureName(last_name="Dupont", first_name="Jean")
         assert a.person_identifiers == {"idref": "111111111"}
 
     def test_two_authors_get_consecutive_positions(self):
@@ -83,7 +84,7 @@ class TestAggregateThesisPersons:
 
     def test_a_person_without_nom_leaves_the_next_one(self):
         these = {"auteurs": [{"prenom": "Sansnom"}, {"nom": "Dupont", "prenom": "Jean"}]}
-        assert [a.raw_author_name for a in aggregate_thesis_persons(these)] == ["Jean Dupont"]
+        assert [a.name.display() for a in aggregate_thesis_persons(these)] == ["Jean Dupont"]
 
     def test_dedup_by_ppn_despite_name_variants(self):
         these = {
@@ -108,7 +109,7 @@ class TestAggregateThesisPersons:
 
     def test_author_without_prenom(self):
         these = {"auteurs": [{"nom": "Dupont"}]}
-        assert aggregate_thesis_persons(these)[0].raw_author_name == "Dupont"
+        assert aggregate_thesis_persons(these)[0].name == SignatureName(last_name="Dupont")
 
     def test_raw_person_is_passed_through(self):
         person = {"nom": "Dupont", "prenom": "Jean", "ppn": "111111111"}

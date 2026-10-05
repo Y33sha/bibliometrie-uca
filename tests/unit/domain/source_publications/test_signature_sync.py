@@ -68,7 +68,7 @@ class TestPlanSignatureSync:
 class TestSignatureContent:
     _BASE = {
         "position": 0,
-        "raw_author_name": "Dupont, Jean",
+        "name": (None, "Dupont", "Jean"),
         "is_corresponding": False,
         "roles": ["author"],
         "neutralized_identifiers": None,
@@ -81,7 +81,8 @@ class TestSignatureContent:
     def test_change_avec_chaque_champ_ecrit(self):
         variantes = [
             {"position": 1},
-            {"raw_author_name": "Dupont, J."},
+            {"name": (None, "Dupont", "J.")},
+            {"name": ("Jean Dupont", None, None)},
             {"is_corresponding": True},
             {"roles": ["supervisor"]},
             {"neutralized_identifiers": {"orcid": "shared"}},

@@ -38,6 +38,7 @@ from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
+from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
@@ -354,13 +355,8 @@ def parse_tei_isbns(label_xml: str | None) -> list[str]:
     return isbns
 
 
-def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
-    """Extrait les identifiants par position d'auteur depuis le TEI HAL.
-
-    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
-
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal` (formes normalisées : préfixes d'URL strippés). Renvoie `[]` si `label_xml` est absent ou mal formé.
-    """
+def _tei_title_authors(label_xml: str | None) -> list[Element]:
+    """Éléments `author` du `titleStmt` TEI, dans l'ordre des auteurs. Liste vide si `label_xml` est absent ou mal formé."""
     if not label_xml:
         return []
     try:
@@ -368,10 +364,34 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     except (ParseError, DefusedXmlException):
         return []
     title_stmt = root.find(".//tei:biblFull/tei:titleStmt", _TEI_NS)
-    if title_stmt is None:
-        return []
+    return [] if title_stmt is None else title_stmt.findall("tei:author", _TEI_NS)
+
+
+def parse_tei_author_names(label_xml: str | None) -> list[list[str]]:
+    """`[surname, forename]` de chaque auteur du TEI HAL, dans l'ordre des auteurs. Un champ absent vaut `""`."""
+    out: list[list[str]] = []
+    for author in _tei_title_authors(label_xml):
+        pers = author.find("tei:persName", _TEI_NS)
+        out.append(
+            [
+                " ".join((e.text or "").strip() for e in pers.findall(f"tei:{part}", _TEI_NS))
+                if pers is not None
+                else ""
+                for part in ("surname", "forename")
+            ]
+        )
+    return out
+
+
+def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
+    """Extrait les identifiants par position d'auteur depuis le TEI HAL.
+
+    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
+
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal` (formes normalisées : préfixes d'URL strippés). Renvoie `[]` si `label_xml` est absent ou mal formé.
+    """
     out: list[dict[str, str]] = []
-    for author in title_stmt.findall("tei:author", _TEI_NS):
+    for author in _tei_title_authors(label_xml):
         ids: dict[str, str] = {}
         for idno in author.findall("tei:idno", _TEI_NS):
             typ = (idno.get("type") or "").upper()
@@ -463,11 +483,11 @@ _HAL_AUTHOR_FIELDS = (
 
 
 def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants par auteur extraits du TEI (`tei_author_identifiers`)."""
+    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants et noms par auteur extraits du TEI (`tei_author_identifiers`, `tei_author_names`)."""
+    label_xml = hal_text_field(doc.get("label_xml"))
     block: dict[str, JsonValue] = {field: doc.get(field) for field in _HAL_AUTHOR_FIELDS}
-    block["tei_author_identifiers"] = cast(
-        "JsonValue", parse_tei_author_identifiers(hal_text_field(doc.get("label_xml")))
-    )
+    block["tei_author_identifiers"] = cast("JsonValue", parse_tei_author_identifiers(label_xml))
+    block["tei_author_names"] = cast("JsonValue", parse_tei_author_names(label_xml))
     return block
 
 
@@ -481,6 +501,10 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
     tei_ids = [as_mapping(e) for e in as_sequence(doc.get("tei_author_identifiers"))]
+    # Nom et prénom séparés par auteur, extraits du TEI ; à défaut, le nom Solr.
+    tei_names = [
+        [as_str(p) for p in as_sequence(e)] for e in as_sequence(doc.get("tei_author_names"))
+    ]
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
@@ -538,6 +562,15 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
         if not name:
             continue
+        signature_name = (
+            SignatureName.from_parts(*tei_names[position][:2])
+            if position < len(tei_names)
+            and len(tei_names[position]) >= 2
+            and tei_names[position][0]
+            else SignatureName.from_raw(name)
+        )
+        if signature_name is None:
+            continue
 
         identifiers = ids_by_position[position]
 
@@ -553,7 +586,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
         records.append(
             AuthorRecord(
                 position=position,
-                raw_name=name,
+                name=signature_name,
                 is_corresponding=is_corresponding,
                 roles=roles or None,
                 person_identifiers=identifiers,

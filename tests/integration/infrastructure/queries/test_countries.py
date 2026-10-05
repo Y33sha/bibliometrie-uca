@@ -33,8 +33,8 @@ def _create_sa(conn, sd_id, source, author_position=0):
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, author_position, identity_id)
-            VALUES (:source, :sd, :pos, :iid) RETURNING id
+                (source, source_publication_id, author_position, identity_id, raw_author_name)
+            VALUES (:source, :sd, :pos, :iid, 'X') RETURNING id
         """),
         {"source": source, "sd": sd_id, "pos": author_position, "iid": identity_id},
     ).scalar_one()

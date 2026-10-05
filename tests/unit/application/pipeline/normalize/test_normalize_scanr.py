@@ -32,6 +32,7 @@ from application.pipeline.normalize.normalize_scanr import (
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
+from domain.persons.signature_name import SignatureName
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
@@ -165,7 +166,7 @@ class TestBuildScanrAuthorRecords:
             ]
         }
         rec = build_scanr_author_records(doc)[0]
-        assert rec.raw_name == "Marie Dupont"
+        assert rec.name == SignatureName(raw="Marie Dupont")
         assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
         assert rec.roles == ["author"]
 
@@ -182,6 +183,10 @@ class TestBuildScanrAuthorRecords:
         assert [a.text for a in rec.addresses] == ["Lab A"]
         # detected_countries = pays d'autorité (dédupliqués, triés), jamais suggested.
         assert rec.addresses[0].countries == ["BE", "FR"]
+
+    def test_le_nom_de_l_affiliation_n_ecrase_pas_celui_de_l_auteur(self):
+        doc = {"authors": [{"fullName": "Marie Dupont", "affiliations": [{"name": "Lab A"}]}]}
+        assert build_scanr_author_records(doc)[0].name == SignatureName(raw="Marie Dupont")
 
     def test_affiliation_sans_nom_garde_son_pays(self):
         """Une affiliation réduite à son pays n'écrit pas d'adresse, mais son pays compte."""

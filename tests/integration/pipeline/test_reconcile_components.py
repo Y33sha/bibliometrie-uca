@@ -583,8 +583,9 @@ class TestExternalDoiCarrier:
         # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
         conn.execute(
             text(
-                "INSERT INTO source_authorships (source, source_publication_id, in_perimeter, identity_id) "
-                "VALUES ('openalex', :sp, true, :iid)"
+                "INSERT INTO source_authorships"
+                " (source, source_publication_id, in_perimeter, identity_id, raw_author_name) "
+                "VALUES ('openalex', :sp, true, :iid, 'X')"
             ),
             {"sp": sp1, "iid": upsert_identity(conn)},
         )

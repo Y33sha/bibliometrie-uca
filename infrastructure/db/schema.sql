@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ca3Dkqyn40cNEUDjgtffMCDwlHhkhzkTKcgSJqfm0r3gsOMOgyPqC9QXUu4KoUI
+\restrict 0QXmrNc2ACfCnfEndTbN4MAk1TEOQxE5UPfGSn8FtiTiIGmyngrTbOIoOgigUt4
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -575,7 +575,9 @@ CREATE TABLE public.author_identifying_keys (
     id integer NOT NULL,
     author_name_normalized text,
     person_identifiers jsonb,
-    key_hash text GENERATED ALWAYS AS (md5(((COALESCE(author_name_normalized, ''::text) || ''::text) || COALESCE((person_identifiers)::text, ''::text)))) STORED
+    last_name_normalized text,
+    first_name_normalized text,
+    key_hash text GENERATED ALWAYS AS (md5(((((((COALESCE(author_name_normalized, ''::text) || ''::text) || COALESCE(last_name_normalized, ''::text)) || ''::text) || COALESCE(first_name_normalized, ''::text)) || ''::text) || COALESCE((person_identifiers)::text, ''::text)))) STORED
 );
 
 
@@ -724,7 +726,10 @@ CREATE TABLE public.source_authorships (
     identity_id integer NOT NULL,
     resolution_mode public.resolution_mode,
     neutralized_identifiers jsonb,
-    content_hash text
+    content_hash text,
+    raw_last_name text,
+    raw_first_name text,
+    CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
 
 
@@ -2139,7 +2144,7 @@ ALTER TABLE ONLY public.audit_log
 --
 
 ALTER TABLE ONLY public.author_identifying_keys
-    ADD CONSTRAINT author_identifying_keys_key UNIQUE NULLS NOT DISTINCT (author_name_normalized, person_identifiers);
+    ADD CONSTRAINT author_identifying_keys_key UNIQUE NULLS NOT DISTINCT (author_name_normalized, last_name_normalized, first_name_normalized, person_identifiers);
 
 
 --
@@ -3804,5 +3809,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ca3Dkqyn40cNEUDjgtffMCDwlHhkhzkTKcgSJqfm0r3gsOMOgyPqC9QXUu4KoUI
+\unrestrict 0QXmrNc2ACfCnfEndTbN4MAk1TEOQxE5UPfGSn8FtiTiIGmyngrTbOIoOgigUt4
 
