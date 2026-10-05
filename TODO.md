@@ -70,6 +70,7 @@
 * 138474: 1 seul document alors que le preprint devrait être distinct
 * 206321: pourquoi UNH non reconnue?
 * 221243: pourquoi pas fusionné avec son hal-id?
+* 81408: openalex, source hal; mais pas de doc hal correpondant
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
