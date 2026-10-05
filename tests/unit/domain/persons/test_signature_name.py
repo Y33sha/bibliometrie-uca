@@ -65,6 +65,12 @@ class TestNormalized:
     def test_prenom_absent(self):
         assert SignatureName(last_name="Dupont").normalized() == ("dupont", None)
 
+    def test_initiales_collees_separees(self):
+        assert SignatureName(last_name="Martin", first_name="JP").normalized() == ("martin", "j p")
+
+    def test_initiales_ponctuees(self):
+        assert SignatureName(raw="Martin, J.-P.").normalized() == ("martin", "j p")
+
 
 class TestDisplay:
     def test_prenom_nom(self):

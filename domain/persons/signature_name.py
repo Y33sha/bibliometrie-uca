@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from domain.errors import ValidationError
 from domain.normalize import clean_raw_author_name, normalize_name_form
-from domain.persons.name_matching import parse_raw_author_name
+from domain.persons.name_matching import normalize_first_name, parse_raw_author_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,9 +46,9 @@ class SignatureName:
         return parse_raw_author_name(self.raw)
 
     def normalized(self) -> tuple[str, str | None]:
-        """(nom de famille, prénom) normalisés. Prénom `None` quand il est vide."""
+        """(nom de famille, prénom) normalisés, initiales du prénom séparées (`normalize_first_name`). Prénom `None` quand il est vide."""
         last, first = self.split()
-        return normalize_name_form(last), normalize_name_form(first) or None
+        return normalize_name_form(last), normalize_first_name(first) or None
 
     def display(self) -> str:
         """Forme « Prénom Nom », ou la chaîne brute."""
