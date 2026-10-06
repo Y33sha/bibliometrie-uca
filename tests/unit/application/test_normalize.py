@@ -407,6 +407,42 @@ class TestFirstDocTypeArbitration:
         ]
         assert arbitrate(sources) == "thesis"
 
+    def test_hal_data_paper_alone_reads_article(self):
+        """Un `data_paper` déclaré par HAL seul n'est pas retenu : les autres sources disent `article`."""
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "article"),
+            self._src("hal", "data_paper"),
+            self._src("openalex", "article"),
+        ]
+        assert arbitrate(sources) == "article"
+
+    def test_hal_data_paper_first_source_alone_reads_article(self):
+        """Sans notice Crossref, HAL passe en tête : son `data_paper` non corroboré se lit encore `article`."""
+        arbitrate = self._arbitrate()
+        assert arbitrate([self._src("hal", "data_paper"), self._src("openalex", "article")]) == (
+            "article"
+        )
+
+    def test_hal_data_paper_corroborated_kept(self):
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "article"),
+            self._src("hal", "data_paper"),
+            self._src("openalex", "data_paper"),
+        ]
+        assert arbitrate(sources) == "data_paper"
+
+    def test_hal_data_paper_alone_yields_to_other_subtype(self):
+        """Le `data_paper` de HAL écarté, un sous-type plus précis d'une autre source l'emporte."""
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "article"),
+            self._src("hal", "data_paper"),
+            self._src("openalex", "review"),
+        ]
+        assert arbitrate(sources) == "review"
+
     def test_empty_rows_returns_other(self):
         arbitrate = self._arbitrate()
         assert arbitrate([]) == "other"
