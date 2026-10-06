@@ -14,10 +14,12 @@ import pytest
 
 from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+from tests.integration.helpers.seeds import (
+    seed_person,
+    seed_publication,
+    seed_source_authorship,
+    uniq,
+)
 
 
 def _uniq_name(prefix: str) -> str:
@@ -36,26 +38,6 @@ def _cleanup_after_module():
         )
 
 
-def _seed_person(last: str = "TESTA", first: str = "J") -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
-            (last, first, last, first),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_publication(title: str = "T", year: int = 2024) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO publications (title, title_normalized, pub_year) "
-            "VALUES (%s, lower(%s), %s) RETURNING id",
-            (title, title, year),
-        )
-        return cur.fetchone()["id"]
-
-
 def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
     with owner_pool() as cur:
         cur.execute(
@@ -66,43 +48,14 @@ def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
         return cur.fetchone()["id"]
 
 
-def _seed_source_publication(source: str = "hal", source_id: str | None = None) -> int:
-    sid = source_id or _uniq("sid")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, pub_year) "
-            "VALUES (%s, %s, 'T', 2024) RETURNING id",
-            (source, sid),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_source_authorship(
-    source: str = "hal",
-    source_pub_id: int | None = None,
-    person_id: int | None = None,
-    raw_author_name: str = "Test Author",
-) -> int:
-    sp = source_pub_id or _seed_source_publication(source=source)
-    with owner_pool() as cur:
-        iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
-        cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES (%s, %s, 0, %s, true, %s, %s) RETURNING id",
-            (source, sp, person_id, raw_author_name, iid),
-        )
-        return cur.fetchone()["id"]
-
-
 def _seed_orphan_authorship(raw_author_name: str) -> int:
     """source_authorship orpheline (person_id NULL, in_perimeter TRUE)."""
-    pub_id = _seed_publication(title=_uniq("Pub"))
+    pub_id = seed_publication(title=uniq("Pub"))
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
             "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
-            (_uniq("sid"), pub_id),
+            (uniq("sid"), pub_id),
         )
         sp_id = cur.fetchone()["id"]
     with owner_pool() as cur:
@@ -120,15 +73,15 @@ def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]
     """source_authorship orpheline rattachée à une publication.
 
     Renvoie (sa_id, publication_id) pour pouvoir rejeter la paire."""
-    pub_id = _seed_publication(title=_uniq("Pub"))
+    pub_id = seed_publication(title=uniq("Pub"))
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
             "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
-            (_uniq("sid"), pub_id),
+            (uniq("sid"), pub_id),
         )
         sp_id = cur.fetchone()["id"]
-    sa_id = _seed_source_authorship(
+    sa_id = seed_source_authorship(
         source="hal", source_pub_id=sp_id, raw_author_name=raw_author_name
     )
     return sa_id, pub_id
@@ -147,8 +100,8 @@ def _reject_pair(publication_id: int, person_id: int) -> None:
 
 class TestExcludeAuthorship:
     def test_ok(self, auth_client):
-        pid = _seed_person()
-        pub = _seed_publication("Exclude test")
+        pid = seed_person()
+        pub = seed_publication("Exclude test")
         aid = _seed_authorship(pub, person_id=pid)
         r = auth_client.patch(f"/api/authorships/{aid}/exclude")
         assert r.status_code == 200
@@ -210,7 +163,7 @@ class TestOrphanAuthorships:
 
 class TestAssignOrphanAuthorship:
     def test_missing_person_id_and_create(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa},
@@ -218,7 +171,7 @@ class TestAssignOrphanAuthorship:
         assert r.status_code == 422
 
     def test_create_person_empty_name(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={
@@ -229,7 +182,7 @@ class TestAssignOrphanAuthorship:
         assert r.status_code == 422
 
     def test_person_not_found(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa, "person_id": 999999999},
@@ -237,8 +190,8 @@ class TestAssignOrphanAuthorship:
         assert r.status_code == 404
 
     def test_ok_with_person_id(self, auth_client):
-        pid = _seed_person()
-        sa = _seed_source_authorship(source="hal")
+        pid = seed_person()
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa, "person_id": pid},
@@ -251,8 +204,8 @@ class TestAssignOrphanAuthorship:
         # avant l'envoi de la réponse, donc le rattachement est lisible depuis une
         # connexion indépendante. Garde-fou du passage final du teardown de
         # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
-        pid = _seed_person()
-        sa = _seed_source_authorship(source="hal")
+        pid = seed_person()
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa, "person_id": pid},
@@ -263,7 +216,7 @@ class TestAssignOrphanAuthorship:
             assert cur.fetchone()["person_id"] == pid
 
     def test_ok_with_create_person(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={
@@ -275,7 +228,7 @@ class TestAssignOrphanAuthorship:
         assert r.json()["ok"] is True
 
     def test_blocked_when_pair_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
@@ -289,7 +242,7 @@ class TestAssignOrphanAuthorship:
         assert pair["rejected_at"]
 
     def test_forced_unrejects_and_assigns(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
@@ -302,7 +255,7 @@ class TestAssignOrphanAuthorship:
 
 class TestBatchAssignOrphanAuthorships:
     def test_empty_authorships_ok_zero(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             "/api/authorships/orphans/batch-assign",
             json={"source_authorship_ids": [], "person_id": pid},
@@ -311,7 +264,7 @@ class TestBatchAssignOrphanAuthorships:
         assert r.json()["assigned"] == 0
 
     def test_person_not_found(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
+        sa = seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/authorships/orphans/batch-assign",
             json={"source_authorship_ids": [sa], "person_id": 999999999},
@@ -319,9 +272,9 @@ class TestBatchAssignOrphanAuthorships:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        pid = _seed_person()
-        sa1 = _seed_source_authorship(source="hal")
-        sa2 = _seed_source_authorship(source="openalex")
+        pid = seed_person()
+        sa1 = seed_source_authorship(source="hal")
+        sa2 = seed_source_authorship(source="openalex")
         r = auth_client.post(
             "/api/authorships/orphans/batch-assign",
             json={"source_authorship_ids": [sa1, sa2], "person_id": pid},
@@ -330,7 +283,7 @@ class TestBatchAssignOrphanAuthorships:
         assert r.json()["assigned"] >= 0
 
     def test_blocked_when_pair_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
@@ -341,7 +294,7 @@ class TestBatchAssignOrphanAuthorships:
         assert r.json()["rejected_pairs"][0]["publication_id"] == pub
 
     def test_forced_unrejects_and_assigns(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(

@@ -7,24 +7,7 @@ import json
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _seed_structure(code: str) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (%s, %s, 'universite') RETURNING id",
-            (code, code),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_perimeter(code: str, name: str, root_structure_ids: list[int]) -> None:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s)",
-            (code, name, root_structure_ids),
-        )
+from tests.integration.helpers.seeds import seed_perimeter, seed_structure
 
 
 def _set_persons_perimeter(code: str) -> None:
@@ -44,8 +27,8 @@ def _cleanup():
 
 
 def test_serves_name_and_roots_of_persons_perimeter(client):
-    root = _seed_structure("inst_root")
-    _seed_perimeter("inst", "Université Test", [root])
+    root = seed_structure("inst_root", type_="universite")
+    seed_perimeter("inst", [root], name="Université Test")
     _set_persons_perimeter("inst")
 
     r = client.get("/api/config/institution")

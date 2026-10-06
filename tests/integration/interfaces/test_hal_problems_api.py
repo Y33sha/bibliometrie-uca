@@ -11,19 +11,14 @@ Couvre :
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+from tests.integration.helpers.seeds import uniq
 
 
 def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int:
-    code = code or _uniq("LAB")
+    code = code or uniq("LAB")
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type, hal_collection) "

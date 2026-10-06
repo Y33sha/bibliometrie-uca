@@ -18,32 +18,7 @@ import uuid
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
-
-def _seed_publisher(name: str | None = None) -> int:
-    name = name or _uniq("Publisher")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO publishers (name, name_normalized) "
-            "VALUES (%s, normalize_name_form(%s)) RETURNING id",
-            (name, name),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_journal(title: str | None = None, publisher_id: int | None = None) -> int:
-    title = title or _uniq("Journal")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO journals (title, title_normalized, publisher_id) "
-            "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
-            (title, title, publisher_id),
-        )
-        return cur.fetchone()["id"]
+from tests.integration.helpers.seeds import seed_journal, seed_publisher, uniq
 
 
 def _add_in_perimeter_authorships(journal_id: int) -> None:
@@ -54,7 +29,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
         for pid in pub_ids:
-            name = _uniq("Author")
+            name = uniq("Author")
             cur.execute(
                 "INSERT INTO persons "
                 "(last_name, first_name, last_name_normalized, first_name_normalized) "
@@ -121,8 +96,8 @@ class TestListJournals:
         assert r.status_code == 200
 
     def test_search_applied(self, client):
-        title = _uniq("ElsevierJournal")
-        _seed_journal(title)
+        title = uniq("ElsevierJournal")
+        seed_journal(title)
         r = client.get("/api/journals", params={"search": title.lower()})
         assert r.status_code == 200
         assert any(j["title"] == title for j in r.json()["journals"])
@@ -130,16 +105,16 @@ class TestListJournals:
     def test_search_with_punctuation_normalizes(self, client):
         # `.` ne figure jamais dans title_normalized (normalize_text → espace).
         # La query doit subir la même normalisation pour matcher.
-        suffix = _uniq("Punct").split("_")[-1]
+        suffix = uniq("Punct").split("_")[-1]
         title = f"Rev S.A. Etudes {suffix}"
-        _seed_journal(title)
+        seed_journal(title)
         r = client.get("/api/journals", params={"search": f"Rev S.A. Etudes {suffix}"})
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
         assert title in titles
 
     def test_search_finds_every_issn_of_a_journal(self, client):
-        journal_id = _seed_journal()
+        journal_id = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO journal_issns (issn, journal_id, support, linking, status) VALUES "
@@ -156,7 +131,7 @@ class TestListJournals:
             assert ids == [journal_id], term
 
     def test_search_tolerates_a_missing_hyphen_and_the_case(self, client):
-        journal_id = _seed_journal()
+        journal_id = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO journal_issns (issn, journal_id, support) VALUES ('9990-005X', %s, 'print')",
@@ -170,22 +145,22 @@ class TestListJournals:
 
     def test_search_keeps_matching_titles(self, client):
         # Un terme qui n'a pas la forme d'un ISSN ne cherche que dans les titres.
-        title = _uniq("TitleOnlyJournal")
-        journal_id = _seed_journal(title)
+        title = uniq("TitleOnlyJournal")
+        journal_id = seed_journal(title)
         r = client.get("/api/journals", params={"search": title, "per_page": 200})
         assert r.status_code == 200
         assert [j["id"] for j in r.json()["journals"]] == [journal_id]
 
     def test_filter_by_publisher(self, client):
-        pub = _seed_publisher()
-        j = _seed_journal(publisher_id=pub)
+        pub = seed_publisher()
+        j = seed_journal(publisher_id=pub)
         r = client.get("/api/journals", params={"publisher_id": pub})
         assert r.status_code == 200
         ids = [item["id"] for item in r.json()["journals"]]
         assert j in ids
 
     def test_filter_by_journal_type(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
         r = client.get("/api/journals", params={"journal_type": "proceedings", "per_page": 200})
@@ -194,7 +169,7 @@ class TestListJournals:
         assert types == {"proceedings"}
 
     def test_filter_by_is_in_doaj(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute("UPDATE journals SET is_in_doaj = TRUE WHERE id = %s", (jid,))
         r = client.get("/api/journals", params={"is_in_doaj": "true", "per_page": 200})
@@ -204,8 +179,8 @@ class TestListJournals:
 
     def test_with_pubs_excludes_orphan_journals(self, client):
         # Revue sans publi rattachée → exclue si with_pubs=true.
-        _seed_journal("OrphanJournal")
-        with_data = _seed_journal("WithPubsJournal")
+        seed_journal("OrphanJournal")
+        with_data = seed_journal("WithPubsJournal")
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
@@ -219,15 +194,15 @@ class TestListJournals:
         assert "OrphanJournal" not in titles
 
     def test_with_pubs_default_false_includes_orphans(self, client):
-        _seed_journal("OrphanDefaultJournal")
+        seed_journal("OrphanDefaultJournal")
         r = client.get("/api/journals", params={"per_page": 200})
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
         assert "OrphanDefaultJournal" in titles
 
     def test_filter_by_oa_model(self, client):
-        matching = _seed_journal()
-        other = _seed_journal()
+        matching = seed_journal()
+        other = seed_journal()
         with owner_pool() as cur:
             cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id = %s", (matching,))
             cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (other,))
@@ -259,7 +234,7 @@ class TestListJournals:
         assert r.status_code == 422
 
     def test_listing_exposes_doaj_url_from_payload(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"DOAJ id": "abc123"}
         with owner_pool() as cur:
             cur.execute(
@@ -284,15 +259,15 @@ def _set_issns(journal_id: int, issn: str | None, eissn: str | None = None) -> N
 
 class TestJournalsWithSameTitle:
     def test_groups_journals_with_the_same_title(self, client):
-        title = _uniq("Doublon")
-        same_title = {_seed_journal(title), _seed_journal(title)}
+        title = uniq("Doublon")
+        same_title = {seed_journal(title), seed_journal(title)}
         r = client.get("/api/journals/same-titles")
         assert r.status_code == 200
         assert any({j["id"] for j in g["journals"]} == same_title for g in r.json()["groups"])
 
     def test_two_journals_with_their_own_issn_are_homonyms(self, client):
-        title = _uniq("Homonyme")
-        a, b = _seed_journal(title), _seed_journal(title)
+        title = uniq("Homonyme")
+        a, b = seed_journal(title), seed_journal(title)
         _set_issns(a, "2999-2222")
         _set_issns(b, "2999-3333")
         r = client.get("/api/journals/same-titles")
@@ -301,8 +276,8 @@ class TestJournalsWithSameTitle:
 
     def test_titles_emptied_by_normalization_form_no_group(self, client):
         """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
-        a = _seed_journal("Παιδαγωγικά ρεύματα στο Αιγαίο")
-        b = _seed_journal("Теория вероятностей и ее применения")
+        a = seed_journal("Παιδαγωγικά ρεύματα στο Αιγαίο")
+        b = seed_journal("Теория вероятностей и ее применения")
         r = client.get("/api/journals/same-titles")
         ids = {j["id"] for g in r.json()["groups"] for j in g["journals"]}
         assert not ({a, b} & ids)
@@ -314,7 +289,7 @@ class TestJournalsWithSameTitle:
 
 class TestJournalsSharingIssn:
     def test_groups_journals_sharing_an_issn_across_supports(self, client):
-        a, b = _seed_journal(), _seed_journal()
+        a, b = seed_journal(), seed_journal()
         _set_issns(a, "2999-1111")
         _set_issns(b, None, "2999-1111")
         r = client.get("/api/journals/shared-issns")
@@ -329,14 +304,14 @@ class TestJournalsSharingIssn:
 
 def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
     """Revue typée `journal` portant un enregistrement par couple `(source, type brut)`."""
-    jid = _seed_journal()
+    jid = seed_journal()
     with owner_pool() as cur:
         cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
         for source, raw_type in raw_types:
             cur.execute(
                 "INSERT INTO source_publications (source, source_id, title, journal_id, doc_type)"
                 " VALUES (%s, %s, 'Doc', %s, %s)",
-                (source, _uniq("sp"), jid, raw_type),
+                (source, uniq("sp"), jid, raw_type),
             )
     return jid
 
@@ -346,7 +321,7 @@ def _seed_record(journal_id: int, doi: str, *, source: str = "hal", raw_metadata
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, journal_id, doi, raw_metadata)"
             " VALUES (%s, %s, 'Doc', %s, %s, %s::jsonb)",
-            (source, _uniq("sp"), journal_id, doi, raw_metadata),
+            (source, uniq("sp"), journal_id, doi, raw_metadata),
         )
 
 
@@ -354,8 +329,8 @@ class TestDoiNamespaceConflicts:
     def test_enregistrement_contredit_par_l_espace_de_noms(self, client):
         """Cas réel : *Physical review. C* et son titre parasite chez OpenAlex."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
-        journal = _seed_journal()
-        parasite = _seed_journal()
+        journal = seed_journal()
+        parasite = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
@@ -384,8 +359,8 @@ class TestDoiNamespaceConflicts:
     def test_doi_documents_et_part_de_l_espace(self, client):
         """DOI distincts et documents de l'espace de noms ; la part des DOI est celle de l'apprentissage."""
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
-        journal = _seed_journal()
-        other = _seed_journal()
+        journal = seed_journal()
+        other = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
@@ -446,8 +421,8 @@ class TestGetJournal:
         assert r.status_code == 404
 
     def test_returns_existing_with_detail_keys(self, client):
-        title = _uniq("DetailJournal")
-        jid = _seed_journal(title)
+        title = uniq("DetailJournal")
+        jid = seed_journal(title)
         r = client.get(f"/api/journals/{jid}")
         assert r.status_code == 200
         body = r.json()
@@ -461,7 +436,7 @@ class TestGetJournal:
         assert body["pub_count"] == 0
 
     def test_doaj_payload_exposed_when_present(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"License": "CC BY", "Country of publisher": "France"}
         with owner_pool() as cur:
             cur.execute(
@@ -477,7 +452,7 @@ class TestGetJournal:
     def test_doaj_url_null_when_no_url_source_in_payload(self, client):
         """Payload sans `URL in DOAJ` ni `DOAJ id` → `doaj_url` reste null
         pour que le front fallback sur `<span>`."""
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"License": "CC BY"}
         with owner_pool() as cur:
             cur.execute(
@@ -489,7 +464,7 @@ class TestGetJournal:
         assert r.json()["doaj_url"] is None
 
     def test_doaj_url_computed_when_doaj_id_present(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"DOAJ id": "deadbeef1234"}
         with owner_pool() as cur:
             cur.execute(
@@ -503,7 +478,7 @@ class TestGetJournal:
     def test_doaj_url_from_csv_url_in_doaj(self, client):
         """Cas massif : payload import CSV qui porte `URL in DOAJ` (URL toute
         faite) mais pas `DOAJ id`."""
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
         with owner_pool() as cur:
             cur.execute(
@@ -515,7 +490,7 @@ class TestGetJournal:
         assert r.json()["doaj_url"] == "https://doaj.org/toc/csvurl42"
 
     def test_doaj_url_prefers_csv_url_over_doaj_id(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         payload = {"URL in DOAJ": "https://doaj.org/toc/fromcsv", "DOAJ id": "fromid"}
         with owner_pool() as cur:
             cur.execute(
@@ -533,7 +508,7 @@ class TestJournalDashboard:
         assert r.status_code == 404
 
     def test_returns_distributions_for_journal_without_pubs(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         # Type explicite : le défaut DB est désormais 'unknown' (pas de mapping
         # doc_types) ; on teste ici le mapping d'un 'journal'.
         with owner_pool() as cur:
@@ -550,7 +525,7 @@ class TestJournalDashboard:
         assert body["expected_oa_statuses"] == []
 
     def test_aggregates_publications(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, doc_type, oa_status, journal_id) "
@@ -570,7 +545,7 @@ class TestJournalDashboard:
         assert oa == {("gold", 1), ("closed", 1), (None, 1)}
 
     def test_expected_flags_doc_types_against_journal_type(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             # `journal_type=proceedings` : article inattendu, conference_paper attendu.
             cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
@@ -588,7 +563,7 @@ class TestJournalDashboard:
         assert body["expected_doc_types"] == sorted(["conference", "conference_paper", "other"])
 
     def test_expected_flags_oa_statuses_against_oa_model(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (jid,))
             cur.execute(
@@ -610,7 +585,7 @@ class TestJournalDashboard:
     def test_no_oa_model_yields_empty_expected_list(self, client):
         # oa_model NULL → pas de signal côté revue → expected_oa_statuses vide,
         # tous les counts retournent expected=True.
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, oa_status, journal_id) "
@@ -626,13 +601,13 @@ class TestJournalDashboard:
 
 class TestJournalSubjects:
     def test_returns_empty_for_journal_without_pubs(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200
         assert r.json() == []
 
     def test_returns_top_subjects_excluding_generic(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) "
@@ -641,7 +616,7 @@ class TestJournalSubjects:
             )
             pub_ids = [r["id"] for r in cur.fetchall()]
             # Sujet spécifique (sous le seuil 5000) attaché aux 2 publis.
-            specific_label = _uniq("specific_subject")
+            specific_label = uniq("specific_subject")
             cur.execute(
                 "INSERT INTO subjects (label, usage_count) VALUES (%s, 100) RETURNING id",
                 (specific_label,),
@@ -649,7 +624,7 @@ class TestJournalSubjects:
             spec_id = cur.fetchone()["id"]
             # Sujet trop générique (au-dessus du seuil) attaché à 1 publi —
             # doit être exclu du top.
-            generic_label = _uniq("generic_subject")
+            generic_label = uniq("generic_subject")
             cur.execute(
                 "INSERT INTO subjects (label, usage_count) VALUES (%s, 9999) RETURNING id",
                 (generic_label,),
@@ -671,21 +646,21 @@ class TestJournalSubjects:
         assert spec_entry["count"] == 2
 
     def test_respects_limit(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         r = client.get(f"/api/journals/{jid}/subjects", params={"limit": 5})
         assert r.status_code == 200
         # Tableau vide pour ce jid neuf ; on vérifie surtout que limit=5 est accepté.
         assert r.json() == []
 
     def test_limit_above_max_rejected(self, client):
-        jid = _seed_journal()
+        jid = seed_journal()
         r = client.get(f"/api/journals/{jid}/subjects", params={"limit": 500})
         assert r.status_code == 422
 
 
 class TestUpdateJournal:
     def test_updates_partial_fields(self, auth_client):
-        jid = _seed_journal()
+        jid = seed_journal()
         r = auth_client.put(
             f"/api/journals/{jid}",
             json={
@@ -706,7 +681,7 @@ class TestUpdateJournal:
 class TestTypeChangeImpact:
     def test_counts_without_writing(self, auth_client):
         """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue ne bouge pas."""
-        jid = _seed_journal()
+        jid = seed_journal()
         auth_client.put(f"/api/journals/{jid}", json={"journal_type": "journal"})
         r = auth_client.post(
             f"/api/journals/{jid}/type-change-impact", json={"journal_type": "proceedings"}
@@ -727,20 +702,20 @@ class TestTypeChangeImpact:
 
 class TestMergeJournals:
     def test_404_when_target_missing(self, auth_client):
-        src = _seed_journal()
+        src = seed_journal()
         r = auth_client.post("/api/journals/999999999/merge", json={"source_id": src})
         assert r.status_code == 404
         assert "introuvable" in r.json()["detail"]
 
     def test_404_when_source_missing(self, auth_client):
-        dst = _seed_journal()
+        dst = seed_journal()
         r = auth_client.post(f"/api/journals/{dst}/merge", json={"source_id": 999999998})
         assert r.status_code == 404
         assert "introuvable" in r.json()["detail"]
 
     def test_happy_path(self, auth_client):
-        src = _seed_journal("MergeSrc")
-        dst = _seed_journal("MergeDst")
+        src = seed_journal("MergeSrc")
+        dst = seed_journal("MergeDst")
         r = auth_client.post(f"/api/journals/{dst}/merge", json={"source_id": src})
         assert r.status_code == 200
         body = r.json()
@@ -817,10 +792,10 @@ class TestJournalsPublisherFacet:
     """GET /api/journals/facets/entities : facette éditeur, décomptée en revues."""
 
     def test_counts_journals_per_publisher(self, client):
-        name = _uniq("FacetPublisher")
-        publisher_id = _seed_publisher(name)
-        _seed_journal(publisher_id=publisher_id)
-        _seed_journal(publisher_id=publisher_id)
+        name = uniq("FacetPublisher")
+        publisher_id = seed_publisher(name)
+        seed_journal(publisher_id=publisher_id)
+        seed_journal(publisher_id=publisher_id)
         r = client.get(
             "/api/journals/facets/entities",
             params={"kind": "publisher", "entity_search": name},
@@ -830,11 +805,11 @@ class TestJournalsPublisherFacet:
         assert counts == {publisher_id: 2}
 
     def test_entity_search_filters_on_the_publisher_name(self, client):
-        name = _uniq("Searchable")
-        wanted = _seed_publisher(name)
-        other = _seed_publisher(_uniq("Autre"))
-        _seed_journal(publisher_id=wanted)
-        _seed_journal(publisher_id=other)
+        name = uniq("Searchable")
+        wanted = seed_publisher(name)
+        other = seed_publisher(uniq("Autre"))
+        seed_journal(publisher_id=wanted)
+        seed_journal(publisher_id=other)
         r = client.get(
             "/api/journals/facets/entities",
             params={"kind": "publisher", "entity_search": name},
@@ -845,10 +820,10 @@ class TestJournalsPublisherFacet:
 
     def test_ignores_the_publisher_filter_but_honours_the_others(self, client):
         # La facette écarte sa propre dimension : un éditeur sélectionné ne réduit pas les options.
-        selected = _seed_publisher(_uniq("Selected"))
-        other = _seed_publisher(_uniq("Other"))
-        _seed_journal(publisher_id=selected)
-        proceedings = _seed_journal(publisher_id=other)
+        selected = seed_publisher(uniq("Selected"))
+        other = seed_publisher(uniq("Other"))
+        seed_journal(publisher_id=selected)
+        proceedings = seed_journal(publisher_id=other)
         with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (proceedings,)
@@ -877,7 +852,7 @@ class TestTracabiliteEdition:
     """
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
-        jid = _seed_journal(_uniq("Audit revue"))
+        jid = seed_journal(uniq("Audit revue"))
 
         issns = [{"issn": "1234-5679", "support": "print"}]
         r = auth_client.put(f"/api/journals/{jid}", json={"issns": issns})

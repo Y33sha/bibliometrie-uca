@@ -15,21 +15,7 @@ import uuid
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
-
-def _seed_publisher(name: str | None = None) -> int:
-    name = name or _uniq("Publisher")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO publishers (name, name_normalized) "
-            "VALUES (%s, normalize_name_form(%s)) RETURNING id",
-            (name, name),
-        )
-        return cur.fetchone()["id"]
+from tests.integration.helpers.seeds import seed_journal, seed_publisher, uniq
 
 
 def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
@@ -43,17 +29,6 @@ def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
     return prefix
 
 
-def _seed_journal(publisher_id: int, title: str | None = None) -> int:
-    title = title or _uniq("Journal")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO journals (title, title_normalized, publisher_id) "
-            "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
-            (title, title, publisher_id),
-        )
-        return cur.fetchone()["id"]
-
-
 def _add_in_perimeter_authorships(journal_id: int) -> None:
     """Pose un authorship in_perimeter (personne non rejetée) sur chaque
     publication de la revue : les requêtes publishers ne comptent que les
@@ -62,7 +37,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
         for pid in pub_ids:
-            name = _uniq("Author")
+            name = uniq("Author")
             cur.execute(
                 "INSERT INTO persons "
                 "(last_name, first_name, last_name_normalized, first_name_normalized) "
@@ -131,8 +106,8 @@ class TestListPublishers:
         assert r.status_code == 200
 
     def test_search_applied(self, client):
-        name = _uniq("Elsevier")
-        _seed_publisher(name)
+        name = uniq("Elsevier")
+        seed_publisher(name)
         r = client.get("/api/publishers", params={"search": name.lower()})
         assert r.status_code == 200
         assert any(p["name"] == name for p in r.json()["publishers"])
@@ -140,9 +115,9 @@ class TestListPublishers:
     def test_search_with_punctuation_normalizes(self, client):
         # `.` ne figure jamais dans name_normalized (normalize_text → espace).
         # La query doit subir la même normalisation pour matcher.
-        suffix = _uniq("Punct").split("_")[-1]
+        suffix = uniq("Punct").split("_")[-1]
         name = f"Acme S.A. Pub {suffix}"
-        _seed_publisher(name)
+        seed_publisher(name)
         r = client.get("/api/publishers", params={"search": f"Acme S.A. Pub {suffix}"})
         assert r.status_code == 200
         names = {p["name"] for p in r.json()["publishers"]}
@@ -173,7 +148,7 @@ class TestListPublishers:
         assert r.status_code == 422
 
     def test_filter_by_publisher_type(self, client):
-        pid = _seed_publisher()
+        pid = seed_publisher()
         with owner_pool() as cur:
             cur.execute("UPDATE publishers SET publisher_type = 'commercial' WHERE id = %s", (pid,))
         r = client.get("/api/publishers", params={"publisher_type": "commercial", "per_page": 200})
@@ -182,8 +157,8 @@ class TestListPublishers:
         assert types == {"commercial"}
 
     def test_filter_by_country(self, client):
-        pid = _seed_publisher()
-        country = _uniq("XX")[:5]  # code court unique
+        pid = seed_publisher()
+        country = uniq("XX")[:5]  # code court unique
         with owner_pool() as cur:
             cur.execute("UPDATE publishers SET country = %s WHERE id = %s", (country, pid))
         r = client.get("/api/publishers", params={"country": country, "per_page": 200})
@@ -193,10 +168,10 @@ class TestListPublishers:
 
     def test_with_pubs_excludes_orphan_publishers(self, client):
         # Éditeur sans aucune publi rattachée → exclu si with_pubs=true.
-        _seed_publisher("OrphanPub")
+        seed_publisher("OrphanPub")
         # Éditeur avec une revue et une publi → inclus.
-        with_data = _seed_publisher("WithPubsPub")
-        jid = _seed_journal(with_data)
+        with_data = seed_publisher("WithPubsPub")
+        jid = seed_journal(publisher_id=with_data)
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
@@ -211,7 +186,7 @@ class TestListPublishers:
 
     def test_with_pubs_default_false_includes_orphans(self, client):
         # Sans le flag, on liste tout comme avant.
-        _seed_publisher("OrphanDefault")
+        seed_publisher("OrphanDefault")
         r = client.get("/api/publishers", params={"per_page": 200})
         assert r.status_code == 200
         names = {p["name"] for p in r.json()["publishers"]}
@@ -223,8 +198,8 @@ class TestListPublishers:
 
 class TestPublishersFacets:
     def test_returns_2_dimensions(self, client):
-        pid = _seed_publisher()
-        country = _uniq("ZZ")[:5]
+        pid = seed_publisher()
+        country = uniq("ZZ")[:5]
         with owner_pool() as cur:
             cur.execute("UPDATE publishers SET country = %s WHERE id = %s", (country, pid))
         r = client.get("/api/publishers/facets")
@@ -244,7 +219,7 @@ class TestGetPublisher:
         assert r.status_code == 404
 
     def test_returns_existing_with_detail_keys(self, client):
-        pid = _seed_publisher("TestGetPub")
+        pid = seed_publisher("TestGetPub")
         r = client.get(f"/api/publishers/{pid}")
         assert r.status_code == 200
         body = r.json()
@@ -260,8 +235,8 @@ class TestGetPublisher:
 
     def test_doi_prefixes_aggregated(self, client):
         """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
-        name = _uniq("PrefixedPub")
-        pid = _seed_publisher(name)
+        name = uniq("PrefixedPub")
+        pid = seed_publisher(name)
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
@@ -278,8 +253,8 @@ class TestGetPublisher:
 
     def test_doi_prefixes_in_list(self, client):
         """Régression : la colonne « Préfixes DOI » du tableau des éditeurs restait vide, la liste ne les renvoyant pas."""
-        name = _uniq("ListedPrefixedPub")
-        pid = _seed_publisher(name)
+        name = uniq("ListedPrefixedPub")
+        pid = seed_publisher(name)
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.9010', 'Crossref', %s)",
@@ -300,7 +275,7 @@ class TestPublisherDashboard:
         assert r.status_code == 404
 
     def test_empty_distributions_for_publisher_without_journals(self, client):
-        pid = _seed_publisher()
+        pid = seed_publisher()
         r = client.get(f"/api/publishers/{pid}/dashboard")
         assert r.status_code == 200
         body = r.json()
@@ -312,9 +287,9 @@ class TestPublisherDashboard:
         }
 
     def test_aggregates_journals_and_publications(self, client):
-        pid = _seed_publisher()
-        j_journal = _seed_journal(pid)
-        j_proc = _seed_journal(pid)
+        pid = seed_publisher()
+        j_journal = seed_journal(publisher_id=pid)
+        j_proc = seed_journal(publisher_id=pid)
         with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET journal_type = 'journal' WHERE id = %s",
@@ -350,14 +325,14 @@ class TestPublisherDashboard:
 
 class TestPublisherSubjects:
     def test_returns_empty_for_publisher_without_pubs(self, client):
-        pid = _seed_publisher()
+        pid = seed_publisher()
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200
         assert r.json() == []
 
     def test_returns_top_subjects_excluding_generic(self, client):
-        pid = _seed_publisher()
-        jid = _seed_journal(pid)
+        pid = seed_publisher()
+        jid = seed_journal(publisher_id=pid)
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) "
@@ -365,13 +340,13 @@ class TestPublisherSubjects:
                 (jid, jid),
             )
             pub_ids = [r["id"] for r in cur.fetchall()]
-            specific_label = _uniq("specific_subject")
+            specific_label = uniq("specific_subject")
             cur.execute(
                 "INSERT INTO subjects (label, usage_count) VALUES (%s, 100) RETURNING id",
                 (specific_label,),
             )
             spec_id = cur.fetchone()["id"]
-            generic_label = _uniq("generic_subject")
+            generic_label = uniq("generic_subject")
             cur.execute(
                 "INSERT INTO subjects (label, usage_count) VALUES (%s, 9999) RETURNING id",
                 (generic_label,),
@@ -393,7 +368,7 @@ class TestPublisherSubjects:
         assert spec_entry["count"] == 2
 
     def test_limit_above_max_rejected(self, client):
-        pid = _seed_publisher()
+        pid = seed_publisher()
         r = client.get(f"/api/publishers/{pid}/subjects", params={"limit": 500})
         assert r.status_code == 422
 
@@ -407,7 +382,7 @@ class TestUpdatePublisher:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        pid = _seed_publisher()
+        pid = seed_publisher()
         r = auth_client.put(
             f"/api/publishers/{pid}",
             json={
@@ -428,18 +403,18 @@ class TestMergePublishers:
         assert r.status_code == 401
 
     def test_target_not_found(self, auth_client):
-        src = _seed_publisher()
+        src = seed_publisher()
         r = auth_client.post("/api/publishers/999999999/merge", json={"source_id": src})
         assert r.status_code == 404
 
     def test_source_not_found(self, auth_client):
-        dst = _seed_publisher()
+        dst = seed_publisher()
         r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": 999999998})
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        src = _seed_publisher("MergeSrc")
-        dst = _seed_publisher("MergeDst")
+        src = seed_publisher("MergeSrc")
+        dst = seed_publisher("MergeDst")
         r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": src})
         assert r.status_code == 200
         body = r.json()
@@ -448,8 +423,8 @@ class TestMergePublishers:
         assert body["target_id"] == dst
 
     def test_refused_on_distinct_crossref_members(self, auth_client):
-        src = _seed_publisher("MembreSrc")
-        dst = _seed_publisher("MembreDst")
+        src = seed_publisher("MembreSrc")
+        dst = seed_publisher("MembreDst")
         _seed_doi_prefix(src, crossref_member_id=793)
         _seed_doi_prefix(dst, crossref_member_id=297)
         r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": src})
@@ -457,8 +432,8 @@ class TestMergePublishers:
         assert "793" in r.json()["detail"]
 
     def test_merges_when_a_crossref_member_is_shared(self, auth_client):
-        src = _seed_publisher("MembrePartageSrc")
-        dst = _seed_publisher("MembrePartageDst")
+        src = seed_publisher("MembrePartageSrc")
+        dst = seed_publisher("MembrePartageDst")
         _seed_doi_prefix(src, crossref_member_id=297)
         _seed_doi_prefix(dst, crossref_member_id=297)
         r = auth_client.post(f"/api/publishers/{dst}/merge", json={"source_id": src})
@@ -496,7 +471,7 @@ class TestTracabilite:
     """
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
-        pid = _seed_publisher(_uniq("Audit éditeur"))
+        pid = seed_publisher(uniq("Audit éditeur"))
 
         r = auth_client.put(f"/api/publishers/{pid}", json={"country": "FR"})
         assert r.status_code == 200, r.text

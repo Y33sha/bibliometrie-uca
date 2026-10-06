@@ -8,26 +8,10 @@ Couvre :
 - GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
-import uuid
-
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
-
-def _seed_structure(code: str | None = None, type_: str = "labo") -> int:
-    code = code or _uniq("STR")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (%s, %s, %s::structure_type) RETURNING id",
-            (code, code, type_),
-        )
-        return cur.fetchone()["id"]
+from tests.integration.helpers.seeds import seed_structure, seed_structure_name_form, uniq
 
 
 def _seed_tutelle(parent_id: int, child_id: int) -> int:
@@ -35,17 +19,6 @@ def _seed_tutelle(parent_id: int, child_id: int) -> int:
         cur.execute(
             "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s) RETURNING id",
             (parent_id, child_id),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_name_form(structure_id: int, form_text: str | None = None) -> int:
-    form_text = form_text or _uniq("form")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-            "VALUES (%s, %s, char_length(%s) <= 6) RETURNING id",
-            (structure_id, form_text, form_text),
         )
         return cur.fetchone()["id"]
 
@@ -70,14 +43,14 @@ class TestListStructures:
         assert isinstance(r.json(), list)
 
     def test_filter_by_type(self, client):
-        _seed_structure(type_="labo")
+        seed_structure(type_="labo")
         r = client.get("/api/structures", params={"structure_type": "labo"})
         assert r.status_code == 200
         assert all(s["type"] == "labo" for s in r.json())
 
     def test_filter_by_search(self, client):
-        code = _uniq("FINDME")
-        _seed_structure(code=code)
+        code = uniq("FINDME")
+        seed_structure(code=code)
         r = client.get("/api/structures", params={"search": code})
         assert r.status_code == 200
         assert any(s["code"] == code for s in r.json())
@@ -101,7 +74,7 @@ class TestGetStructure:
         assert r.status_code == 404
 
     def test_ok_minimal(self, client):
-        sid = _seed_structure()
+        sid = seed_structure()
         r = client.get(f"/api/structures/{sid}")
         assert r.status_code == 200
         body = r.json()
@@ -111,11 +84,11 @@ class TestGetStructure:
         assert body["forms"] == []
 
     def test_ok_with_relations_and_forms(self, client):
-        parent = _seed_structure(type_="universite")
-        child = _seed_structure(type_="labo")
+        parent = seed_structure(type_="universite")
+        child = seed_structure(type_="labo")
         _seed_tutelle(parent, child)
-        _seed_name_form(child, _uniq("FormA"))
-        _seed_name_form(child, _uniq("FormB"))
+        seed_structure_name_form(child, uniq("FormA"))
+        seed_structure_name_form(child, uniq("FormB"))
 
         r = client.get(f"/api/structures/{child}")
         assert r.status_code == 200
@@ -141,7 +114,7 @@ class TestCreateStructure:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        code = _uniq("CREATE")
+        code = uniq("CREATE")
         r = auth_client.post(
             "/api/structures",
             json={
@@ -165,7 +138,7 @@ class TestCreateStructure:
         # est commitée avant l'envoi de la réponse, donc lisible depuis une connexion
         # indépendante. Garde-fou du passage final du teardown de db_conn en
         # rollback — un command handler sans `commit()` ferait alors échouer ce test.
-        code = _uniq("READBACK")
+        code = uniq("READBACK")
         r = auth_client.post(
             "/api/structures",
             json={"code": code, "name": "Readback", "type": "labo"},
@@ -186,7 +159,7 @@ class TestUpdateStructure:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        sid = _seed_structure()
+        sid = seed_structure()
         r = auth_client.put(
             f"/api/structures/{sid}",
             json={"name": "Renommée", "acronym": "REN"},
@@ -205,7 +178,7 @@ class TestDeleteStructure:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        sid = _seed_structure()
+        sid = seed_structure()
         r = auth_client.delete(f"/api/structures/{sid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
@@ -223,8 +196,8 @@ class TestCreateRelation:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        parent = _seed_structure(type_="universite")
-        child = _seed_structure(type_="labo")
+        parent = seed_structure(type_="universite")
+        child = seed_structure(type_="labo")
         r = auth_client.post(
             "/api/structures/tutelles",
             json={
@@ -238,8 +211,8 @@ class TestCreateRelation:
         assert "status" in body or "id" in body or "relation_id" in body
 
     def test_duplicate_already_exists(self, auth_client):
-        parent = _seed_structure(type_="universite")
-        child = _seed_structure(type_="labo")
+        parent = seed_structure(type_="universite")
+        child = seed_structure(type_="labo")
         _seed_tutelle(parent, child)
         r = auth_client.post(
             "/api/structures/tutelles",
@@ -253,7 +226,7 @@ class TestCreateRelation:
 
     def test_conflict_when_a_structure_is_missing(self, auth_client):
         """`parent_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
-        child = _seed_structure(type_="labo")
+        child = seed_structure(type_="labo")
         r = auth_client.post(
             "/api/structures/tutelles",
             json={"parent_id": 999999999, "child_id": child},
@@ -271,8 +244,8 @@ class TestDeleteRelation:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        parent = _seed_structure(type_="universite")
-        child = _seed_structure(type_="labo")
+        parent = seed_structure(type_="universite")
+        child = seed_structure(type_="labo")
         rid = _seed_tutelle(parent, child)
         r = auth_client.delete(f"/api/structures/tutelles/{rid}")
         assert r.status_code == 200
@@ -288,8 +261,8 @@ class TestGetNameForm:
         assert r.status_code == 404
 
     def test_ok(self, client):
-        sid = _seed_structure()
-        fid = _seed_name_form(sid)
+        sid = seed_structure()
+        fid = seed_structure_name_form(sid)
         r = client.get(f"/api/structures/name-forms/{fid}")
         assert r.status_code == 200
         assert r.json()["id"] == fid
@@ -301,12 +274,12 @@ class TestCreateNameForm:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        sid = _seed_structure()
+        sid = seed_structure()
         r = auth_client.post(
             "/api/structures/name-forms",
             json={
                 "structure_id": sid,
-                "form_text": _uniq("F"),
+                "form_text": uniq("F"),
                 "is_word_boundary": True,
                 "is_excluding": False,
             },
@@ -315,13 +288,13 @@ class TestCreateNameForm:
         assert "id" in r.json()
 
     def test_with_requires_context(self, auth_client):
-        sid = _seed_structure()
-        ctx = _seed_structure()
+        sid = seed_structure()
+        ctx = seed_structure()
         r = auth_client.post(
             "/api/structures/name-forms",
             json={
                 "structure_id": sid,
-                "form_text": _uniq("Fctx"),
+                "form_text": uniq("Fctx"),
                 "requires_context_of": [ctx],
             },
         )
@@ -331,7 +304,7 @@ class TestCreateNameForm:
         """`structure_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
         r = auth_client.post(
             "/api/structures/name-forms",
-            json={"structure_id": 999999999, "form_text": _uniq("Fghost")},
+            json={"structure_id": 999999999, "form_text": uniq("Fghost")},
         )
         assert r.status_code == 409
 
@@ -346,11 +319,11 @@ class TestUpdateNameForm:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        sid = _seed_structure()
-        fid = _seed_name_form(sid)
+        sid = seed_structure()
+        fid = seed_structure_name_form(sid)
         r = auth_client.put(
             f"/api/structures/name-forms/{fid}",
-            json={"form_text": _uniq("UpF"), "is_excluding": True},
+            json={"form_text": uniq("UpF"), "is_excluding": True},
         )
         assert r.status_code == 200
 
@@ -365,8 +338,8 @@ class TestDeleteNameForm:
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        sid = _seed_structure()
-        fid = _seed_name_form(sid)
+        sid = seed_structure()
+        fid = seed_structure_name_form(sid)
         r = auth_client.delete(f"/api/structures/name-forms/{fid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
