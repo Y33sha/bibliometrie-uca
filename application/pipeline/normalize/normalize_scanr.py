@@ -35,6 +35,7 @@ from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.impact import Impact
 from domain.sources.scanr import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
@@ -257,7 +258,7 @@ def insert_scanr_document(  # noqa: C901
             topics=topics,
             oa_status=pub_meta.oa_status,
             urls=urls or None,
-            cited_by_count=cited_by_count,
+            impact=Impact(cited_by_count=cited_by_count).to_json(),
         ),
     )
 

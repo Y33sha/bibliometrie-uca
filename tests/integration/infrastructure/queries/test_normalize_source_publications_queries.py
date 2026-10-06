@@ -67,16 +67,15 @@ class TestUpsertSourcePublication:
         """Le dernier import fait autorité : une valeur absente de l'import courant est effacée."""
         staging_id = _create_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(
-            sa_sync_conn, _row(staging_id, cited_by_count=500, abstract="Un résumé", language="fr")
+            sa_sync_conn,
+            _row(staging_id, impact={"cited_by_count": 500}, abstract="Un résumé", language="fr"),
         )
         _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         row = sa_sync_conn.execute(
-            text(
-                "SELECT cited_by_count, abstract, language FROM source_publications WHERE id = :id"
-            ),
+            text("SELECT impact, abstract, language FROM source_publications WHERE id = :id"),
             {"id": sp_id},
         ).one()
-        assert row.cited_by_count is None
+        assert row.impact is None
         assert row.abstract is None
         assert row.language is None
 

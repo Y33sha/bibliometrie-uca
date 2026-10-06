@@ -869,7 +869,7 @@ source_publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("urls", ARRAY(Text)),
-    Column("cited_by_count", Integer),
+    Column("impact", Jsonb),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("oa_status", Text),
@@ -898,6 +898,10 @@ source_publications = Table(
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",
         name="source_publications_external_ids_is_object",
+    ),
+    CheckConstraint(
+        "impact IS NULL OR jsonb_typeof(impact) = 'object'",
+        name="source_publications_impact_is_object",
     ),
     CheckConstraint(
         "jsonb_typeof(raw_metadata) = 'object'",

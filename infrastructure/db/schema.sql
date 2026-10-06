@@ -850,7 +850,6 @@ CREATE TABLE public.source_publications (
     hal_collections text[],
     external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
     urls text[],
-    cited_by_count integer,
     journal_id integer,
     oa_status text,
     language text,
@@ -868,7 +867,9 @@ CREATE TABLE public.source_publications (
     embargo_until date,
     monograph_id integer,
     authors_hash text,
+    impact jsonb,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
 

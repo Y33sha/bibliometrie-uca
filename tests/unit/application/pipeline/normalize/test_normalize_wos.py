@@ -843,7 +843,7 @@ class TestInsertWosDocument:
         assert row_arg.oa_status == "gold"
         assert row_arg.language == "en"
         assert row_arg.abstract == "abs"
-        assert row_arg.cited_by_count == 9
+        assert row_arg.impact == {"cited_by_count": 9}
         assert row_arg.staging_id == 10
 
     def test_none_pub_meta_values_propagate(self):

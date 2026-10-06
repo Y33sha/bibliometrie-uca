@@ -16,7 +16,7 @@ from domain.types import JsonValue
 class SourcePublicationUpsert:
     """Un enregistrement `source_publications` tel qu'une source le fournit, prêt à être écrit.
 
-    Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas de compte de citations, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
+    Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas d'indicateur de citation, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
     Deux colonnes de `source_publications` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture. `publication_id` est le rattachement à la publication canonique, que la phase `publications` pose et que l'import ne connaît pas.
     """
@@ -51,8 +51,9 @@ class SourcePublicationUpsert:
     urls: list[str] | None = None
     embargo_until: date | None = None
 
-    # Métriques et drapeaux
-    cited_by_count: int | None = None
+    # Citations et drapeaux
+    impact: JsonValue = None
+    """Indicateurs de citation, construits par `domain.source_publications.impact.Impact.to_json`."""
     is_retracted: bool | None = None
 
     # Collections HAL

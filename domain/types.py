@@ -32,6 +32,21 @@ def as_int(value: JsonValue) -> int | None:
     return value if isinstance(value, int) else None
 
 
+def as_float(value: JsonValue) -> float | None:
+    """Nombre porté par `value`, ou `None` si elle n'en porte pas. Un entier est converti en flottant, un booléen écarté."""
+    if isinstance(value, bool):
+        return None
+    return float(value) if isinstance(value, int | float) else None
+
+
+def as_bool(value: JsonValue) -> bool | None:
+    """Booléen porté par `value`, ou `None` si elle n'en porte pas.
+
+    Aucune conversion : `0`, `"false"` ou une chaîne vide reçus là où un booléen est attendu signalent une donnée d'une autre nature.
+    """
+    return value if isinstance(value, bool) else None
+
+
 def as_mapping(value: JsonValue) -> Mapping[str, JsonValue]:
     """Objet porté par `value`, ou un objet vide.
 

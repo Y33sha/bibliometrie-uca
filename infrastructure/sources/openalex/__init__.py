@@ -42,6 +42,8 @@ SELECT_FIELDS = ",".join(
         "authorships",
         "open_access",
         "cited_by_count",
+        "fwci",
+        "citation_normalized_percentile",
         "biblio",
         "is_retracted",
         "topics",
