@@ -7,16 +7,13 @@ Identique à test_addresses_api.py : seed minimal via un pool dédié
 collisions entre cas.
 """
 
-import uuid
-
 import pytest
 
-from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+from tests.integration.helpers.seeds import (
+    seed_person,
+    uniq,
+)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -33,73 +30,12 @@ def _cleanup_after_module():
         )
 
 
-def _seed_person(last: str = "TESTP", first: str = "J") -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
-            (last, first, last, first),
-        )
-        return cur.fetchone()["id"]
-
-
 def _seed_identifier(person_id: int, id_type: str, id_value: str, status: str = "pending") -> int:
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
             "VALUES (%s, %s, %s, 'manual', %s::identifier_status) RETURNING id",
             (person_id, id_type, id_value, status),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_publication(title: str = "T", year: int = 2024) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO publications (title, title_normalized, pub_year) "
-            "VALUES (%s, lower(%s), %s) RETURNING id",
-            (title, title, year),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_source_publication(source: str = "hal", source_id: str | None = None) -> int:
-    sid = source_id or _uniq("sid")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, pub_year) "
-            "VALUES (%s, %s, 'T', 2024) RETURNING id",
-            (source, sid),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_source_authorship(
-    source: str = "hal",
-    source_pub_id: int | None = None,
-    person_id: int | None = None,
-    authorship_id: int | None = None,
-    in_perimeter: bool = True,
-    raw_author_name: str = "Test Author",
-    author_position: int = 0,
-) -> int:
-    sp = source_pub_id or _seed_source_publication(source=source)
-    with owner_pool() as cur:
-        iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
-        cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, authorship_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (
-                source,
-                sp,
-                author_position,
-                person_id,
-                authorship_id,
-                in_perimeter,
-                raw_author_name,
-                iid,
-            ),
         )
         return cur.fetchone()["id"]
 
@@ -171,7 +107,7 @@ class TestPersonProfileIdentifiers:
 
         La règle tient dans la lecture, non dans la page : tout client de l'API en dépend.
         """
-        person = _seed_person(last="REJECTEDID")
+        person = seed_person(last="REJECTEDID")
         _seed_identifier(person, "orcid", "0000-0002-0000-0001", status="rejected")
         _seed_identifier(person, "orcid", "0000-0002-0000-0002", status="confirmed")
 
@@ -246,12 +182,12 @@ class TestPersonDetail:
         assert r.status_code in (200, 404)
 
     def test_profile_ok(self, client):
-        pid = _seed_person("Profileur", "Zoé")
+        pid = seed_person("Profileur", "Zoé")
         r = client.get(f"/api/persons/{pid}")
         assert r.status_code == 200
 
     def test_addresses_ok(self, client):
-        pid = _seed_person("Addressed", "Léa")
+        pid = seed_person("Addressed", "Léa")
         r = client.get(f"/api/persons/{pid}/addresses", params={"page": 1, "per_page": 50})
         assert r.status_code == 200
 
@@ -269,7 +205,7 @@ class TestAddIdentifier:
 
     def test_invalid_id_type(self, auth_client):
         # Valeur hors de l'énum `PersonIdentifierType` : rejetée au bord par Pydantic (422).
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "unknown", "id_value": "whatever"},
@@ -277,7 +213,7 @@ class TestAddIdentifier:
         assert r.status_code == 422
 
     def test_empty_value_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "   "},
@@ -285,7 +221,7 @@ class TestAddIdentifier:
         assert r.status_code == 422
 
     def test_invalid_orcid_format(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "orcid", "id_value": "not-an-orcid"},
@@ -293,7 +229,7 @@ class TestAddIdentifier:
         assert r.status_code == 422
 
     def test_orcid_url_is_normalized(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={
@@ -307,7 +243,7 @@ class TestAddIdentifier:
         assert body["id_value"] == "0000-0001-2222-3333"
 
     def test_idhal_is_normalized(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "  Jean-Dupont  "},
@@ -316,7 +252,7 @@ class TestAddIdentifier:
         assert r.json()["id_value"] == "jean-dupont"
 
     def test_invalid_idref_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idref", "id_value": "123456"},
@@ -331,7 +267,7 @@ class TestAddIdentifier:
         assert r.status_code == 404
 
     def test_already_exists_same_person(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         _seed_identifier(pid, "idhal", "same-person-id")
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
@@ -343,8 +279,8 @@ class TestAddIdentifier:
         assert body["reason"] == "already_exists"
 
     def test_conflict_other_person_not_rejected(self, auth_client):
-        other = _seed_person()
-        pid = _seed_person()
+        other = seed_person()
+        pid = seed_person()
         _seed_identifier(other, "idhal", "conflict-id", status="confirmed")
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
@@ -353,8 +289,8 @@ class TestAddIdentifier:
         assert r.status_code == 409
 
     def test_reassign_from_rejected(self, auth_client):
-        other = _seed_person()
-        pid = _seed_person()
+        other = seed_person()
+        pid = seed_person()
         _seed_identifier(other, "idhal", "reassignable-id", status="rejected")
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
@@ -372,8 +308,8 @@ class TestUpdateIdentifierStatus:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        pid = _seed_person()
-        iid = _seed_identifier(pid, "idhal", _uniq("st"))
+        pid = seed_person()
+        iid = _seed_identifier(pid, "idhal", uniq("st"))
         r = auth_client.patch(
             f"/api/persons/identifiers/{iid}/status", json={"status": "confirmed"}
         )
@@ -387,17 +323,17 @@ class TestReassignIdentifier:
         assert r.status_code == 401
 
     def test_target_not_found(self, auth_client):
-        pid = _seed_person()
-        iid = _seed_identifier(pid, "idhal", _uniq("ra"))
+        pid = seed_person()
+        iid = _seed_identifier(pid, "idhal", uniq("ra"))
         r = auth_client.patch(
             f"/api/persons/identifiers/{iid}/reassign", json={"person_id": 999999999}
         )
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        src = _seed_person()
-        dst = _seed_person()
-        iid = _seed_identifier(src, "idhal", _uniq("ra"), status="rejected")
+        src = seed_person()
+        dst = seed_person()
+        iid = _seed_identifier(src, "idhal", uniq("ra"), status="rejected")
         r = auth_client.patch(f"/api/persons/identifiers/{iid}/reassign", json={"person_id": dst})
         assert r.status_code == 200
         body = r.json()
@@ -414,7 +350,7 @@ class TestSetPersonExclusion:
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.patch(
             f"/api/persons/{pid}/exclusion", json={"exclusion": "out_of_perimeter"}
         )
@@ -422,7 +358,7 @@ class TestSetPersonExclusion:
         assert r.json()["ok"] is True
 
     def test_unknown_reason_is_422(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.patch(f"/api/persons/{pid}/exclusion", json={"exclusion": "autre"})
         assert r.status_code == 422
 
@@ -433,14 +369,14 @@ class TestUpdatePersonName:
         assert r.status_code == 401
 
     def test_empty_last_name_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.patch(
             f"/api/persons/{pid}/name", json={"last_name": "   ", "first_name": "Y"}
         )
         assert r.status_code == 422
 
     def test_ok(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.patch(
             f"/api/persons/{pid}/name", json={"last_name": "Nouveau", "first_name": "Prénom"}
         )
@@ -452,8 +388,8 @@ class TestUpdatePersonName:
         # avant l'envoi de la réponse, donc l'écriture est lisible depuis une
         # connexion indépendante. Garde-fou du passage final du teardown de
         # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
-        pid = _seed_person()
-        marker = _uniq("READBACK")
+        pid = seed_person()
+        marker = uniq("READBACK")
         r = auth_client.patch(
             f"/api/persons/{pid}/name", json={"last_name": marker, "first_name": "Z"}
         )
@@ -469,23 +405,23 @@ class TestMergePersons:
         assert r.status_code == 401
 
     def test_same_id_rejected(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(f"/api/persons/{pid}/merge", json={"source_id": pid})
         assert r.status_code == 422
 
     def test_target_not_found(self, auth_client):
-        src = _seed_person()
+        src = seed_person()
         r = auth_client.post("/api/persons/999999999/merge", json={"source_id": src})
         assert r.status_code == 404
 
     def test_source_not_found(self, auth_client):
-        dst = _seed_person()
+        dst = seed_person()
         r = auth_client.post(f"/api/persons/{dst}/merge", json={"source_id": 999999998})
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
-        src = _seed_person("MergeSrc")
-        dst = _seed_person("MergeDst")
+        src = seed_person("MergeSrc")
+        dst = seed_person("MergeDst")
         r = auth_client.post(f"/api/persons/{dst}/merge", json={"source_id": src})
         assert r.status_code == 200
         body = r.json()
@@ -499,8 +435,8 @@ class TestMergePersons:
 
 class TestNameFormAuthorships:
     def test_ok(self, client):
-        pid = _seed_person("Nameform", "Test")
-        nf = _uniq("Nameform Test")
+        pid = seed_person("Nameform", "Test")
+        nf = uniq("Nameform Test")
         _seed_name_form(pid, nf)
         r = client.get(f"/api/persons/{pid}/name-form-authorships", params={"name_form": nf})
         assert r.status_code == 200
@@ -515,7 +451,7 @@ class TestDetachAuthorships:
         assert r.status_code == 401
 
     def test_ok_empty(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/detach-authorships",
             json={"authorships": []},
@@ -531,8 +467,8 @@ class TestUpdateNameFormStatus:
         assert r.status_code == 401
 
     def test_reject_sets_status(self, auth_client):
-        pid = _seed_person("RejectForm", "Nf")
-        nf = _uniq("RejectForm Nf")
+        pid = seed_person("RejectForm", "Nf")
+        nf = uniq("RejectForm Nf")
         _seed_name_form(pid, nf, source="hal")
         r = auth_client.patch(
             f"/api/persons/{pid}/name-forms/status", json={"name_form": nf, "status": "rejected"}
@@ -544,7 +480,7 @@ class TestUpdateNameFormStatus:
         assert body["status"] == "rejected"
 
     def test_unknown_form_404(self, auth_client):
-        pid = _seed_person("UnknownForm", "Nf")
+        pid = seed_person("UnknownForm", "Nf")
         r = auth_client.patch(
             f"/api/persons/{pid}/name-forms/status",
             json={"name_form": "inexistante zzz", "status": "confirmed"},
@@ -559,18 +495,18 @@ class TestPersonDashboardAndSubjects:
         assert r.status_code == 200
 
     def test_dashboard_of_seeded_person(self, client):
-        pid = _seed_person("Dash", "Bo")
+        pid = seed_person("Dash", "Bo")
         r = client.get(f"/api/persons/{pid}/dashboard")
         assert r.status_code == 200
 
     def test_subjects_of_person_without_publication(self, client):
-        pid = _seed_person("Subj", "Ec")
+        pid = seed_person("Subj", "Ec")
         r = client.get(f"/api/persons/{pid}/subjects")
         assert r.status_code == 200
         assert r.json() == []
 
     def test_subjects_honours_limit(self, client):
-        pid = _seed_person("SubjLim", "Ec")
+        pid = seed_person("SubjLim", "Ec")
         r = client.get(f"/api/persons/{pid}/subjects", params={"limit": 5})
         assert r.status_code == 200
 
@@ -611,22 +547,22 @@ class TestPersonAdminProjection:
         assert r.status_code == 404
 
     def test_returns_seeded_person(self, client):
-        pid = _seed_person("AdminProj", "Ec")
+        pid = seed_person("AdminProj", "Ec")
         r = client.get(f"/api/persons/{pid}/curation")
         assert r.status_code == 200
         assert r.json()["id"] == pid
 
     def test_sharing_name_forms_without_sharer(self, client):
-        pid = _seed_person("Sharing", "Ec")
-        _seed_name_form(pid, _uniq("sharing ec"))
+        pid = seed_person("Sharing", "Ec")
+        _seed_name_form(pid, uniq("sharing ec"))
         r = client.get(f"/api/persons/{pid}/sharing-name-forms")
         assert r.status_code == 200
         assert r.json() == []
 
     def test_sharing_name_forms_finds_sharer(self, client):
-        form = _uniq("partagee ec")
-        a = _seed_person("SharedA", "Ec")
-        b = _seed_person("SharedB", "Ec")
+        form = uniq("partagee ec")
+        a = seed_person("SharedA", "Ec")
+        b = seed_person("SharedB", "Ec")
         _seed_name_form(a, form)
         _seed_name_form(b, form)
         r = client.get(f"/api/persons/{a}/sharing-name-forms")
@@ -640,15 +576,15 @@ class TestMarkPersonsDistinct:
         assert r.status_code == 401
 
     def test_marks_pair(self, auth_client):
-        a = _seed_person("DistinctA", "Ec")
-        b = _seed_person("DistinctB", "Ec")
+        a = seed_person("DistinctA", "Ec")
+        b = seed_person("DistinctB", "Ec")
         r = auth_client.post(
             "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": b}
         )
         assert r.status_code == 200
 
     def test_rejects_same_person(self, auth_client):
-        a = _seed_person("DistinctSame", "Ec")
+        a = seed_person("DistinctSame", "Ec")
         r = auth_client.post(
             "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
         )
@@ -675,7 +611,7 @@ class TestTracabilite:
     """
 
     def test_le_changement_de_nom_est_consigne(self, auth_client):
-        pid = _seed_person("AVANT", "A")
+        pid = seed_person("AVANT", "A")
 
         r = auth_client.patch(
             f"/api/persons/{pid}/name", json={"last_name": "APRES", "first_name": "B"}
@@ -688,7 +624,7 @@ class TestTracabilite:
         assert evenements[0]["user_id"]
 
     def test_l_ajout_d_un_identifiant_est_consigne(self, auth_client):
-        pid = _seed_person()
+        pid = seed_person()
 
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
@@ -706,7 +642,7 @@ class TestTracabilite:
 
     def test_un_ajout_sans_effet_ne_consigne_rien(self, auth_client):
         """Réattribuer le même identifiant à la même personne ne décide rien : l'appel est idempotent."""
-        pid = _seed_person()
+        pid = seed_person()
         corps = {"id_type": "idhal", "id_value": "audit-idempotent"}
         assert auth_client.post(f"/api/persons/{pid}/identifiers", json=corps).status_code == 200
         assert auth_client.post(f"/api/persons/{pid}/identifiers", json=corps).status_code == 200

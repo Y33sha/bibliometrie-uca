@@ -10,36 +10,11 @@ Couvre :
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
-
-
-def _seed_structure(code: str | None = None, type_: str = "universite") -> int:
-    code = code or _uniq("STRUCT")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (%s, %s, CAST(%s AS structure_type)) RETURNING id",
-            (code, code, type_),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_perimeter(code: str | None = None, root_structure_ids: list[int] | None = None) -> int:
-    code = code or _uniq("perim")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s) RETURNING id",
-            (code, code, root_structure_ids or []),
-        )
-        return cur.fetchone()["id"]
+from tests.integration.helpers.seeds import seed_perimeter, seed_structure, uniq
 
 
 def _set_config(key: str, value: str) -> None:
@@ -73,8 +48,8 @@ class TestListPerimeters:
         assert isinstance(r.json(), list)
 
     def test_lists_seeded_perimeter(self, client):
-        code = _uniq("listp")
-        pid = _seed_perimeter(code=code)
+        code = uniq("listp")
+        pid = seed_perimeter(code=code)
         r = client.get("/api/perimeters")
         assert r.status_code == 200
         ids = [p["id"] for p in r.json()]
@@ -83,7 +58,7 @@ class TestListPerimeters:
 
 class TestCreatePerimeter:
     def test_creates_perimeter(self, auth_client):
-        code = _uniq("create")
+        code = uniq("create")
         r = auth_client.post(
             "/api/perimeters",
             json={"code": code, "name": "Created"},
@@ -98,7 +73,7 @@ class TestCreatePerimeter:
             assert row["name"] == "Created"
 
     def test_strips_whitespace(self, auth_client):
-        code = _uniq("strip")
+        code = uniq("strip")
         r = auth_client.post(
             "/api/perimeters",
             json={"code": f"  {code}  ", "name": "  TrimMe  "},
@@ -113,7 +88,7 @@ class TestCreatePerimeter:
 
 class TestUpdatePerimeter:
     def test_partial_update_strips_name(self, auth_client):
-        pid = _seed_perimeter()
+        pid = seed_perimeter()
         r = auth_client.put(
             f"/api/perimeters/{pid}",
             json={"name": "  NewName  "},
@@ -126,9 +101,9 @@ class TestUpdatePerimeter:
             assert row["name"] == "NewName"
 
     def test_update_structure_ids(self, auth_client):
-        s1 = _seed_structure()
-        s2 = _seed_structure()
-        pid = _seed_perimeter(root_structure_ids=[s1])
+        s1 = seed_structure(type_="universite")
+        s2 = seed_structure(type_="universite")
+        pid = seed_perimeter(root_structure_ids=[s1])
         r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [s1, s2]})
         assert r.status_code == 200
         with owner_pool() as cur:
@@ -138,7 +113,7 @@ class TestUpdatePerimeter:
 
 class TestDeletePerimeter:
     def test_deletes_when_unused(self, auth_client):
-        pid = _seed_perimeter()
+        pid = seed_perimeter()
         r = auth_client.delete(f"/api/perimeters/{pid}")
         assert r.status_code == 200
         assert r.json() == {"ok": True}
@@ -148,8 +123,8 @@ class TestDeletePerimeter:
 
     def test_refuses_when_used_in_pipeline_config(self, auth_client):
         # delete_perimeter refuse si une config pipeline référence son code.
-        code = _uniq("inuse")
-        pid = _seed_perimeter(code=code)
+        code = uniq("inuse")
+        pid = seed_perimeter(code=code)
         _set_config("perimeter_persons", code)
         try:
             r = auth_client.delete(f"/api/perimeters/{pid}")
@@ -174,27 +149,27 @@ class TestMaterializedPerimeterStructures:
     sans attendre le pipeline (racine + descendants `est_tutelle_de`)."""
 
     def test_adding_root_materializes_closure(self, auth_client):
-        root = _seed_structure()
-        lab = _seed_structure(type_="labo")
+        root = seed_structure(type_="universite")
+        lab = seed_structure(type_="labo")
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
                 (root, lab),
             )
-        pid = _seed_perimeter()
+        pid = seed_perimeter()
         r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [root]})
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}
 
     def test_creating_with_roots_materializes_closure(self, auth_client):
-        root = _seed_structure()
-        lab = _seed_structure(type_="labo")
+        root = seed_structure(type_="universite")
+        lab = seed_structure(type_="labo")
         with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
                 (root, lab),
             )
-        code = _uniq("withroots")
+        code = uniq("withroots")
         r = auth_client.post(
             "/api/perimeters", json={"code": code, "name": code, "root_structure_ids": [root]}
         )
@@ -202,9 +177,9 @@ class TestMaterializedPerimeterStructures:
         assert _perimeter_structure_ids(r.json()["id"]) == {root, lab}
 
     def test_creating_tutelle_relation_materializes_new_descendant(self, auth_client):
-        root = _seed_structure()
-        lab = _seed_structure(type_="labo")
-        pid = _seed_perimeter(root_structure_ids=[root])
+        root = seed_structure(type_="universite")
+        lab = seed_structure(type_="labo")
+        pid = seed_perimeter(root_structure_ids=[root])
         r = auth_client.post(
             "/api/structures/tutelles",
             json={"parent_id": root, "child_id": lab},
@@ -233,8 +208,8 @@ class TestTracabilite:
     """
 
     def test_la_creation_est_consignee(self, auth_client):
-        code = _uniq("audit_create")
-        racine = _seed_structure()
+        code = uniq("audit_create")
+        racine = seed_structure(type_="universite")
         r = auth_client.post(
             "/api/perimeters",
             json={"code": code, "name": "Audité", "root_structure_ids": [racine]},
@@ -252,7 +227,7 @@ class TestTracabilite:
         assert evenements[0]["user_id"]
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
-        code = _uniq("audit_update")
+        code = uniq("audit_update")
         pid = auth_client.post("/api/perimeters", json={"code": code, "name": "Avant"}).json()["id"]
 
         r = auth_client.put(f"/api/perimeters/{pid}", json={"name": "Après"})
@@ -265,11 +240,11 @@ class TestTracabilite:
         assert evenements[0]["payload"] == {"name": "Après"}
 
     def test_un_changement_de_racines_est_consigne(self, auth_client):
-        code = _uniq("audit_roots")
+        code = uniq("audit_roots")
         pid = auth_client.post("/api/perimeters", json={"code": code, "name": "Racines"}).json()[
             "id"
         ]
-        racine = _seed_structure()
+        racine = seed_structure(type_="universite")
 
         r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [racine]})
         assert r.status_code == 200

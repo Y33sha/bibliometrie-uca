@@ -9,6 +9,7 @@ status code sur une base non-contrôlée, ajouter un seed minimal
 import pytest
 
 from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.seeds import seed_address, seed_structure
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -74,26 +75,6 @@ def _seed_addresses_api(client):
             "audit_log RESTART IDENTITY CASCADE"
         )
         cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
-
-
-def _seed_address(raw_text, countries=None):
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO addresses (raw_text, normalized_text, countries) "
-            "VALUES (%s, lower(%s), %s) RETURNING id",
-            (raw_text, raw_text, countries),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_structure(code):
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (%s, %s, 'labo') RETURNING id",
-            (code, code),
-        )
-        return cur.fetchone()["id"]
 
 
 # ── GET /api/addresses ───────────────────────────────────────────
@@ -189,7 +170,7 @@ class TestGetAddressPublications:
         assert r.status_code == 404
 
     def test_200_when_address_exists(self, client):
-        addr = _seed_address("Addr pubs test")
+        addr = seed_address("Addr pubs test")
         r = client.get(f"/api/addresses/{addr}/publications")
         assert r.status_code == 200
         assert r.json()["address_id"] == addr
@@ -200,8 +181,8 @@ class TestGetAddressPublications:
 
 class TestReviewAddress:
     def test_confirm(self, auth_client):
-        addr = _seed_address("Review confirm")
-        struct = _seed_structure("LAB-REV-CONF")
+        addr = seed_address("Review confirm")
+        struct = seed_structure("LAB-REV-CONF")
         r = auth_client.post(
             f"/api/addresses/{addr}/review",
             json={"structure_id": struct, "is_confirmed": True},
@@ -210,8 +191,8 @@ class TestReviewAddress:
         assert r.json()["is_confirmed"] is True
 
     def test_reject(self, auth_client):
-        addr = _seed_address("Review reject")
-        struct = _seed_structure("LAB-REV-REJ")
+        addr = seed_address("Review reject")
+        struct = seed_structure("LAB-REV-REJ")
         r = auth_client.post(
             f"/api/addresses/{addr}/review",
             json={"structure_id": struct, "is_confirmed": False},
@@ -219,8 +200,8 @@ class TestReviewAddress:
         assert r.status_code == 200
 
     def test_reset(self, auth_client):
-        addr = _seed_address("Review reset")
-        struct = _seed_structure("LAB-REV-RES")
+        addr = seed_address("Review reset")
+        struct = seed_structure("LAB-REV-RES")
         r = auth_client.post(
             f"/api/addresses/{addr}/review",
             json={"structure_id": struct, "is_confirmed": None},
@@ -229,7 +210,7 @@ class TestReviewAddress:
 
     def test_unknown_address_refused(self, auth_client):
         """Une adresse inexistante rend 404, là où l'écriture ne toucherait rien en silence."""
-        struct = _seed_structure("LAB-REV-404")
+        struct = seed_structure("LAB-REV-404")
         r = auth_client.post(
             "/api/addresses/999999999/review",
             json={"structure_id": struct, "is_confirmed": True},
@@ -242,7 +223,7 @@ class TestReviewAddress:
 
 class TestBatchReview:
     def test_empty_batch(self, auth_client):
-        struct = _seed_structure("LAB-BATCH-EMPTY")
+        struct = seed_structure("LAB-BATCH-EMPTY")
         r = auth_client.post(
             "/api/addresses/batch-review",
             json={"address_ids": [], "structure_id": struct, "is_confirmed": True},
@@ -251,9 +232,9 @@ class TestBatchReview:
         assert r.json()["updated"] == 0
 
     def test_non_empty_batch(self, auth_client):
-        a1 = _seed_address("Batch a1")
-        a2 = _seed_address("Batch a2")
-        struct = _seed_structure("LAB-BATCH-NE")
+        a1 = seed_address("Batch a1")
+        a2 = seed_address("Batch a2")
+        struct = seed_structure("LAB-BATCH-NE")
         r = auth_client.post(
             "/api/addresses/batch-review",
             json={"address_ids": [a1, a2], "structure_id": struct, "is_confirmed": True},
@@ -311,12 +292,12 @@ class TestSetAddressCountry:
         assert r.status_code == 404
 
     def test_422_unknown_country_code(self, auth_client):
-        addr = _seed_address("Set country bad")
+        addr = seed_address("Set country bad")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["ZZ"]})
         assert r.status_code == 422
 
     def test_ok_with_valid_country(self, auth_client):
-        addr = _seed_address("Set country ok")
+        addr = seed_address("Set country ok")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
 
@@ -325,7 +306,7 @@ class TestSetAddressCountry:
         # est lisible dès le GET suivant. Garde-fou de la dépendance commit-as-you-go
         # et du futur passage du teardown en rollback — un handler d'écriture sans
         # `commit()` ferait alors échouer ce test.
-        addr = _seed_address("Readback marker QWXZ")
+        addr = seed_address("Readback marker QWXZ")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
         r2 = auth_client.get("/api/addresses/countries", params={"search": "QWXZ"})
@@ -347,7 +328,7 @@ class TestBatchSetCountry:
         assert r.status_code == 422
 
     def test_ok_with_ids(self, auth_client):
-        a = _seed_address("Batch country ids")
+        a = seed_address("Batch country ids")
         r = auth_client.post(
             "/api/addresses/batch-country",
             json={"country_code": "FR", "address_ids": [a]},
@@ -357,7 +338,7 @@ class TestBatchSetCountry:
         assert "updated" in body and "propagated" in body
 
     def test_ok_with_filter(self, auth_client):
-        _seed_address("Unique search target for batch")
+        seed_address("Unique search target for batch")
         r = auth_client.post(
             "/api/addresses/batch-country",
             json={"country_code": "FR", "search": "Unique search target"},
@@ -382,7 +363,7 @@ class TestAddressStats:
         assert r.status_code == 422
 
     def test_with_structure_id(self, client):
-        struct = _seed_structure("LAB-STATS")
+        struct = seed_structure("LAB-STATS")
         r = client.get("/api/addresses/stats", params={"structure_id": struct})
         assert r.status_code == 200
         body = r.json()
@@ -412,8 +393,8 @@ class TestTracabilite:
     """
 
     def test_l_arbitrage_d_un_rattachement_est_consigne(self, auth_client):
-        addr = _seed_address("Audit review unitaire")
-        struct = _seed_structure("LAB-AUDIT-REV")
+        addr = seed_address("Audit review unitaire")
+        struct = seed_structure("LAB-AUDIT-REV")
         avant = len(_evenements("address.link_reviewed"))
 
         r = auth_client.post(
@@ -432,9 +413,9 @@ class TestTracabilite:
         assert dernier["user_id"]
 
     def test_un_lot_d_arbitrages_vaut_un_seul_evenement(self, auth_client):
-        a1 = _seed_address("Audit review lot 1")
-        a2 = _seed_address("Audit review lot 2")
-        struct = _seed_structure("LAB-AUDIT-BREV")
+        a1 = seed_address("Audit review lot 1")
+        a2 = seed_address("Audit review lot 2")
+        struct = seed_structure("LAB-AUDIT-BREV")
         avant = len(_evenements("address.batch_link_reviewed"))
 
         r = auth_client.post(
@@ -452,7 +433,7 @@ class TestTracabilite:
         assert dernier["payload"]["updated"] == 2
 
     def test_l_attribution_d_un_pays_est_consignee(self, auth_client):
-        addr = _seed_address("Audit pays unitaire")
+        addr = seed_address("Audit pays unitaire")
         avant = len(_evenements("address.country_set"))
 
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
@@ -465,7 +446,7 @@ class TestTracabilite:
         assert dernier["payload"]["countries"] == ["FR"]
 
     def test_un_lot_de_pays_par_identifiants_porte_les_identifiants(self, auth_client):
-        addr = _seed_address("Audit pays lot identifiants")
+        addr = seed_address("Audit pays lot identifiants")
         avant = len(_evenements("address.batch_country_set"))
 
         r = auth_client.post(
@@ -483,7 +464,7 @@ class TestTracabilite:
 
     def test_un_lot_de_pays_par_filtre_porte_le_critere(self, auth_client):
         """Une sélection par filtre peut couvrir toute la table : c'est le critère qui est la décision, non la liste qu'il rend."""
-        _seed_address("Cible unique pour le filtre d audit")
+        seed_address("Cible unique pour le filtre d audit")
         avant = len(_evenements("address.batch_country_set"))
 
         r = auth_client.post(

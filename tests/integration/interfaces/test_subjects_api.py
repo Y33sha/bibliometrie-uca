@@ -7,19 +7,14 @@ Couvre :
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-
-
-def _uniq(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+from tests.integration.helpers.seeds import uniq
 
 
 def _seed_subject(label: str | None = None, usage_count: int = 1) -> int:
-    label = label or _uniq("Subject")
+    label = label or uniq("Subject")
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
@@ -81,7 +76,7 @@ class TestListSubjects:
         assert r.status_code == 422
 
     def test_search_by_label(self, client):
-        label = _uniq("FindMeSubject")
+        label = uniq("FindMeSubject")
         sid = _seed_subject(label=label, usage_count=10)
         r = client.get("/api/subjects", params={"search": label.lower()})
         assert r.status_code == 200
@@ -89,8 +84,8 @@ class TestListSubjects:
         assert sid in ids
 
     def test_min_count_filter(self, client):
-        low = _seed_subject(_uniq("LowCount"), usage_count=1)
-        high = _seed_subject(_uniq("HighCount"), usage_count=50)
+        low = _seed_subject(uniq("LowCount"), usage_count=1)
+        high = _seed_subject(uniq("HighCount"), usage_count=50)
         # min_count=10 doit filtrer `low` mais retenir `high`.
         r = client.get("/api/subjects", params={"min_count": 10, "per_page": 200})
         assert r.status_code == 200
@@ -105,7 +100,7 @@ class TestGetSubject:
         assert r.status_code == 404
 
     def test_returns_subject_with_empty_neighbors(self, client):
-        label = _uniq("DetailSubject")
+        label = uniq("DetailSubject")
         sid = _seed_subject(label=label, usage_count=5)
         r = client.get(f"/api/subjects/{sid}")
         assert r.status_code == 200
@@ -115,9 +110,9 @@ class TestGetSubject:
         assert body["neighbors"] == []
 
     def test_returns_neighbors_when_cooccurrences_exist(self, client):
-        s_main = _seed_subject(_uniq("Main"), usage_count=10)
-        s_n1 = _seed_subject(_uniq("Neighbor1"), usage_count=8)
-        s_n2 = _seed_subject(_uniq("Neighbor2"), usage_count=5)
+        s_main = _seed_subject(uniq("Main"), usage_count=10)
+        s_n1 = _seed_subject(uniq("Neighbor1"), usage_count=8)
+        s_n2 = _seed_subject(uniq("Neighbor2"), usage_count=5)
         _seed_cooccurrence(s_main, s_n1, count=10)
         _seed_cooccurrence(s_main, s_n2, count=5)
 
@@ -129,8 +124,8 @@ class TestGetSubject:
         assert s_n2 in ids
 
     def test_min_cooccurrence_filters(self, client):
-        s_main = _seed_subject(_uniq("MainFilter"), usage_count=10)
-        s_weak = _seed_subject(_uniq("WeakNeighbor"), usage_count=8)
+        s_main = _seed_subject(uniq("MainFilter"), usage_count=10)
+        s_weak = _seed_subject(uniq("WeakNeighbor"), usage_count=8)
         _seed_cooccurrence(s_main, s_weak, count=2)
 
         r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 5})
