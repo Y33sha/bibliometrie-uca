@@ -56,6 +56,7 @@ from infrastructure.observability.log import (
     reset_log_phase,
     set_console_writer,
     set_log_phase,
+    setup_file_logger,
     setup_logger,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
@@ -548,6 +549,7 @@ def phase_persons(options: RunOptions) -> PhaseMetrics:
         PgPersonsMatchingQueries(),
         PgPersonNameFormsQueries(),
         log,
+        orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
         person_repo_factory=person_repository,
         authorship_repo_factory=authorship_repository,
     )

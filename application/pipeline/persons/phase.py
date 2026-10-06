@@ -41,10 +41,14 @@ def run(
     name_forms_queries: PersonNameFormsQueries,
     logger: logging.Logger,
     *,
+    orphans_log: logging.Logger | None = None,
     person_repo_factory: Callable[[Connection], PersonRepository],
     authorship_repo_factory: Callable[[Connection], AuthorshipRepository],
 ) -> PhaseMetrics:
-    """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques."""
+    """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques.
+
+    `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
+    """
     with open_tx() as conn:
         person_repo = person_repo_factory(conn)
         authorship_repo = authorship_repo_factory(conn)
@@ -57,7 +61,12 @@ def run(
             conn, persons_queries, logger, person_repo=person_repo
         )
         cascade_result = run_cascade(
-            conn, persons_queries, logger, person_repo=person_repo, authorship_repo=authorship_repo
+            conn,
+            persons_queries,
+            logger,
+            person_repo=person_repo,
+            authorship_repo=authorship_repo,
+            orphans_log=orphans_log,
         )
 
         # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.

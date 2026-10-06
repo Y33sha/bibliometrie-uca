@@ -501,6 +501,30 @@ class TestCascadeRun:
 
         assert _get_person_id(sa_sync_conn, oa_as) is None
 
+    def test_ambiguous_orphan_logged_with_competing_persons(self, sa_sync_conn, caplog):
+        """La signature restée orpheline est journalisée avec son motif et les personnes que désigne sa forme."""
+        pub = _insert_publication(sa_sync_conn)
+        pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
+        sd = _insert_source_document(sa_sync_conn, "openalex", "W778", pub)
+        orphan = _insert_authorship(sa_sync_conn, "openalex", sd, "J Dupont")
+
+        repo = person_repository(sa_sync_conn)
+        with caplog.at_level(logging.INFO, logger="test_orphelines"):
+            run_cascade(
+                sa_sync_conn,
+                _queries,
+                _logger,
+                person_repo=repo,
+                authorship_repo=authorship_repository(sa_sync_conn),
+                orphans_log=logging.getLogger("test_orphelines"),
+            )
+
+        (line,) = [r.getMessage() for r in caplog.records if r.name == "test_orphelines"]
+        assert f"signature {orphan} (openalex)" in line
+        assert "ambiguous_name_form" in line
+        assert f"[{pid1}, {pid2}]" in line
+
     def test_rejected_pair_blocks_identifier_match(self, sa_sync_conn):
         """Paire (publi, personne) dans `rejected_authorships` → un match par
         identifiant vers cette personne est annulé. La cascade ne ré-attache
