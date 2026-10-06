@@ -1,6 +1,8 @@
 """Requêtes du rapport bibliométrique par structure."""
 
+from collections.abc import Collection
 from dataclasses import dataclass
+from enum import StrEnum
 
 from sqlalchemy import Connection, text
 
@@ -48,13 +50,49 @@ _REPORT_PUBLICATION = f"""
     AND {AUTHORED_PUBLICATION}
 """
 
-# Publication `p` dont un auteur correspondant signe avec la structure `:structure_id`.
-_STRUCTURE_CORRESPONDING = f"""
+
+class KeyAuthorRole(StrEnum):
+    """Rôle d'auteur retenu pour compter les publications qu'une structure mène."""
+
+    CORRESPONDING = "corresponding"
+    FIRST = "first"
+    LAST = "last"
+
+
+# Publication `p` dont un auteur de la position donnée (`min` : premier, `max` : dernier) dans la notice OpenAlex signe avec la structure `:structure_id`.
+_OPENALEX_POSITION = """
     EXISTS (
-        SELECT 1 FROM authorships a
-        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
+        SELECT 1
+        FROM source_publications sp
+        JOIN source_authorships sa ON sa.source_publication_id = sp.id
+        JOIN authorship_structures aus ON aus.authorship_id = sa.authorship_id
+        WHERE sp.publication_id = p.id
+          AND sp.source = 'openalex'
+          AND sa.in_perimeter
+          AND aus.structure_id = :structure_id
+          AND sa.author_position = (
+              SELECT {bound}(x.author_position) FROM source_authorships x
+              WHERE x.source_publication_id = sp.id AND 'author' = ANY(x.roles)
+          )
     )
 """
+
+# Publication `p` où un auteur qui signe avec la structure `:structure_id` tient le rôle.
+_KEY_ROLE_CONDITIONS = {
+    KeyAuthorRole.CORRESPONDING: f"""
+        EXISTS (
+            SELECT 1 FROM authorships a
+            WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
+        )
+    """,
+    KeyAuthorRole.FIRST: _OPENALEX_POSITION.format(bound="min"),
+    KeyAuthorRole.LAST: _OPENALEX_POSITION.format(bound="max"),
+}
+
+
+def _key_role_condition(roles: Collection[KeyAuthorRole]) -> str:
+    """Publication `p` où un auteur de la structure tient au moins un des rôles."""
+    return "(" + " OR ".join(_KEY_ROLE_CONDITIONS[r] for r in KeyAuthorRole if r in roles) + ")"
 
 
 def _params(structure_id: int, doc_types: list[DocType], from_year: int) -> dict[str, object]:
@@ -81,15 +119,20 @@ def publications_by_year_and_type(
     return [YearDocTypeCount(r.pub_year, DocType(r.doc_type), r.n) for r in rows]
 
 
-def corresponding_publications_by_year(
-    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int
+def key_role_publications_by_year(
+    conn: Connection,
+    structure_id: int,
+    *,
+    roles: Collection[KeyAuthorRole],
+    doc_types: list[DocType],
+    from_year: int,
 ) -> dict[int, int]:
-    """Nombre de publications signées par la structure dont un auteur correspondant signe avec la structure, par année."""
+    """Nombre de publications signées par la structure où un de ses auteurs tient un des `roles`, par année. Premier et dernier auteur se lisent dans la notice OpenAlex."""
     rows = conn.execute(
         text(f"""
             SELECT p.pub_year, count(*) AS n
             FROM publications p
-            WHERE {_REPORT_PUBLICATION} AND {_STRUCTURE_CORRESPONDING}
+            WHERE {_REPORT_PUBLICATION} AND {_key_role_condition(roles)}
             GROUP BY 1
         """),  # noqa: S608 — fragments SQL constants
         _params(structure_id, doc_types, from_year),
@@ -185,12 +228,18 @@ def _top_journals(
     return list(journals.values())
 
 
-def corresponding_publications_top_journals(
-    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
+def key_role_publications_top_journals(
+    conn: Connection,
+    structure_id: int,
+    *,
+    roles: Collection[KeyAuthorRole],
+    doc_types: list[DocType],
+    from_year: int,
+    limit: int,
 ) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications de `corresponding_publications_by_year`."""
+    """Les `limit` revues qui portent le plus de publications de `key_role_publications_by_year`."""
     return _top_journals(
-        conn, _STRUCTURE_CORRESPONDING, _params(structure_id, doc_types, from_year), limit
+        conn, _key_role_condition(roles), _params(structure_id, doc_types, from_year), limit
     )
 
 
