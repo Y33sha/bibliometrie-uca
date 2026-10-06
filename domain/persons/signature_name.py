@@ -29,6 +29,11 @@ class SignatureName:
         if self.first_name is not None and self.last_name is None:
             raise ValidationError("SignatureName : prénom sans nom de famille")
 
+    @property
+    def split_by_source(self) -> bool:
+        """Vrai quand la source sépare nom et prénom, faux pour une chaîne brute découpée par le parseur."""
+        return self.raw is None
+
     @classmethod
     def from_parts(cls, last_name: str | None, first_name: str | None) -> "SignatureName | None":
         """Nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. `None` sans aucun nom."""

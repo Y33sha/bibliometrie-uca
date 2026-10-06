@@ -23,23 +23,35 @@ _SELECT_SQL = (
 )
 
 
-def _params(author_name_normalized: str | None, person_identifiers: dict | None) -> dict:
-    """Forme « prénom nom » découpée au dernier espace : nom de famille à droite, prénom à gauche. La colonne calculée `author_name_normalized` redonne ainsi la forme reçue. `None` donne un nom vide."""
-    first, _, last = (author_name_normalized or "").rpartition(" ")
+def _params(last: str, first: str | None, person_identifiers: dict | None) -> dict:
     ids_json = json.dumps(person_identifiers) if person_identifiers is not None else None
     return {"last": last, "first": first or None, "ids": ids_json}
 
 
-def upsert_identity(conn, author_name_normalized=None, person_identifiers=None) -> int:
-    """Upsert l'identité de forme normalisée `author_name_normalized` (« prénom nom ») et d'identifiants `person_identifiers` (dict ou `None`), sur une connexion SQLAlchemy, et renvoie son `id`."""
-    params = _params(author_name_normalized, person_identifiers)
+def _form_params(author_name_normalized: str | None, person_identifiers: dict | None) -> dict:
+    """Forme « prénom nom » découpée au dernier espace : nom de famille à droite, prénom à gauche. La colonne calculée `author_name_normalized` redonne ainsi la forme reçue. `None` donne un nom vide."""
+    first, _, last = (author_name_normalized or "").rpartition(" ")
+    return _params(last, first, person_identifiers)
+
+
+def _upsert(conn, params: dict) -> int:
     conn.exec_driver_sql(_INSERT_SQL, params)
     return conn.exec_driver_sql(_SELECT_SQL, params).scalar_one()
 
 
+def upsert_identity(conn, author_name_normalized=None, person_identifiers=None) -> int:
+    """Upsert l'identité de forme normalisée `author_name_normalized` (« prénom nom ») et d'identifiants `person_identifiers` (dict ou `None`), sur une connexion SQLAlchemy, et renvoie son `id`."""
+    return _upsert(conn, _form_params(author_name_normalized, person_identifiers))
+
+
+def upsert_split_identity(conn, last: str, first: str | None, person_identifiers=None) -> int:
+    """`upsert_identity` d'après un nom et un prénom normalisés explicites."""
+    return _upsert(conn, _params(last, first, person_identifiers))
+
+
 def upsert_identity_on_cursor(cur, author_name_normalized=None, person_identifiers=None) -> int:
     """`upsert_identity` sur un curseur psycopg à lignes en dictionnaire."""
-    params = _params(author_name_normalized, person_identifiers)
+    params = _form_params(author_name_normalized, person_identifiers)
     cur.execute(_INSERT_SQL, params)
     cur.execute(_SELECT_SQL, params)
     return cur.fetchone()["id"]

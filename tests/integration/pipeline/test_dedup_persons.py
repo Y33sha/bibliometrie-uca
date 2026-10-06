@@ -25,7 +25,7 @@ from application.pipeline.persons.cascade import run_cascade
 from application.services.persons.core import add_name_form, create_person
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.authorships import upsert_identity, upsert_split_identity
 
 _queries = PgPersonsMatchingQueries()
 _logger = logging.getLogger("test")
@@ -484,6 +484,41 @@ class TestCascadeRun:
         _run_cascade(sa_sync_conn)
 
         assert _get_person_id(sa_sync_conn, inverted) == person_id
+
+    def test_created_person_takes_split_given_by_source(self, sa_sync_conn):
+        """Une chaîne brute « Yannick Kitutila W. » et la même signature au nom séparé (HAL : « Kitutila W. », « Yannick ») : la personne créée prend le découpage de la source, quel que soit l'ordre des signatures."""
+        pub = _insert_publication(sa_sync_conn)
+        scanr_sd = _insert_source_document(sa_sync_conn, "scanr", "scanr-kitutila", pub)
+        hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-kitutila", pub)
+        parsed = sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (source, source_publication_id, author_position, in_perimeter,
+                     raw_author_name, identity_id)
+                VALUES ('scanr', :sd, 0, TRUE, 'Yannick Kitutila W.', :iid)
+                RETURNING id
+            """),
+            {"sd": scanr_sd, "iid": upsert_split_identity(sa_sync_conn, "yannick kitutila", "w")},
+        ).scalar_one()
+        native = sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (source, source_publication_id, author_position, in_perimeter,
+                     raw_last_name, raw_first_name, identity_id)
+                VALUES ('hal', :sd, 0, TRUE, 'Kitutila W.', 'Yannick', :iid)
+                RETURNING id
+            """),
+            {"sd": hal_sd, "iid": upsert_split_identity(sa_sync_conn, "kitutila w", "yannick")},
+        ).scalar_one()
+
+        _run_cascade(sa_sync_conn)
+
+        person_id = _get_person_id(sa_sync_conn, native)
+        assert _get_person_id(sa_sync_conn, parsed) == person_id
+        name = sa_sync_conn.execute(
+            text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": person_id}
+        ).one()
+        assert tuple(name) == ("Kitutila W.", "Yannick")
 
     def test_ambiguous_name_form_stays_orphan(self, sa_sync_conn):
         """Nom mappé à 2 personnes (homonymes) → skip, pas de rattachement."""

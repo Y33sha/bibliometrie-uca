@@ -17,7 +17,7 @@ Une personne au prénom réduit à des initiales prend le prénom plein compatib
 
 Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
+`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures dont la source sépare nom et prénom passent en premier : une personne créée prend le découpage de la source plutôt que celui du parseur. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
 
 Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
@@ -414,7 +414,11 @@ def run_cascade(
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme ambiguë le reste.
     indecidables = [a for a in non_identifiees if c.name_form_ambiguous(a)]
     indecidables_ids = {a.authorship_id for a in indecidables}
-    a_creer = [a for a in non_identifiees if a.authorship_id not in indecidables_ids]
+    # Les signatures au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
+    a_creer = sorted(
+        (a for a in non_identifiees if a.authorship_id not in indecidables_ids),
+        key=lambda a: not a.name.split_by_source,
+    )
 
     etape(logger, "Création de nouvelles personnes")
     logger.info(
