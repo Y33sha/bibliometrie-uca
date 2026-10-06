@@ -11,6 +11,7 @@ import uuid
 
 import pytest
 
+from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
 
 
@@ -30,23 +31,6 @@ def _cleanup_after_module():
             "source_publications, publications, persons, person_identifiers, "
             "person_name_forms, audit_log RESTART IDENTITY CASCADE"
         )
-
-
-def _upsert_identity(cur, raw_author_name: str) -> int:
-    """Upsert de l'identité (nom normalisé `lower(raw)`, sans identifiants) et
-    renvoi de son id, sur le curseur psycopg du seed."""
-    cur.execute(
-        "INSERT INTO author_identifying_keys (last_name_normalized, person_identifiers) "
-        "VALUES (lower(%s), NULL) ON CONFLICT DO NOTHING",
-        (raw_author_name,),
-    )
-    cur.execute(
-        "SELECT id FROM author_identifying_keys "
-        "WHERE last_name_normalized = lower(%s) AND first_name_normalized IS NULL"
-        "  AND person_identifiers IS NULL",
-        (raw_author_name,),
-    )
-    return cur.fetchone()["id"]
 
 
 def _seed_person(last: str = "TESTP", first: str = "J") -> int:
@@ -101,7 +85,7 @@ def _seed_source_authorship(
 ) -> int:
     sp = source_pub_id or _seed_source_publication(source=source)
     with owner_pool() as cur:
-        iid = _upsert_identity(cur, raw_author_name)
+        iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
             "person_id, authorship_id, in_perimeter, raw_author_name, identity_id) "
