@@ -18,6 +18,7 @@ from application.pipeline.extract.base import (
 )
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
@@ -131,6 +132,8 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
         def compte(annee: int) -> int:
             try:
                 return self._adapter.count(annee, affiliations)
+            except SourceUnavailableError:
+                raise
             except Exception:
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
@@ -141,14 +144,16 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
                 new, updated, unchanged = extract_year(
                     self._adapter, self.conn, annee, affiliations, slog, avancement
                 )
+                metrics = PhaseMetrics(new=new, updated=updated, unchanged=unchanged)
+            except SourceUnavailableError:
+                raise
             except Exception as e:
                 slog.error("erreur : %s — passage à la suivante", e)
-                return PhaseMetrics()
-            finally:
-                # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
-                if annee != years[-1] and not self._breaker_tripped():
-                    time.sleep(30)
-            return PhaseMetrics(new=new, updated=updated, unchanged=unchanged)
+                metrics = PhaseMetrics()
+            # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
+            if annee != years[-1] and not self._breaker_tripped():
+                time.sleep(30)
+            return metrics
 
         return self._extrait_par_annee(years, compte, extrait)
 
