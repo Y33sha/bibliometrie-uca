@@ -4,6 +4,7 @@ from domain.publications.doc_types import DocType
 from infrastructure.read_models.structure_report import (
     JournalYearCounts,
     ReportStructure,
+    Top10Count,
     YearDocTypeCount,
 )
 from interfaces.cli.reports.structure_report import StructureReportData, render_report
@@ -11,12 +12,13 @@ from interfaces.cli.reports.structure_report import StructureReportData, render_
 _LABO = ReportStructure(id=1, code="labo", acronym="LABO", name="Laboratoire")
 
 
-def _render(by_year_and_type=(), corresponding_by_year=None, top_journals=()):
+def _render(by_year_and_type=(), corresponding_by_year=None, top_journals=(), top_10=None):
     data = StructureReportData(
         structure=_LABO,
         by_year_and_type=by_year_and_type,
         corresponding_by_year=corresponding_by_year or {},
         corresponding_top_journals=top_journals,
+        top_10_by_year=top_10 or {},
     )
     return render_report(data, years=[2024, 2025], current_year=2025, generated_on="2025-10-06")
 
@@ -55,3 +57,8 @@ def test_annee_en_cours_marquee():
 def test_revue_sans_editeur():
     report = _render(top_journals=[JournalYearCounts("Revue B", None, {2024: 1})])
     assert "| Revue B | 1 | 0 |" in report
+
+
+def test_part_top_10_sur_les_publications_au_percentile_connu():
+    report = _render(top_10={2024: Top10Count(top_10=3, with_percentile=20)})
+    assert "| Part dans le top 10 % | 15,0 % | – |" in report

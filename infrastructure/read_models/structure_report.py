@@ -98,6 +98,40 @@ def corresponding_publications_by_year(
 
 
 @dataclass(frozen=True, slots=True)
+class Top10Count:
+    top_10: int
+    """Publications dans le top 10 % des plus citées."""
+    with_percentile: int
+    """Publications dont le percentile de citations normalisé est connu."""
+
+
+def top_10_percent_by_year(
+    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int
+) -> dict[int, Top10Count]:
+    """Publications signées par la structure dans le top 10 % des plus citées, par année, et publications dont le percentile est connu. Le percentile vient des notices OpenAlex de la publication."""
+    rows = conn.execute(
+        text(f"""
+            SELECT p.pub_year,
+                   count(*) FILTER (WHERE oa.top_10) AS top_10,
+                   count(*) AS with_percentile
+            FROM publications p
+            JOIN LATERAL (
+                SELECT bool_or((sp.impact->>'top_10_percent')::boolean) AS top_10
+                FROM source_publications sp
+                WHERE sp.publication_id = p.id
+                  AND sp.source = 'openalex'
+                  AND sp.impact ? 'top_10_percent'
+                HAVING count(*) > 0
+            ) oa ON TRUE
+            WHERE {_REPORT_PUBLICATION}
+            GROUP BY 1
+        """),  # noqa: S608 — fragments SQL constants
+        _params(structure_id, doc_types, from_year),
+    ).all()
+    return {r.pub_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
+
+
+@dataclass(frozen=True, slots=True)
 class JournalYearCounts:
     title: str
     publisher: str | None
