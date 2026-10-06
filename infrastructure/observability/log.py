@@ -261,6 +261,20 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     return logger
 
 
+def setup_file_logger(name: str, log_dir: str) -> logging.Logger:
+    """Logger à sortie fichier seule, pour un journal de détail que la console n'affiche pas. Même fichier et même opt-in `LOG_TO_FILE` que `setup_logger` ; sans `LOG_TO_FILE`, le logger n'écrit rien."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if logger.handlers:
+        return logger
+    if os.environ.get("LOG_TO_FILE", "").lower() == "true":
+        _attach_file_handler(logger, name, log_dir, _make_formatter())
+    if not logger.handlers:
+        logger.addHandler(logging.NullHandler())
+    return logger
+
+
 def _attach_file_handler(
     logger: logging.Logger, name: str, log_dir: str, fmt: logging.Formatter
 ) -> None:

@@ -113,6 +113,8 @@ class _Cascade:
         for namesake in queries.fetch_namesakes(conn):
             self._index_namesake(namesake._replace(conflicting=namesake.person_id in conflicting))
         self.first_names_completed = 0
+        # Signatures du périmètre restées sans personne en passe `create`, avec le motif du `skip`.
+        self.orphans: list[tuple[EnrichedAuthorship, str]] = []
 
         self.matched_counts: dict[str, int] = defaultdict(int)
         self.skipped_counts: dict[str, int] = defaultdict(int)
@@ -231,7 +233,25 @@ class _Cascade:
             return True
         else:
             self.skipped_counts[decision.reason] += 1
+            self.orphans.append((a, decision.reason))
         return False
+
+    def log_orphans(self, orphans_log: logging.Logger) -> None:
+        """Écrit une ligne par signature restée sans personne : motif, personnes que désignent ses formes de nom, personnes aux initiales compatibles, personnes rejetées pour la publication. Les signatures dont la création est interdite (jurys de thèse) sont omises."""
+        for a, reason in self.orphans:
+            if reason == "creation_not_allowed":
+                continue
+            forms = {f: self._name_form_map.get(f) for f in a.name_forms}
+            orphans_log.info(
+                "signature %d (%s) « %s » : %s ; formes %s ; initiales compatibles %s ; rejetées pour la publication %s",
+                a.authorship_id,
+                a.source,
+                a.name.display(),
+                reason,
+                forms,
+                compatible_persons(a.name, self._namesakes),
+                sorted(self._rejected_for(a)),
+            )
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> bool:
         """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
@@ -339,10 +359,13 @@ def run_cascade(
     *,
     person_repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
+    orphans_log: logging.Logger | None = None,
 ) -> CascadeResult:
     """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
 
     Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante.
+
+    `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`_Cascade.log_orphans`).
 
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
@@ -418,4 +441,6 @@ def run_cascade(
         accord(c.created - creees_avant, "personne"),
         forme(c.created - creees_avant, "créée"),
     )
+    if orphans_log is not None:
+        c.log_orphans(orphans_log)
     return c.result()
