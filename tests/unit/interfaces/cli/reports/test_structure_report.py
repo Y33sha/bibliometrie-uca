@@ -52,8 +52,8 @@ def test_typologie_types_presents_et_total_par_annee():
 
 
 def test_titre_de_section_selon_les_roles():
-    assert "## Publications avec auteur correspondant de l'unité\n" in _render()
-    assert "## Publications avec auteur correspondant, premier ou dernier auteur de l'unité\n" in (
+    assert "## Publications avec auteur correspondant\n" in _render()
+    assert "## Publications avec auteur correspondant, premier ou dernier auteur\n" in (
         _render(key_roles=frozenset(KeyAuthorRole))
     )
 

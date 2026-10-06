@@ -83,9 +83,9 @@ KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[KeyAuthorRole]] = {
 }
 
 _KEY_ROLES_TITLES = {
-    _CORRESPONDING: "Publications avec auteur correspondant de l'unité",
-    _CORRESPONDING_OR_FIRST: "Publications avec auteur correspondant ou premier auteur de l'unité",
-    _CORRESPONDING_FIRST_OR_LAST: "Publications avec auteur correspondant, premier ou dernier auteur de l'unité",
+    _CORRESPONDING: "Publications avec auteur correspondant",
+    _CORRESPONDING_OR_FIRST: "Publications avec auteur correspondant ou premier auteur",
+    _CORRESPONDING_FIRST_OR_LAST: "Publications avec auteur correspondant, premier ou dernier auteur",
 }
 
 
