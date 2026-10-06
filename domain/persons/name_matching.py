@@ -23,11 +23,35 @@ def _opens_family_name(word: str) -> bool:
     return normalize_name(word) in _PARTICLES or re.match(r"d['’ʼ]", word.lower()) is not None
 
 
+def is_initials(text: str) -> bool:
+    """Vrai si chaque mot normalisé de `text` tient en une lettre (« M. », « O. V. », « J.-P. »)."""
+    words = normalize_name(text).split()
+    return bool(words) and all(len(word) == 1 for word in words)
+
+
+def orient_initials(last_name: str, first_name: str) -> tuple[str, str]:
+    """(nom, prénom), inversés quand le nom se réduit à des initiales et que le prénom n'en est pas : « M. » / « Brigante » donne « Brigante » / « M. »."""
+    if is_initials(last_name) and first_name.strip() and not is_initials(first_name):
+        return first_name, last_name
+    return last_name, first_name
+
+
+def _trailing_initials_start(words: list[str]) -> int | None:
+    """Indice du premier mot d'une suite finale d'initiales précédée d'un mot plein (« Del Buono L. » donne 2), `None` sinon."""
+    if is_initials(words[0]) or not is_initials(words[-1]):
+        return None
+    start = len(words) - 1
+    while start > 1 and is_initials(words[start - 1]):
+        start -= 1
+    return start
+
+
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """Parse un raw_author_name en (last_name, first_name).
 
     Formats gérés :
-    - "LastName, FirstName" (WoS, HAL parfois)
+    - "LastName, FirstName" (WoS, HAL parfois) ; des initiales avant la virgule passent en prénom (« C., Küll »).
+    - "LastName I." : des initiales finales forment le prénom (« Del Buono L. »).
     - "FirstName LastName" (OpenAlex) : le nom de famille commence à la première particule après le premier mot (« Alison da Silva »), sinon il se réduit au dernier mot.
     """
     if not raw_name:
@@ -36,10 +60,13 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     raw = clean_raw_author_name(raw_name).strip()
     if "," in raw:
         parts = raw.split(",", 1)
-        return parts[0].strip(), parts[1].strip()
+        return orient_initials(parts[0].strip(), parts[1].strip())
     words = raw.split()
     if len(words) < 2:
         return raw, ""
+    initials = _trailing_initials_start(words)
+    if initials is not None:
+        return " ".join(words[:initials]), " ".join(words[initials:])
     start = next(
         (i for i in range(1, len(words) - 1) if _opens_family_name(words[i])), len(words) - 1
     )
@@ -49,13 +76,13 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
 def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
     """Découpages (nom de famille, prénom) possibles d'une signature.
 
-    Au format « Nom, Prénom », le seul découpage de la virgule. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
+    Au format « Nom, Prénom » ou « Nom I. », le seul découpage de `parse_raw_author_name`. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
     """
     raw = clean_raw_author_name(raw_name or "").strip()
     if not raw:
         return []
     words = raw.split()
-    if "," in raw or len(words) < 2:
+    if "," in raw or len(words) < 2 or _trailing_initials_start(words) is not None:
         return [parse_raw_author_name(raw)]
     return [(" ".join(words[k:]), " ".join(words[:k])) for k in range(1, len(words))]
 
