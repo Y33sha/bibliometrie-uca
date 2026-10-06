@@ -230,7 +230,7 @@ def top_journals(
     from_year: int,
     limit: int,
 ) -> list[JournalCounts]:
-    """Les `limit` revues qui portent le plus de publications signées par la structure sur la période, avec leur éditeur. Tri par nombre décroissant, puis par titre."""
+    """Les `limit` revues où la structure publie le plus sur la période, avec leur éditeur. Tri par nombre de publications décroissant, puis par titre."""
     rows = conn.execute(
         text(f"""
             WITH pubs AS (
