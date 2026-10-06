@@ -1,12 +1,13 @@
 # STATUS: oneshot (2026-10-06)
 """Découpe en nom et prénom les formes de nom des personnes qui portent un verdict (confirmée, rejetée).
 
-Une forme `name_form` est une chaîne unique (« dupont marie »). Ce script renseigne `last_name_normalized` et `first_name_normalized` quand le découpage est certain :
+Une forme `name_form` est une chaîne unique (« dupont marie »). Ce script renseigne `last_name_normalized` et `first_name_normalized` quand le découpage est certain, essais dans l'ordre :
 
 - la chaîne est une forme de la personne elle-même (`person_name_form_splits`) ;
-- sinon, une seule identité de signature découpée porte cette chaîne (`author_identifying_keys.author_name_normalized`).
+- une seule identité de signature porte cette chaîne dans l'ordre « prénom nom » (`author_identifying_keys.author_name_normalized`) ;
+- une seule identité la porte dans l'ordre « nom prénom », celui des signatures au format « Nom, Prénom ».
 
-Il rapporte les formes restantes : aucun découpage, ou plusieurs. Rejouable : il traite les seules formes encore sans découpage.
+Une forme qu'aucune identité ne porte, dans aucun ordre, est supprimée. Le script rapporte les formes restantes, à plusieurs découpages. Rejouable : il traite les seules formes encore sans découpage.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_name_form_splits            # exécution
@@ -35,15 +36,20 @@ _FORMS_SQL = text("""
     WHERE f.status <> 'pending' AND f.last_name_normalized IS NULL
 """)
 
-_IDENTITY_SPLITS_SQL = text("""
-    SELECT author_name_normalized AS name_form,
-           array_agg(DISTINCT last_name_normalized) AS lasts,
-           array_agg(DISTINCT coalesce(first_name_normalized, '')) AS firsts,
-           count(DISTINCT (last_name_normalized, first_name_normalized)) AS n
-    FROM author_identifying_keys
-    WHERE author_name_normalized = ANY(:forms)
-    GROUP BY author_name_normalized
-""")
+# Clé de rapprochement d'une identité avec une forme, par ordre essayé.
+_ORDERS = {
+    "identité de signature, prénom nom": "author_name_normalized",
+    "identité de signature, nom prénom": (
+        "CASE WHEN first_name_normalized IS NOT NULL"
+        " THEN last_name_normalized || ' ' || first_name_normalized END"
+    ),
+}
+
+_DELETE_SQL = text("""
+    DELETE FROM person_name_forms f
+    USING jsonb_to_recordset(:payload) AS t(name_form text, person_id integer)
+    WHERE f.name_form = t.name_form AND f.person_id = t.person_id
+""").bindparams(bindparam("payload", type_=Jsonb))
 
 _UPDATE_SQL = text("""
     UPDATE person_name_forms f
@@ -54,39 +60,55 @@ _UPDATE_SQL = text("""
 """).bindparams(bindparam("payload", type_=Jsonb))
 
 
+def _identity_splits(
+    conn: Connection, key: str, forms: list[str]
+) -> dict[str, set[tuple[str, str | None]]]:
+    """Découpages (nom, prénom) des identités dont la clé `key` (expression SQL) vaut l'une des `forms`."""
+    rows = conn.execute(
+        text(f"""
+            SELECT DISTINCT {key} AS name_form, last_name_normalized, first_name_normalized
+            FROM author_identifying_keys WHERE {key} = ANY(:forms)
+        """),
+        {"forms": forms},
+    )
+    splits: dict[str, set[tuple[str, str | None]]] = {}
+    for r in rows:
+        splits.setdefault(r.name_form, set()).add((r.last_name_normalized, r.first_name_normalized))
+    return splits
+
+
 def backfill(conn: Connection, *, apply: bool) -> Counter[str]:
-    """Renseigne le découpage des formes à verdict quand il est certain. Retourne les comptes par issue et par verdict."""
+    """Renseigne le découpage des formes à verdict quand il est certain, supprime celles qu'aucune identité ne porte. Retourne les comptes par issue et par verdict."""
     rows = conn.execute(_FORMS_SQL).all()
-    identity_splits = {
-        r.name_form: r
-        for r in conn.execute(_IDENTITY_SPLITS_SQL, {"forms": sorted({r.name_form for r in rows})})
+    forms = sorted({r.name_form for r in rows})
+    candidates_by_order = {
+        issue: _identity_splits(conn, key, forms) for issue, key in _ORDERS.items()
     }
     stats: Counter[str] = Counter()
-    payload = []
+    updates, deletes = [], []
     for row in rows:
+        key = {"name_form": row.name_form, "person_id": row.person_id}
         split = person_name_form_splits(row.last_name, row.first_name or "").get(row.name_form)
         issue = "fiche de la personne"
         if split is None:
-            candidates = identity_splits.get(row.name_form)
-            if candidates is None:
-                stats[f"{row.status} : aucun découpage"] += 1
+            found = [
+                (o, c[row.name_form]) for o, c in candidates_by_order.items() if row.name_form in c
+            ]
+            if not found:
+                stats[f"{row.status} : aucune identité, supprimée"] += 1
+                deletes.append(key)
                 continue
-            if candidates.n > 1:
-                stats[f"{row.status} : plusieurs découpages"] += 1
+            issue, splits = found[0]
+            if len(splits) > 1:
+                stats[f"{row.status} : plusieurs découpages ({issue})"] += 1
                 continue
-            split = (candidates.lasts[0], candidates.firsts[0] or None)
-            issue = "identité de signature"
+            (split,) = splits
         stats[f"{row.status} : {issue}"] += 1
-        payload.append(
-            {
-                "name_form": row.name_form,
-                "person_id": row.person_id,
-                "last_name": split[0],
-                "first_name": split[1],
-            }
-        )
-    if apply and payload:
-        conn.execute(_UPDATE_SQL, {"payload": payload})
+        updates.append({**key, "last_name": split[0], "first_name": split[1]})
+    if apply and updates:
+        conn.execute(_UPDATE_SQL, {"payload": updates})
+    if apply and deletes:
+        conn.execute(_DELETE_SQL, {"payload": deletes})
     return stats
 
 
