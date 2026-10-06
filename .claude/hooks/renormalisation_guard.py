@@ -18,7 +18,7 @@ RAPPEL = """Tu viens d'employer « renormaliser ». Rappel du cycle, à confront
 - Une notice déjà normalisée ne repasse donc pas par `normalize` d'elle-même. Rejouer la normalisation d'un stock passe par `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py`.
 - `--normalize-full` ne remet aucune notice en file : il force la synchronisation des signatures des seules notices traitées pendant ce passage, même à bloc auteurs inchangé.
 
-Vérifie ton affirmation contre ces règles, dans le code au besoin. Si elle est fausse, dis-le explicitement à l'utilisatrice et corrige-la."""
+Vérifie ton affirmation contre ces règles, dans le code au besoin. Si elle est fausse, dis-le explicitement à l'utilisatrice et corrige-la. Si elle est juste, termine sans rien écrire."""
 
 
 def _texte(contenu: object) -> str:
