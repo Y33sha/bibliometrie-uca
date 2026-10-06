@@ -49,8 +49,6 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 
 Quand l'utilisatrice signale une tournure qui l'agace, la classer :
 
-- Expression figée remplaçable mot à mot → ajouter au `swap` de `styles/Maison/Periphrases.yml`, avec le substitut qu'elle propose. Si elle n'en propose pas, en suggérer un et le lui faire valider.
+- Expression figée remplaçable mot à mot → ajouter au `swap` de `styles/Maison/Vocabulaire.yml`, avec le substitut qu'elle propose. Si elle n'en propose pas, en suggérer un et le lui faire valider.
 - Défaut de structure (redite, remplissage, longueur, ton) → ajouter une paire AVANT / APRÈS dans `reference.md`, en gardant son texte exact en AVANT.
 - Motif récurrent qui n'est pas une expression figée → proposer une nouvelle règle `existence` dans `styles/Maison/`, et la lui soumettre avant de l'écrire.
-
-Après tout ajout au style Vale : lancer `vale .` et rapporter le nombre de déclenchements. Au-delà d'une dizaine sur du texte déjà relu, la règle est trop large — la restreindre avant de la garder.
