@@ -79,7 +79,9 @@ def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
 def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
     counts = {(c.year, c.doc_type): c.count for c in data.by_year_and_type}
     by_type = {t: [counts.get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
-    rows = [[label, *map(str, by_type[t])] for t, label in DOC_TYPE_LABELS.items()]
+    rows = [
+        [label, *map(str, by_type[t])] for t, label in DOC_TYPE_LABELS.items() if any(by_type[t])
+    ]
     per_year = [sum(by_type[t][i] for t in DOC_TYPE_LABELS) for i in range(len(years))]
     rows.append(["**Total**", *(f"**{n}**" for n in per_year)])
     return rows

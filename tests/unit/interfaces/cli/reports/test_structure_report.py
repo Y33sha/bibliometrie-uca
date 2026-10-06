@@ -34,7 +34,7 @@ def test_titre_sigle_et_nom():
     assert _render().startswith("# LABO — Laboratoire\n")
 
 
-def test_typologie_chaque_type_avec_zeros_et_total_par_annee():
+def test_typologie_types_presents_et_total_par_annee():
     report = _render(
         [
             YearDocTypeCount(2024, DocType.ARTICLE, 3),
@@ -43,7 +43,8 @@ def test_typologie_chaque_type_avec_zeros_et_total_par_annee():
         ]
     )
     assert "| Articles | 3 | 1 |" in report
-    assert "| Ouvrages | 0 | 0 |" in report
+    assert "| Chapitres | 2 | 0 |" in report
+    assert "Ouvrages" not in report
     assert "| **Total** | **5** | **1** |" in report
 
 
