@@ -3,7 +3,6 @@
 import pytest
 
 from domain.normalize import normalize_name
-from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
@@ -185,30 +184,3 @@ class TestNamesCompatible:
     def test_digits_ignored(self):
         # Les chiffres (années de naissance type SUDOC) sont retirés avant comparaison.
         assert names_compatible("chiari", "sophie 1977", "chiari lasserre", "sophie") is True
-
-
-# ── compute_person_name_forms ──
-
-
-class TestComputePersonNameForms:
-    def test_standard(self):
-        forms = compute_person_name_forms("Dupont", "Jean")
-        assert "jean dupont" in forms
-        assert "dupont jean" in forms
-        assert "j dupont" in forms
-        assert "dupont j" in forms
-
-    def test_compound_first_name(self):
-        forms = compute_person_name_forms("Dupont", "Jean Michel")
-        assert "jean michel dupont" in forms
-        assert "j m dupont" in forms
-        assert "jm dupont" in forms
-
-    def test_no_first_name(self):
-        forms = compute_person_name_forms("Dupont", "")
-        assert "dupont" in forms
-        assert len(forms) == 1
-
-    def test_empty_last_name(self):
-        forms = compute_person_name_forms("", "Jean")
-        assert forms == set()

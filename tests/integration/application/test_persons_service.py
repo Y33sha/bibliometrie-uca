@@ -507,7 +507,7 @@ class TestUpdateName:
         row = sa_sync_conn.execute(
             text(
                 "SELECT sources FROM person_name_forms "
-                "WHERE name_form = 'martin sophie' AND person_id = :pid"
+                "WHERE name_form = 'sophie martin' AND person_id = :pid"
             ),
             {"pid": p},
         ).one()
@@ -561,7 +561,7 @@ class TestCreatePerson:
                 text("SELECT name_form FROM person_name_forms WHERE person_id = :p"), {"p": p}
             )
         }
-        assert "dupont jean" in forms
+        assert forms == {"jean dupont", "j dupont"}
 
     def test_strips_surrounding_space(self, sa_sync_conn, repo):
         p = create_person("  Dupont  ", "  Jean  ", repo=repo)
@@ -860,7 +860,7 @@ class TestDetachAuthorships:
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT 1 FROM person_name_forms WHERE name_form='dupont jean' AND person_id=:p",
+                "SELECT 1 FROM person_name_forms WHERE name_form='jean dupont' AND person_id=:p",
                 p=person_id,
             )
             == 1
@@ -1072,7 +1072,7 @@ class TestUpdateNameFormStatus:
 
         with pytest.raises(ConflictError):
             update_name_form_status(
-                person_id, "gamma delta", "rejected", repo=repo, authorship_repo=authorship_repo
+                person_id, "delta gamma", "rejected", repo=repo, authorship_repo=authorship_repo
             )
 
     def test_unknown_form_raises(self, repo, authorship_repo):

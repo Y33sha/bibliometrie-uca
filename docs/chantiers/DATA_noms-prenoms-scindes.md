@@ -26,7 +26,7 @@ Un test de record linkage probabiliste (Splink) sur les signatures du périmètr
 - Le matching des personnes s'appuie sur le nom et le prénom découpés.
 - `source_authorships` stocke ce que la source fournit : `raw_last_name` et `raw_first_name` quand la source les sépare, sinon `raw_author_name`. Une contrainte impose l'une ou l'autre forme.
 - `author_identifying_keys` porte le découpage retenu, normalisé, dans la clé d'identité. Corriger une inversion revient à rattacher la signature à l'identité de découpage inverse.
-- `person_name_forms` stocke nom et prénom en deux colonnes.
+- `person_name_forms` stocke une chaîne « prénom nom » normalisée, au format de `author_identifying_keys.author_name_normalized`.
 - L'interface présente les formes de nom (volet personne, formes confirmées et rejetées) telles que les sources les donnent, au format « Prénom Nom ».
 
 ## Phasage
@@ -58,10 +58,10 @@ La synchronisation des signatures d'une notice renormalisée rapproche les signa
 
 Une inversion se repère en confrontant le découpage d'une signature aux personnes connues : la correction des inversions et le matching par forme de nom vont ensemble.
 
-- [ ] Nom de famille réduit à des initiales : le découpage retenu les place en prénom. Trois cas, environ 13 000 signatures : format « Nom I. » découpé par le parseur (« Del Buono L. »), format « I., Nom » (« C., Küll »), champs natifs inversés (surname « M. », forename « Brigante »). Signatures existantes rattachées à leur identité corrigée.
-- [ ] Formes de nom (`person_name_forms`) en deux colonnes. Formes d'une personne : (nom, prénom) et (nom, initiales).
-- [ ] Matching par forme de nom sur le nom et le prénom découpés. À défaut de personne, le couple inversé : s'il désigne une seule personne, la signature y est rattachée et passe sur l'identité au découpage inverse.
-- [ ] Corroboration d'un identifiant par le nom : même essai du couple inversé.
+- [x] Nom de famille réduit à des initiales : le découpage retenu les place en prénom. Trois cas, environ 13 000 signatures : format « Nom I. » découpé par le parseur (« Del Buono L. »), format « I., Nom » (« C., Küll »), champs natifs inversés (surname « M. », forename « Brigante »). Signatures existantes rattachées à leur identité corrigée.
+- [x] Formes de nom dans l'ordre « prénom nom ». Formes d'une personne : « prénom nom » et « initiales nom ». Verdicts réécrits dans cet ordre d'après leur découpage.
+- [x] Matching par forme de nom et corroboration d'un identifiant : forme « prénom nom », puis « nom prénom ».
+- [ ] Signature inversée rattachée par sa forme « nom prénom » : passage sur l'identité au découpage inverse.
 - [ ] Personnes au nom inversé, dont la majorité des signatures donne le découpage inverse (14 personnes au nom de famille réduit à une initiale).
 - [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 

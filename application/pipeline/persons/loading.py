@@ -13,6 +13,7 @@ from application.ports.pipeline.persons.matching import (
     PersonsMatchingQueries,
 )
 from domain.persons.creation import allow_person_creation
+from domain.persons.name_forms import signature_name_forms
 from domain.persons.signature_name import SignatureName
 
 
@@ -23,6 +24,8 @@ class EnrichedAuthorship(NamedTuple):
     source: str
     name: SignatureName
     author_name_normalized: str | None
+    # Formes cherchées dans `person_name_forms`, ordre inversé compris (`signature_name_forms`).
+    name_forms: tuple[str, ...]
     identifiers: dict[str, str]
     roles: list[str] | None
     publication_id: int | None
@@ -47,6 +50,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         source=row.source,
         name=row.name,
         author_name_normalized=row.author_name_normalized,
+        name_forms=signature_name_forms(last_norm, first_norm),
         identifiers=row.identifiers,
         roles=row.roles,
         publication_id=row.publication_id,
