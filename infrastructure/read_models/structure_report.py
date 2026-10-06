@@ -197,14 +197,6 @@ def top_10_percent_by_year(
     return {r.pub_year: Top10Count(r.top_10, r.with_percentile) for r in rows}
 
 
-@dataclass(frozen=True, slots=True)
-class JournalYearCounts:
-    title: str
-    publisher: str | None
-    counts: dict[int, int]
-    """Nombre de publications par année."""
-
-
 # Publication `p` dans le top 10 % des plus citées selon une de ses notices OpenAlex.
 _TOP_10_PERCENT = """
     EXISTS (
@@ -216,42 +208,20 @@ _TOP_10_PERCENT = """
 """
 
 
-def _top_journals(
-    conn: Connection, condition: str, params: dict[str, object], limit: int
-) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications du rapport satisfaisant `condition`, avec leur éditeur et leur nombre par année. Tri par nombre total décroissant, puis par titre."""
-    rows = conn.execute(
-        text(f"""
-            WITH pubs AS (
-                SELECT p.journal_id, p.pub_year
-                FROM publications p
-                WHERE p.journal_id IS NOT NULL
-                  AND {_REPORT_PUBLICATION} AND {condition}
-            ),
-            top AS (
-                SELECT pubs.journal_id, j.title, pb.name AS publisher, count(*) AS total
-                FROM pubs
-                JOIN journals j ON j.id = pubs.journal_id
-                LEFT JOIN publishers pb ON pb.id = j.publisher_id
-                GROUP BY 1, 2, 3
-                ORDER BY total DESC, j.title
-                LIMIT :limit
-            )
-            SELECT top.journal_id, top.title, top.publisher, pubs.pub_year, count(*) AS n
-            FROM top JOIN pubs USING (journal_id)
-            GROUP BY top.journal_id, top.title, top.publisher, top.total, pubs.pub_year
-            ORDER BY top.total DESC, top.title
-        """),  # noqa: S608 — fragments SQL constants
-        {**params, "limit": limit},
-    ).all()
-    journals: dict[int, JournalYearCounts] = {}
-    for r in rows:
-        journal = journals.setdefault(r.journal_id, JournalYearCounts(r.title, r.publisher, {}))
-        journal.counts[r.pub_year] = r.n
-    return list(journals.values())
+@dataclass(frozen=True, slots=True)
+class JournalCounts:
+    title: str
+    publisher: str | None
+    publications: int
+    top_10: int
+    """Publications dans le top 10 % des plus citées."""
+    key_role: int
+    """Publications où un auteur de la structure tient un des rôles demandés."""
+    top_10_key_role: int
+    """Publications dans le top 10 % où un auteur de la structure tient un des rôles demandés."""
 
 
-def key_role_publications_top_journals(
+def top_journals(
     conn: Connection,
     structure_id: int,
     *,
@@ -259,18 +229,35 @@ def key_role_publications_top_journals(
     doc_types: list[DocType],
     from_year: int,
     limit: int,
-) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications de `key_role_publications_by_year`."""
-    return _top_journals(
-        conn, _key_role_condition(roles), _params(structure_id, doc_types, from_year), limit
-    )
-
-
-def top_10_percent_top_journals(
-    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
-) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications de la structure dans le top 10 % des plus citées."""
-    return _top_journals(conn, _TOP_10_PERCENT, _params(structure_id, doc_types, from_year), limit)
+) -> list[JournalCounts]:
+    """Les `limit` revues qui portent le plus de publications signées par la structure sur la période, avec leur éditeur. Tri par nombre décroissant, puis par titre."""
+    rows = conn.execute(
+        text(f"""
+            WITH pubs AS (
+                SELECT p.journal_id,
+                       {_TOP_10_PERCENT} AS top_10,
+                       {_key_role_condition(roles)} AS key_role
+                FROM publications p
+                WHERE p.journal_id IS NOT NULL AND {_REPORT_PUBLICATION}
+            )
+            SELECT j.title, pb.name AS publisher,
+                   count(*) AS publications,
+                   count(*) FILTER (WHERE top_10) AS top_10,
+                   count(*) FILTER (WHERE key_role) AS key_role,
+                   count(*) FILTER (WHERE top_10 AND key_role) AS top_10_key_role
+            FROM pubs
+            JOIN journals j ON j.id = pubs.journal_id
+            LEFT JOIN publishers pb ON pb.id = j.publisher_id
+            GROUP BY pubs.journal_id, j.title, pb.name
+            ORDER BY publications DESC, j.title
+            LIMIT :limit
+        """),  # noqa: S608 — fragments SQL constants
+        {**_params(structure_id, doc_types, from_year), "limit": limit},
+    ).all()
+    return [
+        JournalCounts(r.title, r.publisher, r.publications, r.top_10, r.key_role, r.top_10_key_role)
+        for r in rows
+    ]
 
 
 def publications_by_source(

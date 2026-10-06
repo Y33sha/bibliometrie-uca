@@ -2,7 +2,7 @@
 
 from domain.publications.doc_types import DocType
 from infrastructure.read_models.structure_report import (
-    JournalYearCounts,
+    JournalCounts,
     KeyAuthorRole,
     ReportStructure,
     Top10Count,
@@ -17,10 +17,9 @@ def _render(
     by_year_and_type=(),
     key_roles=frozenset({KeyAuthorRole.CORRESPONDING}),
     key_role_by_year=None,
-    key_role_journals=(),
     top_10=None,
-    top_10_journals=(),
     top_10_key_role=None,
+    journals=(),
     by_source=None,
 ):
     data = StructureReportData(
@@ -28,10 +27,9 @@ def _render(
         by_year_and_type=by_year_and_type,
         key_roles=key_roles,
         key_role_by_year=key_role_by_year or {},
-        key_role_top_journals=key_role_journals,
         top_10_by_year=top_10 or {},
-        top_10_top_journals=top_10_journals,
         top_10_key_role_by_year=top_10_key_role or {},
+        journals=journals,
         by_source=by_source or {},
     )
     return render_report(data, years=[2024, 2025], current_year=2025, generated_on="2025-10-06")
@@ -60,8 +58,9 @@ def test_synthese_une_ligne_par_indicateur():
 def test_libelle_des_roles_selon_l_unite():
     report = _render(key_roles=frozenset(KeyAuthorRole))
     assert "| Avec auteur correspondant, premier ou dernier auteur |" in report
-    assert "## Revues des publications avec auteur correspondant, premier ou dernier auteur\n" in (
-        report
+    assert (
+        "| Revue | Publications | Top 10 % | Auteur correspondant, premier ou dernier auteur | Les deux |"
+        in report
     )
 
 
@@ -79,14 +78,14 @@ def test_typologie_types_presents_et_total_par_annee():
     assert "| **Total** | **5** | **1** |" in report
 
 
-def test_sections_revues_seulement_des_revues():
+def test_revues_totaux_de_la_periode():
     report = _render(
-        key_role_journals=[JournalYearCounts("Revue A", "Éditeur", {2025: 2})],
-        top_10_journals=[JournalYearCounts("Revue B", None, {2024: 1})],
+        journals=[
+            JournalCounts("Revue A", "Éditeur", 12, 3, 5, 2),
+            JournalCounts("Revue B", None, 4, 0, 1, 0),
+        ]
     )
-    assert "| --- | ---: | ---: |\n| Revue A (Éditeur) | 0 | 2 |" in report
-    assert "| --- | ---: | ---: |\n| Revue B | 1 | 0 |" in report
-    assert "Toutes revues" not in report
+    assert "| Revue A (Éditeur) | 12 | 3 | 5 | 2 |\n| Revue B | 4 | 0 | 1 | 0 |" in report
 
 
 def test_annee_en_cours_marquee():
