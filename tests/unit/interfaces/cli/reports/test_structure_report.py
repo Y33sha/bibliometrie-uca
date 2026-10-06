@@ -9,11 +9,15 @@ _LABO = ReportStructure(id=1, code="labo", acronym="LABO", name="Laboratoire")
 
 def _render(rows):
     return render_report(
-        [(_LABO, rows)], years=[2024, 2025], current_year=2025, generated_on="2025-10-06"
+        _LABO, rows, years=[2024, 2025], current_year=2025, generated_on="2025-10-06"
     )
 
 
-def test_synthese_totalise_les_types_par_annee():
+def test_titre_sigle_et_nom():
+    assert _render([]).startswith("# LABO — Laboratoire\n")
+
+
+def test_chaque_type_avec_zeros_et_total_par_annee():
     report = _render(
         [
             YearDocTypeCount(2024, DocType.ARTICLE, 3),
@@ -21,15 +25,9 @@ def test_synthese_totalise_les_types_par_annee():
             YearDocTypeCount(2025, DocType.ARTICLE, 1),
         ]
     )
-    assert "| LABO | 5 | 1 | 6 |" in report
-
-
-def test_section_detaille_chaque_type_avec_zeros():
-    report = _render([YearDocTypeCount(2024, DocType.ARTICLE, 3)])
-    assert "## LABO — Laboratoire" in report
-    assert "| Articles | 3 | 0 | 3 |" in report
+    assert "| Articles | 3 | 1 | 4 |" in report
     assert "| Ouvrages | 0 | 0 | 0 |" in report
-    assert "| **Total** | **3** | **0** | **3** |" in report
+    assert "| **Total** | **5** | **1** | **6** |" in report
 
 
 def test_annee_en_cours_marquee():

@@ -1,14 +1,12 @@
 # STATUS: recurring (reports)
-"""Rapport bibliométrique par unité de recherche, au format Markdown.
-
-Le rapport s'ouvre sur une synthèse : le nombre total de publications de chaque unité, par année. Une section par unité suit, avec le détail par type de document. Chaque section commence par un titre de niveau 2 : une feuille de style peut y placer un saut de page.
+"""Rapports bibliométriques par unité de recherche, au format Markdown : un fichier `<code>.md` par unité.
 
 Une publication compte pour une unité quand au moins un de ses auteurs du périmètre signe avec cette unité. Les types de documents retenus sont les articles, les articles de synthèse, les ouvrages, les chapitres et les conference papers. L'année en cours est incomplète.
 
 Usage :
-    python -m interfaces.cli.reports.structure_report [--structure CODE ...] [--from-year 2022] [--output chemin.md]
+    python -m interfaces.cli.reports.structure_report [--structure CODE ...] [--from-year 2022] [--output-dir data/reports]
 
-Sans `--structure`, le rapport couvre tous les laboratoires.
+Sans `--structure`, un rapport par laboratoire.
 """
 
 from __future__ import annotations
@@ -39,7 +37,7 @@ DOC_TYPE_LABELS: dict[DocType, str] = {
     DocType.CONFERENCE_PAPER: "Conference papers",
 }
 
-DEFAULT_OUTPUT = Path("data/reports/rapport-bibliometrique.md")
+DEFAULT_OUTPUT_DIR = Path("data/reports")
 
 
 def _structure_label(structure: ReportStructure) -> str:
@@ -61,53 +59,34 @@ def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
 
 
 def render_report(
-    sections: Sequence[tuple[ReportStructure, Sequence[YearDocTypeCount]]],
+    structure: ReportStructure,
+    rows: Sequence[YearDocTypeCount],
     *,
     years: Sequence[int],
     current_year: int,
     generated_on: str,
 ) -> str:
-    """Rapport Markdown : synthèse, puis une section par structure."""
-    year_headers = [_year_header(y, current_year) for y in years]
-    counts: dict[int, dict[tuple[int, DocType], int]] = {
-        structure.id: {(c.year, c.doc_type): c.count for c in rows} for structure, rows in sections
-    }
-
-    def total(structure_id: int, year: int) -> int:
-        return sum(n for (y, _), n in counts[structure_id].items() if y == year)
-
-    lines = [
-        "# Rapport bibliométrique par unité de recherche",
-        "",
-        f"Données au {generated_on}. Types de documents : "
-        + ", ".join(label.lower() for label in DOC_TYPE_LABELS.values())
-        + f". \\* {current_year} : année en cours.",
-        "",
-        "## Synthèse",
-        "",
+    """Rapport Markdown d'une structure."""
+    counts = {(c.year, c.doc_type): c.count for c in rows}
+    by_type = {t: [counts.get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
+    table_rows = [
+        [label, *map(str, by_type[t]), str(sum(by_type[t]))] for t, label in DOC_TYPE_LABELS.items()
     ]
-    synthesis_rows = []
-    for structure, _ in sections:
-        per_year = [total(structure.id, y) for y in years]
-        synthesis_rows.append(
-            [_structure_label(structure), *map(str, per_year), str(sum(per_year))]
-        )
-    lines += _table(["Unité", *year_headers, "Total"], synthesis_rows)
+    per_year = [sum(by_type[t][i] for t in DOC_TYPE_LABELS) for i in range(len(years))]
+    table_rows.append(["**Total**", *(f"**{n}**" for n in per_year), f"**{sum(per_year)}**"])
 
-    for structure, _ in sections:
-        by_type = {t: [counts[structure.id].get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
-        rows = [
-            [label, *map(str, by_type[t]), str(sum(by_type[t]))]
-            for t, label in DOC_TYPE_LABELS.items()
-        ]
-        per_year = [total(structure.id, y) for y in years]
-        rows.append(["**Total**", *(f"**{n}**" for n in per_year), f"**{sum(per_year)}**"])
-        title = _structure_label(structure)
-        if structure.acronym:
-            title += f" — {structure.name}"
-        lines += ["", f"## {title}", "", "### Publications", ""]
-        lines += _table(["Type", *year_headers, "Total"], rows)
-
+    title = structure.acronym or structure.name
+    if structure.acronym:
+        title += f" — {structure.name}"
+    lines = [
+        f"# {title}",
+        "",
+        f"Données au {generated_on}. \\* {current_year} : année en cours.",
+        "",
+        "## Publications",
+        "",
+        *_table(["Type", *(_year_header(y, current_year) for y in years), "Total"], table_rows),
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -121,7 +100,9 @@ def main() -> int:
         help="code de la structure (option répétable) ; tous les laboratoires par défaut",
     )
     parser.add_argument("--from-year", type=int, default=2022, help="première année (2022)")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"({DEFAULT_OUTPUT})")
+    parser.add_argument(
+        "--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"({DEFAULT_OUTPUT_DIR})"
+    )
     args = parser.parse_args()
 
     current_year = today().year
@@ -134,22 +115,27 @@ def main() -> int:
         if unknown:
             log.error("Structures inconnues : %s", ", ".join(sorted(unknown)))
             return 1
-        sections = [
-            (
-                s,
-                publications_by_year_and_type(
-                    conn, s.id, doc_types=doc_types, from_year=args.from_year
-                ),
+        reports = {
+            s: publications_by_year_and_type(
+                conn, s.id, doc_types=doc_types, from_year=args.from_year
             )
             for s in structures
-        ]
+        }
 
-    report = render_report(
-        sections, years=years, current_year=current_year, generated_on=today().isoformat()
-    )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(report, encoding="utf-8")
-    log.info("Rapport écrit : %s (%d unités)", args.output, len(sections))
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    for structure, rows in reports.items():
+        path = args.output_dir / f"{structure.code}.md"
+        path.write_text(
+            render_report(
+                structure,
+                rows,
+                years=years,
+                current_year=current_year,
+                generated_on=today().isoformat(),
+            ),
+            encoding="utf-8",
+        )
+        log.info("Rapport écrit : %s", path)
     return 0
 
 
