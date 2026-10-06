@@ -25,7 +25,7 @@ Un test de record linkage probabiliste (Splink) sur les signatures du périmètr
 - Le découpage nom / prénom précède tout matching.
 - Le matching des personnes s'appuie sur le nom et le prénom découpés.
 - `source_authorships` stocke ce que la source fournit : `raw_last_name` et `raw_first_name` quand la source les sépare, sinon `raw_author_name`. Une contrainte impose l'une ou l'autre forme.
-- `author_identifying_keys` porte le découpage retenu, normalisé, dans la clé d'identité. Corriger une inversion revient à rattacher la signature à l'identité de découpage inverse.
+- `author_identifying_keys` porte le découpage retenu, normalisé, dans la clé d'identité.
 - `person_name_forms` stocke une chaîne « prénom nom » normalisée, au format de `author_identifying_keys.author_name_normalized`.
 - L'interface présente les formes de nom (volet personne, formes confirmées et rejetées) telles que les sources les donnent, au format « Prénom Nom ».
 
@@ -61,8 +61,7 @@ Une inversion se repère en confrontant le découpage d'une signature aux person
 - [x] Nom de famille réduit à des initiales : le découpage retenu les place en prénom. Trois cas, environ 13 000 signatures : format « Nom I. » découpé par le parseur (« Del Buono L. »), format « I., Nom » (« C., Küll »), champs natifs inversés (surname « M. », forename « Brigante »). Signatures existantes rattachées à leur identité corrigée.
 - [x] Formes de nom dans l'ordre « prénom nom ». Formes d'une personne : « prénom nom » et « initiales nom ». Verdicts réécrits dans cet ordre d'après leur découpage.
 - [x] Matching par forme de nom et corroboration d'un identifiant : forme « prénom nom », puis « nom prénom ».
-- [ ] Signature inversée rattachée par sa forme « nom prénom » : passage sur l'identité au découpage inverse.
-- [ ] Personnes au nom inversé, dont la majorité des signatures donne le découpage inverse (14 personnes au nom de famille réduit à une initiale).
+- [ ] Personnes au nom de famille fait d'initiales (17) : supprimées par un oneshot, puis recréées ou rattachées par le pipeline d'après le découpage de leurs signatures.
 - [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 
 ### Phase 4 — Interface
@@ -79,6 +78,5 @@ Une inversion se repère en confrontant le découpage d'une signature aux person
 
 ## Questions ouvertes
 
-- Reprise des verdicts manuels de `person_name_forms` : une forme issue d'une signature (« dupont marie ») se découpe par les identités qui la portent. Que devient son verdict quand plusieurs découpages correspondent ?
 - Affichage d'une forme normalisée qui regroupe plusieurs graphies brutes : la plus fréquente, ou toutes ?
-- Correction d'une inversion au matching : dès que le couple inversé désigne une seule personne, ou sur confirmation par une autre source de la même publication ?
+- Parseur : la règle des initiales finales vise le format « Nom I. » (« Del Buono L. »). Elle découpe aussi « Prénom Nom I. » en nom « Prénom Nom » : « Jean PERRIOT M.D. », « Valérie Julian V ». Fréquence à mesurer.
