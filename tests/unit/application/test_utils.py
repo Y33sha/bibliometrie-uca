@@ -116,6 +116,24 @@ class TestParseRawAuthorName:
     def test_family_name_opens_at_the_first_particle(self, raw, parsed):
         assert parse_raw_author_name(raw) == parsed
 
+    @pytest.mark.parametrize(
+        ("raw", "parsed"),
+        [
+            ("Del Buono L.", ("Del Buono", "L.")),
+            ("Solovyanov O. V.", ("Solovyanov", "O. V.")),
+            ("Bal M. -C.", ("Bal", "M. -C.")),
+            ("Amziane S", ("Amziane", "S")),
+        ],
+    )
+    def test_trailing_initials_form_the_first_name(self, raw, parsed):
+        assert parse_raw_author_name(raw) == parsed
+
+    def test_leading_initial_stays_first_name(self):
+        assert parse_raw_author_name("J. Dupont") == ("Dupont", "J.")
+
+    def test_initials_before_the_comma_are_the_first_name(self):
+        assert parse_raw_author_name("C., Küll") == ("Küll", "C.")
+
     def test_single_name(self):
         assert parse_raw_author_name("Dupont") == ("Dupont", "")
 

@@ -7,6 +7,7 @@ from domain.normalize import clean_raw_author_name, normalize_name_form
 from domain.persons.name_matching import (
     family_name_splits,
     normalize_first_name,
+    orient_initials,
     parse_raw_author_name,
 )
 
@@ -53,9 +54,9 @@ class SignatureName:
         return cls(raw=raw)
 
     def split(self) -> tuple[str, str]:
-        """(nom de famille, prénom) : ceux de la source, sinon le découpage de `parse_raw_author_name`."""
+        """(nom de famille, prénom) : ceux de la source, sinon le découpage de `parse_raw_author_name`. Un nom de la source réduit à des initiales passe en prénom (`orient_initials`)."""
         if self.last_name is not None:
-            return self.last_name, self.first_name or ""
+            return orient_initials(self.last_name, self.first_name or "")
         return parse_raw_author_name(self.raw)
 
     def splits(self) -> list[tuple[str, str]]:

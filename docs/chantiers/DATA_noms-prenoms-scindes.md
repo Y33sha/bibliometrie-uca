@@ -54,28 +54,31 @@ La synchronisation des signatures d'une notice renormalisée rapproche les signa
 - [x] Migration : clé d'identité réduite au nom, au prénom et aux identifiants ; `author_name_normalized` calculé.
 - [x] Matching et affichage : lecture du nom et du prénom découpés.
 
-### Phase 3 — Correction des inversions entre sources
+### Phase 3 — Matching des personnes et correction des inversions
 
-- [ ] Détection des signatures dont le découpage contredit celui des autres sources de la même publication ou de la même personne.
-- [ ] Correction de ces découpages.
+Une inversion se repère en confrontant le découpage d'une signature aux personnes connues : la correction des inversions et le matching par forme de nom vont ensemble.
 
-### Phase 4 — Matching des personnes
-
-- [ ] Formes de nom (`person_name_forms`) en deux colonnes, et matching par forme de nom sur le nom et le prénom découpés.
+- [ ] Nom de famille réduit à des initiales : le découpage retenu les place en prénom. Trois cas, environ 13 000 signatures : format « Nom I. » découpé par le parseur (« Del Buono L. »), format « I., Nom » (« C., Küll »), champs natifs inversés (surname « M. », forename « Brigante »). Signatures existantes rattachées à leur identité corrigée.
+- [ ] Formes de nom (`person_name_forms`) en deux colonnes. Formes d'une personne : (nom, prénom) et (nom, initiales).
+- [ ] Matching par forme de nom sur le nom et le prénom découpés. À défaut de personne, le couple inversé : s'il désigne une seule personne, la signature y est rattachée et passe sur l'identité au découpage inverse.
+- [ ] Corroboration d'un identifiant par le nom : même essai du couple inversé.
+- [ ] Personnes au nom inversé, dont la majorité des signatures donne le découpage inverse (14 personnes au nom de famille réduit à une initiale).
 - [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 
-### Phase 5 — Interface
+### Phase 4 — Interface
 
 - [ ] Volet personne et listes de formes de nom confirmées et rejetées : formes « Prénom Nom » des sources.
 
-### Phase 6 — Reprise du test Splink
+### Phase 5 — Reprise du test Splink
 
 - [ ] Modèle relancé sur les noms découpés, comparé aux rattachements de la base.
 
-### Phase 7 — Documentation
+### Phase 6 — Documentation
 
 - [ ] Mise à jour de `docs/pipeline` (normalisation, personnes).
 
 ## Questions ouvertes
 
-- Où découper `raw_author_name` (OpenAlex) et `fullName` (ScanR) : dans la normalisation, ou dans une étape ultérieure qui compare les sources ?
+- Reprise des verdicts manuels de `person_name_forms` : une forme issue d'une signature (« dupont marie ») se découpe par les identités qui la portent. Que devient son verdict quand plusieurs découpages correspondent ?
+- Affichage d'une forme normalisée qui regroupe plusieurs graphies brutes : la plus fréquente, ou toutes ?
+- Correction d'une inversion au matching : dès que le couple inversé désigne une seule personne, ou sur confirmation par une autre source de la même publication ?

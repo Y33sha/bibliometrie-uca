@@ -56,6 +56,14 @@ class TestSplit:
     def test_chaine_brute_decoupee_par_le_parseur(self):
         assert SignatureName(raw="Alison da Silva").split() == ("da Silva", "Alison")
 
+    def test_initiale_de_la_source_en_champ_nom_passe_en_prenom(self):
+        name = SignatureName(last_name="M.", first_name="Brigante")
+        assert name.split() == ("Brigante", "M.")
+        assert name.normalized() == ("brigante", "m")
+
+    def test_initiales_des_deux_cotes_laissees_en_place(self):
+        assert SignatureName(last_name="M.", first_name="J.").split() == ("M.", "J.")
+
 
 class TestFromColumns:
     def test_nom_et_prenom(self):
