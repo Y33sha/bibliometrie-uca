@@ -388,7 +388,7 @@ class TestDecideMatchByIdentifier:
     def test_compatible_name_returns_person_id(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, _sig("Jean Dupont"), "jean dupont", {}
+            "252404955", idref_map, _sig("Jean Dupont"), ("jean dupont",), {}
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -397,7 +397,7 @@ class TestDecideMatchByIdentifier:
         """Sans verdict, nom incompatible → match refusé (test de tokens), rejet journalisé."""
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, _sig("Paul Martin"), "paul martin", {}
+            "252404955", idref_map, _sig("Paul Martin"), ("paul martin",), {}
         )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
@@ -408,7 +408,7 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "maneval", "axelle")}
         status = {("van lander axelle", 42): "confirmed"}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Van Lander Axelle"), "van lander axelle", status
+            "x", idref_map, _sig("Van Lander Axelle"), ("van lander axelle",), status
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -418,31 +418,31 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Jean Dupont"), "jean dupont", status
+            "x", idref_map, _sig("Jean Dupont"), ("jean dupont",), status
         )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
 
     def test_value_absent_returns_empty(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("999999999", idref_map, _sig("X"), "x", {})
+        result = decide_match_by_identifier("999999999", idref_map, _sig("X"), ("x",), {})
         assert result.person_id is None
         assert result.rejection is None
 
     def test_falsy_value_returns_empty(self):
         """Pas de tentative de lookup si la valeur est vide/None."""
         m = {"foo": IdentifiedPerson(1, "a", "b")}
-        assert decide_match_by_identifier(None, m, _sig("X"), "x", {}).person_id is None
-        assert decide_match_by_identifier("", m, _sig("X"), "x", {}).person_id is None
+        assert decide_match_by_identifier(None, m, _sig("X"), ("x",), {}).person_id is None
+        assert decide_match_by_identifier("", m, _sig("X"), ("x",), {}).person_id is None
 
     def test_empty_map(self):
-        assert decide_match_by_identifier("anything", {}, _sig("X"), "x", {}).person_id is None
+        assert decide_match_by_identifier("anything", {}, _sig("X"), ("x",), {}).person_id is None
 
     def test_surname_only_signature_not_rejected(self):
         """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
         donc pas de refus — on s'abstient plutôt que de rejeter."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("x", idref_map, _sig("Dupont"), "dupont", {})
+        result = decide_match_by_identifier("x", idref_map, _sig("Dupont"), ("dupont",), {})
         assert result.person_id == 42
         assert result.rejection is None
 
@@ -450,7 +450,7 @@ class TestDecideMatchByIdentifier:
         """La fonction est générique : même contrat pour IdRef et ORCID."""
         orcid_map = {"0000-0001-2345-6789": IdentifiedPerson(7, "curie", "marie")}
         result = decide_match_by_identifier(
-            "0000-0001-2345-6789", orcid_map, _sig("Marie Curie"), "marie curie", {}
+            "0000-0001-2345-6789", orcid_map, _sig("Marie Curie"), ("marie curie",), {}
         )
         assert result.person_id == 7
 
@@ -459,7 +459,7 @@ class TestDecideMatchByIdentifier:
         rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
         idref_map = {"x": IdentifiedPerson(42, "khalil", "toufik")}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Toufic Khalil"), "toufic khalil", {}
+            "x", idref_map, _sig("Toufic Khalil"), ("toufic khalil",), {}
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -469,10 +469,19 @@ class TestDecideMatchByIdentifier:
         corroboration par graphie)."""
         idref_map = {"x": IdentifiedPerson(42, "chanal", "helene")}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Herve Chanal"), "herve chanal", {}
+            "x", idref_map, _sig("Herve Chanal"), ("herve chanal",), {}
         )
         assert result.person_id is None
         assert result.rejection == (42, "helene chanal")
+
+    def test_verdict_on_inverted_form(self):
+        """Signature au nom et prénom inversés : le verdict porté par sa forme « nom prénom » tranche."""
+        idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
+        status = {("jean dupont", 42): "rejected"}
+        result = decide_match_by_identifier(
+            "x", idref_map, _sig("Dupont Jean"), ("dupont jean", "jean dupont"), status
+        )
+        assert result.person_id is None
 
 
 class TestDecidePersonMatch:

@@ -8,7 +8,7 @@ from domain.errors import ValidationError
 from domain.persons.name_forms import (
     PersonNameForm,
     compute_person_name_forms,
-    person_name_form_splits,
+    signature_name_forms,
 )
 
 
@@ -42,27 +42,40 @@ class TestPersonNameFormSemantics:
             form.value = "autre"  # type: ignore[misc]
 
 
-class TestPersonNameFormSplits:
-    def test_chaque_forme_porte_son_decoupage(self) -> None:
-        assert person_name_form_splits("Dupont", "Jean Michel") == {
-            "jean michel dupont": ("dupont", "jean michel"),
-            "dupont jean michel": ("dupont", "jean michel"),
-            "j m dupont": ("dupont", "j m"),
-            "dupont j m": ("dupont", "j m"),
-            "jm dupont": ("dupont", "j m"),
-            "dupont jm": ("dupont", "j m"),
+class TestComputePersonNameForms:
+    def test_prenom_nom_et_initiales_nom(self) -> None:
+        assert compute_person_name_forms("Dupont", "Jean Michel") == {
+            "jean michel dupont",
+            "j m dupont",
+        }
+
+    def test_prenom_en_initiales_collees(self) -> None:
+        """Prénom normalisé comme celui des signatures : « JP » donne « j p »."""
+        assert compute_person_name_forms("Dupont", "JP") == {"j p dupont"}
+
+    def test_accents(self) -> None:
+        assert compute_person_name_forms("Bensoussan", "Népomucène") == {
+            "nepomucene bensoussan",
+            "n bensoussan",
+        }
+
+    def test_annee_de_naissance_retiree(self) -> None:
+        """Une fiche créée d'après une forme d'autorité porte l'année de naissance."""
+        assert compute_person_name_forms("Chométy", "Philippe 1973-") == {
+            "philippe chomety",
+            "p chomety",
         }
 
     def test_sans_prenom(self) -> None:
-        assert person_name_form_splits("Dupont", "") == {"dupont": ("dupont", None)}
+        assert compute_person_name_forms("Dupont", "") == {"dupont"}
 
     def test_sans_nom(self) -> None:
-        assert person_name_form_splits("", "Jean") == {}
+        assert compute_person_name_forms("", "Jean") == set()
 
-    def test_formes_de_la_personne(self) -> None:
-        assert compute_person_name_forms("Dupont", "Marie") == {
-            "marie dupont",
-            "dupont marie",
-            "m dupont",
-            "dupont m",
-        }
+
+class TestSignatureNameForms:
+    def test_prenom_nom_puis_nom_prenom(self) -> None:
+        assert signature_name_forms("dupont", "marie") == ("marie dupont", "dupont marie")
+
+    def test_sans_prenom(self) -> None:
+        assert signature_name_forms("dupont", None) == ("dupont",)

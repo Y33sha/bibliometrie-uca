@@ -324,9 +324,7 @@ class TestCascadeRun:
         assert rows
         assert all(r.status == "pending" for r in rows)
         assert all("persons" in r.sources for r in rows)
-        forms = {r.name_form for r in rows}
-        assert "fifi brindacier" in forms
-        assert "brindacier fifi" in forms
+        assert {r.name_form for r in rows} == {"fifi brindacier", "f brindacier"}
 
     def test_identifier_match_refused_when_name_form_rejected(self, sa_sync_conn):
         """Forme de nom `rejected` pour la personne : le match identifiant est refusé
@@ -465,6 +463,27 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, oa_as) == person_id
         ids = _get_person_identifiers(sa_sync_conn, person_id)
         assert ("orcid", "0000-0002-3456-7890") in ids
+
+    def test_inverted_name_matches_by_name_form(self, sa_sync_conn):
+        """Signature au nom et prénom inversés (« Martin » en prénom, « Pierre » en nom) : sa forme « nom prénom » rejoint Pierre Martin."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
+        sd = _insert_source_document(sa_sync_conn, "crossref", "10.1/inverse", pub)
+        identity_id = upsert_identity(sa_sync_conn, author_name_normalized="martin pierre")
+        inverted = sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (source, source_publication_id, author_position, in_perimeter,
+                     raw_last_name, raw_first_name, identity_id)
+                VALUES ('crossref', :sd, 0, TRUE, 'Pierre', 'Martin', :iid)
+                RETURNING id
+            """),
+            {"sd": sd, "iid": identity_id},
+        ).scalar_one()
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, inverted) == person_id
 
     def test_ambiguous_name_form_stays_orphan(self, sa_sync_conn):
         """Nom mappé à 2 personnes (homonymes) → skip, pas de rattachement."""

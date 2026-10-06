@@ -241,7 +241,7 @@ def decide_match_by_identifier(
     value: str | None,
     identifier_map: Mapping[str, IdentifiedPerson],
     signature: SignatureName,
-    signature_form: str | None,
+    signature_forms: Sequence[str],
     name_form_status: Mapping[tuple[str, int], str],
 ) -> IdentifierMatch:
     """Résout un identifiant (IdRef, ORCID…) vers une `person_id`, corroboré par le nom.
@@ -250,7 +250,7 @@ def decide_match_by_identifier(
 
     Corroboration par le nom, du verdict humain au test heuristique :
 
-    1. Le statut du couple `(signature_form, person_id)` dans `person_name_forms` (`name_form_status`) tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
+    1. Le statut du couple (forme de la signature, `person_id`) dans `person_name_forms` (`name_form_status`), pour la première des `signature_forms` qui en porte un, tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
     2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« toufic » pour « toufik ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
 
     Un refus est matérialisé dans `rejection` pour journalisation.
@@ -262,7 +262,14 @@ def decide_match_by_identifier(
         return IdentifierMatch()
     person_id = target.person_id
 
-    verdict = name_form_status.get((signature_form, person_id)) if signature_form else None
+    verdict = next(
+        (
+            name_form_status[(f, person_id)]
+            for f in signature_forms
+            if (f, person_id) in name_form_status
+        ),
+        None,
+    )
     if verdict == "confirmed":
         return IdentifierMatch(person_id=person_id)
     if verdict == "rejected":

@@ -10,7 +10,7 @@ Deux populations de candidats traversent la même cascade :
 1. **ORCID** déposé par l'auteur (sources de `ORCID_MATCH_SOURCES`).
 2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
 3. **IdRef**.
-4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
+4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne, dans l'ordre « prénom nom » puis, pour une signature au nom et prénom inversés, « nom prénom » ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
 5. **Cross-source** — même publication × position, nom compatible ; inopérant au bootstrap.
 
 Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une signature qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses signatures attestent seul.
@@ -156,8 +156,9 @@ class _Cascade:
         self, a: EnrichedAuthorship, rejected_for_pub: frozenset[int]
     ) -> NameFormDecision:
         """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
-        norm = a.author_name_normalized
-        person_ids = self._name_form_map.get(norm) if norm else None
+        person_ids = next(
+            (self._name_form_map[f] for f in a.name_forms if f in self._name_form_map), None
+        )
         compatible = compatible_persons(a.name, self._namesakes) if person_ids is None else []
         return decide_name_form_outcome(
             person_ids,
@@ -173,14 +174,13 @@ class _Cascade:
     def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
-        form = a.author_name_normalized
         idref = a.identifiers.get(PersonIdentifierType.IDREF)
         hal_person_id = a.identifiers.get(PersonIdentifierType.HAL_PERSON_ID)
         idref_decision = decide_match_by_identifier(
-            idref, self._idref_map, a.name, form, self._name_form_status
+            idref, self._idref_map, a.name, a.name_forms, self._name_form_status
         )
         hal_decision = decide_match_by_identifier(
-            hal_person_id, self._hal_account_map, a.name, form, self._name_form_status
+            hal_person_id, self._hal_account_map, a.name, a.name_forms, self._name_form_status
         )
         # ORCID comme signal seulement depuis les sources à dépôt auteur (`ORCID_MATCH_SOURCES`) ; les autres restent enregistrés sur person_identifiers via add_identifiers.
         orcid_signal = (
@@ -189,7 +189,7 @@ class _Cascade:
             else None
         )
         orcid_decision = decide_match_by_identifier(
-            orcid_signal, self._orcid_map, a.name, form, self._name_form_status
+            orcid_signal, self._orcid_map, a.name, a.name_forms, self._name_form_status
         )
         for id_type, id_value, id_decision in (
             ("orcid", orcid_signal, orcid_decision),
@@ -248,7 +248,7 @@ class _Cascade:
             repo=self._authorship_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
-        add_name_form(pid, a.name.display(), repo=self._person_repo)
+        add_name_form(pid, a.author_name_normalized or "", repo=self._person_repo)
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
         add_identifiers(pid, [a.identifiers], repo=self._person_repo)
         self._complete_first_name(pid, a)
@@ -273,7 +273,7 @@ class _Cascade:
             marker, a.source, a.authorship_id, repo=self._authorship_repo, resolution_mode="name"
         )
         add_identifiers(marker, [a.identifiers], repo=self._person_repo)
-        add_name_form(marker, a.name.display(), repo=self._person_repo)
+        add_name_form(marker, a.author_name_normalized or "", repo=self._person_repo)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
         if a.publication_id is not None:
@@ -283,7 +283,7 @@ class _Cascade:
         self.created += 1
 
     def _index_namesake(self, namesake: Namesake) -> None:
-        """Rend la personne matchable dans la même passe par son nom de famille, et par toutes les formes de son nom — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
+        """Rend la personne matchable dans la même passe par son nom de famille, et par les formes de son nom via le générateur qui sert au peuplement de `person_name_forms`.
 
         Les formes fusionnent dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière personne indexée.
         """
