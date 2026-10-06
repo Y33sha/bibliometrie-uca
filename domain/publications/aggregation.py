@@ -21,7 +21,7 @@ from typing import cast
 
 from domain.normalize import normalize_text
 from domain.publications.conference import arbitrate_conference
-from domain.publications.doc_types import ARTICLE_SUBTYPES
+from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import (
     OA_CLOSED_STATUSES,
@@ -31,6 +31,7 @@ from domain.publications.metadata import (
 )
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
+from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
 
 
@@ -170,19 +171,29 @@ def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) ->
     Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
 
     CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Une source moins prioritaire ayant produit un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
-    """
-    article_subtype_present: str | None = None
-    for s in sources:
-        if not s.doc_type:
-            continue
-        if s.doc_type in ARTICLE_SUBTYPES:
-            article_subtype_present = s.doc_type
-            break
 
-    for s in sources:
-        if not s.doc_type:
+    Un `data_paper` déclaré par HAL seul se lit `article` : le type de dépôt HAL est souvent mal choisi, et les autres sources ne distinguent pas les data papers.
+    """
+    doc_types = [_corroborated_doc_type(s, sources) for s in sources]
+    article_subtype_present = next((t for t in doc_types if t in ARTICLE_SUBTYPES), None)
+
+    for doc_type in doc_types:
+        if not doc_type:
             continue
-        if s.doc_type == "article" and article_subtype_present:
+        if doc_type == DocType.ARTICLE and article_subtype_present:
             return article_subtype_present
-        return s.doc_type
+        return doc_type
     return "other"
+
+
+def _corroborated_doc_type(
+    source: SourcePublication, sources: list[SourcePublication]
+) -> str | None:
+    """`doc_type` de `source`, ramené à `article` pour un `data_paper` de HAL qu'aucune autre source ne déclare."""
+    if (
+        source.source == Source.HAL
+        and source.doc_type == DocType.DATA_PAPER
+        and not any(s.source != Source.HAL and s.doc_type == DocType.DATA_PAPER for s in sources)
+    ):
+        return DocType.ARTICLE
+    return source.doc_type
