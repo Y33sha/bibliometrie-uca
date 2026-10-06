@@ -7,7 +7,7 @@
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import ThesesTable from '$lib/components/ThesesTable.svelte';
-	import type { ThesisRow } from '$lib/components/ThesesTable.svelte';
+	import type { PublicationSort, ThesisRow } from '$lib/components/ThesesTable.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -34,7 +34,7 @@
 	const hasFixedLab = $derived(labId != null);
 
 	let search = $state('');
-	let currentSort = $state('soutenance_desc');
+	let currentSort: PublicationSort = $state('soutenance_desc');
 	let selectedYears: string[] = $state([]);
 	let selectedLabs: string[] = $state([]);
 	let selectedStatus: string[] = $state([]);
@@ -147,7 +147,7 @@
 		facets.load();
 	});
 
-	function toggleSort(asc: string, desc: string) {
+	function toggleSort(asc: PublicationSort, desc: PublicationSort) {
 		currentSort = currentSort === desc ? asc : desc;
 		onFilterChange();
 	}
@@ -166,7 +166,7 @@
 			if (restored.sourceStates)
 				sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
 			if (restored.search) search = restored.search as string;
-			if (restored.currentSort) currentSort = restored.currentSort as string;
+			if (restored.currentSort) currentSort = restored.currentSort as PublicationSort;
 			if (restored.currentPage) pubs.page = restored.currentPage as number;
 		}
 		await facets.load();
