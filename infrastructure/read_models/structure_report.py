@@ -128,14 +128,37 @@ def key_role_publications_by_year(
     from_year: int,
 ) -> dict[int, int]:
     """Nombre de publications signées par la structure où un de ses auteurs tient un des `roles`, par année. Premier et dernier auteur se lisent dans la notice OpenAlex."""
+    return _count_by_year(
+        conn, _key_role_condition(roles), _params(structure_id, doc_types, from_year)
+    )
+
+
+def top_10_key_role_publications_by_year(
+    conn: Connection,
+    structure_id: int,
+    *,
+    roles: Collection[KeyAuthorRole],
+    doc_types: list[DocType],
+    from_year: int,
+) -> dict[int, int]:
+    """Nombre de publications de `key_role_publications_by_year` dans le top 10 % des plus citées, par année."""
+    return _count_by_year(
+        conn,
+        f"{_TOP_10_PERCENT} AND {_key_role_condition(roles)}",
+        _params(structure_id, doc_types, from_year),
+    )
+
+
+def _count_by_year(conn: Connection, condition: str, params: dict[str, object]) -> dict[int, int]:
+    """Nombre de publications du rapport satisfaisant `condition`, par année."""
     rows = conn.execute(
         text(f"""
             SELECT p.pub_year, count(*) AS n
             FROM publications p
-            WHERE {_REPORT_PUBLICATION} AND {_key_role_condition(roles)}
+            WHERE {_REPORT_PUBLICATION} AND {condition}
             GROUP BY 1
         """),  # noqa: S608 — fragments SQL constants
-        _params(structure_id, doc_types, from_year),
+        params,
     ).all()
     return {r.pub_year: r.n for r in rows}
 

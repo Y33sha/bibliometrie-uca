@@ -33,6 +33,7 @@ from infrastructure.read_models.structure_report import (
     key_role_publications_top_journals,
     publications_by_year_and_type,
     report_structures,
+    top_10_key_role_publications_by_year,
     top_10_percent_by_year,
     top_10_percent_top_journals,
 )
@@ -82,10 +83,10 @@ KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[KeyAuthorRole]] = {
     ),
 }
 
-_KEY_ROLES_TITLES = {
-    _CORRESPONDING: "Publications avec auteur correspondant",
-    _CORRESPONDING_OR_FIRST: "Publications avec auteur correspondant ou premier auteur",
-    _CORRESPONDING_FIRST_OR_LAST: "Publications avec auteur correspondant, premier ou dernier auteur",
+_KEY_ROLES_LABELS = {
+    _CORRESPONDING: "auteur correspondant",
+    _CORRESPONDING_OR_FIRST: "auteur correspondant ou premier auteur",
+    _CORRESPONDING_FIRST_OR_LAST: "auteur correspondant, premier ou dernier auteur",
 }
 
 
@@ -97,6 +98,7 @@ class StructureReportData:
     key_role_by_year: Mapping[int, int]
     key_role_top_journals: Sequence[JournalYearCounts]
     top_10_by_year: Mapping[int, Top10Count]
+    top_10_key_role_by_year: Mapping[int, int]
     top_10_top_journals: Sequence[JournalYearCounts]
 
 
@@ -114,14 +116,38 @@ def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
     return lines
 
 
-def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+def _by_type(data: StructureReportData, years: Sequence[int]) -> dict[DocType, list[int]]:
     counts = {(c.year, c.doc_type): c.count for c in data.by_year_and_type}
-    by_type = {t: [counts.get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
-    rows = [
-        [label, *map(str, by_type[t])] for t, label in DOC_TYPE_LABELS.items() if any(by_type[t])
+    return {t: [counts.get((y, t), 0) for y in years] for t in DOC_TYPE_LABELS}
+
+
+def _totals(data: StructureReportData, years: Sequence[int]) -> list[int]:
+    by_type = _by_type(data, years)
+    return [sum(counts[i] for counts in by_type.values()) for i in range(len(years))]
+
+
+def _synthesis_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+    role_label = _KEY_ROLES_LABELS[frozenset(data.key_roles)]
+    top_10 = [data.top_10_by_year.get(y, Top10Count(0, 0)) for y in years]
+    return [
+        ["Publications", *map(str, _totals(data, years))],
+        [f"Avec {role_label}", *(str(data.key_role_by_year.get(y, 0)) for y in years)],
+        ["Dans le top 10 % des plus citées", *(str(c.top_10) for c in top_10)],
+        ["Part dans le top 10 %", *(_percent(c.top_10, c.with_percentile) for c in top_10)],
+        [
+            f"Dans le top 10 %, avec {role_label}",
+            *(str(data.top_10_key_role_by_year.get(y, 0)) for y in years),
+        ],
     ]
-    per_year = [sum(by_type[t][i] for t in DOC_TYPE_LABELS) for i in range(len(years))]
-    rows.append(["**Total**", *(f"**{n}**" for n in per_year)])
+
+
+def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+    rows = [
+        [DOC_TYPE_LABELS[t], *map(str, counts)]
+        for t, counts in _by_type(data, years).items()
+        if any(counts)
+    ]
+    rows.append(["**Total**", *(f"**{n}**" for n in _totals(data, years))])
     return rows
 
 
@@ -136,30 +162,8 @@ def _journal_rows(journals: Sequence[JournalYearCounts], years: Sequence[int]) -
     ]
 
 
-def _key_role_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
-    return [
-        [
-            "**Toutes revues et supports**",
-            *(f"**{data.key_role_by_year.get(y, 0)}**" for y in years),
-        ],
-        *_journal_rows(data.key_role_top_journals, years),
-    ]
-
-
 def _percent(part: int, whole: int) -> str:
     return f"{100 * part / whole:.1f} %".replace(".", ",") if whole else "–"
-
-
-def _top_10_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
-    counts = [data.top_10_by_year.get(y, Top10Count(0, 0)) for y in years]
-    return [
-        [
-            "**Part dans le top 10 %**",
-            *(f"**{_percent(c.top_10, c.with_percentile)}**" for c in counts),
-        ],
-        ["**Toutes revues et supports**", *(f"**{c.top_10}**" for c in counts)],
-        *_journal_rows(data.top_10_top_journals, years),
-    ]
 
 
 def render_report(
@@ -176,21 +180,27 @@ def render_report(
         "",
         f"Données au {generated_on}. \\* {current_year} : année en cours.",
         "",
+        "## Synthèse",
+        "",
+        "Tous types confondus. Part dans le top 10 % calculée sur les publications dont le percentile de citations est connu dans OpenAlex.",
+        "",
+        *_table(["", *year_headers], _synthesis_rows(data, years)),
+        "",
         "## Typologie des publications",
         "",
         *_table(["Type", *year_headers], _typology_rows(data, years)),
         "",
-        f"## {_KEY_ROLES_TITLES[frozenset(data.key_roles)]}",
+        f"## Revues des publications avec {_KEY_ROLES_LABELS[frozenset(data.key_roles)]}",
         "",
-        f"Tous types confondus, puis détail pour les {TOP_JOURNALS} premières revues.",
+        f"Les {TOP_JOURNALS} premières revues.",
         "",
-        *_table(["Revue", *year_headers], _key_role_rows(data, years)),
+        *_table(["Revue", *year_headers], _journal_rows(data.key_role_top_journals, years)),
         "",
-        "## Publications dans le top 10 % des plus citées",
+        "## Revues des publications du top 10 %",
         "",
-        f"Tous types confondus. Part calculée sur les publications dont le percentile de citations est connu dans OpenAlex. Nombre de publications, puis détail pour les {TOP_JOURNALS} premières revues.",
+        f"Les {TOP_JOURNALS} premières revues.",
         "",
-        *_table(["Revue", *year_headers], _top_10_rows(data, years)),
+        *_table(["Revue", *year_headers], _journal_rows(data.top_10_top_journals, years)),
     ]
     return "\n".join(lines) + "\n"
 
@@ -209,6 +219,9 @@ def _report_data(
             conn, structure.id, roles=roles, **scope, limit=TOP_JOURNALS
         ),
         top_10_by_year=top_10_percent_by_year(conn, structure.id, **scope),
+        top_10_key_role_by_year=top_10_key_role_publications_by_year(
+            conn, structure.id, roles=roles, **scope
+        ),
         top_10_top_journals=top_10_percent_top_journals(
             conn, structure.id, **scope, limit=TOP_JOURNALS
         ),
