@@ -770,7 +770,14 @@ person_name_forms = Table(
     Column("sources", ARRAY(Text), nullable=False, server_default="{}"),
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    # Découpage de `name_form` en nom et prénom normalisés, renseigné au fil de la conversion.
+    Column("last_name_normalized", Text),
+    Column("first_name_normalized", Text),
     PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
+    CheckConstraint(
+        "first_name_normalized IS NULL OR last_name_normalized IS NOT NULL",
+        name="person_name_forms_split",
+    ),
 )
 
 

@@ -42,30 +42,30 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
         - initiales séparées : "j m nom", "nom j m"
         - initiales collées  : "jm nom", "nom jm"
     """
+    return set(person_name_form_splits(last_name, first_name))
+
+
+def person_name_form_splits(last_name: str, first_name: str) -> dict[str, tuple[str, str | None]]:
+    """Formes de nom d'une personne (`compute_person_name_forms`), chacune avec son découpage (nom, prénom) normalisé. Le prénom d'une forme initialisée est fait d'initiales séparées (« j m »)."""
     # Même nettoyage que les signatures : une fiche créée d'après une forme d'autorité porte l'année de naissance (« Philippe 1973- »).
     ln = normalize_name(clean_raw_author_name(last_name))
     fn = normalize_name(clean_raw_author_name(first_name))
     if not ln:
-        return set()
+        return {}
+    if not fn:
+        return {ln: (ln, None)}
 
-    forms: set[str] = set()
-    if fn:
-        forms.add(f"{fn} {ln}")
-        forms.add(f"{ln} {fn}")
-
-        parts = fn.split()
-        if parts:
-            initials_spaced = " ".join(p[0] for p in parts)
-            initials_joined = "".join(p[0] for p in parts)
-            forms.add(f"{initials_spaced} {ln}")
-            forms.add(f"{ln} {initials_spaced}")
-            if initials_joined != initials_spaced:
-                forms.add(f"{initials_joined} {ln}")
-                forms.add(f"{ln} {initials_joined}")
-    else:
-        forms.add(ln)
-
-    return forms
+    initials_spaced = " ".join(p[0] for p in fn.split())
+    initials_joined = initials_spaced.replace(" ", "")
+    splits: dict[str, tuple[str, str | None]] = {}
+    for first, split_first in (
+        (fn, fn),
+        (initials_spaced, initials_spaced),
+        (initials_joined, initials_spaced),
+    ):
+        splits[f"{first} {ln}"] = (ln, split_first)
+        splits[f"{ln} {first}"] = (ln, split_first)
+    return splits
 
 
 # Marqueur de provenance inscrit dans `person_name_forms.sources` pour les formes calculées

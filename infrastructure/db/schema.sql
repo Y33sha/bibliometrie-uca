@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uX9wreMARKUZ8khQfFrSIGjJPevLQPdKU3CDk642CP1r8m0dHN0bixHXOiYzu1g
+\restrict EOirnchrvNQfFdQbG8fQxokPW6wXVQ9aeTpkQbxtJ4UXWiz0Vp9KLTHE34UfX4l
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1335,7 +1335,10 @@ CREATE TABLE public.person_name_forms (
     person_id integer NOT NULL,
     sources text[] DEFAULT '{}'::text[] NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
+    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL,
+    last_name_normalized text,
+    first_name_normalized text,
+    CONSTRAINT person_name_forms_split CHECK (((first_name_normalized IS NULL) OR (last_name_normalized IS NOT NULL)))
 );
 
 
@@ -3814,5 +3817,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uX9wreMARKUZ8khQfFrSIGjJPevLQPdKU3CDk642CP1r8m0dHN0bixHXOiYzu1g
+\unrestrict EOirnchrvNQfFdQbG8fQxokPW6wXVQ9aeTpkQbxtJ4UXWiz0Vp9KLTHE34UfX4l
 
