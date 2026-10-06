@@ -26,7 +26,7 @@ from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
 # Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
-_AUTHOR_SIGNATURE = """
+AUTHOR_SIGNATURE = """
     a.in_perimeter = TRUE
     AND a.roles && ARRAY['author']::text[]
     AND EXISTS (
@@ -39,7 +39,7 @@ _AUTHOR_SIGNATURE = """
 AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM authorships a
-        WHERE a.publication_id = p.id AND {_AUTHOR_SIGNATURE}
+        WHERE a.publication_id = p.id AND {AUTHOR_SIGNATURE}
     )
 """
 
@@ -282,7 +282,7 @@ class PgStructuresQueries(StructuresQueries):
                 SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE {_AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SIGNATURE}
                   AND p.pub_year IS NOT NULL
                   AND p.pub_year >= :min_year
                 GROUP BY p.pub_year
@@ -297,7 +297,7 @@ class PgStructuresQueries(StructuresQueries):
                     {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE {_AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SIGNATURE}
             """),
             {"structure_id": structure_id},
         ).one()
@@ -313,7 +313,7 @@ class PgStructuresQueries(StructuresQueries):
                     ) AS international
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE {_AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SIGNATURE}
                   AND p.doc_type = '{DocType.ARTICLE.value}'
             """),
             {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},

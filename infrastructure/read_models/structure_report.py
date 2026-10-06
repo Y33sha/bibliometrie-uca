@@ -6,7 +6,7 @@ from sqlalchemy import Connection, text
 
 from domain.publications.doc_types import DocType
 from domain.structures.structure import StructureType
-from infrastructure.read_models.structures import AUTHORED_PUBLICATION
+from infrastructure.read_models.structures import AUTHOR_SIGNATURE, AUTHORED_PUBLICATION
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,11 +48,11 @@ _REPORT_PUBLICATION = f"""
     AND {AUTHORED_PUBLICATION}
 """
 
-# Publication `p` dont un auteur correspondant est dans le périmètre.
-_PERIMETER_CORRESPONDING = """
+# Publication `p` dont un auteur correspondant signe avec la structure `:structure_id`.
+_STRUCTURE_CORRESPONDING = f"""
     EXISTS (
-        SELECT 1 FROM authorships ca
-        WHERE ca.publication_id = p.id AND ca.is_corresponding AND ca.in_perimeter
+        SELECT 1 FROM authorships a
+        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
     )
 """
 
@@ -84,12 +84,12 @@ def publications_by_year_and_type(
 def corresponding_publications_by_year(
     conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int
 ) -> dict[int, int]:
-    """Nombre de publications signées par la structure dont un auteur correspondant est dans le périmètre, par année."""
+    """Nombre de publications signées par la structure dont un auteur correspondant signe avec la structure, par année."""
     rows = conn.execute(
         text(f"""
             SELECT p.pub_year, count(*) AS n
             FROM publications p
-            WHERE {_REPORT_PUBLICATION} AND {_PERIMETER_CORRESPONDING}
+            WHERE {_REPORT_PUBLICATION} AND {_STRUCTURE_CORRESPONDING}
             GROUP BY 1
         """),  # noqa: S608 — fragments SQL constants
         _params(structure_id, doc_types, from_year),
@@ -115,7 +115,7 @@ def corresponding_publications_top_journals(
                 SELECT p.journal_id, p.pub_year
                 FROM publications p
                 WHERE p.journal_id IS NOT NULL
-                  AND {_REPORT_PUBLICATION} AND {_PERIMETER_CORRESPONDING}
+                  AND {_REPORT_PUBLICATION} AND {_STRUCTURE_CORRESPONDING}
             ),
             top AS (
                 SELECT pubs.journal_id, j.title, pb.name AS publisher, count(*) AS total
