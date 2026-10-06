@@ -80,6 +80,10 @@ def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list
     return rows
 
 
+def _journal_label(journal: JournalYearCounts) -> str:
+    return f"{journal.title} ({journal.publisher})" if journal.publisher else journal.title
+
+
 def _corresponding_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
     rows = [
         [
@@ -88,7 +92,7 @@ def _corresponding_rows(data: StructureReportData, years: Sequence[int]) -> list
         ]
     ]
     rows += [
-        [journal.title, *(str(journal.counts.get(y, 0)) for y in years)]
+        [_journal_label(journal), *(str(journal.counts.get(y, 0)) for y in years)]
         for journal in data.corresponding_top_journals
     ]
     return rows

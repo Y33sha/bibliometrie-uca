@@ -41,10 +41,17 @@ def test_typologie_chaque_type_avec_zeros_et_total_par_annee():
 def test_correspondant_total_puis_revues():
     report = _render(
         corresponding_by_year={2024: 7},
-        top_journals=[JournalYearCounts("Revue A", {2025: 2})],
+        top_journals=[JournalYearCounts("Revue A", "Éditeur", {2025: 2})],
     )
-    assert "| **Toutes revues et supports** | **7** | **0** |\n| Revue A | 0 | 2 |" in report
+    assert (
+        "| **Toutes revues et supports** | **7** | **0** |\n| Revue A (Éditeur) | 0 | 2 |" in report
+    )
 
 
 def test_annee_en_cours_marquee():
     assert "| 2024 | 2025* |" in _render()
+
+
+def test_revue_sans_editeur():
+    report = _render(top_journals=[JournalYearCounts("Revue B", None, {2024: 1})])
+    assert "| Revue B | 1 | 0 |" in report

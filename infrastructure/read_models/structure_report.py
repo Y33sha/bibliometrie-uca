@@ -100,6 +100,7 @@ def corresponding_publications_by_year(
 @dataclass(frozen=True, slots=True)
 class JournalYearCounts:
     title: str
+    publisher: str | None
     counts: dict[int, int]
     """Nombre de publications par année."""
 
@@ -107,7 +108,7 @@ class JournalYearCounts:
 def corresponding_publications_top_journals(
     conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
 ) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications de `corresponding_publications_by_year`, avec leur nombre par année. Tri par nombre total décroissant, puis par titre."""
+    """Les `limit` revues qui portent le plus de publications de `corresponding_publications_by_year`, avec leur éditeur et leur nombre par année. Tri par nombre total décroissant, puis par titre."""
     rows = conn.execute(
         text(f"""
             WITH pubs AS (
@@ -117,20 +118,24 @@ def corresponding_publications_top_journals(
                   AND {_REPORT_PUBLICATION} AND {_PERIMETER_CORRESPONDING}
             ),
             top AS (
-                SELECT pubs.journal_id, j.title, count(*) AS total
-                FROM pubs JOIN journals j ON j.id = pubs.journal_id
-                GROUP BY 1, 2
+                SELECT pubs.journal_id, j.title, pb.name AS publisher, count(*) AS total
+                FROM pubs
+                JOIN journals j ON j.id = pubs.journal_id
+                LEFT JOIN publishers pb ON pb.id = j.publisher_id
+                GROUP BY 1, 2, 3
                 ORDER BY total DESC, j.title
                 LIMIT :limit
             )
-            SELECT top.journal_id, top.title, pubs.pub_year, count(*) AS n
+            SELECT top.journal_id, top.title, top.publisher, pubs.pub_year, count(*) AS n
             FROM top JOIN pubs USING (journal_id)
-            GROUP BY top.journal_id, top.title, top.total, pubs.pub_year
+            GROUP BY top.journal_id, top.title, top.publisher, top.total, pubs.pub_year
             ORDER BY top.total DESC, top.title
         """),  # noqa: S608 — fragments SQL constants
         {**_params(structure_id, doc_types, from_year), "limit": limit},
     ).all()
     journals: dict[int, JournalYearCounts] = {}
     for r in rows:
-        journals.setdefault(r.journal_id, JournalYearCounts(r.title, {})).counts[r.pub_year] = r.n
+        journals.setdefault(r.journal_id, JournalYearCounts(r.title, r.publisher, {})).counts[
+            r.pub_year
+        ] = r.n
     return list(journals.values())
