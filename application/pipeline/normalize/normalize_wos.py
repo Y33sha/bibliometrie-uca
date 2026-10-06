@@ -33,6 +33,7 @@ from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.impact import Impact
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 
@@ -451,7 +452,7 @@ def insert_wos_document(
             topics=dict(as_mapping(rec.get("topics"))) or None,
             oa_status=pub_meta.oa_status,
             urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
-            cited_by_count=as_int(rec.get("cited_by_count")),
+            impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
         ),
     )
 

@@ -400,7 +400,7 @@ class TestInsertScanrDocumentChamps:
     def test_citations_cumulees_sur_les_annees(self):
         document = self._call({"cited_by_counts_by_year": {"2023": 4, "2024": 6}})
 
-        assert document.cited_by_count == 10
+        assert document.impact == {"cited_by_count": 10}
 
     def test_adresses_du_document_dedupliquees(self):
         """Les adresses viennent du document et du constat d'accès ouvert : les doublons tombent."""

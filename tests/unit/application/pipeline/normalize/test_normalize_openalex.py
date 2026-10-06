@@ -19,6 +19,7 @@ from application.pipeline.normalize.normalize_openalex import (
     OpenalexNormalizer,
     _extract_openalex_orcid,
     build_openalex_author_records,
+    extract_impact,
     extract_locations_data,
     extract_pub_metadata,
     extract_topics,
@@ -144,6 +145,33 @@ class TestExtractTopics:
         """Si un topic n'a aucun champ exploitable, il n'est pas inclus."""
         work = {"topics": [{"foo": "bar"}]}  # ni domain, ni field, ni subfield, ni display_name
         assert extract_topics(work) is None
+
+
+# ── extract_impact ───────────────────────────────────────────────
+
+
+class TestExtractImpact:
+    def test_indicateurs_de_citation(self):
+        work = {
+            "cited_by_count": 21,
+            "fwci": 1.5035,
+            "citation_normalized_percentile": {
+                "value": 0.7717646,
+                "is_in_top_1_percent": False,
+                "is_in_top_10_percent": False,
+            },
+        }
+        assert extract_impact(work).to_json() == {
+            "cited_by_count": 21,
+            "fwci": 1.5035,
+            "citation_percentile": 0.7717646,
+            "top_10_percent": False,
+            "top_1_percent": False,
+        }
+
+    def test_indicateurs_nuls_omis(self):
+        work = {"cited_by_count": 0, "fwci": None, "citation_normalized_percentile": None}
+        assert extract_impact(work).to_json() == {"cited_by_count": 0}
 
 
 # ── _extract_openalex_orcid ──────────────────────────────────────

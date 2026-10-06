@@ -5,7 +5,7 @@ Une donnée reçue de l'extérieur n'a pas la forme annoncée mais celle qu'elle
 
 import pytest
 
-from domain.types import as_int, as_mapping, as_sequence, as_str
+from domain.types import as_bool, as_float, as_int, as_mapping, as_sequence, as_str
 
 
 class TestAsStr:
@@ -36,6 +36,32 @@ class TestAsInt:
     @pytest.mark.parametrize("valeur", [None, "2024", 2024.5, [2024], {"annee": 2024}])
     def test_ce_qui_n_est_pas_un_entier(self, valeur):
         assert as_int(valeur) is None
+
+
+class TestAsFloat:
+    def test_flottant(self):
+        assert as_float(1.5035) == 1.5035
+
+    def test_entier_converti(self):
+        assert as_float(2) == 2.0
+        assert isinstance(as_float(2), float)
+
+    def test_booleen_ecarte(self):
+        assert as_float(True) is None
+
+    @pytest.mark.parametrize("valeur", [None, "1.5", [1.5], {"valeur": 1.5}])
+    def test_ce_qui_n_est_pas_un_nombre(self, valeur):
+        assert as_float(valeur) is None
+
+
+class TestAsBool:
+    def test_booleens(self):
+        assert as_bool(True) is True
+        assert as_bool(False) is False
+
+    @pytest.mark.parametrize("valeur", [None, 0, 1, "false", "", [True]])
+    def test_ce_qui_n_est_pas_un_booleen(self, valeur):
+        assert as_bool(valeur) is None
 
 
 class TestAsMapping:

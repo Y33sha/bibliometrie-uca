@@ -35,6 +35,7 @@ from domain.persons.identifiers import (
 from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.impact import Impact
 from domain.sources.openalex import (
     OpenalexLocation,
     extract_external_ids_from_urls,
@@ -45,7 +46,16 @@ from domain.sources.openalex import (
     short_openalex_id,
     should_skip_publisher_journal,
 )
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from domain.types import (
+    JsonValue,
+    as_bool,
+    as_float,
+    as_int,
+    as_mapping,
+    as_sequence,
+    as_str,
+    as_strs,
+)
 
 # =============================================================
 # UTILITAIRES
@@ -127,6 +137,18 @@ def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] 
         if topic:
             topics.append(topic)
     return topics or None
+
+
+def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
+    """Indicateurs de citation OpenAlex : nombre de citations, FWCI et percentile de citations normalisé."""
+    percentile = as_mapping(work.get("citation_normalized_percentile"))
+    return Impact(
+        cited_by_count=as_int(work.get("cited_by_count")),
+        fwci=as_float(work.get("fwci")),
+        citation_percentile=as_float(percentile.get("value")),
+        top_10_percent=as_bool(percentile.get("is_in_top_10_percent")),
+        top_1_percent=as_bool(percentile.get("is_in_top_1_percent")),
+    )
 
 
 # =============================================================
@@ -246,7 +268,7 @@ def insert_openalex_document(  # noqa: C901
     """Crée/retrouve l'entrée source_publications pour OpenAlex.
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
-    journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, cited_by_count, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
+    journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
@@ -264,7 +286,6 @@ def insert_openalex_document(  # noqa: C901
         else:
             del external_ids[ExternalIdType.RELATED_DOIS]
 
-    cited_by_count = as_int(work.get("cited_by_count"))
     is_retracted = bool(work.get("is_retracted"))
 
     # Biblio (volume, issue, pages)
@@ -338,7 +359,7 @@ def insert_openalex_document(  # noqa: C901
             topics=topics_json,
             oa_status=pub_meta.oa_status,
             urls=urls or None,
-            cited_by_count=cited_by_count,
+            impact=extract_impact(work).to_json(),
             is_retracted=is_retracted,
         ),
     )
