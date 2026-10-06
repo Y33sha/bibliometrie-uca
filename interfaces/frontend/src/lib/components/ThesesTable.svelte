@@ -3,7 +3,7 @@
 	import { halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import type { components } from '$lib/api/schema';
+	import type { components, operations } from '$lib/api/schema';
 
 	// Ligne servie par `/api/publications` (mode thèses) : le sous-ensemble de `PublicationListItem` que ce tableau consomme.
 	export type ThesisRow = Pick<
@@ -23,6 +23,11 @@
 		| 'lab_items'
 	>;
 
+	// Tri accepté par `/api/publications`.
+	export type PublicationSort = NonNullable<
+		NonNullable<operations['list_publications_api_publications_get']['parameters']['query']>['sort']
+	>;
+
 	let {
 		items,
 		loading = false,
@@ -32,8 +37,8 @@
 	}: {
 		items: ThesisRow[];
 		loading?: boolean;
-		sort: string;
-		onToggleSort: (asc: string, desc: string) => void;
+		sort: PublicationSort;
+		onToggleSort: (asc: PublicationSort, desc: PublicationSort) => void;
 		showLabsColumn?: boolean;
 	} = $props();
 
@@ -48,10 +53,10 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	function sortArrow(asc: string, desc: string): string {
+	function sortArrow(asc: PublicationSort, desc: PublicationSort): string {
 		return sort === asc ? '▲' : sort === desc ? '▼' : '';
 	}
-	function sortActive(asc: string, desc: string): boolean {
+	function sortActive(asc: PublicationSort, desc: PublicationSort): boolean {
 		return sort === asc || sort === desc;
 	}
 
@@ -59,8 +64,8 @@
 	const inscrActive = $derived(sortActive('inscription_asc', 'inscription_desc'));
 	const soutArrow = $derived(sortArrow('soutenance_asc', 'soutenance_desc'));
 	const soutActive = $derived(sortActive('soutenance_asc', 'soutenance_desc'));
-	const titleArrow = $derived(sortArrow('title', 'title_desc'));
-	const titleActive = $derived(sortActive('title', 'title_desc'));
+	const titleArrow = $derived(sortArrow('title_asc', 'title_desc'));
+	const titleActive = $derived(sortActive('title_asc', 'title_desc'));
 </script>
 
 <div class="table-scroll">
@@ -81,7 +86,7 @@
 			<th
 				class="col-title sortable"
 				class:active={titleActive}
-				onclick={() => onToggleSort('title', 'title_desc')}
+				onclick={() => onToggleSort('title_asc', 'title_desc')}
 			>Titre {titleArrow}</th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}
