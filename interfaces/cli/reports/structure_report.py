@@ -25,19 +25,18 @@ from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.structure_report import (
-    JournalYearCounts,
+    JournalCounts,
     KeyAuthorRole,
     ReportStructure,
     Top10Count,
     YearDocTypeCount,
     key_role_publications_by_year,
-    key_role_publications_top_journals,
     publications_by_source,
     publications_by_year_and_type,
     report_structures,
     top_10_key_role_publications_by_year,
     top_10_percent_by_year,
-    top_10_percent_top_journals,
+    top_journals,
 )
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
@@ -98,10 +97,9 @@ class StructureReportData:
     by_year_and_type: Sequence[YearDocTypeCount]
     key_roles: Collection[KeyAuthorRole]
     key_role_by_year: Mapping[int, int]
-    key_role_top_journals: Sequence[JournalYearCounts]
     top_10_by_year: Mapping[int, Top10Count]
     top_10_key_role_by_year: Mapping[int, int]
-    top_10_top_journals: Sequence[JournalYearCounts]
+    journals: Sequence[JournalCounts]
     by_source: Mapping[str, int]
     """Nombre de publications présentes dans chaque source, par ordre décroissant."""
 
@@ -155,14 +153,20 @@ def _typology_rows(data: StructureReportData, years: Sequence[int]) -> list[list
     return rows
 
 
-def _journal_label(journal: JournalYearCounts) -> str:
+def _journal_label(journal: JournalCounts) -> str:
     return f"{journal.title} ({journal.publisher})" if journal.publisher else journal.title
 
 
-def _journal_rows(journals: Sequence[JournalYearCounts], years: Sequence[int]) -> list[list[str]]:
+def _journal_rows(journals: Sequence[JournalCounts]) -> list[list[str]]:
     return [
-        [_journal_label(journal), *(str(journal.counts.get(y, 0)) for y in years)]
-        for journal in journals
+        [
+            _journal_label(j),
+            str(j.publications),
+            str(j.top_10),
+            str(j.key_role),
+            str(j.top_10_key_role),
+        ]
+        for j in journals
     ]
 
 
@@ -201,17 +205,20 @@ def render_report(
         "",
         *_table(["Type", *year_headers], _typology_rows(data, years)),
         "",
-        f"## Revues des publications avec {_KEY_ROLES_LABELS[frozenset(data.key_roles)]}",
+        "## Revues",
         "",
-        f"Les {TOP_JOURNALS} premières revues.",
+        f"Les {TOP_JOURNALS} revues qui portent le plus de publications sur la période.",
         "",
-        *_table(["Revue", *year_headers], _journal_rows(data.key_role_top_journals, years)),
-        "",
-        "## Revues des publications du top 10 %",
-        "",
-        f"Les {TOP_JOURNALS} premières revues.",
-        "",
-        *_table(["Revue", *year_headers], _journal_rows(data.top_10_top_journals, years)),
+        *_table(
+            [
+                "Revue",
+                "Publications",
+                "Top 10 %",
+                _KEY_ROLES_LABELS[frozenset(data.key_roles)].capitalize(),
+                "Les deux",
+            ],
+            _journal_rows(data.journals),
+        ),
         "",
         "## Sources",
         "",
@@ -232,16 +239,11 @@ def _report_data(
         by_year_and_type=publications_by_year_and_type(conn, structure.id, **scope),
         key_roles=roles,
         key_role_by_year=key_role_publications_by_year(conn, structure.id, roles=roles, **scope),
-        key_role_top_journals=key_role_publications_top_journals(
-            conn, structure.id, roles=roles, **scope, limit=TOP_JOURNALS
-        ),
         top_10_by_year=top_10_percent_by_year(conn, structure.id, **scope),
         top_10_key_role_by_year=top_10_key_role_publications_by_year(
             conn, structure.id, roles=roles, **scope
         ),
-        top_10_top_journals=top_10_percent_top_journals(
-            conn, structure.id, **scope, limit=TOP_JOURNALS
-        ),
+        journals=top_journals(conn, structure.id, roles=roles, **scope, limit=TOP_JOURNALS),
         by_source=publications_by_source(conn, structure.id, **scope),
     )
 
