@@ -7,7 +7,7 @@ Une forme `name_form` est une chaîne unique (« dupont marie »). Ce script ren
 - une seule identité de signature porte cette chaîne dans l'ordre « prénom nom » (`author_identifying_keys.author_name_normalized`) ;
 - une seule identité la porte dans l'ordre « nom prénom », celui des signatures au format « Nom, Prénom ».
 
-Une forme qu'aucune identité ne porte, dans aucun ordre, est supprimée. Le script rapporte les formes restantes, à plusieurs découpages. Rejouable : il traite les seules formes encore sans découpage.
+Quand plusieurs identités la portent avec des découpages différents, `_choose` en retient un. Une forme qu'aucune identité ne porte, dans aucun ordre, est supprimée. Le script rapporte les formes restantes. Rejouable : il traite les seules formes encore sans découpage.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_name_form_splits            # exécution
@@ -22,6 +22,7 @@ from collections import Counter
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.normalize import clean_raw_author_name, normalize_name
 from domain.persons.name_forms import person_name_form_splits
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
@@ -60,21 +61,45 @@ _UPDATE_SQL = text("""
 """).bindparams(bindparam("payload", type_=Jsonb))
 
 
-def _identity_splits(
-    conn: Connection, key: str, forms: list[str]
-) -> dict[str, set[tuple[str, str | None]]]:
-    """Découpages (nom, prénom) des identités dont la clé `key` (expression SQL) vaut l'une des `forms`."""
+_Split = tuple[str, str | None]
+
+
+def _identity_splits(conn: Connection, key: str, forms: list[str]) -> dict[str, Counter[_Split]]:
+    """Découpages (nom, prénom) des identités dont la clé `key` (expression SQL) vaut l'une des `forms`, avec leur nombre de signatures."""
     rows = conn.execute(
         text(f"""
-            SELECT DISTINCT {key} AS name_form, last_name_normalized, first_name_normalized
-            FROM author_identifying_keys WHERE {key} = ANY(:forms)
+            SELECT {key} AS name_form, aik.last_name_normalized, aik.first_name_normalized,
+                   count(*) AS signatures
+            FROM author_identifying_keys aik
+            JOIN source_authorships sa ON sa.identity_id = aik.id
+            WHERE {key} = ANY(:forms)
+            GROUP BY 1, 2, 3
         """),
         {"forms": forms},
     )
-    splits: dict[str, set[tuple[str, str | None]]] = {}
+    splits: dict[str, Counter[_Split]] = {}
     for r in rows:
-        splits.setdefault(r.name_form, set()).add((r.last_name_normalized, r.first_name_normalized))
+        splits.setdefault(r.name_form, Counter())[
+            (r.last_name_normalized, r.first_name_normalized)
+        ] += r.signatures
     return splits
+
+
+def _choose(splits: Counter[_Split], person_last_name: str) -> tuple[str, _Split] | None:
+    """Découpage retenu parmi plusieurs, avec la règle qui l'a choisi ; `None` si aucune ne tranche.
+
+    Règles dans l'ordre : nom égal à celui de la fiche de la personne, nom sans initiale, découpage porté par le plus de signatures.
+    """
+    same_last = [s for s in splits if s[0] == person_last_name]
+    if len(same_last) == 1:
+        return "nom de la fiche", same_last[0]
+    without_initials = [s for s in splits if not any(len(w) == 1 for w in s[0].split())]
+    if len(without_initials) == 1:
+        return "nom sans initiale", without_initials[0]
+    ranked = sorted(without_initials or splits, key=lambda s: -splits[s])
+    if len(ranked) == 1 or splits[ranked[0]] > splits[ranked[1]]:
+        return "plus de signatures", ranked[0]
+    return None
 
 
 def backfill(conn: Connection, *, apply: bool) -> Counter[str]:
@@ -99,10 +124,15 @@ def backfill(conn: Connection, *, apply: bool) -> Counter[str]:
                 deletes.append(key)
                 continue
             issue, splits = found[0]
-            if len(splits) > 1:
-                stats[f"{row.status} : plusieurs découpages ({issue})"] += 1
-                continue
-            (split,) = splits
+            if len(splits) == 1:
+                (split,) = splits
+            else:
+                chosen = _choose(splits, normalize_name(clean_raw_author_name(row.last_name)))
+                if chosen is None:
+                    stats[f"{row.status} : plusieurs découpages, aucune règle ne tranche"] += 1
+                    continue
+                rule, split = chosen
+                issue = f"plusieurs découpages, {rule}"
         stats[f"{row.status} : {issue}"] += 1
         updates.append({**key, "last_name": split[0], "first_name": split[1]})
     if apply and updates:
