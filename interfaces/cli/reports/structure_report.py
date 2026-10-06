@@ -207,7 +207,7 @@ def render_report(
         "",
         "## Revues",
         "",
-        f"Les {TOP_JOURNALS} revues qui portent le plus de publications sur la période.",
+        f"Les {TOP_JOURNALS} revues où l'unité publie le plus sur la période.",
         "",
         *_table(
             [
