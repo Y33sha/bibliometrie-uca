@@ -36,7 +36,7 @@ _AUTHOR_SIGNATURE = """
 """
 
 # Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
-_AUTHORED_PUBLICATION = f"""
+AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM authorships a
         WHERE a.publication_id = p.id AND {_AUTHOR_SIGNATURE}
@@ -327,7 +327,7 @@ class PgStructuresQueries(StructuresQueries):
                     SELECT p.id, unnest(p.countries) AS cc
                     FROM publications p
                     WHERE p.doc_type = '{DocType.ARTICLE.value}'
-                      AND {_AUTHORED_PUBLICATION}
+                      AND {AUTHORED_PUBLICATION}
                 ) sub
                 JOIN countries co ON co.code = sub.cc
                 WHERE sub.cc <> ALL(:non_international)
