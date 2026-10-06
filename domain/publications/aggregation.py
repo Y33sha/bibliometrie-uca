@@ -9,7 +9,7 @@ Règles d'agrégation par type de champ :
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
 - **JSONB `biblio`, `meta`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
-- **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`). Les valeurs lues sont déjà canoniques et corrigées (mapping + corrections persistés en amont sur la `source_publication`).
+- **`doc_type`** : premier non-null, un sous-type d'article d'une source moins prioritaire l'emportant sur `article` (cf. `arbitrate_doc_type_with_article_subtype`), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`).
 
 Priorité d'ordre : les enregistrements canoniques passent avant les formes secondaires convergées (`secondary_ids` — pièce, version ou variante dont le DOI a été substitué par celui de l'œuvre canonique), afin que les scalaires descriptifs (titre en tête) viennent de l'enregistrement qui porte nativement le DOI, pas d'une pièce. La priorité de source départage à l'intérieur de chaque groupe.
 
@@ -170,9 +170,7 @@ def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) ->
 
     Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
 
-    CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Une source moins prioritaire ayant produit un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
-
-    Un `data_paper` déclaré par HAL seul se lit `article` : le type de dépôt HAL est souvent mal choisi, et les autres sources ne distinguent pas les data papers.
+    CrossRef (priorité 2) renvoie `journal-article` pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`. Un `data_paper` déclaré par HAL seul compte pour `article`.
     """
     doc_types = [_corroborated_doc_type(s, sources) for s in sources]
     article_subtype_present = next((t for t in doc_types if t in ARTICLE_SUBTYPES), None)
