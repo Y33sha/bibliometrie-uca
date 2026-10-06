@@ -26,11 +26,13 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.structure_report import (
     JournalYearCounts,
     ReportStructure,
+    Top10Count,
     YearDocTypeCount,
     corresponding_publications_by_year,
     corresponding_publications_top_journals,
     publications_by_year_and_type,
     report_structures,
+    top_10_percent_by_year,
 )
 
 log = setup_logger("structure_report", os.path.dirname(__file__))
@@ -55,6 +57,7 @@ class StructureReportData:
     by_year_and_type: Sequence[YearDocTypeCount]
     corresponding_by_year: Mapping[int, int]
     corresponding_top_journals: Sequence[JournalYearCounts]
+    top_10_by_year: Mapping[int, Top10Count]
 
 
 def _year_header(year: int, current_year: int) -> str:
@@ -98,6 +101,15 @@ def _corresponding_rows(data: StructureReportData, years: Sequence[int]) -> list
     return rows
 
 
+def _percent(part: int, whole: int) -> str:
+    return f"{100 * part / whole:.1f} %".replace(".", ",") if whole else "–"
+
+
+def _top_10_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+    counts = [data.top_10_by_year.get(y, Top10Count(0, 0)) for y in years]
+    return [["Part dans le top 10 %", *(_percent(c.top_10, c.with_percentile) for c in counts)]]
+
+
 def render_report(
     data: StructureReportData, *, years: Sequence[int], current_year: int, generated_on: str
 ) -> str:
@@ -121,6 +133,12 @@ def render_report(
         f"Tous types confondus, puis détail pour les {TOP_JOURNALS} premières revues.",
         "",
         *_table(["Revue", *year_headers], _corresponding_rows(data, years)),
+        "",
+        "## Publications dans le top 10 % des plus citées",
+        "",
+        "Tous types confondus. Part calculée sur les publications dont le percentile de citations est connu dans OpenAlex.",
+        "",
+        *_table(["", *year_headers], _top_10_rows(data, years)),
     ]
     return "\n".join(lines) + "\n"
 
@@ -136,6 +154,7 @@ def _report_data(
         corresponding_top_journals=corresponding_publications_top_journals(
             conn, structure.id, **scope, limit=TOP_JOURNALS
         ),
+        top_10_by_year=top_10_percent_by_year(conn, structure.id, **scope),
     )
 
 
