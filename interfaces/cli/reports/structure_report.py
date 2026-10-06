@@ -21,6 +21,7 @@ from sqlalchemy import Connection
 
 from domain.dates import today
 from domain.publications.doc_types import DocType
+from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.structure_report import (
@@ -31,6 +32,7 @@ from infrastructure.read_models.structure_report import (
     YearDocTypeCount,
     key_role_publications_by_year,
     key_role_publications_top_journals,
+    publications_by_source,
     publications_by_year_and_type,
     report_structures,
     top_10_key_role_publications_by_year,
@@ -100,6 +102,8 @@ class StructureReportData:
     top_10_by_year: Mapping[int, Top10Count]
     top_10_key_role_by_year: Mapping[int, int]
     top_10_top_journals: Sequence[JournalYearCounts]
+    by_source: Mapping[str, int]
+    """Nombre de publications présentes dans chaque source, par ordre décroissant."""
 
 
 def _year_header(year: int, current_year: int) -> str:
@@ -162,6 +166,13 @@ def _journal_rows(journals: Sequence[JournalYearCounts], years: Sequence[int]) -
     ]
 
 
+def _source_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+    total = sum(_totals(data, years))
+    return [
+        [source_label(source), str(n), _percent(n, total)] for source, n in data.by_source.items()
+    ]
+
+
 def _percent(part: int, whole: int) -> str:
     return f"{100 * part / whole:.1f} %".replace(".", ",") if whole else "–"
 
@@ -201,6 +212,12 @@ def render_report(
         f"Les {TOP_JOURNALS} premières revues.",
         "",
         *_table(["Revue", *year_headers], _journal_rows(data.top_10_top_journals, years)),
+        "",
+        "## Sources",
+        "",
+        "Publications de la période présentes dans chaque source.",
+        "",
+        *_table(["Source", "Publications", "Part"], _source_rows(data, years)),
     ]
     return "\n".join(lines) + "\n"
 
@@ -225,6 +242,7 @@ def _report_data(
         top_10_top_journals=top_10_percent_top_journals(
             conn, structure.id, **scope, limit=TOP_JOURNALS
         ),
+        by_source=publications_by_source(conn, structure.id, **scope),
     )
 
 
