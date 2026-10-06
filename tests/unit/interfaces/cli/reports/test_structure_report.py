@@ -3,6 +3,7 @@
 from domain.publications.doc_types import DocType
 from infrastructure.read_models.structure_report import (
     JournalYearCounts,
+    KeyAuthorRole,
     ReportStructure,
     Top10Count,
     YearDocTypeCount,
@@ -14,7 +15,8 @@ _LABO = ReportStructure(id=1, code="labo", acronym="LABO", name="Laboratoire")
 
 def _render(
     by_year_and_type=(),
-    corresponding_by_year=None,
+    key_roles=frozenset({KeyAuthorRole.CORRESPONDING}),
+    key_role_by_year=None,
     top_journals=(),
     top_10=None,
     top_10_journals=(),
@@ -22,8 +24,9 @@ def _render(
     data = StructureReportData(
         structure=_LABO,
         by_year_and_type=by_year_and_type,
-        corresponding_by_year=corresponding_by_year or {},
-        corresponding_top_journals=top_journals,
+        key_roles=key_roles,
+        key_role_by_year=key_role_by_year or {},
+        key_role_top_journals=top_journals,
         top_10_by_year=top_10 or {},
         top_10_top_journals=top_10_journals,
     )
@@ -48,9 +51,16 @@ def test_typologie_types_presents_et_total_par_annee():
     assert "| **Total** | **5** | **1** |" in report
 
 
-def test_correspondant_total_puis_revues():
+def test_titre_de_section_selon_les_roles():
+    assert "## Publications avec auteur correspondant de l'unité\n" in _render()
+    assert "## Publications avec auteur correspondant, premier ou dernier auteur de l'unité\n" in (
+        _render(key_roles=frozenset(KeyAuthorRole))
+    )
+
+
+def test_roles_total_puis_revues():
     report = _render(
-        corresponding_by_year={2024: 7},
+        key_role_by_year={2024: 7},
         top_journals=[JournalYearCounts("Revue A", "Éditeur", {2025: 2})],
     )
     assert (

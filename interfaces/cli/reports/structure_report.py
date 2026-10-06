@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,11 +25,12 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.structure_report import (
     JournalYearCounts,
+    KeyAuthorRole,
     ReportStructure,
     Top10Count,
     YearDocTypeCount,
-    corresponding_publications_by_year,
-    corresponding_publications_top_journals,
+    key_role_publications_by_year,
+    key_role_publications_top_journals,
     publications_by_year_and_type,
     report_structures,
     top_10_percent_by_year,
@@ -51,13 +52,50 @@ DEFAULT_OUTPUT_DIR = Path("data/reports")
 
 TOP_JOURNALS = 10
 
+_CORRESPONDING = frozenset({KeyAuthorRole.CORRESPONDING})
+_CORRESPONDING_OR_FIRST = frozenset({KeyAuthorRole.CORRESPONDING, KeyAuthorRole.FIRST})
+_CORRESPONDING_FIRST_OR_LAST = frozenset(KeyAuthorRole)
+
+# Rôles d'auteur comptés pour chaque unité, selon l'ordre des auteurs dans ses publications. Une unité absente compte seulement l'auteur correspondant : ordre alphabétique, ou trop peu d'auteurs pour juger.
+KEY_ROLES_BY_STRUCTURE: dict[str, frozenset[KeyAuthorRole]] = {
+    **dict.fromkeys(["acceppt", "geolab", "lamp", "lmge", "lmv", "opgc"], _CORRESPONDING_OR_FIRST),
+    **dict.fromkeys(
+        [
+            "ame2p",
+            "chelter",
+            "croc",
+            "gdec",
+            "iccf",
+            "igred",
+            "imost",
+            "ip",
+            "lapsco",
+            "m2ish",
+            "medis",
+            "neuro_dol",
+            "piaf",
+            "umrf",
+            "umrh",
+            "unh",
+        ],
+        _CORRESPONDING_FIRST_OR_LAST,
+    ),
+}
+
+_KEY_ROLES_TITLES = {
+    _CORRESPONDING: "Publications avec auteur correspondant de l'unité",
+    _CORRESPONDING_OR_FIRST: "Publications avec auteur correspondant ou premier auteur de l'unité",
+    _CORRESPONDING_FIRST_OR_LAST: "Publications avec auteur correspondant, premier ou dernier auteur de l'unité",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class StructureReportData:
     structure: ReportStructure
     by_year_and_type: Sequence[YearDocTypeCount]
-    corresponding_by_year: Mapping[int, int]
-    corresponding_top_journals: Sequence[JournalYearCounts]
+    key_roles: Collection[KeyAuthorRole]
+    key_role_by_year: Mapping[int, int]
+    key_role_top_journals: Sequence[JournalYearCounts]
     top_10_by_year: Mapping[int, Top10Count]
     top_10_top_journals: Sequence[JournalYearCounts]
 
@@ -98,13 +136,13 @@ def _journal_rows(journals: Sequence[JournalYearCounts], years: Sequence[int]) -
     ]
 
 
-def _corresponding_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
+def _key_role_rows(data: StructureReportData, years: Sequence[int]) -> list[list[str]]:
     return [
         [
             "**Toutes revues et supports**",
-            *(f"**{data.corresponding_by_year.get(y, 0)}**" for y in years),
+            *(f"**{data.key_role_by_year.get(y, 0)}**" for y in years),
         ],
-        *_journal_rows(data.corresponding_top_journals, years),
+        *_journal_rows(data.key_role_top_journals, years),
     ]
 
 
@@ -142,11 +180,11 @@ def render_report(
         "",
         *_table(["Type", *year_headers], _typology_rows(data, years)),
         "",
-        "## Publications avec auteur correspondant UCA",
+        f"## {_KEY_ROLES_TITLES[frozenset(data.key_roles)]}",
         "",
         f"Tous types confondus, puis détail pour les {TOP_JOURNALS} premières revues.",
         "",
-        *_table(["Revue", *year_headers], _corresponding_rows(data, years)),
+        *_table(["Revue", *year_headers], _key_role_rows(data, years)),
         "",
         "## Publications dans le top 10 % des plus citées",
         "",
@@ -161,12 +199,14 @@ def _report_data(
     conn: Connection, structure: ReportStructure, *, from_year: int
 ) -> StructureReportData:
     scope = {"doc_types": list(DOC_TYPE_LABELS), "from_year": from_year}
+    roles = KEY_ROLES_BY_STRUCTURE.get(structure.code, _CORRESPONDING)
     return StructureReportData(
         structure=structure,
         by_year_and_type=publications_by_year_and_type(conn, structure.id, **scope),
-        corresponding_by_year=corresponding_publications_by_year(conn, structure.id, **scope),
-        corresponding_top_journals=corresponding_publications_top_journals(
-            conn, structure.id, **scope, limit=TOP_JOURNALS
+        key_roles=roles,
+        key_role_by_year=key_role_publications_by_year(conn, structure.id, roles=roles, **scope),
+        key_role_top_journals=key_role_publications_top_journals(
+            conn, structure.id, roles=roles, **scope, limit=TOP_JOURNALS
         ),
         top_10_by_year=top_10_percent_by_year(conn, structure.id, **scope),
         top_10_top_journals=top_10_percent_top_journals(
