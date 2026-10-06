@@ -271,3 +271,21 @@ def top_10_percent_top_journals(
 ) -> list[JournalYearCounts]:
     """Les `limit` revues qui portent le plus de publications de la structure dans le top 10 % des plus citées."""
     return _top_journals(conn, _TOP_10_PERCENT, _params(structure_id, doc_types, from_year), limit)
+
+
+def publications_by_source(
+    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int
+) -> dict[str, int]:
+    """Nombre de publications signées par la structure présentes dans chaque source, par ordre décroissant."""
+    rows = conn.execute(
+        text(f"""
+            SELECT sp.source::text AS source, count(DISTINCT p.id) AS n
+            FROM publications p
+            JOIN source_publications sp ON sp.publication_id = p.id
+            WHERE {_REPORT_PUBLICATION}
+            GROUP BY 1
+            ORDER BY n DESC, 1
+        """),  # noqa: S608 — fragments SQL constants
+        _params(structure_id, doc_types, from_year),
+    ).all()
+    return {r.source: r.n for r in rows}

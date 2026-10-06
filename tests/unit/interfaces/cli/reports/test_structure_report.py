@@ -21,6 +21,7 @@ def _render(
     top_10=None,
     top_10_journals=(),
     top_10_key_role=None,
+    by_source=None,
 ):
     data = StructureReportData(
         structure=_LABO,
@@ -31,6 +32,7 @@ def _render(
         top_10_by_year=top_10 or {},
         top_10_top_journals=top_10_journals,
         top_10_key_role_by_year=top_10_key_role or {},
+        by_source=by_source or {},
     )
     return render_report(data, years=[2024, 2025], current_year=2025, generated_on="2025-10-06")
 
@@ -89,3 +91,11 @@ def test_sections_revues_seulement_des_revues():
 
 def test_annee_en_cours_marquee():
     assert "| 2024 | 2025* |" in _render()
+
+
+def test_sources_nombre_et_part_des_publications():
+    report = _render(
+        by_year_and_type=[YearDocTypeCount(2024, DocType.ARTICLE, 20)],
+        by_source={"openalex": 19, "wos": 10},
+    )
+    assert "| OpenAlex | 19 | 95,0 % |\n| WoS | 10 | 50,0 % |" in report
