@@ -19,7 +19,7 @@ from application.pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_s
 from application.pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression, progression
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
+from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 
 __all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
 
@@ -99,11 +99,14 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
     def _stop_on_tripped(self, remaining: str) -> bool:
         """`True`, avec avertissement, si le circuit-breaker a tripé : à tester en tête de boucle d'items pour stopper la source. `remaining` nomme les items non traités (accordé par l'appelant), qui repartent au prochain run."""
         if self._breaker_tripped():
-            self.logger.warning(
-                "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
-            )
+            self._warn_stopped(remaining)
             return True
         return False
+
+    def _warn_stopped(self, remaining: str) -> None:
+        self.logger.warning(
+            "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
+        )
 
     # ── Barre et bilan de la source ─────────────────────────────
 
@@ -120,6 +123,8 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
 
         `compte` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
+
+        Une source indisponible (`SourceUnavailableError`) arrête la boucle : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
         """
         metrics = PhaseMetrics()
         if not annees:
@@ -135,7 +140,11 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
                 if self._stop_on_tripped(sautees):
                     break
                 avancement.renomme(self._libelle(str(annee)))
-                metrics.merge(extrait(annee, avancement))
+                try:
+                    metrics.merge(extrait(annee, avancement))
+                except SourceUnavailableError:
+                    self._warn_stopped(sautees)
+                    break
             else:
                 plage = f"{annees[0]}-{annees[-1]}" if len(annees) > 1 else str(annees[0])
                 avancement.renomme(self._libelle(plage))

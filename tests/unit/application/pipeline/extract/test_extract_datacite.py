@@ -13,6 +13,7 @@ import pytest
 
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_datacite import DataciteExtractor
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.datacite import DataciteExtractConfig, DatacitePage
 from infrastructure.sources.datacite.extract_datacite import build_query
@@ -53,6 +54,16 @@ def test_une_erreur_d_annee_n_interrompt_pas_le_bilan():
     adapter = _adapter([])
     adapter.fetch_page.side_effect = RuntimeError("API indisponible")
     assert _extract(adapter).new == 0
+
+
+def test_source_indisponible_saute_les_annees_suivantes():
+    adapter = _adapter([])
+    adapter.get_years.return_value = [2023, 2024]
+    adapter.fetch_page.side_effect = SourceUnavailableError("datacite")
+    extractor = DataciteExtractor(MagicMock(), _LOGGER, adapter)
+    metrics = extractor.extract_all(argparse.Namespace(year=None, start_year=None), _CONFIG)
+    assert metrics.total == 0
+    assert adapter.fetch_page.call_count == 1
 
 
 def test_configuration_sans_mot_cle_refusee():

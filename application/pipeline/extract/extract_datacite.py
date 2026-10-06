@@ -16,6 +16,7 @@ from application.pipeline.extract.base import (
 )
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import Progression
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract.datacite import (
     DataciteExtractAdapter,
     DataciteExtractConfig,
@@ -46,6 +47,8 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteExtractAd
         def compte(annee: int) -> int:
             try:
                 return self._adapter.count(annee, keywords)
+            except SourceUnavailableError:
+                raise
             except Exception:
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
@@ -68,6 +71,8 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteExtractAd
                     next_url = page.next_url
                     if next_url is None or self._breaker_tripped():
                         break
+            except SourceUnavailableError:
+                raise
             except Exception as e:
                 slog.error("erreur : %s — passage à la suivante", e)
             return metrics
