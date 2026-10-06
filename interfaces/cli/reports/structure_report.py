@@ -118,7 +118,7 @@ def render_report(
         "",
         "## Publications avec auteur correspondant UCA",
         "",
-        f"Tous types confondus. Détail des {TOP_JOURNALS} revues qui en portent le plus.",
+        f"Tous types confondus, puis détail pour les {TOP_JOURNALS} premières revues.",
         "",
         *_table(["Revue", *year_headers], _corresponding_rows(data, years)),
     ]
