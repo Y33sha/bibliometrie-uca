@@ -139,17 +139,28 @@ class JournalYearCounts:
     """Nombre de publications par année."""
 
 
-def corresponding_publications_top_journals(
-    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
+# Publication `p` dans le top 10 % des plus citées selon une de ses notices OpenAlex.
+_TOP_10_PERCENT = """
+    EXISTS (
+        SELECT 1 FROM source_publications sp
+        WHERE sp.publication_id = p.id
+          AND sp.source = 'openalex'
+          AND (sp.impact->>'top_10_percent')::boolean
+    )
+"""
+
+
+def _top_journals(
+    conn: Connection, condition: str, params: dict[str, object], limit: int
 ) -> list[JournalYearCounts]:
-    """Les `limit` revues qui portent le plus de publications de `corresponding_publications_by_year`, avec leur éditeur et leur nombre par année. Tri par nombre total décroissant, puis par titre."""
+    """Les `limit` revues qui portent le plus de publications du rapport satisfaisant `condition`, avec leur éditeur et leur nombre par année. Tri par nombre total décroissant, puis par titre."""
     rows = conn.execute(
         text(f"""
             WITH pubs AS (
                 SELECT p.journal_id, p.pub_year
                 FROM publications p
                 WHERE p.journal_id IS NOT NULL
-                  AND {_REPORT_PUBLICATION} AND {_STRUCTURE_CORRESPONDING}
+                  AND {_REPORT_PUBLICATION} AND {condition}
             ),
             top AS (
                 SELECT pubs.journal_id, j.title, pb.name AS publisher, count(*) AS total
@@ -165,11 +176,26 @@ def corresponding_publications_top_journals(
             GROUP BY top.journal_id, top.title, top.publisher, top.total, pubs.pub_year
             ORDER BY top.total DESC, top.title
         """),  # noqa: S608 — fragments SQL constants
-        {**_params(structure_id, doc_types, from_year), "limit": limit},
+        {**params, "limit": limit},
     ).all()
     journals: dict[int, JournalYearCounts] = {}
     for r in rows:
-        journals.setdefault(r.journal_id, JournalYearCounts(r.title, r.publisher, {})).counts[
-            r.pub_year
-        ] = r.n
+        journal = journals.setdefault(r.journal_id, JournalYearCounts(r.title, r.publisher, {}))
+        journal.counts[r.pub_year] = r.n
     return list(journals.values())
+
+
+def corresponding_publications_top_journals(
+    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
+) -> list[JournalYearCounts]:
+    """Les `limit` revues qui portent le plus de publications de `corresponding_publications_by_year`."""
+    return _top_journals(
+        conn, _STRUCTURE_CORRESPONDING, _params(structure_id, doc_types, from_year), limit
+    )
+
+
+def top_10_percent_top_journals(
+    conn: Connection, structure_id: int, *, doc_types: list[DocType], from_year: int, limit: int
+) -> list[JournalYearCounts]:
+    """Les `limit` revues qui portent le plus de publications de la structure dans le top 10 % des plus citées."""
+    return _top_journals(conn, _TOP_10_PERCENT, _params(structure_id, doc_types, from_year), limit)
