@@ -55,18 +55,32 @@ def test_forme_d_une_seule_identite(sa_sync_conn):
 
     stats = backfill(sa_sync_conn, apply=True)
 
-    assert stats["rejected : identité de signature"] == 1
+    assert stats["rejected : identité de signature, prénom nom"] == 1
     assert _split(sa_sync_conn, pid, "michel durand") == ("durand", "michel")
 
 
-def test_forme_sans_decoupage_laissee(sa_sync_conn):
+def test_forme_dans_l_ordre_nom_prenom(sa_sync_conn):
+    pid = _person(sa_sync_conn, "Dupont", "Marie")
+    _form(sa_sync_conn, pid, "durand michel", "confirmed")
+    upsert_identity(sa_sync_conn, "michel durand")
+
+    stats = backfill(sa_sync_conn, apply=True)
+
+    assert stats["confirmed : identité de signature, nom prénom"] == 1
+    assert _split(sa_sync_conn, pid, "durand michel") == ("durand", "michel")
+
+
+def test_forme_sans_identite_supprimee(sa_sync_conn):
     pid = _person(sa_sync_conn, "Dupont", "Marie")
     _form(sa_sync_conn, pid, "zorglub inconnu", "rejected")
 
     stats = backfill(sa_sync_conn, apply=True)
 
-    assert stats["rejected : aucun découpage"] == 1
-    assert _split(sa_sync_conn, pid, "zorglub inconnu") == (None, None)
+    assert stats["rejected : aucune identité, supprimée"] == 1
+    remaining = sa_sync_conn.execute(
+        text("SELECT count(*) FROM person_name_forms WHERE person_id = :p"), {"p": pid}
+    ).scalar_one()
+    assert remaining == 0
 
 
 def test_forme_en_attente_ignoree(sa_sync_conn):
