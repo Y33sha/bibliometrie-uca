@@ -1706,7 +1706,7 @@ CREATE TABLE public.staging (
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text])))
 );
 
 
