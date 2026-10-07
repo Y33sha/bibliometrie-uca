@@ -281,7 +281,8 @@ def main() -> int:
             render_report(
                 data, years=years, current_year=current_year, generated_on=today().isoformat()
             ),
-            encoding="utf-8",
+            # Le BOM signale l'UTF-8 aux navigateurs qui ouvrent le fichier hors serveur.
+            encoding="utf-8-sig",
         )
         log.info("Rapport écrit : %s", path)
     return 0
