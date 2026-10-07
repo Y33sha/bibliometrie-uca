@@ -52,8 +52,10 @@ def get_records_found(data: Mapping[str, JsonValue]) -> int:
 def extract_doi(rec: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI depuis les identifiants WoS, ou `None`.
 
-    L'API WoS retourne les identifiants à un emplacement profond (`dynamic_data.cluster_related.identifiers.identifier`) et de forme polymorphique : tantôt une liste de dicts, tantôt un dict unique quand il n'y a qu'un seul identifiant. Le code tolère les deux formes et les absences à chaque niveau.
+    L'API WoS retourne les identifiants à un emplacement profond (`dynamic_data.cluster_related.identifiers.identifier`) et de forme polymorphique : tantôt une liste de dicts, tantôt un dict unique quand il n'y a qu'un seul identifiant. Le code tolère les deux formes et les absences à chaque niveau. Une ligne d'export tabulé de l'interface (balise `UT`) donne le DOI sous la balise `DI`.
     """
+    if "UT" in rec:
+        return clean_doi(as_str(rec.get("DI")))
     brut = at_path(rec, "dynamic_data", "cluster_related", "identifiers").get("identifier")
     identifiers = [brut] if isinstance(brut, Mapping) else as_sequence(brut)
     for entree in identifiers:

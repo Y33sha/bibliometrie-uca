@@ -1,4 +1,36 @@
-from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
+from domain.sources.wos import (
+    derive_wos_api_oa_status,
+    is_wos_author_exploitable,
+    parse_export_addresses,
+    parse_export_corresponding,
+    parse_export_researcher_ids,
+    split_export_list,
+)
+
+
+class TestExportFields:
+    def test_liste(self):
+        assert split_export_list("a; b;  ; c") == ["a", "b", "c"]
+        assert split_export_list(None) == []
+
+    def test_adresses_par_auteur(self):
+        c1 = "[Doe, Jane; Martin, Paul] Univ A, Paris, France; [Martin, Paul] Univ B, Lyon, France"
+        assert parse_export_addresses(c1) == {
+            "doe jane": ["Univ A, Paris, France"],
+            "martin paul": ["Univ A, Paris, France", "Univ B, Lyon, France"],
+        }
+
+    def test_adresse_sans_auteur_ignoree(self):
+        assert parse_export_addresses("Univ A, Paris, France; Univ B, Lyon, France") == {}
+
+    def test_auteurs_correspondants(self):
+        rp = "Tang, KH (corresponding author), Univ A, Singapore.; Chu, H (corresponding author), Univ B, Vienna, Austria."
+        assert parse_export_corresponding(rp) == {"tang kh", "chu h"}
+
+    def test_researcher_ids(self):
+        assert parse_export_researcher_ids("/L-1794-2019; Nguifo, Engelbert/A-4769-2019") == {
+            "nguifo engelbert": "A-4769-2019"
+        }
 
 
 class TestIsWosAuthorExploitable:

@@ -28,13 +28,21 @@ from application.services.monographs.containers import Containers, find_or_creat
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
+from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers
 from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
+from domain.sources.wos import (
+    derive_wos_api_oa_status,
+    is_wos_author_exploitable,
+    parse_export_addresses,
+    parse_export_corresponding,
+    parse_export_researcher_ids,
+    split_export_list,
+)
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 
 # =============================================================
@@ -311,6 +319,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
             brut = tc.get("local_count")
             cited_by_count = 0 if brut is None else as_int(brut)
 
+    authors = _parse_api_authors(static, dynamic)
     return {
         "ut": raw.get("UID", ""),
         "doi": doi,
@@ -323,7 +332,8 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "issn": issn_val,
         "eissn": eissn_val,
         "publisher_name": publisher_name,
-        "authors": _parse_api_authors(static, dynamic),
+        "authors": [a for a in authors if is_wos_author_exploitable(a)],
+        "authors_found": len(authors),
         "abstract": abstract,
         "cited_by_count": cited_by_count,
         "biblio": biblio or None,
@@ -340,6 +350,98 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         }
         or None,
     }
+
+
+def _export_authors(raw: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]]:
+    """Auteurs d'une ligne d'export, dans l'ordre de `AF` (noms complets) et `AU` (noms abrégés)."""
+    full_names = split_export_list(as_str(raw.get("AF")))
+    short_names = split_export_list(as_str(raw.get("AU")))
+    addresses = parse_export_addresses(as_str(raw.get("C1")))
+    corresponding = parse_export_corresponding(as_str(raw.get("RP")))
+    researcher_ids = parse_export_researcher_ids(as_str(raw.get("RI")))
+    roles, _ = map_role("wos", "author")
+    authors: list[dict[str, JsonValue]] = []
+    for position, full_name in enumerate(full_names):
+        key = normalize_text(full_name)
+        short_name = short_names[position] if position < len(short_names) else ""
+        author_addresses = addresses.get(key, [])
+        last_name, _, first_name = full_name.partition(", ")
+        authors.append(
+            {
+                "position": position,
+                "full_name": full_name,
+                "last_name": last_name.strip() or None,
+                "first_name": first_name.strip() or None,
+                "researcher_id": researcher_ids.get(key),
+                "is_corresponding": normalize_text(short_name) in corresponding,
+                "raw_affiliation": " | ".join(author_addresses) or None,
+                "addresses": author_addresses,
+                "roles": roles,
+            }
+        )
+    return authors
+
+
+def extract_from_export(
+    raw: Mapping[str, JsonValue], staging_doi: str | None
+) -> dict[str, JsonValue]:
+    """Extrait un record structuré d'une ligne d'export tabulé de l'interface WoS, sous la même forme qu'`extract_from_api`. Le statut open access reste inconnu."""
+
+    def field(tag: str) -> str | None:
+        return as_str(raw.get(tag))
+
+    biblio: dict[str, JsonValue] = {
+        key: value
+        for key, tag in (
+            ("volume", "VL"),
+            ("issue", "IS"),
+            ("first_page", "BP"),
+            ("last_page", "EP"),
+            ("publisher", "PU"),
+        )
+        if (value := field(tag))
+    }
+    journal_obj = {
+        key: value
+        for key, tag in (("title", "SO"), ("issn", "SN"), ("eissn", "EI"))
+        if (value := field(tag))
+    }
+    if journal_obj:
+        biblio["journal"] = journal_obj
+    subjects = list(dict.fromkeys(split_export_list(field("WC")) + split_export_list(field("SC"))))
+    doc_types = split_export_list(field("DT"))
+    languages = split_export_list(field("LA"))
+    isbns = [isbn for value in split_export_list(field("BN")) for isbn in find_isbns(value)]
+    authors = _export_authors(raw)
+    return {
+        "ut": field("UT") or "",
+        "doi": clean_doi(field("DI")) or clean_doi(staging_doi),
+        "title": field("TI") or "(sans titre)",
+        "pub_year": int(py) if (py := field("PY")) and py.isdigit() else None,
+        "doc_type": doc_types[0] if doc_types else "other",
+        "language": languages[0] if languages else None,
+        "oa_status": None,
+        "journal_title": field("SO"),
+        "issn": field("SN"),
+        "eissn": field("EI"),
+        "publisher_name": field("PU"),
+        "authors": authors,
+        "authors_found": len(authors),
+        "abstract": field("AB"),
+        "cited_by_count": int(tc) if (tc := field("TC")) and tc.isdigit() else None,
+        "biblio": biblio or None,
+        "keywords": split_export_list(field("DE")) or None,
+        "topics": {"subjects": subjects} if subjects else None,
+        "urls": None,
+        "external_ids": {ExternalIdType.ISBN: list(dict.fromkeys(isbns))} if isbns else None,
+    }
+
+
+def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:
+    """Extrait un record structuré d'un payload WoS : JSON de l'API, ou ligne d'export tabulé de l'interface (balise `UT`)."""
+    if "UT" in raw:
+        return extract_from_export(raw, staging_doi)
+    return extract_from_api(raw, staging_doi)
 
 
 # =============================================================
@@ -478,17 +580,16 @@ def build_wos_author_records(
 ) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est exploitable alors que le record en porte, logge un warning (détecte une dérive éventuelle de l'API WoS — perte silencieuse de records sinon). Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
+    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
     """
-    raw_authors = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
-    authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
+    authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     if not authors_kept:
-        if raw_authors:
+        if found := as_int(rec.get("authors_found")):
             logger.warning(
                 "WoS record %s : %d auteurs présents mais aucun exploitable "
                 "(filtre is_wos_author_exploitable) — authorships ignorés",
                 as_str(rec.get("ut")) or "?",
-                len(raw_authors),
+                found,
             )
         return []
 
@@ -574,7 +675,7 @@ def process_record(
     staging_doi = staging_row.doi
     raw_data = staging_row.raw_data
 
-    rec = extract_from_api(raw_data, staging_doi)
+    rec = extract_record(raw_data, staging_doi)
 
     if not rec["ut"]:
         rec["ut"] = ut
@@ -598,7 +699,7 @@ class WosNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 500
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        rec = extract_from_api(row.raw_data, row.doi)
+        rec = extract_record(row.raw_data, row.doi)
         return as_str(rec.get("title")), as_int(rec.get("pub_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:

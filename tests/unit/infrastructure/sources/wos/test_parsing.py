@@ -42,6 +42,10 @@ class TestExtractUt:
 
 
 class TestExtractDoi:
+    def test_ligne_d_export(self):
+        assert extract_doi({"UT": "WOS:1", "DI": "10.1000/ABC"}) == "10.1000/abc"
+        assert extract_doi({"UT": "WOS:1"}) is None
+
     def test_finds_doi_in_identifier_list(self):
         rec = {
             "dynamic_data": {
