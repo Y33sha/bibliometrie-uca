@@ -30,7 +30,9 @@ from application.pipeline.normalize.normalize_wos import (
     _safe_list,
     build_wos_author_records,
     extract_from_api,
+    extract_from_export,
     extract_pub_metadata,
+    extract_record,
     get_container_facts,
     insert_wos_document,
     process_record,
@@ -723,6 +725,79 @@ class TestExtractFromApi:
 # ── extract_pub_metadata ─────────────────────────────────────────
 
 
+def _export_row(**surcharges: str) -> dict[str, str]:
+    """Ligne d'export tabulé WoS, réduite à ses balises non vides."""
+    row = {
+        "PT": "J",
+        "AU": "Doe, J; Martin, P; Durand, A",
+        "AF": "Doe, Jane; Martin, Paul; Durand, Anne",
+        "TI": "Un titre",
+        "SO": "JOURNAL OF TESTS",
+        "LA": "English",
+        "DT": "Article; Early Access",
+        "DE": "alpha; beta",
+        "AB": "Un résumé.",
+        "C1": "[Doe, Jane; Martin, Paul] Univ Clermont Auvergne, F-63000 Clermont Ferrand, France; [Durand, Anne] Univ Lyon, Lyon, France",
+        "RP": "Martin, P (corresponding author), Univ Clermont Auvergne, F-63000 Clermont Ferrand, France.",
+        "RI": "Durand, Anne/A-1234-2020",
+        "TC": "7",
+        "PU": "ELSEVIER",
+        "SN": "0123-4567",
+        "EI": "1234-5678",
+        "PY": "2025",
+        "VL": "12",
+        "BP": "3",
+        "EP": "9",
+        "DI": "10.1/XYZ",
+        "WC": "Microbiology",
+        "SC": "Microbiology; Immunology",
+        "UT": "WOS:001",
+    }
+    row.update(surcharges)
+    return row
+
+
+class TestExtractFromExport:
+    def test_champs_bibliographiques(self):
+        rec = extract_from_export(_export_row(), None)
+        assert rec["ut"] == "WOS:001"
+        assert rec["doi"] == "10.1/xyz"
+        assert rec["pub_year"] == 2025
+        assert rec["doc_type"] == "Article"
+        assert rec["language"] == "English"
+        assert rec["journal_title"] == "JOURNAL OF TESTS"
+        assert rec["issn"] == "0123-4567"
+        assert rec["eissn"] == "1234-5678"
+        assert rec["publisher_name"] == "ELSEVIER"
+        assert rec["cited_by_count"] == 7
+        assert rec["keywords"] == ["alpha", "beta"]
+        assert rec["topics"] == {"subjects": ["Microbiology", "Immunology"]}
+        assert rec["biblio"]["volume"] == "12"
+        assert rec["biblio"]["first_page"] == "3"
+
+    def test_auteurs_adresses_et_correspondant(self):
+        authors = extract_from_export(_export_row(), None)["authors"]
+        assert [a["full_name"] for a in authors] == ["Doe, Jane", "Martin, Paul", "Durand, Anne"]
+        assert [a["position"] for a in authors] == [0, 1, 2]
+        assert authors[0]["addresses"] == [
+            "Univ Clermont Auvergne, F-63000 Clermont Ferrand, France"
+        ]
+        assert authors[2]["addresses"] == ["Univ Lyon, Lyon, France"]
+        assert [a["is_corresponding"] for a in authors] == [False, True, False]
+        assert authors[2]["researcher_id"] == "A-1234-2020"
+        assert authors[0]["last_name"] == "Doe"
+        assert authors[0]["first_name"] == "Jane"
+
+    def test_auteurs_retenus_sans_identifiant_wos(self, logger):
+        """L'export ne donne pas le `daisng_id` de l'API : les auteurs restent exploitables."""
+        rec = extract_from_export(_export_row(), None)
+        assert len(build_wos_author_records(rec, logger)) == 3
+
+    def test_aiguillage_selon_la_forme_du_payload(self):
+        assert extract_record(_export_row(), None)["ut"] == "WOS:001"
+        assert extract_record(_make_api_record(), None)["ut"] == "WOS:000123"
+
+
 class TestExtractPubMetadata:
     def test_basic_with_journal_id(self):
         rec = {
@@ -877,15 +952,23 @@ class TestBuildWosAuthorRecords:
         assert build_wos_author_records({"ut": "WOS:1", "authors": []}, logger) == []
 
     def test_all_authors_filtered_logs_warning(self, logger, caplog):
-        """Auteurs présents mais aucun exploitable (filtre is_wos_author_exploitable) → warning."""
-        rec = {
-            "ut": "WOS:42",
-            "authors": [{"position": 0, "full_name": "Mystery", "daisng_id": None}],
-        }
+        """Auteurs présents à l'extraction mais aucun exploitable → warning."""
+        rec = {"ut": "WOS:42", "authors": [], "authors_found": 1}
         with caplog.at_level(logging.WARNING, logger=logger.name):
             records = build_wos_author_records(rec, logger)
         assert records == []
         assert any("aucun exploitable" in r.getMessage() for r in caplog.records)
+
+    def test_extraction_api_ecarte_les_auteurs_sans_daisng(self):
+        raw = _make_api_record(
+            authors=[
+                _make_author_name(seq_no=1, full_name="Doe, Jane"),
+                _make_author_name(seq_no=2, full_name="Mystery", daisng_id=None),
+            ]
+        )
+        rec = extract_from_api(raw, None)
+        assert [a["full_name"] for a in rec["authors"]] == ["Doe, Jane"]
+        assert rec["authors_found"] == 2
 
     def test_nom_et_prenom_separes(self, logger):
         rec = {
