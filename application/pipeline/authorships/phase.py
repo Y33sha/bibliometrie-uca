@@ -10,8 +10,10 @@ Le build est incrémental et convergent (add + prune + recompute en une passe) ;
 """
 
 import logging
+from dataclasses import dataclass
 
 from application.pipeline.authorships.build_authorships import build
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import attente
@@ -27,29 +29,35 @@ from application.ports.pipeline.transaction import OpenTransaction
 _PURGE_BATCH_SIZE = 5000
 
 
-def run(
-    open_tx: OpenTransaction,
-    build_queries: AuthorshipsBuildQueries,
-    purge_queries: PurgeOrphanPublicationsQueries,
-    pub_counts_queries: PubCountsQueries,
-    address_pub_count_queries: AddressPubCountQueries,
-    logger: logging.Logger,
-    *,
-    rebuild_authorships: bool = False,
-) -> PhaseMetrics:
-    """Enchaîne build → purge → recalcul des décomptes et retourne les métriques du build."""
-    with open_tx() as conn:
-        metrics = build(conn, build_queries, logger, rebuild_full=rebuild_authorships)
+@dataclass(frozen=True)
+class AuthorshipsPhase:
+    build_queries: AuthorshipsBuildQueries
+    purge_queries: PurgeOrphanPublicationsQueries
+    pub_counts_queries: PubCountsQueries
+    address_pub_count_queries: AddressPubCountQueries
 
-    n_purged = _purge_orphan_publications(open_tx, purge_queries, logger)
-    summary = metrics.details["summary"]
-    if isinstance(summary, dict):
-        summary["publications_purged"] = n_purged
-    _refresh_pub_counts(open_tx, pub_counts_queries, address_pub_count_queries, logger)
-    # Les sous-étapes affichées portent déjà leur décompte : une ligne de clôture les répéterait.
-    # La purge reste muette, son décompte va aux métriques.
-    metrics.resume = ""
-    return metrics
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Enchaîne build → purge → recalcul des décomptes et retourne les métriques du build."""
+        open_tx, logger = ctx.open_tx, ctx.logger
+        with open_tx() as conn:
+            metrics = build(
+                conn,
+                self.build_queries,
+                logger,
+                rebuild_full=ctx.options.rebuild_authorships,
+            )
+
+        n_purged = _purge_orphan_publications(open_tx, self.purge_queries, logger)
+        summary = metrics.details["summary"]
+        if isinstance(summary, dict):
+            summary["publications_purged"] = n_purged
+        _refresh_pub_counts(
+            open_tx, self.pub_counts_queries, self.address_pub_count_queries, logger
+        )
+        # Les sous-étapes affichées journalisent déjà leur décompte : une ligne de clôture les répéterait.
+        # La purge reste muette, son décompte va aux métriques.
+        metrics.resume = ""
+        return metrics
 
 
 def _purge_orphan_publications(

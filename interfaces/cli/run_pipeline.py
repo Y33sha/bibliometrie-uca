@@ -496,7 +496,7 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
-    from application.pipeline.authorships.phase import run
+    from application.pipeline.authorships.phase import AuthorshipsPhase
     from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
     from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
     from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
@@ -504,15 +504,12 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
         PgPurgeOrphanPublicationsQueries,
     )
 
-    return run(
-        open_tx,
+    return AuthorshipsPhase(
         PgAuthorshipsBuildQueries(),
         PgPurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
         PgAddressPubCountQueries(),
-        log,
-        rebuild_authorships=options.rebuild_authorships,
-    )
+    ).run(_context(options))
 
 
 def phase_countries(options: RunOptions) -> PhaseMetrics:

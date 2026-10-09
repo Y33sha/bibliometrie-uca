@@ -3,13 +3,10 @@
 Le propos testé ici est l'enchaînement et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
 """
 
-import logging
 from unittest.mock import patch
 
 from application.pipeline.authorships import phase
 from application.pipeline.metrics import PhaseMetrics
-
-_LOG = logging.getLogger("test")
 
 
 class _FakePurgeQueries:
@@ -46,7 +43,7 @@ class _FakeAddressPubCountQueries:
         return 7
 
 
-def _run(open_tx, lots, *, rebuild_authorships=False, build_metrics=None):
+def _run(contexte, lots, *, rebuild_authorships=False, build_metrics=None):
     purge = _FakePurgeQueries(lots)
     pub_counts = _FakePubCountsQueries()
     adresses = _FakeAddressPubCountQueries()
@@ -60,20 +57,14 @@ def _run(open_tx, lots, *, rebuild_authorships=False, build_metrics=None):
             vus.__setitem__("rebuild_full", rebuild_full) or metrics
         ),
     ):
-        rendu = phase.run(
-            open_tx,
-            object(),
-            purge,
-            pub_counts,
-            adresses,
-            _LOG,
-            rebuild_authorships=rebuild_authorships,
+        rendu = phase.AuthorshipsPhase(object(), purge, pub_counts, adresses).run(
+            contexte(rebuild_authorships=rebuild_authorships)
         )
     return rendu, purge, pub_counts, vus
 
 
-def test_purge_par_lots_jusqu_a_epuisement(open_tx):
-    rendu, purge, pub_counts, _ = _run(open_tx, [5000, 5000, 120])
+def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
+    rendu, purge, pub_counts, _ = _run(contexte, [5000, 5000, 120])
 
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
@@ -81,38 +72,38 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx):
     assert pub_counts.appels == 2  # revues puis éditeurs
 
 
-def test_rien_a_purger(open_tx):
-    rendu, purge, _, _ = _run(open_tx, [])
+def test_rien_a_purger(open_tx, contexte):
+    rendu, purge, _, _ = _run(contexte, [])
 
     assert rendu.details["summary"]["publications_purged"] == 0
     assert open_tx.conn.commits == 0
 
 
-def test_metriques_du_build_rendues_telles_quelles(open_tx):
-    rendu, _, _, _ = _run(open_tx, [], build_metrics=PhaseMetrics(new=42))
+def test_metriques_du_build_rendues_telles_quelles(contexte):
+    rendu, _, _, _ = _run(contexte, [], build_metrics=PhaseMetrics(new=42))
 
     assert rendu.new == 42
 
 
-def test_rebuild_transmis_au_build(open_tx):
-    _, _, _, vus = _run(open_tx, [], rebuild_authorships=True)
+def test_rebuild_transmis_au_build(contexte):
+    _, _, _, vus = _run(contexte, [], rebuild_authorships=True)
 
     assert vus["rebuild_full"] is True
 
 
-def test_resume_absent_du_build_laisse_la_purge_sans_trace(open_tx):
+def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
     """Le build rend un résumé qui n'est pas un dictionnaire : la purge tourne, sans rien y inscrire."""
     metrics = PhaseMetrics()
     metrics.details["summary"] = "rien à dire"
 
-    rendu, purge, _, _ = _run(open_tx, [7], build_metrics=metrics)
+    rendu, purge, _, _ = _run(contexte, [7], build_metrics=metrics)
 
     assert rendu.details["summary"] == "rien à dire"
     assert purge.limites  # la purge a bien tourné
 
 
-def test_chaque_sous_etape_dans_sa_transaction(open_tx):
-    _run(open_tx, [10])
+def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
+    _run(contexte, [10])
 
     # build, purge, puis un décompte par famille : adresses, revues, éditeurs
     assert open_tx.transactions == 5
