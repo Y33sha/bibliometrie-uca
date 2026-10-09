@@ -292,9 +292,9 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
 
     Séquence, gardes de configuration et métriques dans `application/pipeline/publishers_journals/phase.py`.
     """
-    from application.pipeline.publishers_journals.phase import run
+    from application.pipeline.publishers_journals.phase import PublishersJournalsPhase
 
-    return run(
+    return PublishersJournalsPhase(
         resolve_publishers=_run_resolve_publishers,
         enrich_from_openalex=_run_enrich_journals_from_openalex,
         check_in_sudoc=_run_check_journals_in_sudoc,
@@ -309,8 +309,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
         learn_doi_namespaces=_run_learn_journal_doi_namespaces,
         enrich_from_doaj=_run_enrich_journals_from_doaj,
         credentials_missing=_credentials_missing,
-        logger=log,
-    )
+    ).run(_context(options))
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
