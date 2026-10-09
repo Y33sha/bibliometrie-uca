@@ -4,6 +4,7 @@ import logging
 
 from application.pipeline.normalize.normalize_crossref import build_crossref_author_records
 from application.pipeline.normalize.normalize_datacite import build_datacite_author_records
+from application.pipeline.normalize.normalize_hal import build_hal_author_records
 from application.pipeline.normalize.normalize_openalex import build_openalex_author_records
 from application.pipeline.normalize.normalize_scanr import build_scanr_author_records
 from application.pipeline.normalize.normalize_wos import build_wos_author_records
@@ -86,6 +87,14 @@ def test_scanr_ror_de_toutes_les_affiliations():
     record = build_scanr_author_records(doc)[0]
     assert [a.text for a in record.addresses] == ["Institut Pascal"]
     assert record.ror_ids == {UNIV, LABO}
+
+
+def test_hal_ror_des_affiliations_du_tei():
+    block = {
+        "authFullNameFormIDPersonIDIDHal_fs": ["Jane Doe_FacetSep_1-0_FacetSep_"],
+        "tei_author_rors": [["https://ror.org/03vgfxd91"]],
+    }
+    assert build_hal_author_records(block)[0].ror_ids == {LABO}
 
 
 def test_datacite_affiliation_identifier_de_schema_ror():
