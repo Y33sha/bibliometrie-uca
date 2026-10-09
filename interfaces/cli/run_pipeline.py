@@ -481,7 +481,25 @@ def phase_affiliations(options: RunOptions) -> PhaseMetrics:
         PgAffiliationsQueries(),
         PgPerimeterStructuresQueries(),
         log,
+        refresh_ror=_run_refresh_ror,
     )
+
+
+def _run_refresh_ror() -> PhaseMetrics:
+    """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
+    from application.pipeline.affiliations.refresh_ror import run_refresh_ror
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.repositories import ror_repository
+    from infrastructure.sources.config import get_polite_pool_email_optional
+    from infrastructure.sources.polite_pool import build_user_agent
+    from infrastructure.sources.ror.dump import ZenodoRorDumpSource
+
+    # Le dump est public : l'adresse du polite pool y est facultative.
+    source = ZenodoRorDumpSource(
+        user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=log
+    )
+    with get_sync_engine().connect() as conn:
+        return run_refresh_ror(conn, source=source, repo=ror_repository(conn), logger=log)
 
 
 def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:

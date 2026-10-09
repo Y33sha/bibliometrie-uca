@@ -22,12 +22,13 @@ def import_ror_dump(
     conn: Connection,
     organizations: Iterable[RorOrganization],
     *,
+    version: str,
     repo: RorRepository,
 ) -> RorImportStats:
-    """Remplit le référentiel ROR avec les organisations du dump et leurs relations parent/enfant, en une transaction."""
+    """Remplit le référentiel ROR avec les organisations du dump `version` et leurs relations parent/enfant, en une transaction."""
     orgs = list(organizations)
     relations = ror_relations(orgs)
-    repo.replace_all(orgs, relations)
+    repo.replace_all(orgs, relations, version=version)
     conn.commit()
     return RorImportStats(organizations=len(orgs), relations=len(relations))
 
