@@ -1077,12 +1077,9 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
 
     Séquence et métriques dans `application/pipeline/oa_status/phase.py` ; ici, le câblage.
     """
-    import asyncio
-
     import httpx2
 
-    from application.pipeline.oa_status.phase import run
-    from application.pipeline.signals import filter_configured
+    from application.pipeline.oa_status.phase import OaStatusPhase
     from infrastructure.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import (
@@ -1092,36 +1089,19 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     )
     from infrastructure.sources.unpaywall.client import fetch_oa_status
 
-    metrics = PhaseMetrics()
-    if not filter_configured(
-        ["unpaywall"],
-        metrics,
-        credentials_missing=_credentials_missing,
-        logger=log,
-        phase="oa_status",
-    ):
-        return metrics
-
     base_url = API_BASE_URLS["unpaywall"]
     email = get_polite_pool_email_optional() or ""
 
     async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
         return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
 
-    with open_tx() as conn:
-        metrics.merge(
-            asyncio.run(
-                run(
-                    conn,
-                    PgOaStatusQueries(),
-                    log,
-                    fetcher=fetcher,
-                    staleness_days=get_unpaywall_recheck_after_days(conn),
-                    max_per_run=get_unpaywall_max_per_run(conn),
-                )
-            )
-        )
-    return metrics
+    return OaStatusPhase(
+        PgOaStatusQueries(),
+        fetcher,
+        credentials_missing=_credentials_missing,
+        staleness_days=get_unpaywall_recheck_after_days,
+        max_per_run=get_unpaywall_max_per_run,
+    ).run(_context(options))
 
 
 # Implémentation de chaque phase. `PHASE_ORDER` fixe l'ordre d'exécution ; un contrôle au

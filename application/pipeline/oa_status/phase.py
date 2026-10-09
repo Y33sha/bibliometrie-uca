@@ -9,10 +9,12 @@ Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` s
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 import httpx2
 from sqlalchemy import Connection
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -23,6 +25,7 @@ from application.pipeline.libelles import (
 )
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
+from application.pipeline.signals import filter_configured
 from application.ports.pipeline.oa_status import OaStatusQueries
 from domain.publications.metadata import decide_oa_status
 
@@ -34,7 +37,49 @@ BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 
 
-async def run(
+@dataclass(frozen=True)
+class OaStatusPhase:
+    """Vérifie sur Unpaywall le statut OA des publications à DOI.
+
+    `staleness_days` lit le délai, en jours, au-delà duquel une publication vérifiée l'est de nouveau. `max_per_run` lit le plafond de DOI vérifiés par run, `None` valant illimité.
+    """
+
+    queries: OaStatusQueries
+    fetcher: OaStatusFetcher
+    credentials_missing: Callable[[str], str | None]
+    staleness_days: Callable[[Connection], int]
+    max_per_run: Callable[[Connection], int | None]
+    max_concurrent: int = MAX_CONCURRENT
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Saute la phase quand Unpaywall est sans configuration, sinon vérifie les publications dans une seule transaction."""
+        metrics = PhaseMetrics()
+        if not filter_configured(
+            ["unpaywall"],
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=ctx.logger,
+            phase="oa_status",
+        ):
+            return metrics
+        with ctx.open_tx() as conn:
+            metrics.merge(
+                asyncio.run(
+                    _verifier(
+                        conn,
+                        self.queries,
+                        ctx.logger,
+                        fetcher=self.fetcher,
+                        staleness_days=self.staleness_days(conn),
+                        max_per_run=self.max_per_run(conn),
+                        max_concurrent=self.max_concurrent,
+                    )
+                )
+            )
+        return metrics
+
+
+async def _verifier(
     conn: Connection,
     queries: OaStatusQueries,
     logger: logging.Logger,
@@ -42,12 +87,9 @@ async def run(
     fetcher: OaStatusFetcher,
     staleness_days: int,
     max_per_run: int | None,
-    max_concurrent: int = MAX_CONCURRENT,
+    max_concurrent: int,
 ) -> PhaseMetrics:
-    """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run.
-
-    `staleness_days` est le délai, en jours, au-delà duquel une publication vérifiée l'est de nouveau. `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
-    """
+    """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run."""
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
         conn, limit=max_per_run, staleness_days=staleness_days
