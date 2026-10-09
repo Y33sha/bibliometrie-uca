@@ -5,7 +5,6 @@ Trois passes se succèdent, chacune dans sa transaction, et leur ordre porte une
 La phase assemble ensuite un bilan : les compteurs des trois passes, et la ventilation par règle déclenchée, du plus fréquent au moins fréquent.
 """
 
-import logging
 from unittest.mock import patch
 
 from application.pipeline.metadata_correction import phase
@@ -13,10 +12,8 @@ from application.pipeline.metadata_correction.correct_by_cluster import ClusterC
 from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
 from application.pipeline.metadata_correction.journal_by_doi import JournalByDoiStats
 
-_LOG = logging.getLogger("test")
 
-
-def _run(open_tx, *, journal=None, unary=None, cluster=None):
+def _run(contexte, *, journal=None, unary=None, cluster=None):
     ordre: list[str] = []
     journal = journal or JournalByDoiStats(examined=0, attached=0)
     unary = unary or UnaryCorrectionStats(examined=0, corrected=0, rule_counts={})
@@ -36,26 +33,26 @@ def _run(open_tx, *, journal=None, unary=None, cluster=None):
             side_effect=lambda conn, q, log: ordre.append("cluster") or cluster,
         ),
     ):
-        metrics = phase.run(open_tx, object(), _LOG)
+        metrics = phase.MetadataCorrectionPhase(object()).run(contexte())
     return metrics, ordre
 
 
-def test_rattachement_de_revue_avant_la_reclassification(open_tx):
+def test_rattachement_de_revue_avant_la_reclassification(contexte):
     """La revue posée par la première passe est ce sur quoi la deuxième s'appuie."""
-    _, ordre = _run(open_tx)
+    _, ordre = _run(contexte)
 
     assert ordre == ["journal_by_doi", "unaire", "cluster"]
 
 
-def test_chaque_passe_dans_sa_transaction(open_tx):
-    _run(open_tx)
+def test_chaque_passe_dans_sa_transaction(open_tx, contexte):
+    _run(contexte)
 
     assert open_tx.transactions == 3
 
 
-def test_bilan_assemble_des_trois_passes(open_tx):
+def test_bilan_assemble_des_trois_passes(contexte):
     metrics, _ = _run(
-        open_tx,
+        contexte,
         journal=JournalByDoiStats(examined=10, attached=4),
         unary=UnaryCorrectionStats(examined=20, corrected=6, rule_counts={}),
         cluster=ClusterCorrectionStats(examined=30, corrected=1, case_counts={}),
@@ -73,10 +70,10 @@ def test_bilan_assemble_des_trois_passes(open_tx):
     }
 
 
-def test_ventilation_des_regles_du_plus_frequent_au_moins(open_tx):
+def test_ventilation_des_regles_du_plus_frequent_au_moins(contexte):
     """Les déclenchements des deux passes correctrices se rejoignent dans un même classement."""
     metrics, _ = _run(
-        open_tx,
+        contexte,
         unary=UnaryCorrectionStats(examined=0, corrected=0, rule_counts={"type_absent": 2}),
         cluster=ClusterCorrectionStats(
             examined=0, corrected=0, case_counts={"version_vers_concept": 5, "chapitre": 1}
