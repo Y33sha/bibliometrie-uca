@@ -33,9 +33,15 @@ _SOURCE_JOURNALS = """
       AND NOT (s.raw_metadata ? 'journal_id')
 """
 
+# Tous les ISSN de la revue, quel que soit leur statut : le rapprochement avec Crossref retient
+# aussi les valeurs écartées, qui désignent souvent la même revue.
 _JOURNALS = """
-    SELECT id, title, array_remove(ARRAY[issn, eissn, issnl], NULL) || rejected_issns AS issns
-    FROM journals
+    SELECT j.id, j.title,
+           coalesce((
+               SELECT array_agg(i.issn ORDER BY i.id) FROM journal_issns i
+               WHERE i.journal_id = j.id
+           ), ARRAY[]::text[]) AS issns
+    FROM journals j
 """
 
 _PUBLICATION_RA = """
