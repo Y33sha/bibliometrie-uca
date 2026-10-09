@@ -10,6 +10,7 @@ from infrastructure.read_models.publications.detail import (
     get_publication_subjects,
 )
 from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.journals import insert_monograph, insert_publisher
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -22,18 +23,10 @@ class TestGetPublicationDetail:
 
     def test_monographie_et_son_editeur(self, sa_sync_conn):
         """Une publication sans revue prend l'éditeur de sa monographie."""
-        publisher = sa_sync_conn.execute(
-            text(
-                "INSERT INTO publishers (name, name_normalized) VALUES ('Dykinson', 'dykinson') RETURNING id"
-            )
-        ).scalar_one()
-        monograph = sa_sync_conn.execute(
-            text(
-                "INSERT INTO monographs (title, title_normalized, proceedings, publisher_id)"
-                " VALUES ('Diplomacy', 'diplomacy', true, :p) RETURNING id"
-            ),
-            {"p": publisher},
-        ).scalar_one()
+        publisher = insert_publisher(sa_sync_conn, "Dykinson")
+        monograph = insert_monograph(
+            sa_sync_conn, "Diplomacy", proceedings=True, publisher_id=publisher
+        )
         pub = insert_publication(sa_sync_conn, doc_type="conference_paper")
         sa_sync_conn.execute(
             text("UPDATE publications SET monograph_id = :m WHERE id = :id"),

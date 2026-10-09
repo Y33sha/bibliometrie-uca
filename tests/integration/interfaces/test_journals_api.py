@@ -22,6 +22,7 @@ from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_in_perimeter_authorships,
     seed_journal,
+    seed_journal_issn,
     seed_publication,
     seed_publisher,
     seed_source_publication,
@@ -78,15 +79,10 @@ class TestListJournals:
 
     def test_search_finds_every_issn_of_a_journal(self, client):
         journal_id = seed_journal()
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO journal_issns (issn, journal_id, support, linking, status) VALUES "
-                "('9990-0018', %(j)s, 'print', false, 'active'), "
-                "('9990-0026', %(j)s, 'electronic', false, 'active'), "
-                "('9990-0034', %(j)s, NULL, true, 'active'), "
-                "('9990-0042', %(j)s, NULL, false, 'related_title')",
-                {"j": journal_id},
-            )
+        seed_journal_issn(journal_id, issn="9990-0018", support="print")
+        seed_journal_issn(journal_id, issn="9990-0026", support="electronic")
+        seed_journal_issn(journal_id, issn="9990-0034", linking=True)
+        seed_journal_issn(journal_id, issn="9990-0042", status="related_title")
         for term in ("9990-0018", "9990-0026", "9990-0034", "9990-0042"):
             r = client.get("/api/journals", params={"search": term, "per_page": 200})
             assert r.status_code == 200
@@ -95,11 +91,7 @@ class TestListJournals:
 
     def test_search_tolerates_a_missing_hyphen_and_the_case(self, client):
         journal_id = seed_journal()
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO journal_issns (issn, journal_id, support) VALUES ('9990-005X', %s, 'print')",
-                (journal_id,),
-            )
+        seed_journal_issn(journal_id, issn="9990-005X", support="print")
         for term in ("9990005X", "9990-005x", "9990-005X"):
             r = client.get("/api/journals", params={"search": term, "per_page": 200})
             assert r.status_code == 200
@@ -207,13 +199,9 @@ class TestListJournals:
 
 
 def _set_issns(journal_id: int, issn: str | None, eissn: str | None = None) -> None:
-    with owner_pool() as cur:
-        for value, support in ((issn, "print"), (eissn, "electronic")):
-            if value:
-                cur.execute(
-                    "INSERT INTO journal_issns (issn, journal_id, support) VALUES (%s, %s, %s)",
-                    (value, journal_id, support),
-                )
+    for value, support in ((issn, "print"), (eissn, "electronic")):
+        if value:
+            seed_journal_issn(journal_id, issn=value, support=support)
 
 
 class TestJournalsWithSameTitle:
@@ -263,9 +251,7 @@ class TestJournalsSharingIssn:
 
 def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
     """Revue typée `journal` portant un enregistrement par couple `(source, type brut)`."""
-    jid = seed_journal()
-    with owner_pool() as cur:
-        cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
+    jid = seed_journal(journal_type="journal")
     for source, raw_type in raw_types:
         _seed_record(source, journal_id=jid, doc_type=raw_type)
     return jid

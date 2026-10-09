@@ -6,6 +6,7 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_publications import get_publication_sources
+from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
@@ -14,17 +15,7 @@ _notice = partial(insert_source_publication, title="Titre")
 
 
 def _create_journal(conn, title, publisher_name):
-    publisher_id = conn.execute(
-        text("INSERT INTO publishers (name, name_normalized) VALUES (:n, lower(:n)) RETURNING id"),
-        {"n": publisher_name},
-    ).scalar_one()
-    return conn.execute(
-        text("""
-            INSERT INTO journals (title, title_normalized, publisher_id)
-            VALUES (:t, lower(:t), :pub) RETURNING id
-        """),
-        {"t": title, "pub": publisher_id},
-    ).scalar_one()
+    return insert_journal(conn, title, publisher_id=insert_publisher(conn, publisher_name))
 
 
 def _records(conn, pub_id):

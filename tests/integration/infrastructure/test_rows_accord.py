@@ -19,6 +19,7 @@ from infrastructure.repositories.perimeter_repository import PgPerimeterReposito
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
+from tests.integration.helpers.journals import insert_journal, insert_publisher
 
 
 class TestRelevesRendantUneListe:
@@ -64,21 +65,11 @@ class TestRelevesRendantUneLigne:
     """Relevés dont l'accord demande qu'une ligne existe."""
 
     def test_une_revue_s_accorde(self, sa_sync_conn_owner):
-        journal_id = sa_sync_conn_owner.execute(
-            text("""
-                INSERT INTO journals (title, title_normalized)
-                VALUES ('Revue', 'revue') RETURNING id
-            """)
-        ).scalar_one()
+        journal_id = insert_journal(sa_sync_conn_owner, "Revue")
         assert PgJournalRepository(sa_sync_conn_owner).find_by_id(journal_id) is not None
 
     def test_un_editeur_s_accorde(self, sa_sync_conn_owner):
-        publisher_id = sa_sync_conn_owner.execute(
-            text("""
-                INSERT INTO publishers (name, name_normalized)
-                VALUES ('Éditeur', 'editeur') RETURNING id
-            """)
-        ).scalar_one()
+        publisher_id = insert_publisher(sa_sync_conn_owner, "Éditeur", name_normalized="editeur")
         assert PgPublisherRepository(sa_sync_conn_owner).find_by_id(publisher_id) is not None
 
     def test_un_perimetre_s_accorde(self, sa_sync_conn_owner):

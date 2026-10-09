@@ -58,21 +58,55 @@ def seed_perimeter(
     )
 
 
-def seed_publisher(name: str | None = None) -> int:
+def seed_publisher(name: str | None = None, *, name_normalized: str | None = None) -> int:
+    """Éditeur de nom unique par défaut, normalisé par `normalize_name_form` sauf `name_normalized`."""
     name = name or uniq("Publisher")
     return _insert(
         "INSERT INTO publishers (name, name_normalized) "
-        "VALUES (%s, normalize_name_form(%s)) RETURNING id",
-        (name, name),
+        "VALUES (%s, COALESCE(%s, normalize_name_form(%s))) RETURNING id",
+        (name, name_normalized, name),
     )
 
 
-def seed_journal(title: str | None = None, publisher_id: int | None = None) -> int:
+def seed_journal(
+    title: str | None = None,
+    *,
+    title_normalized: str | None = None,
+    publisher_id: int | None = None,
+    journal_type: str = "unknown",
+) -> int:
+    """Revue de titre unique par défaut, normalisé par `normalize_name_form` sauf `title_normalized`. Le type par défaut est celui du schéma."""
     title = title or uniq("Journal")
     return _insert(
-        "INSERT INTO journals (title, title_normalized, publisher_id) "
-        "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
-        (title, title, publisher_id),
+        "INSERT INTO journals (title, title_normalized, publisher_id, journal_type) "
+        "VALUES (%s, COALESCE(%s, normalize_name_form(%s)), %s, CAST(%s AS journal_type)) "
+        "RETURNING id",
+        (title, title_normalized, title, publisher_id, journal_type),
+    )
+
+
+def seed_journal_issn(
+    journal_id: int,
+    *,
+    issn: str,
+    support: str | None = None,
+    linking: bool = False,
+    status: str = "active",
+) -> int:
+    """ISSN de la revue `journal_id`. Les valeurs par défaut sont celles du schéma."""
+    return _insert(
+        "INSERT INTO journal_issns (issn, journal_id, support, linking, status) "
+        "VALUES (%s, %s, CAST(%s AS issn_support), %s, CAST(%s AS issn_status)) RETURNING id",
+        (issn, journal_id, support, linking, status),
+    )
+
+
+def seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = None) -> int:
+    """Monographie de titre normalisé par `normalize_name_form`."""
+    return _insert(
+        "INSERT INTO monographs (title, title_normalized, proceedings, isbn)"
+        " VALUES (%s, normalize_name_form(%s), %s, %s) RETURNING id",
+        (title, title, proceedings, isbn),
     )
 
 

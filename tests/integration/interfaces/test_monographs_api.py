@@ -3,20 +3,16 @@
 from functools import partial
 
 from tests.integration.helpers.db import owner_pool
-from tests.integration.helpers.seeds import seed_publication, uniq
+from tests.integration.helpers.seeds import (
+    seed_journal,
+    seed_monograph,
+    seed_publication,
+    seed_publisher,
+    uniq,
+)
 
 # Publication sans titre normalisé.
 _publication = partial(seed_publication, normalize_title=False)
-
-
-def _seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = None) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO monographs (title, title_normalized, proceedings, isbn)"
-            " VALUES (%s, normalize_name_form(%s), %s, %s) RETURNING id",
-            (title, title, proceedings, isbn),
-        )
-        return cur.fetchone()["id"]
 
 
 def _seed_publications(monograph_id: int, n: int) -> None:
@@ -33,37 +29,28 @@ def _ids(client, **params) -> list[int]:
 class TestListMonographs:
     def test_search_by_title(self, client):
         title = uniq("Actes du colloque")
-        mid = _seed_monograph(title)
+        mid = seed_monograph(title)
         assert _ids(client, search=title) == [mid]
 
     def test_search_by_isbn_prefix(self, client):
-        mid = _seed_monograph(uniq("Livre"), isbn="9782999000017")
+        mid = seed_monograph(uniq("Livre"), isbn="9782999000017")
         assert mid in _ids(client, search="978-2-999-000")
 
     def test_kind_filters_books_and_proceedings(self, client):
         title = uniq("Volume")
-        book = _seed_monograph(title)
-        volume = _seed_monograph(title, proceedings=True)
+        book = seed_monograph(title)
+        volume = seed_monograph(title, proceedings=True)
         assert _ids(client, search=title, type="book") == [book]
         assert _ids(client, search=title, type="proceedings") == [volume]
         assert sorted(_ids(client, search=title, type="book,proceedings")) == sorted([book, volume])
 
     def test_publisher_and_journal_filters(self, client):
         title = uniq("Rattachement")
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
-                (title, title.lower()),
-            )
-            publisher = cur.fetchone()["id"]
-            cur.execute(
-                "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
-                (title, title.lower()),
-            )
-            journal = cur.fetchone()["id"]
-        in_publisher = _seed_monograph(title)
-        in_journal = _seed_monograph(title)
-        _seed_monograph(title)
+        publisher = seed_publisher(title, name_normalized=title.lower())
+        journal = seed_journal(title, title_normalized=title.lower())
+        in_publisher = seed_monograph(title)
+        in_journal = seed_monograph(title)
+        seed_monograph(title)
         with owner_pool() as cur:
             cur.execute(
                 "UPDATE monographs SET publisher_id = %s WHERE id = %s", (publisher, in_publisher)
@@ -79,8 +66,8 @@ class TestListMonographs:
 
     def test_sorted_by_publications_and_counted(self, client):
         title = uniq("Recueil")
-        few = _seed_monograph(title)
-        many = _seed_monograph(title)
+        few = seed_monograph(title)
+        many = seed_monograph(title)
         _seed_publications(few, 1)
         _seed_publications(many, 3)
         r = client.get("/api/monographs", params={"search": title, "sort": "pubs_desc"})
@@ -90,9 +77,9 @@ class TestListMonographs:
 class TestMonographsFacets:
     def test_kind_counts_ignore_kind_filter(self, client):
         title = uniq("Facette")
-        _seed_monograph(title)
-        _seed_monograph(title)
-        _seed_monograph(title, proceedings=True)
+        seed_monograph(title)
+        seed_monograph(title)
+        seed_monograph(title, proceedings=True)
         r = client.get("/api/monographs/facets", params={"search": title, "type": "book"})
         assert r.status_code == 200
         counts = {o["value"]: o["count"] for o in r.json()["kinds"]}
@@ -100,8 +87,8 @@ class TestMonographsFacets:
 
     def test_annees_filtrees_et_comptees(self, client):
         title = uniq("Annee")
-        m2019 = _seed_monograph(title)
-        m2020 = _seed_monograph(title)
+        m2019 = seed_monograph(title)
+        m2020 = seed_monograph(title)
         with owner_pool() as cur:
             cur.execute("UPDATE monographs SET year = 2019 WHERE id = %s", (m2019,))
             cur.execute("UPDATE monographs SET year = 2020 WHERE id = %s", (m2020,))
@@ -114,18 +101,9 @@ class TestMonographsFacets:
 
     def test_facette_des_editeurs_et_des_collections(self, client):
         title = uniq("Entite")
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
-                (title, title.lower()),
-            )
-            publisher = cur.fetchone()["id"]
-            cur.execute(
-                "INSERT INTO journals (title, title_normalized) VALUES (%s, %s) RETURNING id",
-                (title, title.lower()),
-            )
-            journal = cur.fetchone()["id"]
-        mid = _seed_monograph(title)
+        publisher = seed_publisher(title, name_normalized=title.lower())
+        journal = seed_journal(title, title_normalized=title.lower())
+        mid = seed_monograph(title)
         with owner_pool() as cur:
             cur.execute(
                 "UPDATE monographs SET publisher_id = %s, journal_id = %s WHERE id = %s",
@@ -142,8 +120,8 @@ class TestMonographsFacets:
 
 class TestMonographPublications:
     def test_publications_filtered_by_monograph(self, client):
-        mid = _seed_monograph(uniq("Ouvrage"))
-        other = _seed_monograph(uniq("Autre"))
+        mid = seed_monograph(uniq("Ouvrage"))
+        other = seed_monograph(uniq("Autre"))
         chapter = _publication("Chapitre", monograph_id=mid, in_perimeter=True)
         _publication("Ailleurs", monograph_id=other, in_perimeter=True)
         r = client.get("/api/publications", params={"monograph_id": mid})
@@ -155,6 +133,6 @@ class TestMonographPublications:
 
 class TestGetMonograph:
     def test_detail_and_404(self, client):
-        mid = _seed_monograph(uniq("Fiche"))
+        mid = seed_monograph(uniq("Fiche"))
         assert client.get(f"/api/monographs/{mid}").json()["id"] == mid
         assert client.get("/api/monographs/999999999").status_code == 404
