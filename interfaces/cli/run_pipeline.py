@@ -175,20 +175,16 @@ def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
 
     Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
     """
-    from application.pipeline.fetch_missing.phase import run
+    from application.pipeline.fetch_missing.phase import FetchMissingPhase
     from infrastructure.parallel import run_parallel
 
-    return run(
-        mode=options.mode,
-        sources=set(options.sources) if options.sources else None,
-        include_wos=options.include_wos,
+    return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
         fetch_doi_one=_run_fetch_missing_doi,
         run_parallel=run_parallel,
         credentials_missing=_credentials_missing,
-        logger=log,
-    )
+    ).run(_context(options))
 
 
 def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
