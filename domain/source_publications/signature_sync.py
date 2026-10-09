@@ -4,7 +4,7 @@ La renormalisation d'une notice rapproche ses signatures entrantes de ses signat
 """
 
 from collections import defaultdict
-from collections.abc import Hashable, Sequence
+from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -84,9 +84,10 @@ def signature_content(
     roles: Sequence[str] | None,
     neutralized_identifiers: JsonValue,
     addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None]],
+    ror_ids: Iterable[str] = (),
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source."""
-    return {
+    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués par la source, présents dans le contenu seulement s'il y en a."""
+    content: dict[str, JsonValue] = {
         "position": position,
         "name": list(name),
         "is_corresponding": is_corresponding,
@@ -97,3 +98,6 @@ def signature_content(
             for text, countries, suggested in addresses
         ],
     }
+    if rors := sorted(ror_ids):
+        content["ror_ids"] = list(rors)
+    return content

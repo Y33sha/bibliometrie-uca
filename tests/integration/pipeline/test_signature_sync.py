@@ -10,6 +10,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from domain.persons.signature_name import SignatureName
+from domain.structures.identifiers import RorId
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 
@@ -180,6 +181,34 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
 
     assert _signatures(conn, sp)[0][0] == sa_id
     assert _addresses(conn, sa_id) == ["Labo B"]
+
+
+def _rors(conn, sa_id: int) -> list[str]:
+    return (
+        conn.execute(
+            text(
+                "SELECT ror_id FROM source_authorship_rors WHERE source_authorship_id = :i "
+                "ORDER BY ror_id"
+            ),
+            {"i": sa_id},
+        )
+        .scalars()
+        .all()
+    )
+
+
+def test_ror_ecrits_a_l_insertion_et_reecrits_si_modifies(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _source_publication(conn)
+    univ, labo = RorId("01a8ajp46"), RorId("03vgfxd91")
+    _write(conn, sp, [_rec(0, "Dupont, Jean", ror_ids=frozenset({univ, labo}))])
+    sa_id = _signatures(conn, sp)[0][0]
+    assert _rors(conn, sa_id) == ["01a8ajp46", "03vgfxd91"]
+
+    _write(conn, sp, [_rec(0, "Dupont, Jean", ror_ids=frozenset({labo}))])
+
+    assert _signatures(conn, sp)[0][0] == sa_id
+    assert _rors(conn, sa_id) == ["03vgfxd91"]
 
 
 def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):

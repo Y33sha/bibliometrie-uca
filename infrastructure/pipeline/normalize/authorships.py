@@ -15,6 +15,7 @@ from application.ports.pipeline.normalize.authorships import (
     AddressBatchItem,
     AddressCountryItem,
     AuthorshipAddressItem,
+    AuthorshipRorItem,
     AuthorshipsBatchQueries,
     SourceAuthorshipItem,
     SourceAuthorshipUpdate,
@@ -252,6 +253,13 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 {"ids": ids},
             )
 
+    def delete_source_authorship_rors(self, conn: Connection, ids: list[int]) -> None:
+        if ids:
+            conn.execute(
+                text("DELETE FROM source_authorship_rors WHERE source_authorship_id = ANY(:ids)"),
+                {"ids": ids},
+            )
+
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
         # Même mécanisme que le batch (upsert de l'identité, puis résolution de `identity_id` par `key_hash`) pour une seule ligne, dont l'id est rendu par `RETURNING`. Pas d'`ON CONFLICT` : le `clear` en amont vide le document.
         conn.execute(_UPSERT_IDENTITY_SQL, dict(item))
@@ -324,7 +332,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     def insert_source_authorship_addresses_batch(
         self, conn: Connection, values: list[AuthorshipAddressItem]
     ) -> None:
-        # Pas d'ON CONFLICT : les authorships viennent d'être (re)créées (le clear a cascadé sur le pivot), leurs `sa_id` sont neufs et le writer déduplique les couples (sa_id, addr_id) — aucune collision.
+        # Pas d'ON CONFLICT : le writer supprime les liens d'une signature réécrite avant de les réinsérer, et déduplique les couples (sa_id, addr_id).
         if not values:
             return
         stmt = text("""
@@ -337,5 +345,23 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             {
                 "sa_ids": [v["sa_id"] for v in values],
                 "addr_ids": [v["addr_id"] for v in values],
+            },
+        )
+
+    def insert_source_authorship_rors_batch(
+        self, conn: Connection, values: list[AuthorshipRorItem]
+    ) -> None:
+        # Pas d'ON CONFLICT : le writer supprime les ROR d'une signature réécrite avant de les réinsérer, et les ROR d'une signature forment un ensemble.
+        if not values:
+            return
+        conn.execute(
+            text("""
+                INSERT INTO source_authorship_rors (source_authorship_id, ror_id)
+                SELECT sa_id, ror_id
+                FROM unnest(:sa_ids ::integer[], :ror_ids ::text[]) AS t(sa_id, ror_id)
+            """),
+            {
+                "sa_ids": [v["sa_id"] for v in values],
+                "ror_ids": [v["ror_id"] for v in values],
             },
         )

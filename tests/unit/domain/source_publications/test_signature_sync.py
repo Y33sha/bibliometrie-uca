@@ -88,7 +88,16 @@ class TestSignatureContent:
             {"neutralized_identifiers": {"orcid": "shared"}},
             {"addresses": [("Université Clermont Auvergne", ["FR"], ["FR"])]},
             {"addresses": []},
+            {"ror_ids": ["01a8ajp46"]},
         ]
         base = signature_content(**self._BASE)
         for variante in variantes:
             assert signature_content(**{**self._BASE, **variante}) != base, variante
+
+    def test_sans_ror_le_contenu_omet_la_cle(self):
+        assert "ror_ids" not in signature_content(**self._BASE)
+
+    def test_ror_independants_de_l_ordre(self):
+        assert signature_content(**self._BASE, ror_ids=["b", "a"]) == signature_content(
+            **self._BASE, ror_ids=["a", "b"]
+        )
