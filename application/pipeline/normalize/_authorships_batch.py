@@ -17,6 +17,7 @@ from application.ports.pipeline.fingerprint import Fingerprinter
 from application.ports.pipeline.normalize.authorships import (
     AddressCountryItem,
     AuthorshipAddressItem,
+    AuthorshipRorItem,
     AuthorshipsBatchQueries,
     SignatureNameFields,
     SourceAuthorshipItem,
@@ -30,6 +31,7 @@ from domain.source_publications.signature_sync import (
     plan_signature_sync,
     signature_content,
 )
+from domain.structures.identifiers import RorId
 from domain.types import JsonValue
 
 
@@ -50,7 +52,7 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement).
+    `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature.
     """
 
     position: int
@@ -59,6 +61,7 @@ class AuthorRecord:
     roles: list[str] | None = None
     person_identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
+    ror_ids: frozenset[RorId] = frozenset()
 
 
 AuthorBlock = Mapping[str, JsonValue]
@@ -108,7 +111,7 @@ def write_source_authorships(
 ) -> None:
     """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Elle est réécrite, adresses comprises, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
+    Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
 
     Les `author_position` de `records` sont uniques : elles identifient les signatures entrantes. Chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
@@ -137,6 +140,7 @@ def write_source_authorships(
                         (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
                         for a in rec.addresses
                     ],
+                    ror_ids=[r.value for r in rec.ror_ids],
                 )
             ),
         }
@@ -171,6 +175,7 @@ def write_source_authorships(
         conn, [{**item_by_position[position], "id": sa_id} for sa_id, position in plan.updates]
     )
     queries.delete_source_authorship_addresses(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.delete_source_authorship_rors(conn, [sa_id for sa_id, _ in plan.updates])
     queries.upsert_source_authorships_batch(
         conn, [item_by_position[position] for position in plan.inserts]
     )
@@ -189,6 +194,14 @@ def write_source_authorships(
         [
             (sa_id_by_position.get(position), record_by_position[position].addresses)
             for position in sorted(sa_id_by_position)
+        ],
+    )
+    queries.insert_source_authorship_rors_batch(
+        conn,
+        [
+            AuthorshipRorItem(sa_id=sa_id, ror_id=ror_id.value)
+            for position, sa_id in sorted(sa_id_by_position.items())
+            for ror_id in sorted(record_by_position[position].ror_ids, key=str)
         ],
     )
 

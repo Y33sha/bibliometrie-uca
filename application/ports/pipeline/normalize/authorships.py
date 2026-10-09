@@ -86,6 +86,13 @@ class AuthorshipAddressItem(TypedDict):
     addr_id: int
 
 
+class AuthorshipRorItem(TypedDict):
+    """Ligne du batch insert `source_authorship_rors` : ROR attribué par la source à une signature."""
+
+    sa_id: int
+    ror_id: str
+
+
 class AuthorshipsBatchQueries(Protocol):
     """Opérations SQL batch partagées pour l'écriture des authorships."""
 
@@ -131,6 +138,10 @@ class AuthorshipsBatchQueries(Protocol):
         """Supprime les liens d'adresse de signatures réécrites, avant leur réécriture."""
         ...
 
+    def delete_source_authorship_rors(self, conn: Connection, ids: list[int]) -> None:
+        """Supprime les ROR de signatures réécrites, avant leur réécriture."""
+        ...
+
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
         """Écrit une signature seule et retourne son id.
 
@@ -170,4 +181,10 @@ class AuthorshipsBatchQueries(Protocol):
         self, conn: Connection, values: list[AuthorshipAddressItem]
     ) -> None:
         """Batch INSERT des liens `source_authorship_addresses` (pivot authorship↔adresse)."""
+        ...
+
+    def insert_source_authorship_rors_batch(
+        self, conn: Connection, values: list[AuthorshipRorItem]
+    ) -> None:
+        """Batch INSERT des ROR des signatures."""
         ...
