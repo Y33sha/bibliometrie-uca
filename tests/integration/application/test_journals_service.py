@@ -41,6 +41,7 @@ from infrastructure.repositories import (
     publisher_repository,
 )
 from tests.integration.helpers.journals import (
+    insert_doi_prefix,
     insert_journal_with_issns,
     insert_monograph,
     insert_publisher,
@@ -609,12 +610,8 @@ class TestMergePublishers:
         """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, publisher_checked_at)"
-                " VALUES ('10.99999', 'Crossref', :s, now())"
-            ),
-            {"s": source},
+        insert_doi_prefix(
+            sa_sync_conn, "10.99999", ra="Crossref", publisher_id=source, publisher_checked=True
         )
 
         merge_publishers(

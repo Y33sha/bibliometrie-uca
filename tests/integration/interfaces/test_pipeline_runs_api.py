@@ -8,11 +8,10 @@ Couvre :
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.seeds import seed_phase_execution
 
 
 def _metrics(duration_s: float) -> dict:
@@ -42,26 +41,16 @@ def _seed_phase(
     details: dict | None = None,
     signals: list | None = None,
 ) -> None:
-    with owner_pool() as cur:
-        cur.execute(
-            """
-            INSERT INTO pipeline_phase_executions
-                (run_id, phase, started_at, ended_at, mode, sources, status,
-                 signals, metrics, details)
-            VALUES
-                (%s, %s, now(), now(), %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
-            """,
-            (
-                run_id,
-                phase,
-                "full",
-                ["hal", "openalex"],
-                status,
-                json.dumps(signals or []),
-                json.dumps(_metrics(duration_s)),
-                json.dumps(details or {}),
-            ),
-        )
+    seed_phase_execution(
+        run_id,
+        phase=phase,
+        mode="full",
+        status=status,
+        sources=["hal", "openalex"],
+        signals=signals or [],
+        metrics=_metrics(duration_s),
+        details=details or {},
+    )
 
 
 @pytest.fixture(scope="module")

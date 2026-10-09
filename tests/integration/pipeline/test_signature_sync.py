@@ -15,6 +15,7 @@ from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_publication
 
@@ -65,10 +66,7 @@ def _pin(conn, sa_id: int) -> int:
         text("UPDATE source_authorships SET person_id = :p WHERE id = :i"),
         {"p": person, "i": sa_id},
     )
-    conn.execute(
-        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:i, :p)"),
-        {"i": sa_id, "p": person},
-    )
+    insert_confirmed_authorship(conn, sa_id, person_id=person)
     return person
 
 

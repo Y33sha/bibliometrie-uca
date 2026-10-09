@@ -46,3 +46,50 @@ def insert_publication(
         },
         {"doc_type": "doc_type", "oa_status": "oa_type", "sources": "source_type[]"},
     )
+
+
+def insert_publication_relation(
+    conn: Connection,
+    from_publication_id: int,
+    *,
+    relation_type: str,
+    source: str,
+    target_doi: str | None = None,
+    target_publication_id: int | None = None,
+) -> int:
+    """Insère une relation de la publication `from_publication_id` vers un DOI ou une publication, et renvoie son `id`."""
+    return insert_row(
+        conn,
+        "publication_relations",
+        {
+            "from_publication_id": from_publication_id,
+            "relation_type": relation_type,
+            "target_doi": target_doi,
+            "target_publication_id": target_publication_id,
+            "source": source,
+        },
+        {"relation_type": "relation_type"},
+    )
+
+
+def insert_apc_payment(
+    conn: Connection,
+    *,
+    publication_id: int | None = None,
+    journal_id: int | None = None,
+    amount_eur_ht: float | None = None,
+    budget_structure_id: int | None = None,
+    open_access_fee: bool | None = None,
+) -> int:
+    """Insère un paiement d'APC et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
+    return insert_row(
+        conn,
+        "apc_payments",
+        {
+            "publication_id": publication_id,
+            "journal_id": journal_id,
+            "amount_eur_ht": amount_eur_ht,
+            "budget_structure_id": budget_structure_id,
+            "open_access_fee": open_access_fee,
+        },
+    )

@@ -82,3 +82,15 @@ def insert_authorship(
             "roles": roles,
         },
     )
+
+
+def insert_confirmed_authorship(
+    conn: Connection, source_authorship_id: int, *, person_id: int
+) -> None:
+    """Épingle la signature `source_authorship_id` à la personne `person_id`."""
+    insert_row(
+        conn,
+        "confirmed_authorships",
+        {"source_authorship_id": source_authorship_id, "person_id": person_id},
+        returning=False,
+    )

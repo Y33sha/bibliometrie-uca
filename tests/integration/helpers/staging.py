@@ -1,4 +1,4 @@
-"""Semis de la table `staging`, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
+"""Semis des tables d'extraction, sur la connexion SQLAlchemy (`sa_sync_conn`) : lignes de staging et recherches infructueuses (`failed_lookups`)."""
 
 import json
 
@@ -62,3 +62,30 @@ def insert_staging(
         ),
         {column: value for column, value in values.items() if value is not None},
     ).scalar_one()
+
+
+def insert_failed_lookup(
+    conn: Connection,
+    source: str = "hal",
+    *,
+    id_type: str,
+    id_value: str,
+    not_found_days_ago: int = 0,
+    retry_in_days: int | None = None,
+) -> None:
+    """Inscrit une recherche infructueuse de `id_value`, datée de `not_found_days_ago` jours avant l'instant de la transaction. `retry_in_days` place la nouvelle tentative autant de jours après cet instant (négatif pour une date passée) ; sans lui, l'absence est définitive."""
+    next_retry = "now() + make_interval(days => :retry)" if retry_in_days is not None else "NULL"
+    conn.execute(
+        text(
+            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
+            "VALUES (CAST(:source AS source_type), :id_type, :id_value, "
+            f"now() - make_interval(days => :ago), {next_retry})"
+        ),
+        {
+            "source": source,
+            "id_type": id_type,
+            "id_value": id_value,
+            "ago": not_found_days_ago,
+            "retry": retry_in_days,
+        },
+    )

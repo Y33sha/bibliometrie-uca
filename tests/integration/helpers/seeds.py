@@ -384,3 +384,78 @@ def seed_source_authorship(
             ),
         )
         return cur.fetchone()["id"]
+
+
+def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
+    """Sujet de libellé unique par défaut. Le compte d'usage par défaut est celui du schéma."""
+    return _insert(
+        "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
+        (label or uniq("Subject"), usage_count),
+    )
+
+
+def seed_publication_subject(publication_id: int, *, subject_id: int, source: str = "hal") -> None:
+    """Lien de la publication `publication_id` au sujet `subject_id`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+            "VALUES (%s, %s, CAST(%s AS source_type))",
+            (publication_id, subject_id, source),
+        )
+
+
+def seed_doi_prefix(
+    prefix: str,
+    *,
+    ra: str,
+    publisher_id: int | None = None,
+    crossref_member_id: int | None = None,
+) -> None:
+    """Préfixe DOI `prefix` de l'agence `ra`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
+            "VALUES (%s, %s, %s, %s)",
+            (prefix, ra, publisher_id, crossref_member_id),
+        )
+
+
+def seed_journal_doi_namespace(namespace: str, *, journal_id: int, dois: int, share: float) -> None:
+    """Espace de noms DOI `namespace` appris pour la revue `journal_id`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share) "
+            "VALUES (%s, %s, %s, %s)",
+            (namespace, journal_id, dois, share),
+        )
+
+
+def seed_phase_execution(
+    run_id: int,
+    *,
+    phase: str,
+    mode: str,
+    status: str,
+    sources: list[str],
+    signals: list[object],
+    metrics: dict[str, object],
+    details: dict[str, object],
+) -> None:
+    """Exécution de la phase `phase` du run `run_id`, commencée et finie à l'instant présent."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO pipeline_phase_executions "
+            "(run_id, phase, started_at, ended_at, mode, sources, status, signals, metrics, details) "
+            "VALUES (%s, %s, now(), now(), %s, %s, %s, "
+            "CAST(%s AS jsonb), CAST(%s AS jsonb), CAST(%s AS jsonb))",
+            (
+                run_id,
+                phase,
+                mode,
+                sources,
+                status,
+                json.dumps(signals),
+                json.dumps(metrics),
+                json.dumps(details),
+            ),
+        )

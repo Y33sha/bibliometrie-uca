@@ -19,6 +19,7 @@ from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.subjects import insert_subject
 
 
 class TestExtractors:
@@ -241,9 +242,7 @@ class TestRunOrchestrator:
 
     def test_purges_orphan_subjects(self, sa_sync_conn, queries):
         # Un sujet sans aucun lien est purgé en fin de phase.
-        orphan = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label) VALUES ('orphelin sans lien') RETURNING id")
-        ).scalar_one()
+        orphan = insert_subject(sa_sync_conn, "orphelin sans lien")
         run(sa_sync_conn, queries, logging.getLogger("test"))
         still = sa_sync_conn.execute(
             text("SELECT 1 FROM subjects WHERE id = :id"), {"id": orphan}

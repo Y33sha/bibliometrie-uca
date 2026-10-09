@@ -11,9 +11,10 @@ from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.journals import insert_doi_prefix
+from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 # Publication de 2020 sans titre normalisé ni type.
 _publication = partial(insert_publication, normalize_title=False, pub_year=2020, doc_type=None)
@@ -183,12 +184,8 @@ class TestGetMissingDois:
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
         """target='crossref' : DOIs DataCite/mEDRA filtrés via doi_prefixes."""
-        sa_sync_conn.execute(
-            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
-        )
-        sa_sync_conn.execute(
-            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.1038', 'Crossref')")
-        )
+        insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
+        insert_doi_prefix(sa_sync_conn, "10.1038", ra="Crossref")
         # Trois DOIs non-crossref in-périmètre : DataCite, Crossref, préfixe inconnu.
         _add_inperim_sp(sa_sync_conn, "hal", "h1", doi="10.5281/zenodo.1")
         _add_inperim_sp(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
@@ -229,12 +226,12 @@ class TestGetMissingDois:
     def test_includes_relation_targets(self, sa_sync_conn):
         """Les cibles des relations depuis une publication in-périmètre (`publication_relations.target_doi`) entrent dans le pool."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=True)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_relations "
-                "(from_publication_id, relation_type, target_doi, source) "
-                "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
-            )
+        insert_publication_relation(
+            sa_sync_conn,
+            1,
+            relation_type="is_preprint_of",
+            source="crossref",
+            target_doi="10.9999/related",
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.9999/related" in result
@@ -242,20 +239,18 @@ class TestGetMissingDois:
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
         """Une relation depuis une publication hors-périmètre n'entre pas dans le pool."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=False)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_relations "
-                "(from_publication_id, relation_type, target_doi, source) "
-                "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
-            )
+        insert_publication_relation(
+            sa_sync_conn,
+            1,
+            relation_type="is_preprint_of",
+            source="crossref",
+            target_doi="10.9999/related",
         )
         assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
-        sa_sync_conn.execute(
-            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
-        )
+        insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
         result = get_missing_dois(sa_sync_conn, "hal")
@@ -266,24 +261,19 @@ class TestGetMissingDois:
         """Un DOI dont la recherche a échoué et attend sa reprise (next_retry futur) sort du pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-                "VALUES ('hal', 'doi', '10.1234/a', now(), now() + interval '30 days')"
-            )
-        )
+        insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a", retry_in_days=30)
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
         """Délai échu (next_retry passé) → le DOI repasse dans le pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-                "VALUES ('hal', 'doi', '10.1234/a', now() - interval '60 days', "
-                "now() - interval '1 day')"
-            )
+        insert_failed_lookup(
+            sa_sync_conn,
+            id_type="doi",
+            id_value="10.1234/a",
+            not_found_days_ago=60,
+            retry_in_days=-1,
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/a"]
@@ -291,12 +281,7 @@ class TestGetMissingDois:
     def test_backoff_is_per_target_source(self, sa_sync_conn):
         """L'échec d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
         _add_inperim_sp(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-                "VALUES ('hal', 'doi', '10.1234/a', now(), now() + interval '30 days')"
-            )
-        )
+        insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a", retry_in_days=30)
         assert get_missing_dois(sa_sync_conn, "hal") == []
         assert get_missing_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
 
@@ -304,12 +289,7 @@ class TestGetMissingDois:
         """Un DOI à l'échec définitif (`next_retry NULL`) sort du pool pour toujours."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-                "VALUES ('hal', 'doi', '10.1234/a', now(), NULL)"
-            )
-        )
+        insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a")
         result = get_missing_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
@@ -391,12 +371,12 @@ class TestGetPrefixesToResolve:
 
         # Préfixe vu UNIQUEMENT via publication_relations.target_doi (parent in-périmètre).
         _publication(sa_sync_conn, "P", row_id=1, in_perimeter=True)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_relations "
-                "(from_publication_id, relation_type, target_doi, source) "
-                "VALUES (1, 'is_preprint_of', '10.77777/rel', 'crossref')"
-            )
+        insert_publication_relation(
+            sa_sync_conn,
+            1,
+            relation_type="is_preprint_of",
+            source="crossref",
+            target_doi="10.77777/rel",
         )
         # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), SP in-périmètre.
         _notice(

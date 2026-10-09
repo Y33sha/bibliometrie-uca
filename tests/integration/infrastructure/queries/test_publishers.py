@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import text
-
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from tests.integration.helpers.journals import (
+    insert_doi_prefix,
     insert_journal,
     insert_journal_name_form,
     insert_monograph,
@@ -19,12 +18,7 @@ class TestDeleteEmptyPublishers:
         with_journal = insert_publisher(sa_sync_conn, "Elsevier BV")
         insert_journal(sa_sync_conn, "Revue", publisher_id=with_journal)
         with_prefix = insert_publisher(sa_sync_conn, "Informa UK Limited")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.99998', 'Crossref', :p)"
-            ),
-            {"p": with_prefix},
-        )
+        insert_doi_prefix(sa_sync_conn, "10.99998", ra="Crossref", publisher_id=with_prefix)
         with_form = insert_publisher(
             sa_sync_conn, "Elsevier on behalf of the American College of Cardiology"
         )

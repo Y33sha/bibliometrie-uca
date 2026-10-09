@@ -11,7 +11,12 @@ from application.pipeline.metadata_correction.correct_by_cluster import compute_
 from application.pipeline.metadata_correction.correct_unary import compute_update
 from domain.dates import today
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from tests.integration.helpers.journals import insert_journal, insert_publisher
+from tests.integration.helpers.journals import (
+    insert_doi_prefix,
+    insert_journal,
+    insert_journal_doi_namespace,
+    insert_publisher,
+)
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de titre « T », OpenAlex par défaut.
@@ -28,13 +33,7 @@ _Q = PgMetadataCorrectionQueries()
 def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
     journal_id = insert_journal(conn, "J", journal_type=journal_type)
     if namespace is not None:
-        conn.execute(
-            text(
-                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share) "
-                "VALUES (:ns, :jid, 10, 1.0)"
-            ),
-            {"ns": namespace, "jid": journal_id},
-        )
+        insert_journal_doi_namespace(conn, namespace, journal_id=journal_id, dois=10, share=1.0)
     return journal_id
 
 
@@ -139,12 +138,7 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
     """Cas réel : The Conversation dépose ses articles sous `10.64628`, sans titre de revue."""
     conn = sa_sync_conn
     publisher = insert_publisher(conn, "The Conversation Media Group", publisher_type="media")
-    conn.execute(
-        text(
-            "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.64628', 'Crossref', :p)"
-        ),
-        {"p": publisher},
-    )
+    insert_doi_prefix(conn, "10.64628", ra="Crossref", publisher_id=publisher)
     sp = _notice(
         conn,
         source="crossref",

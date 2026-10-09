@@ -22,10 +22,13 @@ from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_in_perimeter_authorships,
     seed_journal,
+    seed_journal_doi_namespace,
     seed_journal_issn,
     seed_publication,
+    seed_publication_subject,
     seed_publisher,
     seed_source_publication,
+    seed_subject,
     uniq,
 )
 
@@ -263,12 +266,7 @@ class TestDoiNamespaceConflicts:
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         journal = seed_journal()
         parasite = seed_journal()
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
-                " VALUES (%s, %s, 40, 0.95)",
-                (namespace, journal),
-            )
+        seed_journal_doi_namespace(namespace, journal_id=journal, dois=40, share=0.95)
         _seed_record(journal_id=journal, doi=f"{namespace}1")
         _seed_record("openalex", journal_id=parasite, doi=f"{namespace}2")
         _seed_record("openalex", journal_id=parasite, doi=f"{namespace}3")
@@ -293,12 +291,7 @@ class TestDoiNamespaceConflicts:
         namespace = f"10.9001/{uuid.uuid4().hex[:8]}."
         journal = seed_journal()
         other = seed_journal()
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share)"
-                " VALUES (%s, %s, 40, 0.95)",
-                (namespace, journal),
-            )
+        seed_journal_doi_namespace(namespace, journal_id=journal, dois=40, share=0.95)
         for source in ("hal", "crossref", "scanr"):
             _seed_record(source, journal_id=journal, doi=f"{namespace}1")
         _seed_record("openalex", journal_id=other, doi=f"{namespace}1")
@@ -525,28 +518,20 @@ class TestJournalSubjects:
 
     def test_returns_top_subjects_excluding_generic(self, client):
         jid = seed_journal()
-        with owner_pool() as cur:
-            pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
-            # Sujet spécifique (sous le seuil 5000) attaché aux 2 publis.
-            specific_label = uniq("specific_subject")
-            cur.execute(
-                "INSERT INTO subjects (label, usage_count) VALUES (%s, 100) RETURNING id",
-                (specific_label,),
-            )
-            spec_id = cur.fetchone()["id"]
-            # Sujet trop générique (au-dessus du seuil) attaché à 1 publi —
-            # doit être exclu du top.
-            generic_label = uniq("generic_subject")
-            cur.execute(
-                "INSERT INTO subjects (label, usage_count) VALUES (%s, 9999) RETURNING id",
-                (generic_label,),
-            )
-            gen_id = cur.fetchone()["id"]
-            cur.execute(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (%s, %s, 'hal'), (%s, %s, 'hal'), (%s, %s, 'hal')",
-                (pub_ids[0], spec_id, pub_ids[1], spec_id, pub_ids[0], gen_id),
-            )
+        pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
+        # Sujet spécifique (sous le seuil 5000) attaché aux 2 publis.
+        specific_label = uniq("specific_subject")
+        spec_id = seed_subject(specific_label, usage_count=100)
+        # Sujet trop générique (au-dessus du seuil) attaché à 1 publi —
+        # doit être exclu du top.
+        generic_label = uniq("generic_subject")
+        gen_id = seed_subject(generic_label, usage_count=9999)
+        for pub_id, subject_id in (
+            (pub_ids[0], spec_id),
+            (pub_ids[1], spec_id),
+            (pub_ids[0], gen_id),
+        ):
+            seed_publication_subject(pub_id, subject_id=subject_id)
         seed_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200

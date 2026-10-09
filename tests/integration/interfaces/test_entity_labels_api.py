@@ -6,7 +6,12 @@ Seed via un pool dédié en autocommit, hors du pool partagé par l'API, avec un
 import uuid
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_journal, seed_person, seed_publisher
+from tests.integration.helpers.seeds import (
+    seed_journal,
+    seed_person,
+    seed_publisher,
+    seed_subject,
+)
 
 _cleanup_after_module = truncate_after_module("journals", "publishers")
 
@@ -45,9 +50,7 @@ class TestEntityLabels:
 
     def test_subject_reads_its_label(self, client):
         label = f"Sujet {uuid.uuid4().hex[:8]}"
-        with owner_pool() as cur:
-            cur.execute("INSERT INTO subjects (label) VALUES (%s) RETURNING id", (label,))
-            subject_id = cur.fetchone()["id"]
+        subject_id = seed_subject(label)
         try:
             r = client.get(
                 "/api/entity-labels", params={"kind": "subject", "entity_id": subject_id}

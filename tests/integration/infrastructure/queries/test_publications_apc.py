@@ -1,10 +1,8 @@
 """Lignes APC de la liste des publications : `in_perimeter` suit la règle du filtre `has_apc`."""
 
-from sqlalchemy import text
-
 from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.list import list_publications
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.structures import insert_structure
 
 
@@ -15,13 +13,12 @@ def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
         sa_sync_conn, "APC", normalize_title=False, doc_type=None, in_perimeter=True
     )
     for budget in (inside, outside, None):
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO apc_payments"
-                " (publication_id, amount_eur_ht, budget_structure_id, open_access_fee)"
-                " VALUES (:p, 100, :b, true)"
-            ),
-            {"p": pub_id, "b": budget},
+        insert_apc_payment(
+            sa_sync_conn,
+            publication_id=pub_id,
+            amount_eur_ht=100,
+            budget_structure_id=budget,
+            open_access_fee=True,
         )
 
     response = list_publications(
