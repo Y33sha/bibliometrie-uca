@@ -54,3 +54,19 @@ class RorOrganization:
             raise ValidationError(
                 f"Code pays invalide pour l'organisation ROR {self.ror_id} : {self.country_code!r}"
             )
+
+
+def ror_relations(organizations: list[RorOrganization]) -> frozenset[tuple[RorId, RorId]]:
+    """Couples `(parent, enfant)` déclarés par l'une ou l'autre des deux organisations, limités aux organisations de la liste.
+
+    Le ROR déclare chaque relation des deux côtés, à quelques exceptions près : l'union les couvre.
+    """
+    known = {org.ror_id for org in organizations}
+    pairs = {(parent, org.ror_id) for org in organizations for parent in org.parent_ids} | {
+        (org.ror_id, child) for org in organizations for child in org.child_ids
+    }
+    return frozenset(
+        (parent, child)
+        for parent, child in pairs
+        if parent != child and parent in known and child in known
+    )
