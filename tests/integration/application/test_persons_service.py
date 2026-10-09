@@ -8,6 +8,7 @@ merge_person, etc.
 """
 
 import json
+from functools import partial
 
 import pytest
 from sqlalchemy import text
@@ -48,6 +49,12 @@ from infrastructure.repositories import (
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Signature de forme « jean dupont » par défaut.
+_jean_dupont_signature = partial(insert_signature, author_name_normalized="jean dupont")
+
+# Notice de titre « Test », d'identifiant « hal-1 » par défaut.
+_notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
 _BUILD_QUERIES = PgAuthorshipsBuildQueries()
 
@@ -111,8 +118,8 @@ class TestLinkAuthorship:
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(sa_sync_conn, sp_id, author_name_normalized="jean dupont")
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
 
         link_authorship(person_id, "hal", sa_id, repo=authorship_repo, resolution_mode="name")
 
@@ -269,17 +276,9 @@ class TestIdentifierStatusPropagation:
         )
 
     def _signature(self, conn, person_id, source, source_id, identifiers, **kw):
-        sp = insert_source_publication(
-            conn, insert_publication(conn), source=source, source_id=source_id, title="Test"
-        )
-        insert_signature(
-            conn,
-            sp,
-            source=source,
-            person_id=person_id,
-            author_name_normalized="jean dupont",
-            person_identifiers=identifiers,
-            **kw,
+        sp = _notice(conn, insert_publication(conn), source=source, source_id=source_id)
+        _jean_dupont_signature(
+            conn, sp, source=source, person_id=person_id, person_identifiers=identifiers, **kw
         )
 
     def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, repo):
@@ -595,14 +594,10 @@ class TestBatchAssignOrphanAuthorships:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_hal = insert_source_publication(sa_sync_conn, pub_id, source_id="h-1", title="Test")
-        sp_oa = insert_source_publication(
-            sa_sync_conn, pub_id, source="openalex", source_id="W1", title="Test"
-        )
-        sa1 = insert_signature(sa_sync_conn, sp_hal, author_name_normalized="jean dupont")
-        sa2 = insert_signature(
-            sa_sync_conn, sp_oa, source="openalex", author_name_normalized="jean dupont"
-        )
+        sp_hal = _notice(sa_sync_conn, pub_id, source_id="h-1")
+        sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1")
+        sa1 = _jean_dupont_signature(sa_sync_conn, sp_hal)
+        sa2 = _jean_dupont_signature(sa_sync_conn, sp_oa, source="openalex")
 
         assigned = batch_assign_orphan_authorships(
             person_id,
@@ -630,10 +625,8 @@ class TestBatchAssignOrphanAuthorships:
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa1 = insert_signature(
-            sa_sync_conn, sp_id, person_id=p1, author_name_normalized="jean dupont"
-        )
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa1 = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=p1)
 
         assigned = batch_assign_orphan_authorships(
             p2,
@@ -658,7 +651,7 @@ class TestDetachAuthorships:
     def test_detaches_and_removes_authorship_if_orphan(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
+        sp_id = _notice(sa_sync_conn, pub_id)
         auth_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO authorships (publication_id, person_id) "
@@ -666,9 +659,7 @@ class TestDetachAuthorships:
             ),
             {"pub": pub_id, "pid": person_id},
         ).scalar_one()
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="jean dupont"
-        )
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         result = detach_authorships(
             person_id,
@@ -702,20 +693,10 @@ class TestDetachAuthorships:
             ),
             {"pub": pub_id, "pid": person_id},
         ).scalar_one()
-        sp_hal = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sp_oa = insert_source_publication(
-            sa_sync_conn, pub_id, source="openalex", source_id="oa-1", title="Test"
-        )
-        sa_hal = insert_signature(
-            sa_sync_conn, sp_hal, person_id=person_id, author_name_normalized="jean dupont"
-        )
-        sa_oa = insert_signature(
-            sa_sync_conn,
-            sp_oa,
-            source="openalex",
-            person_id=person_id,
-            author_name_normalized="jean dupont",
-        )
+        sp_hal = _notice(sa_sync_conn, pub_id)
+        sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
+        sa_hal = _jean_dupont_signature(sa_sync_conn, sp_hal, person_id=person_id)
+        sa_oa = _jean_dupont_signature(sa_sync_conn, sp_oa, source="openalex", person_id=person_id)
 
         # Une seule source sélectionnée (la hal).
         result = detach_authorships(
@@ -750,8 +731,8 @@ class TestDetachAuthorships:
         active après détachement, est supprimée."""
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(
             sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
         )
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
@@ -777,8 +758,8 @@ class TestDetachAuthorships:
         détruirait le blocage de non-retour qu'elle matérialise."""
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(
             sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
         )
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
@@ -833,12 +814,12 @@ class TestDetachAuthorships:
         person_id = _insert_person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
-        sp1 = insert_source_publication(sa_sync_conn, pub1, source_id="hal-1", title="Test")
-        sp2 = insert_source_publication(sa_sync_conn, pub2, source_id="hal-2", title="Test")
-        sa1 = insert_signature(
+        sp1 = _notice(sa_sync_conn, pub1)
+        sp2 = _notice(sa_sync_conn, pub2, source_id="hal-2")
+        sa1 = _jean_dupont_signature(
             sa_sync_conn, sp1, person_id=person_id, author_name_normalized="dupont jean"
         )
-        insert_signature(
+        _jean_dupont_signature(
             sa_sync_conn, sp2, person_id=person_id, author_name_normalized="dupont jean"
         )
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
@@ -1056,8 +1037,8 @@ class TestUpdateNameFormStatus:
             {"pid": pid},
         )
         pub = insert_publication(sa_sync_conn)
-        spid = insert_source_publication(sa_sync_conn, pub, source_id="hal-1", title="Test")
-        sa_id = insert_signature(
+        spid = _notice(sa_sync_conn, pub)
+        sa_id = _jean_dupont_signature(
             sa_sync_conn, spid, person_id=pid, author_name_normalized="intrus etranger"
         )
         sa_sync_conn.execute(
@@ -1104,10 +1085,8 @@ class TestAssignOrphanAuthorship:
         person_id = _insert_person(sa_sync_conn)
         other_id = _insert_person(sa_sync_conn, "Other", "Author")
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=other_id, author_name_normalized="jean dupont"
-        )
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=other_id)
 
         with pytest.raises(AuthorshipAlreadyAssignedError) as exc:
             assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
@@ -1126,8 +1105,8 @@ class TestAssignOrphanAuthorship:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(sa_sync_conn, sp_id, author_name_normalized="jean dupont")
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
 
         assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
 
@@ -1159,8 +1138,8 @@ class TestReassignRejectedPairUnit:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(sa_sync_conn, sp_id, author_name_normalized="jean dupont")
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
         _reject_pair(sa_sync_conn, pub_id, person_id)
 
         with pytest.raises(RejectedPairError) as exc:
@@ -1181,8 +1160,8 @@ class TestReassignRejectedPairUnit:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
-        sa_id = insert_signature(sa_sync_conn, sp_id, author_name_normalized="jean dupont")
+        sp_id = _notice(sa_sync_conn, pub_id)
+        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
         _reject_pair(sa_sync_conn, pub_id, person_id)
 
         assign_orphan_authorship(
@@ -1219,10 +1198,10 @@ class TestReassignRejectedPairUnit:
         person_id = _insert_person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
-        sp1 = insert_source_publication(sa_sync_conn, pub1, source_id="h-1", title="Test")
-        sp2 = insert_source_publication(sa_sync_conn, pub2, source_id="h-2", title="Test")
-        sa1 = insert_signature(sa_sync_conn, sp1, author_name_normalized="jean dupont")
-        sa2 = insert_signature(sa_sync_conn, sp2, author_name_normalized="jean dupont")
+        sp1 = _notice(sa_sync_conn, pub1, source_id="h-1")
+        sp2 = _notice(sa_sync_conn, pub2, source_id="h-2")
+        sa1 = _jean_dupont_signature(sa_sync_conn, sp1)
+        sa2 = _jean_dupont_signature(sa_sync_conn, sp2)
         _reject_pair(sa_sync_conn, pub1, person_id)
 
         with pytest.raises(RejectedPairError) as exc:
@@ -1248,8 +1227,8 @@ class TestReassignRejectedPairUnit:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
-        sp1 = insert_source_publication(sa_sync_conn, pub1, source_id="h-1", title="Test")
-        sa1 = insert_signature(sa_sync_conn, sp1, author_name_normalized="jean dupont")
+        sp1 = _notice(sa_sync_conn, pub1, source_id="h-1")
+        sa1 = _jean_dupont_signature(sa_sync_conn, sp1)
         _reject_pair(sa_sync_conn, pub1, person_id)
 
         assigned = batch_assign_orphan_authorships(

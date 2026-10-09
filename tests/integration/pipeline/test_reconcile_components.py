@@ -4,6 +4,7 @@ Valide le SQL neuf (voisinage 1-hop, fetch dirty, clear) sur vraie base, et le b
 """
 
 import logging
+from functools import partial
 
 from sqlalchemy import bindparam, text
 
@@ -16,8 +17,12 @@ from infrastructure.pipeline.publications.reconciliation import (
 
 _Q = PgPublicationsReconciliationQueries()
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.authorships import upsert_identity
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Notice OpenAlex de 2024, de titre « T », article par défaut.
+_notice = partial(
+    insert_source_publication, source="openalex", title="T", pub_year=2024, doc_type="article"
+)
 
 logger = logging.getLogger("test_reconcile_components")
 
@@ -57,38 +62,9 @@ class TestUniverse:
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         unrelated_pub = _seed_pub(conn)
-        dirty = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
-        neighbor = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
-        insert_source_publication(
-            conn,
-            unrelated_pub,
-            source="openalex",
-            source_id="c",
-            title="T",
-            doi="10.9/z",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
+        dirty = _notice(conn, pub_a, source_id="a", doi="10.1/x")
+        neighbor = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
+        _notice(conn, unrelated_pub, source_id="c", doi="10.9/z", keys_dirty=False)
 
         universe = {r.id for r in _Q.fetch_reconciliation_universe(conn)}
         assert universe == {dirty, neighbor}
@@ -97,24 +73,11 @@ class TestUniverse:
         conn = sa_sync_conn
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        dirty = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["hal-1"]},
-        )
-        neighbor = insert_source_publication(
+        dirty = _notice(conn, pub_a, source_id="a", external_ids={"hal_id": ["hal-1"]})
+        neighbor = _notice(
             conn,
             pub_b,
-            source="openalex",
             source_id="b",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
             keys_dirty=False,
             external_ids={"hal_id": ["hal-1", "hal-2"]},
         )
@@ -123,25 +86,8 @@ class TestUniverse:
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'une notice est le premier identifiant qu'elle liste : les suivants ne relient rien."""
         conn = sa_sync_conn
-        dirty = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="a",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["hal-2"]},
-        )
-        insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="b",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-            external_ids={"hal_id": ["hal-1", "hal-2"]},
-        )
+        dirty = _notice(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
+        _notice(conn, source_id="b", keys_dirty=False, external_ids={"hal_id": ["hal-1", "hal-2"]})
         assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
@@ -149,24 +95,18 @@ class TestUniverse:
         conn = sa_sync_conn
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        dirty = insert_source_publication(
+        dirty = _notice(
             conn,
             pub_a,
-            source="openalex",
             source_id="a",
-            title="T",
             title_normalized="ma these de doctorat au titre suffisamment long",
-            pub_year=2024,
             doc_type="thesis",
         )
-        neighbor = insert_source_publication(
+        neighbor = _notice(
             conn,
             pub_b,
-            source="openalex",
             source_id="b",
-            title="T",
             title_normalized="ma these de doctorat au titre suffisamment long",
-            pub_year=2024,
             doc_type="thesis",
             keys_dirty=False,
         )
@@ -176,15 +116,7 @@ class TestUniverse:
         """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
-        orphan = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="orphan",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
+        orphan = _notice(conn, source_id="orphan", doi="10.1/x")
         assert _Q.fetch_dirty_source_publication_ids(conn) == [orphan]
 
 
@@ -197,26 +129,8 @@ class TestEndToEnd:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        sp_a = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
-        sp_b = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
+        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
+        sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x")
 
         run(
             conn,
@@ -255,26 +169,8 @@ class TestEndToEnd:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
-        insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
+        _notice(conn, pub_a, source_id="a", doi="10.1/x")
+        _notice(conn, pub_b, source_id="b", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             run(
@@ -290,16 +186,7 @@ class TestEndToEnd:
         """Sous `rebuild`, l'étape annonce une reconstruction complète."""
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
-        insert_source_publication(
-            conn,
-            _seed_pub(conn),
-            source="openalex",
-            source_id="a",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-        )
+        _notice(conn, _seed_pub(conn), source_id="a", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             run(
@@ -319,28 +206,8 @@ class TestEndToEnd:
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub = _seed_pub(conn, doi="10.1/x")
-        sp_x = insert_source_publication(
-            conn,
-            pub,
-            source="openalex",
-            source_id="x",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["h"]},
-        )
-        sp_y = insert_source_publication(
-            conn,
-            pub,
-            source="openalex",
-            source_id="y",
-            title="T",
-            doi="10.2/y",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["h"]},
-        )
+        sp_x = _notice(conn, pub, source_id="x", doi="10.1/x", external_ids={"hal_id": ["h"]})
+        sp_y = _notice(conn, pub, source_id="y", doi="10.2/y", external_ids={"hal_id": ["h"]})
 
         run(
             conn,
@@ -363,24 +230,18 @@ class TestEndToEnd:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        sp_a = insert_source_publication(
+        sp_a = _notice(
             conn,
             pub_a,
-            source="openalex",
             source_id="a",
-            title="T",
             title_normalized="ma these de doctorat au titre suffisamment long",
-            pub_year=2024,
             doc_type="thesis",
         )
-        sp_b = insert_source_publication(
+        sp_b = _notice(
             conn,
             pub_b,
-            source="openalex",
             source_id="b",
-            title="T",
             title_normalized="ma these de doctorat au titre suffisamment long",
-            pub_year=2024,
             doc_type="thesis",
         )
 
@@ -403,28 +264,8 @@ class TestEndToEnd:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn, doi="10.1/x")
         pub_b = _seed_pub(conn, doi="10.2/y")
-        sp_a = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            doi="10.1/x",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["hal-1"]},
-        )
-        sp_b = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            doi="10.2/y",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["hal-1"]},
-        )
+        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]})
+        sp_b = _notice(conn, pub_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]})
 
         run(
             conn,
@@ -449,25 +290,11 @@ class TestMetadataBlock:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        sp_a = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            title_normalized=self.LONG,
-            pub_year=2024,
-            doc_type="conference_paper",
+        sp_a = _notice(
+            conn, pub_a, source_id="a", title_normalized=self.LONG, doc_type="conference_paper"
         )
-        sp_b = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            title_normalized=self.LONG,
-            pub_year=2024,
-            doc_type="conference_paper",
+        sp_b = _notice(
+            conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="conference_paper"
         )
 
         run(
@@ -489,25 +316,11 @@ class TestMetadataBlock:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        sp_a = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            title_normalized="court titre",
-            pub_year=2024,
-            doc_type="conference_paper",
+        sp_a = _notice(
+            conn, pub_a, source_id="a", title_normalized="court titre", doc_type="conference_paper"
         )
-        sp_b = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            title_normalized="court titre",
-            pub_year=2024,
-            doc_type="conference_paper",
+        sp_b = _notice(
+            conn, pub_b, source_id="b", title_normalized="court titre", doc_type="conference_paper"
         )
 
         run(
@@ -528,25 +341,11 @@ class TestMetadataBlock:
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
-        sp_a = insert_source_publication(
-            conn,
-            pub_a,
-            source="openalex",
-            source_id="a",
-            title="T",
-            title_normalized=self.LONG,
-            pub_year=2024,
-            doc_type="conference_paper",
+        sp_a = _notice(
+            conn, pub_a, source_id="a", title_normalized=self.LONG, doc_type="conference_paper"
         )
-        sp_b = insert_source_publication(
-            conn,
-            pub_b,
-            source="openalex",
-            source_id="b",
-            title="T",
-            title_normalized=self.LONG,
-            pub_year=2024,
-            doc_type="book_chapter",
+        sp_b = _notice(
+            conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="book_chapter"
         )
 
         run(
@@ -567,63 +366,23 @@ class TestMarkKeysDirty:
 
     def test_mark_all(self, sa_sync_conn):
         conn = sa_sync_conn
-        a = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="a",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
-        b = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="b",
-            title="T",
-            pub_year=2024,
-            doc_type="book_chapter",
-            keys_dirty=False,
-        )
+        a = _notice(conn, source_id="a", keys_dirty=False)
+        b = _notice(conn, source_id="b", doc_type="book_chapter", keys_dirty=False)
         assert mark_keys_dirty(conn) >= 2
         assert _sp_state(conn, a)[1] is True
         assert _sp_state(conn, b)[1] is True
 
     def test_mark_where_targets_subset(self, sa_sync_conn):
         conn = sa_sync_conn
-        art = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="art",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
-        chap = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="chap",
-            title="T",
-            pub_year=2024,
-            doc_type="book_chapter",
-            keys_dirty=False,
-        )
+        art = _notice(conn, source_id="art", keys_dirty=False)
+        chap = _notice(conn, source_id="chap", doc_type="book_chapter", keys_dirty=False)
         mark_keys_dirty(conn, "doc_type = 'book_chapter'")
         assert _sp_state(conn, chap)[1] is True
         assert _sp_state(conn, art)[1] is False
 
     def test_dry_run_counts_without_writing(self, sa_sync_conn):
         conn = sa_sync_conn
-        sp = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="d",
-            title="T",
-            pub_year=2024,
-            doc_type="poster",
-            keys_dirty=False,
-        )
+        sp = _notice(conn, source_id="d", doc_type="poster", keys_dirty=False)
         assert mark_keys_dirty(conn, "doc_type = 'poster'", dry_run=True) >= 1
         assert _sp_state(conn, sp)[1] is False  # dry-run n'écrit pas
 
@@ -642,149 +401,61 @@ class TestUniverseMatchesPythonTokens:
         long_a, long_b = "a" * 40, "b" * 40
         len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
         ids = [
-            insert_source_publication(
+            _notice(conn, source_id="doi1", doi="10.1/x", keys_dirty=False),
+            _notice(conn, source_id="doi2", doi="10.1/x", keys_dirty=False),
+            _notice(
                 conn,
-                source="openalex",
-                source_id="doi1",
-                title="T",
-                doi="10.1/x",
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
-                source_id="doi2",
-                title="T",
-                doi="10.1/x",
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
                 source_id="hal1",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
                 keys_dirty=False,
                 external_ids={"hal_id": ["hal-00000001", "hal-00000002"]},
             ),
-            insert_source_publication(
+            _notice(
                 conn,
-                source="openalex",
                 source_id="hal2",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
                 keys_dirty=False,
                 external_ids={"hal_id": ["hal-00000002", "hal-00000003"]},
             ),
             # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
             # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
             # Le numéro fait 8 chiffres (docid CCSD), exigence du VO.
-            insert_source_publication(
+            _notice(
                 conn,
-                source="openalex",
                 source_id="emse1",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
                 keys_dirty=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
-            insert_source_publication(
+            _notice(
                 conn,
-                source="openalex",
                 source_id="emse2",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
                 keys_dirty=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
-            insert_source_publication(
+            _notice(conn, source_id="nnt1", keys_dirty=False, external_ids={"nnt": "2024UCA01"}),
+            _notice(conn, source_id="nnt2", keys_dirty=False, external_ids={"nnt": "2024UCA01"}),
+            _notice(
                 conn,
-                source="openalex",
-                source_id="nnt1",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-                external_ids={"nnt": "2024UCA01"},
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
-                source_id="nnt2",
-                title="T",
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-                external_ids={"nnt": "2024UCA01"},
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
                 source_id="mb1",
-                title="T",
                 title_normalized=long_a,
-                pub_year=2024,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            insert_source_publication(
+            _notice(
                 conn,
-                source="openalex",
                 source_id="mb2",
-                title="T",
                 title_normalized=long_a,
-                pub_year=2024,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            insert_source_publication(
+            _notice(
                 conn,
-                source="openalex",
                 source_id="mbo",
-                title="T",
                 title_normalized=long_b,
-                pub_year=2024,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            insert_source_publication(
-                conn,
-                source="openalex",
-                source_id="s1",
-                title="T",
-                title_normalized=len30,
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
-                source_id="s2",
-                title="T",
-                title_normalized=len30,
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-            ),
-            insert_source_publication(
-                conn,
-                source="openalex",
-                source_id="lone",
-                title="T",
-                title_normalized="zz",
-                pub_year=2024,
-                doc_type="article",
-                keys_dirty=False,
-            ),
+            _notice(conn, source_id="s1", title_normalized=len30, keys_dirty=False),
+            _notice(conn, source_id="s2", title_normalized=len30, keys_dirty=False),
+            _notice(conn, source_id="lone", title_normalized="zz", keys_dirty=False),
         ]
         rows = {
             r.id: r
@@ -825,35 +496,11 @@ class TestExternalDoiCarrier:
     def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
         conn = sa_sync_conn
         orphan_pub = _seed_pub(conn, doi="10.70675/abc")  # porte le DOI, aucune SP
-        sp1 = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="t1",
-            title="T",
-            title_normalized="t",
-            doi="10.70675/abc",
-            pub_year=2024,
-            doc_type="article",
-        )
-        sp2 = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="t2",
-            title="T",
-            doi="10.70675/abc",
-            pub_year=2024,
-            doc_type="article",
-        )
+        sp1 = _notice(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
+        sp2 = _notice(conn, source_id="t2", doi="10.70675/abc")
         # in_perimeter → sans le correctif, ce groupe d'orphelins serait une CRÉATION et
         # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
-        conn.execute(
-            text(
-                "INSERT INTO source_authorships"
-                " (source, source_publication_id, in_perimeter, identity_id, raw_author_name) "
-                "VALUES ('openalex', :sp, true, :iid, 'X')"
-            ),
-            {"sp": sp1, "iid": upsert_identity(conn)},
-        )
+        insert_signature(conn, sp1, source="openalex", author_position=None, in_perimeter=True)
 
         reconcile(
             conn,
@@ -887,16 +534,7 @@ class TestDeletePublicationsWithoutSources:
         conn = sa_sync_conn
         vide = _seed_pub(conn)
         garnie = _seed_pub(conn, doi="10.1/garnie")
-        insert_source_publication(
-            conn,
-            garnie,
-            source="openalex",
-            source_id="garnie",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
+        _notice(conn, garnie, source_id="garnie", keys_dirty=False)
 
         assert _Q.delete_publications_without_sources(conn) == 1
         assert not _pub_exists(conn, vide)
@@ -921,27 +559,15 @@ class TestStaleMembership:
         """Une publication au DOI de préversion, ses deux SP, et plus aucune clé partagée entre
         elles : DOI distincts, aucun identifiant commun, titres absents (pas de token bloc)."""
         pub = _seed_pub(conn, doi=self.PREPRINT_DOI)
-        preprint = insert_source_publication(
+        preprint = _notice(
             conn,
             pub,
-            source="openalex",
             source_id="preprint",
-            title="T",
             doi=self.PREPRINT_DOI,
-            pub_year=2024,
             doc_type="preprint",
             keys_dirty=False,
         )
-        published = insert_source_publication(
-            conn,
-            pub,
-            source="openalex",
-            source_id="published",
-            title="T",
-            doi=self.PUBLISHED_DOI,
-            pub_year=2024,
-            doc_type="article",
-        )
+        published = _notice(conn, pub, source_id="published", doi=self.PUBLISHED_DOI)
         return pub, preprint, published
 
     def test_siblings_of_a_dirty_source_publication_are_marked(self, sa_sync_conn):
@@ -949,25 +575,8 @@ class TestStaleMembership:
         publication, ni les orphelines."""
         conn = sa_sync_conn
         _, preprint, _ = self._seed_drifted_pair(conn)
-        other = insert_source_publication(
-            conn,
-            _seed_pub(conn),
-            source="openalex",
-            source_id="other",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
-        orphan = insert_source_publication(
-            conn,
-            source="openalex",
-            source_id="orphan",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            keys_dirty=False,
-        )
+        other = _notice(conn, _seed_pub(conn), source_id="other", keys_dirty=False)
+        orphan = _notice(conn, source_id="orphan", keys_dirty=False)
 
         assert _Q.mark_publication_siblings_dirty(conn) == 1
         assert _sp_state(conn, preprint)[1] is True
@@ -996,35 +605,22 @@ class TestFirstHalIdKey:
     def test_bridge_notice_joins_first_listed_deposit_only(self, sa_sync_conn):
         conn = sa_sync_conn
         pub = _seed_pub(conn)
-        first = insert_source_publication(
+        first = _notice(
             conn,
             pub,
-            source="openalex",
             source_id="hal-01234567",
-            title="T",
-            pub_year=2024,
             doc_type="conference_paper",
             external_ids={"hal_id": ["hal-01234567"]},
         )
-        second = insert_source_publication(
+        second = _notice(
             conn,
             pub,
-            source="openalex",
             source_id="hal-07654321",
-            title="T",
-            pub_year=2024,
             doc_type="book_chapter",
             external_ids={"hal_id": ["hal-07654321"]},
         )
-        bridge = insert_source_publication(
-            conn,
-            pub,
-            source="openalex",
-            source_id="W1",
-            title="T",
-            pub_year=2024,
-            doc_type="article",
-            external_ids={"hal_id": ["hal-01234567", "hal-07654321"]},
+        bridge = _notice(
+            conn, pub, source_id="W1", external_ids={"hal_id": ["hal-01234567", "hal-07654321"]}
         )
 
         reconcile(conn, _Q, publication_repo=publication_repository(conn))

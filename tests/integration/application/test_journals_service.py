@@ -6,6 +6,7 @@ par le pipeline) et les fonctions async (update_journal, update_publisher,
 merge_*).
 """
 
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
@@ -40,9 +41,13 @@ from infrastructure.repositories import (
     publisher_repository,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 
 # Stateless (connexion passée aux méthodes) → une instance module suffit.
 _CORRECTION_QUERIES = PgMetadataCorrectionQueries()
+
+# Notice OpenAlex de 2024, de titre « T ».
+_openalex_notice = partial(insert_source_publication, source="openalex", title="T", pub_year=2024)
 
 
 @pytest.fixture
@@ -894,14 +899,7 @@ class TestMergeJournals:
         pub_id = insert_publication(sa_sync_conn, journal_id=source)
         # ≥1 source_publication : sinon `refresh_from_sources` (déclenché par la
         # requalification post-merge) supprimerait la publication comme orpheline.
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(source, source_id, title, pub_year, journal_id, publication_id) "
-                "VALUES ('openalex', 'W-transfer', 'T', 2024, :jid, :pid)"
-            ),
-            {"jid": source, "pid": pub_id},
-        )
+        _openalex_notice(sa_sync_conn, pub_id, source_id="W-transfer", journal_id=source)
 
         merge_journals(
             target,
@@ -1032,13 +1030,8 @@ class TestMergeJournals:
         sa_sync_conn.execute(
             text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
         )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(source, source_id, title, pub_year, doc_type, journal_id, publication_id) "
-                "VALUES ('openalex', 'W-merge-requalif', 'T', 2024, 'article', :jid, :pid)"
-            ),
-            {"jid": revue, "pid": pub},
+        _openalex_notice(
+            sa_sync_conn, pub, source_id="W-merge-requalif", doc_type="article", journal_id=revue
         )
 
         merge_journals(
@@ -1071,14 +1064,9 @@ class TestRequalifyPublicationsForJournal:
         conn.execute(
             text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
         )
-        sp = conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(source, source_id, title, pub_year, doc_type, journal_id, publication_id) "
-                "VALUES ('openalex', 'W-requalif', 'T', 2024, 'article', :jid, :pid) RETURNING id"
-            ),
-            {"jid": journal, "pid": pub},
-        ).scalar_one()
+        sp = _openalex_notice(
+            conn, pub, source_id="W-requalif", doc_type="article", journal_id=journal
+        )
         return journal, pub, sp
 
     def test_persists_sp_correction_and_retypes_publication(self, sa_sync_conn, publication_repo):

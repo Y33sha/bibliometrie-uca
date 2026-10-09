@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from functools import partial
 
 import pytest
 from sqlalchemy import text
@@ -12,6 +13,9 @@ from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de titre « Article ».
+_article = partial(insert_source_publication, title="Article")
 
 
 @pytest.fixture
@@ -107,41 +111,30 @@ class TestSudocCheck:
     def test_queue_holds_journals_whose_records_carry_an_unknown_issn(self, sa_sync_conn, repo):
         """Une revue vérifiée revient dans la file quand un de ses enregistrements, quelle que soit sa source, porte un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
         journal_id = _create_journal(sa_sync_conn, issn="0149-5992", checked=True)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
-                " VALUES (:source, :sid, 'Article', :jid, CAST(:biblio AS jsonb))"
-            ),
-            [
-                {
-                    "source": "hal",
-                    "sid": f"sp-issn-{journal_id}",
-                    "jid": journal_id,
-                    "biblio": '{"journal": {"issn": "19355548", "eissn": "0149-5992"}}',
-                },
-                {
-                    "source": "openalex",
-                    "sid": f"sp-issn-bad-{journal_id}",
-                    "jid": journal_id,
-                    "biblio": '{"journal": {"issn": "1234-5678"}}',
-                },
-            ],
+        _article(
+            sa_sync_conn,
+            source_id=f"sp-issn-{journal_id}",
+            journal_id=journal_id,
+            biblio={"journal": {"issn": "19355548", "eissn": "0149-5992"}},
+        )
+        _article(
+            sa_sync_conn,
+            source="openalex",
+            source_id=f"sp-issn-bad-{journal_id}",
+            journal_id=journal_id,
+            biblio={"journal": {"issn": "1234-5678"}},
         )
         rows = {r.id: r for r in repo.find_journals_to_check_in_sudoc()}
         assert rows[journal_id].document_issns == ("1935-5548",)
 
     def test_queue_ignores_records_whose_issns_the_journal_carries(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn, issn="0149-5992", checked=True)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
-                " VALUES ('scanr', :sid, 'Article', :jid, CAST(:biblio AS jsonb))"
-            ),
-            {
-                "sid": f"sp-own-{journal_id}",
-                "jid": journal_id,
-                "biblio": '{"journal": {"issn": "01495992"}}',
-            },
+        _article(
+            sa_sync_conn,
+            source="scanr",
+            source_id=f"sp-own-{journal_id}",
+            journal_id=journal_id,
+            biblio={"journal": {"issn": "01495992"}},
         )
         assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
 
@@ -149,16 +142,11 @@ class TestSudocCheck:
         """Un ISSN d'une autre publication, déjà vérifié et gardé sans revue, ne ramène pas la revue dans la file."""
         journal_id = _create_journal(sa_sync_conn, issn="1254-7867", checked=True)
         _add_issn(sa_sync_conn, None, "2750-6185", support="electronic", checked=True)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, journal_id, biblio)"
-                " VALUES ('hal', :sid, 'Article', :jid, CAST(:biblio AS jsonb))"
-            ),
-            {
-                "sid": f"sp-other-{journal_id}",
-                "jid": journal_id,
-                "biblio": '{"journal": {"issn": "2750-6185"}}',
-            },
+        _article(
+            sa_sync_conn,
+            source_id=f"sp-other-{journal_id}",
+            journal_id=journal_id,
+            biblio={"journal": {"issn": "2750-6185"}},
         )
         assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
 
@@ -200,46 +188,30 @@ class TestSudocCheck:
         """Seules les paires dont les enregistrements partagent un préfixe DOI sont retenues ; une revue vide ou deux revues à ISSN restent hors de la règle."""
         with_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe", issn="2999-0003")
         without_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe")
-        insert_source_publication(
+        _article(
             sa_sync_conn,
             source_id=f"sp-{with_issn}-10.9999/a",
-            title="Article",
             doi="10.9999/a",
             journal_id=with_issn,
         )
-        insert_source_publication(
+        _article(
             sa_sync_conn,
             source_id=f"sp-{without_issn}-10.9999/b",
-            title="Article",
             doi="10.9999/b",
             journal_id=without_issn,
         )
         full = _create_journal(sa_sync_conn, title="Revue test doublon vide", issn="2999-0006")
         _create_journal(sa_sync_conn, title="Revue test doublon vide")
-        insert_source_publication(
-            sa_sync_conn,
-            source_id=f"sp-{full}-10.9999/c",
-            title="Article",
-            doi="10.9999/c",
-            journal_id=full,
-        )
+        _article(sa_sync_conn, source_id=f"sp-{full}-10.9999/c", doi="10.9999/c", journal_id=full)
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0004")
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0005")
         active_a = _create_journal(sa_sync_conn, title="Revue test actives distinctes")
         active_b = _create_journal(sa_sync_conn, title="Revue test actives distinctes")
-        insert_source_publication(
-            sa_sync_conn,
-            source_id=f"sp-{active_a}-10.1111/x",
-            title="Article",
-            doi="10.1111/x",
-            journal_id=active_a,
+        _article(
+            sa_sync_conn, source_id=f"sp-{active_a}-10.1111/x", doi="10.1111/x", journal_id=active_a
         )
-        insert_source_publication(
-            sa_sync_conn,
-            source_id=f"sp-{active_b}-10.2222/y",
-            title="Article",
-            doi="10.2222/y",
-            journal_id=active_b,
+        _article(
+            sa_sync_conn, source_id=f"sp-{active_b}-10.2222/y", doi="10.2222/y", journal_id=active_b
         )
         groups = {g.key: g.journal_ids for g in repo.find_same_title_duplicates()}
         assert set(groups["revue test même préfixe"]) == {with_issn, without_issn}
@@ -254,10 +226,9 @@ class TestSudocCheck:
                 text("INSERT INTO journals (title, title_normalized) VALUES (:t, '') RETURNING id"),
                 {"t": title},
             ).scalar_one()
-            insert_source_publication(
+            _article(
                 sa_sync_conn,
                 source_id=f"sp-{journal_id}-10.9999/vide-{journal_id}",
-                title="Article",
                 doi=f"10.9999/vide-{journal_id}",
                 journal_id=journal_id,
             )
@@ -275,12 +246,11 @@ class TestSudocCheck:
         _add_issn(sa_sync_conn, earlier, "2999-0013", status=IssnStatus.RELATED_TITLE, checked=True)
         _add_issn(sa_sync_conn, later, "2999-0014", status=IssnStatus.RELATED_TITLE, checked=True)
         for journal_id, year in ((earlier, 2018), (earlier, 2026), (later, 2022), (later, 2025)):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO source_publications (source, source_id, title, journal_id, pub_year)"
-                    " VALUES ('hal', :sid, 'Article', :jid, :year)"
-                ),
-                {"sid": f"sp-rejete-{journal_id}-{year}", "jid": journal_id, "year": year},
+            _article(
+                sa_sync_conn,
+                source_id=f"sp-rejete-{journal_id}-{year}",
+                pub_year=year,
+                journal_id=journal_id,
             )
         groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_an_inactive_issn()}
         assert groups["2999-0013"] == (later, earlier)
@@ -295,13 +265,11 @@ class TestSudocCheck:
             text("INSERT INTO publications (title, pub_year) VALUES ('Article', 2024) RETURNING id")
         ).scalar_one()
         for journal_id in (full, abbreviated):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO source_publications"
-                    " (source, source_id, title, journal_id, publication_id)"
-                    " VALUES ('hal', :sid, 'Article', :jid, :pid)"
-                ),
-                {"sid": f"sp-publication-{journal_id}", "jid": journal_id, "pid": publication_id},
+            _article(
+                sa_sync_conn,
+                publication_id,
+                source_id=f"sp-publication-{journal_id}",
+                journal_id=journal_id,
             )
         pairs = [
             p
@@ -320,10 +288,9 @@ class TestSudocCheck:
         _add_issn(sa_sync_conn, empty, "2999-0015", support="electronic")
         _add_issn(sa_sync_conn, None, "2999-0015", support="electronic", checked=True)
         with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")
-        insert_source_publication(
+        _article(
             sa_sync_conn,
             source_id=f"sp-{with_record}-10.9999/d",
-            title="Article",
             doi="10.9999/d",
             journal_id=with_record,
         )
@@ -480,14 +447,17 @@ class TestRecordTypesOfUnknownJournals:
     def test_type_brut_avant_correction(self, sa_sync_conn, repo):
         """Un document retypé par la correction est compté avec son type de source."""
         jid = _create_journal(sa_sync_conn)
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_publications (source, source_id, title, journal_id, doc_type, raw_metadata)
-                VALUES ('crossref', '10.1/a', 'A', :jid, 'conference_paper',
-                        '{"doc_type": {"raw": "book-chapter", "corrected_by": "X"}}'),
-                       ('hal', 'hal-1', 'B', :jid, 'COMM', '{}')
-            """),
-            {"jid": jid},
+        insert_source_publication(
+            sa_sync_conn,
+            source="crossref",
+            source_id="10.1/a",
+            title="A",
+            doc_type="conference_paper",
+            journal_id=jid,
+            raw_metadata={"doc_type": {"raw": "book-chapter", "corrected_by": "X"}},
+        )
+        insert_source_publication(
+            sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid
         )
 
         rows = [r for r in repo.find_record_types_of_unknown_journals() if r.journal_id == jid]
@@ -497,13 +467,7 @@ class TestRecordTypesOfUnknownJournals:
     def test_revues_typees_et_vides_exclues(self, sa_sync_conn, repo):
         typed = _create_journal(sa_sync_conn)
         empty = _create_journal(sa_sync_conn)
-        insert_source_publication(
-            sa_sync_conn,
-            source_id=f"sp-{typed}-10.1/b",
-            title="Article",
-            doi="10.1/b",
-            journal_id=typed,
-        )
+        _article(sa_sync_conn, source_id=f"sp-{typed}-10.1/b", doi="10.1/b", journal_id=typed)
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": typed}
         )
@@ -517,17 +481,15 @@ class TestRecordTypesOfUnknownJournals:
 class TestDoiNamespaces:
     def test_revue_posee_par_son_espace_exclue_des_temoins(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn)
-        insert_source_publication(
+        _article(
             sa_sync_conn,
             source_id=f"sp-{journal_id}-10.9001/abc.1",
-            title="Article",
             doi="10.9001/abc.1",
             journal_id=journal_id,
         )
-        insert_source_publication(
+        _article(
             sa_sync_conn,
             source_id=f"sp-{journal_id}-10.9001/abc.2",
-            title="Article",
             doi="10.9001/abc.2",
             journal_id=journal_id,
         )

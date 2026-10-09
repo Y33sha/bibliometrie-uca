@@ -1,5 +1,7 @@
 """Tests de la persistance et du hash de détection de l'extraction (infrastructure/pipeline)."""
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 
@@ -10,6 +12,9 @@ from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de titre « T ».
+_notice = partial(insert_source_publication, title="T")
 
 # ── fingerprint ─────────────────────────────────────────────────
 
@@ -142,9 +147,7 @@ def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
             "RETURNING id"
         )
     ).scalar_one()
-    insert_source_publication(
-        conn, pub_id, source=source, source_id=sid, title="T", doi=doi, external_ids=external_ids
-    )
+    _notice(conn, pub_id, source=source, source_id=sid, doi=doi, external_ids=external_ids)
 
 
 class TestGetMissingDois:
@@ -180,13 +183,7 @@ class TestGetMissingDois:
                 "RETURNING id"
             )
         ).scalar_one()
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, doi, publication_id) "
-                "VALUES ('openalex', 'W1', 'T', '10.1234/out', :pub)"
-            ),
-            {"pub": pub_id},
-        )
+        _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1", doi="10.1234/out")
         assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
@@ -372,20 +369,14 @@ class TestGetStaleRows:
         # source_publications → pub_year NULL, conservée (LEFT JOIN conservateur).
         for sid in ("W1", "W2", "W3"):
             _insert_staging(sa_sync_conn, "openalex", sid, None, seen_days_ago=100)
-        insert_source_publication(
-            sa_sync_conn, source="openalex", source_id="W1", title="T", pub_year=2020
-        )
-        insert_source_publication(
-            sa_sync_conn, source="openalex", source_id="W2", title="T", pub_year=2023
-        )
+        _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2020)
+        _notice(sa_sync_conn, source="openalex", source_id="W2", pub_year=2023)
         rows = get_stale_rows(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(src_id for _, src_id in rows) == ["W2", "W3"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
-        insert_source_publication(
-            sa_sync_conn, source="openalex", source_id="W1", title="T", pub_year=2010
-        )
+        _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2010)
         assert [
             src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex", after_days=90)
         ] == ["W1"]
@@ -433,11 +424,12 @@ class TestGetPrefixesToResolve:
             )
         )
         # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), SP in-périmètre.
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, publication_id, "
-                "external_ids) VALUES ('openalex', 'W1', 'T', 1, '{\"arxiv_id\": \"2605.02321\"}')"
-            )
+        _notice(
+            sa_sync_conn,
+            1,
+            source="openalex",
+            source_id="W1",
+            external_ids={"arxiv_id": "2605.02321"},
         )
 
         prefixes = PgDoiPrefixesQueries(sa_sync_conn).get_prefixes_to_resolve()

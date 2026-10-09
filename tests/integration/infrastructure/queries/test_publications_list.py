@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.read_models.publications.list`."""
 
+from functools import partial
+
 from sqlalchemy import text
 
 from application.ports.read_models.publications_queries import PublicationFilters
@@ -10,7 +12,11 @@ from infrastructure.read_models.publications.list import (
     list_publications,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure
+
+# Notice de titre « T ».
+_notice = partial(insert_source_publication, title="T")
 
 
 def _create_lab(conn):
@@ -177,25 +183,14 @@ class TestHalStatusMultipleHalEntries:
         ).one()
         return row.id
 
-    @staticmethod
-    def _add_hal_source(conn, pub_id: int, source_id: str, collections: list[str]) -> None:
-        conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(publication_id, source, source_id, title, hal_collections) "
-                "VALUES (:pid, 'hal', :sid, 'T', :cols)"
-            ),
-            {"pid": pub_id, "sid": source_id, "cols": collections},
-        )
-
     def test_pub_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
         non. Doit être exclue du filtre `hors_collection`."""
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
         pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
-        self._add_hal_source(sa_sync_conn, pub, "hal-CMH", ["CMH", "AO-DROIT"])
-        self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT", "SHS"])
+        _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
+        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT", "SHS"])
         sa_sync_conn.execute(
             text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
             {"id": pub},
@@ -217,8 +212,8 @@ class TestHalStatusMultipleHalEntries:
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
         pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
-        self._add_hal_source(sa_sync_conn, pub, "hal-CMH", ["CMH", "AO-DROIT"])
-        self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT"])
+        _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
+        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT"])
 
         res = list_publications(
             sa_sync_conn,
@@ -237,7 +232,7 @@ class TestHalStatusMultipleHalEntries:
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
         pub = insert_publication(sa_sync_conn, "Outside only")
         _attach(sa_sync_conn, pub, lab)
-        self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT"])
+        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT"])
 
         res = list_publications(
             sa_sync_conn,
@@ -260,7 +255,7 @@ class TestHalStatusMultipleHalEntries:
         ).scalar_one()
         pub = insert_publication(sa_sync_conn, "Open in HAL")
         _attach(sa_sync_conn, pub, lab)
-        self._add_hal_source(sa_sync_conn, pub, "hal-x", ["SOME-COL"])
+        _notice(sa_sync_conn, pub, source_id="hal-x", hal_collections=["SOME-COL"])
         sa_sync_conn.execute(
             text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
             {"id": pub},
@@ -295,13 +290,7 @@ class TestThesesExport:
             ("scanr", "sc-1"),
             ("theses", "2024NNT"),
         ):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO source_publications (publication_id, source, source_id, title) "
-                    "VALUES (:pid, :src, :sid, 'T')"
-                ),
-                {"pid": pub, "src": src, "sid": sid},
-            )
+            _notice(sa_sync_conn, pub, source=src, source_id=sid)
 
         csv_text = "".join(
             export_theses_csv(

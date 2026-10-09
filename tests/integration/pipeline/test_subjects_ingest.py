@@ -230,12 +230,8 @@ class TestRunOrchestrator:
     def test_ignores_unlinked_source_publications(self, sa_sync_conn, queries):
         # source_pub orphelin (publication_id NULL) : jamais sélectionné, son concept
         # n'est pas ingéré.
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, topics) "
-                "VALUES ('openalex', 'oa-orphan', 'X', CAST(:t AS jsonb))"
-            ),
-            {"t": json.dumps([{"topic": "ghosttopic"}])},
+        insert_source_publication(
+            sa_sync_conn, source="openalex", source_id="oa-orphan", topics=[{"topic": "ghosttopic"}]
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
         n_ghost = sa_sync_conn.execute(

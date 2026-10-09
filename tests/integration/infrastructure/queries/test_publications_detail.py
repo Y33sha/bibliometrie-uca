@@ -9,10 +9,9 @@ from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
 )
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -57,16 +56,7 @@ class TestGetPublicationDetail:
             {"pub": pub, "pid": pid},
         ).one()
         auth_id = auth_row.id
-        identity_id = upsert_identity(sa_sync_conn)
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position,
-                     person_id, authorship_id, identity_id, raw_author_name)
-                VALUES ('hal', :sd, 0, :pid, :auth, :iid, 'X')
-            """),
-            {"sd": sd, "pid": pid, "auth": auth_id, "iid": identity_id},
-        )
+        insert_signature(sa_sync_conn, sd, person_id=pid, authorship_id=auth_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
@@ -85,19 +75,12 @@ class TestGetPublicationDetail:
             ("oa-piece", "DATACITE_PACKAGE_PIECE"),
             ("oa-chapter", "OUVRAGE_VS_CHAPITRE"),
         ):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO source_publications "
-                    "(source, source_id, title, publication_id, raw_metadata) "
-                    "VALUES ('openalex', :sid, 'X', :pub, CAST(:rm AS jsonb))"
-                ),
-                {
-                    "sid": source_id,
-                    "pub": pub,
-                    "rm": json.dumps(
-                        {"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}}
-                    ),
-                },
+            insert_source_publication(
+                sa_sync_conn,
+                pub,
+                source="openalex",
+                source_id=source_id,
+                raw_metadata={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
             )
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
@@ -115,12 +98,13 @@ class TestGetPublicationDetail:
             {"m": json.dumps({"date_soutenance": "2023-05-10"}), "id": pub},
         )
         # source_publications theses avec meta
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_publications (source, source_id, title, publication_id, meta)
-                VALUES ('theses', 't-1', 'Thèse', :pub, CAST(:m AS jsonb))
-            """),
-            {"pub": pub, "m": json.dumps({"discipline": "Informatique"})},
+        insert_source_publication(
+            sa_sync_conn,
+            pub,
+            source="theses",
+            source_id="t-1",
+            title="Thèse",
+            meta={"discipline": "Informatique"},
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)
@@ -170,14 +154,7 @@ class TestGetPublicationDetail:
             ),
             {"id": sd_old},
         )
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, raw_author_name, identity_id)
-                VALUES ('openalex', :sd, 0, 'Alice', :iid)
-            """),
-            {"sd": sd_old, "iid": upsert_identity(sa_sync_conn)},
-        )
+        insert_signature(sa_sync_conn, sd_old, source="openalex", raw_author_name="Alice")
         # Row OpenAlex la plus récente, avec 1 auteur "Bob"
         sd_new = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
         sa_sync_conn.execute(
@@ -187,14 +164,7 @@ class TestGetPublicationDetail:
             ),
             {"id": sd_new},
         )
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, raw_author_name, identity_id)
-                VALUES ('openalex', :sd, 0, 'Bob', :iid)
-            """),
-            {"sd": sd_new, "iid": upsert_identity(sa_sync_conn)},
-        )
+        insert_signature(sa_sync_conn, sd_new, source="openalex", raw_author_name="Bob")
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None

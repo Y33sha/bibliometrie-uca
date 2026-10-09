@@ -1,6 +1,7 @@
 """Tests d'intégration de `PgMonographGatewayQueries`."""
 
 import logging
+from functools import partial
 
 import pytest
 from sqlalchemy import text
@@ -10,6 +11,9 @@ from application.pipeline.publishers_journals.type_proceedings_volumes import (
 )
 from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de titre « Chapitre ».
+_chapter = partial(insert_source_publication, title="Chapitre")
 
 _PAPER = "9783030580803"
 _ELECTRONIC = "9783030580810"
@@ -75,9 +79,7 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
 def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     source = _create(repo, "Pascal intempestif", isbn=_PAPER, year=2024)
     target = _create(repo, "Pascal intempestif")
-    insert_source_publication(
-        sa_sync_conn, source_id="hal-fusion", title="Chapitre", monograph_id=source
-    )
+    _chapter(sa_sync_conn, source_id="hal-fusion", monograph_id=source)
     groups = [g for g in repo.find_monographs_sharing_a_title() if g.title == "Pascal intempestif"]
     assert [m.id for m in groups[0].monographs] == [source, target]
 
@@ -111,23 +113,11 @@ def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
     volume = _journal(sa_sync_conn, "NuFACT 2022")
     collection = _journal(sa_sync_conn, "Lecture notes test", issn="2999-0101")
     mid = _create(repo, "NuFACT 2022", journal_id=volume)
-    insert_source_publication(
-        sa_sync_conn,
-        source="crossref",
-        source_id="c-1",
-        title="Chapitre",
-        journal_id=collection,
-        monograph_id=mid,
+    _chapter(
+        sa_sync_conn, source="crossref", source_id="c-1", journal_id=collection, monograph_id=mid
     )
-    insert_source_publication(
-        sa_sync_conn,
-        source="crossref",
-        source_id="c-2",
-        title="Chapitre",
-        journal_id=volume,
-        monograph_id=mid,
-    )
-    insert_source_publication(sa_sync_conn, source_id="c-3", title="Chapitre", monograph_id=mid)
+    _chapter(sa_sync_conn, source="crossref", source_id="c-2", journal_id=volume, monograph_id=mid)
+    _chapter(sa_sync_conn, source_id="c-3", monograph_id=mid)
 
     candidates = {c.monograph_id: c for c in repo.find_monograph_journal_candidates()}
     found = candidates[mid]
@@ -147,9 +137,7 @@ def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
     empty = _create(repo, "Vide")
     held = _create(repo, "Portée")
-    insert_source_publication(
-        sa_sync_conn, source_id="hal-monographie", title="Chapitre", monograph_id=held
-    )
+    _chapter(sa_sync_conn, source_id="hal-monographie", monograph_id=held)
     deleted = [mid for mid, _ in repo.delete_empty_monographs()]
     assert empty in deleted
     assert held not in deleted
@@ -181,11 +169,10 @@ def test_nature_recalculee_dans_les_deux_sens(repo, sa_sync_conn):
     lncs = _create(repo, "Fun with Algorithms", journal_id=series)
     livre = _create(repo, "Un livre", proceedings=True)
     for source_id, mid in (("c-lncs", lncs), ("c-livre", livre)):
-        insert_source_publication(
+        _chapter(
             sa_sync_conn,
             source="crossref",
             source_id=source_id,
-            title="Chapitre",
             doc_type="book-chapter",
             monograph_id=mid,
         )

@@ -7,17 +7,20 @@ Le parent est désigné par son `publication_id` ; son DOI peut être absent (ci
 """
 
 import json
+from functools import partial
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
 from application.ports.pipeline.relations import DoiPublication, RelationEdge
-from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
 _Q = PgPublicationRelationsQueries()
+
+# Notice de titre « t ».
+_notice = partial(insert_source_publication, title="t")
 
 # Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
@@ -363,22 +366,19 @@ class TestRebuildRelations:
 
 
 class TestFetchSharedKeyPairs:
-    def _notice(self, conn, publication_id, source, source_id, hal_ids):
-        conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, publication_id, external_ids) "
-                "VALUES (:source, :sid, 't', :pid, :ids)"
-            ).bindparams(bindparam("ids", type_=Jsonb)),
-            {"source": source, "sid": source_id, "pid": publication_id, "ids": {"hal_id": hal_ids}},
-        )
-
     def test_publications_sans_doi_partageant_un_identifiant_hal(self, sa_sync_conn):
         """Deux publications distinctes qui partagent une clé forment une paire, avec ou sans DOI."""
         a = _pub(sa_sync_conn, doc_type="conference_paper", title_normalized="t-a", doi=None)
         b = _pub(sa_sync_conn, doc_type="poster", title_normalized="t-b", doi=None)
-        self._notice(sa_sync_conn, a, "hal", "hal-skp-1", ["hal-skp-1"])
-        self._notice(sa_sync_conn, b, "hal", "hal-skp-2", ["hal-skp-2"])
-        self._notice(sa_sync_conn, a, "openalex", "W-skp", ["hal-skp-1", "hal-skp-2"])
+        _notice(sa_sync_conn, a, source_id="hal-skp-1", external_ids={"hal_id": ["hal-skp-1"]})
+        _notice(sa_sync_conn, b, source_id="hal-skp-2", external_ids={"hal_id": ["hal-skp-2"]})
+        _notice(
+            sa_sync_conn,
+            a,
+            source="openalex",
+            source_id="W-skp",
+            external_ids={"hal_id": ["hal-skp-1", "hal-skp-2"]},
+        )
 
         pairs = [p for p in _Q.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
 

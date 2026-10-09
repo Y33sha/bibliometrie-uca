@@ -11,12 +11,18 @@ la décision d'assignation + réconciliation est testée à l'unité
 la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
 """
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 
 from application.services.publications.core import refresh_from_sources
 from domain.normalize import normalize_text
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de 2024, de titre « Test ».
+_notice = partial(insert_source_publication, title="Test", pub_year=2024)
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -47,28 +53,6 @@ def _scalar(conn, sql, **binds):
 class TestRefreshFromSources:
     """Teste refresh_from_sources : recalcul des métadonnées depuis source_publications."""
 
-    def _insert_sd(self, conn, pub_id, source, **kwargs):
-        """Insère un source_document rattaché à pub_id."""
-        conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year, publication_id,
-                                              doc_type, oa_status, language, journal_id)
-                VALUES (:source, :source_id, 'Test', 2024, :pub_id,
-                        :doc_type, :oa_status, :language, :journal_id)
-                """
-            ),
-            {
-                "source": source,
-                "source_id": f"{source}-{pub_id}-{kwargs.get('oa_status', '')}",
-                "pub_id": pub_id,
-                "doc_type": kwargs.get("doc_type"),
-                "oa_status": kwargs.get("oa_status"),
-                "language": kwargs.get("language"),
-                "journal_id": kwargs.get("journal_id"),
-            },
-        )
-
     def test_language_from_source(self, sa_sync_conn):
         """refresh_from_sources propage les métadonnées des source_publications."""
         id1 = _insert_pub(
@@ -78,7 +62,7 @@ class TestRefreshFromSources:
             pub_year=2024,
             doc_type="article",
         )
-        self._insert_sd(sa_sync_conn, id1, "hal", language="en", oa_status="closed")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", language="en", oa_status="closed")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -87,8 +71,14 @@ class TestRefreshFromSources:
     def test_oa_status_upgrade(self, sa_sync_conn):
         """Le statut OA le plus ouvert gagne (closed + green → green)."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/oa", oa_status="closed")
-        self._insert_sd(sa_sync_conn, id1, "hal", oa_status="closed")
-        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="green")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", oa_status="closed")
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id=f"openalex-{id1}-green",
+            oa_status="green",
+        )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
@@ -97,8 +87,14 @@ class TestRefreshFromSources:
     def test_diamond_always_wins(self, sa_sync_conn):
         """Diamond prime sur tout."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
-        self._insert_sd(sa_sync_conn, id1, "hal", oa_status="gold")
-        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="diamond")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-gold", oa_status="gold")
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id=f"openalex-{id1}-diamond",
+            oa_status="diamond",
+        )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
@@ -110,25 +106,27 @@ class TestRefreshFromSources:
         conn = sa_sync_conn
         pub = _insert_pub(conn, doi="10.9001/set", doc_type="dataset", title="obsolète")
         # Pièce convergée, insérée en premier : sans dépriorisation son titre gagnerait.
-        conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(source, source_id, title, pub_year, publication_id, doc_type, doi, raw_metadata) "
-                "VALUES ('datacite', 'dc-piece', 'README_data.txt', 2024, :pid, 'dataset', "
-                "'10.9001/set', "
-                '\'{"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}}\'::jsonb)'
-            ),
-            {"pid": pub},
+        insert_source_publication(
+            conn,
+            pub,
+            source="datacite",
+            source_id="dc-piece",
+            title="README_data.txt",
+            doi="10.9001/set",
+            pub_year=2024,
+            doc_type="dataset",
+            raw_metadata={"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
         )
         # Parent dataset, DOI non corrigé.
-        conn.execute(
-            text(
-                "INSERT INTO source_publications "
-                "(source, source_id, title, pub_year, publication_id, doc_type, doi) "
-                "VALUES ('datacite', 'dc-parent', 'Jeu de données phénotypiques', 2024, :pid, "
-                "'dataset', '10.9001/set')"
-            ),
-            {"pid": pub},
+        insert_source_publication(
+            conn,
+            pub,
+            source="datacite",
+            source_id="dc-parent",
+            title="Jeu de données phénotypiques",
+            doi="10.9001/set",
+            pub_year=2024,
+            doc_type="dataset",
         )
         refresh_from_sources(pub, repo=publication_repository(conn))
         title = _scalar(conn, "SELECT title FROM publications WHERE id = :id", id=pub)
@@ -142,7 +140,9 @@ class TestRefreshFromSources:
         sa_sync_conn.execute(
             text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"), {"id": id1}
         )
-        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="gold")  # source dit gold
+        _notice(
+            sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-gold", oa_status="gold"
+        )  # source dit gold
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
@@ -152,7 +152,9 @@ class TestRefreshFromSources:
         """Tant que pas vérifiée par Unpaywall (`unpaywall_checked_at` NULL), l'OA est
         bien ré-agrégé depuis les sources (comportement nominal préservé)."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/agg", oa_status="closed")
-        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="gold")
+        _notice(
+            sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-gold", oa_status="gold"
+        )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
@@ -161,8 +163,8 @@ class TestRefreshFromSources:
     def test_source_priority_hal_over_openalex(self, sa_sync_conn):
         """HAL est prioritaire sur OpenAlex pour les champs scalaires."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/prio", pub_year=2024, doc_type="article")
-        self._insert_sd(sa_sync_conn, id1, "openalex", language="en")
-        self._insert_sd(sa_sync_conn, id1, "hal", language="fr")
+        _notice(sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-", language="en")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-", language="fr")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -171,8 +173,15 @@ class TestRefreshFromSources:
     def test_thesis_priority_theses_over_hal(self, sa_sync_conn):
         """Pour les thèses, theses.fr est prioritaire."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/thesis-prio", pub_year=2024, doc_type="thesis")
-        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="thesis")
-        self._insert_sd(sa_sync_conn, id1, "theses", language="fr", doc_type="thesis")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-", doc_type="thesis", language="en")
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="theses",
+            source_id=f"theses-{id1}-",
+            doc_type="thesis",
+            language="fr",
+        )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -181,8 +190,15 @@ class TestRefreshFromSources:
     def test_source_priority_hal_over_scanr(self, sa_sync_conn):
         """Pour les non-thèses, HAL est prioritaire sur ScanR (cf. SOURCE_PRIORITY)."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/hal-prio", pub_year=2024, doc_type="article")
-        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="article")
-        self._insert_sd(sa_sync_conn, id1, "scanr", language="fr", doc_type="article")
+        _notice(sa_sync_conn, id1, source_id=f"hal-{id1}-", doc_type="article", language="en")
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="scanr",
+            source_id=f"scanr-{id1}-",
+            doc_type="article",
+            language="fr",
+        )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
@@ -191,7 +207,7 @@ class TestRefreshFromSources:
     def test_ongoing_thesis_to_thesis(self, sa_sync_conn):
         """Un ongoing_thesis passe à thesis quand theses.fr le dit."""
         id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="ongoing_thesis")
-        self._insert_sd(sa_sync_conn, id1, "theses", doc_type="thesis")
+        _notice(sa_sync_conn, id1, source="theses", source_id=f"theses-{id1}-", doc_type="thesis")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
@@ -203,7 +219,9 @@ class TestRefreshFromSources:
         sont détachées (FK ON DELETE SET NULL), pas supprimées."""
         conn = sa_sync_conn
         pid = _insert_pub(conn, doc_type="article", pub_year=2024)
-        self._insert_sd(conn, pid, "openalex", doc_type=out_of_scope_type)
+        _notice(
+            conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type=out_of_scope_type
+        )
         refresh_from_sources(pid, repo=publication_repository(conn))
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
@@ -219,7 +237,7 @@ class TestRefreshFromSources:
         CASCADE) ; la personne, elle, survit."""
         conn = sa_sync_conn
         pid = _insert_pub(conn, doc_type="article", pub_year=2024)
-        self._insert_sd(conn, pid, "openalex", doc_type="peer_review")
+        _notice(conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type="peer_review")
         person_id = conn.execute(
             text(
                 "INSERT INTO persons (last_name, first_name, last_name_normalized, "
@@ -245,15 +263,13 @@ class TestRefreshFromSources:
     def test_keywords_merged(self, sa_sync_conn):
         """Les keywords sont fusionnés sans doublons."""
         id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="article")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, keywords)
-                VALUES ('hal', 'hal-kw1', 'Test', 2024, :p, ARRAY['python', 'data']),
-                       ('openalex', 'oa-kw1', 'Test', 2024, :p, ARRAY['Data', 'machine learning'])
-                """
-            ),
-            {"p": id1},
+        _notice(sa_sync_conn, id1, source_id="hal-kw1", keywords=["python", "data"])
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id="oa-kw1",
+            keywords=["Data", "machine learning"],
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
@@ -275,17 +291,18 @@ class TestRefreshFromSources:
         conflit entre sources, avant le fix les données OpenAlex étaient
         silencieusement perdues si HAL était prioritaire)."""
         id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="article")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
-                VALUES ('hal', 'hal-tp1', 'Test', 2024, :p,
-                        '{"hal_domains": ["info_FacetSep_Informatique [cs]"]}'),
-                       ('openalex', 'oa-tp1', 'Test', 2024, :p,
-                        '{"concepts": ["AI"], "hal_domains": ["math"]}')
-                """
-            ),
-            {"p": id1},
+        _notice(
+            sa_sync_conn,
+            id1,
+            source_id="hal-tp1",
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        )
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id="oa-tp1",
+            topics={"concepts": ["AI"], "hal_domains": ["math"]},
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
@@ -303,17 +320,27 @@ class TestRefreshFromSources:
         Avant le fix, cette liste était silencieusement ignorée (isinstance dict check).
         Maintenant elle est conservée sous la clé 'openalex'."""
         id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="article")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
-                VALUES ('openalex', 'oa-tp2', 'Test', 2024, :p,
-                        '[{"domain": "SS", "field": "Eco", "subfield": "Micro", "topic": "Behav", "score": 0.95}]'::jsonb),
-                       ('theses', 'th-tp2', 'Test', 2024, :p,
-                        '{"discipline": "Info", "rameau": ["Algo"]}')
-                """
-            ),
-            {"p": id1},
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id="oa-tp2",
+            topics=[
+                {
+                    "domain": "SS",
+                    "field": "Eco",
+                    "subfield": "Micro",
+                    "topic": "Behav",
+                    "score": 0.95,
+                }
+            ],
+        )
+        _notice(
+            sa_sync_conn,
+            id1,
+            source="theses",
+            source_id="th-tp2",
+            topics={"discipline": "Info", "rameau": ["Algo"]},
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
@@ -331,16 +358,8 @@ class TestRefreshFromSources:
     def test_is_retracted_or(self, sa_sync_conn):
         """is_retracted = True si au moins une source le dit."""
         id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="article")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, is_retracted)
-                VALUES ('hal', 'hal-ret1', 'Test', 2024, :p, FALSE),
-                       ('openalex', 'oa-ret1', 'Test', 2024, :p, TRUE)
-                """
-            ),
-            {"p": id1},
-        )
+        _notice(sa_sync_conn, id1, source_id="hal-ret1", is_retracted=False)
+        _notice(sa_sync_conn, id1, source="openalex", source_id="oa-ret1", is_retracted=True)
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         is_ret = _scalar(

@@ -20,8 +20,12 @@ from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.addresses import ensure_country, insert_address
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 from tests.integration.helpers.structures import insert_structure
 
 _GATEWAY = PgCountryQueries()
@@ -432,34 +436,14 @@ class TestPropagateCountriesToPublications:
         pub_id = sa_sync_conn.execute(
             text("INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id")
         ).scalar_one()
-        sp_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, publication_id) "
-                "VALUES ('hal', 'h-1', 'Test', :pid) RETURNING id"
-            ),
-            {"pid": pub_id},
-        ).scalar_one()
-        identity_id = upsert_identity(sa_sync_conn)
-        sa_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorships "
-                "(source, source_publication_id, author_position, identity_id, raw_author_name) "
-                "VALUES ('hal', :sp, 0, :iid, 'X') RETURNING id"
-            ),
-            {"sp": sp_id, "iid": identity_id},
-        ).scalar_one()
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="h-1", title="Test")
+        sa_id = insert_signature(sa_sync_conn, sp_id)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         sa_sync_conn.execute(
             text("UPDATE addresses SET countries = :c WHERE id = :id"),
             {"c": ["FR"], "id": addr},
         )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorship_addresses "
-                "(source_authorship_id, address_id) VALUES (:sa, :a)"
-            ),
-            {"sa": sa_id, "a": addr},
-        )
+        insert_signature_address(sa_sync_conn, sa_id, address_id=addr)
 
         propagate_countries_to_publications(sa_sync_conn, [addr], country_queries=_GATEWAY)
 
