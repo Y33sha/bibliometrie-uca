@@ -16,12 +16,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
+from application.pipeline.context import PhaseContext
 from application.pipeline.extract.base import scoped_logger
 from application.pipeline.libelles import DERNIERE_BRANCHE, branche_de_source
 from application.pipeline.metrics import PhaseMetrics
@@ -38,7 +40,7 @@ from application.ports.pipeline.extract.fetch_stale import (
 )
 from domain.sources.registry import ALL_SOURCES
 
-__all__ = ["refresh", "run_phase"]
+__all__ = ["FetchStalePhase", "refresh"]
 
 COMMIT_EVERY = 50
 
@@ -51,56 +53,55 @@ GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
 """`(start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
 
-def run_phase(
-    *,
-    mode: str,
-    sources: set[str] | None,
-    include_wos: bool,
-    year: int | None,
-    start_year: int | None,
-    refresh_one: RefreshOne,
-    credentials_missing: CredentialsMissing,
-    get_years_for_window: GetYearsForWindow,
-    logger: logging.Logger,
-) -> PhaseMetrics:
-    """Rafraîchit le stale de chaque source configurée, bornée à la fenêtre d'années du run.
+@dataclass(frozen=True)
+class FetchStalePhase:
+    refresh_one: RefreshOne
+    credentials_missing: CredentialsMissing
+    get_years_for_window: GetYearsForWindow
 
-    La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
-    """
-    metrics = PhaseMetrics()
-    if not MODES[mode].fetch_stale:
-        logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, mode)
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Rafraîchit le stale de chaque source configurée, bornée à la fenêtre d'années du run.
+
+        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
+        """
+        options, logger = ctx.options, ctx.logger
+        metrics = PhaseMetrics()
+        if not MODES[options.mode].fetch_stale:
+            logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
+            return metrics
+        targets = select_targets(
+            ALL_SOURCES, options.sources or None, include_wos=options.include_wos
+        )
+        configured = filter_configured(
+            targets,
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=logger,
+            phase="fetch_stale",
+        )
+
+        year = options.year
+        years_default = [int(year)] if year else self.get_years_for_window(options.start_year)
+        years_theses = [int(year)] if year else None
+
+        by_source: dict[str, dict[str, float]] = {}
+        for target in configured:
+            row_years = years_theses if target == "theses" else years_default
+            source_metrics, duration = timed_metrics(partial(self.refresh_one, target, row_years))
+            metrics.merge(source_metrics)
+            by_source[target] = {
+                "interrogated": source_metrics.total,
+                "refreshed": source_metrics.updated,
+                "unchanged": source_metrics.unchanged,
+                "disappeared": source_metrics.extras.get("disappeared", 0),
+                "duration_s": round(duration, 1),
+            }
+
+        if by_source:
+            metrics.details["table"] = {
+                "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+            }
         return metrics
-    targets = select_targets(ALL_SOURCES, sources, include_wos=include_wos)
-    configured = filter_configured(
-        targets,
-        metrics,
-        credentials_missing=credentials_missing,
-        logger=logger,
-        phase="fetch_stale",
-    )
-
-    years_default = [int(year)] if year else get_years_for_window(start_year)
-    years_theses = [int(year)] if year else None
-
-    by_source: dict[str, dict[str, float]] = {}
-    for target in configured:
-        row_years = years_theses if target == "theses" else years_default
-        source_metrics, duration = timed_metrics(partial(refresh_one, target, row_years))
-        metrics.merge(source_metrics)
-        by_source[target] = {
-            "interrogated": source_metrics.total,
-            "refreshed": source_metrics.updated,
-            "unchanged": source_metrics.unchanged,
-            "disappeared": source_metrics.extras.get("disappeared", 0),
-            "duration_s": round(duration, 1),
-        }
-
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
 
 
 async def refresh(

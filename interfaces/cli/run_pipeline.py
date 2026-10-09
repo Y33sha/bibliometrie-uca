@@ -198,21 +198,15 @@ def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
 
     Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 
-    Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::run_phase`.
+    Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::FetchStalePhase`.
     """
-    from application.pipeline.extract.fetch_stale import run_phase
+    from application.pipeline.extract.fetch_stale import FetchStalePhase
 
-    return run_phase(
-        mode=options.mode,
-        sources=set(options.sources) if options.sources else None,
-        include_wos=options.include_wos,
-        year=options.year,
-        start_year=options.start_year,
+    return FetchStalePhase(
         refresh_one=_run_fetch_stale,
         credentials_missing=_credentials_missing,
         get_years_for_window=_get_years_for_window,
-        logger=log,
-    )
+    ).run(_context(options))
 
 
 def _credentials_missing(source: str) -> str | None:
