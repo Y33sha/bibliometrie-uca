@@ -15,8 +15,14 @@ Vérifie :
 
 from __future__ import annotations
 
+from functools import partial
+
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import create_all_publications
+from tests.integration.helpers.staging import insert_staging
+
+# Ligne de staging Crossref à traiter.
+_crossref_staging = partial(insert_staging, source="crossref", processed=False)
 
 CROSSREF_STAGING_DOCS = [
     {
@@ -69,18 +75,16 @@ CROSSREF_STAGING_DOCS = [
 
 
 def _insert_crossref_staging(conn, docs):
-    from sqlalchemy import bindparam, text
-
-    from infrastructure.db.jsonb import Jsonb
-
-    stmt = text("""
-        INSERT INTO staging (source, source_id, doi, raw_data, processed)
-        VALUES ('crossref', :source_id, :doi, :raw_data, FALSE)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            processed = FALSE, raw_data = EXCLUDED.raw_data
-    """).bindparams(bindparam("raw_data", type_=Jsonb))
     for doc in docs:
-        conn.execute(stmt, doc)
+        insert_staging(
+            conn,
+            "crossref",
+            source_id=doc["source_id"],
+            doi=doc["doi"],
+            raw_data=doc["raw_data"],
+            processed=False,
+            upsert="raw_data",
+        )
 
 
 def _run_normalize_crossref(conn):
@@ -232,15 +236,9 @@ class TestNormalizeCrossrefIdempotence:
 class TestNormalizeCrossrefSkipBranches:
     def test_skips_when_raw_data_empty(self, sa_sync_conn):
         # raw_data vide → process_work retourne None et marque processed.
-        from sqlalchemy import bindparam, text
+        from sqlalchemy import text
 
-        from infrastructure.db.jsonb import Jsonb
-
-        stmt = text("""
-            INSERT INTO staging (source, source_id, doi, raw_data, processed)
-            VALUES ('crossref', '10.9999/cr-empty', '10.9999/cr-empty', :raw_data, FALSE)
-        """).bindparams(bindparam("raw_data", type_=Jsonb))
-        sa_sync_conn.execute(stmt, {"raw_data": {}})
+        _crossref_staging(sa_sync_conn, source_id="10.9999/cr-empty", doi="10.9999/cr-empty")
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
@@ -256,15 +254,9 @@ class TestNormalizeCrossrefSkipBranches:
 
     def test_skips_when_no_doi(self, sa_sync_conn):
         # raw_data sans DOI → skip avec WARNING + processed=TRUE.
-        from sqlalchemy import bindparam, text
+        from sqlalchemy import text
 
-        from infrastructure.db.jsonb import Jsonb
-
-        stmt = text("""
-            INSERT INTO staging (source, source_id, doi, raw_data, processed)
-            VALUES ('crossref', 'no-doi-001', NULL, :raw_data, FALSE)
-        """).bindparams(bindparam("raw_data", type_=Jsonb))
-        sa_sync_conn.execute(stmt, {"raw_data": {"title": ["Untitled"]}})
+        _crossref_staging(sa_sync_conn, source_id="no-doi-001", raw_data={"title": ["Untitled"]})
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
@@ -278,15 +270,14 @@ class TestNormalizeCrossrefSkipBranches:
 
     def test_skips_when_no_title_or_year(self, sa_sync_conn):
         # raw_data avec DOI mais sans titre/année → skip.
-        from sqlalchemy import bindparam, text
+        from sqlalchemy import text
 
-        from infrastructure.db.jsonb import Jsonb
-
-        stmt = text("""
-            INSERT INTO staging (source, source_id, doi, raw_data, processed)
-            VALUES ('crossref', '10.9999/no-title', '10.9999/no-title', :raw_data, FALSE)
-        """).bindparams(bindparam("raw_data", type_=Jsonb))
-        sa_sync_conn.execute(stmt, {"raw_data": {"DOI": "10.9999/no-title"}})
+        _crossref_staging(
+            sa_sync_conn,
+            source_id="10.9999/no-title",
+            doi="10.9999/no-title",
+            raw_data={"DOI": "10.9999/no-title"},
+        )
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0

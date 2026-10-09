@@ -1,21 +1,17 @@
 """Tests d'intégration pour `infrastructure.pipeline.normalize.source_publications`."""
 
-from sqlalchemy import Connection, text
+from functools import partial
+
+from sqlalchemy import text
 
 from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+from tests.integration.helpers.staging import insert_staging
+
+# Ligne de staging theses.fr « t-stg ».
+_thesis_staging = partial(insert_staging, source="theses", source_id="t-stg")
 
 _Q = PgSourcePublicationQueries()
-
-
-def _create_staging(conn: Connection, source_id: str = "t-stg") -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO staging (source, source_id, raw_data) "
-            "VALUES ('theses', :sid, '{}'::jsonb) RETURNING id"
-        ),
-        {"sid": source_id},
-    ).scalar_one()
 
 
 def _row(staging_id: int, **overrides) -> SourcePublicationUpsert:
@@ -32,7 +28,7 @@ def _row(staging_id: int, **overrides) -> SourcePublicationUpsert:
 
 class TestUpsertSourcePublication:
     def test_inserts_new(self, sa_sync_conn):
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
         row = sa_sync_conn.execute(
             text("SELECT title, language FROM source_publications WHERE id = :id"),
@@ -43,13 +39,13 @@ class TestUpsertSourcePublication:
 
     def test_reimport_keeps_row_identity(self, sa_sync_conn):
         """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         first = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         second = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
         assert first == second
 
     def test_reimport_overwrites_metadata(self, sa_sync_conn):
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(
             sa_sync_conn, _row(staging_id, title="Titre initial", language="en")
         )
@@ -65,7 +61,7 @@ class TestUpsertSourcePublication:
 
     def test_reimport_without_a_value_clears_it(self, sa_sync_conn):
         """Le dernier import fait autorité : une valeur absente de l'import courant est effacée."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(
             sa_sync_conn,
             _row(staging_id, impact={"cited_by_count": 500}, abstract="Un résumé", language="fr"),
@@ -81,7 +77,7 @@ class TestUpsertSourcePublication:
 
     def test_reimport_marks_keys_dirty(self, sa_sync_conn):
         """`keys_dirty` signale la ligne à la phase `publications`, qui recalcule son rattachement."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         sa_sync_conn.execute(
             text("UPDATE source_publications SET keys_dirty = false WHERE id = :id"),
@@ -95,7 +91,7 @@ class TestUpsertSourcePublication:
 
     def test_reimport_clears_the_original_values_of_corrections(self, sa_sync_conn):
         """Régression : une valeur d'origine gardée d'un import précédent l'emportait sur la valeur fraîche à la correction suivante."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         sa_sync_conn.execute(
             text(
@@ -113,7 +109,7 @@ class TestUpsertSourcePublication:
 
     def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
         """La colonne est `NOT NULL` et contrainte à un objet JSON."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, external_ids=None))
         assert (
             sa_sync_conn.execute(
@@ -125,7 +121,7 @@ class TestUpsertSourcePublication:
 
     def test_external_ids_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
         """Chaque valeur passe par son value object. Une valeur invalide ou une clé inconnue est écartée et journalisée."""
-        staging_id = _create_staging(sa_sync_conn)
+        staging_id = _thesis_staging(sa_sync_conn)
         sp_id = _Q.upsert_source_publication(
             sa_sync_conn,
             _row(

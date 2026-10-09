@@ -12,11 +12,11 @@ différent, l'UPSERT écrase `raw_data` avec la version tronquée et le
 refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 """
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
-from infrastructure.db.jsonb import Jsonb
 from infrastructure.fingerprint import fingerprint
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
+from tests.integration.helpers.staging import insert_staging
 
 _adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
 
@@ -60,14 +60,6 @@ def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=
     }
 
 
-_SEED_REFETCHED_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES ('openalex', :source_id, :doi, :raw_data, :raw_hash, :processed)
-    """
-).bindparams(bindparam("raw_data", type_=Jsonb))
-
-
 def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
     """Pose une ligne staging dans l'état post-refetch.
 
@@ -76,15 +68,14 @@ def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
     initiale dont le hash est conservé en base (c'est l'invariant
     de préservation : refetch ne recalcule pas `raw_hash`).
     """
-    conn.execute(
-        _SEED_REFETCHED_SQL,
-        {
-            "source_id": source_id,
-            "doi": full_work["doi"].replace("https://doi.org/", ""),
-            "raw_data": full_work,
-            "raw_hash": fingerprint(bulk_payload),
-            "processed": processed,
-        },
+    insert_staging(
+        conn,
+        "openalex",
+        source_id=source_id,
+        doi=full_work["doi"].replace("https://doi.org/", ""),
+        raw_data=full_work,
+        raw_hash=fingerprint(bulk_payload),
+        processed=processed,
     )
 
 
