@@ -70,22 +70,34 @@ class PublishersJournalsPhase:
         ):
             openalex = self.enrich_from_openalex()
 
+        sudoc = self.check_in_sudoc()
+        merges = self.merge_duplicates()
+        deletions = self.delete_empty()
+        monograph_merges = self.merge_duplicate_monographs()
+        monograph_deletions = self.delete_empty_monographs()
+        monograph_links = self.link_monographs_to_collections()
+        publisher_deletions = self.delete_empty_publishers()
+        proceedings = self.type_proceedings()
+        volumes = self.type_proceedings_volumes()
+        namespaces = self.learn_doi_namespaces()
+        doaj = self.enrich_from_doaj()
+
         _assemble(
             metrics,
             logger,
             publishers=publishers,
             openalex=openalex,
-            sudoc=self.check_in_sudoc(),
-            merges=self.merge_duplicates(),
-            deletions=self.delete_empty(),
-            monograph_merges=self.merge_duplicate_monographs(),
-            monograph_deletions=self.delete_empty_monographs(),
-            monograph_links=self.link_monographs_to_collections(),
-            publisher_deletions=self.delete_empty_publishers(),
-            proceedings=self.type_proceedings(),
-            volumes=self.type_proceedings_volumes(),
-            namespaces=self.learn_doi_namespaces(),
-            doaj=self.enrich_from_doaj(),
+            sudoc=sudoc,
+            merges=merges,
+            deletions=deletions,
+            monograph_merges=monograph_merges,
+            monograph_deletions=monograph_deletions,
+            monograph_links=monograph_links,
+            publisher_deletions=publisher_deletions,
+            proceedings=proceedings,
+            volumes=volumes,
+            namespaces=namespaces,
+            doaj=doaj,
         )
         return metrics
 
