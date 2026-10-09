@@ -2,10 +2,9 @@
 
 La phase encadre quatre sous-étapes de deux bilans, et en tire un résumé : combien d'adresses manquaient de pays au départ, combien la passe en a rattaché, ce qui reste. Ce résumé est le propos de la phase — les sous-étapes, elles, ont leurs propres tests.
 
-`retry_empty` distingue le mode complet du mode quotidien : il fait repasser la suggestion sur les adresses déjà tentées sans résultat.
+Le mode complet fait repasser la suggestion sur les adresses déjà tentées sans résultat.
 """
 
-import logging
 from unittest.mock import patch
 
 import pytest
@@ -13,8 +12,6 @@ import pytest
 from application.pipeline.countries import phase
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.countries import AddressCountryStatus
-
-_LOG = logging.getLogger("test")
 
 
 class _FakeCountryQueries:
@@ -61,10 +58,10 @@ def sous_etapes():
         yield appels
 
 
-def test_resume_l_entonnoir_des_bilans(open_tx, sous_etapes):
+def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes):
     queries = _FakeCountryQueries([_bilan(100, 60), _bilan(100, 85, with_suggestion=7)])
 
-    metrics = phase.run(open_tx, queries, _LOG, retry_empty=False)
+    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
     assert metrics.details["summary"] == {
         "total": 100,
@@ -76,34 +73,37 @@ def test_resume_l_entonnoir_des_bilans(open_tx, sous_etapes):
     }
 
 
-def test_cumule_les_metriques_des_sous_etapes(open_tx, sous_etapes):
+def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes):
     queries = _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)])
 
-    metrics = phase.run(open_tx, queries, _LOG, retry_empty=False)
+    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
     assert metrics.new == 11  # 4 (nom de pays) + 6 (nom de lieu) + 1 (suggestion)
     assert sous_etapes["refresh"] is True
 
 
-def test_base_vide_sans_division_par_zero(open_tx, sous_etapes):
+def test_base_vide_sans_division_par_zero(contexte, sous_etapes):
     queries = _FakeCountryQueries([_bilan(0, 0), _bilan(0, 0)])
 
-    metrics = phase.run(open_tx, queries, _LOG, retry_empty=False)
+    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
     assert metrics.details["summary"]["without_pct"] == 0
 
 
-def test_retry_empty_transmis_a_la_suggestion(open_tx, sous_etapes):
+@pytest.mark.parametrize(("mode", "retry_empty"), [("daily", False), ("full", True)])
+def test_le_mode_decide_de_retenter_les_suggestions_vides(
+    contexte, sous_etapes, mode: str, retry_empty: bool
+):
     queries = _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)])
 
-    phase.run(open_tx, queries, _LOG, retry_empty=True)
+    phase.CountriesPhase(queries).run(contexte(mode=mode))
 
-    assert sous_etapes["retry_empty"] is True
+    assert sous_etapes["retry_empty"] is retry_empty
 
 
-def test_chaque_sous_etape_dans_sa_transaction(open_tx, sous_etapes):
+def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes):
     queries = _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)])
 
-    phase.run(open_tx, queries, _LOG, retry_empty=False)
+    phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
     assert open_tx.transactions == 6  # deux bilans + quatre sous-étapes
