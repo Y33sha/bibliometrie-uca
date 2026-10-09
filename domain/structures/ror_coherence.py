@@ -62,8 +62,8 @@ def tutelle_coherence(
     ror_edges = list(ror_edges)
     ror_parents = _parents_by_child(ror_edges)
     ror_children: dict[RorId, set[RorId]] = defaultdict(set)
-    for parent, child in ror_edges:
-        ror_children[parent].add(child)
+    for parent_ror, child_ror in ror_edges:
+        ror_children[parent_ror].add(child_ror)
 
     structures_by_ror: dict[RorId, set[int]] = defaultdict(set)
     for structure_id, ror_id in structure_rors.items():

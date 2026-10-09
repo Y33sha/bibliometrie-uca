@@ -42,12 +42,12 @@ class PgRorRepository:
                     for org in batch
                 ],
             )
-        for batch in batched(relations, _BATCH_SIZE):
+        for relation_batch in batched(relations, _BATCH_SIZE):
             self._conn.execute(
                 insert(ror_relations),
                 [
                     {"parent_ror_id": parent.value, "child_ror_id": child.value}
-                    for parent, child in batch
+                    for parent, child in relation_batch
                 ],
             )
         self._conn.execute(
