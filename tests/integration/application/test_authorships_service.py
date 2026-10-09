@@ -4,8 +4,6 @@ Documentent le comportement actuel des fonctions du service pour protéger
 contre les régressions lors de refactos ultérieurs.
 """
 
-import json
-
 import pytest
 from sqlalchemy import text
 
@@ -22,6 +20,7 @@ from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.structures import insert_structure, refresh_structure_matviews
 
@@ -109,13 +108,6 @@ def _create_perimeter(conn, code, name, structure_ids):
         {"c": code, "n": name, "sids": structure_ids},
     ).one()
     return row.id
-
-
-def _set_config(conn, key, value):
-    conn.execute(
-        text("INSERT INTO config (key, value) VALUES (:k, CAST(:v AS jsonb))"),
-        {"k": key, "v": json.dumps(value)},
-    )
 
 
 def _link_address_structure(conn, address_id, structure_id, is_confirmed=True):
@@ -574,8 +566,8 @@ class TestPropagateUcaForAddresses:
 
         uca_id = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
         _create_perimeter(conn, "uca", "UCA", [uca_id])
-        _set_config(conn, "perimeter_persons", "uca")
-        _set_config(conn, "perimeter_extraction", "uca")
+        set_config(conn, "perimeter_persons", "uca")
+        set_config(conn, "perimeter_extraction", "uca")
         refresh_perimeter_structures(conn)
         return uca_id
 

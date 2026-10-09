@@ -5,8 +5,6 @@ Trois réglages en dépendent : les années à couvrir, les collections HAL à m
 Les clés dont la forme est imposée — plafonds d'interrogation, délais de réinterrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
 """
 
-import json
-
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -25,25 +23,18 @@ from infrastructure.sources.config import (
     get_unpaywall_recheck_after_days,
     get_years,
 )
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.structures import insert_perimeter, insert_structure
-
-
-def _set_config(conn, key: str, value) -> None:
-    conn.execute(text("DELETE FROM config WHERE key = :k"), {"k": key})
-    conn.execute(
-        text("INSERT INTO config (key, value) VALUES (:k, CAST(:v AS jsonb))"),
-        {"k": key, "v": json.dumps(value)},
-    )
 
 
 class TestGetYears:
     def test_uses_config_anchor_when_no_argument(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "pipeline_start_year_full", 2017)
+        set_config(sa_sync_conn, "pipeline_start_year_full", 2017)
         current = today().year
         assert get_years(sa_sync_conn) == list(range(2017, current + 1))
 
     def test_explicit_start_year_overrides_config(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "pipeline_start_year_full", 2017)
+        set_config(sa_sync_conn, "pipeline_start_year_full", 2017)
         current = today().year
         assert get_years(sa_sync_conn, start_year=2020) == list(range(2020, current + 1))
 
@@ -66,17 +57,17 @@ class TestFormeImposeeEnBase:
     @pytest.mark.parametrize("valeur", ["pas une année", True, "2017", 1969, 3.5])
     def test_une_annee_hors_forme_est_refusee(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_year_is_in_range"):
-            _set_config(sa_sync_conn, "pipeline_start_year_full", valeur)
+            set_config(sa_sync_conn, "pipeline_start_year_full", valeur)
 
     @pytest.mark.parametrize("valeur", ["beaucoup", -1, True, 2.5])
     def test_un_plafond_hors_forme_est_refuse(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_cap_is_non_negative_integer"):
-            _set_config(sa_sync_conn, "unpaywall_max_per_run", valeur)
+            set_config(sa_sync_conn, "unpaywall_max_per_run", valeur)
 
     @pytest.mark.parametrize("valeur", ["longtemps", 0, -3, True, 1.5])
     def test_un_delai_hors_forme_est_refuse(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_delay_is_positive_integer"):
-            _set_config(sa_sync_conn, "fetch_stale_after_days", valeur)
+            set_config(sa_sync_conn, "fetch_stale_after_days", valeur)
 
 
 class TestGetHalCollections:
@@ -84,13 +75,13 @@ class TestGetHalCollections:
         conn = sa_sync_conn
         structure = insert_structure(conn, "cfg_labo_a", hal_collection="LABO-A")
         insert_perimeter(conn, "cfg_perim", root_structure_ids=[structure], materialize=True)
-        _set_config(conn, "perimeter_extraction", "cfg_perim")
+        set_config(conn, "perimeter_extraction", "cfg_perim")
 
         assert get_hal_collections(conn) == {"LABO-A": "cfg_labo_a"}
 
     def test_perimetre_designe_mais_inexistant(self, sa_sync_conn):
         conn = sa_sync_conn
-        _set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
+        set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
 
         assert get_hal_collections(conn) == {}
 
@@ -100,7 +91,7 @@ class TestGetHalCollections:
         insert_perimeter(
             conn, "cfg_perim_sans_collection", root_structure_ids=[structure], materialize=True
         )
-        _set_config(conn, "perimeter_extraction", "cfg_perim_sans_collection")
+        set_config(conn, "perimeter_extraction", "cfg_perim_sans_collection")
 
         assert get_hal_collections(conn) == {}
 
@@ -119,7 +110,7 @@ class TestGetExtractionApiIds:
         insert_perimeter(
             conn, "cfg_perim_ids", root_structure_ids=[premiere, seconde], materialize=True
         )
-        _set_config(conn, "perimeter_extraction", "cfg_perim_ids")
+        set_config(conn, "perimeter_extraction", "cfg_perim_ids")
 
         # Dédupliqués, dans l'ordre de première rencontre.
         assert get_extraction_api_ids(conn, "openalex") == ["I1", "I2", "I3"]
@@ -130,7 +121,7 @@ class TestGetExtractionApiIds:
         insert_perimeter(
             conn, "cfg_perim_scalaire", root_structure_ids=[structure], materialize=True
         )
-        _set_config(conn, "perimeter_extraction", "cfg_perim_scalaire")
+        set_config(conn, "perimeter_extraction", "cfg_perim_scalaire")
 
         assert get_extraction_api_ids(conn, "scanr") == ["S1"]
 
@@ -142,7 +133,7 @@ class TestGetExtractionApiIds:
         insert_perimeter(
             conn, "cfg_perim_formes", root_structure_ids=[premiere, seconde], materialize=True
         )
-        _set_config(conn, "perimeter_extraction", "cfg_perim_formes")
+        set_config(conn, "perimeter_extraction", "cfg_perim_formes")
 
         assert get_extraction_api_ids(conn, "openalex") == ["I2"]
 
@@ -150,7 +141,7 @@ class TestGetExtractionApiIds:
         conn = sa_sync_conn
         structure = insert_structure(conn, "cfg_labo_e", api_ids={"openalex": ["I1"]})
         insert_perimeter(conn, "cfg_perim_autre", root_structure_ids=[structure], materialize=True)
-        _set_config(conn, "perimeter_extraction", "cfg_perim_autre")
+        set_config(conn, "perimeter_extraction", "cfg_perim_autre")
 
         assert get_extraction_api_ids(conn, "wos") == []
 
@@ -162,7 +153,7 @@ class TestGetExtractionApiIds:
 
     def test_perimetre_configure_mais_vide(self, sa_sync_conn):
         conn = sa_sync_conn
-        _set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
+        set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
 
         assert get_extraction_api_ids(conn, "openalex") == []
 
@@ -171,11 +162,11 @@ class TestPlafondsParRun:
     """Plafonds d'interrogation lus en configuration, zéro valant illimité."""
 
     def test_le_plafond_unpaywall_configure_est_lu(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "unpaywall_max_per_run", 250)
+        set_config(sa_sync_conn, "unpaywall_max_per_run", 250)
         assert get_unpaywall_max_per_run(sa_sync_conn) == 250
 
     def test_zero_vaut_illimite_pour_unpaywall(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "unpaywall_max_per_run", 0)
+        set_config(sa_sync_conn, "unpaywall_max_per_run", 0)
         assert get_unpaywall_max_per_run(sa_sync_conn) is None
 
     def test_la_cle_absente_laisse_le_plafond_par_defaut(self, sa_sync_conn):
@@ -183,11 +174,11 @@ class TestPlafondsParRun:
         assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
 
     def test_le_plafond_de_fetch_missing_configure_est_lu(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
+        set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
         assert get_fetch_missing_max_per_source(sa_sync_conn) == 5000
 
     def test_zero_vaut_illimite_pour_fetch_missing(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
+        set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
         assert get_fetch_missing_max_per_source(sa_sync_conn) is None
 
     def test_fetch_missing_sans_cle_est_illimite(self, sa_sync_conn):
@@ -208,7 +199,7 @@ class TestDelais:
         ],
     )
     def test_le_delai_configure_est_lu(self, sa_sync_conn, key, lire):
-        _set_config(sa_sync_conn, key, 7)
+        set_config(sa_sync_conn, key, 7)
         assert lire(sa_sync_conn) == 7
 
     def test_la_cle_absente_laisse_le_delai_par_defaut(self, sa_sync_conn):

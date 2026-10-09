@@ -1,8 +1,6 @@
 """Tests de caractérisation pour application/addresses_structures.py
 et application/addresses_countries.py."""
 
-import json
-
 import pytest
 from sqlalchemy import text
 
@@ -23,6 +21,7 @@ from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.structures import insert_structure
 
 _GATEWAY = PgCountryQueries()
@@ -53,13 +52,6 @@ def _create_perimeter(conn, code, structure_ids):
     )
 
 
-def _set_config(conn, key, value):
-    conn.execute(
-        text("INSERT INTO config (key, value) VALUES (:key, CAST(:val AS jsonb))"),
-        {"key": key, "val": json.dumps(value)},
-    )
-
-
 def _insert_address_structure(
     conn, address_id, structure_id, *, is_confirmed=None, matched_form_id=None
 ):
@@ -78,7 +70,7 @@ def _setup_uca_perimeter(conn):
     """Monte un périmètre UCA minimal pour que propagate_in_perimeter_for_addresses marche."""
     uca = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
     _create_perimeter(conn, "uca", [uca])
-    _set_config(conn, "perimeter_persons", "uca")
+    set_config(conn, "perimeter_persons", "uca")
     return uca
 
 
