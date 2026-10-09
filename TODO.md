@@ -25,6 +25,7 @@
 * [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée) / Cf personne 62293
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 * [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
+* [ ] titres de revues: OpenAlex zappe les apostrophes; corriger
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
