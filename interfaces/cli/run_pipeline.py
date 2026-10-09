@@ -42,7 +42,7 @@ from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE
 from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from domain.dates import date_to_french
-from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -234,23 +234,20 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
 
     Séquence, nettoyage et VACUUM dans `application/pipeline/normalize/phase.py`.
     """
-    from application.pipeline.normalize.phase import run
+    from application.pipeline.normalize.phase import NormalizePhase
 
     registry = _normalize_builders(archive=options.raw_store, full=options.normalize_full)
 
     def normalize_one(source: str) -> dict[str, object]:
         return _run_normalize(source, registry[source])
 
-    return run(
-        sources=options.sources if options.sources is not None else set(ALL_SOURCES_SET),
-        mode=options.mode,
+    return NormalizePhase(
         ordered_sources=list(registry),
         normalize_one=normalize_one,
         prune_disappeared=_run_prune_disappeared,
         cleanup_orphan_identities=_run_cleanup_orphan_identities,
         vacuum_staging=_vacuum_staging,
-        logger=log,
-    )
+    ).run(_context(options))
 
 
 def _run_prune_disappeared() -> int:
