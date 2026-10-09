@@ -1,6 +1,6 @@
 #  Résolution et création des personnes
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-09.*
 
 ```mermaid
 flowchart LR
@@ -21,7 +21,7 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 3. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-4. **Forme de nom** : le nom normalisé de la signature désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — variantes prénom/nom, nom/prénom, initiales — et du nom porté par ses signatures. Un nom qui désigne plusieurs personnes laisse la signature orpheline, pour traitement manuel via `admin/orphan-authorships`.
+4. **Forme de nom** : le nom normalisé de la signature désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — « prénom nom » et « initiales nom » — et du nom porté par ses signatures. Une signature est cherchée sous la forme « prénom nom », puis « nom prénom », ce qui rattrape un nom et un prénom inversés par la source. Un nom qui désigne plusieurs personnes laisse la signature orpheline, pour traitement manuel via `admin/orphan-authorships`.
 
 5. **Même publication, même position, dans une autre source** : une autre source donne la même publication, avec à la même position d'auteur une signature déjà rattachée à une personne, dont le nom est compatible. Interrogé en dernier : il s'appuie sur les rattachements que les critères précédents viennent de poser.
 

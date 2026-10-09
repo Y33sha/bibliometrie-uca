@@ -18,8 +18,6 @@ Cinq sources sur sept fournissent nom et prénom séparés. La normalisation les
 
 OpenAlex et ScanR portent environ la moitié des signatures du périmètre. Une même personne a le plus souvent aussi une signature d'une source qui fournit le découpage.
 
-Un test de record linkage probabiliste (Splink) sur les signatures du périmètre bute sur ces inversions. Des signatures de même ORCID ont nom et prénom inversés, donc le modèle sous-pondère la discordance des prénoms. Le test reprend sur les noms découpés.
-
 ## Décisions
 
 - Le découpage nom / prénom précède tout matching.
@@ -27,7 +25,6 @@ Un test de record linkage probabiliste (Splink) sur les signatures du périmètr
 - `source_authorships` stocke ce que la source fournit : `raw_last_name` et `raw_first_name` quand la source les sépare, sinon `raw_author_name`. Une contrainte impose l'une ou l'autre forme.
 - `author_identifying_keys` porte le découpage retenu, normalisé, dans la clé d'identité.
 - `person_name_forms` stocke une chaîne « prénom nom » normalisée, au format de `author_identifying_keys.author_name_normalized`.
-- L'interface présente les formes de nom (volet personne, formes confirmées et rejetées) telles que les sources les donnent, au format « Prénom Nom ».
 
 ## Phasage
 
@@ -63,21 +60,11 @@ Une inversion se repère en confrontant le découpage d'une signature aux person
 - [x] Matching par forme de nom et corroboration d'un identifiant : forme « prénom nom », puis « nom prénom ».
 - [x] Personnes au nom de famille fait d'initiales (17) : supprimées par un oneshot, puis recréées ou rattachées par le pipeline d'après le découpage de leurs signatures.
 - [x] Personne créée : découpage de la source en priorité sur celui du parseur.
-- [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 
-### Phase 4 — Interface
+### Phase 4 — Documentation
 
-- [ ] Volet personne et listes de formes de nom confirmées et rejetées : formes « Prénom Nom » des sources.
-
-### Phase 5 — Reprise du test Splink
-
-- [ ] Modèle relancé sur les noms découpés, comparé aux rattachements de la base.
-
-### Phase 6 — Documentation
-
-- [ ] Mise à jour de `docs/pipeline` (normalisation, personnes).
+- [x] Corrections de `docs/pipeline` : identité d'une signature (normalisation), formes de nom et ordre inverse au matching (personnes).
 
 ## Questions ouvertes
 
-- Affichage d'une forme normalisée qui regroupe plusieurs graphies brutes : la plus fréquente, ou toutes ?
 - Parseur : la règle des initiales finales vise le format « Nom I. » (« Del Buono L. »). Comparée au découpage natif de la même signature, elle est juste dans 335 cas sur 392. Elle se trompe sur « Prénom Nom I. » (34 cas, « Valérie Julian V ») et « Nom Prénom I. » (23 cas, « Brandt Mark J. »). La chaîne seule ne distingue pas ces formats.
