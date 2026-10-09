@@ -17,6 +17,7 @@ Périmètre des scénarios :
 """
 
 import logging
+from functools import partial
 
 from sqlalchemy import text
 
@@ -25,9 +26,12 @@ from application.pipeline.persons.cascade import run_cascade
 from application.services.persons.core import add_name_form, create_person
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.authorships import upsert_identity, upsert_split_identity
+from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Notice de 2024, de titre « Test ».
+_notice = partial(insert_source_publication, title="Test", pub_year=2024)
 
 _queries = PgPersonsMatchingQueries()
 _logger = logging.getLogger("test")
@@ -140,9 +144,7 @@ class TestPasseDeCreation:
     def test_une_signature_hors_perimetre_ne_cree_pas_de_personne(self, sa_sync_conn):
         """Un nom inconnu hors périmètre reste sans personne, sans en introduire une."""
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source="openalex", source_id="W1")
         signature = _insert_authorship(
             sa_sync_conn, "openalex", sp, "Inconnue Hors Perimetre", in_perimeter=False
         )
@@ -156,9 +158,7 @@ class TestPasseDeCreation:
     def test_une_signature_du_perimetre_cree_sa_personne(self, sa_sync_conn):
         """Le pendant : dans le périmètre, un nom inconnu introduit sa personne."""
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W2", title="Test", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source="openalex", source_id="W2")
         signature = _insert_authorship(
             sa_sync_conn, "openalex", sp, "Inconnue Du Perimetre", in_perimeter=True
         )
@@ -172,9 +172,7 @@ class TestIdentifierPromotion:
     def test_every_identifier_type_of_the_signature_is_promoted(self, sa_sync_conn):
         """Chaque type d'identifiant que porte la signature, idhal compris, passe sur la personne qu'elle crée."""
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-promo", title="Test", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="hal-promo")
         identifiers = {
             "orcid": "0000-0002-1633-8730",
             "idref": "181370662",
@@ -200,9 +198,7 @@ class TestCascadeRun:
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
 
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-100", title="Test", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-100")
         _insert_authorship(
             sa_sync_conn,
             "hal",
@@ -213,9 +209,7 @@ class TestCascadeRun:
             identifiers={"hal_person_id": "111"},
         )
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W111", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W111")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",
@@ -237,9 +231,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W333", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W333")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",
@@ -258,9 +250,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
 
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-200", title="Test", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-200")
         hal_as = _insert_authorship(
             sa_sync_conn,
             "hal",
@@ -282,9 +272,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
 
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-201", title="Test", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-201")
         hal_as = _insert_authorship(
             sa_sync_conn,
             "hal",
@@ -328,9 +316,7 @@ class TestCascadeRun:
             {"pid": person_id},
         )
 
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-202", title="Test", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-202")
         hal_as = _insert_authorship(
             sa_sync_conn, "hal", hal_sd, "Jean Dupond", identifiers={"hal_person_id": "111222"}
         )
@@ -353,9 +339,7 @@ class TestCascadeRun:
         add_name_form(person_b, "Van Lander", repo=person_repository(sa_sync_conn))
         _set_name_form_status(sa_sync_conn, person_a, "Van Lander", "confirmed")
 
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-203", title="Test", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-203")
         hal_as = _insert_authorship(
             sa_sync_conn, "hal", hal_sd, "Van Lander", identifiers={"hal_person_id": "987654"}
         )
@@ -370,9 +354,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-9999-0000", "rejected")
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W444", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W444")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",
@@ -400,9 +382,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
 
-        wos_sd = insert_source_publication(
-            sa_sync_conn, pub, source="wos", source_id="WOS:111", title="Test", pub_year=2024
-        )
+        wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:111")
         wos_as = _insert_authorship(
             sa_sync_conn,
             "wos",
@@ -421,14 +401,7 @@ class TestCascadeRun:
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
 
-        dc_sd = insert_source_publication(
-            sa_sync_conn,
-            pub,
-            source="datacite",
-            source_id="10.5281/zenodo.1",
-            title="Test",
-            pub_year=2024,
-        )
+        dc_sd = _notice(sa_sync_conn, pub, source="datacite", source_id="10.5281/zenodo.1")
         dc_as = _insert_authorship(
             sa_sync_conn,
             "datacite",
@@ -450,9 +423,7 @@ class TestCascadeRun:
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W666", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W666")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",
@@ -471,25 +442,16 @@ class TestCascadeRun:
         """Signature au nom et prénom inversés (« Martin » en prénom, « Pierre » en nom) : sa forme « nom prénom » rejoint Pierre Martin."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
-        sd = insert_source_publication(
+        sd = _notice(sa_sync_conn, pub, source="crossref", source_id="10.1/inverse")
+        inverted = insert_signature(
             sa_sync_conn,
-            pub,
+            sd,
             source="crossref",
-            source_id="10.1/inverse",
-            title="Test",
-            pub_year=2024,
+            raw_last_name="Pierre",
+            raw_first_name="Martin",
+            author_name_normalized="martin pierre",
+            in_perimeter=True,
         )
-        identity_id = upsert_identity(sa_sync_conn, author_name_normalized="martin pierre")
-        inverted = sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, in_perimeter,
-                     raw_last_name, raw_first_name, identity_id)
-                VALUES ('crossref', :sd, 0, TRUE, 'Pierre', 'Martin', :iid)
-                RETURNING id
-            """),
-            {"sd": sd, "iid": identity_id},
-        ).scalar_one()
 
         _run_cascade(sa_sync_conn)
 
@@ -498,37 +460,24 @@ class TestCascadeRun:
     def test_created_person_takes_split_given_by_source(self, sa_sync_conn):
         """Une chaîne brute « Yannick Kitutila W. » et la même signature au nom séparé (HAL : « Kitutila W. », « Yannick ») : la personne créée prend le découpage de la source, quel que soit l'ordre des signatures."""
         pub = insert_publication(sa_sync_conn)
-        scanr_sd = insert_source_publication(
+        scanr_sd = _notice(sa_sync_conn, pub, source="scanr", source_id="scanr-kitutila")
+        hal_sd = _notice(sa_sync_conn, pub, source_id="hal-kitutila")
+        parsed = insert_signature(
             sa_sync_conn,
-            pub,
+            scanr_sd,
             source="scanr",
-            source_id="scanr-kitutila",
-            title="Test",
-            pub_year=2024,
+            raw_author_name="Yannick Kitutila W.",
+            identity_id=upsert_split_identity(sa_sync_conn, "yannick kitutila", "w"),
+            in_perimeter=True,
         )
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-kitutila", title="Test", pub_year=2024
+        native = insert_signature(
+            sa_sync_conn,
+            hal_sd,
+            raw_last_name="Kitutila W.",
+            raw_first_name="Yannick",
+            identity_id=upsert_split_identity(sa_sync_conn, "kitutila w", "yannick"),
+            in_perimeter=True,
         )
-        parsed = sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, in_perimeter,
-                     raw_author_name, identity_id)
-                VALUES ('scanr', :sd, 0, TRUE, 'Yannick Kitutila W.', :iid)
-                RETURNING id
-            """),
-            {"sd": scanr_sd, "iid": upsert_split_identity(sa_sync_conn, "yannick kitutila", "w")},
-        ).scalar_one()
-        native = sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, in_perimeter,
-                     raw_last_name, raw_first_name, identity_id)
-                VALUES ('hal', :sd, 0, TRUE, 'Kitutila W.', 'Yannick', :iid)
-                RETURNING id
-            """),
-            {"sd": hal_sd, "iid": upsert_split_identity(sa_sync_conn, "kitutila w", "yannick")},
-        ).scalar_one()
 
         _run_cascade(sa_sync_conn)
 
@@ -548,9 +497,7 @@ class TestCascadeRun:
         add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W777", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W777")
         oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")
 
         _run_cascade(sa_sync_conn)
@@ -562,9 +509,7 @@ class TestCascadeRun:
         pub = insert_publication(sa_sync_conn)
         pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
-        sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W778", title="Test", pub_year=2024
-        )
+        sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
         orphan = _insert_authorship(sa_sync_conn, "openalex", sd, "J Dupont")
 
         repo = person_repository(sa_sync_conn)
@@ -592,9 +537,7 @@ class TestCascadeRun:
         _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
         _reject_pair(sa_sync_conn, pub, person_id)
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W999", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W999")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",
@@ -618,9 +561,7 @@ class TestCascadeRun:
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
         _reject_pair(sa_sync_conn, pub, pid1)
 
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W778", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
         oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")
 
         _run_cascade(sa_sync_conn)
@@ -631,9 +572,7 @@ class TestCascadeRun:
         """Forme inconnue + authorship-auteur → crée la personne et importe ses
         identifiants."""
         pub = insert_publication(sa_sync_conn)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W888", title="Test", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W888")
         oa_as = _insert_authorship(
             sa_sync_conn,
             "openalex",

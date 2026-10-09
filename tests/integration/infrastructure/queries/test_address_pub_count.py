@@ -5,7 +5,6 @@ from sqlalchemy import text
 from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
 
 _Q = PgAddressPubCountQueries()
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
@@ -80,21 +79,7 @@ class TestRecomputePubCount:
 
     def test_ignores_source_publication_without_publication_id(self, sa_sync_conn):
         """Un document non rattaché (publication_id NULL) ne compte pas."""
-        sd_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, pub_year) "
-                "VALUES ('hal', 'orphan', 'X', 2024) RETURNING id"
-            )
-        ).scalar_one()
-        sa_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorships"
-                " (source, source_publication_id, author_position, identity_id, raw_author_name) "
-                "VALUES ('hal', :sd, 0, :iid, 'X') RETURNING id"
-            ),
-            {"sd": sd_id, "iid": upsert_identity(sa_sync_conn)},
-        ).scalar_one()
-        _link_address(sa_sync_conn, sa_id, "Orphan Address")
+        _link_address(sa_sync_conn, _sa_for_pub(sa_sync_conn, None, "orphan"), "Orphan Address")
 
         _Q.recompute_pub_count(sa_sync_conn)
 

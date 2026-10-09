@@ -2,6 +2,7 @@
 
 import json
 from datetime import timedelta
+from functools import partial
 
 from sqlalchemy import text
 
@@ -11,6 +12,14 @@ from application.pipeline.metadata_correction.correct_unary import compute_updat
 from domain.dates import today
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de titre « T », OpenAlex par défaut.
+_typed_notice = partial(
+    insert_source_publication, source="openalex", title="T", title_normalized="t"
+)
+
+# Notice de titre « Un titre », OpenAlex par défaut.
+_notice = partial(insert_source_publication, source="openalex", title="Un titre")
 
 _Q = PgMetadataCorrectionQueries()
 
@@ -54,14 +63,7 @@ def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
     # pose la revue ; l'unaire qui suit (même run) la joint et reclasse preprint → media.
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media", namespace="10.64628/aak.")
-    sp = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_tc",
-        title="Un titre",
-        doi="10.64628/aak.xyz",
-        doc_type="preprint",
-    )
+    sp = _notice(conn, source_id="W_tc", doi="10.64628/aak.xyz", doc_type="preprint")
 
     assert _apply_journal_by_doi(conn) == 1
     jid, raw = conn.execute(
@@ -82,14 +84,7 @@ def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
 def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
     conn = sa_sync_conn
     journal = _seed_journal(conn, "journal", namespace="10.5194/acp-")
-    sp = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_acp",
-        title="Un titre",
-        doi="10.5194/acp-20-1-2020",
-        doc_type="article",
-    )
+    sp = _notice(conn, source_id="W_acp", doi="10.5194/acp-20-1-2020", doc_type="article")
 
     assert _apply_journal_by_doi(conn) == 1
     assert _apply_journal_by_doi(conn) == 0  # second run : rien ne change
@@ -121,25 +116,11 @@ def _doi(conn, sp_id: int) -> str | None:
 def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
-    media_sp = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_media",
-        title="Un titre",
-        doc_type="article",
-        journal_id=media_journal,
+    media_sp = _notice(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
+    theses_sp = _notice(
+        conn, source_id="W_theses", doc_type="article", urls=["https://theses.fr/2020ABCD"]
     )
-    theses_sp = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_theses",
-        title="Un titre",
-        doc_type="article",
-        urls=["https://theses.fr/2020ABCD"],
-    )
-    plain_sp = insert_source_publication(
-        conn, source="openalex", source_id="W_plain", title="Un titre", doc_type="article"
-    )
+    plain_sp = _notice(conn, source_id="W_plain", doc_type="article")
 
     n = _apply(conn)
     assert n == 2  # media + theses corrigées, plain non
@@ -175,11 +156,10 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
         ),
         {"p": publisher},
     )
-    sp = insert_source_publication(
+    sp = _notice(
         conn,
         source="crossref",
         source_id="10.64628/aak.x",
-        title="Un titre",
         doi="10.64628/aak.x",
         doc_type="posted-content",
     )
@@ -193,7 +173,7 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
 
 def test_hal_code_mapped_to_canonical(sa_sync_conn):
     conn = sa_sync_conn
-    sp = insert_source_publication(conn, source_id="hal-1", title="Un titre", doc_type="ART")
+    sp = _notice(conn, source_id="hal-1", doc_type="ART", source="hal")
     assert _apply(conn) == 1
     doc_type, raw = _state(conn, sp)
     assert doc_type == "article"  # ART → article par mapping
@@ -203,14 +183,7 @@ def test_hal_code_mapped_to_canonical(sa_sync_conn):
 def test_reversibility_invariant(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
-    insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_media",
-        title="Un titre",
-        doc_type="article",
-        journal_id=media_journal,
-    )
+    _notice(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
     _apply(conn)
 
     # COALESCE(raw_metadata->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
@@ -226,22 +199,8 @@ def test_reversibility_invariant(sa_sync_conn):
 def test_idempotent_second_run_changes_nothing(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
-    insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_media",
-        title="Un titre",
-        doc_type="article",
-        journal_id=media_journal,
-    )
-    insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_theses",
-        title="Un titre",
-        doc_type="article",
-        urls=["https://theses.fr/2020ABCD"],
-    )
+    _notice(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
+    _notice(conn, source_id="W_theses", doc_type="article", urls=["https://theses.fr/2020ABCD"])
 
     assert _apply(conn) == 2
     assert _apply(conn) == 0  # rien à recorriger
@@ -250,14 +209,7 @@ def test_idempotent_second_run_changes_nothing(sa_sync_conn):
 def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
-    sp = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="W_media",
-        title="Un titre",
-        doc_type="article",
-        journal_id=media_journal,
-    )
+    sp = _notice(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
     assert _apply(conn) == 1
     assert _state(conn, sp)[0] == "media"
 
@@ -361,24 +313,8 @@ def _apply_cluster(conn) -> int:
 
 def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     conn = sa_sync_conn
-    book = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="b1",
-        title="T",
-        title_normalized="t",
-        doi="10.1/x",
-        doc_type="book",
-    )
-    chapter = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="c1",
-        title="T",
-        title_normalized="t",
-        doi="10.1/x",
-        doc_type="book_chapter",
-    )
+    book = _typed_notice(conn, source_id="b1", doi="10.1/x", doc_type="book")
+    chapter = _typed_notice(conn, source_id="c1", doi="10.1/x", doc_type="book_chapter")
 
     assert _apply_cluster(conn) == 1  # seul le chapitre
 
@@ -412,24 +348,8 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
 
 def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     conn = sa_sync_conn
-    book = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="b1",
-        title="T",
-        title_normalized="t",
-        doi="10.1/x",
-        doc_type="book",
-    )
-    chapter = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="c1",
-        title="T",
-        title_normalized="t",
-        doi="10.1/x",
-        doc_type="book_chapter",
-    )
+    book = _typed_notice(conn, source_id="b1", doi="10.1/x", doc_type="book")
+    chapter = _typed_notice(conn, source_id="c1", doi="10.1/x", doc_type="book_chapter")
     assert _apply_cluster(conn) == 1
     assert _apply_cluster(conn) == 0  # idempotent
 
@@ -529,12 +449,10 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
 def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=None):
     """Notice DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
     meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
-    return insert_source_publication(
+    return _typed_notice(
         conn,
         source="datacite",
         source_id=source_id,
-        title="T",
-        title_normalized="t",
         doi=doi,
         doc_type=doc_type,
         meta=meta,
@@ -555,15 +473,7 @@ def test_la_regle_lit_le_type_de_la_notice_qui_mentionne_la_cible(sa_sync_conn):
         doc_type="preprint",
         relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
     )
-    oa = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="oa",
-        title="T",
-        title_normalized="t",
-        doi="10.18154/rwth-1",
-        doc_type="article",
-    )
+    oa = _typed_notice(conn, source_id="oa", doi="10.18154/rwth-1", doc_type="article")
     assert _apply_cluster(conn) == 0
     assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
 
@@ -579,15 +489,7 @@ def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
         relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
         raw_metadata=stash,
     )
-    oa = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="oa",
-        title="T",
-        title_normalized="t",
-        doi="10.48550/arxiv.1",
-        doc_type="article",
-    )
+    oa = _typed_notice(conn, source_id="oa", doi="10.48550/arxiv.1", doc_type="article")
     conn.execute(
         text("UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
         {"raw": json.dumps(stash), "id": oa},
@@ -606,15 +508,7 @@ def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
         doc_type="article",
         relations=[("IsVariantFormOf", "10.1007/article")],
     )
-    oa = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="oa",
-        title="T",
-        title_normalized="t",
-        doi="10.3204/pubdb-1",
-        doc_type="article",
-    )
+    oa = _typed_notice(conn, source_id="oa", doi="10.3204/pubdb-1", doc_type="article")
     assert _apply_cluster(conn) == 2
     assert (_doi(conn, copie), _doi(conn, oa)) == ("10.1007/article", "10.1007/article")
 
@@ -654,28 +548,12 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
     # Le parent dataset est moissonné ; la pièce (DOI frère, non suffixé) et son doublon
     # cross-source basculent tous deux sur le DOI parent.
     conn = sa_sync_conn
-    parent = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="d-parent",
-        title="T",
-        title_normalized="t",
-        doi="10.9001/set",
-        doc_type="dataset",
-    )
+    parent = _typed_notice(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")
     piece = _seed_datacite_piece(
         conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set"
     )
     # Doublon OpenAlex de la pièce : même DOI, sans la relation ; il doit converger aussi.
-    sibling = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="oa-piece",
-        title="T",
-        title_normalized="t",
-        doi="10.9002/file1",
-        doc_type="dataset",
-    )
+    sibling = _typed_notice(conn, source_id="oa-piece", doi="10.9002/file1", doc_type="dataset")
 
     assert _apply_cluster(conn) == 2  # la pièce DataCite + son doublon OpenAlex
 
@@ -694,15 +572,7 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
 def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):
     # Parent moissonné mais typé `article` (dataset supplémentaire d'un article) : pas de fusion.
     conn = sa_sync_conn
-    insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="art",
-        title="T",
-        title_normalized="t",
-        doi="10.9004/paper",
-        doc_type="article",
-    )
+    _typed_notice(conn, source_id="art", doi="10.9004/paper", doc_type="article")
     piece = _seed_datacite_piece(
         conn, source_id="d-piece", doi="10.9002/data", parent_doi="10.9004/paper"
     )
@@ -722,15 +592,7 @@ def test_dataset_piece_not_merged_when_parent_absent(sa_sync_conn):
 
 def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_conn):
     conn = sa_sync_conn
-    parent = insert_source_publication(
-        conn,
-        source="openalex",
-        source_id="d-parent",
-        title="T",
-        title_normalized="t",
-        doi="10.9001/set",
-        doc_type="dataset",
-    )
+    parent = _typed_notice(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")
     piece = _seed_datacite_piece(
         conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set"
     )
@@ -752,9 +614,7 @@ def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_con
 def test_language_mapped_to_referential_code_with_source_value_kept(sa_sync_conn):
     # WoS donne le nom anglais de la langue ; la forme `english` du référentiel le ramène à `en`.
     conn = sa_sync_conn
-    sp = insert_source_publication(
-        conn, source="wos", source_id="wos-1", title="Un titre", doc_type="article"
-    )
+    sp = _notice(conn, source="wos", source_id="wos-1", doc_type="article")
     conn.execute(
         text("UPDATE source_publications SET language = 'English' WHERE id = :id"), {"id": sp}
     )

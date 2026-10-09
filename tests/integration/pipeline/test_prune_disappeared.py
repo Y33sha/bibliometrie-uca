@@ -3,6 +3,7 @@
 Un `staging` portant `disappeared_at` perd ses `source_publications`, et celles-ci emportent leurs `source_authorships` par cascade. La ligne de `staging` reste, avec sa marque.
 """
 
+from functools import partial
 from unittest.mock import MagicMock
 
 from sqlalchemy import text
@@ -13,6 +14,9 @@ from infrastructure.pipeline.normalize.staging import (
 )
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Notice de titre « Titre », aux clés à jour.
+_notice = partial(insert_source_publication, title="Titre", keys_dirty=False)
 
 
 def _publication(conn) -> int:
@@ -56,13 +60,7 @@ def _signature(conn, source_publication_id: int) -> None:
 
 def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-disparu", disparu=True)
-    sp_id = insert_source_publication(
-        sa_sync_conn_owner,
-        source_id="hal-disparu",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    sp_id = _notice(sa_sync_conn_owner, source_id="hal-disparu", staging_id=staging_id)
 
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 1
 
@@ -74,13 +72,7 @@ def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
 
 def test_les_signatures_suivent_par_cascade(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-avec-signature", disparu=True)
-    sp_id = insert_source_publication(
-        sa_sync_conn_owner,
-        source_id="hal-avec-signature",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    sp_id = _notice(sa_sync_conn_owner, source_id="hal-avec-signature", staging_id=staging_id)
     _signature(sa_sync_conn_owner, sp_id)
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
@@ -96,36 +88,26 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
     """La publication perd une source : ses autres sources la font réconcilier et rafraîchir."""
     conn = sa_sync_conn_owner
     publication = _publication(conn)
-    insert_source_publication(
+    _notice(
         conn,
         publication,
         source_id="hal-disparu",
-        title="Titre",
         staging_id=_staging(conn, "hal-disparu", disparu=True),
-        keys_dirty=False,
     )
-    soeur = insert_source_publication(
+    soeur = _notice(
         conn,
         publication,
         source_id="hal-soeur",
-        title="Titre",
         staging_id=_staging(conn, "hal-soeur", disparu=False),
-        keys_dirty=False,
     )
-    etrangere = insert_source_publication(
+    etrangere = _notice(
         conn,
         _publication(conn),
         source_id="hal-autre",
-        title="Titre",
         staging_id=_staging(conn, "hal-autre", disparu=False),
-        keys_dirty=False,
     )
-    orpheline = insert_source_publication(
-        conn,
-        source_id="hal-seule",
-        title="Titre",
-        staging_id=_staging(conn, "hal-seule", disparu=False),
-        keys_dirty=False,
+    orpheline = _notice(
+        conn, source_id="hal-seule", staging_id=_staging(conn, "hal-seule", disparu=False)
     )
 
     delete_disappeared_source_publications(conn)
@@ -137,13 +119,7 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
 
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-present", disparu=False)
-    sp_id = insert_source_publication(
-        sa_sync_conn_owner,
-        source_id="hal-present",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    sp_id = _notice(sa_sync_conn_owner, source_id="hal-present", staging_id=staging_id)
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
 
@@ -155,13 +131,7 @@ def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
 
 def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-trace", disparu=True)
-    insert_source_publication(
-        sa_sync_conn_owner,
-        source_id="hal-trace",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    _notice(sa_sync_conn_owner, source_id="hal-trace", staging_id=staging_id)
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
 
@@ -174,13 +144,7 @@ def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
 def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
     """Balayage idempotent : rien ne subsiste à retirer au passage suivant."""
     staging_id = _staging(sa_sync_conn_owner, "hal-idempotent", disparu=True)
-    insert_source_publication(
-        sa_sync_conn_owner,
-        source_id="hal-idempotent",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    _notice(sa_sync_conn_owner, source_id="hal-idempotent", staging_id=staging_id)
 
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 1
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 0
@@ -190,23 +154,9 @@ def test_une_notice_sans_metadonnees_minimales_perd_son_enregistrement(sa_sync_c
     """Une notice renormalisée sans année supprime l'enregistrement qu'elle avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
     pub = _publication(sa_sync_conn_owner)
     staging_id = _staging(sa_sync_conn_owner, "W3131333980", disparu=False)
-    sp_id = insert_source_publication(
-        sa_sync_conn_owner,
-        pub,
-        source_id="W3131333980",
-        title="Titre",
-        staging_id=staging_id,
-        keys_dirty=False,
-    )
+    sp_id = _notice(sa_sync_conn_owner, pub, source_id="W3131333980", staging_id=staging_id)
     autre_staging = _staging(sa_sync_conn_owner, "hal-soeur", disparu=False)
-    soeur = insert_source_publication(
-        sa_sync_conn_owner,
-        pub,
-        source_id="hal-soeur",
-        title="Titre",
-        staging_id=autre_staging,
-        keys_dirty=False,
-    )
+    soeur = _notice(sa_sync_conn_owner, pub, source_id="hal-soeur", staging_id=autre_staging)
 
     PgStagingQueries(raw_store=MagicMock()).discard_source_publication(
         sa_sync_conn_owner, staging_id

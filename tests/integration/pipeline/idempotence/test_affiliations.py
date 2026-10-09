@@ -1,5 +1,11 @@
 """Idempotence : phase `populate_affiliations` (propagation périmètre/structures)."""
 
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
+
 
 def _setup_affiliations_test_data(conn):
     """Crée des données pour tester populate_affiliations :
@@ -11,12 +17,6 @@ def _setup_affiliations_test_data(conn):
     résolution d'adresse (sert pour l'idempotence des comptages).
     """
     from sqlalchemy import text
-
-    from tests.integration.helpers.sources import (
-        insert_signature,
-        insert_signature_address,
-        insert_source_publication,
-    )
 
     conn.execute(
         text("""
@@ -220,30 +220,27 @@ class TestPopulateAffiliationsTheses:
         # Ajoute une source_publication + source_authorship theses,
         # liées à l'adresse 80001 (déjà résolue vers structure 80001
         # via address_structures par _setup_affiliations_test_data).
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
-                VALUES (80003, 'theses', '2024UCFA0001', 'Thèse Test', 2024, 'thesis', 80001)
-            """)
+        insert_source_publication(
+            sa_sync_conn,
+            80001,
+            source="theses",
+            source_id="2024UCFA0001",
+            title="Thèse Test",
+            row_id=80003,
+            pub_year=2024,
+            doc_type="thesis",
         )
-        from tests.integration.helpers.authorships import upsert_identity
-
-        alice = upsert_identity(sa_sync_conn, "alice dupont")
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (id, source, source_publication_id, author_position,
-                     in_perimeter, identity_id, roles, raw_author_name)
-                VALUES (80003, 'theses', 80003, 0, FALSE, :iid, ARRAY['author'], 'Alice Dupont')
-            """),
-            {"iid": alice},
+        insert_signature(
+            sa_sync_conn,
+            80003,
+            source="theses",
+            row_id=80003,
+            raw_author_name="Alice Dupont",
+            author_name_normalized="alice dupont",
+            in_perimeter=False,
+            roles=["author"],
         )
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-                VALUES (80003, 80001)
-            """)
-        )
+        insert_signature_address(sa_sync_conn, 80003, address_id=80001)
 
         _run_populate_affiliations(sa_sync_conn)
 

@@ -8,6 +8,7 @@ Recalcul des caches pays depuis `addresses.countries` :
 from __future__ import annotations
 
 import logging
+from functools import partial
 
 import pytest
 from sqlalchemy import text
@@ -20,6 +21,9 @@ from tests.integration.helpers.sources import (
     insert_signature_address,
     insert_source_publication,
 )
+
+# Notice de 2024, de titre « Test sp », OpenAlex par défaut.
+_notice = partial(insert_source_publication, source="openalex", title="Test sp", pub_year=2024)
 
 
 def _insert_source_authorship(
@@ -78,9 +82,7 @@ def log() -> logging.Logger:
 class TestCascade:
     def test_single_address_propagates_to_publication(self, sa_sync_conn, queries, log):
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
@@ -94,9 +96,7 @@ class TestCascade:
     def test_multi_country_union_propagates(self, sa_sync_conn, queries, log):
         # Deux adresses sur le même sa : union des pays remontée jusqu'à pub.
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
         a1 = _insert_address(sa_sync_conn, "addr FR", countries=["fr"])
         a2 = _insert_address(sa_sync_conn, "addr US", countries=["us"])
@@ -112,12 +112,8 @@ class TestCascade:
         # Même publication via deux sources distinctes (OA et HAL), chacune
         # avec une adresse dans un pays différent → union au niveau publi.
         pub = insert_publication(sa_sync_conn)
-        sp_oa = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
-        sp_hal = insert_source_publication(
-            sa_sync_conn, pub, source_id="hal-1", title="Test sp", pub_year=2024
-        )
+        sp_oa = _notice(sa_sync_conn, pub, source_id="W1")
+        sp_hal = _notice(sa_sync_conn, pub, source_id="hal-1", source="hal")
         sa_oa = _insert_source_authorship(sa_sync_conn, sp_oa, source="openalex")
         sa_hal = _insert_source_authorship(sa_sync_conn, sp_hal, source="hal", position=1)
         a_fr = _insert_address(sa_sync_conn, "addr Paris", countries=["fr"])
@@ -133,9 +129,7 @@ class TestCascade:
         # Base sans adresses avec pays → la refresh ne change rien et
         # retourne 0 publications mises à jour.
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="W1")
         _insert_source_authorship(sa_sync_conn, sp)
 
         updated = refresh(sa_sync_conn, queries, log)
@@ -149,9 +143,7 @@ class TestIdempotence:
         # Premier run : la publi passe de NULL à ['fr']. Deuxième run :
         # rien à changer, retour 0 (cf. `IS DISTINCT FROM` côté query).
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "addr", countries=["fr"])
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
@@ -169,9 +161,7 @@ class TestCleanup:
         # source_publications.countries=['fr'] déjà persistées, mais l'adresse du sa
         # n'a plus de `countries` (NULL) → le LEFT JOIN remet sp.countries à NULL.
         pub = insert_publication(sa_sync_conn)
-        sp = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
-        )
+        sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
         sa_sync_conn.execute(
             text("UPDATE source_publications SET countries = ARRAY['fr'] WHERE id = :id"),

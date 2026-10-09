@@ -10,7 +10,11 @@ from application.ports.read_models.addresses_queries import (
 )
 from infrastructure.read_models.addresses import PgAddressesQueries
 from tests.integration.helpers.addresses import ensure_country, insert_address
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 from tests.integration.helpers.structures import insert_structure
 
 
@@ -250,32 +254,10 @@ class TestGetAddressPublications:
             """)
         ).one()
         pub = pub_row.id
-        sd_row = sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_publications (source, source_id, title, publication_id)
-                VALUES ('hal', 'h-1', 'T', :p) RETURNING id
-            """),
-            {"p": pub},
-        ).one()
-        sd = sd_row.id
-        identity_id = upsert_identity(sa_sync_conn)
-        sa_row = sa_sync_conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, identity_id, raw_author_name)
-                VALUES ('hal', :sd, 0, :iid, 'X') RETURNING id
-            """),
-            {"sd": sd, "iid": identity_id},
-        ).one()
-        sa_id = sa_row.id
+        sd = insert_source_publication(sa_sync_conn, pub, source_id="h-1", title="T")
+        sa_id = insert_signature(sa_sync_conn, sd)
         addr = insert_address(sa_sync_conn, "rue X")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-                "VALUES (:sa, :a)"
-            ),
-            {"sa": sa_id, "a": addr},
-        )
+        insert_signature_address(sa_sync_conn, sa_id, address_id=addr)
 
         rows = _q(sa_sync_conn).get_address_publications(addr, limit=10)
         assert len(rows) == 1

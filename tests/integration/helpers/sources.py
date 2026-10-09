@@ -29,10 +29,13 @@ def insert_source_publication(
     monograph_id: int | None = None,
     staging_id: int | None = None,
     container_title: str | None = None,
+    language: str | None = None,
+    keywords: list[str] | None = None,
     countries: list[str] | None = None,
     hal_collections: list[str] | None = None,
     urls: list[str] | None = None,
     oa_status: str | None = None,
+    is_retracted: bool | None = None,
     embargo_until: datetime.date | None = None,
     keys_dirty: bool | None = None,
     external_ids: dict[str, object] | None = None,
@@ -59,10 +62,13 @@ def insert_source_publication(
             "monograph_id": monograph_id,
             "staging_id": staging_id,
             "container_title": container_title,
+            "language": language,
+            "keywords": keywords,
             "countries": countries,
             "hal_collections": hal_collections,
             "urls": urls,
             "oa_status": oa_status,
+            "is_retracted": is_retracted,
             "embargo_until": embargo_until,
             "keys_dirty": keys_dirty,
             "external_ids": _jsonb(external_ids),
@@ -87,6 +93,7 @@ def insert_signature(
     raw_first_name: str | None = None,
     author_name_normalized: str | None = None,
     person_identifiers: dict[str, object] | None = None,
+    identity_id: int | None = None,
     person_id: int | None = None,
     authorship_id: int | None = None,
     in_perimeter: bool | None = None,
@@ -96,7 +103,7 @@ def insert_signature(
 ) -> int:
     """Insère une signature et renvoie son `id`. `row_id` fixe l'`id`.
 
-    L'identité est celle de forme `author_name_normalized` et d'identifiants `person_identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
+    L'identité est `identity_id`, sinon celle de forme `author_name_normalized` et d'identifiants `person_identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
     """
     if raw_author_name is None and raw_last_name is None:
         raw_author_name = "X"
@@ -108,7 +115,11 @@ def insert_signature(
             "source": source,
             "source_publication_id": source_publication_id,
             "author_position": author_position,
-            "identity_id": upsert_identity(conn, author_name_normalized, person_identifiers),
+            "identity_id": (
+                identity_id
+                if identity_id is not None
+                else upsert_identity(conn, author_name_normalized, person_identifiers)
+            ),
             "raw_author_name": raw_author_name,
             "raw_last_name": raw_last_name,
             "raw_first_name": raw_first_name,

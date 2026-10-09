@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.read_models.hal_problems`."""
 
+from functools import partial
+
 from sqlalchemy import text
 
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
@@ -13,6 +15,9 @@ from tests.integration.helpers.sources import (
     insert_source_publication,
 )
 from tests.integration.helpers.structures import add_authorship_structure
+
+# Notice de 2024, de titre « T ».
+_notice = partial(insert_source_publication, title="T", pub_year=2024)
 
 
 def _q(conn) -> PgHalProblemsQueries:
@@ -57,7 +62,7 @@ def _create_hal_sa_with_hal_id(
 ):
     """Crée un sa HAL portant `hal_person_id` sur son identité."""
     pub = insert_publication(conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}")
-    sd = insert_source_publication(conn, pub, source_id=source_id, title="T", pub_year=2024)
+    sd = _notice(conn, pub, source_id=source_id)
     insert_signature(
         conn,
         sd,
@@ -93,12 +98,8 @@ class TestHalDuplicateAccounts:
 class TestHalDuplicatePubsByDoi:
     def test_detects_two_hal_deposits_same_doi(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
-            sa_sync_conn, pub, source_id="h-1", title="T", doi="10.1/shared", pub_year=2024
-        )
-        insert_source_publication(
-            sa_sync_conn, pub, source_id="h-2", title="T", doi="10.1/shared", pub_year=2024
-        )
+        _notice(sa_sync_conn, pub, source_id="h-1", doi="10.1/shared")
+        _notice(sa_sync_conn, pub, source_id="h-2", doi="10.1/shared")
 
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
         assert res.total >= 1
@@ -109,22 +110,8 @@ class TestHalDuplicatePubsByDoi:
         expected = {}
         for i in (1, 2, 3):
             pub = insert_publication(sa_sync_conn, title=f"Doublon {i}", doi=f"10.1/dup-{i}")
-            insert_source_publication(
-                sa_sync_conn,
-                pub,
-                source_id=f"h-dup-{i}-a",
-                title="T",
-                doi=f"10.1/dup-{i}",
-                pub_year=2024,
-            )
-            insert_source_publication(
-                sa_sync_conn,
-                pub,
-                source_id=f"h-dup-{i}-b",
-                title="T",
-                doi=f"10.1/dup-{i}",
-                pub_year=2024,
-            )
+            _notice(sa_sync_conn, pub, source_id=f"h-dup-{i}-a", doi=f"10.1/dup-{i}")
+            _notice(sa_sync_conn, pub, source_id=f"h-dup-{i}-b", doi=f"10.1/dup-{i}")
             expected[pub] = (f"Doublon {i}", {f"h-dup-{i}-a", f"h-dup-{i}-b"})
 
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
@@ -138,9 +125,7 @@ class TestHalDuplicatePubsByDoi:
 
     def test_noop_without_duplicates(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
-            sa_sync_conn, pub, source_id="h-uniq", title="T", doi="10.1/u", pub_year=2024
-        )
+        _notice(sa_sync_conn, pub, source_id="h-uniq", doi="10.1/u")
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
         assert res.total == 0
 
@@ -152,8 +137,8 @@ class TestHalDuplicatePubsByMetadata:
         title_norm = title.lower()
         p1 = insert_publication(sa_sync_conn, title=title, title_normalized=title_norm)
         p2 = insert_publication(sa_sync_conn, title=title, title_normalized=title_norm)
-        insert_source_publication(sa_sync_conn, p1, source_id="h-meta-1", title="T", pub_year=2024)
-        insert_source_publication(sa_sync_conn, p2, source_id="h-meta-2", title="T", pub_year=2024)
+        _notice(sa_sync_conn, p1, source_id="h-meta-1")
+        _notice(sa_sync_conn, p2, source_id="h-meta-2")
 
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_metadata(page=1, per_page=50)
         assert res.total >= 1
@@ -222,14 +207,10 @@ class TestHalAffiliationConflicts:
     def test_detects_conflict_with_openalex(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn, title="Conflict OA")
         lab = _create_lab(sa_sync_conn, code="LAB-OA")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-oa-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-oa-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="oa-1", title="T", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-1")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex")
         _create_address_for_sa(sa_sync_conn, oa_sa)
 
@@ -239,14 +220,10 @@ class TestHalAffiliationConflicts:
     def test_detects_conflict_with_wos(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn, title="Conflict WoS")
         lab = _create_lab(sa_sync_conn, code="LAB-WOS")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-wos-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-wos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        wos_sd = insert_source_publication(
-            sa_sync_conn, pub, source="wos", source_id="WOS:1", title="T", pub_year=2024
-        )
+        wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:1")
         wos_sa = insert_signature(sa_sync_conn, wos_sd, source="wos")
         _create_address_for_sa(sa_sync_conn, wos_sa)
 
@@ -259,14 +236,10 @@ class TestHalAffiliationConflicts:
         # désaveu. Garde-fou contre les faux positifs.
         pub = insert_publication(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-noaddr-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-noaddr-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="oa-noaddr", title="T", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-noaddr")
         insert_signature(sa_sync_conn, oa_sd, source="openalex")
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
@@ -277,14 +250,10 @@ class TestHalAffiliationConflicts:
         # HAL UCA en pos 0, OA hors-UCA en pos 1 → conflit détecté.
         pub = insert_publication(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-pos-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-pos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="oa-pos", title="T", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-pos")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex", author_position=1)
         _create_address_for_sa(sa_sync_conn, oa_sa)
 
@@ -296,14 +265,10 @@ class TestHalAffiliationConflicts:
         # exclu de la comparaison.
         pub = insert_publication(sa_sync_conn, title="ScanR only")
         lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-scanr-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-scanr-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        sr_sd = insert_source_publication(
-            sa_sync_conn, pub, source="scanr", source_id="sr-1", title="T", pub_year=2024
-        )
+        sr_sd = _notice(sa_sync_conn, pub, source="scanr", source_id="sr-1")
         sr_sa = insert_signature(sa_sync_conn, sr_sd, source="scanr")
         _create_address_for_sa(sa_sync_conn, sr_sa)
 
@@ -314,14 +279,10 @@ class TestHalAffiliationConflicts:
         # OA atteste aussi UCA → pas de conflit.
         pub = insert_publication(sa_sync_conn, title="OA confirms")
         lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-confirm-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-confirm-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="oa-confirm", title="T", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-confirm")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex", in_perimeter=True)
         _create_address_for_sa(sa_sync_conn, oa_sa)
 
@@ -333,19 +294,13 @@ class TestHalAffiliationConflicts:
         # cherche n'importe quelle SP WoS/OA avec in_perimeter).
         pub = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-mixed-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-mixed-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
-        oa_sd = insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="oa-mixed", title="T", pub_year=2024
-        )
+        oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-mixed")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex")
         _create_address_for_sa(sa_sync_conn, oa_sa)
-        wos_sd = insert_source_publication(
-            sa_sync_conn, pub, source="wos", source_id="WOS:mixed", title="T", pub_year=2024
-        )
+        wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:mixed")
         wos_sa = insert_signature(sa_sync_conn, wos_sd, source="wos", in_perimeter=True)
         _create_address_for_sa(sa_sync_conn, wos_sa)
 
@@ -356,9 +311,7 @@ class TestHalAffiliationConflicts:
         # Publi vue seulement par HAL → pas de comparaison possible, pas un conflit.
         pub = insert_publication(sa_sync_conn, title="HAL only")
         lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
-        hal_sd = insert_source_publication(
-            sa_sync_conn, pub, source_id="h-only-1", title="T", pub_year=2024
-        )
+        hal_sd = _notice(sa_sync_conn, pub, source_id="h-only-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, authorship_id=a_uca, in_perimeter=True)
 

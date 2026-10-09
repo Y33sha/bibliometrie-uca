@@ -1,12 +1,16 @@
 """Tests d'intégration pour `infrastructure.read_models.publications.source_publications`."""
 
 import json
+from functools import partial
 
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_publications import get_publication_sources
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+
+# Notice de titre « Titre ».
+_notice = partial(insert_source_publication, title="Titre")
 
 
 def _create_journal(conn, title, publisher_name):
@@ -43,11 +47,10 @@ class TestGetPublicationSources:
     def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
         journal = _create_journal(sa_sync_conn, "Nature", "Springer Nature")
-        insert_source_publication(
+        _notice(
             sa_sync_conn,
             pub,
             source_id="hal-1",
-            title="Titre",
             journal_id=journal,
             biblio={
                 "journal": {"title": "Nature (London)", "issn": "0028-0836", "eissn": "1476-4687"},
@@ -68,12 +71,11 @@ class TestGetPublicationSources:
 
     def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        _notice(
             sa_sync_conn,
             pub,
             source="crossref",
             source_id="10.1/x",
-            title="Titre",
             external_ids={
                 "pmid": "123",
                 "isbn": ["978-2", "978-3"],
@@ -85,12 +87,11 @@ class TestGetPublicationSources:
 
     def test_bibliographic_fields(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        _notice(
             sa_sync_conn,
             pub,
             source="openalex",
             source_id="W1",
-            title="Titre",
             container_title="Actes du colloque",
             biblio={"volume": "12", "issue": "3", "first_page": "100", "last_page": "120"},
         )
@@ -104,12 +105,11 @@ class TestGetPublicationSources:
 
     def test_pages_as_given_by_source(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        _notice(
             sa_sync_conn,
             pub,
             source="crossref",
             source_id="10.1/y",
-            title="Titre",
             biblio={"page": "e1234", "article_number": "e1234"},
         )
         [record] = _records(sa_sync_conn, pub)
@@ -117,7 +117,7 @@ class TestGetPublicationSources:
 
     def test_language_name_and_source_value(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(sa_sync_conn, pub, source="wos", source_id="WOS:1", title="Titre")
+        _notice(sa_sync_conn, pub, source="wos", source_id="WOS:1")
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET language = 'en', "

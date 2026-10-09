@@ -23,13 +23,7 @@ class TestRefreshAddressSourceCountries:
         addr = insert_address(
             sa_sync_conn, "Clermont", countries=["FR"], normalized_text="Clermont"
         )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-                "VALUES (:sa, :addr)"
-            ),
-            {"sa": sa, "addr": addr},
-        )
+        insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         updated = _Q.refresh_address_source_countries(sa_sync_conn)
         assert updated == 1
@@ -45,13 +39,7 @@ class TestRefreshAddressSourceCountries:
         sd = insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="oa-2")
         sa = insert_signature(sa_sync_conn, sd, source="openalex")
         addr = insert_address(sa_sync_conn, "X", countries=None, normalized_text="X")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-                "VALUES (:sa, :addr)"
-            ),
-            {"sa": sa, "addr": addr},
-        )
+        insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         updated = _Q.refresh_address_source_countries(sa_sync_conn)
         assert updated == 0

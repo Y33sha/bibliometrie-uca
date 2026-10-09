@@ -10,6 +10,7 @@ from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository, publication_repository
+from tests.integration.helpers.sources import insert_source_publication
 
 
 @pytest.fixture
@@ -112,15 +113,15 @@ class TestRefreshFromSources:
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(sa_sync_conn, "Science")
         pub_id = _seed_pub(publication_repo, "Pub", doi="10.5555/enrich-test")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year,
-                                              publication_id, oa_status, journal_id)
-                VALUES ('openalex', 'W999enrich', 'Pub', 2024, :pid, 'gold', :jid)
-                """
-            ),
-            {"pid": pub_id, "jid": journal_id},
+        insert_source_publication(
+            sa_sync_conn,
+            pub_id,
+            source="openalex",
+            source_id="W999enrich",
+            title="Pub",
+            pub_year=2024,
+            journal_id=journal_id,
+            oa_status="gold",
         )
         refresh_from_sources(pub_id, repo=publication_repo)
         row = sa_sync_conn.execute(
