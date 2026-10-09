@@ -9,6 +9,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import EntityFacetItem, EntityKind
+from infrastructure.db.sql_fragments import has_author_role
 
 
 class EntitySql(NamedTuple):
@@ -41,7 +42,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         id="pe.id",
         label="pe.first_name || ' ' || pe.last_name",
         join=(
-            "JOIN authorships au ON au.publication_id = p.id AND au.roles && ARRAY['author']::text[] "
+            f"JOIN authorships au ON au.publication_id = p.id AND {has_author_role('au')} "
             "JOIN persons pe ON pe.id = au.person_id AND pe.exclusion IS NULL"
         ),
     ),

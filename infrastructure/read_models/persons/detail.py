@@ -23,6 +23,7 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.dates import today
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
+from infrastructure.db.sql_fragments import has_author_role
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
 
@@ -51,7 +52,7 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = :pid
               AND sa.source = '{Source.THESES.value}'
-              AND NOT (sa.roles && ARRAY['author']::text[])
+              AND NOT ({has_author_role("sa")})
               AND sd.publication_id IS NOT NULL
         """),
         {"pid": person_id},
@@ -110,11 +111,11 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
                 FROM authorships a2
                 JOIN persons pe2 ON pe2.id = a2.person_id
                 WHERE a2.publication_id = p.id
-                  AND a2.roles && ARRAY['author']::text[]
+                  AND {has_author_role("a2")}
                 LIMIT 1
             ) author ON TRUE
             WHERE a.person_id = :pid
-              AND NOT (a.roles && ARRAY['author']::text[])
+              AND NOT ({has_author_role("a")})
               AND EXISTS (
                   SELECT 1 FROM source_authorships sa
                   WHERE sa.authorship_id = a.id AND sa.source = '{Source.THESES.value}'
@@ -230,7 +231,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[Sub
             entity_subjects_sql(
                 "EXISTS (SELECT 1 FROM authorships a "
                 "WHERE a.publication_id = p.id AND a.person_id = :pid "
-                "AND a.roles && ARRAY['author']::text[])"
+                f"AND {has_author_role('a')})"
             )
         ),
         {"pid": person_id, "lim": limit},
@@ -243,12 +244,12 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
     current_year = today().year
 
     pubs_year_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.person_id = :pid
-              AND a.roles && ARRAY['author']::text[]
+              AND {has_author_role("a")}
               AND p.pub_year IS NOT NULL
               AND p.pub_year >= :min_year
             GROUP BY p.pub_year
@@ -265,7 +266,7 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.person_id = :pid
-              AND a.roles && ARRAY['author']::text[]
+              AND {has_author_role("a")}
         """),
         {"pid": person_id},
     ).one()

@@ -20,15 +20,16 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
+from infrastructure.db.sql_fragments import has_author_role
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
 # Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
-AUTHOR_SIGNATURE = """
+AUTHOR_SIGNATURE = f"""
     a.in_perimeter = TRUE
-    AND a.roles && ARRAY['author']::text[]
+    AND {has_author_role("a")}
     AND EXISTS (
         SELECT 1 FROM authorship_structures aus
         WHERE aus.authorship_id = a.id AND aus.structure_id = :structure_id
@@ -190,14 +191,14 @@ class PgStructuresQueries(StructuresQueries):
         ).all()
 
         theses_row = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT COUNT(*) AS n
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 JOIN authorship_structures aus ON aus.authorship_id = a.id
                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
                   AND aus.structure_id = :id
-                  AND a.roles && ARRAY['author']::text[]
+                  AND {has_author_role("a")}
             """),
             {"id": structure_id},
         ).one()
@@ -266,7 +267,7 @@ class PgStructuresQueries(StructuresQueries):
                     "EXISTS (SELECT 1 FROM authorships a "
                     "JOIN authorship_structures aus ON aus.authorship_id = a.id "
                     "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
-                    "AND a.roles && ARRAY['author']::text[])"
+                    f"AND {has_author_role('a')})"
                 )
             ),
             {"structure_id": structure_id, "lim": limit},
