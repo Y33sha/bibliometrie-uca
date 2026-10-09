@@ -421,10 +421,10 @@ def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/metadata_correction/phase.py`.
     """
-    from application.pipeline.metadata_correction.phase import run
+    from application.pipeline.metadata_correction.phase import MetadataCorrectionPhase
     from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 
-    return run(open_tx, PgMetadataCorrectionQueries(), log)
+    return MetadataCorrectionPhase(PgMetadataCorrectionQueries()).run(_context(options))
 
 
 def phase_publications(options: RunOptions) -> PhaseMetrics:

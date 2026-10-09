@@ -7,11 +7,12 @@ Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
 3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre.
 """
 
-import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.metadata_correction.correct_by_cluster import run as run_cluster
 from application.pipeline.metadata_correction.correct_unary import run as run_unary
 from application.pipeline.metadata_correction.journal_by_doi import run as run_journal_by_doi
@@ -26,31 +27,34 @@ def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:
         return step(conn)
 
 
-def run(
-    open_tx: OpenTransaction, queries: MetadataCorrectionQueries, logger: logging.Logger
-) -> PhaseMetrics:
-    """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
-    journal_by_doi = _step(open_tx, lambda conn: run_journal_by_doi(conn, queries, logger))
-    unary = _step(open_tx, lambda conn: run_unary(conn, queries, logger))
-    cluster = _step(open_tx, lambda conn: run_cluster(conn, queries, logger))
+@dataclass(frozen=True)
+class MetadataCorrectionPhase:
+    queries: MetadataCorrectionQueries
 
-    metrics = PhaseMetrics()
-    metrics.add(
-        total=journal_by_doi.examined + unary.examined + cluster.examined,
-        updated=journal_by_doi.attached + unary.corrected + cluster.corrected,
-    )
-    # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
-    metrics.details["summary"] = {
-        "journal_by_doi_examined": journal_by_doi.examined,
-        "journal_by_doi_corrected": journal_by_doi.attached,
-        "unary_examined": unary.examined,
-        "unary_corrected": unary.corrected,
-        "cluster_examined": cluster.examined,
-        "cluster_corrected": cluster.corrected,
-    }
-    counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
-    counts.sort(key=lambda kc: kc[1], reverse=True)
-    metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
-    # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
-    metrics.resume = ""
-    return metrics
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
+        open_tx, queries, logger = ctx.open_tx, self.queries, ctx.logger
+        journal_by_doi = _step(open_tx, lambda conn: run_journal_by_doi(conn, queries, logger))
+        unary = _step(open_tx, lambda conn: run_unary(conn, queries, logger))
+        cluster = _step(open_tx, lambda conn: run_cluster(conn, queries, logger))
+
+        metrics = PhaseMetrics()
+        metrics.add(
+            total=journal_by_doi.examined + unary.examined + cluster.examined,
+            updated=journal_by_doi.attached + unary.corrected + cluster.corrected,
+        )
+        # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
+        metrics.details["summary"] = {
+            "journal_by_doi_examined": journal_by_doi.examined,
+            "journal_by_doi_corrected": journal_by_doi.attached,
+            "unary_examined": unary.examined,
+            "unary_corrected": unary.corrected,
+            "cluster_examined": cluster.examined,
+            "cluster_corrected": cluster.corrected,
+        }
+        counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
+        counts.sort(key=lambda kc: kc[1], reverse=True)
+        metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
+        # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
+        metrics.resume = ""
+        return metrics
