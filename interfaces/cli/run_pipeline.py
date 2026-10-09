@@ -30,6 +30,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES
 from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
+from application.pipeline.signals import select_targets
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -452,11 +453,12 @@ def _execute_phases(
     from infrastructure.observability.phase_executions import start_run
 
     sources = {s.strip() for s in args.sources.split(",") if s.strip()}
-    # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
-    effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
 
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
-    recorder = start_run(mode=args.mode, sources=effective_sources)
+    recorder = start_run(
+        mode=args.mode,
+        sources=select_targets(ALL_SOURCES, sources, include_wos=args.include_wos),
+    )
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
