@@ -13,6 +13,7 @@ from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.staging import insert_staging
 
 # Publication de 2020 sans titre normalisé ni type.
 _publication = partial(insert_publication, normalize_title=False, pub_year=2020, doc_type=None)
@@ -313,37 +314,32 @@ class TestGetMissingDois:
         assert result == ["10.1234/b"]
 
 
-def _insert_staging(conn, source, sid, doi, *, seen_days_ago, disappeared=False):
-    conn.execute(
-        text(
-            "INSERT INTO staging (source, source_id, doi, raw_data, last_seen_at, disappeared_at) "
-            "VALUES (CAST(:s AS source_type), :sid, :doi, '{}'::jsonb, "
-            "       now() - make_interval(days => :d), "
-            "       CASE WHEN :dis THEN now() ELSE NULL END)"
-        ),
-        {"s": source, "sid": sid, "doi": doi, "d": seen_days_ago, "dis": disappeared},
-    )
-
-
 class TestGetStaleRows:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
         # Le refetch par id natif ne dépend pas du DOI : la row sans DOI est
         # sélectionnée au même titre que celle qui en a un.
-        _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/old", seen_days_ago=100)
-        _insert_staging(sa_sync_conn, "openalex", "W2", None, seen_days_ago=100)
-        _insert_staging(sa_sync_conn, "openalex", "W3", "10.1/recent", seen_days_ago=10)
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", doi="10.1/old", seen_days_ago=100)
+        insert_staging(sa_sync_conn, "openalex", source_id="W2", seen_days_ago=100)
+        insert_staging(
+            sa_sync_conn, "openalex", source_id="W3", doi="10.1/recent", seen_days_ago=10
+        )
         rows = get_stale_rows(sa_sync_conn, "openalex", after_days=90)
         assert sorted(src_id for _, src_id in rows) == ["W1", "W2"]
 
     def test_excludes_disappeared(self, sa_sync_conn):
-        _insert_staging(
-            sa_sync_conn, "openalex", "W1", "10.1/gone", seen_days_ago=100, disappeared=True
+        insert_staging(
+            sa_sync_conn,
+            "openalex",
+            source_id="W1",
+            doi="10.1/gone",
+            seen_days_ago=100,
+            disappeared=True,
         )
         assert get_stale_rows(sa_sync_conn, "openalex", after_days=90) == []
 
     def test_scoped_to_source(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/a", seen_days_ago=100)
-        _insert_staging(sa_sync_conn, "scanr", "S1", "10.1/b", seen_days_ago=100)
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", doi="10.1/a", seen_days_ago=100)
+        insert_staging(sa_sync_conn, "scanr", source_id="S1", doi="10.1/b", seen_days_ago=100)
         assert [
             src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex", after_days=90)
         ] == ["W1"]
@@ -352,21 +348,21 @@ class TestGetStaleRows:
         # W1 hors fenêtre (exclue), W2 dans la fenêtre (gardée), W3 sans
         # source_publications → pub_year NULL, conservée (LEFT JOIN conservateur).
         for sid in ("W1", "W2", "W3"):
-            _insert_staging(sa_sync_conn, "openalex", sid, None, seen_days_ago=100)
+            insert_staging(sa_sync_conn, "openalex", source_id=sid, seen_days_ago=100)
         _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2020)
         _notice(sa_sync_conn, source="openalex", source_id="W2", pub_year=2023)
         rows = get_stale_rows(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(src_id for _, src_id in rows) == ["W2", "W3"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
         _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2010)
         assert [
             src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex", after_days=90)
         ] == ["W1"]
 
     def test_the_threshold_comes_from_the_argument(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=40)
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=40)
         assert get_stale_rows(sa_sync_conn, "openalex", after_days=90) == []
         rows = get_stale_rows(sa_sync_conn, "openalex", after_days=30)
         assert [src_id for _, src_id in rows] == ["W1"]
@@ -374,7 +370,7 @@ class TestGetStaleRows:
 
 class TestDisappearedMarking:
     def test_set_disappeared_by_source_id(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
         set_disappeared_by_source_id(sa_sync_conn, "openalex", "W1")
         marked = sa_sync_conn.execute(
             text(

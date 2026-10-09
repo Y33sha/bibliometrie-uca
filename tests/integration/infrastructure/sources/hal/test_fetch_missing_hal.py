@@ -9,17 +9,12 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.staging import insert_staging
 
 
 def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
     """Crée un source_publication `source` rattaché à `publication_id`, avec sa ligne staging."""
-    staging_id = conn.execute(
-        text(
-            "INSERT INTO staging (source, source_id, raw_data) "
-            "VALUES (CAST(:src AS source_type), :sid, '{}'::jsonb) RETURNING id"
-        ),
-        {"src": source, "sid": source_id},
-    ).scalar_one()
+    staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_publication(
         conn,
         publication_id,
@@ -68,11 +63,7 @@ class TestFindMissingHalIds:
 
     def test_skips_hal_id_already_in_staging_hal(self, sa_sync_conn):
         self._carry(sa_sync_conn, "scanr", "scanr-1", ["hal-ccc"])
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', 'hal-ccc', '{}')"
-            )
-        )
+        insert_staging(sa_sync_conn, source_id="hal-ccc")
         assert self._missing(sa_sync_conn) == []
 
     def test_skips_hal_id_already_searched_in_vain(self, sa_sync_conn):
@@ -170,9 +161,7 @@ class TestInsertResults:
         assert staged == 1
 
     def test_un_document_deja_en_staging_n_est_pas_nouveau(self, sa_sync_conn):
-        sa_sync_conn.execute(
-            text("INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', 'tel-01', '{}')")
-        )
+        insert_staging(sa_sync_conn, source_id="tel-01")
         result = PgHalFetchMissingAdapter().insert_nnt_result(
             sa_sync_conn, "2024UCA0001", {"halId_s": "tel-01"}, retry_after_days=30
         )

@@ -5,18 +5,14 @@ from sqlalchemy import text
 from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from domain.publications.metadata import normalized_title
 from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+from tests.integration.helpers.staging import insert_staging
 
 _Q = PgSourcePublicationQueries()
 
 
 def test_upsert_writes_title_normalized(sa_sync_conn):
     conn = sa_sync_conn
-    staging_id = conn.execute(
-        text(
-            "INSERT INTO staging (source, source_id, raw_data) "
-            "VALUES ('openalex', 'W_title_norm', '{}'::jsonb) RETURNING id"
-        )
-    ).scalar_one()
+    staging_id = insert_staging(conn, "openalex", source_id="W_title_norm")
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
     sp_id = _Q.upsert_source_publication(
         conn,

@@ -9,6 +9,7 @@ from infrastructure.pipeline.normalize.staging import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )
+from tests.integration.helpers.staging import insert_staging
 
 
 def _fetch(conn, source_id):
@@ -28,12 +29,7 @@ class TestRehydrateStagingRow:
         assert _fetch(sa_sync_conn, "hal-absent") is None
 
     def test_updates_existing_row(self, sa_sync_conn):
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO staging (source, source_id, raw_data, processed) "
-                "VALUES ('hal', 'hal-1', '{}'::jsonb, TRUE)"
-            )
-        )
+        insert_staging(sa_sync_conn, source_id="hal-1", processed=True)
         assert rehydrate_staging_row(sa_sync_conn, "hal", "hal-1", {"x": 1}) is True
         row = _fetch(sa_sync_conn, "hal-1")
         assert row.raw_data == {"x": 1}

@@ -9,15 +9,15 @@ la mise à jour des métadonnées lors d'un re-traitement.
 
 import copy
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
-from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories import publication_repository
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
     create_all_publications,
 )
+from tests.integration.helpers.staging import insert_staging
 
 # ── Données HAL minimales ───────────────────────────────────────
 
@@ -36,20 +36,13 @@ HAL_DOC_CLOSED = {
 
 def _insert_hal_staging(conn, doc):
     """Insère un document HAL dans staging."""
-    stmt = text("""
-        INSERT INTO staging (source, source_id, doi, raw_data, processed)
-        VALUES ('hal', :halid, :doi, :raw_data, FALSE)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            raw_data = EXCLUDED.raw_data,
-            processed = FALSE
-    """).bindparams(bindparam("raw_data", type_=Jsonb))
-    conn.execute(
-        stmt,
-        {
-            "halid": doc["halId_s"],
-            "doi": doc.get("doiId_s"),
-            "raw_data": doc,
-        },
+    insert_staging(
+        conn,
+        source_id=doc["halId_s"],
+        doi=doc.get("doiId_s"),
+        raw_data=doc,
+        processed=False,
+        upsert="raw_data",
     )
 
 

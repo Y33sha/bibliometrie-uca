@@ -1,6 +1,7 @@
 """Idempotence : normalisation Web of Science."""
 
 from tests.helpers.signature_sync import SYNC_SETTINGS
+from tests.integration.helpers.staging import insert_staging
 
 WOS_STAGING_DOCS = [
     {
@@ -50,17 +51,16 @@ WOS_STAGING_DOCS = [
 
 
 def insert_wos_staging(conn, docs):
-    from sqlalchemy import bindparam, text
-
-    from infrastructure.db.jsonb import Jsonb
-
-    stmt = text("""
-        INSERT INTO staging (source, source_id, doi, raw_data, processed)
-        VALUES ('wos', :ut, :doi, :raw_data, FALSE)
-        ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-    """).bindparams(bindparam("raw_data", type_=Jsonb))
     for doc in docs:
-        conn.execute(stmt, {"ut": doc["ut"], "doi": doc["doi"], "raw_data": doc["raw_data"]})
+        insert_staging(
+            conn,
+            "wos",
+            source_id=doc["ut"],
+            doi=doc["doi"],
+            raw_data=doc["raw_data"],
+            processed=False,
+            upsert="processed",
+        )
 
 
 def run_normalize_wos(conn):

@@ -8,16 +8,11 @@ Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture es
 from sqlalchemy import text
 
 from infrastructure.pipeline.extract.staging import upsert_staging
+from tests.integration.helpers.staging import insert_staging
 
 
 def _insert_existing(conn, source_id, doi):
-    conn.execute(
-        text(
-            "INSERT INTO staging (source, source_id, doi, raw_data, processed, raw_hash) "
-            "VALUES ('hal', :sid, :doi, '{}'::jsonb, TRUE, 'oldhash')"
-        ),
-        {"sid": source_id, "doi": doi},
-    )
+    insert_staging(conn, source_id=source_id, doi=doi, processed=True, raw_hash="oldhash")
 
 
 def _staging_doi(conn, source_id):
