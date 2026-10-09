@@ -9,6 +9,7 @@
 ### Non commencé
 
 - [Conférences et actes](METIER_conferences-et-actes.md)
+- [Duplications dans les tests](CODE_duplications-tests.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)

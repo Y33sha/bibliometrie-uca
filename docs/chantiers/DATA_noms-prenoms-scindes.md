@@ -61,7 +61,8 @@ Une inversion se repère en confrontant le découpage d'une signature aux person
 - [x] Nom de famille réduit à des initiales : le découpage retenu les place en prénom. Trois cas, environ 13 000 signatures : format « Nom I. » découpé par le parseur (« Del Buono L. »), format « I., Nom » (« C., Küll »), champs natifs inversés (surname « M. », forename « Brigante »). Signatures existantes rattachées à leur identité corrigée.
 - [x] Formes de nom dans l'ordre « prénom nom ». Formes d'une personne : « prénom nom » et « initiales nom ». Verdicts réécrits dans cet ordre d'après leur découpage.
 - [x] Matching par forme de nom et corroboration d'un identifiant : forme « prénom nom », puis « nom prénom ».
-- [ ] Personnes au nom de famille fait d'initiales (17) : supprimées par un oneshot, puis recréées ou rattachées par le pipeline d'après le découpage de leurs signatures.
+- [x] Personnes au nom de famille fait d'initiales (17) : supprimées par un oneshot, puis recréées ou rattachées par le pipeline d'après le découpage de leurs signatures.
+- [x] Personne créée : découpage de la source en priorité sur celui du parseur.
 - [ ] Effet mesuré sur les rattachements, les signatures orphelines et les personnes créées.
 
 ### Phase 4 — Interface
@@ -79,4 +80,4 @@ Une inversion se repère en confrontant le découpage d'une signature aux person
 ## Questions ouvertes
 
 - Affichage d'une forme normalisée qui regroupe plusieurs graphies brutes : la plus fréquente, ou toutes ?
-- Parseur : la règle des initiales finales vise le format « Nom I. » (« Del Buono L. »). Elle découpe aussi « Prénom Nom I. » en nom « Prénom Nom » : « Jean PERRIOT M.D. », « Valérie Julian V ». Fréquence à mesurer.
+- Parseur : la règle des initiales finales vise le format « Nom I. » (« Del Buono L. »). Comparée au découpage natif de la même signature, elle est juste dans 335 cas sur 392. Elle se trompe sur « Prénom Nom I. » (34 cas, « Valérie Julian V ») et « Nom Prénom I. » (23 cas, « Brandt Mark J. »). La chaîne seule ne distingue pas ces formats.
