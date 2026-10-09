@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 from application.pipeline.context import RunOptions
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.normalize.base import NormalizeStats
 from interfaces.cli.phases import extract, fetch_truncated, normalize
 from interfaces.cli.phases.execution import phase_context
 
@@ -30,12 +31,10 @@ def test_refetch_not_called_in_extract():
 
 
 def test_refetch_not_called_in_normalize():
-    # La ligne d'observabilité d'une source, dont la phase somme les documents normalisés.
-    ligne = {"key": "openalex", "processed": 0, "skipped": 0, "errors": 0, "duration_s": 0.0}
     with (
-        patch.object(normalize, "_run_normalize", return_value=ligne),
+        patch.object(normalize, "_run_normalize", return_value=NormalizeStats(0, 0, 0)),
         patch.object(normalize, "_vacuum_staging"),
-        patch.object(normalize, "_run_prune_disappeared"),
+        patch.object(normalize, "_run_prune_disappeared", return_value=0),
         patch.object(normalize, "_run_cleanup_orphan_identities"),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):

@@ -21,11 +21,12 @@ from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
+from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.progression import attente
 from domain.sources.registry import ALL_SOURCES_SET
 
-NormalizeOne = Callable[[str], dict[str, object]]
-"""Normalise une source (connexion + normaliseur câblé) et rend sa ligne d'observabilité."""
+NormalizeOne = Callable[[str], NormalizeStats]
+"""Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
 VacuumStaging = Callable[[bool], None]
 """`VACUUM` du staging (maintenance physique, autocommit) ; `full=True` réécrit la table."""
 
@@ -45,9 +46,14 @@ class NormalizePhase:
         logger = ctx.logger
         sources = ctx.options.sources if ctx.options.sources is not None else ALL_SOURCES_SET
         etape(logger, "Normalisation")
-        rows = [self.normalize_one(source) for source in self.ordered_sources if source in sources]
+        rows = [self._normalize(source) for source in self.ordered_sources if source in sources]
 
         disparues = self.prune_disappeared()
+        if disparues:
+            logger.info(
+                "%s (disparus de leur source)",
+                accord(disparues, "document supprimé", "documents supprimés"),
+            )
 
         if not disparues and not any(_a_traite(row) for row in rows):
             rien_a_faire(logger)
@@ -71,6 +77,18 @@ class NormalizePhase:
         metrics.details["table"] = {"rows": rows}
         metrics.details["disappeared_pruned"] = disparues
         return metrics
+
+    def _normalize(self, source: str) -> dict[str, object]:
+        """Normalise `source` et rend sa ligne de la table d'observabilité."""
+        t0 = time.perf_counter()
+        stats = self.normalize_one(source)
+        return {
+            "key": source,
+            "processed": stats.processed,
+            "skipped": stats.skipped,
+            "errors": stats.errors,
+            "duration_s": round(time.perf_counter() - t0, 1),
+        }
 
 
 def _a_traite(row: dict[str, object]) -> bool:

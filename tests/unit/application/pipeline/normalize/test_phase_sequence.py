@@ -5,14 +5,21 @@ Le retrait des documents disparus précède le nettoyage des identités : il en 
 
 import logging
 
+from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.normalize.phase import NormalizePhase
 
 
-def _run(contexte, appels: list[str], *, disparues: int = 0, ligne: dict | None = None, **options):
-    ligne = {"processed": 3} if ligne is None else ligne
+def _run(
+    contexte,
+    appels: list[str],
+    *,
+    disparues: int = 0,
+    bilan: NormalizeStats = NormalizeStats(3, 0, 0),
+    **options,
+):
     return NormalizePhase(
         ordered_sources=["hal", "openalex"],
-        normalize_one=lambda source: (appels.append(f"normalize:{source}"), ligne)[1],
+        normalize_one=lambda source: (appels.append(f"normalize:{source}"), bilan)[1],
         prune_disappeared=lambda: (appels.append("prune"), disparues)[1],
         cleanup_orphan_identities=lambda: appels.append("cleanup"),
         vacuum_staging=lambda full: appels.append("vacuum"),
@@ -41,13 +48,13 @@ def test_le_total_reste_celui_des_documents_normalises(contexte):
     assert metrics.total == 3
 
 
-_RIEN = {"processed": 0, "skipped": 0, "errors": 0}
+_RIEN = NormalizeStats(0, 0, 0)
 
 
 def test_sans_document_la_phase_saute_la_maintenance(contexte, caplog):
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
-        metrics = _run(contexte, appels, ligne=_RIEN)
+        metrics = _run(contexte, appels, bilan=_RIEN)
     assert appels == ["normalize:hal", "prune"]
     assert "Rien à faire" in caplog.text
     assert "Maintenance" not in caplog.text
@@ -56,11 +63,28 @@ def test_sans_document_la_phase_saute_la_maintenance(contexte, caplog):
 
 def test_un_retrait_suffit_a_declencher_la_maintenance(contexte):
     appels: list[str] = []
-    _run(contexte, appels, disparues=2, ligne=_RIEN)
+    _run(contexte, appels, disparues=2, bilan=_RIEN)
     assert appels[-2:] == ["cleanup", "vacuum"]
 
 
 def test_un_document_ecarte_suffit_a_declencher_la_maintenance(contexte):
     appels: list[str] = []
-    _run(contexte, appels, ligne={**_RIEN, "skipped": 1})
+    _run(contexte, appels, bilan=NormalizeStats(0, 1, 0))
     assert appels[-2:] == ["cleanup", "vacuum"]
+
+
+def test_les_retraits_sont_annonces(contexte, caplog):
+    with caplog.at_level(logging.INFO, logger="test"):
+        _run(contexte, [], disparues=2)
+    assert "2 documents supprimés (disparus de leur source)" in caplog.text
+
+
+def test_la_table_porte_une_ligne_par_source(contexte):
+    metrics = _run(contexte, [], bilan=NormalizeStats(3, 1, 2))
+    (ligne,) = metrics.details["table"]["rows"]
+    assert {k: v for k, v in ligne.items() if k != "duration_s"} == {
+        "key": "hal",
+        "processed": 3,
+        "skipped": 1,
+        "errors": 2,
+    }
