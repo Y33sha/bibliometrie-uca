@@ -14,7 +14,9 @@ Reconstruction complète à chaque run (table dérivée) : la table est purgée 
 """
 
 import logging
+from dataclasses import dataclass
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.relations import (
@@ -26,7 +28,6 @@ from application.ports.pipeline.relations import (
     SharedKeyPair,
     TitleMatch,
 )
-from application.ports.pipeline.transaction import OpenTransaction
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
@@ -150,42 +151,45 @@ def _build_title_match_edges(
     ]
 
 
-def run(
-    open_tx: OpenTransaction, queries: PublicationRelationsQueries, logger: logging.Logger
-) -> PhaseMetrics:
-    """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
-    with open_tx() as conn:
-        sources = queries.fetch_declared_relation_sources(conn)
-        declared_edges = _build_declared_edges(sources)
-        publications_by_doi = queries.fetch_publications_by_doi(
-            conn, _distinct_work_targets(sources)
-        )
-        declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
+@dataclass(frozen=True)
+class RelationsPhase:
+    queries: PublicationRelationsQueries
 
-        pairs = queries.fetch_shared_key_pairs(conn)
-        declared_pairs = queries.fetch_declared_related_pairs(conn)
-        shared_edges = _build_shared_key_edges(pairs, declared_pairs)
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
+        queries = self.queries
+        with ctx.open_tx() as conn:
+            sources = queries.fetch_declared_relation_sources(conn)
+            declared_edges = _build_declared_edges(sources)
+            publications_by_doi = queries.fetch_publications_by_doi(
+                conn, _distinct_work_targets(sources)
+            )
+            declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
-        erratum_matches = queries.fetch_erratum_title_matches(conn)
-        preprint_matches = queries.fetch_preprint_title_matches(conn)
-        title_edges = _build_title_match_edges(
-            erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
-        ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
+            pairs = queries.fetch_shared_key_pairs(conn)
+            declared_pairs = queries.fetch_declared_related_pairs(conn)
+            shared_edges = _build_shared_key_edges(pairs, declared_pairs)
 
-        # L'ordre déclarées → clés partagées → titre fixe la priorité de dédup (`ON CONFLICT`).
-        rebuild = queries.rebuild_relations(conn, declared_edges + shared_edges + title_edges)
-        by_type = queries.count_by_relation_type(conn)
+            erratum_matches = queries.fetch_erratum_title_matches(conn)
+            preprint_matches = queries.fetch_preprint_title_matches(conn)
+            title_edges = _build_title_match_edges(
+                erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
+            ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
 
-    _log_changes(rebuild, logger)
+            # L'ordre déclarées → clés partagées → titre fixe la priorité de dédup (`ON CONFLICT`).
+            rebuild = queries.rebuild_relations(conn, declared_edges + shared_edges + title_edges)
+            by_type = queries.count_by_relation_type(conn)
 
-    metrics = PhaseMetrics()
-    metrics.add(new=sum(count for _, count in rebuild.added_by_type))
-    metrics.details["table"] = {
-        "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
-    }
-    # La sous-étape porte le détail des nouvelles relations : une ligne de clôture le répéterait.
-    metrics.resume = ""
-    return metrics
+        _log_changes(rebuild, ctx.logger)
+
+        metrics = PhaseMetrics()
+        metrics.add(new=sum(count for _, count in rebuild.added_by_type))
+        metrics.details["table"] = {
+            "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
+        }
+        # La sous-étape journalise le détail des nouvelles relations : une ligne de clôture le répéterait.
+        metrics.resume = ""
+        return metrics
 
 
 def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:

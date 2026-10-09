@@ -458,10 +458,10 @@ def phase_relations(options: RunOptions) -> PhaseMetrics:
 
     La phase suit `publications`, qui a rattaché les documents sources et permet de résoudre les DOI cibles en `publication_id`. Elle reconstruit `publication_relations` depuis les relations que les sources déclarent — `meta.related_identifiers` chez DataCite, `meta.relation` chez Crossref — complétées par les clés partagées et le rapprochement par titre. Les liens entre formes d'une même œuvre relèvent du dédoublonnage, en phase `metadata_correction`.
     """
-    from application.pipeline.relations.phase import run
+    from application.pipeline.relations.phase import RelationsPhase
     from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 
-    return run(open_tx, PgPublicationRelationsQueries(), log)
+    return RelationsPhase(PgPublicationRelationsQueries()).run(_context(options))
 
 
 def phase_persons(options: RunOptions) -> PhaseMetrics:
