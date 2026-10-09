@@ -11,9 +11,11 @@ Les deux étapes — réconciliation, suppression — sont idempotentes ; chacun
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publications.reconcile_components import run as reconcile_run
@@ -24,30 +26,33 @@ from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.publication_repository import PublicationRepository
 
 
-def run(
-    open_tx: OpenTransaction,
-    reconciliation_queries: PublicationsReconciliationQueries,
-    logger: logging.Logger,
-    *,
-    publication_repo_factory: Callable[[Connection], PublicationRepository],
-    rebuild_publications: bool = False,
-) -> PhaseMetrics:
-    """Réconciliation, puis suppression des publications restées sans source."""
-    metrics = _reconcile(
-        open_tx,
-        reconciliation_queries,
-        logger,
-        publication_repo_factory,
-        rebuild=rebuild_publications,
-    )
-    _delete_publications_without_sources(open_tx, reconciliation_queries, logger)
-    with open_tx() as conn:
-        pub_total = reconciliation_queries.count_publications(conn)
-    summary = metrics.details["summary"]
-    if isinstance(summary, dict):
-        summary["pub_total"] = pub_total
-    metrics.resume = ""
-    return metrics
+@dataclass(frozen=True)
+class PublicationsPhase:
+    reconciliation_queries: PublicationsReconciliationQueries
+    publication_repo_factory: Callable[[Connection], PublicationRepository]
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Réconciliation, puis suppression des publications restées sans source."""
+        open_tx, reconciliation_queries, logger = (
+            ctx.open_tx,
+            self.reconciliation_queries,
+            ctx.logger,
+        )
+        metrics = _reconcile(
+            open_tx,
+            reconciliation_queries,
+            logger,
+            self.publication_repo_factory,
+            rebuild=ctx.options.rebuild_publications,
+        )
+        _delete_publications_without_sources(open_tx, reconciliation_queries, logger)
+        with open_tx() as conn:
+            pub_total = reconciliation_queries.count_publications(conn)
+        summary = metrics.details["summary"]
+        if isinstance(summary, dict):
+            summary["pub_total"] = pub_total
+        metrics.resume = ""
+        return metrics
 
 
 def _delete_publications_without_sources(
