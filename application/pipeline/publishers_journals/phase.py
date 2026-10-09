@@ -1,18 +1,21 @@
-"""Orchestrateur de la phase `publishers_journals` : enrichissement du référentiel `journals`.
+"""Orchestrateur de la phase `publishers_journals` : enrichissement des référentiels d'éditeurs, de revues et de monographies.
 
-Sous-étapes incrémentales, dans l'ordre :
+Quatre groupes de sous-étapes, dans l'ordre :
 
-1. **resolve_publishers** — préfixe DOI → Registration Agency + éditeur Crossref / repository DataCite (interroge Crossref et DataCite, email polite pool requis).
-2. **enrich_journals_from_openalex** — OpenAlex Sources → APC + journal_type (clé ou email OpenAlex).
-3. **check_journals_in_sudoc** — Sudoc (public) → ISSN des revues vérifiés, corrigés et rangés par support.
-4. **merge_duplicate_journals** — fusion des revues en double : même ISSN-L, même ISSN sous un titre emboîté, même titre et même préfixe DOI.
-5. **delete_empty_journals** — suppression des revues sans enregistrement, sans publication et sans paiement APC, puis des monographies sans enregistrement ni publication, après la fusion des monographies en double, et avant le rattachement de chaque monographie à sa collection, puis des éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
-6. **type_proceedings_journals** — typage en recueil d'actes des revues de type inconnu qui contiennent surtout des articles de congrès.
-7. **type_proceedings_volumes** — nature des monographies, volume d'actes ou livre, recalculée d'après leurs enregistrements, leur collection typée et leur titre.
-8. **learn_journal_doi_namespaces** — calcul des espaces de noms DOI des revues, sur les revues fusionnées et typées.
-9. **enrich_journals_from_doaj** — dump CSV DOAJ (public) → `doaj_payload` + `is_in_doaj`.
+- **Éditeurs** — `resolve_publishers` : éditeur Crossref ou repository DataCite de chaque préfixe DOI en attente.
+- **Revues** — `enrich_journals_from_openalex` (type et frais de publication), `check_journals_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_journals`, `type_proceedings_journals`, `learn_journal_doi_namespaces`, `enrich_journals_from_doaj`.
+- **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
+- **Nettoyage** — suppression des monographies, des revues puis des éditeurs vides.
 
-La vérification Sudoc précède la fusion, qui lui prend l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN. Chaque accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de config sont injectés par le composition-root ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
+Contraintes d'ordre :
+
+- OpenAlex type les revues `unknown` avant le typage en recueil d'actes, qui vise aussi les revues `unknown`.
+- La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN.
+- Les espaces de noms DOI suivent la fusion et le typage des revues.
+- Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
+- Les suppressions viennent en dernier : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur.
+
+Chaque sous-étape tient une ligne du journal, sous le titre de son groupe. Un accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de configuration sont injectés par le câblage ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
 """
 
 import logging
@@ -20,8 +23,23 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import rien_a_faire
+from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.publishers_journals import (
+    check_journals_in_sudoc,
+    delete_empty_journals,
+    delete_empty_monographs,
+    delete_empty_publishers,
+    enrich_journals_from_openalex,
+    import_journals_from_doaj_dump,
+    learn_journal_doi_namespaces,
+    link_monographs_to_collections,
+    merge_duplicate_journals,
+    merge_duplicate_monographs,
+    resolve_publishers,
+    type_proceedings_journals,
+    type_proceedings_volumes,
+)
 from application.pipeline.signals import filter_configured
 
 RunSubstep = Callable[[], PhaseMetrics]
@@ -29,197 +47,191 @@ CredentialsMissing = Callable[[str], str | None]
 
 
 @dataclass(frozen=True)
+class _SousEtape:
+    """Sous-étape de la phase : le champ de `PublishersJournalsPhase` qui l'exécute, son libellé, et les accès à configurer avant de la lancer."""
+
+    champ: str
+    libelle: str
+    acces: tuple[str, ...] = ()
+
+
+_GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
+    (
+        "Éditeurs",
+        (_SousEtape("resolve_publishers", resolve_publishers.LIBELLE, ("crossref", "datacite")),),
+    ),
+    (
+        "Revues",
+        (
+            _SousEtape(
+                "enrich_journals_from_openalex",
+                enrich_journals_from_openalex.LIBELLE,
+                ("openalex",),
+            ),
+            _SousEtape("check_journals_in_sudoc", check_journals_in_sudoc.LIBELLE),
+            _SousEtape("merge_duplicate_journals", merge_duplicate_journals.LIBELLE),
+            _SousEtape("type_proceedings_journals", type_proceedings_journals.LIBELLE),
+            _SousEtape("learn_journal_doi_namespaces", learn_journal_doi_namespaces.LIBELLE),
+            _SousEtape("enrich_journals_from_doaj", import_journals_from_doaj_dump.LIBELLE),
+        ),
+    ),
+    (
+        "Monographies",
+        (
+            _SousEtape("merge_duplicate_monographs", merge_duplicate_monographs.LIBELLE),
+            _SousEtape("link_monographs_to_collections", link_monographs_to_collections.LIBELLE),
+            _SousEtape("type_proceedings_volumes", type_proceedings_volumes.LIBELLE),
+        ),
+    ),
+    (
+        "Nettoyage",
+        (
+            _SousEtape("delete_empty_monographs", delete_empty_monographs.LIBELLE),
+            _SousEtape("delete_empty_journals", delete_empty_journals.LIBELLE),
+            _SousEtape("delete_empty_publishers", delete_empty_publishers.LIBELLE),
+        ),
+    ),
+)
+
+
+@dataclass(frozen=True)
 class PublishersJournalsPhase:
     resolve_publishers: RunSubstep
-    enrich_from_openalex: RunSubstep
-    check_in_sudoc: RunSubstep
-    merge_duplicates: RunSubstep
-    delete_empty: RunSubstep
+    enrich_journals_from_openalex: RunSubstep
+    check_journals_in_sudoc: RunSubstep
+    merge_duplicate_journals: RunSubstep
+    type_proceedings_journals: RunSubstep
+    learn_journal_doi_namespaces: RunSubstep
+    enrich_journals_from_doaj: RunSubstep
     merge_duplicate_monographs: RunSubstep
-    delete_empty_monographs: RunSubstep
     link_monographs_to_collections: RunSubstep
-    delete_empty_publishers: RunSubstep
-    type_proceedings: RunSubstep
     type_proceedings_volumes: RunSubstep
-    learn_doi_namespaces: RunSubstep
-    enrich_from_doaj: RunSubstep
+    delete_empty_monographs: RunSubstep
+    delete_empty_journals: RunSubstep
+    delete_empty_publishers: RunSubstep
     credentials_missing: CredentialsMissing
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne les sous-étapes (les deux premières sous garde de config) et assemble les métriques de la phase."""
+        """Enchaîne les groupes de sous-étapes, écrit une ligne par sous-étape et assemble les métriques de la phase."""
         logger = ctx.logger
         metrics = PhaseMetrics()
-
-        publishers = PhaseMetrics()
-        if filter_configured(
-            ["crossref", "datacite"],
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=logger,
-            phase="publishers_journals",
-        ):
-            publishers = self.resolve_publishers()
-
-        openalex = PhaseMetrics()
-        if filter_configured(
-            ["openalex"],
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=logger,
-            phase="publishers_journals",
-        ):
-            openalex = self.enrich_from_openalex()
-
-        sudoc = self.check_in_sudoc()
-        merges = self.merge_duplicates()
-        deletions = self.delete_empty()
-        monograph_merges = self.merge_duplicate_monographs()
-        monograph_deletions = self.delete_empty_monographs()
-        monograph_links = self.link_monographs_to_collections()
-        publisher_deletions = self.delete_empty_publishers()
-        proceedings = self.type_proceedings()
-        volumes = self.type_proceedings_volumes()
-        namespaces = self.learn_doi_namespaces()
-        doaj = self.enrich_from_doaj()
-
-        _assemble(
-            metrics,
-            logger,
-            publishers=publishers,
-            openalex=openalex,
-            sudoc=sudoc,
-            merges=merges,
-            deletions=deletions,
-            monograph_merges=monograph_merges,
-            monograph_deletions=monograph_deletions,
-            monograph_links=monograph_links,
-            publisher_deletions=publisher_deletions,
-            proceedings=proceedings,
-            volumes=volumes,
-            namespaces=namespaces,
-            doaj=doaj,
-        )
+        by_step: dict[str, PhaseMetrics] = {}
+        for titre, sous_etapes in _GROUPES:
+            etape(logger, titre)
+            for indice, sous_etape in enumerate(sous_etapes):
+                branche = DERNIERE_BRANCHE if indice == len(sous_etapes) - 1 else BRANCHE
+                by_step[sous_etape.champ] = self._run_one(sous_etape, branche, metrics, logger)
+        _assemble(metrics, by_step)
         return metrics
 
+    def _run_one(
+        self, sous_etape: _SousEtape, branche: str, metrics: PhaseMetrics, logger: logging.Logger
+    ) -> PhaseMetrics:
+        """Exécute une sous-étape, sauf si aucun de ses accès n'est configuré, et écrit sa ligne de bilan."""
+        if sous_etape.acces and not filter_configured(
+            list(sous_etape.acces),
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=logger,
+            phase="publishers_journals",
+        ):
+            logger.info("%s%s : sautée, accès non configuré", branche, sous_etape.libelle)
+            return PhaseMetrics()
+        sub: PhaseMetrics = getattr(self, sous_etape.champ)()
+        if sub.resume is not None:
+            bilan = sub.resume
+        elif sub.signals:
+            bilan = "interrompue"
+        else:
+            bilan = "rien à faire"
+        logger.info("%s%s : %s", branche, sous_etape.libelle, bilan)
+        return sub
 
-def _assemble(
-    metrics: PhaseMetrics,
-    logger: logging.Logger,
-    *,
-    publishers: PhaseMetrics,
-    openalex: PhaseMetrics,
-    sudoc: PhaseMetrics,
-    merges: PhaseMetrics,
-    deletions: PhaseMetrics,
-    monograph_merges: PhaseMetrics,
-    monograph_deletions: PhaseMetrics,
-    monograph_links: PhaseMetrics,
-    publisher_deletions: PhaseMetrics,
-    proceedings: PhaseMetrics,
-    volumes: PhaseMetrics,
-    namespaces: PhaseMetrics,
-    doaj: PhaseMetrics,
-) -> None:
+
+# Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié.
+_TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
+    (
+        "resolve_publishers",
+        "préfixes DOI → publishers",
+        lambda m: m.extras.get("publisher_matched", 0),
+    ),
+    ("enrich_journals_from_openalex", "revues OpenAlex", lambda m: m.updated),
+    (
+        "check_journals_in_sudoc",
+        "revues vérifiées dans le Sudoc",
+        lambda m: m.extras.get("sudoc_found", 0),
+    ),
+    (
+        "merge_duplicate_journals",
+        "groupes de revues en double",
+        lambda m: m.extras.get("journals_merged", 0),
+    ),
+    (
+        "type_proceedings_journals",
+        "revues typées recueils d'actes",
+        lambda m: m.extras.get("journals_typed_proceedings", 0),
+    ),
+    (
+        "learn_journal_doi_namespaces",
+        "DOI → espaces de noms des revues",
+        lambda m: m.extras.get("journal_doi_namespaces", 0),
+    ),
+    (
+        "merge_duplicate_monographs",
+        "monographies en double fusionnées",
+        lambda m: m.extras.get("monographs_merged", 0),
+    ),
+    (
+        "link_monographs_to_collections",
+        "monographies rattachées à leur collection",
+        lambda m: m.extras.get("monographs_linked", 0),
+    ),
+    (
+        "type_proceedings_volumes",
+        "monographies retypées (actes ou livre)",
+        lambda m: m.extras.get("monographs_to_proceedings", 0),
+    ),
+    (
+        "delete_empty_monographs",
+        "monographies vides supprimées",
+        lambda m: m.extras.get("monographs_deleted", 0),
+    ),
+    (
+        "delete_empty_journals",
+        "revues vides supprimées",
+        lambda m: m.extras.get("journals_deleted", 0),
+    ),
+    (
+        "delete_empty_publishers",
+        "éditeurs vides supprimés",
+        lambda m: m.extras.get("publishers_deleted", 0),
+    ),
+)
+
+
+def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     """Reporte dans `metrics` les métriques des sous-étapes, dans l'ordre de leur exécution."""
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
-    for sub in (
-        publishers,
-        openalex,
-        sudoc,
-        merges,
-        deletions,
-        monograph_merges,
-        monograph_deletions,
-        monograph_links,
-        publisher_deletions,
-        proceedings,
-        volumes,
-        namespaces,
-        doaj,
-    ):
+    for sub in by_step.values():
         metrics.merge(sub)
 
-    # Chaque sous-étape se tait quand elle n'a rien à traiter : la phase le dit pour elles.
-    if metrics.total == 0 and not metrics.extras:
-        rien_a_faire(logger)
-
+    publishers = by_step["resolve_publishers"]
     metrics.details["table"] = {
         "rows": [
             {
-                "key": "préfixes DOI → publishers",
-                "traités": publishers.total,
-                "identifiés": publishers.extras.get("publisher_matched", 0),
-                "créés": publishers.extras.get("publisher_created", 0),
-            },
-            {
-                "key": "revues OpenAlex",
-                "traités": openalex.total,
-                "identifiés": openalex.updated,
-                "créés": 0,
-            },
-            {
-                "key": "revues vérifiées dans le Sudoc",
-                "traités": sudoc.total,
-                "identifiés": sudoc.extras.get("sudoc_found", 0),
-                "créés": 0,
-            },
-            {
-                "key": "groupes de revues en double",
-                "traités": merges.total,
-                "identifiés": merges.extras.get("journals_merged", 0),
-                "créés": 0,
-            },
-            {
-                "key": "revues vides supprimées",
-                "traités": deletions.total,
-                "identifiés": deletions.extras.get("journals_deleted", 0),
-                "créés": 0,
-            },
-            {
-                "key": "monographies en double fusionnées",
-                "traités": monograph_merges.total,
-                "identifiés": monograph_merges.extras.get("monographs_merged", 0),
-                "créés": 0,
-            },
-            {
-                "key": "monographies vides supprimées",
-                "traités": monograph_deletions.total,
-                "identifiés": monograph_deletions.extras.get("monographs_deleted", 0),
-                "créés": 0,
-            },
-            {
-                "key": "monographies rattachées à leur collection",
-                "traités": monograph_links.total,
-                "identifiés": monograph_links.extras.get("monographs_linked", 0),
-                "créés": 0,
-            },
-            {
-                "key": "éditeurs vides supprimés",
-                "traités": publisher_deletions.total,
-                "identifiés": publisher_deletions.extras.get("publishers_deleted", 0),
-                "créés": 0,
-            },
-            {
-                "key": "revues typées recueils d'actes",
-                "traités": proceedings.total,
-                "identifiés": proceedings.extras.get("journals_typed_proceedings", 0),
-                "créés": 0,
-            },
-            {
-                "key": "monographies retypées (actes ou livre)",
-                "traités": volumes.total,
-                "identifiés": volumes.extras.get("monographs_to_proceedings", 0),
-                "créés": 0,
-            },
-            {
-                "key": "DOI → espaces de noms des revues",
-                "traités": namespaces.total,
-                "identifiés": namespaces.extras.get("journal_doi_namespaces", 0),
-                "créés": 0,
-            },
+                "key": key,
+                "traités": by_step[champ].total,
+                "identifiés": identifies(by_step[champ]),
+                "créés": publishers.extras.get("publisher_created", 0)
+                if champ == "resolve_publishers"
+                else 0,
+            }
+            for champ, key, identifies in _TABLE
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
-    metrics.details["summary"] = {"doaj_matched": doaj.extras.get("matched", 0)}
-    # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
+    metrics.details["summary"] = {
+        "doaj_matched": by_step["enrich_journals_from_doaj"].extras.get("matched", 0)
+    }
+    # Chaque sous-étape a écrit sa ligne ; la table d'observabilité garde le détail.
     metrics.resume = ""

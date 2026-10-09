@@ -22,18 +22,18 @@ def build() -> Phase:
 
     return PublishersJournalsPhase(
         resolve_publishers=_run_resolve_publishers,
-        enrich_from_openalex=_run_enrich_journals_from_openalex,
-        check_in_sudoc=_run_check_journals_in_sudoc,
-        merge_duplicates=_run_merge_duplicate_journals,
-        delete_empty=_run_delete_empty_journals,
+        enrich_journals_from_openalex=_run_enrich_journals_from_openalex,
+        check_journals_in_sudoc=_run_check_journals_in_sudoc,
+        merge_duplicate_journals=_run_merge_duplicate_journals,
+        type_proceedings_journals=_run_type_proceedings_journals,
+        learn_journal_doi_namespaces=_run_learn_journal_doi_namespaces,
+        enrich_journals_from_doaj=_run_enrich_journals_from_doaj,
         merge_duplicate_monographs=_run_merge_duplicate_monographs,
-        delete_empty_monographs=_run_delete_empty_monographs,
         link_monographs_to_collections=_run_link_monographs_to_collections,
-        delete_empty_publishers=_run_delete_empty_publishers,
-        type_proceedings=_run_type_proceedings_journals,
         type_proceedings_volumes=_run_type_proceedings_volumes,
-        learn_doi_namespaces=_run_learn_journal_doi_namespaces,
-        enrich_from_doaj=_run_enrich_journals_from_doaj,
+        delete_empty_monographs=_run_delete_empty_monographs,
+        delete_empty_journals=_run_delete_empty_journals,
+        delete_empty_publishers=_run_delete_empty_publishers,
         credentials_missing=credentials_missing,
     )
 

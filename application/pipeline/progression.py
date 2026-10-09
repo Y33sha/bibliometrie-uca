@@ -176,8 +176,10 @@ class Progression:
         *,
         intervalle_s: float = JALON_INTERVALLE_S,
         compte_retenus: bool = False,
+        efface: bool = False,
     ) -> None:
         self._total = total
+        self._efface = efface
         self._libelle = libelle
         self._logger = logger
         self._intervalle_s = intervalle_s
@@ -268,7 +270,7 @@ class Progression:
         )
 
     def ferme(self) -> None:
-        """Retire la barre en laissant sa dernière image au-dessus de celles qui tournent encore.
+        """Retire la barre en laissant sa dernière image au-dessus de celles qui tournent encore, ou sans rien laisser si elle s'efface.
 
         La ligne passe par le chemin des lignes de journal, qui efface les barres, écrit, puis les redessine. `tqdm` la poserait, lui, en tête du bloc des barres, sur la ligne d'une autre, et ferait glisser tout le reste d'un cran.
         """
@@ -280,7 +282,8 @@ class Progression:
         with tqdm.get_lock():
             derniere_image = str(barre)
             barre.close()
-            ecrire_hors_barre(derniere_image, _flux_barres or sys.stderr)
+            if not self._efface:
+                ecrire_hors_barre(derniere_image, _flux_barres or sys.stderr)
 
     def __enter__(self) -> "Progression":
         return self
@@ -302,13 +305,19 @@ def progression(
     *,
     intervalle_s: float = JALON_INTERVALLE_S,
     compte_retenus: bool = False,
+    efface: bool = False,
 ) -> Iterator[Progression]:
     """Ouvre une progression et la referme à la sortie du bloc.
 
-    `compte_retenus` fait porter au compteur les éléments retenus, posés par `retient()`, quand la barre elle-même suit les éléments parcourus.
+    `compte_retenus` fait porter au compteur les éléments retenus, posés par `retient()`, quand la barre elle-même suit les éléments parcourus. `efface` retire la barre sans trace à la fermeture, quand une ligne de bilan prend sa place.
     """
     p = Progression(
-        total, libelle, logger, intervalle_s=intervalle_s, compte_retenus=compte_retenus
+        total,
+        libelle,
+        logger,
+        intervalle_s=intervalle_s,
+        compte_retenus=compte_retenus,
+        efface=efface,
     )
     try:
         yield p

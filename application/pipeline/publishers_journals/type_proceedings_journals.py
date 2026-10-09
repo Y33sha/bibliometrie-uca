@@ -9,7 +9,7 @@ Trois règles de `domain/journals/containers.py` désignent un recueil d'actes :
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals._journal_label import journal_label
 from application.ports.pipeline.journals import JournalProceedingsTypingQueries
@@ -19,6 +19,9 @@ from domain.journals.containers import (
     is_proceedings_title_without_issn,
 )
 from domain.journals.journal import JournalType
+
+LIBELLE = "Typage des recueils d'actes"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 _BY_RECORDS = "articles de congrès"
 _BY_DATED_TITLE = "titre daté"
@@ -44,10 +47,6 @@ def run_type_proceedings_journals(
             reasons[journal.id] = _BY_PROCEEDINGS_TITLE
     if not reasons:
         return metrics
-    if len(reasons) == 1:
-        etape(logger, "Typage d'une revue en recueil d'actes")
-    else:
-        etape(logger, "Typage de %d revues en recueils d'actes", len(reasons))
     summaries = journal_repo.describe_journals(list(reasons))
     for journal_id, reason in reasons.items():
         journal_repo.set_journal_type(journal_id, JournalType.PROCEEDINGS)
@@ -59,9 +58,7 @@ def run_type_proceedings_journals(
             extra={"detail": True},
         )
     metrics.add(total=len(reasons), journals_typed_proceedings=len(reasons))
-    logger.info(
-        "%sTerminé : %s",
-        DERNIERE_BRANCHE,
-        accord(len(reasons), "revue typée recueil d'actes", "revues typées recueils d'actes"),
+    metrics.resume = accord(
+        len(reasons), "revue typée recueil d'actes", "revues typées recueils d'actes"
     )
     return metrics

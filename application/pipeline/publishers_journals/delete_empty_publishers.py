@@ -5,9 +5,12 @@ Un éditeur vide ne porte ni revue, ni monographie, ni préfixe DOI, ni paiement
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.publishers import PublisherCleanupQueries
+
+LIBELLE = "Éditeurs vides"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 
 def run_delete_empty_publishers(
@@ -18,17 +21,9 @@ def run_delete_empty_publishers(
     metrics = PhaseMetrics()
     if not deleted:
         return metrics
-    if len(deleted) == 1:
-        etape(logger, "Suppression d'un éditeur vide")
-    else:
-        etape(logger, "Suppression des %d éditeurs vides", len(deleted))
     for publisher_id, name in deleted:
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Éditeur vide supprimé : %d « %s »", publisher_id, name, extra={"detail": True})
     metrics.add(total=len(deleted), publishers_deleted=len(deleted))
-    logger.info(
-        "%sTerminé : %s",
-        DERNIERE_BRANCHE,
-        accord(len(deleted), "éditeur supprimé", "éditeurs supprimés"),
-    )
+    metrics.resume = accord(len(deleted), "éditeur supprimé", "éditeurs supprimés")
     return metrics

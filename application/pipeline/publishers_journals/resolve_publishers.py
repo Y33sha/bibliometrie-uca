@@ -10,8 +10,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import BRANCHE, accord
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import (
     DoiPrefixesQueries,
@@ -20,6 +21,9 @@ from application.ports.pipeline.doi_prefixes import (
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
+
+LIBELLE = "Éditeurs des préfixes DOI"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 FetchCrossrefPrefixFn = Callable[[str, str | None], tuple[str, int | None] | None]
 """Signature : `(prefix, sample_doi) -> (publisher_name, member_id) | None`."""
@@ -46,53 +50,76 @@ def run_resolve_publishers(
     rows = repo.get_prefixes_pending_publisher()
     if not rows:
         return metrics
-    etape(
-        log,
-        "%s : identification des éditeurs",
-        accord(len(rows), "nouveau préfixe DOI", "nouveaux préfixes DOI"),
-    )
-
-    for indice, row in enumerate(rows):
-        branche = DERNIERE_BRANCHE if indice == len(rows) - 1 else BRANCHE
-        if breaker is not None and breaker.tripped:
-            log.warning("resolve_publishers : circuit-breaker tripé, arrêt")
-            break
-        metrics.add(total=1)
-        name_raw = row.publisher_name_raw
-        name_normalized = row.publisher_name_normalized
-        if name_normalized is None:
-            # `/prefixes` pas encore tenté pour cette row → fetch + persistance des métadonnées (et correction de la RA si elle était `unknown`).
-            name_raw, name_normalized = _fetch_and_store_publisher_metadata(
+    with progression(len(rows), f"{BRANCHE}{LIBELLE}", log, efface=True) as avancement:
+        for row in rows:
+            if breaker is not None and breaker.tripped:
+                log.warning("resolve_publishers : circuit-breaker tripé, arrêt")
+                break
+            _resolve_one(
                 row,
-                repo=repo,
-                fetch_crossref_prefix_fn=fetch_crossref_prefix_fn,
-                fetch_datacite_prefix_fn=fetch_datacite_prefix_fn,
+                metrics,
+                log,
+                repo,
+                publisher_repo,
+                fetch_crossref_prefix_fn,
+                fetch_datacite_prefix_fn,
             )
+            avancement.avance()
 
-        matched = (
-            match_or_create_publisher(name_raw, repo=publisher_repo)
-            if name_raw and name_normalized is not None
-            else None
-        )
-        if matched is not None:
-            publisher_id, created = matched
-            repo.update_publisher_id(row.prefix, publisher_id)
-            metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
-            log.info(
-                "%s%s → “%s”%s",
-                branche,
-                row.prefix,
-                name_raw,
-                " (nouveau)" if created else "",
-            )
-        else:
-            metrics.add(no_publisher=1)
-            log.info("%s%s → éditeur inconnu de %s", branche, row.prefix, row.ra)
-
-        # Tentative effectuée (succès ou échec) → ne plus reprendre cette row.
-        repo.mark_publisher_checked(row.prefix)
-
+    metrics.resume = (
+        f"{accord(metrics.total, 'préfixe')} : "
+        f"{accord(metrics.extras.get('publisher_matched', 0), 'éditeur reconnu', 'éditeurs reconnus')}, "
+        f"{accord(metrics.extras.get('publisher_created', 0), 'créé', 'créés')}, "
+        f"{accord(metrics.extras.get('no_publisher', 0), 'inconnu', 'inconnus')}"
+    )
     return metrics
+
+
+def _resolve_one(
+    row: PendingPublisherPrefix,
+    metrics: PhaseMetrics,
+    log: logging.Logger,
+    repo: DoiPrefixesQueries,
+    publisher_repo: PublisherFindOrCreateQueries,
+    fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
+    fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
+) -> None:
+    """Interroge `/prefixes` pour un préfixe en attente, rattache son éditeur et marque le préfixe vérifié."""
+    metrics.add(total=1)
+    name_raw = row.publisher_name_raw
+    name_normalized = row.publisher_name_normalized
+    if name_normalized is None:
+        # `/prefixes` pas encore tenté pour cette row → fetch + persistance des métadonnées (et correction de la RA si elle était `unknown`).
+        name_raw, name_normalized = _fetch_and_store_publisher_metadata(
+            row,
+            repo=repo,
+            fetch_crossref_prefix_fn=fetch_crossref_prefix_fn,
+            fetch_datacite_prefix_fn=fetch_datacite_prefix_fn,
+        )
+
+    matched = (
+        match_or_create_publisher(name_raw, repo=publisher_repo)
+        if name_raw and name_normalized is not None
+        else None
+    )
+    if matched is not None:
+        publisher_id, created = matched
+        repo.update_publisher_id(row.prefix, publisher_id)
+        metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+        # Ligne de détail : le terminal la masque, le journal la garde.
+        log.info(
+            "%s → “%s”%s",
+            row.prefix,
+            name_raw,
+            " (nouveau)" if created else "",
+            extra={"detail": True},
+        )
+    else:
+        metrics.add(no_publisher=1)
+        log.info("%s → éditeur inconnu de %s", row.prefix, row.ra, extra={"detail": True})
+
+    # Tentative effectuée (succès ou échec) → ne plus reprendre cette row.
+    repo.mark_publisher_checked(row.prefix)
 
 
 def _fetch_and_store_publisher_metadata(

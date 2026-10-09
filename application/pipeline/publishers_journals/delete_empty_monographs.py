@@ -5,9 +5,12 @@ Une monographie vide n'est portée par aucun enregistrement ni aucune publicatio
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.monographs import MonographCleanupQueries
+
+LIBELLE = "Monographies vides"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 
 def run_delete_empty_monographs(
@@ -18,19 +21,11 @@ def run_delete_empty_monographs(
     metrics = PhaseMetrics()
     if not deleted:
         return metrics
-    if len(deleted) == 1:
-        etape(logger, "Suppression d'une monographie vide")
-    else:
-        etape(logger, "Suppression des %d monographies vides", len(deleted))
     for monograph_id, title in deleted:
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info(
             "Monographie vide supprimée : %d « %s »", monograph_id, title, extra={"detail": True}
         )
     metrics.add(total=len(deleted), monographs_deleted=len(deleted))
-    logger.info(
-        "%sTerminé : %s",
-        DERNIERE_BRANCHE,
-        accord(len(deleted), "monographie supprimée", "monographies supprimées"),
-    )
+    metrics.resume = accord(len(deleted), "monographie supprimée", "monographies supprimées")
     return metrics

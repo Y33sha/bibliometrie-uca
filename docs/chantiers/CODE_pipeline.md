@@ -31,13 +31,13 @@ Les refontes des phases `countries` et `subjects` relèvent de leurs fiches resp
 - [x] Définir dans `application/pipeline/` un contrat commun à toutes les phases : `run(contexte) -> PhaseMetrics`. Le contexte regroupe la fabrique de transactions, le logger, le circuit breaker et les options du run.
 - [x] Sortir le câblage de chaque phase de `run_pipeline.py`, dans un module par phase. `run_pipeline.py` sélectionne, enchaîne et affiche.
 - [x] Déplacer dans `application/` la logique applicative présente dans le câblage. a5924042c, 8238170ae, d6669e4fd, 29f67e81c
-- [x] Ranger `fetch_stale` et `fetch_truncated` dans leur propre package, hors de `extract/`.
+- [x] Ranger `fetch_stale` et `fetch_truncated` dans leur propre package, hors de `extract/`. 19c83d094
 
 ### Phase 2 — Découpage de publishers_journals
 
 `publishers_journals` enchaîne treize sous-étapes qui touchent tour à tour éditeurs, revues et monographies.
 
-- [ ] Réordonner les sous-étapes par référentiel : éditeurs, puis revues, puis monographies.
+- [x] Réordonner les sous-étapes en quatre groupes : éditeurs, revues, monographies, nettoyage. Une ligne de journal par sous-étape, sous le titre de son groupe.
 - [ ] Examiner le découpage en plusieurs phases, une par référentiel.
 
 ### Phase 3 — Reports au run suivant
@@ -62,3 +62,6 @@ Les refontes des phases `countries` et `subjects` relèvent de leurs fiches resp
 ## Questions ouvertes
 
 - Phase 4 : projections en vues matérialisées, ou phase finale de projection ?
+- Type des séries et nature des monographies s'appuient l'un sur l'autre. `link_monographs_to_collections` type une série d'après la nature de ses volumes, et ne pose ce type qu'à la création (`set_journal_type_if_unknown`). `type_proceedings_volumes` fait du type de la collection (`monographs.journal_id`) un signal suffisant de volume d'actes. Une série typée recueil d'actes maintient donc ses volumes en volumes d'actes, et le résultat dépend de l'ordre d'arrivée des volumes. Lire le type de collection par les revues des enregistrements, et recalculer le type des séries créées à chaque run ?
+- `link_monographs_to_collections` type aussi une revue existante sans ISSN de type `unknown` qu'il retrouve par son titre. Limiter le typage aux séries qu'il crée ?
+- Règles de nature d'un volume : un titre d'édition datée de congrès type une revue sans ISSN en recueil d'actes, mais pas un volume. Un volume sans signal propre, dans une série de volumes d'actes, reste un livre. À trancher sur des cas réels.

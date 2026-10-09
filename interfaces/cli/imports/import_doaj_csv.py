@@ -13,6 +13,7 @@ Usage :
 import argparse
 import os
 
+from application.pipeline.libelles import accord
 from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
@@ -34,13 +35,14 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        run_import_doaj_dump(
+        stats = run_import_doaj_dump(
             conn,
             log,
             journal_repo=PgJournalGatewayQueries(conn),
             rows=read_doaj_dump_rows(args.csv_file),
             dry_run=args.dry_run,
         )
+        log.info("Terminé : %s", accord(stats.matched, "revue mise à jour", "revues mises à jour"))
     finally:
         conn.close()
 

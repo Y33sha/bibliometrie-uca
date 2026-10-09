@@ -71,7 +71,7 @@ def fetch_doaj_dump(
 
     Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, `DumpDownloadError` quand le téléchargement sort de ce qu'on en attend — pas de repli gracieux ici, l'appelant décide (on ne veut pas importer un dump tronqué).
     """
-    logger.info("Téléchargement du dump DOAJ depuis %s …", url)
+    logger.info("Téléchargement du dump DOAJ depuis %s", url, extra={"detail": True})
     target = httpx2.URL(url)
     headers = {"User-Agent": user_agent}
     with httpx2.Client(timeout=timeout, follow_redirects=False) as client:
@@ -82,7 +82,9 @@ def fetch_doaj_dump(
                     continue
                 raise_for_status(resp)
                 written = write_capped(resp, dest_path, max_bytes, label="DOAJ")
-            logger.info("Dump DOAJ téléchargé : %s (%d octets)", dest_path, written)
+            logger.info(
+                "Dump DOAJ téléchargé : %s (%d octets)", dest_path, written, extra={"detail": True}
+            )
             return
     raise DumpDownloadError(
         f"Le téléchargement du dump DOAJ dépasse {_MAX_REDIRECTS} redirections depuis {url}."
