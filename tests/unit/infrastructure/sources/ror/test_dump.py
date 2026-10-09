@@ -37,7 +37,7 @@ _ROW = {
 
 
 def _zenodo_body(files):
-    return {"hits": {"hits": [{"metadata": {"title": "ROR Data v2.14"}, "files": files}]}}
+    return {"hits": {"hits": [{"files": files}]}}
 
 
 def _archive_file(url=_ARCHIVE_URL):
@@ -84,7 +84,7 @@ class TestFindLatestRorDump:
             return_value=httpx2.Response(200, json=_zenodo_body([_archive_file()]))
         )
         dump = find_latest_ror_dump(user_agent="test")
-        assert dump.title == "ROR Data v2.14"
+        assert dump.name == "v2.14-2026-10-06-ror-data.zip"
         assert dump.url == _ARCHIVE_URL
 
     def test_refuse_une_archive_hors_de_zenodo(self, http_mock):

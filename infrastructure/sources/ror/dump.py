@@ -33,9 +33,9 @@ _CSV_SUFFIX = "-ror-data.csv"
 
 @dataclass(frozen=True, slots=True)
 class RorDumpFile:
-    """Archive d'une version du dump : son titre Zenodo (« ROR Data v2.14 »…) et son URL de téléchargement."""
+    """Archive d'une version du dump : son nom (`v2.14-2026-10-06-ror-data.zip`…) et son URL de téléchargement."""
 
-    title: str
+    name: str
     url: str
 
 
@@ -57,15 +57,17 @@ def find_latest_ror_dump(*, user_agent: str) -> RorDumpFile:
     if not hits:
         raise DumpDownloadError("Aucune version du dump ROR sur Zenodo.")
     record = as_mapping(hits[0])
-    title = as_str(as_mapping(record.get("metadata")).get("title")) or ""
     for file in as_sequence(record.get("files")):
         entry = as_mapping(file)
-        if (as_str(entry.get("key")) or "").endswith(_ARCHIVE_SUFFIX):
+        name = as_str(entry.get("key")) or ""
+        if name.endswith(_ARCHIVE_SUFFIX):
             url = as_str(as_mapping(entry.get("links")).get("self")) or ""
             if httpx2.URL(url).host != ZENODO_HOST:
                 raise DumpDownloadError(f"L'archive du dump ROR est hors de {ZENODO_HOST} : {url}")
-            return RorDumpFile(title=title, url=url)
-    raise DumpDownloadError(f"Aucune archive `*{_ARCHIVE_SUFFIX}` dans la version « {title} ».")
+            return RorDumpFile(name=name, url=url)
+    raise DumpDownloadError(
+        f"Aucune archive `*{_ARCHIVE_SUFFIX}` dans la dernière version du dump ROR."
+    )
 
 
 def fetch_ror_dump(
@@ -81,7 +83,7 @@ def fetch_ror_dump(
     Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, redirection comprise, et `DumpDownloadError` au-delà de `max_bytes`.
     """
     dump = find_latest_ror_dump(user_agent=user_agent)
-    logger.info("Téléchargement du dump ROR (%s) depuis %s …", dump.title, dump.url)
+    logger.info("Téléchargement du dump ROR %s …", dump.name)
     with (
         httpx2.Client(timeout=timeout, follow_redirects=False) as client,
         client.stream("GET", dump.url, headers={"User-Agent": user_agent}) as resp,
