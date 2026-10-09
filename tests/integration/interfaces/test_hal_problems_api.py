@@ -11,9 +11,7 @@ Couvre :
 
 from __future__ import annotations
 
-import pytest
-
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import uniq
 
 
@@ -45,12 +43,9 @@ def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int
         return lab_id
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        cur.execute("TRUNCATE TABLE structures RESTART IDENTITY CASCADE")
-        cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
+_cleanup_after_module = truncate_after_module(
+    "structures", then=["DELETE FROM config WHERE key = 'perimeter_persons'"]
+)
 
 
 class TestDuplicateAccounts:

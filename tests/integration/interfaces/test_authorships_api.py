@@ -10,10 +10,8 @@ test pour éviter les collisions.
 
 import uuid
 
-import pytest
-
 from tests.integration.helpers.authorships import upsert_identity_on_cursor
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_person,
     seed_publication,
@@ -27,15 +25,15 @@ def _uniq_name(prefix: str) -> str:
     return prefix + uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnop"))
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    """Truncate à la fin pour ne pas polluer les suites suivantes."""
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE authorships, source_authorships, author_identifying_keys, "
-            "source_publications, publications, persons, audit_log RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module(
+    "authorships",
+    "source_authorships",
+    "author_identifying_keys",
+    "source_publications",
+    "publications",
+    "persons",
+    "audit_log",
+)
 
 
 def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:

@@ -17,7 +17,7 @@ import uuid
 
 import pytest
 
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import seed_journal, seed_publisher, uniq
 
 
@@ -66,15 +66,9 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
         )
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE journals, publishers, publications, "
-            "publication_subjects, subjects, audit_log "
-            "RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module(
+    "journals", "publishers", "publications", "publication_subjects", "subjects", "audit_log"
+)
 
 
 class TestListJournals:

@@ -6,11 +6,12 @@ Les tests d'intégration de l'API montent leur jeu de données au niveau du modu
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any
 
 import psycopg
+import pytest
 from psycopg.rows import dict_row
 
 _ARGS: dict[str, Any] = {
@@ -33,3 +34,20 @@ def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
             yield cur
     finally:
         conn.close()
+
+
+def truncate_after_module(*tables: str, then: Sequence[str] = ()) -> Callable[[], Iterator[None]]:
+    """Fixture de module qui vide `tables` à la fin du module, puis exécute les instructions `then`.
+
+    Les écritures des tests d'API sont validées dans la base : le module les retire pour ne pas peser sur les suites suivantes. S'emploie au niveau du module : `_cleanup_after_module = truncate_after_module("structures")`.
+    """
+
+    @pytest.fixture(scope="module", autouse=True)
+    def _truncate() -> Iterator[None]:
+        yield
+        with owner_pool() as cur:
+            cur.execute(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE")
+            for statement in then:
+                cur.execute(statement)
+
+    return _truncate

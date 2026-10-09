@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import seed_perimeter, seed_structure, uniq
 
 
@@ -32,13 +30,7 @@ def _clear_config(key: str) -> None:
         cur.execute("DELETE FROM config WHERE key = %s", (key,))
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE perimeters, structures, audit_log, config RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module("perimeters", "structures", "audit_log", "config")
 
 
 class TestListPerimeters:

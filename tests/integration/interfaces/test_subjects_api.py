@@ -7,9 +7,7 @@ Couvre :
 
 from __future__ import annotations
 
-import pytest
-
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import uniq
 
 
@@ -44,15 +42,14 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
         cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        # Cascade vide publication_subjects ; publications 'cooc-seed' du
-        # helper `_seed_cooccurrence` sont nettoyées explicitement.
-        cur.execute("TRUNCATE TABLE subjects RESTART IDENTITY CASCADE")
-        cur.execute("DELETE FROM publications WHERE title = 'cooc-seed'")
-        cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
+# La cascade vide `publication_subjects` ; les publications « cooc-seed » de `_seed_cooccurrence` partent explicitement.
+_cleanup_after_module = truncate_after_module(
+    "subjects",
+    then=[
+        "DELETE FROM publications WHERE title = 'cooc-seed'",
+        "REFRESH MATERIALIZED VIEW subject_cooccurrences",
+    ],
+)
 
 
 class TestListSubjects:
