@@ -42,6 +42,7 @@ from domain.sources.scanr import (
     select_leaf_affiliations,
     split_scanr_concepts,
 )
+from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
@@ -273,7 +274,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
-    - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation).
+    - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
+    - ROR de toutes les affiliations, tutelles comprises → `ror_ids`.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
@@ -312,6 +314,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 roles=roles or None,
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=part, countries=countries) for part in addr_parts],
+                ror_ids=parse_ror_ids(as_str(aff.get("ror")) for aff in affiliations),
             )
         )
     return records

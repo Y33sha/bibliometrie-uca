@@ -43,6 +43,7 @@ from domain.sources.wos import (
     parse_export_researcher_ids,
     split_export_list,
 )
+from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 
 # =============================================================
@@ -580,7 +581,7 @@ def build_wos_author_records(
 ) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
+    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes et les ROR des organisations de ses adresses. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
     """
     authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     if not authors_kept:
@@ -616,6 +617,10 @@ def build_wos_author_records(
                     for e in as_sequence(author.get("addresses"))
                     if (adresse := as_str(e))
                 ],
+                ror_ids=parse_ror_ids(
+                    as_str(as_mapping(o).get("ror_id"))
+                    for o in as_sequence(author.get("organizations"))
+                ),
             )
         )
     # `author_position` lue du payload WoS : dédup (première occurrence gagne).

@@ -51,6 +51,7 @@ from domain.sources.crossref import (
     parse_crossref_issns,
     strip_jats_tags,
 )
+from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
@@ -269,12 +270,23 @@ def _author_affiliation_strings(author: Mapping[str, JsonValue]) -> list[str]:
     return out
 
 
+def _author_ror_ids(author: Mapping[str, JsonValue]) -> frozenset[RorId]:
+    """ROR des affiliations : identifiants `id` de type `ROR`."""
+    return parse_ror_ids(
+        as_str(ident.get("id"))
+        for aff in as_sequence(author.get("affiliation"))
+        for ident in (as_mapping(i) for i in as_sequence(as_mapping(aff).get("id")))
+        if ident.get("id-type") == "ROR"
+    )
+
+
 def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
 
     - nom et prénom séparés (`family`, `given`) ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
+    - identifiants ROR des affiliations → `ror_ids` ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
     """
     authors = msg.get("author") or []
@@ -305,6 +317,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=aff) for aff in _author_affiliation_strings(author)],
+                ror_ids=_author_ror_ids(author),
             )
         )
     return records

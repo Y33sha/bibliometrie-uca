@@ -9,6 +9,7 @@ Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui 
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
@@ -72,6 +73,11 @@ class RorId:
 
     def __str__(self) -> str:
         return self.value
+
+
+def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
+    """Ensemble des `RorId` valides de `raws`, URL ou identifiants courts. Les valeurs vides ou invalides sont écartées."""
+    return frozenset(ror for raw in raws if (ror := RorId.try_parse(raw)) is not None)
 
 
 # ── HalCollection (code de collection HAL) ─────────────────────────
