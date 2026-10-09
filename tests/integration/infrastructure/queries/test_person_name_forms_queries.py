@@ -5,44 +5,8 @@ from sqlalchemy import text
 from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
 _Q = PgPersonNameFormsQueries()
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
-
-
-def _create_sd(conn):
-    return conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title) "
-            "VALUES ('hal', 'h-1', 'X') RETURNING id"
-        )
-    ).scalar_one()
-
-
-def _create_sa(
-    conn,
-    sd,
-    *,
-    author_position=0,
-    person_id=None,
-    author_name_normalized=None,
-    source="hal",
-):
-    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
-    return conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position,
-                 person_id, identity_id, raw_author_name)
-            VALUES (:source, :sd, :pos, :person_id, :iid, 'X') RETURNING id
-        """),
-        {
-            "source": source,
-            "sd": sd,
-            "pos": author_position,
-            "person_id": person_id,
-            "iid": identity_id,
-        },
-    ).scalar_one()
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _insert_pnf(conn, name_form, person_id, sources):
@@ -111,8 +75,10 @@ class TestSyncFromRawForms:
         """Une forme observée à la fois en `_raw_forms` (source 'persons')
         et en `source_authorships` (source 'hal') aboutit à `sources` mergé."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        sd = _create_sd(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal")
+        sd = insert_source_publication(sa_sync_conn, source_id="h-1")
+        insert_signature(
+            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal"
+        )
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         _Q.insert_raw_forms_batch(
@@ -144,13 +110,9 @@ class TestSyncFromRawForms:
         """Une row existante dont `sources` diffère de l'attendu est UPDATE,
         pas DELETE/INSERT (et `updated` est incrémenté)."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        sd = _create_sd(sa_sync_conn)
-        _create_sa(
-            sa_sync_conn,
-            sd,
-            person_id=pid,
-            author_name_normalized="dupond j",
-            source="openalex",
+        sd = insert_source_publication(sa_sync_conn, source_id="h-1")
+        insert_signature(
+            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="openalex"
         )
         # Base : sources = ['hal'] (obsolète vs source_authorships qui dit openalex)
         _insert_pnf(sa_sync_conn, "dupond j", pid, ["hal"])

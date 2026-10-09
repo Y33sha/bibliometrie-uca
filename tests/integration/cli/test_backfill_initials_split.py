@@ -7,24 +7,14 @@ from domain.persons.signature_name import SignatureName
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 from interfaces.cli.oneshot.backfill_initials_split import backfill
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _signature(conn, raw: str, identity: str) -> tuple[int, int]:
-    sp = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title) "
-            "VALUES ('openalex', 'W-initiales', 't') RETURNING id"
-        )
-    ).scalar_one()
-    sa = conn.execute(
-        text(
-            "INSERT INTO source_authorships "
-            "(source, source_publication_id, author_position, raw_author_name, identity_id) "
-            "VALUES ('openalex', :sp, 0, :raw, :iid) RETURNING id"
-        ),
-        {"sp": sp, "raw": raw, "iid": upsert_identity(conn, identity)},
-    ).scalar_one()
+    sp = insert_source_publication(conn, source="openalex", source_id="W-initiales", title="t")
+    sa = insert_signature(
+        conn, sp, source="openalex", raw_author_name=raw, author_name_normalized=identity
+    )
     return sp, sa
 
 

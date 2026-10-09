@@ -3,32 +3,10 @@
 from sqlalchemy import text
 
 from infrastructure.pipeline.countries import PgCountryQueries
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _Q = PgCountryQueries()
-
-
-def _create_sd(conn, pub_id, source, source_id, countries=None):
-    return conn.execute(
-        text("""
-            INSERT INTO source_publications (source, source_id, title, publication_id, countries)
-            VALUES (:source, :source_id, 'X', :pub_id, :countries) RETURNING id
-        """),
-        {"source": source, "source_id": source_id, "pub_id": pub_id, "countries": countries},
-    ).scalar_one()
-
-
-def _create_sa(conn, sd_id, source, author_position=0):
-    identity_id = upsert_identity(conn)
-    return conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position, identity_id, raw_author_name)
-            VALUES (:source, :sd, :pos, :iid, 'X') RETURNING id
-        """),
-        {"source": source, "sd": sd_id, "pos": author_position, "iid": identity_id},
-    ).scalar_one()
 
 
 def _create_address(conn, raw_text, countries):
@@ -52,8 +30,8 @@ class TestRefreshAddressSourceCountries:
     def test_propagates_country_from_address(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
         pub_id = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1")
-        sa = _create_sa(sa_sync_conn, sd, "openalex")
+        sd = insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
+        sa = insert_signature(sa_sync_conn, sd, source="openalex")
         addr = _create_address(sa_sync_conn, "Clermont", ["FR"])
         sa_sync_conn.execute(
             text(
@@ -74,8 +52,8 @@ class TestRefreshAddressSourceCountries:
 
     def test_noop_without_address_countries(self, sa_sync_conn):
         pub_id = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-2")
-        sa = _create_sa(sa_sync_conn, sd, "openalex")
+        sd = insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="oa-2")
+        sa = insert_signature(sa_sync_conn, sd, source="openalex")
         addr = _create_address(sa_sync_conn, "X", None)
         sa_sync_conn.execute(
             text(
@@ -92,11 +70,15 @@ class TestRefreshAddressSourceCountries:
 class TestRefreshPublicationCountries:
     def test_unions_all_source_countries(self, sa_sync_conn):
         pub_id = insert_publication(sa_sync_conn)
-        sd1 = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
-        sd2 = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1", countries=["US", "FR"])
+        sd1 = insert_source_publication(
+            sa_sync_conn, pub_id, source="hal", source_id="hal-1", countries=["FR"]
+        )
+        sd2 = insert_source_publication(
+            sa_sync_conn, pub_id, source="openalex", source_id="oa-1", countries=["US", "FR"]
+        )
         # un sa (dirty par défaut) met la publication dans la portée du refresh.
-        _create_sa(sa_sync_conn, sd1, "hal")
-        _create_sa(sa_sync_conn, sd2, "openalex")
+        insert_signature(sa_sync_conn, sd1, source="hal")
+        insert_signature(sa_sync_conn, sd2, source="openalex")
 
         updated = _Q.refresh_publication_countries(sa_sync_conn)
         assert updated == 1
@@ -108,14 +90,18 @@ class TestRefreshPublicationCountries:
         assert result == ["FR", "US"]
 
     def test_ignores_source_pubs_without_publication_id(self, sa_sync_conn):
-        _create_sd(sa_sync_conn, None, "hal", "hal-orphan", countries=["FR"])
+        insert_source_publication(
+            sa_sync_conn, None, source="hal", source_id="hal-orphan", countries=["FR"]
+        )
         updated = _Q.refresh_publication_countries(sa_sync_conn)
         assert updated == 0
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
         pub_id = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
-        _create_sa(sa_sync_conn, sd, "hal")  # dirty → publication dans la portée
+        sd = insert_source_publication(
+            sa_sync_conn, pub_id, source="hal", source_id="hal-1", countries=["FR"]
+        )
+        insert_signature(sa_sync_conn, sd, source="hal")  # dirty → publication dans la portée
         sa_sync_conn.execute(
             text("UPDATE publications SET countries = ARRAY['FR'] WHERE id = :pid"),
             {"pid": pub_id},
@@ -160,10 +146,12 @@ class TestDirtyDrivenSourceCountries:
 
     def test_only_dirty_sources_recomputed(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        dirty_sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-dirty")
-        clean_sd = _create_sd(sa_sync_conn, pub, "hal", "hal-clean")
-        dirty_sa = _create_sa(sa_sync_conn, dirty_sd, "openalex")  # dirty par défaut
-        clean_sa = _create_sa(sa_sync_conn, clean_sd, "hal")
+        dirty_sd = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="oa-dirty"
+        )
+        clean_sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-clean")
+        dirty_sa = insert_signature(sa_sync_conn, dirty_sd, source="openalex")  # dirty par défaut
+        clean_sa = insert_signature(sa_sync_conn, clean_sd, source="hal")
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"),
             {"i": clean_sa},
@@ -177,8 +165,10 @@ class TestDirtyDrivenSourceCountries:
 
     def test_orphan_dirty_source_reset_to_null(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-o", countries=["FR"])
-        sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, adresse sans pays
+        sd = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="oa-o", countries=["FR"]
+        )
+        sa = insert_signature(sa_sync_conn, sd, source="openalex")  # dirty, adresse sans pays
         _link_sa_address(sa_sync_conn, sa, _create_address(sa_sync_conn, "X", None))
 
         _Q.refresh_address_source_countries(sa_sync_conn)
@@ -187,8 +177,8 @@ class TestDirtyDrivenSourceCountries:
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
         # Un document NON dirty est recalculé parce que l'adresse de son sa devient dirty.
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-m")
-        sa = _create_sa(sa_sync_conn, sd, "openalex")
+        sd = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="oa-m")
+        sa = insert_signature(sa_sync_conn, sd, source="openalex")
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"), {"i": sa}
         )
@@ -203,8 +193,8 @@ class TestDirtyDrivenSourceCountries:
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-c")
-        sa = _create_sa(sa_sync_conn, sd, "openalex")  # sa dirty par défaut
+        sd = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="oa-c")
+        sa = insert_signature(sa_sync_conn, sd, source="openalex")  # sa dirty par défaut
         addr = _create_address(sa_sync_conn, "Paris", None)
         _Q.write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")  # addr dirty
         _Q.clear_countries_dirty(sa_sync_conn)

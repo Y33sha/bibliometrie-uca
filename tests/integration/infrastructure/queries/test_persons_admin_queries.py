@@ -18,6 +18,7 @@ from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _create_authorship(conn, pub_id, person_id):
@@ -30,61 +31,15 @@ def _create_authorship(conn, pub_id, person_id):
     )
 
 
-def _create_sd(conn, pub_id, source="hal", source_id="h1"):
-    row = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES (:src, :sid, 'X', :pid) RETURNING id"
-        ),
-        {"src": source, "sid": source_id, "pid": pub_id},
-    ).one()
-    return row.id
-
-
-def _create_sa(
-    conn,
-    sd,
-    *,
-    source="hal",
-    author_position=0,
-    person_id=None,
-    in_perimeter=True,
-    author_name_normalized=None,
-    raw_author_name="X",
-    roles=None,
-):
-    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
-    row = conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position,
-                 person_id, in_perimeter, identity_id, raw_author_name,
-                 roles)
-            VALUES (:src, :sd, :pos, :pid, :inp, :iid, :raw,
-                    COALESCE(:roles, ARRAY['author']::text[]))
-            RETURNING id
-        """),
-        {
-            "src": source,
-            "sd": sd,
-            "pos": author_position,
-            "pid": person_id,
-            "inp": in_perimeter,
-            "iid": identity_id,
-            "raw": raw_author_name,
-            "roles": roles,
-        },
-    ).one()
-    return row.id
-
-
 class TestNameFormAuthorships:
     def test_returns_authorships_and_other_persons(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "Dupond")
         other = insert_person(sa_sync_conn, "Martin")
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j")
+        sd = insert_source_publication(sa_sync_conn, pub)
+        insert_signature(
+            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", in_perimeter=True
+        )
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_name_forms (name_form, person_id, sources) "
@@ -195,7 +150,7 @@ class TestIdentifierConflicts:
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
         p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
@@ -213,7 +168,7 @@ class TestIdentifierConflicts:
         """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
         p1 = insert_person(sa_sync_conn, "Brown", first_name="Anne")
         p2 = insert_person(sa_sync_conn, "Brown", first_name="A")
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
             _sa_with_identifiers(
@@ -232,7 +187,7 @@ class TestIdentifierConflicts:
         """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
         p1 = insert_person(sa_sync_conn, "Veyssiere", first_name="Hugo")
         p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0003-2202-7362"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0003-2202-7362"})
@@ -242,7 +197,7 @@ class TestIdentifierConflicts:
     def test_unattributed_value_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A")
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
 
@@ -251,7 +206,7 @@ class TestIdentifierConflicts:
     def test_excluded_person_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A", exclusion="out_of_perimeter")
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})

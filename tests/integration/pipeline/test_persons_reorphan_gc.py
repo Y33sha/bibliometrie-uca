@@ -7,8 +7,9 @@ from sqlalchemy import text
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 
 _Q = PgPersonsMatchingQueries()
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _name_form(conn, form, person_id, status="pending"):
@@ -22,26 +23,18 @@ def _name_form(conn, form, person_id, status="pending"):
 
 
 def _signature(conn, *, form, person_id, mode, identifiers=None):
-    pub = conn.execute(
-        text("INSERT INTO publications (title, pub_year) VALUES ('t', 2024) RETURNING id")
-    ).scalar_one()
-    sp = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES ('hal', :sid, 't', :p) RETURNING id"
-        ),
-        {"sid": f"hal-{pub}", "p": pub},
-    ).scalar_one()
-    identity = upsert_identity(conn, form, identifiers)
-    return conn.execute(
-        text(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id, resolution_mode) "
-            "VALUES ('hal', :sp, 0, :pid, TRUE, :raw, :iid, CAST(:mode AS resolution_mode)) "
-            "RETURNING id"
-        ),
-        {"sp": sp, "pid": person_id, "raw": form, "iid": identity, "mode": mode},
-    ).scalar_one()
+    pub = insert_publication(conn, "t")
+    sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
+    return insert_signature(
+        conn,
+        sp,
+        raw_author_name=form,
+        author_name_normalized=form,
+        person_identifiers=identifiers,
+        person_id=person_id,
+        in_perimeter=True,
+        resolution_mode=mode,
+    )
 
 
 def _row(conn, sa_id):

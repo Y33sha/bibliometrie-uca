@@ -12,6 +12,7 @@ from infrastructure.pipeline.normalize.staging import (
     delete_disappeared_source_publications,
 )
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.sources import insert_signature
 
 
 def _publication(conn) -> int:
@@ -59,19 +60,11 @@ def _source_publication(
 
 
 def _signature(conn, source_publication_id: int) -> None:
-    identity_id = conn.execute(
-        text("""
-            INSERT INTO author_identifying_keys (last_name_normalized, first_name_normalized)
-            VALUES ('dupont', 'jean') RETURNING id
-        """)
-    ).scalar_one()
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position, raw_author_name, identity_id)
-            VALUES ('hal', :sp, 0, 'Dupont, Jean', :iid)
-        """),
-        {"sp": source_publication_id, "iid": identity_id},
+    insert_signature(
+        conn,
+        source_publication_id,
+        raw_author_name="Dupont, Jean",
+        author_name_normalized="jean dupont",
     )
 
 
