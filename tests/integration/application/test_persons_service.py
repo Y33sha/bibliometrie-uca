@@ -47,6 +47,7 @@ from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -414,13 +415,7 @@ class TestSetExclusion:
             (shared, other),
             (unrelated, other),
         ):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO authorships (publication_id, person_id, in_perimeter) "
-                    "VALUES (:pub, :pid, TRUE)"
-                ),
-                {"pub": pub, "pid": pid},
-            )
+            insert_authorship(sa_sync_conn, pub, person_id=pid, in_perimeter=True)
         sa_sync_conn.execute(
             text("UPDATE publications SET in_perimeter = (id <> :u) WHERE id IN (:a, :s, :u)"),
             {"a": alone, "s": shared, "u": unrelated},
@@ -652,13 +647,7 @@ class TestDetachAuthorships:
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        auth_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id) "
-                "VALUES (:pub, :pid) RETURNING id"
-            ),
-            {"pub": pub_id, "pid": person_id},
-        ).scalar_one()
+        auth_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         result = detach_authorships(
@@ -686,13 +675,7 @@ class TestDetachAuthorships:
         détache toutes les sources de la même paire et peuple le store."""
         person_id = _insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
-        auth_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id) "
-                "VALUES (:pub, :pid) RETURNING id"
-            ),
-            {"pub": pub_id, "pid": person_id},
-        ).scalar_one()
+        auth_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sp_hal = _notice(sa_sync_conn, pub_id)
         sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
         sa_hal = _jean_dupont_signature(sa_sync_conn, sp_hal, person_id=person_id)
@@ -1041,10 +1024,7 @@ class TestUpdateNameFormStatus:
         sa_id = _jean_dupont_signature(
             sa_sync_conn, spid, person_id=pid, author_name_normalized="intrus etranger"
         )
-        sa_sync_conn.execute(
-            text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid)"),
-            {"p": pub, "pid": pid},
-        )
+        insert_authorship(sa_sync_conn, pub, person_id=pid)
 
         update_name_form_status(
             pid, "intrus etranger", "rejected", repo=repo, authorship_repo=authorship_repo

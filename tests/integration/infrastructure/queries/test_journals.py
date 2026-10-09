@@ -12,6 +12,7 @@ from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de titre « Article ».
@@ -261,9 +262,9 @@ class TestSudocCheck:
         """Deux revues que les enregistrements d'une publication portent forment une paire."""
         full = _create_journal(sa_sync_conn, title="Journal test complet", issn="2999-0009")
         abbreviated = _create_journal(sa_sync_conn, title="J.Test Compl.")
-        publication_id = sa_sync_conn.execute(
-            text("INSERT INTO publications (title, pub_year) VALUES ('Article', 2024) RETURNING id")
-        ).scalar_one()
+        publication_id = insert_publication(
+            sa_sync_conn, "Article", normalize_title=False, doc_type=None
+        )
         for journal_id in (full, abbreviated):
             _article(
                 sa_sync_conn,

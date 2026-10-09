@@ -1,4 +1,4 @@
-"""Helper de test : matérialiser l'identité d'auteur d'une `source_authorships`.
+"""Semis des authorships et des identités d'auteur, sur la connexion SQLAlchemy ou un curseur psycopg.
 
 Le nom normalisé et les identifiants d'une signature vivent dans la table
 d'identités dédupliquée `author_identifying_keys` ; `source_authorships` ne
@@ -8,6 +8,10 @@ psycopg) pour obtenir l'`identity_id` correspondant.
 """
 
 import json
+
+from sqlalchemy import Connection
+
+from tests.integration.helpers.rows import insert_row
 
 # Paramètres au format psycopg (`%(nom)s`), que SQLAlchemy accepte via `exec_driver_sql`.
 _INSERT_SQL = (
@@ -55,3 +59,26 @@ def upsert_identity_on_cursor(cur, author_name_normalized=None, person_identifie
     cur.execute(_INSERT_SQL, params)
     cur.execute(_SELECT_SQL, params)
     return cur.fetchone()["id"]
+
+
+def insert_authorship(
+    conn: Connection,
+    publication_id: int,
+    *,
+    person_id: int | None = None,
+    author_position: int | None = None,
+    in_perimeter: bool | None = None,
+    roles: list[str] | None = None,
+) -> int:
+    """Insère une authorship et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
+    return insert_row(
+        conn,
+        "authorships",
+        {
+            "publication_id": publication_id,
+            "person_id": person_id,
+            "author_position": author_position,
+            "in_perimeter": in_perimeter,
+            "roles": roles,
+        },
+    )

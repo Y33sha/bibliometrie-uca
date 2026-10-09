@@ -18,6 +18,7 @@ from application.pipeline.persons.arbitrate_identifiers import arbitrate_identif
 from application.pipeline.persons.cascade import run_cascade
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _LOG = logging.getLogger("test")
@@ -27,13 +28,7 @@ _IDREF = "109964128"  # IdRef réel (valide au regard du value object)
 def _seed(conn, *, sa_id, raw_name, name_norm, idref):
     """Publication + signature in-périmètre non rattachée, portant l'identité
     `(name_norm, {idref})`. `sa_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
-    conn.execute(
-        text("""
-            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-            VALUES (:p, :t, :t, 'article', 2024)
-        """),
-        {"p": sa_id, "t": f"pub {sa_id}"},
-    )
+    insert_publication(conn, f"pub {sa_id}", row_id=sa_id)
     insert_source_publication(
         conn,
         sa_id,

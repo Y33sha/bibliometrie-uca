@@ -18,6 +18,7 @@ from application.services.persons.core import create_person
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _LOG = logging.getLogger("test")
@@ -27,13 +28,7 @@ def _seed_signature(conn, *, pub_id, raw_name, name_norm):
     """Publication + source_publication + signature in-périmètre non rattachée, portant
     l'identité `name_norm` (sans identifiant). L'id de la signature = `pub_id`, ce qui
     fixe l'ordre de traitement."""
-    conn.execute(
-        text("""
-            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-            VALUES (:p, :t, :t, 'article', 2024)
-        """),
-        {"p": pub_id, "t": f"pub {pub_id}"},
-    )
+    insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
     insert_source_publication(
         conn,
         pub_id,
@@ -56,13 +51,7 @@ def _seed_signature(conn, *, pub_id, raw_name, name_norm):
 def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2):
     """Une publication vue par HAL et OpenAlex, même auteur en position 0 mais deux graphies.
     Deux signatures non rattachées, à créer."""
-    conn.execute(
-        text("""
-            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-            VALUES (:p, :t, :t, 'article', 2024)
-        """),
-        {"p": pub_id, "t": f"pub {pub_id}"},
-    )
+    insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
     for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
         insert_source_publication(
             conn,

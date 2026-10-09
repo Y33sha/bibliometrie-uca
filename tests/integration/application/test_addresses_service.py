@@ -21,6 +21,7 @@ from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
@@ -433,9 +434,7 @@ class TestPropagateCountriesToPublications:
         """Test d'intégration minimal : une adresse avec countries liée à
         une source_authorship, le pays doit remonter jusqu'à publications.countries."""
         ensure_country(sa_sync_conn, "FR")
-        pub_id = sa_sync_conn.execute(
-            text("INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id")
-        ).scalar_one()
+        pub_id = insert_publication(sa_sync_conn, "Test", normalize_title=False, doc_type=None)
         sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="h-1", title="Test")
         sa_id = insert_signature(sa_sync_conn, sp_id)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")

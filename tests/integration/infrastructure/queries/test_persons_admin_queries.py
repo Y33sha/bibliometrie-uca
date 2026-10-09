@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 
@@ -13,19 +15,13 @@ from infrastructure.read_models.persons.admin import (
     persons_sharing_name_form,
 )
 from infrastructure.read_models.persons.list import person_name_forms
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
-
-def _create_authorship(conn, pub_id, person_id):
-    conn.execute(
-        text(
-            "INSERT INTO authorships (publication_id, person_id, roles) "
-            "VALUES (:p, :pe, ARRAY['author']::text[])"
-        ),
-        {"p": pub_id, "pe": person_id},
-    )
+# Authorship de rôle auteur.
+_author = partial(insert_authorship, roles=["author"])
 
 
 class TestNameFormAuthorships:
@@ -232,10 +228,10 @@ class TestNameDuplicates:
         b = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         coauthor = insert_person(sa_sync_conn, "Martin", first_name="Paul")
         pub1, pub2 = insert_publication(sa_sync_conn), insert_publication(sa_sync_conn)
-        _create_authorship(sa_sync_conn, pub1, a)
-        _create_authorship(sa_sync_conn, pub1, coauthor)
-        _create_authorship(sa_sync_conn, pub2, b)
-        _create_authorship(sa_sync_conn, pub2, coauthor)
+        _author(sa_sync_conn, pub1, person_id=a)
+        _author(sa_sync_conn, pub1, person_id=coauthor)
+        _author(sa_sync_conn, pub2, person_id=b)
+        _author(sa_sync_conn, pub2, person_id=coauthor)
 
         assert name_duplicates_count(sa_sync_conn) >= 1
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)

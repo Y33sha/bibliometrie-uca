@@ -84,12 +84,87 @@ def seed_person(last: str = "TEST", first: str = "J") -> int:
     )
 
 
-def seed_publication(title: str = "T", year: int = 2024) -> int:
+def seed_publication(
+    title: str = "T",
+    *,
+    year: int = 2024,
+    normalize_title: bool = True,
+    doc_type: str | None = "other",
+    oa_status: str | None = "unknown",
+    journal_id: int | None = None,
+    monograph_id: int | None = None,
+    in_perimeter: bool = False,
+) -> int:
+    """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
     return _insert(
-        "INSERT INTO publications (title, title_normalized, pub_year) "
-        "VALUES (%s, lower(%s), %s) RETURNING id",
-        (title, title, year),
+        "INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, "
+        "journal_id, monograph_id, in_perimeter) "
+        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, %s) "
+        "RETURNING id",
+        (
+            title,
+            title if normalize_title else None,
+            year,
+            doc_type,
+            oa_status,
+            journal_id,
+            monograph_id,
+            in_perimeter,
+        ),
     )
+
+
+def seed_authorship(
+    publication_id: int,
+    *,
+    person_id: int | None = None,
+    in_perimeter: bool = False,
+    roles: list[str] | None = None,
+) -> int:
+    """Authorship de `publication_id`. Les valeurs par défaut sont celles du schéma."""
+    return _insert(
+        "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (publication_id, person_id, in_perimeter, roles),
+    )
+
+
+def seed_in_perimeter_authorships(journal_id: int) -> None:
+    """Pose une authorship du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `pub_count` de la revue et de son éditeur."""
+    with owner_pool() as cur:
+        cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
+        pub_ids = [r["id"] for r in cur.fetchall()]
+        for pid in pub_ids:
+            name = uniq("Author")
+            cur.execute(
+                "INSERT INTO persons "
+                "(last_name, first_name, last_name_normalized, first_name_normalized) "
+                "VALUES (%s, 'Jane', normalize_name_form(%s), 'jane') RETURNING id",
+                (name, name),
+            )
+            seed_authorship(
+                pid, person_id=cur.fetchone()["id"], in_perimeter=True, roles=["author"]
+            )
+        cur.execute(
+            "UPDATE publications p SET in_perimeter = EXISTS ("
+            "SELECT 1 FROM authorships a JOIN persons pe "
+            "ON pe.id = a.person_id AND pe.exclusion IS NULL "
+            "WHERE a.publication_id = p.id AND a.in_perimeter = TRUE) "
+            "WHERE p.journal_id = %s",
+            (journal_id,),
+        )
+        cur.execute(
+            "UPDATE journals j SET pub_count = COALESCE((SELECT COUNT(*) "
+            "FROM publications p WHERE p.journal_id = j.id AND p.in_perimeter "
+            "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
+            (journal_id,),
+        )
+        cur.execute(
+            "UPDATE publishers pub SET pub_count = COALESCE((SELECT SUM(j.pub_count) "
+            "FROM journals j WHERE j.publisher_id = pub.id), 0) "
+            "WHERE pub.id = (SELECT publisher_id FROM journals WHERE id = %s)",
+            (journal_id,),
+        )
 
 
 def seed_source_publication(

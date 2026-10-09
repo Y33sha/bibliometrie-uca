@@ -11,17 +11,11 @@ from sqlalchemy import text
 from infrastructure.pipeline.authorships.purge_orphan_publications import (
     PgPurgeOrphanPublicationsQueries,
 )
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 
 _Q = PgPurgeOrphanPublicationsQueries()
-
-
-def _add_authorship(conn, *, pub_id, person_id):
-    conn.execute(
-        text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pe)"),
-        {"p": pub_id, "pe": person_id},
-    )
 
 
 class TestPurgeOrphanPublications:
@@ -36,7 +30,7 @@ class TestPurgeOrphanPublications:
     def test_keeps_pub_with_authorship(self, sa_sync_conn):
         kept = insert_publication(sa_sync_conn, "kept")
         person = insert_person(sa_sync_conn, "Doe", first_name="Jane")
-        _add_authorship(sa_sync_conn, pub_id=kept, person_id=person)
+        insert_authorship(sa_sync_conn, kept, person_id=person)
         _Q.purge_orphan_publications(sa_sync_conn)
         still_there = sa_sync_conn.execute(
             text("SELECT 1 FROM publications WHERE id = :id"), {"id": kept}

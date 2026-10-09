@@ -8,7 +8,7 @@ Couvre :
 from __future__ import annotations
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import uniq
+from tests.integration.helpers.seeds import seed_publication, uniq
 
 
 def _seed_subject(label: str | None = None, usage_count: int = 1) -> int:
@@ -28,11 +28,7 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
     a, b = sorted([subject_a_id, subject_b_id])
     with owner_pool() as cur:
         for _ in range(count):
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, doc_type) "
-                "VALUES ('cooc-seed', 2024, 'article') RETURNING id"
-            )
-            pub_id = cur.fetchone()["id"]
+            pub_id = seed_publication("cooc-seed", normalize_title=False, doc_type="article")
             for s in (a, b):
                 cur.execute(
                     "INSERT INTO publication_subjects (publication_id, subject_id, source) "

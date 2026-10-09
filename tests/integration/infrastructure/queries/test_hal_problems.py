@@ -7,6 +7,7 @@ from sqlalchemy import text
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -175,16 +176,11 @@ class TestHalMissingCollections:
 
 
 def _create_authorship_uca(conn, pub_id, lab_id, position=0):
-    row = conn.execute(
-        text("""
-            INSERT INTO authorships
-                (publication_id, author_position, in_perimeter, roles)
-            VALUES (:p, :pos, TRUE, ARRAY['author']) RETURNING id
-        """),
-        {"p": pub_id, "pos": position},
-    ).one()
-    add_authorship_structure(conn, row.id, lab_id)
-    return row.id
+    authorship_id = insert_authorship(
+        conn, pub_id, author_position=position, in_perimeter=True, roles=["author"]
+    )
+    add_authorship_structure(conn, authorship_id, lab_id)
+    return authorship_id
 
 
 def _create_address_for_sa(conn, sa_id):

@@ -9,14 +9,13 @@ from application.services.authorships.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _orphan_sa(conn):
     """Publication + source_publication + source_authorship orpheline. Retourne (sa_id, pub_id)."""
-    pub = conn.execute(
-        text("INSERT INTO publications (title, pub_year) VALUES ('t', 2024) RETURNING id")
-    ).scalar_one()
+    pub = insert_publication(conn, "t", normalize_title=False, doc_type=None)
     sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
     sa = insert_signature(
         conn,
