@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from application.pipeline.authorships import phase as authorships_phase
+from application.pipeline.context import PhaseContext, RunOptions
 from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli import run_pipeline
 
@@ -30,13 +31,10 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
     with patch.object(
         authorships_phase, "build", return_value=PhaseMetrics(details={"summary": {}})
     ):
-        authorships_phase.run(
-            _fake_tx,
-            build_queries,
-            purge_queries,
-            pub_counts,
-            address_pub_count,
-            logging.getLogger("test"),
+        authorships_phase.AuthorshipsPhase(
+            build_queries, purge_queries, pub_counts, address_pub_count
+        ).run(
+            PhaseContext(open_tx=_fake_tx, logger=logging.getLogger("test"), options=RunOptions())
         )
     address_pub_count.recompute_pub_count.assert_called_once()
     pub_counts.refresh_journal_pub_counts.assert_called_once()
