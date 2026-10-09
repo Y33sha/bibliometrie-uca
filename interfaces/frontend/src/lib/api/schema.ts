@@ -613,7 +613,7 @@ export interface paths {
         put?: never;
         /**
          * Create Structure
-         * @description Crée une structure. Lève 409 si le `code` est déjà utilisé.
+         * @description Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé.
          */
         post: operations["create_structure_api_structures_post"];
         delete?: never;
