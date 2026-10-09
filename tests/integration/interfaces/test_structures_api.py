@@ -133,6 +133,13 @@ class TestCreateStructure:
         assert body["code"] == code
         assert body["type"] == "labo"
 
+    def test_conflict_when_ror_id_already_used(self, auth_client):
+        payload = {"name": "Doublon", "type": "labo", "ror_id": "03rth4p18"}
+        first = auth_client.post("/api/structures", json={**payload, "code": uniq("ROR_A")})
+        assert first.status_code == 200
+        r = auth_client.post("/api/structures", json={**payload, "code": uniq("ROR_B")})
+        assert r.status_code == 409
+
     def test_create_visible_immediately(self, auth_client):
         # Régression (chantier commit-avant-réponse) : la structure écrite par le POST
         # est commitée avant l'envoi de la réponse, donc lisible depuis une connexion

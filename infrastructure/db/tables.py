@@ -213,6 +213,7 @@ structures = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("api_ids", Jsonb),
     UniqueConstraint("code", name="structures_code_key"),
+    UniqueConstraint("ror_id", name="structures_ror_id_key"),
 )
 
 
