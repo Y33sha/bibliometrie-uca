@@ -44,7 +44,7 @@ from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
-from domain.structures.ror import RorStatus
+from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
 from infrastructure.db.jsonb import Jsonb
 
@@ -253,14 +253,15 @@ structure_name_forms = Table(
 
 
 ror_status_enum = PgEnum(*(s.value for s in RorStatus), name="ror_status", create_type=False)
+ror_type_enum = PgEnum(*(t.value for t in RorType), name="ror_type", create_type=False)
 
 ror_organizations = Table(
     "ror_organizations",
     metadata,
     Column("ror_id", Text, primary_key=True),
     Column("name", Text, nullable=False),
-    Column("country_code", CHAR(2)),
-    Column("types", ARRAY(Text), nullable=False),
+    Column("country_code", CHAR(2), nullable=False),
+    Column("types", ARRAY(ror_type_enum), nullable=False),
     Column("status", ror_status_enum, nullable=False),
     comment=(
         "Organisations du Research Organization Registry, chargées depuis son dump. "

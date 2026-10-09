@@ -3,8 +3,14 @@
 Le ROR décrit les organisations de recherche du monde entier et leurs relations parent/enfant. `structures.ror_id` relie le référentiel interne à ce référentiel.
 """
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
+
+from domain.errors import ValidationError
+from domain.structures.identifiers import RorId
+
+_COUNTRY_CODE = re.compile(r"^[a-z]{2}$")
 
 
 class RorStatus(StrEnum):
@@ -15,14 +21,36 @@ class RorStatus(StrEnum):
     WITHDRAWN = "withdrawn"
 
 
+class RorType(StrEnum):
+    """Type d'une organisation dans le ROR. `facility` désigne notamment les laboratoires et unités de recherche."""
+
+    ARCHIVE = "archive"
+    COMPANY = "company"
+    EDUCATION = "education"
+    FACILITY = "facility"
+    FUNDER = "funder"
+    GOVERNMENT = "government"
+    HEALTHCARE = "healthcare"
+    NONPROFIT = "nonprofit"
+    OTHER = "other"
+
+
 @dataclass(frozen=True, slots=True)
 class RorOrganization:
-    """Organisation du ROR. `country_code` est le code ISO en minuscules de la première localisation."""
+    """Organisation du ROR. `country_code` est le code ISO 3166-1 en minuscules de la première localisation."""
 
-    ror_id: str
+    ror_id: RorId
     name: str
-    country_code: str | None
-    types: tuple[str, ...]
+    country_code: str
+    types: frozenset[RorType]
     status: RorStatus
-    parent_ids: tuple[str, ...]
-    child_ids: tuple[str, ...]
+    parent_ids: frozenset[RorId]
+    child_ids: frozenset[RorId]
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValidationError(f"Organisation ROR sans nom : {self.ror_id}")
+        if not _COUNTRY_CODE.match(self.country_code):
+            raise ValidationError(
+                f"Code pays invalide pour l'organisation ROR {self.ror_id} : {self.country_code!r}"
+            )
