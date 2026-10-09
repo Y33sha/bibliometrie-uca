@@ -29,13 +29,29 @@ def seed_address(raw_text: str, *, countries: list[str] | None = None, pub_count
     )
 
 
-def seed_structure(code: str | None = None, type_: str = "labo") -> int:
+def seed_structure(
+    code: str | None = None,
+    type_: str = "labo",
+    *,
+    name: str | None = None,
+    hal_collection: str | None = None,
+    reuse: bool = False,
+) -> int:
+    """Structure de code unique par défaut ; le nom vaut le code par défaut. `reuse` renvoie la structure de même code si elle existe."""
     code = code or uniq("STR")
-    return _insert(
-        "INSERT INTO structures (code, name, structure_type) "
-        "VALUES (%s, %s, CAST(%s AS structure_type)) RETURNING id",
-        (code, code, type_),
-    )
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO structures (code, name, structure_type, hal_collection) "
+            "VALUES (%s, %s, CAST(%s AS structure_type), %s)"
+            + (" ON CONFLICT (code) DO NOTHING" if reuse else "")
+            + " RETURNING id",
+            (code, name or code, type_, hal_collection),
+        )
+        row = cur.fetchone()
+        if row is None:
+            cur.execute("SELECT id FROM structures WHERE code = %s", (code,))
+            row = cur.fetchone()
+        return row["id"]
 
 
 def seed_structure_name_form(structure_id: int, form_text: str | None = None) -> int:
@@ -49,13 +65,83 @@ def seed_structure_name_form(structure_id: int, form_text: str | None = None) ->
 
 
 def seed_perimeter(
-    code: str | None = None, root_structure_ids: list[int] | None = None, name: str | None = None
+    code: str | None = None,
+    root_structure_ids: list[int] | None = None,
+    name: str | None = None,
+    *,
+    replace: bool = False,
 ) -> int:
+    """Périmètre de code unique par défaut. `replace` remplace les racines d'un périmètre de même code."""
     code = code or uniq("perim")
+    conflict = (
+        " ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids"
+        if replace
+        else ""
+    )
     return _insert(
-        "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s) RETURNING id",
+        "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s)"
+        + conflict
+        + " RETURNING id",
         (code, name or code, root_structure_ids or []),
     )
+
+
+def seed_add_to_perimeter(structure_id: int, *, code: str, name: str) -> int:
+    """Rattache `structure_id` au périmètre `code`, créé sous le nom `name` s'il est absent, et renvoie l'`id` du périmètre."""
+    perimeter_id = _insert(
+        "INSERT INTO perimeters (code, name) VALUES (%s, %s) "
+        "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id",
+        (code, name),
+    )
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
+            "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (perimeter_id, structure_id),
+        )
+    return perimeter_id
+
+
+def seed_tutelle(parent_id: int, *, child_id: int) -> int:
+    """Tutelle de `parent_id` sur `child_id`."""
+    return _insert(
+        "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s) RETURNING id",
+        (parent_id, child_id),
+    )
+
+
+def seed_address_structure(
+    address_id: int,
+    *,
+    structure_id: int,
+    matched_form_id: int | None = None,
+    is_confirmed: bool | None = None,
+) -> int:
+    """Lien de l'adresse `address_id` à la structure `structure_id`."""
+    return _insert(
+        "INSERT INTO address_structures (address_id, structure_id, matched_form_id, is_confirmed) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (address_id, structure_id, matched_form_id, is_confirmed),
+    )
+
+
+def seed_country(code: str, name: str) -> None:
+    """Pays `code`, s'il est absent du référentiel."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO countries (code, name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (code, name),
+        )
+
+
+def seed_config(key: str, value: object) -> None:
+    """Paramètre `key` à `value`, sérialisé en jsonb, en remplaçant une valeur existante."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO config (key, value) VALUES (%s, CAST(%s AS jsonb)) "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            (key, json.dumps(value)),
+        )
 
 
 def seed_publisher(name: str | None = None, *, name_normalized: str | None = None) -> int:

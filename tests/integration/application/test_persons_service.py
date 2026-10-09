@@ -7,7 +7,6 @@ re-synchronisation de l'authorship canonique depuis ses sources),
 merge_person, etc.
 """
 
-import json
 from functools import partial
 
 import pytest
@@ -56,6 +55,7 @@ from tests.integration.helpers.persons import (
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.structures import insert_persons_perimeter
 
 # Forme de nom de source HAL.
 _hal_name_form = partial(insert_person_name_form, sources=["hal"])
@@ -83,25 +83,6 @@ def authorship_repo(sa_sync_conn):
 
 
 # ── Helpers ─────────────────────────────────────────────────
-
-
-def _setup_uca(conn):
-    """Périmètre UCA minimal pour les tests qui dépendent de in_perimeter."""
-    uca_id = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES ('UCA', 'UCA', CAST('universite' AS structure_type)) RETURNING id"
-        )
-    ).scalar_one()
-    conn.execute(
-        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES ('uca', 'UCA', :ids)"),
-        {"ids": [uca_id]},
-    )
-    conn.execute(
-        text("INSERT INTO config (key, value) VALUES ('perimeter_persons', CAST(:v AS jsonb))"),
-        {"v": json.dumps("uca")},
-    )
-    return uca_id
 
 
 def _scalar(conn, sql_text: str, **params):
@@ -556,7 +537,7 @@ class TestMergePerson:
 
 class TestBatchAssignOrphanAuthorships:
     def test_empty_list_returns_zero(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         assert (
             batch_assign_orphan_authorships(
@@ -571,7 +552,7 @@ class TestBatchAssignOrphanAuthorships:
         )
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_hal = _notice(sa_sync_conn, pub_id, source_id="h-1")
@@ -601,7 +582,7 @@ class TestBatchAssignOrphanAuthorships:
         assert all(r.authorship_id is not None for r in rows)
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         pub_id = insert_publication(sa_sync_conn)
@@ -1030,7 +1011,7 @@ class TestUpdateNameFormStatus:
 class TestAssignOrphanAuthorship:
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Une signature déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
         pub_id = insert_publication(sa_sync_conn)
@@ -1051,7 +1032,7 @@ class TestAssignOrphanAuthorship:
             assign_orphan_authorship(person_id, 999999, repo=repo, authorship_repo=authorship_repo)
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
@@ -1077,7 +1058,7 @@ class TestReassignRejectedPairUnit:
     """Pré-contrôle de rejet sur les chemins de réassignation orphan-authorships."""
 
     def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
@@ -1099,7 +1080,7 @@ class TestReassignRejectedPairUnit:
     def test_assign_forced_unrejects_and_recreates_canonical(
         self, sa_sync_conn, repo, authorship_repo
     ):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
@@ -1136,7 +1117,7 @@ class TestReassignRejectedPairUnit:
         )
 
     def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
@@ -1166,7 +1147,7 @@ class TestReassignRejectedPairUnit:
             )
 
     def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, authorship_repo):
-        _setup_uca(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         sp1 = _notice(sa_sync_conn, pub1, source_id="h-1")

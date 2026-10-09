@@ -9,20 +9,14 @@ Couvre :
 
 from __future__ import annotations
 
-import json
-
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_perimeter, seed_structure, uniq
-
-
-def _set_config(key: str, value: str) -> None:
-    """Inscrit une clé de config (utilisée pour bloquer la suppression d'un perimeter)."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES (%s, CAST(%s AS jsonb)) "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (key, json.dumps(value)),
-        )
+from tests.integration.helpers.seeds import (
+    seed_config,
+    seed_perimeter,
+    seed_structure,
+    seed_tutelle,
+    uniq,
+)
 
 
 def _clear_config(key: str) -> None:
@@ -117,7 +111,7 @@ class TestDeletePerimeter:
         # delete_perimeter refuse si une config pipeline référence son code.
         code = uniq("inuse")
         pid = seed_perimeter(code=code)
-        _set_config("perimeter_persons", code)
+        seed_config("perimeter_persons", code)
         try:
             r = auth_client.delete(f"/api/perimeters/{pid}")
             # 409 Conflict : sémantique correcte ("ressource en usage"), à
@@ -143,11 +137,7 @@ class TestMaterializedPerimeterStructures:
     def test_adding_root_materializes_closure(self, auth_client):
         root = seed_structure(type_="universite")
         lab = seed_structure(type_="labo")
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
-                (root, lab),
-            )
+        seed_tutelle(root, child_id=lab)
         pid = seed_perimeter()
         r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [root]})
         assert r.status_code == 200
@@ -156,11 +146,7 @@ class TestMaterializedPerimeterStructures:
     def test_creating_with_roots_materializes_closure(self, auth_client):
         root = seed_structure(type_="universite")
         lab = seed_structure(type_="labo")
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
-                (root, lab),
-            )
+        seed_tutelle(root, child_id=lab)
         code = uniq("withroots")
         r = auth_client.post(
             "/api/perimeters", json={"code": code, "name": code, "root_structure_ids": [root]}

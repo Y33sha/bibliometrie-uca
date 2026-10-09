@@ -11,36 +11,22 @@ Couvre :
 
 from __future__ import annotations
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import uniq
+from tests.integration.helpers.db import truncate_after_module
+from tests.integration.helpers.seeds import (
+    seed_add_to_perimeter,
+    seed_config,
+    seed_structure,
+    uniq,
+)
 
 
 def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int:
-    code = code or uniq("LAB")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type, hal_collection) "
-            "VALUES (%s, %s, 'labo'::structure_type, %s) RETURNING id",
-            (code, code, hal_collection),
-        )
-        lab_id = cur.fetchone()["id"]
-        # Rattache au périmètre persons, désigné en configuration : les lectures HAL
-        # scopent au périmètre, pas au type de structure.
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', '\"uca\"') "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-        )
-        cur.execute(
-            "INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter') "
-            "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id"
-        )
-        perim_id = cur.fetchone()["id"]
-        cur.execute(
-            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
-            "VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (perim_id, lab_id),
-        )
-        return lab_id
+    lab_id = seed_structure(code or uniq("LAB"), hal_collection=hal_collection)
+    # Rattache au périmètre persons, désigné en configuration : les lectures HAL
+    # scopent au périmètre, pas au type de structure.
+    seed_config("perimeter_persons", "uca")
+    seed_add_to_perimeter(lab_id, code="uca", name="test persons perimeter")
+    return lab_id
 
 
 _cleanup_after_module = truncate_after_module(

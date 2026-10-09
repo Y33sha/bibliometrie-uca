@@ -186,22 +186,6 @@ class TestDirtyDrivenSourceCountries:
         assert _addr_dirty(sa_sync_conn, addr) is False
 
 
-def _create_address_full_sa(conn, raw_text, normalized_text=None, countries=None, pub_count=0):
-    """Helper SA pour `suggest_addresses_countries_batch` (Connection SA)."""
-    return conn.execute(
-        text("""
-            INSERT INTO addresses (raw_text, normalized_text, countries, pub_count)
-            VALUES (:raw, :norm, :countries, :pub_count) RETURNING id
-        """),
-        {
-            "raw": raw_text,
-            "norm": normalized_text or raw_text.lower(),
-            "countries": countries,
-            "pub_count": pub_count,
-        },
-    ).scalar_one()
-
-
 def _get_address_field_sa(conn, addr_id, field):
     return conn.execute(
         text(f"SELECT {field} FROM addresses WHERE id = :id"),
@@ -215,10 +199,12 @@ class TestSuggestCountryQueries:
     (cible → pays) est couvert en unit par `CountrySuggester`."""
 
     def test_fetch_targets_excludes_ineligible(self, sa_sync_conn):
-        eligible = _create_address_full_sa(sa_sync_conn, "Lab Foo seul", "lab foo seul")
-        countried = _create_address_full_sa(sa_sync_conn, "Done", "already done", countries=["FR"])
-        short = _create_address_full_sa(sa_sync_conn, "Sh", "lyon")
-        suggested = _create_address_full_sa(sa_sync_conn, "Sug", "sug done")
+        eligible = insert_address(sa_sync_conn, "Lab Foo seul", normalized_text="lab foo seul")
+        countried = insert_address(
+            sa_sync_conn, "Done", normalized_text="already done", countries=["FR"]
+        )
+        short = insert_address(sa_sync_conn, "Sh", normalized_text="lyon")
+        suggested = insert_address(sa_sync_conn, "Sug", normalized_text="sug done")
         _Q.write_countries(sa_sync_conn, [(suggested, ["FR"])])
 
         ids = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
@@ -228,15 +214,15 @@ class TestSuggestCountryQueries:
         assert suggested not in ids  # déjà tentée
 
     def test_fetch_targets_keyset_after_id(self, sa_sync_conn):
-        a = _create_address_full_sa(sa_sync_conn, "A", "lab aaa seul")
-        b = _create_address_full_sa(sa_sync_conn, "B", "lab bbb seul")
+        a = insert_address(sa_sync_conn, "A", normalized_text="lab aaa seul")
+        b = insert_address(sa_sync_conn, "B", normalized_text="lab bbb seul")
         ids = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
         assert a not in ids and b in ids
 
     def test_fetch_retry_empty_includes_empties_not_positives(self, sa_sync_conn):
-        fresh = _create_address_full_sa(sa_sync_conn, "Fresh", "lab fresh seul")
-        empty = _create_address_full_sa(sa_sync_conn, "Empty", "lab empty seul")
-        positive = _create_address_full_sa(sa_sync_conn, "Pos", "lab positive seul")
+        fresh = insert_address(sa_sync_conn, "Fresh", normalized_text="lab fresh seul")
+        empty = insert_address(sa_sync_conn, "Empty", normalized_text="lab empty seul")
+        positive = insert_address(sa_sync_conn, "Pos", normalized_text="lab positive seul")
         _Q.write_countries(sa_sync_conn, [(empty, []), (positive, ["FR"])])
         inc = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
         assert fresh in inc and empty not in inc and positive not in inc  # incrémental : nouvelles
@@ -250,22 +236,22 @@ class TestSuggestCountryQueries:
         assert fresh in full and empty in full and positive not in full
 
     def test_load_pool_returns_only_countried(self, sa_sync_conn):
-        _create_address_full_sa(sa_sync_conn, "P", "lab pool a", countries=["FR"])
-        _create_address_full_sa(sa_sync_conn, "N", "lab no country")
+        insert_address(sa_sync_conn, "P", normalized_text="lab pool a", countries=["FR"])
+        insert_address(sa_sync_conn, "N", normalized_text="lab no country")
         texts = {t for t, _ in _Q.load_country_pool(sa_sync_conn)}
         assert "lab pool a" in texts
         assert "lab no country" not in texts
 
     def test_write_suggested_array_and_empty(self, sa_sync_conn):
-        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
-        b = _create_address_full_sa(sa_sync_conn, "B", "lab b seul")
+        a = insert_address(sa_sync_conn, "A", normalized_text="lab a seul")
+        b = insert_address(sa_sync_conn, "B", normalized_text="lab b seul")
         _Q.write_countries(sa_sync_conn, [(a, ["FR"]), (b, [])])
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
         # array vide (et non NULL) : marque « tentée sans match » pour la sauter ensuite.
         assert _get_address_field_sa(sa_sync_conn, b, "suggested_countries") == []
 
     def test_write_direct_to_countries(self, sa_sync_conn):
-        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
+        a = insert_address(sa_sync_conn, "A", normalized_text="lab a seul")
         _Q.write_countries(sa_sync_conn, [(a, ["FR"])], target_column="countries")
         assert _get_address_field_sa(sa_sync_conn, a, "countries") == ["FR"]
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") is None
@@ -277,7 +263,7 @@ class TestSuggestCountryQueries:
             _Q.write_countries(sa_sync_conn, [(1, ["FR"])], target_column="bogus")
 
     def test_write_idempotent_same_value_then_overwrite(self, sa_sync_conn):
-        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
+        a = insert_address(sa_sync_conn, "A", normalized_text="lab a seul")
         _Q.write_countries(sa_sync_conn, [(a, ["FR"])])
         _Q.write_countries(sa_sync_conn, [(a, ["FR"])])  # même valeur : no-op
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
@@ -285,8 +271,8 @@ class TestSuggestCountryQueries:
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["BE"]
 
     def test_count_eligible(self, sa_sync_conn):
-        _create_address_full_sa(sa_sync_conn, "E", "lab eligible seul")
-        attempted = _create_address_full_sa(sa_sync_conn, "A", "lab attempted seul")
+        insert_address(sa_sync_conn, "E", normalized_text="lab eligible seul")
+        attempted = insert_address(sa_sync_conn, "A", normalized_text="lab attempted seul")
         _Q.write_countries(sa_sync_conn, [(attempted, [])])  # tentée sans match
         counts = _Q.count_suggest_eligible(sa_sync_conn)
         assert counts.eligible >= 1  # la fraîche (suggested_countries IS NULL)

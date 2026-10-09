@@ -2,21 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-from tests.integration.helpers.seeds import seed_perimeter, seed_structure
-
-
-def _set_persons_perimeter(code: str) -> None:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', CAST(%s AS jsonb)) "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (json.dumps(code),),
-        )
+from tests.integration.helpers.seeds import seed_config, seed_perimeter, seed_structure
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +18,7 @@ def _cleanup():
 def test_serves_name_and_roots_of_persons_perimeter(client):
     root = seed_structure("inst_root", type_="universite")
     seed_perimeter("inst", [root], name="Université Test")
-    _set_persons_perimeter("inst")
+    seed_config("perimeter_persons", "inst")
 
     r = client.get("/api/config/institution")
 
@@ -38,7 +27,7 @@ def test_serves_name_and_roots_of_persons_perimeter(client):
 
 
 def test_falls_back_to_code_without_perimeter_row(client):
-    _set_persons_perimeter("sans_ligne")
+    seed_config("perimeter_persons", "sans_ligne")
 
     r = client.get("/api/config/institution")
 

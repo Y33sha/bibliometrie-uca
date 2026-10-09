@@ -8,14 +8,7 @@ idempotent.
 from sqlalchemy import text
 
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
-from tests.integration.helpers.structures import insert_perimeter, insert_structure
-
-
-def _tutelle(conn, parent_id: int, child_id: int) -> None:
-    conn.execute(
-        text("INSERT INTO structure_tutelles (parent_id, child_id) VALUES (:p, :c)"),
-        {"p": parent_id, "c": child_id},
-    )
+from tests.integration.helpers.structures import insert_perimeter, insert_structure, insert_tutelle
 
 
 def _closure(conn, perimeter_id: int) -> set[int]:
@@ -32,8 +25,8 @@ def test_closure_descends_transitively(sa_sync_conn):
     child = insert_structure(conn, "ps_test_child")
     grandchild = insert_structure(conn, "ps_test_grandchild")
     unrelated = insert_structure(conn, "ps_test_unrelated")
-    _tutelle(conn, root, child)
-    _tutelle(conn, child, grandchild)
+    insert_tutelle(conn, root, child_id=child)
+    insert_tutelle(conn, child, child_id=grandchild)
     perim = insert_perimeter(conn, "ps_test_perim", root_structure_ids=[root])
 
     refresh_perimeter_structures(conn)
@@ -48,7 +41,7 @@ def test_refresh_idempotent(sa_sync_conn):
     conn = sa_sync_conn
     root = insert_structure(conn, "ps_test_root2", structure_type="universite")
     child = insert_structure(conn, "ps_test_child2")
-    _tutelle(conn, root, child)
+    insert_tutelle(conn, root, child_id=child)
     perim = insert_perimeter(conn, "ps_test_perim2", root_structure_ids=[root])
 
     refresh_perimeter_structures(conn)

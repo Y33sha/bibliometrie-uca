@@ -20,6 +20,11 @@ from infrastructure.repositories.publication_repository import PgPublicationRepo
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from tests.integration.helpers.journals import insert_journal, insert_publisher
+from tests.integration.helpers.structures import (
+    insert_perimeter,
+    insert_structure,
+    insert_structure_name_form,
+)
 
 
 class TestRelevesRendantUneListe:
@@ -73,29 +78,12 @@ class TestRelevesRendantUneLigne:
         assert PgPublisherRepository(sa_sync_conn_owner).find_by_id(publisher_id) is not None
 
     def test_un_perimetre_s_accorde(self, sa_sync_conn_owner):
-        perimeter_id = sa_sync_conn_owner.execute(
-            text("""
-                INSERT INTO perimeters (code, name) VALUES ('test-accord', 'Périmètre')
-                RETURNING id
-            """)
-        ).scalar_one()
+        perimeter_id = insert_perimeter(sa_sync_conn_owner, "test-accord", name="Périmètre")
         assert PgPerimeterRepository(sa_sync_conn_owner).find_by_id(perimeter_id) is not None
 
     def test_une_structure_et_ses_formes_de_nom_s_accordent(self, sa_sync_conn_owner):
-        structure_id = sa_sync_conn_owner.execute(
-            text("""
-                INSERT INTO structures (code, name, structure_type)
-                VALUES ('test-accord', 'Structure', 'labo')
-                RETURNING id
-            """)
-        ).scalar_one()
-        sa_sync_conn_owner.execute(
-            text("""
-                INSERT INTO structure_name_forms (structure_id, form_text)
-                VALUES (:sid, 'Forme de nom')
-            """),
-            {"sid": structure_id},
-        )
+        structure_id = insert_structure(sa_sync_conn_owner, "test-accord", name="Structure")
+        insert_structure_name_form(sa_sync_conn_owner, structure_id, form_text="Forme de nom")
         structure = PgStructureRepository(sa_sync_conn_owner).find_by_id(structure_id)
         assert structure is not None
         assert structure.name_forms

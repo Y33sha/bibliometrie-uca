@@ -2,12 +2,11 @@
 
 from functools import partial
 
-from sqlalchemy import text
-
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -15,7 +14,11 @@ from tests.integration.helpers.sources import (
     insert_signature_address,
     insert_source_publication,
 )
-from tests.integration.helpers.structures import add_authorship_structure
+from tests.integration.helpers.structures import (
+    add_authorship_structure,
+    add_to_perimeter,
+    insert_structure,
+)
 
 # Notice de 2024, de titre « T ».
 _notice = partial(insert_source_publication, title="T", pub_year=2024)
@@ -26,35 +29,11 @@ def _q(conn) -> PgHalProblemsQueries:
 
 
 def _create_lab(conn, code="LAB", hal_collection=None):
-    row = conn.execute(
-        text("""
-            INSERT INTO structures (code, name, structure_type, hal_collection)
-            VALUES (:c, 'L', 'labo', :col) RETURNING id
-        """),
-        {"c": code, "col": hal_collection},
-    ).one()
-    lab_id = row.id
+    lab_id = insert_structure(conn, code, name="L", hal_collection=hal_collection)
     # Rattache au périmètre persons, désigné en configuration : les lectures HAL scopent
     # au périmètre, pas au type de structure.
-    conn.execute(
-        text(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', '\"uca\"') "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-        )
-    )
-    perim_id = conn.execute(
-        text("""
-            INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter')
-            ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id
-        """)
-    ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
-            "VALUES (:p, :s) ON CONFLICT DO NOTHING"
-        ),
-        {"p": perim_id, "s": lab_id},
-    )
+    set_config(conn, "perimeter_persons", "uca")
+    add_to_perimeter(conn, lab_id, code="uca", name="test persons perimeter")
     return lab_id
 
 

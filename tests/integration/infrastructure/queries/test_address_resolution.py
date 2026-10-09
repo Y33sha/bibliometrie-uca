@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.pipeline.affiliations.address_resolution`."""
 
+from functools import partial
+
 from sqlalchemy import text
 
 from application.ports.pipeline.affiliations.address_resolution import (
@@ -7,26 +9,19 @@ from application.ports.pipeline.affiliations.address_resolution import (
     KeptPair,
 )
 from infrastructure.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
-from tests.integration.helpers.addresses import insert_address
-from tests.integration.helpers.structures import insert_structure
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
+from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
+
+# Forme de nom « uca ».
+_uca_form = partial(insert_structure_name_form, form_text="uca")
 
 _Q = PgAddressResolutionQueries()
-
-
-def _create_form(conn, struct_id, form_text="uca"):
-    return conn.execute(
-        text(
-            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-            "VALUES (:struct_id, :form_text, char_length(:form_text) <= 6) RETURNING id"
-        ),
-        {"struct_id": struct_id, "form_text": form_text},
-    ).scalar_one()
 
 
 class TestLoadNameForms:
     def test_returns_all_forms(self, sa_sync_conn):
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s, form_text="uca")
+        f = _uca_form(sa_sync_conn, s)
         rows = _Q.load_name_forms(sa_sync_conn)
         assert any(r.id == f for r in rows)
         ours = next(r for r in rows if r.id == f)
@@ -73,16 +68,10 @@ class TestDeleteObsoleteDetectionsBulk:
     def test_keeps_pairs_in_kept_list(self, sa_sync_conn):
         s1 = insert_structure(sa_sync_conn, "S1", name="X")
         s2 = insert_structure(sa_sync_conn, "S2", name="X")
-        f = _create_form(sa_sync_conn, s1)
+        f = _uca_form(sa_sync_conn, s1)
         addr = insert_address(sa_sync_conn, normalized_text="X")
         for struct in (s1, s2):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO address_structures (address_id, structure_id, matched_form_id) "
-                    "VALUES (:addr, :struct, :form)"
-                ),
-                {"addr": addr, "struct": struct, "form": f},
-            )
+            insert_address_structure(sa_sync_conn, addr, structure_id=struct, matched_form_id=f)
 
         count = _Q.delete_obsolete_detections_bulk(
             sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)]
@@ -97,29 +86,18 @@ class TestDeleteObsoleteDetectionsBulk:
 
     def test_deletes_all_when_kept_empty(self, sa_sync_conn):
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s)
+        f = _uca_form(sa_sync_conn, s)
         addr = insert_address(sa_sync_conn, normalized_text="X")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_structures (address_id, structure_id, matched_form_id) "
-                "VALUES (:addr, :struct, :form)"
-            ),
-            {"addr": addr, "struct": s, "form": f},
-        )
+        insert_address_structure(sa_sync_conn, addr, structure_id=s, matched_form_id=f)
         count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
         assert count == 1
 
     def test_preserves_manually_confirmed_links(self, sa_sync_conn):
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s)
+        f = _uca_form(sa_sync_conn, s)
         addr = insert_address(sa_sync_conn, normalized_text="X")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_structures "
-                "(address_id, structure_id, matched_form_id, is_confirmed) "
-                "VALUES (:addr, :struct, :form, TRUE)"
-            ),
-            {"addr": addr, "struct": s, "form": f},
+        insert_address_structure(
+            sa_sync_conn, addr, structure_id=s, matched_form_id=f, is_confirmed=True
         )
         count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
         assert count == 0  # lien manuel non supprimé
@@ -127,17 +105,11 @@ class TestDeleteObsoleteDetectionsBulk:
     def test_pair_scoped_not_structure_scoped(self, sa_sync_conn):
         """Une même structure gardée pour une adresse n'épargne pas une autre adresse."""
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s)
+        f = _uca_form(sa_sync_conn, s)
         addr1 = insert_address(sa_sync_conn, "A1", normalized_text="A1")
         addr2 = insert_address(sa_sync_conn, "A2", normalized_text="A2")
         for addr in (addr1, addr2):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO address_structures (address_id, structure_id, matched_form_id) "
-                    "VALUES (:addr, :struct, :form)"
-                ),
-                {"addr": addr, "struct": s, "form": f},
-            )
+            insert_address_structure(sa_sync_conn, addr, structure_id=s, matched_form_id=f)
         # On garde (addr1, s) ; (addr2, s) devient obsolète bien que même structure.
         count = _Q.delete_obsolete_detections_bulk(
             sa_sync_conn, [addr1, addr2], kept_pairs=[KeptPair(addr1, s)]
@@ -158,15 +130,10 @@ class TestUnflagObsoleteDetectionsBulk:
     def test_clears_matched_form_id_on_confirmed(self, sa_sync_conn):
         s1 = insert_structure(sa_sync_conn, "S1", name="X")
         s2 = insert_structure(sa_sync_conn, "S2", name="X")
-        f = _create_form(sa_sync_conn, s1)
+        f = _uca_form(sa_sync_conn, s1)
         addr = insert_address(sa_sync_conn, normalized_text="X")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_structures "
-                "(address_id, structure_id, matched_form_id, is_confirmed) "
-                "VALUES (:addr, :struct, :form, TRUE)"
-            ),
-            {"addr": addr, "struct": s2, "form": f},
+        insert_address_structure(
+            sa_sync_conn, addr, structure_id=s2, matched_form_id=f, is_confirmed=True
         )
 
         _Q.unflag_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)])
@@ -184,7 +151,7 @@ class TestUnflagObsoleteDetectionsBulk:
 class TestUpsertDetectedStructuresBulk:
     def test_inserts_new(self, sa_sync_conn):
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s)
+        f = _uca_form(sa_sync_conn, s)
         addr = insert_address(sa_sync_conn, normalized_text="X")
         _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         result = sa_sync_conn.execute(
@@ -198,8 +165,8 @@ class TestUpsertDetectedStructuresBulk:
 
     def test_updates_existing(self, sa_sync_conn):
         s = insert_structure(sa_sync_conn, name="X")
-        f1 = _create_form(sa_sync_conn, s, form_text="x1")
-        f2 = _create_form(sa_sync_conn, s, form_text="x2")
+        f1 = insert_structure_name_form(sa_sync_conn, s, form_text="x1")
+        f2 = insert_structure_name_form(sa_sync_conn, s, form_text="x2")
         addr = insert_address(sa_sync_conn, normalized_text="X")
         _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f1)])
         _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f2)])
@@ -215,8 +182,8 @@ class TestUpsertDetectedStructuresBulk:
     def test_inserts_many_in_one_call(self, sa_sync_conn):
         s1 = insert_structure(sa_sync_conn, "S1", name="X")
         s2 = insert_structure(sa_sync_conn, "S2", name="X")
-        f1 = _create_form(sa_sync_conn, s1)
-        f2 = _create_form(sa_sync_conn, s2, form_text="y")
+        f1 = _uca_form(sa_sync_conn, s1)
+        f2 = insert_structure_name_form(sa_sync_conn, s2, form_text="y")
         addr = insert_address(sa_sync_conn, normalized_text="X")
         _Q.upsert_detected_structures_bulk(
             sa_sync_conn, [DetectedStructure(addr, s1, f1), DetectedStructure(addr, s2, f2)]
@@ -230,7 +197,7 @@ class TestUpsertDetectedStructuresBulk:
     def test_idempotent_skips_noop_update(self, sa_sync_conn):
         """Réinsérer une détection identique n'écrit pas de nouvelle version (xmax inchangé)."""
         s = insert_structure(sa_sync_conn, name="X")
-        f = _create_form(sa_sync_conn, s)
+        f = _uca_form(sa_sync_conn, s)
         addr = insert_address(sa_sync_conn, normalized_text="X")
         _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         xmin_before = sa_sync_conn.execute(

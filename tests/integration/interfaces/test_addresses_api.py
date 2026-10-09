@@ -9,7 +9,13 @@ status code sur une base non-contrôlée, ajouter un seed minimal
 import pytest
 
 from tests.integration.helpers.db import owner_pool
-from tests.integration.helpers.seeds import seed_address, seed_structure
+from tests.integration.helpers.seeds import (
+    seed_address,
+    seed_config,
+    seed_country,
+    seed_perimeter,
+    seed_structure,
+)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -29,32 +35,12 @@ def _seed_addresses_api(client):
     fixtures (test_addresses_service, test_authorships_service,
     test_persons_service).
     """
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO countries (code, name) VALUES ('FR', 'France') ON CONFLICT DO NOTHING"
-        )
-        # Code unique pour éviter les collisions avec d'autres tests d'intégration
-        # qui insèrent aussi une structure 'UCA' en dur.
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES ('UCA-ADDR-API-SEED', 'UCA seed', 'universite') "
-            "ON CONFLICT (code) DO NOTHING RETURNING id"
-        )
-        row = cur.fetchone()
-        if row:
-            uca_id = row["id"]
-        else:
-            cur.execute("SELECT id FROM structures WHERE code = 'UCA-ADDR-API-SEED'")
-            uca_id = cur.fetchone()["id"]
-        cur.execute(
-            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES ('uca', 'UCA', %s) "
-            "ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids",
-            ([uca_id],),
-        )
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', to_jsonb('uca'::text)) "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-        )
+    seed_country("FR", "France")
+    # Code unique pour éviter les collisions avec d'autres tests d'intégration
+    # qui insèrent aussi une structure 'UCA' en dur.
+    uca_id = seed_structure("UCA-ADDR-API-SEED", "universite", name="UCA seed", reuse=True)
+    seed_perimeter("uca", [uca_id], "UCA", replace=True)
+    seed_config("perimeter_persons", "uca")
 
     # Warmup : ping l'API jusqu'à ce qu'une connexion vive soit obtenue
     # (purge les connexions mortes de la pool).
