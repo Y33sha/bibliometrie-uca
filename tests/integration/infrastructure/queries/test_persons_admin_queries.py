@@ -16,6 +16,7 @@ from infrastructure.read_models.persons.admin import (
 )
 from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 
 
@@ -27,18 +28,6 @@ def _create_authorship(conn, pub_id, person_id):
         ),
         {"p": pub_id, "pe": person_id},
     )
-
-
-def _create_person(conn, last="A", first="Z", exclusion=None):
-    row = conn.execute(
-        text(
-            "INSERT INTO persons "
-            "(last_name, first_name, last_name_normalized, first_name_normalized, exclusion) "
-            "VALUES (:l, :f, lower(:l), lower(:f), CAST(:e AS person_exclusion)) RETURNING id"
-        ),
-        {"l": last, "f": first, "e": exclusion},
-    ).one()
-    return row.id
 
 
 def _create_sd(conn, pub_id, source="hal", source_id="h1"):
@@ -91,8 +80,8 @@ def _create_sa(
 
 class TestNameFormAuthorships:
     def test_returns_authorships_and_other_persons(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn, last="Dupond")
-        other = _create_person(sa_sync_conn, last="Martin")
+        pid = insert_person(sa_sync_conn, "Dupond")
+        other = insert_person(sa_sync_conn, "Martin")
         pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j")
@@ -111,8 +100,8 @@ class TestNameFormAuthorships:
         assert other in other_ids
 
     def test_exclut_les_personnes_chez_qui_la_forme_est_rejetee(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn, last="Dupond")
-        rejetee = _create_person(sa_sync_conn, last="Martin")
+        pid = insert_person(sa_sync_conn, "Dupond")
+        rejetee = insert_person(sa_sync_conn, "Martin")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -129,10 +118,10 @@ class TestNameFormAuthorships:
 
 def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_conn):
     """Le compteur d'une forme, la modale de détachement et le panneau des personnes partageant une forme comptent les mêmes personnes."""
-    pid = _create_person(sa_sync_conn, last="Dupond")
-    porteur = _create_person(sa_sync_conn, last="Martin")
-    forme_rejetee = _create_person(sa_sync_conn, last="Durand")
-    personne_rejetee = _create_person(sa_sync_conn, last="Bernard", exclusion="not_a_person")
+    pid = insert_person(sa_sync_conn, "Dupond")
+    porteur = insert_person(sa_sync_conn, "Martin")
+    forme_rejetee = insert_person(sa_sync_conn, "Durand")
+    personne_rejetee = insert_person(sa_sync_conn, "Bernard", exclusion="not_a_person")
     sa_sync_conn.execute(
         text(
             "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -204,8 +193,8 @@ class TestIdentifierConflicts:
     directement le seed de la transaction rollbackée du fixture."""
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
-        p1 = _create_person(sa_sync_conn, last="Smith", first="John")
-        p2 = _create_person(sa_sync_conn, last="Smith", first="J")
+        p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
+        p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
         sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
@@ -222,8 +211,8 @@ class TestIdentifierConflicts:
 
     def test_neutralized_identifier_excluded(self, sa_sync_conn):
         """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
-        p1 = _create_person(sa_sync_conn, last="Brown", first="Anne")
-        p2 = _create_person(sa_sync_conn, last="Brown", first="A")
+        p1 = insert_person(sa_sync_conn, "Brown", first_name="Anne")
+        p2 = insert_person(sa_sync_conn, "Brown", first_name="A")
         sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
@@ -241,8 +230,8 @@ class TestIdentifierConflicts:
     @pytest.mark.parametrize("status", ["confirmed", "rejected", "authenticated"])
     def test_settled_attribution_excluded(self, sa_sync_conn, status):
         """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
-        p1 = _create_person(sa_sync_conn, last="Veyssiere", first="Hugo")
-        p2 = _create_person(sa_sync_conn, last="Pinard", first="Celeste")
+        p1 = insert_person(sa_sync_conn, "Veyssiere", first_name="Hugo")
+        p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
         sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0003-2202-7362"})
@@ -251,8 +240,8 @@ class TestIdentifierConflicts:
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
     def test_unattributed_value_excluded(self, sa_sync_conn):
-        p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
-        p2 = _create_person(sa_sync_conn, last="Lee", first="A")
+        p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
+        p2 = insert_person(sa_sync_conn, "Lee", first_name="A")
         sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
@@ -260,8 +249,8 @@ class TestIdentifierConflicts:
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
     def test_excluded_person_excluded(self, sa_sync_conn):
-        p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
-        p2 = _create_person(sa_sync_conn, last="Lee", first="A", exclusion="out_of_perimeter")
+        p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
+        p2 = insert_person(sa_sync_conn, "Lee", first_name="A", exclusion="out_of_perimeter")
         sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
@@ -277,9 +266,9 @@ class TestNameDuplicates:
         return next(p for p in res.pairs if {p.person_a.person_id, p.person_b.person_id} == {a, b})
 
     def test_shared_coauthor_is_network_tier(self, sa_sync_conn):
-        a = _create_person(sa_sync_conn, last="Dupont", first="J")
-        b = _create_person(sa_sync_conn, last="Dupont", first="Jean")
-        coauthor = _create_person(sa_sync_conn, last="Martin", first="Paul")
+        a = insert_person(sa_sync_conn, "Dupont", first_name="J")
+        b = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        coauthor = insert_person(sa_sync_conn, "Martin", first_name="Paul")
         pub1, pub2 = insert_publication(sa_sync_conn), insert_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub1, a)
         _create_authorship(sa_sync_conn, pub1, coauthor)
@@ -291,8 +280,8 @@ class TestNameDuplicates:
         assert pair.overlaps.coauthors == 1
 
     def test_disjoint_pair_has_no_overlap(self, sa_sync_conn):
-        a = _create_person(sa_sync_conn, last="Bernard", first="M")
-        b = _create_person(sa_sync_conn, last="Bernard", first="Marie")
+        a = insert_person(sa_sync_conn, "Bernard", first_name="M")
+        b = insert_person(sa_sync_conn, "Bernard", first_name="Marie")
 
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
         assert (
@@ -303,14 +292,14 @@ class TestNameDuplicates:
         ) == (0, 0, 0, 0)
 
     def test_compound_first_name_pairs_with_its_first_word(self, sa_sync_conn):
-        a = _create_person(sa_sync_conn, last="Ferrand", first="Ludovic")
-        b = _create_person(sa_sync_conn, last="Ferrand", first="Ludovic S.")
+        a = insert_person(sa_sync_conn, "Ferrand", first_name="Ludovic")
+        b = insert_person(sa_sync_conn, "Ferrand", first_name="Ludovic S.")
 
         self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
 
     def test_excluded_person_excluded(self, sa_sync_conn):
-        a = _create_person(sa_sync_conn, last="Bekono", first="Nina")
-        b = _create_person(sa_sync_conn, last="Bekono", first="N", exclusion="not_a_person")
+        a = insert_person(sa_sync_conn, "Bekono", first_name="Nina")
+        b = insert_person(sa_sync_conn, "Bekono", first_name="N", exclusion="not_a_person")
 
         res = name_duplicates(sa_sync_conn, page=1, per_page=50)
         assert all({p.person_a.person_id, p.person_b.person_id} != {a, b} for p in res.pairs)
@@ -333,16 +322,16 @@ class TestAmbiguousNameForms:
 
     def test_forme_derivee_du_nom_hors_de_la_file(self, sa_sync_conn):
         """Une forme partagée seulement comme forme dérivée du nom de chaque personne n'attend aucune décision."""
-        a = _create_person(sa_sync_conn, last="Martin", first="Jean")
-        b = _create_person(sa_sync_conn, last="Martin", first="Jeanne")
+        a = insert_person(sa_sync_conn, "Martin", first_name="Jean")
+        b = insert_person(sa_sync_conn, "Martin", first_name="Jeanne")
         self._form(sa_sync_conn, "j martin", a, sources="{persons}")
         self._form(sa_sync_conn, "j martin", b, sources="{persons}")
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_forme_derivee_du_nom_confirmee_d_office(self, sa_sync_conn):
         """Face à une forme bibliographique en attente, la forme dérivée du nom apparaît confirmée et verrouillée."""
-        a = _create_person(sa_sync_conn, last="Martin", first="Jean")
-        b = _create_person(sa_sync_conn, last="Martin", first="Jacques")
+        a = insert_person(sa_sync_conn, "Martin", first_name="Jean")
+        b = insert_person(sa_sync_conn, "Martin", first_name="Jacques")
         self._form(sa_sync_conn, "j martin", a, sources="{persons}")
         self._form(sa_sync_conn, "j martin", b)
         persons = {p.person_id: p for p in self._forms(sa_sync_conn)["j martin"].persons}
@@ -351,24 +340,24 @@ class TestAmbiguousNameForms:
 
     def test_forme_rejetee_ne_compte_pas(self, sa_sync_conn):
         """En attente chez une personne, rejetée chez l'autre : une seule personne porte la forme."""
-        a = _create_person(sa_sync_conn, last="Martin")
-        b = _create_person(sa_sync_conn, last="Durand")
+        a = insert_person(sa_sync_conn, "Martin")
+        b = insert_person(sa_sync_conn, "Durand")
         self._form(sa_sync_conn, "j martin", a)
         self._form(sa_sync_conn, "j martin", b, status="rejected")
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_personne_rejetee_ne_compte_pas(self, sa_sync_conn):
-        a = _create_person(sa_sync_conn, last="Martin")
-        b = _create_person(sa_sync_conn, last="Durand", exclusion="out_of_perimeter")
+        a = insert_person(sa_sync_conn, "Martin")
+        b = insert_person(sa_sync_conn, "Durand", exclusion="out_of_perimeter")
         self._form(sa_sync_conn, "j martin", a)
         self._form(sa_sync_conn, "j martin", b)
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_seuls_les_porteurs_sont_affiches(self, sa_sync_conn):
         """Une forme ambiguë liste ses porteurs, sans les personnes chez qui la forme est rejetée."""
-        a = _create_person(sa_sync_conn, last="Martin")
-        b = _create_person(sa_sync_conn, last="Martin", first="Jacques")
-        c = _create_person(sa_sync_conn, last="Durand")
+        a = insert_person(sa_sync_conn, "Martin")
+        b = insert_person(sa_sync_conn, "Martin", first_name="Jacques")
+        c = insert_person(sa_sync_conn, "Durand")
         self._form(sa_sync_conn, "j martin", a)
         self._form(sa_sync_conn, "j martin", b, status="confirmed")
         self._form(sa_sync_conn, "j martin", c, status="rejected")

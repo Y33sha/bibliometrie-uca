@@ -10,6 +10,7 @@ from infrastructure.read_models.publications.detail import (
     get_publication_subjects,
 )
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -21,16 +22,6 @@ def _create_sd(conn, pub_id, source="hal", source_id="h1"):
             "VALUES (:src, :sid, 'X', :pid) RETURNING id"
         ),
         {"src": source, "sid": source_id, "pid": pub_id},
-    ).one()
-    return row.id
-
-
-def _create_person(conn):
-    row = conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES ('X', 'Y', 'x', 'y') RETURNING id"
-        )
     ).one()
     return row.id
 
@@ -65,7 +56,7 @@ class TestGetPublicationDetail:
         assert (core.publisher_id, core.publisher_name) == (publisher, "Dykinson")
 
     def test_returns_full_detail(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
         sd = _create_sd(sa_sync_conn, pub, source="hal", source_id="hal-1")
         auth_row = sa_sync_conn.execute(
@@ -232,7 +223,7 @@ class TestGetPublicationDetail:
         ).one()
         lab_id = lab_row.id
 
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn)
         aid = sa_sync_conn.execute(
             text("""

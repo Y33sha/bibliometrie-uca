@@ -21,6 +21,7 @@ from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.structures import refresh_structure_matviews
 
 _AFFILIATIONS = PgAffiliationsQueries()
@@ -38,18 +39,6 @@ def repo(sa_sync_conn):
 
 
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
-
-
-def _create_person(conn, last="Dupont", first="Jean"):
-    row = conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, "
-            "                     last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).one()
-    return row.id
 
 
 def _create_publication(conn, title="Test Article", pub_year=2024):
@@ -178,7 +167,7 @@ class TestExcludeAuthorship:
     (cœur partagé `reject_pair`)."""
 
     def test_rejects_deletes_row_and_detaches_source(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -215,7 +204,7 @@ class TestExcludeAuthorship:
 
     def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -244,8 +233,8 @@ class TestExcludeAuthorship:
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
 
-        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
-        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         a1 = _create_authorship(sa_sync_conn, pub_id, p1)
         a2 = _create_authorship(sa_sync_conn, pub_id, p2)
         _create_source_authorship(
@@ -279,7 +268,7 @@ class TestRejectPair:
     paire détachées, canonique orpheline supprimée, non recréée au rerun."""
 
     def test_detaches_all_sources_of_pair_and_deletes_canonical(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         # Deux sources (hal + openalex) attestent la même paire.
@@ -327,7 +316,7 @@ class TestRejectPair:
 
     def test_not_recreated_on_rerun(self, sa_sync_conn, repo):
         """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         sa_id = _create_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
@@ -351,8 +340,8 @@ class TestRejectPair:
     def test_does_not_touch_other_persons_sources(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
-        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         sa1 = _create_source_authorship(sa_sync_conn, sp_id, author_position=0, person_id=p1)
         sa2 = _create_source_authorship(sa_sync_conn, sp_id, author_position=1, person_id=p2)
 
@@ -380,7 +369,7 @@ class TestDeleteOrphanAuthorships:
     personne qui ne sont attestées par aucune source_authorship active."""
 
     def test_deletes_authorship_without_source(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub_id, person_id)
 
@@ -393,7 +382,7 @@ class TestDeleteOrphanAuthorships:
         assert rows == []
 
     def test_keeps_authorship_with_attesting_source(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -410,13 +399,13 @@ class TestDeleteOrphanAuthorships:
         assert row is not None
 
     def test_returns_zero_when_no_authorships(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         assert delete_orphan_authorships(person_id, repo=repo) == 0
 
     def test_scoped_to_person(self, sa_sync_conn, repo):
         """Ne touche que les authorships de la personne demandée."""
-        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
-        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         pub_id = _create_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub_id, p1)
         pub2 = _create_publication(sa_sync_conn, title="Autre")
@@ -440,7 +429,7 @@ class TestPruneOrphanAuthorships:
     source_authorship n'atteste — inverse d'`insert_missing_authorships`."""
 
     def test_deletes_orphan(self, sa_sync_conn):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub_id, person_id)
 
@@ -450,7 +439,7 @@ class TestPruneOrphanAuthorships:
         assert sa_sync_conn.execute(text("SELECT id FROM authorships")).first() is None
 
     def test_keeps_attested_pair(self, sa_sync_conn):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -473,9 +462,9 @@ class TestPruneOrphanAuthorships:
         une authorship attestée (autre personne, même pub) est préservée."""
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        p_attested = _create_person(sa_sync_conn, "Martin", "Sophie")
-        p_orphan1 = _create_person(sa_sync_conn, "Dupont", "Jean")
-        p_orphan2 = _create_person(sa_sync_conn, "Durand", "Alice")
+        p_attested = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
+        p_orphan1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        p_orphan2 = insert_person(sa_sync_conn, "Durand", first_name="Alice")
 
         a_attested = _create_authorship(sa_sync_conn, pub_id, p_attested)
         _create_source_authorship(
@@ -509,7 +498,7 @@ class TestPropagateAuthorshipAttributes:
         ).one()
 
     def test_is_corresponding_is_bool_or(self, sa_sync_conn):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         aid = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -540,7 +529,7 @@ class TestPropagateAuthorshipAttributes:
         assert self._attrs(sa_sync_conn, aid).is_corresponding is True
 
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         aid = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -635,7 +624,7 @@ class TestPropagateUcaForAddresses:
 
     def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, repo, perimeter_queries):
         uca_id = self._setup_uca(sa_sync_conn)
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
@@ -686,7 +675,7 @@ class TestPropagateUcaForAddresses:
     def test_unsets_in_perimeter_when_address_rejected(self, sa_sync_conn, repo, perimeter_queries):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
         uca_id = self._setup_uca(sa_sync_conn)
-        person_id = _create_person(sa_sync_conn)
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)

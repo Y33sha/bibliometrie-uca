@@ -6,19 +6,7 @@ from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
 _Q = PgPersonNameFormsQueries()
 from tests.integration.helpers.authorships import upsert_identity
-
-
-def _create_person(conn, last="Dupont", first="Jean", exclusion=None):
-    return conn.execute(
-        text("""
-            INSERT INTO persons
-                (last_name, first_name, last_name_normalized, first_name_normalized, exclusion)
-            VALUES (:last, :first, lower(:last), lower(:first),
-                    CAST(:exclusion AS person_exclusion))
-            RETURNING id
-        """),
-        {"last": last, "first": first, "exclusion": exclusion},
-    ).scalar_one()
+from tests.integration.helpers.persons import insert_person
 
 
 def _create_sd(conn):
@@ -81,15 +69,17 @@ def _fetch_pnf_for(conn, person_id):
 class TestFetchPersonsNames:
     def test_includes_excluded(self, sa_sync_conn):
         """Les personnes exclues, pour l'un ou l'autre motif, restent des ancres du matching."""
-        active = _create_person(sa_sync_conn, last="A")
-        not_a_person = _create_person(sa_sync_conn, last="B", exclusion="not_a_person")
-        out_of_perimeter = _create_person(sa_sync_conn, last="C", exclusion="out_of_perimeter")
+        active = insert_person(sa_sync_conn, "A", first_name="Jean")
+        not_a_person = insert_person(sa_sync_conn, "B", first_name="Jean", exclusion="not_a_person")
+        out_of_perimeter = insert_person(
+            sa_sync_conn, "C", first_name="Jean", exclusion="out_of_perimeter"
+        )
 
         ids = [r.id for r in _Q.fetch_persons_names(sa_sync_conn)]
         assert {active, not_a_person, out_of_perimeter} <= set(ids)
 
     def test_trims_names(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn, last="  Dupond", first="Jean  ")
+        pid = insert_person(sa_sync_conn, "  Dupond", first_name="Jean  ")
         rows = _Q.fetch_persons_names(sa_sync_conn)
         row = next(r for r in rows if r.id == pid)
         assert row.last_name == "Dupond"
@@ -100,7 +90,7 @@ class TestSyncFromRawForms:
     def test_inserts_form_from_raw_forms_with_persons_source(self, sa_sync_conn):
         """Une forme `'persons'` poussée en `_raw_forms` apparaît en base
         après sync, avec `sources = ['persons']` et normalisée par SQL."""
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         _Q.insert_raw_forms_batch(
@@ -120,7 +110,7 @@ class TestSyncFromRawForms:
     def test_aggregates_sources_across_authorships_and_persons(self, sa_sync_conn):
         """Une forme observée à la fois en `_raw_forms` (source 'persons')
         et en `source_authorships` (source 'hal') aboutit à `sources` mergé."""
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         sd = _create_sd(sa_sync_conn)
         _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal")
 
@@ -138,7 +128,7 @@ class TestSyncFromRawForms:
     def test_deletes_missing_form(self, sa_sync_conn):
         """Une row en base qui n'est plus attendue (ni dans `_raw_forms`
         ni dans `source_authorships`) est supprimée."""
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         _insert_pnf(sa_sync_conn, "obsolete", pid, ["persons"])
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
@@ -153,7 +143,7 @@ class TestSyncFromRawForms:
     def test_updates_sources_when_changed(self, sa_sync_conn):
         """Une row existante dont `sources` diffère de l'attendu est UPDATE,
         pas DELETE/INSERT (et `updated` est incrémenté)."""
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         sd = _create_sd(sa_sync_conn)
         _create_sa(
             sa_sync_conn,

@@ -9,16 +9,7 @@ from application.services.authorships.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
-
-
-def _person(conn, last="Martin", first="Jean"):
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
+from tests.integration.helpers.persons import insert_person
 
 
 def _orphan_sa(conn):
@@ -59,7 +50,7 @@ def _sa_person(conn, sa_id):
 
 
 def test_attach_pins(sa_sync_conn):
-    pid = _person(sa_sync_conn)
+    pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     sa, _pub = _orphan_sa(sa_sync_conn)
     assign_orphan_authorship(
         pid,
@@ -72,7 +63,7 @@ def test_attach_pins(sa_sync_conn):
 
 
 def test_detach_unpins(sa_sync_conn):
-    pid = _person(sa_sync_conn)
+    pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     sa, pub = _orphan_sa(sa_sync_conn)
     assign_orphan_authorship(
         pid,
@@ -89,7 +80,7 @@ def test_detach_unpins(sa_sync_conn):
 
 def test_name_form_rejection_spares_pinned_signatures(sa_sync_conn):
     """Rejeter une forme de nom détache les signatures qui la portent, sauf celles que l'admin a épinglées sur la personne."""
-    pid = _person(sa_sync_conn, last="Durand", first="Paul")
+    pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
     pinned, _ = _orphan_sa(sa_sync_conn)
     matched, _ = _orphan_sa(sa_sync_conn)
     persons, authorships = person_repository(sa_sync_conn), authorship_repository(sa_sync_conn)
@@ -114,7 +105,7 @@ def test_name_form_rejection_spares_pinned_signatures(sa_sync_conn):
 
 
 def test_enforce_restores_pinned_signature(sa_sync_conn):
-    pid = _person(sa_sync_conn)
+    pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     sa, _pub = _orphan_sa(sa_sync_conn)
     repo = authorship_repository(sa_sync_conn)
     repo.pin_authorships([sa], pid)

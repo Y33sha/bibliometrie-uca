@@ -3,16 +3,7 @@
 from sqlalchemy import text
 
 from interfaces.cli.oneshot.delete_initials_last_name_persons import delete_persons
-
-
-def _person(conn, last: str, first: str) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, normalize_name_form(:l), normalize_name_form(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
+from tests.integration.helpers.persons import insert_person
 
 
 def _exists(conn, person_id: int) -> bool:
@@ -23,8 +14,8 @@ def _exists(conn, person_id: int) -> bool:
 
 
 def test_supprime_la_personne_au_nom_fait_d_initiales(sa_sync_conn):
-    inverted = _person(sa_sync_conn, "P.P.", "Lechalard")
-    regular = _person(sa_sync_conn, "Lechalard", "P.P.")
+    inverted = insert_person(sa_sync_conn, "P.P.", first_name="Lechalard")
+    regular = insert_person(sa_sync_conn, "Lechalard", first_name="P.P.")
 
     assert delete_persons(sa_sync_conn, apply=True) == [inverted]
     assert not _exists(sa_sync_conn, inverted)
@@ -32,7 +23,7 @@ def test_supprime_la_personne_au_nom_fait_d_initiales(sa_sync_conn):
 
 
 def test_epargne_une_personne_a_verdict(sa_sync_conn):
-    pid = _person(sa_sync_conn, "D.", "Lancierini")
+    pid = insert_person(sa_sync_conn, "D.", first_name="Lancierini")
     sa_sync_conn.execute(
         text(
             "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -46,7 +37,7 @@ def test_epargne_une_personne_a_verdict(sa_sync_conn):
 
 
 def test_dry_run_n_ecrit_rien(sa_sync_conn):
-    pid = _person(sa_sync_conn, "G.", "Giuli")
+    pid = insert_person(sa_sync_conn, "G.", first_name="Giuli")
 
     assert delete_persons(sa_sync_conn, apply=False) == [pid]
     assert _exists(sa_sync_conn, pid)

@@ -3,25 +3,10 @@
 L'annuaire et l'autocomplétion appliquent la même règle : prénom et nom se saisissent ensemble, dans n'importe quel ordre, sans tenir compte des accents."""
 
 import pytest
-from sqlalchemy import text
 
 from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.list import list_persons, search_persons
-
-
-def _create_person(conn, last, first):
-    return (
-        conn.execute(
-            text(
-                "INSERT INTO persons "
-                "(last_name, first_name, last_name_normalized, first_name_normalized) "
-                "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-            ),
-            {"l": last, "f": first},
-        )
-        .one()
-        .id
-    )
+from tests.integration.helpers.persons import insert_person
 
 
 def _directory_ids(conn, search):
@@ -38,8 +23,8 @@ def _autocomplete_ids(conn, search):
 @pytest.fixture
 def people(sa_sync_conn):
     return {
-        "legue": _create_person(sa_sync_conn, "Legué", "Valérie"),
-        "martin": _create_person(sa_sync_conn, "Martin", "Valérie"),
+        "legue": insert_person(sa_sync_conn, "Legué", first_name="Valérie"),
+        "martin": insert_person(sa_sync_conn, "Martin", first_name="Valérie"),
     }
 
 
