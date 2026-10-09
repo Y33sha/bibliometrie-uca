@@ -27,6 +27,7 @@ from sqlalchemy import text
 from domain.journals.series import ContainerLevel, container_level, series_key
 from domain.source_publications.doc_types import map_doc_type
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.sql_fragments import has_active_issn
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("audit_container_levels", os.path.dirname(__file__))
@@ -34,9 +35,9 @@ log = setup_logger("audit_container_levels", os.path.dirname(__file__))
 _PLATFORM_TYPES = frozenset({"repository", "preprint_server", "ebook_platform", "media"})
 _MONOGRAPH_DOC_TYPES = frozenset({"book", "book_chapter", "conference_paper"})
 
-_JOURNALS = text("""
+_JOURNALS = text(f"""
     SELECT j.id, j.title, j.journal_type::text AS journal_type, j.publisher_id, j.pub_count,
-           (j.issn IS NOT NULL OR j.eissn IS NOT NULL OR j.issnl IS NOT NULL) AS has_issn,
+           {has_active_issn("j.id")} AS has_issn,
            array_remove(array_agg(s.source::text), NULL) AS sources,
            array_remove(array_agg(coalesce(s.raw_metadata->'doc_type'->>'raw', s.doc_type)), NULL)
                AS raw_types
