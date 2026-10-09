@@ -8,8 +8,6 @@ from unittest.mock import patch
 
 from application.pipeline.publications import phase
 
-_LOG = logging.getLogger("test")
-
 
 class _FakeQueries:
     """Enregistre l'ordre des appels ; rend les volumes fixés à la construction."""
@@ -28,7 +26,7 @@ class _FakeQueries:
         return self._total
 
 
-def _run(open_tx, *, supprimees: int, total: int = 40):
+def _run(contexte, *, supprimees: int, total: int = 40):
     appels: list[str] = []
     queries = _FakeQueries(appels, supprimees=supprimees, total=total)
     with patch.object(
@@ -36,31 +34,33 @@ def _run(open_tx, *, supprimees: int, total: int = 40):
         "reconcile_run",
         side_effect=lambda *args, **kwargs: appels.append("réconciliation"),
     ):
-        rendu = phase.run(open_tx, queries, _LOG, publication_repo_factory=lambda conn: object())
+        rendu = phase.PublicationsPhase(
+            queries, publication_repo_factory=lambda conn: object()
+        ).run(contexte())
     return rendu, appels
 
 
-def test_la_suppression_suit_la_reconciliation_et_precede_le_decompte(open_tx):
-    _, appels = _run(open_tx, supprimees=2)
+def test_la_suppression_suit_la_reconciliation_et_precede_le_decompte(contexte):
+    _, appels = _run(contexte, supprimees=2)
 
     assert appels == ["réconciliation", "suppression", "décompte"]
 
 
-def test_le_total_est_compte_apres_la_suppression(open_tx):
-    rendu, _ = _run(open_tx, supprimees=2, total=40)
+def test_le_total_est_compte_apres_la_suppression(contexte):
+    rendu, _ = _run(contexte, supprimees=2, total=40)
 
     assert rendu.details["summary"]["pub_total"] == 40
 
 
-def test_le_journal_compte_les_publications_supprimees(open_tx, caplog):
+def test_le_journal_compte_les_publications_supprimees(contexte, caplog):
     with caplog.at_level(logging.INFO):
-        _run(open_tx, supprimees=2)
+        _run(contexte, supprimees=2)
 
     assert "2 publications supprimées" in caplog.text
 
 
-def test_sans_publication_a_supprimer_le_journal_se_tait(open_tx, caplog):
+def test_sans_publication_a_supprimer_le_journal_se_tait(contexte, caplog):
     with caplog.at_level(logging.INFO):
-        _run(open_tx, supprimees=0)
+        _run(contexte, supprimees=0)
 
     assert "Publications sans source" not in caplog.text

@@ -436,19 +436,16 @@ def phase_publications(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
-    from application.pipeline.publications.phase import run
+    from application.pipeline.publications.phase import PublicationsPhase
     from infrastructure.pipeline.publications.reconciliation import (
         PgPublicationsReconciliationQueries,
     )
     from infrastructure.repositories import publication_repository
 
-    return run(
-        open_tx,
+    return PublicationsPhase(
         PgPublicationsReconciliationQueries(),
-        log,
         publication_repo_factory=publication_repository,
-        rebuild_publications=options.rebuild_publications,
-    )
+    ).run(_context(options))
 
 
 def phase_relations(options: RunOptions) -> PhaseMetrics:
