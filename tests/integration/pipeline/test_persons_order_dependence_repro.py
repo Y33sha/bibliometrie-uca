@@ -121,7 +121,7 @@ def _run_phase(conn):
     """Run complet de la phase personnes : rattachement/création, peuplement des formes, purge.
 
     Le peuplement est simulé (`populate` committe, incompatible avec le rollback de la fixture),
-    la purge appelée directement — l'ordre reproduit `phase_persons`."""
+    la purge appelée directement — l'ordre reproduit `PersonsPhase`."""
     _run_create(conn)
     _populate_canonical_forms(conn)
     purge(conn, PgPersonsMatchingQueries(), _LOG)

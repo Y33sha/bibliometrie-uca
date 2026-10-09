@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 from contextlib import nullcontext
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
@@ -35,6 +36,11 @@ def _args(**surcharges) -> argparse.Namespace:
         "normalize_full": False,
     }
     return argparse.Namespace(**{**base, **surcharges})
+
+
+def _phase(run):
+    """Fonction `build` d'une phase dont `run(ctx)` est `run`."""
+    return lambda: SimpleNamespace(run=run)
 
 
 class _FakeRecorder:
@@ -100,15 +106,15 @@ def _masquant(origine: BaseException) -> PendingRollbackError:
 
 
 class TestRunOnePhase:
-    def _executer(self, fn, recorder=None, args=None):
+    def _executer(self, run, recorder=None, args=None):
         recorder = recorder or _FakeRecorder()
         resultat = run_pipeline._run_one_phase(
-            "persons", fn, args=args or _args(), sources={"hal"}, recorder=recorder
+            "persons", _phase(run), args=args or _args(), sources={"hal"}, recorder=recorder
         )
         return resultat, recorder
 
     def test_phase_reussie_consignee(self):
-        (nom, duree), recorder = self._executer(lambda options: PhaseMetrics(new=3))
+        (nom, duree), recorder = self._executer(lambda ctx: PhaseMetrics(new=3))
 
         assert nom == "persons"
         assert duree >= 0
@@ -120,20 +126,20 @@ class TestRunOnePhase:
         metrics = PhaseMetrics()
         metrics.signals.append({"level": "warning", "code": "source_unconfigured", "message": ""})
 
-        _, recorder = self._executer(lambda options: metrics)
+        _, recorder = self._executer(lambda ctx: metrics)
 
         assert recorder.records[0]["status"] == "warning"
 
     def test_phase_sans_metriques(self):
         """Une phase qui ne rend rien est consignée avec des compteurs vides, non ignorée."""
-        _, recorder = self._executer(lambda options: None)
+        _, recorder = self._executer(lambda ctx: None)
 
         assert recorder.records[0]["status"] == "ok"
 
     def test_interruption_utilisateur(self, caplog):
         """L'arrêt demandé est un avertissement, non une erreur, et dit par où reprendre."""
 
-        def _interrompue(options):
+        def _interrompue(ctx):
             raise KeyboardInterrupt
 
         with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
@@ -145,7 +151,7 @@ class TestRunOnePhase:
     def test_interruption_masquee_par_le_nettoyage(self):
         """Un Ctrl+C en pleine requête invalide la connexion, et le nettoyage lève une erreur SQLAlchemy à la place : la phase se consigne quand même comme interrompue."""
 
-        def _interrompue(options):
+        def _interrompue(ctx):
             raise _masquant(KeyboardInterrupt())
 
         recorder = _FakeRecorder()
@@ -160,7 +166,7 @@ class TestRunOnePhase:
     def test_echec_consigne_avec_son_erreur_d_origine(self):
         """L'erreur levée par le nettoyage masque celle d'origine : le message consigné donne les deux."""
 
-        def _en_echec(options):
+        def _en_echec(ctx):
             raise _masquant(ValueError("colonne inconnue"))
 
         recorder = _FakeRecorder()
@@ -173,7 +179,7 @@ class TestRunOnePhase:
         assert "PendingRollbackError" in message
 
     def test_echec_de_phase(self, caplog):
-        def _en_echec(options):
+        def _en_echec(ctx):
             raise RuntimeError("la source est à bout de budget")
 
         recorder = _FakeRecorder()
@@ -189,7 +195,7 @@ class TestRunOnePhase:
     def test_perte_de_la_base_consignee_comme_un_echec(self, caplog):
         """Un serveur redémarré coupe les connexions : la phase se consigne et dit par où reprendre, au lieu d'une trace d'appels."""
 
-        def _connexion_perdue(options):
+        def _connexion_perdue(ctx):
             raise OperationalError("SELECT 1", {}, Exception("server closed the connection"))
 
         recorder = _FakeRecorder()
@@ -205,7 +211,7 @@ class TestRunOnePhase:
         recus: dict = {}
 
         self._executer(
-            lambda options: recus.update(options=options) or PhaseMetrics(),
+            lambda ctx: recus.update(options=ctx.options) or PhaseMetrics(),
             args=_args(mode="daily", year=2024, include_wos=True),
         )
 
@@ -235,8 +241,8 @@ class TestExecutePhases:
 
     def test_chaque_phase_consignee_et_journal_clos(self, run_prepare):
         phases = [
-            ("une", lambda options: PhaseMetrics()),
-            ("deux", lambda options: PhaseMetrics()),
+            ("une", _phase(lambda ctx: PhaseMetrics())),
+            ("deux", _phase(lambda ctx: PhaseMetrics())),
         ]
 
         run_pipeline._execute_phases(_args(), phases)

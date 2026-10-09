@@ -19,9 +19,10 @@ SOURCES = ["hal", "openalex", "wos", "scanr", "theses"]
 _SCRIPT = """
 import sys
 
-import interfaces.cli.run_pipeline as run_pipeline
+import interfaces.cli.run_pipeline
+from interfaces.cli.phases import extract
 
-registry = run_pipeline._extractors()
+registry = extract._extractors()
 print(",".join(sorted(m for m in sys.modules if "{marqueur}" in m)))
 """
 

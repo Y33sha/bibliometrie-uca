@@ -8,9 +8,11 @@ la phase `oa_status` s'en sert comme garde d'entrée.
 import logging
 from unittest.mock import AsyncMock, patch
 
+from application.pipeline.context import RunOptions
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
-from interfaces.cli import run_pipeline
+from interfaces.cli.phases import oa_status
+from interfaces.cli.phases.execution import phase_context
 
 _RUN_ENRICH = "application.pipeline.oa_status.phase._verifier"
 _LOG = logging.getLogger("test")
@@ -60,7 +62,7 @@ def test_phase_oa_status_skips_without_email():
         ),
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
     ):
-        metrics = run_pipeline.phase_oa_status(run_pipeline.RunOptions())
+        metrics = oa_status.build().run(phase_context(RunOptions()))
 
     run_step.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
@@ -74,7 +76,7 @@ def test_phase_oa_status_runs_with_email():
         patch("infrastructure.repositories.publication_repository"),
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
-        metrics = run_pipeline.phase_oa_status(run_pipeline.RunOptions())
+        metrics = oa_status.build().run(phase_context(RunOptions()))
 
     run_step.assert_called_once()
     assert metrics.new == 4
