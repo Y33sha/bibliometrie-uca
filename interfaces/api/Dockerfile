@@ -13,7 +13,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 RUN pip install --no-cache-dir uv
 
 # Les versions viennent de `uv.lock`, comme l'intégration et l'image de production.
-# `--extra dev` ajoute pytest, ruff et mypy, pour lancer les contrôles dans le conteneur.
+# Le groupe `dev`, installé par défaut, ajoute pytest, ruff et mypy, pour lancer les contrôles dans le conteneur.
 # Le code applicatif copié ici est recouvert par le montage de la composition.
 COPY pyproject.toml uv.lock ./
 COPY application/     ./application/
@@ -21,7 +21,7 @@ COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
 
-RUN uv sync --frozen --extra dev
+RUN uv sync --frozen
 
 EXPOSE 8000
 

@@ -29,7 +29,8 @@ dependencies = [
 # Orchestrateur du pipeline, installé comme commande : `run_pipeline --mode daily`.
 run_pipeline = "interfaces.cli.run_pipeline:main"
 
-[project.optional-dependencies]
+# Outils de développement et de test. `uv sync` les installe par défaut ; `--no-dev` les écarte.
+[dependency-groups]
 dev = [
     "pytest==9.1.1",           # CVE-2025-71176 fixed
     "pytest-asyncio==1.4.0",   # tests des extractions HTTP async du pipeline
@@ -53,7 +54,7 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*"]
 
 # ----------------------------------------------------------------------
 # deptry : détection de dépendances manquantes / inutiles / transitives
-# Lit [project.dependencies] (PEP 621) et [project.optional-dependencies.dev].
+# Lit [project.dependencies] (PEP 621) et [dependency-groups] (PEP 735).
 # ----------------------------------------------------------------------
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces"]
@@ -61,9 +62,6 @@ known_first_party = ["application", "domain", "infrastructure", "interfaces"]
 # développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
 # hors du dépôt.
 extend_exclude = ["frontend", ".venv", "venv", "scripts", "data"]
-# Le groupe `dev` de [project.optional-dependencies] est pour les outils
-# de dev/test — deptry ne doit pas exiger qu'ils soient importés.
-optional_dependencies_dev_groups = ["dev"]
 
 # ----------------------------------------------------------------------
 # import-linter : vérifie les règles de dépendance entre couches DDD.
