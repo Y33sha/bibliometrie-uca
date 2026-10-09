@@ -1,8 +1,9 @@
 """Semis de publications pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
+from tests.integration.helpers.rows import insert_row
 
 
 def insert_publication(
@@ -22,31 +23,21 @@ def insert_publication(
 
     `title_normalized` vaut par défaut le titre normalisé. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma.
     """
-    values: dict[str, object] = {
-        "title": title,
-        "title_normalized": title_normalized
-        if title_normalized is not None
-        else normalize_text(title),
-        "pub_year": pub_year,
-        "doc_type": doc_type,
-    }
-    casts = {"doc_type": "doc_type", "oa_status": "oa_type", "sources": "source_type[]"}
-    optional = {
-        "doi": doi,
-        "oa_status": oa_status,
-        "journal_id": journal_id,
-        "sources": sources,
-        "in_perimeter": in_perimeter,
-    }
-    values |= {column: value for column, value in optional.items() if value is not None}
-    placeholders = [
-        f"CAST(:{column} AS {casts[column]})" if column in casts else f":{column}"
-        for column in values
-    ]
-    return conn.execute(
-        text(
-            f"INSERT INTO publications ({', '.join(values)}) "
-            f"VALUES ({', '.join(placeholders)}) RETURNING id"
-        ),
-        values,
-    ).scalar_one()
+    return insert_row(
+        conn,
+        "publications",
+        {
+            "title": title,
+            "title_normalized": (
+                title_normalized if title_normalized is not None else normalize_text(title)
+            ),
+            "pub_year": pub_year,
+            "doc_type": doc_type,
+            "doi": doi,
+            "oa_status": oa_status,
+            "journal_id": journal_id,
+            "sources": sources,
+            "in_perimeter": in_perimeter,
+        },
+        {"doc_type": "doc_type", "oa_status": "oa_type", "sources": "source_type[]"},
+    )

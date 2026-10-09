@@ -1,7 +1,5 @@
 """La cascade personnes ignore les identifiants qu'une signature neutralise, et la requalification réécrit les neutralisations `misplaced`."""
 
-import json
-
 from sqlalchemy import text
 
 from application.ports.pipeline.persons.matching import MisplacedNeutralizations
@@ -9,6 +7,8 @@ from domain.persons.matching import ResolutionMode
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _ORCID = "0000-0001-2345-6789"
 
@@ -23,40 +23,22 @@ def _signature(
     resolution_mode=None,
 ):
     """Signature crossref du périmètre portant un ORCID et la carte `neutralized`. Retourne `(signature, identité)`."""
-    pub = conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES ('X', 'x', 2024, 'article') RETURNING id"
-        )
-    ).scalar_one()
-    sd = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES ('crossref', :sid, 'X', :p) RETURNING id"
-        ),
-        {"sid": source_id, "p": pub},
-    ).scalar_one()
-    identity_id = upsert_identity(
-        conn, author_name_normalized=name, person_identifiers={"orcid": _ORCID}
+    sd = insert_source_publication(
+        conn, insert_publication(conn), source="crossref", source_id=source_id
     )
-    signature_id = conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position, in_perimeter, raw_author_name,
-                 identity_id, neutralized_identifiers, person_id, resolution_mode)
-            VALUES ('crossref', :sd, 0, TRUE, 'Jean Neutralisation', :iid, CAST(:neu AS jsonb),
-                    :pid, CAST(:mode AS resolution_mode))
-            RETURNING id
-        """),
-        {
-            "sd": sd,
-            "iid": identity_id,
-            "neu": json.dumps(neutralized) if neutralized else None,
-            "pid": person_id,
-            "mode": resolution_mode,
-        },
-    ).scalar_one()
-    return signature_id, identity_id
+    signature_id = insert_signature(
+        conn,
+        sd,
+        source="crossref",
+        raw_author_name="Jean Neutralisation",
+        author_name_normalized=name,
+        person_identifiers={"orcid": _ORCID},
+        person_id=person_id,
+        in_perimeter=True,
+        resolution_mode=resolution_mode,
+        neutralized_identifiers=neutralized,
+    )
+    return signature_id, upsert_identity(conn, name, {"orcid": _ORCID})
 
 
 def _carte(conn, signature_id):

@@ -4,88 +4,51 @@ from sqlalchemy import text
 
 from application.ports.read_models.authorships_queries import OrphanFilters
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.structures import add_source_authorship_structure
-
-
-def _create_sd(conn, pub_id, source="hal", source_id="h1"):
-    return conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES (:src, :sid, 'X', :pid) RETURNING id"
-        ),
-        {"src": source, "sid": source_id, "pid": pub_id},
-    ).scalar_one()
-
-
-def _create_sa(
-    conn,
-    sd,
-    *,
-    source="hal",
-    author_position=0,
-    person_id=None,
-    in_perimeter=True,
-    raw_author_name="X",
-    raw_last_name=None,
-    raw_first_name=None,
-    roles=None,
-):
-    identity_id = upsert_identity(conn, author_name_normalized=None)
-    return conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position,
-                 person_id, in_perimeter, identity_id, raw_author_name, raw_last_name,
-                 raw_first_name, roles)
-            VALUES (:src, :sd, :pos, :pid, :inp, :iid, :raw, :last, :first,
-                    COALESCE(:roles, ARRAY['author']::text[]))
-            RETURNING id
-        """),
-        {
-            "src": source,
-            "sd": sd,
-            "pos": author_position,
-            "pid": person_id,
-            "inp": in_perimeter,
-            "iid": identity_id,
-            "raw": raw_author_name,
-            "last": raw_last_name,
-            "first": raw_first_name,
-            "roles": roles,
-        },
-    ).scalar_one()
 
 
 class TestOrphanAuthorshipsCount:
     def test_counts_orphans(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, author_position=0, person_id=None)  # orpheline
+        sd = insert_source_publication(sa_sync_conn, pub)
+        insert_signature(
+            sa_sync_conn, sd, author_position=0, person_id=None, in_perimeter=True
+        )  # orpheline
         pid = insert_person(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, author_position=1, person_id=pid)  # attribuée
+        insert_signature(
+            sa_sync_conn, sd, author_position=1, person_id=pid, in_perimeter=True
+        )  # attribuée
 
         assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total >= 1
 
     def test_excludes_out_of_perimeter(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, person_id=None, in_perimeter=False)
+        sd = insert_source_publication(sa_sync_conn, pub)
+        insert_signature(sa_sync_conn, sd, person_id=None, in_perimeter=False)
         assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total == 0
 
     def test_excludes_non_author_roles(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, source="theses", source_id="t1")
-        _create_sa(sa_sync_conn, sd, source="theses", person_id=None, roles=["thesis_director"])
-        _create_sa(
+        sd = insert_source_publication(sa_sync_conn, pub, source="theses", source_id="t1")
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            source="theses",
+            person_id=None,
+            roles=["thesis_director"],
+            in_perimeter=True,
+        )
+        insert_signature(
             sa_sync_conn,
             sd,
             source="theses",
             author_position=1,
             person_id=None,
             roles=["jury_member"],
+            in_perimeter=True,
         )
         assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total == 0
 
@@ -99,21 +62,24 @@ def _list(conn, **filters):
 class TestListOrphanAuthorships:
     def test_lists_orphan_authorships(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        sa = _create_sa(sa_sync_conn, sd, person_id=None, raw_author_name="Dupond Jean")
+        sd = insert_source_publication(sa_sync_conn, pub)
+        sa = insert_signature(
+            sa_sync_conn, sd, person_id=None, raw_author_name="Dupond Jean", in_perimeter=True
+        )
 
         res = _list(sa_sync_conn)
         assert res.total >= 1
         assert any(a.source_authorship_id == sa for a in res.authorships)
 
     def test_nom_et_prenom_separes_par_la_source(self, sa_sync_conn):
-        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
-        sa = _create_sa(
+        sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
+        sa = insert_signature(
             sa_sync_conn,
             sd,
             raw_author_name=None,
             raw_last_name="Caldefie Chezet",
             raw_first_name="Zorphine",
+            in_perimeter=True,
         )
 
         res = _list(sa_sync_conn, search="zorphine caldefie")
@@ -126,11 +92,23 @@ class TestListOrphanAuthorships:
 
     def test_filters_by_search(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        sa_match = _create_sa(
-            sa_sync_conn, sd, author_position=0, person_id=None, raw_author_name="SpecialName"
+        sd = insert_source_publication(sa_sync_conn, pub)
+        sa_match = insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=0,
+            person_id=None,
+            raw_author_name="SpecialName",
+            in_perimeter=True,
         )
-        _create_sa(sa_sync_conn, sd, author_position=1, person_id=None, raw_author_name="Autre")
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=1,
+            person_id=None,
+            raw_author_name="Autre",
+            in_perimeter=True,
+        )
 
         res = _list(sa_sync_conn, search="Special")
         assert sa_match in [a.source_authorship_id for a in res.authorships]
@@ -151,10 +129,16 @@ class TestListOrphanAuthorships:
                 ("ORPH-TEAM", "EQ", "equipe"),
             )
         )
-        sd = _create_sd(conn, insert_publication(conn))
-        sa = _create_sa(conn, sd, author_position=0, raw_author_name="Zzorph Avec")
-        other = _create_sa(conn, sd, author_position=1, raw_author_name="Zzorph Autre")
-        none = _create_sa(conn, sd, author_position=2, raw_author_name="Zzorph Sans")
+        sd = insert_source_publication(conn, insert_publication(conn))
+        sa = insert_signature(
+            conn, sd, author_position=0, raw_author_name="Zzorph Avec", in_perimeter=True
+        )
+        other = insert_signature(
+            conn, sd, author_position=1, raw_author_name="Zzorph Autre", in_perimeter=True
+        )
+        none = insert_signature(
+            conn, sd, author_position=2, raw_author_name="Zzorph Sans", in_perimeter=True
+        )
         add_source_authorship_structure(conn, sa, lab)
         add_source_authorship_structure(conn, sa, team)
         add_source_authorship_structure(conn, other, other_lab)

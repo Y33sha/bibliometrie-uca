@@ -1,12 +1,11 @@
 """Purge des attributions d'identifiant automatiques qu'aucune signature de leur personne ne porte."""
 
-import json
-
 from sqlalchemy import text
 
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _ORCID = "0000-0001-2345-6789"
 
@@ -22,31 +21,18 @@ def _attribution(conn, person_id, *, status="pending", source="auto"):
 
 
 def _signature(conn, person_id, name, *, neutralized=None):
-    pub = conn.execute(
-        text("INSERT INTO publications (title, pub_year) VALUES ('t', 2024) RETURNING id")
-    ).scalar_one()
-    sp = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES ('hal', :sid, 't', :p) RETURNING id"
-        ),
-        {"sid": f"hal-{pub}", "p": pub},
-    ).scalar_one()
-    identity = upsert_identity(conn, name, {"orcid": _ORCID})
-    conn.execute(
-        text(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id, resolution_mode, "
-            "neutralized_identifiers) "
-            "VALUES ('hal', :sp, 0, :pid, TRUE, :raw, :iid, 'name', CAST(:neu AS jsonb))"
-        ),
-        {
-            "sp": sp,
-            "pid": person_id,
-            "raw": name,
-            "iid": identity,
-            "neu": json.dumps(neutralized) if neutralized else None,
-        },
+    pub = insert_publication(conn, "t")
+    sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
+    insert_signature(
+        conn,
+        sp,
+        raw_author_name=name,
+        author_name_normalized=name,
+        person_identifiers={"orcid": _ORCID},
+        person_id=person_id,
+        in_perimeter=True,
+        resolution_mode="name",
+        neutralized_identifiers=neutralized,
     )
 
 

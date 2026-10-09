@@ -12,18 +12,8 @@ from infrastructure.read_models.publications.detail import (
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure
-
-
-def _create_sd(conn, pub_id, source="hal", source_id="h1"):
-    row = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES (:src, :sid, 'X', :pid) RETURNING id"
-        ),
-        {"src": source, "sid": source_id, "pid": pub_id},
-    ).one()
-    return row.id
 
 
 class TestGetPublicationDetail:
@@ -58,7 +48,7 @@ class TestGetPublicationDetail:
     def test_returns_full_detail(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
-        sd = _create_sd(sa_sync_conn, pub, source="hal", source_id="hal-1")
+        sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
         auth_row = sa_sync_conn.execute(
             text(
                 "INSERT INTO authorships (publication_id, person_id) "
@@ -90,7 +80,7 @@ class TestGetPublicationDetail:
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
         # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
         pub = insert_publication(sa_sync_conn, doi="10.9001/set")
-        _create_sd(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
+        insert_source_publication(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
         for source_id, corrected_by in (
             ("oa-piece", "DATACITE_PACKAGE_PIECE"),
             ("oa-chapter", "OUVRAGE_VS_CHAPITRE"),
@@ -172,7 +162,7 @@ class TestGetPublicationDetail:
         """
         pub = insert_publication(sa_sync_conn, title="Multi-OA")
         # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
-        sd_old = _create_sd(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
+        sd_old = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET created_at = '2026-01-01'::timestamptz "
@@ -189,7 +179,7 @@ class TestGetPublicationDetail:
             {"sd": sd_old, "iid": upsert_identity(sa_sync_conn)},
         )
         # Row OpenAlex la plus récente, avec 1 auteur "Bob"
-        sd_new = _create_sd(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
+        sd_new = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET created_at = '2026-05-01'::timestamptz "
