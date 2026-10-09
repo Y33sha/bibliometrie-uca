@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Les phases du pipeline n'ont pas de contrat commun. Chaque `run` de `application/pipeline/<phase>/` a sa propre signature : fabrique de transactions ou connexion, ports ou callables, synchrone ou asynchrone. `interfaces/cli/run_pipeline.py` câble toutes les phases. Une trentaine de fonctions y répètent la même séquence : connexion, circuit breaker, source indisponible, commit. Certaines contiennent de la logique applicative, comme la fusion des revues en double.
+Les phases du pipeline n'ont pas de contrat commun. Chaque `run` de `application/pipeline/<phase>/` a sa propre signature : fabrique de transactions ou connexion, ports ou callables, synchrone ou asynchrone. `interfaces/cli/run_pipeline.py` câble toutes les phases. Une trentaine de fonctions y répètent la même séquence : connexion, circuit breaker, source indisponible, commit. Certaines contiennent de la logique applicative, comme la décision de sauter l'import du DOAJ quand le dernier import est récent.
 
 Plusieurs tables ont plusieurs écrivains : sept phases écrivent `publications`, cinq écrivent `source_authorships`, six endroits écrivent les colonnes de pays.
 
