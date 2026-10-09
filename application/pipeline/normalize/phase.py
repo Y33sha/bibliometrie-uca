@@ -12,15 +12,17 @@ Sans document traité ni retiré, la phase s'arrête après l'étape 2.
 Les runners par source, la suppression, le nettoyage et le VACUUM (maintenance physique) sont injectés par le composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
 """
 
-import logging
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import cast
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
 from application.pipeline.progression import attente
+from domain.sources.registry import ALL_SOURCES_SET
 
 NormalizeOne = Callable[[str], dict[str, object]]
 """Normalise une source (connexion + normaliseur câblé) et rend sa ligne d'observabilité."""
@@ -28,45 +30,47 @@ VacuumStaging = Callable[[bool], None]
 """`VACUUM` du staging (maintenance physique, autocommit) ; `full=True` réécrit la table."""
 
 
-def run(
-    *,
-    sources: set[str],
-    mode: str,
-    ordered_sources: list[str],
-    normalize_one: NormalizeOne,
-    prune_disappeared: Callable[[], int],
-    cleanup_orphan_identities: Callable[[], None],
-    vacuum_staging: VacuumStaging,
-    logger: logging.Logger,
-) -> PhaseMetrics:
-    """Normalise les sources retenues (dans l'ordre de priorité), retire les documents disparus, nettoie puis VACUUM le staging."""
-    etape(logger, "Normalisation")
-    rows = [normalize_one(source) for source in ordered_sources if source in sources]
+@dataclass(frozen=True)
+class NormalizePhase:
+    """`ordered_sources` liste les sources dans l'ordre de priorité ; le run normalise celles de ses options, toutes quand il n'en restreint aucune."""
 
-    disparues = prune_disappeared()
+    ordered_sources: list[str]
+    normalize_one: NormalizeOne
+    prune_disappeared: Callable[[], int]
+    cleanup_orphan_identities: Callable[[], None]
+    vacuum_staging: VacuumStaging
 
-    if not disparues and not any(_a_traite(row) for row in rows):
-        rien_a_faire(logger)
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Normalise les sources retenues (dans l'ordre de priorité), retire les documents disparus, nettoie puis VACUUM le staging."""
+        logger = ctx.logger
+        sources = ctx.options.sources if ctx.options.sources is not None else ALL_SOURCES_SET
+        etape(logger, "Normalisation")
+        rows = [self.normalize_one(source) for source in self.ordered_sources if source in sources]
+
+        disparues = self.prune_disappeared()
+
+        if not disparues and not any(_a_traite(row) for row in rows):
+            rien_a_faire(logger)
+            metrics = PhaseMetrics()
+            metrics.resume = ""
+            metrics.details["table"] = {"rows": rows}
+            metrics.details["disappeared_pruned"] = 0
+            return metrics
+
+        etape(logger, "Maintenance des tables")
+        t0 = time.perf_counter()
+        with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
+            self.cleanup_orphan_identities()
+            self.vacuum_staging(MODES[ctx.options.mode].vacuum_full)
+            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+
         metrics = PhaseMetrics()
-        metrics.resume = ""
+        normalises = sum(cast("int", row["processed"]) for row in rows)
+        metrics.add(total=normalises)
+        metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
         metrics.details["table"] = {"rows": rows}
-        metrics.details["disappeared_pruned"] = 0
+        metrics.details["disappeared_pruned"] = disparues
         return metrics
-
-    etape(logger, "Maintenance des tables")
-    t0 = time.perf_counter()
-    with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
-        cleanup_orphan_identities()
-        vacuum_staging(MODES[mode].vacuum_full)
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
-
-    metrics = PhaseMetrics()
-    normalises = sum(cast("int", row["processed"]) for row in rows)
-    metrics.add(total=normalises)
-    metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
-    metrics.details["table"] = {"rows": rows}
-    metrics.details["disappeared_pruned"] = disparues
-    return metrics
 
 
 def _a_traite(row: dict[str, object]) -> bool:
