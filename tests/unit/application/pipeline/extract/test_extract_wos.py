@@ -20,6 +20,7 @@ from application.pipeline.progression import Progression
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractConfig
+from tests.helpers.extractors import extracteur
 
 _LOGGER = logging.getLogger("test")
 
@@ -114,12 +115,6 @@ def _config(**surcharges) -> WosExtractConfig:
     return WosExtractConfig(**valeurs)
 
 
-def _extracteur(adapter: MagicMock, config: WosExtractConfig, annees: list[int]):
-    adapter.load_config.return_value = config
-    adapter.get_years.return_value = annees
-    return WosExtractor(MagicMock(), _LOGGER, adapter)
-
-
 def _args(**surcharges) -> argparse.Namespace:
     valeurs: dict = {"year": None, "start_year": None}
     valeurs.update(surcharges)
@@ -129,7 +124,7 @@ def _args(**surcharges) -> argparse.Namespace:
 def test_run_parcourt_les_annees_de_la_configuration():
     adapter = _adapter([_records(1), _records(1)], total=1)
     adapter.fetch_page.side_effect = [{"page": i} for i in range(4)]
-    metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args())
+    metrics = extracteur(WosExtractor, adapter, _config(), [2023, 2024]).run(_args())
     assert metrics.new == 2
 
 
@@ -137,7 +132,7 @@ def test_run_isole_l_echec_d_une_annee():
     """Une année qui lève laisse la suivante s'exécuter."""
     adapter = _adapter([_records(1)], total=1)
     adapter.fetch_page.side_effect = [RuntimeError("API en panne"), {"page": 0}, {"page": 1}]
-    metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args())
+    metrics = extracteur(WosExtractor, adapter, _config(), [2023, 2024]).run(_args())
     assert metrics.new == 1
 
 
@@ -145,26 +140,31 @@ def test_run_survit_a_un_comptage_impossible():
     """Un comptage qui lève compte l'année pour zéro : son extraction s'exécute quand même."""
     adapter = _adapter([_records(1)], total=1)
     adapter.count.side_effect = RuntimeError("API en panne")
-    metrics = _extracteur(adapter, _config(), [2024]).run(_args())
+    metrics = extracteur(WosExtractor, adapter, _config(), [2024]).run(_args())
     assert metrics.new == 1
 
 
 def test_run_survit_a_un_quota_illisible():
     adapter = _adapter([], total=0)
     adapter.check_quota.side_effect = RuntimeError("service indisponible")
-    metrics = _extracteur(adapter, _config(), [2024]).run(_args())
+    metrics = extracteur(WosExtractor, adapter, _config(), [2024]).run(_args())
     assert metrics.total == 0
 
 
 def test_run_sans_affiliation_refuse():
     with pytest.raises(ExtractionConfigError, match="aucune affiliation"):
-        _extracteur(_adapter([], total=0), _config(affiliations=[]), [2024]).run(_args())
+        extracteur(WosExtractor, _adapter([], total=0), _config(affiliations=[]), [2024]).run(
+            _args()
+        )
 
 
 def test_run_sans_cle_api_refuse():
     with pytest.raises(ExtractionConfigError, match="clé API"):
-        _extracteur(
-            _adapter([], total=0), _config(credentials_missing="clé API WoS absente"), []
+        extracteur(
+            WosExtractor,
+            _adapter([], total=0),
+            _config(credentials_missing="clé API WoS absente"),
+            [],
         ).run(_args())
 
 
@@ -174,7 +174,7 @@ def test_run_s_arrete_quand_la_source_devient_indisponible(monkeypatch):
     monkeypatch.setattr(extract_wos.time, "sleep", pauses.append)
     adapter = _adapter([_records(1)], total=1)
     adapter.fetch_page.side_effect = [{"page": 0}, SourceUnavailableError("wos")]
-    metrics = _extracteur(adapter, _config(), [2023, 2024, 2025]).run(_args())
+    metrics = extracteur(WosExtractor, adapter, _config(), [2023, 2024, 2025]).run(_args())
     assert metrics.new == 1
     assert adapter.fetch_page.call_count == 2
     # Une seule pause, entre 2023 et 2024.
@@ -185,7 +185,7 @@ def test_run_s_arrete_quand_le_comptage_trouve_la_source_indisponible():
     adapter = _adapter([], total=0)
     adapter.count.side_effect = SourceUnavailableError("wos")
     with pytest.raises(SourceUnavailableError):
-        _extracteur(adapter, _config(), [2023, 2024]).run(_args())
+        extracteur(WosExtractor, adapter, _config(), [2023, 2024]).run(_args())
     assert adapter.count.call_count == 1
     assert adapter.fetch_page.call_count == 0
 
@@ -194,6 +194,8 @@ def test_run_s_arrete_quand_la_source_est_a_bout():
     adapter = _adapter([], total=0)
     breaker = MagicMock()
     breaker.tripped = True
-    metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args(), breaker=breaker)
+    metrics = extracteur(WosExtractor, adapter, _config(), [2023, 2024]).run(
+        _args(), breaker=breaker
+    )
     assert metrics.total == 0
     assert adapter.fetch_page.call_count == 0

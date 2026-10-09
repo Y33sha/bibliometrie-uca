@@ -50,7 +50,7 @@ Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_ru
 
 ### Phase 3 — Tests des extracteurs
 
-- [ ] `_config`, `_avancement`, `_page`, `_extracteur`.
+- [x] `_extracteur` (OpenAlex, ScanR, WoS) : `tests/helpers/extractors.extracteur`. `_page` et `_config` construisent la réponse et la configuration propres à chaque source. `_avancement` tient en une ligne qui nomme la source.
 
 ## Questions ouvertes
 

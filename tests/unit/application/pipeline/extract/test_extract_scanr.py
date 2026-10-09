@@ -16,6 +16,7 @@ from application.pipeline.extract.extract_scanr import ScanrExtractor, extract_y
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractConfig
+from tests.helpers.extractors import extracteur
 
 _LOGGER = logging.getLogger("test")
 
@@ -91,12 +92,6 @@ def _config(**surcharges) -> ScanrExtractConfig:
     return ScanrExtractConfig(**valeurs)
 
 
-def _extracteur(adapter: MagicMock, config: ScanrExtractConfig, annees: list[int]):
-    adapter.load_config.return_value = config
-    adapter.get_years.return_value = annees
-    return ScanrExtractor(MagicMock(), _LOGGER, adapter)
-
-
 def _args(**surcharges) -> argparse.Namespace:
     valeurs: dict = {"year": None, "start_year": None}
     valeurs.update(surcharges)
@@ -105,14 +100,16 @@ def _args(**surcharges) -> argparse.Namespace:
 
 def test_run_parcourt_les_annees_de_la_configuration():
     adapter = _adapter([_page([_hit("a")]), _page([]), _page([_hit("b")]), _page([])])
-    metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args())
+    metrics = extracteur(ScanrExtractor, adapter, _config(), [2023, 2024]).run(_args())
     assert metrics.new == 2
     assert [appel.args[0] for appel in adapter.count.call_args_list] == [2023, 2024]
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration():
     adapter = _adapter([_page([_hit("a")]), _page([])])
-    metrics = _extracteur(adapter, _config(), [2020, 2021, 2022]).run(_args(year=2024))
+    metrics = extracteur(ScanrExtractor, adapter, _config(), [2020, 2021, 2022]).run(
+        _args(year=2024)
+    )
     assert metrics.total == 1
     assert adapter.build_query.call_args_list[0].args[0] == 2024
 
@@ -120,21 +117,26 @@ def test_run_avec_une_annee_demandee_ignore_la_configuration():
 def test_run_sans_affiliation_refuse():
     adapter = _adapter([])
     with pytest.raises(ExtractionConfigError, match="aucun affiliation_id"):
-        _extracteur(adapter, _config(affiliation_ids=[]), [2024]).run(_args())
+        extracteur(ScanrExtractor, adapter, _config(affiliation_ids=[]), [2024]).run(_args())
 
 
 def test_run_sans_identifiants_de_connexion_refuse():
     adapter = _adapter([])
     with pytest.raises(ExtractionConfigError, match="mot de passe"):
-        _extracteur(adapter, _config(credentials_missing="mot de passe ScanR absent"), [2024]).run(
-            _args()
-        )
+        extracteur(
+            ScanrExtractor,
+            adapter,
+            _config(credentials_missing="mot de passe ScanR absent"),
+            [2024],
+        ).run(_args())
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout():
     adapter = _adapter([])
     breaker = MagicMock()
     breaker.tripped = True
-    metrics = _extracteur(adapter, _config(), [2023, 2024]).run(_args(), breaker=breaker)
+    metrics = extracteur(ScanrExtractor, adapter, _config(), [2023, 2024]).run(
+        _args(), breaker=breaker
+    )
     assert metrics.total == 0
     assert adapter.fetch_page.call_count == 0
