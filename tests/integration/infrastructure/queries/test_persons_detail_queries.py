@@ -3,9 +3,9 @@
 from sqlalchemy import text
 
 from infrastructure.read_models.persons.detail import person_theses
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _authorship(conn, pub_id, person_id, roles):
@@ -20,20 +20,11 @@ def _authorship(conn, pub_id, person_id, roles):
 
 def _link_theses_source(conn, authorship_id):
     """source_authorship `source = 'theses'` liée à l'authorship, pour l'EXISTS de `person_theses`."""
-    source_pub = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title) "
-            "VALUES ('theses', :sid, 'These') RETURNING id"
-        ),
-        {"sid": f"theses-{authorship_id}"},
-    ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO source_authorships "
-            "(source, source_publication_id, authorship_id, identity_id, raw_author_name) "
-            "VALUES ('theses', :sp, :aid, :iid, 'X')"
-        ),
-        {"sp": source_pub, "aid": authorship_id, "iid": upsert_identity(conn)},
+    source_pub = insert_source_publication(
+        conn, source="theses", source_id=f"theses-{authorship_id}", title="These"
+    )
+    insert_signature(
+        conn, source_pub, source="theses", author_position=None, authorship_id=authorship_id
     )
 
 

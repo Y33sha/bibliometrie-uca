@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_publications import get_publication_sources
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 
 
 def _create_journal(conn, title, publisher_name):
@@ -20,37 +21,6 @@ def _create_journal(conn, title, publisher_name):
         """),
         {"t": title, "pub": publisher_id},
     ).scalar_one()
-
-
-def _create_source_publication(
-    conn,
-    pub_id,
-    *,
-    source,
-    source_id,
-    journal_id=None,
-    external_ids=None,
-    biblio=None,
-    container_title=None,
-):
-    conn.execute(
-        text("""
-            INSERT INTO source_publications
-                (source, source_id, title, publication_id, journal_id, external_ids, biblio,
-                 container_title)
-            VALUES (:src, :sid, 'Titre', :pid, :jid, CAST(:ext AS jsonb), CAST(:biblio AS jsonb),
-                    :container)
-        """),
-        {
-            "src": source,
-            "sid": source_id,
-            "pid": pub_id,
-            "jid": journal_id,
-            "ext": json.dumps(external_ids or {}),
-            "biblio": json.dumps(biblio) if biblio else None,
-            "container": container_title,
-        },
-    )
 
 
 def _records(conn, pub_id):
@@ -73,11 +43,11 @@ class TestGetPublicationSources:
     def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
         journal = _create_journal(sa_sync_conn, "Nature", "Springer Nature")
-        _create_source_publication(
+        insert_source_publication(
             sa_sync_conn,
             pub,
-            source="hal",
             source_id="hal-1",
+            title="Titre",
             journal_id=journal,
             biblio={
                 "journal": {"title": "Nature (London)", "issn": "0028-0836", "eissn": "1476-4687"},
@@ -98,11 +68,12 @@ class TestGetPublicationSources:
 
     def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        _create_source_publication(
+        insert_source_publication(
             sa_sync_conn,
             pub,
             source="crossref",
             source_id="10.1/x",
+            title="Titre",
             external_ids={
                 "pmid": "123",
                 "isbn": ["978-2", "978-3"],
@@ -114,13 +85,14 @@ class TestGetPublicationSources:
 
     def test_bibliographic_fields(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        _create_source_publication(
+        insert_source_publication(
             sa_sync_conn,
             pub,
             source="openalex",
             source_id="W1",
-            biblio={"volume": "12", "issue": "3", "first_page": "100", "last_page": "120"},
+            title="Titre",
             container_title="Actes du colloque",
+            biblio={"volume": "12", "issue": "3", "first_page": "100", "last_page": "120"},
         )
         [record] = _records(sa_sync_conn, pub)
         assert (record.container_title, record.volume, record.issue, record.pages) == (
@@ -132,11 +104,12 @@ class TestGetPublicationSources:
 
     def test_pages_as_given_by_source(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        _create_source_publication(
+        insert_source_publication(
             sa_sync_conn,
             pub,
             source="crossref",
             source_id="10.1/y",
+            title="Titre",
             biblio={"page": "e1234", "article_number": "e1234"},
         )
         [record] = _records(sa_sync_conn, pub)
@@ -144,7 +117,7 @@ class TestGetPublicationSources:
 
     def test_language_name_and_source_value(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        _create_source_publication(sa_sync_conn, pub, source="wos", source_id="WOS:1")
+        insert_source_publication(sa_sync_conn, pub, source="wos", source_id="WOS:1", title="Titre")
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET language = 'en', "

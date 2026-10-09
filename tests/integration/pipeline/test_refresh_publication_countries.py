@@ -14,20 +14,12 @@ from sqlalchemy import text
 
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.pipeline.countries import PgCountryQueries
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.publications import insert_publication
-
-
-def _insert_source_publication(
-    conn, publication_id: int, source: str = "openalex", source_id: str = "W1"
-) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
-            "VALUES (:src, :sid, 'Test sp', 2024, :pid) RETURNING id"
-        ),
-        {"src": source, "sid": source_id, "pid": publication_id},
-    ).scalar_one()
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 
 
 def _insert_source_authorship(
@@ -40,23 +32,15 @@ def _insert_source_authorship(
     normalized = conn.execute(
         text("SELECT normalize_name_form(:name)"), {"name": raw_author_name}
     ).scalar_one()
-    identity_id = upsert_identity(conn, author_name_normalized=normalized)
-    return conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position, in_perimeter,
-                 raw_author_name, identity_id)
-            VALUES (:src, :sp, :pos, TRUE, :name, :iid)
-            RETURNING id
-        """),
-        {
-            "src": source,
-            "sp": source_publication_id,
-            "pos": position,
-            "name": raw_author_name,
-            "iid": identity_id,
-        },
-    ).scalar_one()
+    return insert_signature(
+        conn,
+        source_publication_id,
+        source=source,
+        author_position=position,
+        raw_author_name=raw_author_name,
+        author_name_normalized=normalized,
+        in_perimeter=True,
+    )
 
 
 def _insert_address(conn, raw_text: str, countries: list[str] | None) -> int:
@@ -67,16 +51,6 @@ def _insert_address(conn, raw_text: str, countries: list[str] | None) -> int:
         ),
         {"r": raw_text, "c": countries},
     ).scalar_one()
-
-
-def _link_sa_address(conn, sa_id: int, address_id: int) -> None:
-    conn.execute(
-        text(
-            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-            "VALUES (:s, :a)"
-        ),
-        {"s": sa_id, "a": address_id},
-    )
 
 
 def _get_pub_countries(conn, pub_id: int) -> list[str] | None:
@@ -104,10 +78,12 @@ def log() -> logging.Logger:
 class TestCascade:
     def test_single_address_propagates_to_publication(self, sa_sync_conn, queries, log):
         pub = insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
+        sp = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
-        _link_sa_address(sa_sync_conn, sa, addr)
+        insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         updated = refresh(sa_sync_conn, queries, log)
 
@@ -118,12 +94,14 @@ class TestCascade:
     def test_multi_country_union_propagates(self, sa_sync_conn, queries, log):
         # Deux adresses sur le même sa : union des pays remontée jusqu'à pub.
         pub = insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
+        sp = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
         sa = _insert_source_authorship(sa_sync_conn, sp)
         a1 = _insert_address(sa_sync_conn, "addr FR", countries=["fr"])
         a2 = _insert_address(sa_sync_conn, "addr US", countries=["us"])
-        _link_sa_address(sa_sync_conn, sa, a1)
-        _link_sa_address(sa_sync_conn, sa, a2)
+        insert_signature_address(sa_sync_conn, sa, address_id=a1)
+        insert_signature_address(sa_sync_conn, sa, address_id=a2)
 
         refresh(sa_sync_conn, queries, log)
 
@@ -134,14 +112,18 @@ class TestCascade:
         # Même publication via deux sources distinctes (OA et HAL), chacune
         # avec une adresse dans un pays différent → union au niveau publi.
         pub = insert_publication(sa_sync_conn)
-        sp_oa = _insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W1")
-        sp_hal = _insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
+        sp_oa = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
+        sp_hal = insert_source_publication(
+            sa_sync_conn, pub, source_id="hal-1", title="Test sp", pub_year=2024
+        )
         sa_oa = _insert_source_authorship(sa_sync_conn, sp_oa, source="openalex")
         sa_hal = _insert_source_authorship(sa_sync_conn, sp_hal, source="hal", position=1)
         a_fr = _insert_address(sa_sync_conn, "addr Paris", countries=["fr"])
         a_de = _insert_address(sa_sync_conn, "addr Berlin", countries=["de"])
-        _link_sa_address(sa_sync_conn, sa_oa, a_fr)
-        _link_sa_address(sa_sync_conn, sa_hal, a_de)
+        insert_signature_address(sa_sync_conn, sa_oa, address_id=a_fr)
+        insert_signature_address(sa_sync_conn, sa_hal, address_id=a_de)
 
         refresh(sa_sync_conn, queries, log)
 
@@ -151,7 +133,9 @@ class TestCascade:
         # Base sans adresses avec pays → la refresh ne change rien et
         # retourne 0 publications mises à jour.
         pub = insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
+        sp = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
         _insert_source_authorship(sa_sync_conn, sp)
 
         updated = refresh(sa_sync_conn, queries, log)
@@ -165,10 +149,12 @@ class TestIdempotence:
         # Premier run : la publi passe de NULL à ['fr']. Deuxième run :
         # rien à changer, retour 0 (cf. `IS DISTINCT FROM` côté query).
         pub = insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
+        sp = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "addr", countries=["fr"])
-        _link_sa_address(sa_sync_conn, sa, addr)
+        insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         first = refresh(sa_sync_conn, queries, log)
         second = refresh(sa_sync_conn, queries, log)
@@ -183,14 +169,16 @@ class TestCleanup:
         # source_publications.countries=['fr'] déjà persistées, mais l'adresse du sa
         # n'a plus de `countries` (NULL) → le LEFT JOIN remet sp.countries à NULL.
         pub = insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
+        sp = insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W1", title="Test sp", pub_year=2024
+        )
         sa = _insert_source_authorship(sa_sync_conn, sp)
         sa_sync_conn.execute(
             text("UPDATE source_publications SET countries = ARRAY['fr'] WHERE id = :id"),
             {"id": sp},
         )
         addr = _insert_address(sa_sync_conn, "addr no country", countries=None)
-        _link_sa_address(sa_sync_conn, sa, addr)
+        insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         refresh(sa_sync_conn, queries, log)
 

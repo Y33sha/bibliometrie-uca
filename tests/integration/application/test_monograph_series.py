@@ -9,6 +9,7 @@ from application.pipeline.publishers_journals.link_monographs_to_collections imp
     run_link_monographs_to_collections,
 )
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
+from tests.integration.helpers.sources import insert_source_publication
 
 
 @pytest.fixture
@@ -34,12 +35,13 @@ def _volume(conn, repo, title: str, source_id: str) -> int:
         publisher_id=None,
         journal_id=journal_id,
     )
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, monograph_id, journal_id)"
-            " VALUES ('crossref', :sid, 'Communication', :mid, :jid)"
-        ),
-        {"sid": source_id, "mid": monograph_id, "jid": journal_id},
+    insert_source_publication(
+        conn,
+        source="crossref",
+        source_id=source_id,
+        title="Communication",
+        journal_id=journal_id,
+        monograph_id=monograph_id,
     )
     return monograph_id
 

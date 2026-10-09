@@ -10,12 +10,12 @@ test pour éviter les collisions.
 
 import uuid
 
-from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_person,
     seed_publication,
     seed_source_authorship,
+    seed_source_publication,
     uniq,
 )
 
@@ -46,39 +46,12 @@ def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
         return cur.fetchone()["id"]
 
 
-def _seed_orphan_authorship(raw_author_name: str) -> int:
-    """source_authorship orpheline (person_id NULL, in_perimeter TRUE)."""
-    pub_id = seed_publication(title=uniq("Pub"))
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
-            "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
-            (uniq("sid"), pub_id),
-        )
-        sp_id = cur.fetchone()["id"]
-    with owner_pool() as cur:
-        iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
-        cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES ('hal', %s, 0, NULL, TRUE, %s, %s) RETURNING id",
-            (sp_id, raw_author_name, iid),
-        )
-        return cur.fetchone()["id"]
-
-
 def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]:
-    """source_authorship orpheline rattachée à une publication.
+    """source_authorship orpheline (person_id NULL, in_perimeter TRUE) rattachée à une publication.
 
     Renvoie (sa_id, publication_id) pour pouvoir rejeter la paire."""
     pub_id = seed_publication(title=uniq("Pub"))
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
-            "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
-            (uniq("sid"), pub_id),
-        )
-        sp_id = cur.fetchone()["id"]
+    sp_id = seed_source_publication(publication_id=pub_id)
     sa_id = seed_source_authorship(
         source="hal", source_pub_id=sp_id, raw_author_name=raw_author_name
     )
@@ -134,7 +107,7 @@ class TestOrphanAuthorships:
     def test_returns_last_name_first_name_from_comma_form(self, client):
         """Format "Last, First" : parsé en last_name="Last", first_name="First"."""
         marker = _uniq_name("Marker")
-        _seed_orphan_authorship(f"{marker}, Jane")
+        _seed_orphan_with_pub(f"{marker}, Jane")
 
         r = client.get("/api/authorships/orphans", params={"search": marker})
         assert r.status_code == 200
@@ -148,7 +121,7 @@ class TestOrphanAuthorships:
     def test_returns_last_name_first_name_from_space_form(self, client):
         """Format "First Last" : parsé en last_name=dernier mot, first_name=reste."""
         marker = _uniq_name("Marker")
-        _seed_orphan_authorship(f"Jane Marie {marker}")
+        _seed_orphan_with_pub(f"Jane Marie {marker}")
 
         r = client.get("/api/authorships/orphans", params={"search": marker})
         assert r.status_code == 200

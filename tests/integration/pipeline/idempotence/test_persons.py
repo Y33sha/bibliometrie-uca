@@ -7,7 +7,7 @@ def setup_persons_test_data(conn):
     """
     from sqlalchemy import text
 
-    from tests.integration.helpers.authorships import upsert_identity
+    from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
     # Publications
     conn.execute(
@@ -19,37 +19,44 @@ def setup_persons_test_data(conn):
     )
 
     # HAL documents
-    conn.execute(
-        text("""
-            INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
-            VALUES (90001, 'hal', 'hal-90000001', 'Test Pub Alpha', 2024, 'ART', 90001),
-                   (90002, 'hal', 'hal-90000002', 'Test Pub Beta', 2024, 'THESE', 90002)
-        """)
-    )
+    for row_id, source_id, title, doc_type in (
+        (90001, "hal-90000001", "Test Pub Alpha", "ART"),
+        (90002, "hal-90000002", "Test Pub Beta", "THESE"),
+    ):
+        insert_source_publication(
+            conn,
+            row_id,
+            source_id=source_id,
+            title=title,
+            row_id=row_id,
+            pub_year=2024,
+            doc_type=doc_type,
+        )
 
     # HAL authorships — les identifiants observés (orcid + hal_person_id) vivent
     # sur l'identité. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
     # sur les 2 pubs et partage donc une seule identité. Frank Moreau
     # (hal_person_id=900002) sur la pub 90001. Grace Petit (sans identifiant) sur
     # la pub 90002.
-    eve = upsert_identity(
-        conn, "eve leroy", {"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}
-    )
-    frank = upsert_identity(conn, "frank moreau", {"hal_person_id": 900002})
-    grace = upsert_identity(conn, "grace petit", None)
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, author_position, in_perimeter,
-                 person_id, raw_author_name, identity_id)
-            VALUES
-                (90001, 'hal', 90001, 0, TRUE, NULL, 'Eve Leroy', :eve),
-                (90002, 'hal', 90001, 1, TRUE, NULL, 'Frank Moreau', :frank),
-                (90003, 'hal', 90002, 0, TRUE, NULL, 'Eve Leroy', :eve),
-                (90004, 'hal', 90002, 1, TRUE, NULL, 'Grace Petit', :grace)
-        """),
-        {"eve": eve, "frank": frank, "grace": grace},
-    )
+    eve = ("Eve Leroy", "eve leroy", {"orcid": "0000-0001-9999-0001", "hal_person_id": 900001})
+    frank = ("Frank Moreau", "frank moreau", {"hal_person_id": 900002})
+    grace = ("Grace Petit", "grace petit", None)
+    for row_id, source_publication_id, position, (raw, normalized, identifiers) in (
+        (90001, 90001, 0, eve),
+        (90002, 90001, 1, frank),
+        (90003, 90002, 0, eve),
+        (90004, 90002, 1, grace),
+    ):
+        insert_signature(
+            conn,
+            source_publication_id,
+            row_id=row_id,
+            author_position=position,
+            raw_author_name=raw,
+            author_name_normalized=normalized,
+            person_identifiers=identifiers,
+            in_perimeter=True,
+        )
 
 
 def run_create_persons(conn):

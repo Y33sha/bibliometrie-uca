@@ -11,6 +11,7 @@ from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
+from tests.integration.helpers.sources import insert_source_publication
 
 
 @pytest.fixture
@@ -73,16 +74,6 @@ def _create_journal(
     if issnl and issnl not in (issn, eissn):
         _add_issn(conn, journal_id, issnl, linking=True, checked=checked)
     return journal_id
-
-
-def _create_record(conn, journal_id, *, doi):
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, journal_id, doi)"
-            " VALUES ('hal', :sid, 'Article', :jid, :doi)"
-        ),
-        {"sid": f"sp-{journal_id}-{doi}", "jid": journal_id, "doi": doi},
-    )
 
 
 def _issns(conn, journal_id):
@@ -209,17 +200,47 @@ class TestSudocCheck:
         """Seules les paires dont les enregistrements partagent un préfixe DOI sont retenues ; une revue vide ou deux revues à ISSN restent hors de la règle."""
         with_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe", issn="2999-0003")
         without_issn = _create_journal(sa_sync_conn, title="Revue test même préfixe")
-        _create_record(sa_sync_conn, with_issn, doi="10.9999/a")
-        _create_record(sa_sync_conn, without_issn, doi="10.9999/b")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{with_issn}-10.9999/a",
+            title="Article",
+            doi="10.9999/a",
+            journal_id=with_issn,
+        )
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{without_issn}-10.9999/b",
+            title="Article",
+            doi="10.9999/b",
+            journal_id=without_issn,
+        )
         full = _create_journal(sa_sync_conn, title="Revue test doublon vide", issn="2999-0006")
         _create_journal(sa_sync_conn, title="Revue test doublon vide")
-        _create_record(sa_sync_conn, full, doi="10.9999/c")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{full}-10.9999/c",
+            title="Article",
+            doi="10.9999/c",
+            journal_id=full,
+        )
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0004")
         _create_journal(sa_sync_conn, title="Revue test homonymes à ISSN", issn="2999-0005")
         active_a = _create_journal(sa_sync_conn, title="Revue test actives distinctes")
         active_b = _create_journal(sa_sync_conn, title="Revue test actives distinctes")
-        _create_record(sa_sync_conn, active_a, doi="10.1111/x")
-        _create_record(sa_sync_conn, active_b, doi="10.2222/y")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{active_a}-10.1111/x",
+            title="Article",
+            doi="10.1111/x",
+            journal_id=active_a,
+        )
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{active_b}-10.2222/y",
+            title="Article",
+            doi="10.2222/y",
+            journal_id=active_b,
+        )
         groups = {g.key: g.journal_ids for g in repo.find_same_title_duplicates()}
         assert set(groups["revue test même préfixe"]) == {with_issn, without_issn}
         assert "revue test doublon vide" not in groups
@@ -233,7 +254,13 @@ class TestSudocCheck:
                 text("INSERT INTO journals (title, title_normalized) VALUES (:t, '') RETURNING id"),
                 {"t": title},
             ).scalar_one()
-            _create_record(sa_sync_conn, journal_id, doi=f"10.9999/vide-{journal_id}")
+            insert_source_publication(
+                sa_sync_conn,
+                source_id=f"sp-{journal_id}-10.9999/vide-{journal_id}",
+                title="Article",
+                doi=f"10.9999/vide-{journal_id}",
+                journal_id=journal_id,
+            )
         assert "" not in {g.key for g in repo.find_same_title_duplicates()}
 
     def test_journals_sharing_an_inactive_issn(self, sa_sync_conn, repo):
@@ -293,7 +320,13 @@ class TestSudocCheck:
         _add_issn(sa_sync_conn, empty, "2999-0015", support="electronic")
         _add_issn(sa_sync_conn, None, "2999-0015", support="electronic", checked=True)
         with_record = _create_journal(sa_sync_conn, title="Revue test avec enregistrement")
-        _create_record(sa_sync_conn, with_record, doi="10.9999/d")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{with_record}-10.9999/d",
+            title="Article",
+            doi="10.9999/d",
+            journal_id=with_record,
+        )
         with_payment = _create_journal(sa_sync_conn, title="Revue test avec paiement")
         sa_sync_conn.execute(
             text("INSERT INTO apc_payments (journal_id, open_access_fee) VALUES (:jid, true)"),
@@ -464,7 +497,13 @@ class TestRecordTypesOfUnknownJournals:
     def test_revues_typees_et_vides_exclues(self, sa_sync_conn, repo):
         typed = _create_journal(sa_sync_conn)
         empty = _create_journal(sa_sync_conn)
-        _create_record(sa_sync_conn, typed, doi="10.1/b")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{typed}-10.1/b",
+            title="Article",
+            doi="10.1/b",
+            journal_id=typed,
+        )
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": typed}
         )
@@ -478,8 +517,20 @@ class TestRecordTypesOfUnknownJournals:
 class TestDoiNamespaces:
     def test_revue_posee_par_son_espace_exclue_des_temoins(self, sa_sync_conn, repo):
         journal_id = _create_journal(sa_sync_conn)
-        _create_record(sa_sync_conn, journal_id, doi="10.9001/abc.1")
-        _create_record(sa_sync_conn, journal_id, doi="10.9001/abc.2")
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{journal_id}-10.9001/abc.1",
+            title="Article",
+            doi="10.9001/abc.1",
+            journal_id=journal_id,
+        )
+        insert_source_publication(
+            sa_sync_conn,
+            source_id=f"sp-{journal_id}-10.9001/abc.2",
+            title="Article",
+            doi="10.9001/abc.2",
+            journal_id=journal_id,
+        )
         sa_sync_conn.execute(
             text(
                 "UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE doi = :doi"

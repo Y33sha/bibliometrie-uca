@@ -9,6 +9,7 @@ from application.pipeline.publishers_journals.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
 from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+from tests.integration.helpers.sources import insert_source_publication
 
 _PAPER = "9783030580803"
 _ELECTRONIC = "9783030580810"
@@ -74,12 +75,8 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
 def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     source = _create(repo, "Pascal intempestif", isbn=_PAPER, year=2024)
     target = _create(repo, "Pascal intempestif")
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
-            " VALUES ('hal', 'hal-fusion', 'Chapitre', :mid)"
-        ),
-        {"mid": source},
+    insert_source_publication(
+        sa_sync_conn, source_id="hal-fusion", title="Chapitre", monograph_id=source
     )
     groups = [g for g in repo.find_monographs_sharing_a_title() if g.title == "Pascal intempestif"]
     assert [m.id for m in groups[0].monographs] == [source, target]
@@ -110,29 +107,27 @@ def _journal(conn, title: str, issn: str | None = None) -> int:
     return journal_id
 
 
-def _record(conn, source_id: str, monograph_id: int, journal_id: int) -> None:
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, monograph_id, journal_id)"
-            " VALUES ('crossref', :sid, 'Chapitre', :mid, :jid)"
-        ),
-        {"sid": source_id, "mid": monograph_id, "jid": journal_id},
-    )
-
-
 def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
     volume = _journal(sa_sync_conn, "NuFACT 2022")
     collection = _journal(sa_sync_conn, "Lecture notes test", issn="2999-0101")
     mid = _create(repo, "NuFACT 2022", journal_id=volume)
-    _record(sa_sync_conn, "c-1", mid, collection)
-    _record(sa_sync_conn, "c-2", mid, volume)
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
-            " VALUES ('hal', 'c-3', 'Chapitre', :mid)"
-        ),
-        {"mid": mid},
+    insert_source_publication(
+        sa_sync_conn,
+        source="crossref",
+        source_id="c-1",
+        title="Chapitre",
+        journal_id=collection,
+        monograph_id=mid,
     )
+    insert_source_publication(
+        sa_sync_conn,
+        source="crossref",
+        source_id="c-2",
+        title="Chapitre",
+        journal_id=volume,
+        monograph_id=mid,
+    )
+    insert_source_publication(sa_sync_conn, source_id="c-3", title="Chapitre", monograph_id=mid)
 
     candidates = {c.monograph_id: c for c in repo.find_monograph_journal_candidates()}
     found = candidates[mid]
@@ -152,12 +147,8 @@ def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
     empty = _create(repo, "Vide")
     held = _create(repo, "Portée")
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, monograph_id)"
-            " VALUES ('hal', 'hal-monographie', 'Chapitre', :mid)"
-        ),
-        {"mid": held},
+    insert_source_publication(
+        sa_sync_conn, source_id="hal-monographie", title="Chapitre", monograph_id=held
     )
     deleted = [mid for mid, _ in repo.delete_empty_monographs()]
     assert empty in deleted
@@ -190,12 +181,13 @@ def test_nature_recalculee_dans_les_deux_sens(repo, sa_sync_conn):
     lncs = _create(repo, "Fun with Algorithms", journal_id=series)
     livre = _create(repo, "Un livre", proceedings=True)
     for source_id, mid in (("c-lncs", lncs), ("c-livre", livre)):
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_publications (source, source_id, title, monograph_id, doc_type)"
-                " VALUES ('crossref', :sid, 'Chapitre', :mid, 'book-chapter')"
-            ),
-            {"sid": source_id, "mid": mid},
+        insert_source_publication(
+            sa_sync_conn,
+            source="crossref",
+            source_id=source_id,
+            title="Chapitre",
+            doc_type="book-chapter",
+            monograph_id=mid,
         )
 
     metrics = run_type_proceedings_volumes(logging.getLogger("test"), monograph_repo=repo)

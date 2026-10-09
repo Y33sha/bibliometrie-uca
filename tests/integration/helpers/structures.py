@@ -14,8 +14,13 @@ import json
 from sqlalchemy import Connection, text
 
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.rows import insert_row
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 
 _seq = itertools.count(1)
 
@@ -83,41 +88,16 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
     """Lie `authorship_id` à `structure_id` dans la matview `authorship_structures`
     (via une chaîne source minimale + appartenance au périmètre d'affiliation),
     puis rafraîchit `source_authorship_structures` et `authorship_structures`."""
-    n = next(_seq)
-    sp_id = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, pub_year) "
-            "VALUES ('hal', :sid, 'X', 2024) RETURNING id"
-        ),
-        {"sid": f"as-test-{n}"},
-    ).scalar_one()
-    identity_id = upsert_identity(conn)
-    sa_id = conn.execute(
-        text(
-            "INSERT INTO source_authorships "
-            "(source, source_publication_id, author_position, authorship_id, identity_id,"
-            " raw_author_name) "
-            "VALUES ('hal', :sp, 0, :aid, :iid, 'X') RETURNING id"
-        ),
-        {"sp": sp_id, "aid": authorship_id, "iid": identity_id},
-    ).scalar_one()
+    sp_id = insert_source_publication(conn, source_id=f"as-test-{next(_seq)}", pub_year=2024)
+    sa_id = insert_signature(conn, sp_id, authorship_id=authorship_id)
     add_source_authorship_structure(conn, sa_id, structure_id)
 
 
 def add_source_authorship_structure(conn, sa_id: int, structure_id: int) -> None:
     """Lie la signature `sa_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
-    n = next(_seq)
-    addr_id = conn.execute(
-        text("INSERT INTO addresses (raw_text, normalized_text) VALUES (:t, :t) RETURNING id"),
-        {"t": f"as-test-addr-{n}"},
-    ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-            "VALUES (:sa, :a)"
-        ),
-        {"sa": sa_id, "a": addr_id},
-    )
+    raw_text = f"as-test-addr-{next(_seq)}"
+    addr_id = insert_address(conn, raw_text, normalized_text=raw_text)
+    insert_signature_address(conn, sa_id, address_id=addr_id)
     conn.execute(
         text(
             "INSERT INTO address_structures (address_id, structure_id, is_confirmed) "

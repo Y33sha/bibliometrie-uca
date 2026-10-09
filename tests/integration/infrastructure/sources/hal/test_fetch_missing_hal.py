@@ -2,20 +2,13 @@
 
 import httpx2
 import pytest
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
 from application.ports.pipeline.fetch_missing.hal import NntInsertResult
-from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 from tests.integration.helpers.publications import insert_publication
-
-_INSERT_SOURCE_PUB_SQL = text(
-    """
-    INSERT INTO source_publications (source, source_id, staging_id, publication_id, title, external_ids)
-    VALUES (CAST(:source AS source_type), :sid, :staging_id, :pub_id, 'titre test', :external_ids)
-    """
-).bindparams(bindparam("external_ids", type_=Jsonb))
+from tests.integration.helpers.sources import insert_source_publication
 
 
 def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
@@ -27,15 +20,14 @@ def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None
         ),
         {"src": source, "sid": source_id},
     ).scalar_one()
-    conn.execute(
-        _INSERT_SOURCE_PUB_SQL,
-        {
-            "source": source,
-            "sid": source_id,
-            "staging_id": staging_id,
-            "pub_id": publication_id,
-            "external_ids": external_ids,
-        },
+    insert_source_publication(
+        conn,
+        publication_id,
+        source=source,
+        source_id=source_id,
+        title="titre test",
+        staging_id=staging_id,
+        external_ids=external_ids,
     )
 
 
