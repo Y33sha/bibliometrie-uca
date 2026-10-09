@@ -7,16 +7,30 @@
 
 	export type PersonRow = components['schemas']['PersonOut'];
 
+	/** Colonne numérique triable ajoutée après les colonnes communes. */
+	export interface CountColumn {
+		label: string;
+		sortKey: string;
+		value: (p: PersonRow) => number | null | undefined;
+	}
+
 	let {
 		persons,
 		loading = false,
 		sort,
 		onSortChange,
+		extraColumns = [],
+		onopen,
+		activeId = null,
 	}: {
 		persons: PersonRow[];
 		loading?: boolean;
 		sort: string;
 		onSortChange: (newSort: string) => void;
+		extraColumns?: CountColumn[];
+		/** Si fourni, le nom ouvre la personne via ce callback au lieu de lier vers sa fiche. */
+		onopen?: (personId: number) => void;
+		activeId?: number | null;
 	} = $props();
 
 	function toggleSort(col: string) {
@@ -57,19 +71,38 @@
 				onclick={() => toggleSort('signatures_as_author')}
 				>Publications{sortIndicator('signatures_as_author')}</th
 			>
+			{#each extraColumns as col (col.sortKey)}
+				<th
+					class="sortable num-col"
+					class:active={sort === `${col.sortKey}_asc` || sort === `${col.sortKey}_desc`}
+					onclick={() => toggleSort(col.sortKey)}>{col.label}{sortIndicator(col.sortKey)}</th
+				>
+			{/each}
 		</tr>
 	</thead>
 	<tbody>
 		{#if persons.length === 0}
-			<TableStatusRow {loading} colspan={5} emptyText="Aucune personne trouvée" />
+			<TableStatusRow {loading} colspan={5 + extraColumns.length} emptyText="Aucune personne trouvée" />
 		{:else}
 			{#each persons as p (p.id)}
-				<tr>
+				<tr class:excluded={!!p.exclusion}>
 					<td>
-						<a href="{base}/persons/{p.id}" class="person-link">
-							<span class="person-last">{titleCase(p.last_name)}</span>
-							{titleCase(p.first_name)}
-						</a>
+						{#if onopen}
+							<button
+								type="button"
+								class="person-link"
+								class:active={activeId === p.id}
+								onclick={() => onopen(p.id)}
+							>
+								<span class="person-last">{titleCase(p.last_name)}</span>
+								{titleCase(p.first_name)}
+							</button>
+						{:else}
+							<a href="{base}/persons/{p.id}" class="person-link">
+								<span class="person-last">{titleCase(p.last_name)}</span>
+								{titleCase(p.first_name)}
+							</a>
+						{/if}
 						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 					</td>
 					<td>
@@ -82,6 +115,9 @@
 					</td>
 					<td class="muted-cell">{p.department_name || ''}</td>
 					<td class="num-col">{p.signature_count_as_author}</td>
+					{#each extraColumns as col (col.sortKey)}
+						<td class="num-col">{col.value(p) ?? 0}</td>
+					{/each}
 				</tr>
 			{/each}
 		{/if}
@@ -118,6 +154,11 @@
 	td { padding: 10px 12px; font-size: 0.95rem; vertical-align: middle; }
 	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.person-link:hover { text-decoration: underline; }
+	button.person-link { background: none; border: none; padding: 0; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+	button.person-link.active { text-decoration: underline; }
+	tr.excluded { opacity: 0.45; }
+	tr.excluded:hover { opacity: 0.7; }
+	tr.excluded .person-link { text-decoration: line-through; }
 	.person-last { font-weight: 600; }
 	.muted-cell { font-size: 0.9rem; color: var(--muted); }
 	.num-col { text-align: right; }

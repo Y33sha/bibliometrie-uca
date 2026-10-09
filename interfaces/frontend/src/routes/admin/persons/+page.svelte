@@ -7,9 +7,9 @@
   import { toast } from "$lib/dialogs.svelte";
   import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import { titleCase } from "$lib/utils";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
+  import PersonsTable, { type CountColumn } from "$lib/components/PersonsTable.svelte";
   import type {
     DetachModalState,
     DetachPublication,
@@ -186,17 +186,20 @@
     updateUrl();
   }
 
-  function toggleSort(field: string) {
-    sortField = sortField === `${field}_asc` ? `${field}_desc` : `${field}_asc`;
+  function changeSort(newSort: string) {
+    sortField = newSort;
     list.page = 1;
     loadTable();
   }
 
-  function sortIndicator(field: string): string {
-    if (sortField === `${field}_asc`) return " \u25B2";
-    if (sortField === `${field}_desc`) return " \u25BC";
-    return "";
-  }
+  const countColumns: CountColumn[] = [
+    { label: "Publis", sortKey: "signatures", value: (p) => p.signature_count },
+    {
+      label: institution.name,
+      sortKey: "in_perimeter_signatures",
+      value: (p) => p.in_perimeter_signature_count,
+    },
+  ];
 
   /* ── URL state ── */
 
@@ -573,41 +576,15 @@
 {#if persons.length === 0 && !list.loading}
   <div class="empty">Aucune personne trouv&eacute;e.</div>
 {:else}
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th class="sortable col-name" onclick={() => toggleSort("name")}
-          >Nom{sortIndicator("name")}</th
-        >
-        <th class="sortable" onclick={() => toggleSort("signatures")}
-          >Publis{sortIndicator("signatures")}</th
-        >
-        <th class="sortable" onclick={() => toggleSort("in_perimeter_signatures")}
-          >{institution.name}{sortIndicator("in_perimeter_signatures")}</th
-        >
-      </tr>
-    </thead>
-    <tbody>
-      {#each persons as p (p.id)}
-        <tr class:excluded={!!p.exclusion}>
-          <td class="td-name">
-            <button
-              type="button"
-              class="person-name"
-              class:active={selectedPersonId === p.id}
-              onclick={() => openDrawer(p.id)}
-            >
-              <span class="person-last">{titleCase(p.last_name)}</span>
-              {titleCase(p.first_name)}
-            </button>
-            {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
-          </td>
-          <td>{p.signature_count ?? 0}</td>
-          <td>{p.in_perimeter_signature_count ?? 0}</td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+  <PersonsTable
+    {persons}
+    loading={list.loading}
+    sort={sortField}
+    onSortChange={changeSort}
+    extraColumns={countColumns}
+    onopen={openDrawer}
+    activeId={selectedPersonId}
+  />
 
   <Pagination page={list.page} pages={list.pages} onchange={handlePageChange} />
   {/if}
@@ -666,49 +643,6 @@
 
 
 <style>
-  .data-table {
-    overflow: visible;
-  }
-  .sortable:hover {
-    color: #2563eb;
-  }
-  .col-name {
-    min-width: 200px;
-  }
-  .td-name {
-    position: relative;
-  }
-  .person-name {
-    font-weight: 500;
-    color: inherit;
-    text-decoration: none;
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-  }
-  .person-name:hover {
-    color: #2563eb;
-    text-decoration: underline;
-  }
-  .person-name.active {
-    color: #2563eb;
-  }
-  .person-last {
-    font-weight: 600;
-  }
-  /* ── Excluded persons ── */
-  tr.excluded {
-    opacity: 0.45;
-  }
-  tr.excluded:hover {
-    opacity: 0.7;
-  }
-  tr.excluded .person-name {
-    text-decoration: line-through;
-  }
   /* ── Orphans ── */
   .orphan-link {
     display: block;
