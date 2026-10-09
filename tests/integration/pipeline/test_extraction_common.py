@@ -11,7 +11,11 @@ from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+
+# Publication de 2020 sans titre normalisé ni type.
+_publication = partial(insert_publication, normalize_title=False, pub_year=2020, doc_type=None)
 
 # Notice de titre « T ».
 _notice = partial(insert_source_publication, title="T")
@@ -141,12 +145,7 @@ def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
     """Publication `in_perimeter` + source_publication `source` rattaché.
 
     Le pool de la recherche par DOI ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
-    pub_id = conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, TRUE) "
-            "RETURNING id"
-        )
-    ).scalar_one()
+    pub_id = _publication(conn, "T", in_perimeter=True)
     _notice(conn, pub_id, source=source, source_id=sid, doi=doi, external_ids=external_ids)
 
 
@@ -177,12 +176,7 @@ class TestGetMissingDois:
 
     def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
-        pub_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, FALSE) "
-                "RETURNING id"
-            )
-        ).scalar_one()
+        pub_id = _publication(sa_sync_conn, "T", in_perimeter=False)
         _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1", doi="10.1234/out")
         assert get_missing_dois(sa_sync_conn, "hal") == []
 
@@ -233,12 +227,7 @@ class TestGetMissingDois:
 
     def test_includes_relation_targets(self, sa_sync_conn):
         """Les cibles des relations depuis une publication in-périmètre (`publication_relations.target_doi`) entrent dans le pool."""
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (id, title, pub_year, in_perimeter) "
-                "VALUES (1, 'Parent', 2020, TRUE)"
-            )
-        )
+        _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=True)
         sa_sync_conn.execute(
             text(
                 "INSERT INTO publication_relations "
@@ -251,12 +240,7 @@ class TestGetMissingDois:
 
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
         """Une relation depuis une publication hors-périmètre n'entre pas dans le pool."""
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (id, title, pub_year, in_perimeter) "
-                "VALUES (1, 'Parent', 2020, FALSE)"
-            )
-        )
+        _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=False)
         sa_sync_conn.execute(
             text(
                 "INSERT INTO publication_relations "
@@ -410,12 +394,7 @@ class TestGetPrefixesToResolve:
         from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
 
         # Préfixe vu UNIQUEMENT via publication_relations.target_doi (parent in-périmètre).
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (id, title, pub_year, in_perimeter) "
-                "VALUES (1, 'P', 2020, TRUE)"
-            )
-        )
+        _publication(sa_sync_conn, "P", row_id=1, in_perimeter=True)
         sa_sync_conn.execute(
             text(
                 "INSERT INTO publication_relations "

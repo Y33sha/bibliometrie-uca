@@ -1,11 +1,18 @@
 """Tests d'intégration des lectures de structure servant la page publique des laboratoires."""
 
+from functools import partial
+
 from sqlalchemy import text
 
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.structures import PgStructuresQueries
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+
+# Authorship du périmètre, de rôle auteur.
+_lab_author = partial(insert_authorship, in_perimeter=True, roles=["author"])
 
 
 def _setup_perimeter(conn, lab_ids, code="uca"):
@@ -31,27 +38,6 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
     # `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
     refresh_perimeter_structures(conn)
     return root
-
-
-def _create_pub_with_authorship(
-    conn, person_id, lab_id, doc_type="article", pub_year=2024, in_perimeter=True
-):
-    pub_id = conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES ('X', 'x', :y, CAST(:dt AS doc_type)) RETURNING id"
-        ),
-        {"y": pub_year, "dt": doc_type},
-    ).scalar_one()
-    aid = conn.execute(
-        text(
-            "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-            "VALUES (:pid, :perid, :inp, ARRAY['author']::text[]) RETURNING id"
-        ),
-        {"pid": pub_id, "perid": person_id, "inp": in_perimeter},
-    ).scalar_one()
-    add_authorship_structure(conn, aid, lab_id)
-    return pub_id
 
 
 class TestListLaboratories:
@@ -182,20 +168,8 @@ class TestGetLaboratoryDashboard:
         )
         lab = insert_structure(sa_sync_conn, "LAB")
         pid = insert_person(sa_sync_conn)
-        pub_id = sa_sync_conn.execute(
-            text("""
-                INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, countries)
-                VALUES ('X', 'x', 2024, 'article', 'gold', ARRAY['fr', 'us'])
-                RETURNING id
-            """)
-        ).scalar_one()
-        aid = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-                "VALUES (:pid, :perid, TRUE, ARRAY['author']::text[]) RETURNING id"
-            ),
-            {"pid": pub_id, "perid": pid},
-        ).scalar_one()
+        pub_id = insert_publication(sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"])
+        aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
         add_authorship_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
@@ -208,20 +182,8 @@ class TestGetLaboratoryDashboard:
         ni apparaître dans le top pays."""
         lab = insert_structure(sa_sync_conn, "LAB")
         pid = insert_person(sa_sync_conn)
-        pub_id = sa_sync_conn.execute(
-            text("""
-                INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, countries)
-                VALUES ('Y', 'y', 2024, 'article', 'closed', ARRAY['fr', 'xx'])
-                RETURNING id
-            """)
-        ).scalar_one()
-        aid = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-                "VALUES (:pid, :perid, TRUE, ARRAY['author']::text[]) RETURNING id"
-            ),
-            {"pid": pub_id, "perid": pid},
-        ).scalar_one()
+        pub_id = insert_publication(sa_sync_conn, "Y", oa_status="closed", countries=["fr", "xx"])
+        aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
         add_authorship_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
@@ -237,16 +199,6 @@ class TestGetLaboratorySubjects:
         _setup_perimeter(sa_sync_conn, [lab])
 
         # 3 publications du labo avec sujets variables.
-        def _create_pub(title="X", doc_type="article"):
-            row = sa_sync_conn.execute(
-                text(
-                    "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-                    "VALUES (:t, lower(:t), 2024, CAST(:dt AS doc_type)) RETURNING id"
-                ),
-                {"t": title, "dt": doc_type},
-            ).one()
-            return row.id
-
         def _create_subject(label):
             row = sa_sync_conn.execute(
                 text("INSERT INTO subjects (label) VALUES (:l) RETURNING id"),
@@ -264,18 +216,12 @@ class TestGetLaboratorySubjects:
             )
 
         def _attach(pub_id):
-            aid = sa_sync_conn.execute(
-                text(
-                    "INSERT INTO authorships (publication_id, in_perimeter, roles) "
-                    "VALUES (:p, TRUE, ARRAY['author']::text[]) RETURNING id"
-                ),
-                {"p": pub_id},
-            ).scalar_one()
+            aid = _lab_author(sa_sync_conn, pub_id)
             add_authorship_structure(sa_sync_conn, aid, lab)
 
-        p1 = _create_pub("p1")
-        p2 = _create_pub("p2")
-        p3 = _create_pub("p3")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
+        p3 = insert_publication(sa_sync_conn, "p3")
         for p in (p1, p2, p3):
             _attach(p)
 

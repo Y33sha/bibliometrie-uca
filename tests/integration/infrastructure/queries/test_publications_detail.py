@@ -9,6 +9,7 @@ from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
 )
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -48,14 +49,7 @@ class TestGetPublicationDetail:
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
         sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
-        auth_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id) "
-                "VALUES (:pub, :pid) RETURNING id"
-            ),
-            {"pub": pub, "pid": pid},
-        ).one()
-        auth_id = auth_row.id
+        auth_id = insert_authorship(sa_sync_conn, pub, person_id=pid)
         insert_signature(sa_sync_conn, sd, person_id=pid, authorship_id=auth_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)
@@ -185,13 +179,7 @@ class TestGetPublicationDetail:
 
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn)
-        aid = sa_sync_conn.execute(
-            text("""
-                INSERT INTO authorships (publication_id, person_id)
-                VALUES (:pub, :pid) RETURNING id
-            """),
-            {"pub": pub, "pid": pid},
-        ).scalar_one()
+        aid = insert_authorship(sa_sync_conn, pub, person_id=pid)
         add_authorship_structure(sa_sync_conn, aid, lab_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)

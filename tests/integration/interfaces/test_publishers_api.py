@@ -11,9 +11,19 @@ Couvre :
 """
 
 import uuid
+from functools import partial
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_journal, seed_publisher, uniq
+from tests.integration.helpers.seeds import (
+    seed_in_perimeter_authorships,
+    seed_journal,
+    seed_publication,
+    seed_publisher,
+    uniq,
+)
+
+# Publication sans titre normalisé.
+_publication = partial(seed_publication, normalize_title=False)
 
 
 def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
@@ -25,51 +35,6 @@ def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
             (prefix, publisher_id, crossref_member_id),
         )
     return prefix
-
-
-def _add_in_perimeter_authorships(journal_id: int) -> None:
-    """Pose un authorship in_perimeter (personne non rejetée) sur chaque
-    publication de la revue : les requêtes publishers ne comptent que les
-    publications du périmètre."""
-    with owner_pool() as cur:
-        cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
-        pub_ids = [r["id"] for r in cur.fetchall()]
-        for pid in pub_ids:
-            name = uniq("Author")
-            cur.execute(
-                "INSERT INTO persons "
-                "(last_name, first_name, last_name_normalized, first_name_normalized) "
-                "VALUES (%s, 'Jane', normalize_name_form(%s), 'jane') RETURNING id",
-                (name, name),
-            )
-            person_id = cur.fetchone()["id"]
-            cur.execute(
-                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-                "VALUES (%s, %s, TRUE, ARRAY['author'])",
-                (pid, person_id),
-            )
-        # Matérialise comme le pipeline (rollup in_perimeter + pub_count) : les
-        # requêtes filtrées au périmètre lisent ces colonnes, pas authorships.
-        cur.execute(
-            "UPDATE publications p SET in_perimeter = EXISTS ("
-            "SELECT 1 FROM authorships a JOIN persons pe "
-            "ON pe.id = a.person_id AND pe.exclusion IS NULL "
-            "WHERE a.publication_id = p.id AND a.in_perimeter = TRUE) "
-            "WHERE p.journal_id = %s",
-            (journal_id,),
-        )
-        cur.execute(
-            "UPDATE journals j SET pub_count = COALESCE((SELECT COUNT(*) "
-            "FROM publications p WHERE p.journal_id = j.id AND p.in_perimeter "
-            "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
-            (journal_id,),
-        )
-        cur.execute(
-            "UPDATE publishers pub SET pub_count = COALESCE((SELECT SUM(j.pub_count) "
-            "FROM journals j WHERE j.publisher_id = pub.id), 0) "
-            "WHERE pub.id = (SELECT publisher_id FROM journals WHERE id = %s)",
-            (journal_id,),
-        )
 
 
 _cleanup_after_module = truncate_after_module(
@@ -164,12 +129,8 @@ class TestListPublishers:
         # Éditeur avec une revue et une publi → inclus.
         with_data = seed_publisher("WithPubsPub")
         jid = seed_journal(publisher_id=with_data)
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
-                (jid,),
-            )
-        _add_in_perimeter_authorships(jid)
+        _publication("p1", journal_id=jid)
+        seed_in_perimeter_authorships(jid)
         r = client.get("/api/publishers", params={"with_pubs": "true", "per_page": 200})
         assert r.status_code == 200
         names = {p["name"] for p in r.json()["publishers"]}
@@ -291,15 +252,11 @@ class TestPublisherDashboard:
                 "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s",
                 (j_proc,),
             )
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, doc_type, oa_status, journal_id) "
-                "VALUES ('p1', 2024, 'article', 'gold', %s), "
-                "       ('p2', 2024, 'article', 'closed', %s), "
-                "       ('p3', 2024, 'conference_paper', NULL, %s)",
-                (j_journal, j_journal, j_proc),
-            )
-        _add_in_perimeter_authorships(j_journal)
-        _add_in_perimeter_authorships(j_proc)
+            _publication("p1", doc_type="article", oa_status="gold", journal_id=j_journal)
+            _publication("p2", doc_type="article", oa_status="closed", journal_id=j_journal)
+            _publication("p3", doc_type="conference_paper", oa_status=None, journal_id=j_proc)
+        seed_in_perimeter_authorships(j_journal)
+        seed_in_perimeter_authorships(j_proc)
         r = client.get(f"/api/publishers/{pid}/dashboard")
         assert r.status_code == 200
         body = r.json()
@@ -326,12 +283,7 @@ class TestPublisherSubjects:
         pid = seed_publisher()
         jid = seed_journal(publisher_id=pid)
         with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, journal_id) "
-                "VALUES ('p1', 2024, %s), ('p2', 2024, %s) RETURNING id",
-                (jid, jid),
-            )
-            pub_ids = [r["id"] for r in cur.fetchall()]
+            pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
             specific_label = uniq("specific_subject")
             cur.execute(
                 "INSERT INTO subjects (label, usage_count) VALUES (%s, 100) RETURNING id",
@@ -349,7 +301,7 @@ class TestPublisherSubjects:
                 "VALUES (%s, %s, 'hal'), (%s, %s, 'hal'), (%s, %s, 'hal')",
                 (pub_ids[0], spec_id, pub_ids[1], spec_id, pub_ids[0], gen_id),
             )
-        _add_in_perimeter_authorships(jid)
+        seed_in_perimeter_authorships(jid)
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200
         body = r.json()

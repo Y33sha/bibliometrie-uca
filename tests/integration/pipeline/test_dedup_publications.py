@@ -19,6 +19,7 @@ from sqlalchemy import text
 from application.services.publications.core import refresh_from_sources
 from domain.normalize import normalize_text
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de 2024, de titre « Test ».
@@ -244,13 +245,7 @@ class TestRefreshFromSources:
                 "first_name_normalized) VALUES ('Testauthor', 'A', 'testauthor', 'a') RETURNING id"
             )
         ).scalar_one()
-        conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id, author_position) "
-                "VALUES (:p, :pe, 1)"
-            ),
-            {"p": pid, "pe": person_id},
-        )
+        insert_authorship(conn, pid, person_id=person_id, author_position=1)
         refresh_from_sources(pid, repo=publication_repository(conn))
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0

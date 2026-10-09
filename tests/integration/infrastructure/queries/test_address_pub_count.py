@@ -5,21 +5,12 @@ from sqlalchemy import text
 from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
 
 _Q = PgAddressPubCountQueries()
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
     insert_source_publication,
 )
-
-
-def _new_pub(conn, title):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES (:t, lower(:t), 2024, 'article') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
 
 
 def _sa_for_pub(conn, pub_id, source_id):
@@ -44,8 +35,8 @@ def _link_address(conn, sa_id, raw_text):
 class TestRecomputePubCount:
     def test_counts_distinct_publications(self, sa_sync_conn):
         """pub_count = nb de publications canoniques distinctes, pas de signatures."""
-        p1 = _new_pub(sa_sync_conn, "P1")
-        p2 = _new_pub(sa_sync_conn, "P2")
+        p1 = insert_publication(sa_sync_conn, "P1")
+        p2 = insert_publication(sa_sync_conn, "P2")
         # 3 signatures sur la même adresse : 2 sur p1 (1 distinct), 1 sur p2.
         for sid, pub in (("h1", p1), ("h2", p1), ("h3", p2)):
             _link_address(sa_sync_conn, _sa_for_pub(sa_sync_conn, pub, sid), "Shared Address")

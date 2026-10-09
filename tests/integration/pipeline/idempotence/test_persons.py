@@ -5,18 +5,13 @@ def setup_persons_test_data(conn):
     """Crée une chaîne complète de données pour tester create_persons :
     publications → source_publications (hal) → source_authorships (in_perimeter=TRUE).
     """
-    from sqlalchemy import text
 
+    from tests.integration.helpers.publications import insert_publication
     from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
     # Publications
-    conn.execute(
-        text("""
-            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-            VALUES (90001, 'Test Pub Alpha', 'test pub alpha', 'article', 2024),
-                   (90002, 'Test Pub Beta', 'test pub beta', 'thesis', 2024)
-        """)
-    )
+    insert_publication(conn, "Test Pub Alpha", row_id=90001)
+    insert_publication(conn, "Test Pub Beta", row_id=90002, doc_type="thesis")
 
     # HAL documents
     for row_id, source_id, title, doc_type in (

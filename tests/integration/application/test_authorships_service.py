@@ -21,14 +21,21 @@ from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
     insert_source_publication,
 )
 from tests.integration.helpers.structures import insert_structure, refresh_structure_matviews
+
+# Publication « Test Article » sans titre normalisé ni type.
+_publication = partial(
+    insert_publication, title="Test Article", normalize_title=False, doc_type=None
+)
 
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
@@ -48,22 +55,6 @@ def repo(sa_sync_conn):
 
 
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
-
-
-def _create_publication(conn, title="Test Article", pub_year=2024):
-    row = conn.execute(
-        text("INSERT INTO publications (title, pub_year) VALUES (:t, :y) RETURNING id"),
-        {"t": title, "y": pub_year},
-    ).one()
-    return row.id
-
-
-def _create_authorship(conn, publication_id, person_id=None):
-    row = conn.execute(
-        text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid) RETURNING id"),
-        {"p": publication_id, "pid": person_id},
-    ).one()
-    return row.id
 
 
 def _create_perimeter(conn, code, name, structure_ids):
@@ -96,9 +87,9 @@ class TestExcludeAuthorship:
 
     def test_rejects_deletes_row_and_detaches_source(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
@@ -133,9 +124,9 @@ class TestExcludeAuthorship:
     def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         exclude_authorship(authorship_id, repo=repo)
@@ -156,13 +147,13 @@ class TestExcludeAuthorship:
 
     def test_does_not_touch_other_authorships(self, sa_sync_conn, repo):
         """Rejeter une authorship ne touche ni les autres paires ni leurs sources."""
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
 
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
-        a1 = _create_authorship(sa_sync_conn, pub_id, p1)
-        a2 = _create_authorship(sa_sync_conn, pub_id, p2)
+        a1 = insert_authorship(sa_sync_conn, pub_id, person_id=p1)
+        a2 = insert_authorship(sa_sync_conn, pub_id, person_id=p2)
         insert_signature(sa_sync_conn, sp_id, person_id=p1, authorship_id=a1)
         sa2 = insert_signature(
             sa_sync_conn, sp_id, author_position=1, person_id=p2, authorship_id=a2
@@ -193,8 +184,8 @@ class TestRejectPair:
 
     def test_detaches_all_sources_of_pair_and_deletes_canonical(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        pub_id = _publication(sa_sync_conn)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         # Deux sources (hal + openalex) attestent la même paire.
         sp_hal = _notice(sa_sync_conn, pub_id)
         sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
@@ -239,7 +230,7 @@ class TestRejectPair:
     def test_not_recreated_on_rerun(self, sa_sync_conn, repo):
         """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
@@ -260,7 +251,7 @@ class TestRejectPair:
         )
 
     def test_does_not_touch_other_persons_sources(self, sa_sync_conn, repo):
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
@@ -292,8 +283,8 @@ class TestDeleteOrphanAuthorships:
 
     def test_deletes_authorship_without_source(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
-        _create_authorship(sa_sync_conn, pub_id, person_id)
+        pub_id = _publication(sa_sync_conn)
+        insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
 
         n = delete_orphan_authorships(person_id, repo=repo)
 
@@ -305,9 +296,9 @@ class TestDeleteOrphanAuthorships:
 
     def test_keeps_authorship_with_attesting_source(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         n = delete_orphan_authorships(person_id, repo=repo)
@@ -326,10 +317,10 @@ class TestDeleteOrphanAuthorships:
         """Ne touche que les authorships de la personne demandée."""
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
-        pub_id = _create_publication(sa_sync_conn)
-        _create_authorship(sa_sync_conn, pub_id, p1)
-        pub2 = _create_publication(sa_sync_conn, title="Autre")
-        _create_authorship(sa_sync_conn, pub2, p2)
+        pub_id = _publication(sa_sync_conn)
+        insert_authorship(sa_sync_conn, pub_id, person_id=p1)
+        pub2 = _publication(sa_sync_conn, title="Autre")
+        insert_authorship(sa_sync_conn, pub2, person_id=p2)
 
         n = delete_orphan_authorships(p1, repo=repo)
 
@@ -350,8 +341,8 @@ class TestPruneOrphanAuthorships:
 
     def test_deletes_orphan(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
-        _create_authorship(sa_sync_conn, pub_id, person_id)
+        pub_id = _publication(sa_sync_conn)
+        insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
 
         n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
@@ -360,9 +351,9 @@ class TestPruneOrphanAuthorships:
 
     def test_keeps_attested_pair(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         n = _BUILD.prune_orphan_authorships(sa_sync_conn)
@@ -378,18 +369,18 @@ class TestPruneOrphanAuthorships:
     def test_global_scope_across_persons(self, sa_sync_conn):
         """Prune toutes les orphelines, pas seulement celles d'une personne ;
         une authorship attestée (autre personne, même pub) est préservée."""
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         p_attested = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         p_orphan1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p_orphan2 = insert_person(sa_sync_conn, "Durand", first_name="Alice")
 
-        a_attested = _create_authorship(sa_sync_conn, pub_id, p_attested)
+        a_attested = insert_authorship(sa_sync_conn, pub_id, person_id=p_attested)
         insert_signature(sa_sync_conn, sp_id, person_id=p_attested, authorship_id=a_attested)
         # Deux orphelines sur deux personnes distinctes (aucune source ne les atteste).
-        _create_authorship(sa_sync_conn, pub_id, p_orphan1)
-        pub2 = _create_publication(sa_sync_conn, title="Autre")
-        _create_authorship(sa_sync_conn, pub2, p_orphan2)
+        insert_authorship(sa_sync_conn, pub_id, person_id=p_orphan1)
+        pub2 = _publication(sa_sync_conn, title="Autre")
+        insert_authorship(sa_sync_conn, pub2, person_id=p_orphan2)
 
         n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
@@ -415,9 +406,9 @@ class TestPropagateAuthorshipAttributes:
 
     def test_is_corresponding_is_bool_or(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        aid = _create_authorship(sa_sync_conn, pub_id, person_id)
+        aid = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         # Une source dit TRUE (wos), une dit FALSE (hal) → bool_or = TRUE,
         # quelle que soit la « priorité » des sources.
         sa_wos = insert_signature(
@@ -436,9 +427,9 @@ class TestPropagateAuthorshipAttributes:
 
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        aid = _create_authorship(sa_sync_conn, pub_id, person_id)
+        aid = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=aid, in_perimeter=True
         )
@@ -531,9 +522,9 @@ class TestPropagateUcaForAddresses:
     def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, repo, perimeter_queries):
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
@@ -582,9 +573,9 @@ class TestPropagateUcaForAddresses:
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        pub_id = _create_publication(sa_sync_conn)
+        pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
         sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id, in_perimeter=True

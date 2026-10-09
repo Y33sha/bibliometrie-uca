@@ -1,5 +1,6 @@
 """Idempotence : phase `populate_affiliations` (propagation périmètre/structures)."""
 
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
@@ -51,12 +52,7 @@ def _setup_affiliations_test_data(conn):
         """)
     )
 
-    conn.execute(
-        text("""
-            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-            VALUES (80001, 'Pub Affiliation Test', 'pub affiliation test', 'article', 2024)
-        """)
-    )
+    insert_publication(conn, "Pub Affiliation Test", row_id=80001)
 
     for row_id, source, source_id, doc_type in (
         (80001, "hal", "hal-80000001", "ART"),

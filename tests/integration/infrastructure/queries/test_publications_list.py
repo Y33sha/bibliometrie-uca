@@ -11,6 +11,7 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv,
     list_publications,
 )
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure
@@ -32,13 +33,7 @@ def _create_lab(conn):
 def _attach(conn, pub_id, lab_id):
     """Authorship reliant la publi à un labo via la matview authorship_structures
     (semée par la chaîne source minimale)."""
-    aid = conn.execute(
-        text(
-            "INSERT INTO authorships (publication_id, in_perimeter, roles) "
-            "VALUES (:pid, TRUE, ARRAY['author']::text[]) RETURNING id"
-        ),
-        {"pid": pub_id},
-    ).scalar_one()
+    aid = insert_authorship(conn, pub_id, in_perimeter=True, roles=["author"])
     add_authorship_structure(conn, aid, lab_id)
 
 
@@ -277,12 +272,7 @@ class TestThesesExport:
 
     def test_renders_a_thesis_with_each_source_url(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn)
-        pub = sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-                "VALUES ('Ma these', 'ma these', 2024, 'thesis'::doc_type) RETURNING id"
-            )
-        ).scalar_one()
+        pub = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
         _attach(sa_sync_conn, pub, lab)
         for src, sid in (
             ("hal", "hal-1"),
@@ -332,13 +322,9 @@ class TestExcludedPersonLab:
                 ),
                 {"e": exclusion},
             ).scalar_one()
-            aid = sa_sync_conn.execute(
-                text(
-                    "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-                    "VALUES (:pub, :pe, TRUE, ARRAY['author']::text[]) RETURNING id"
-                ),
-                {"pub": pub, "pe": person},
-            ).scalar_one()
+            aid = insert_authorship(
+                sa_sync_conn, pub, person_id=person, in_perimeter=True, roles=["author"]
+            )
             add_authorship_structure(sa_sync_conn, aid, lab)
 
         def listed(lab):

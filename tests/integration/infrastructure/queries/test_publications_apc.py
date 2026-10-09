@@ -4,18 +4,16 @@ from sqlalchemy import text
 
 from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.list import list_publications
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import insert_structure
 
 
 def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
     inside = insert_structure(sa_sync_conn, "apc_inside", structure_type="universite")
     outside = insert_structure(sa_sync_conn, "apc_outside", structure_type="universite")
-    pub_id = sa_sync_conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, in_perimeter) "
-            "VALUES ('APC', 2024, TRUE) RETURNING id"
-        )
-    ).scalar_one()
+    pub_id = insert_publication(
+        sa_sync_conn, "APC", normalize_title=False, doc_type=None, in_perimeter=True
+    )
     for budget in (inside, outside, None):
         sa_sync_conn.execute(
             text(

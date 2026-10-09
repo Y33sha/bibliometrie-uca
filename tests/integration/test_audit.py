@@ -15,6 +15,7 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
+from tests.integration.helpers.publications import insert_publication
 
 
 @pytest.fixture
@@ -141,14 +142,6 @@ class TestEndToEndServiceIntegration:
                 "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
             ),
             {"l": last, "f": first},
-        ).scalar_one()
-
-    def _create_publication(self, conn):
-        return conn.execute(
-            text(
-                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-                "VALUES ('X', 'x', 2024, CAST('article' AS doc_type)) RETURNING id"
-            )
         ).scalar_one()
 
     def _last_event(self, conn):
@@ -327,7 +320,7 @@ class TestEndToEndServiceIntegration:
         from infrastructure.repositories import authorship_repository
 
         person_id = self._create_person(sa_sync_conn)
-        pub_id = self._create_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         token = set_current_user("admin")
         try:
             reject_pair(

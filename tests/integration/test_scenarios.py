@@ -1,5 +1,7 @@
 """Tests d'intégration — nécessitent la base bibliometrie_test."""
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
@@ -10,7 +12,11 @@ from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository, publication_repository
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+
+# Publication sans titre normalisé ni type.
+_publication = partial(insert_publication, normalize_title=False, doc_type=None)
 
 
 @pytest.fixture
@@ -52,18 +58,6 @@ def create_journal(conn, title="Test Journal"):
     ).scalar_one()
 
 
-def create_publication(conn, title, doi=None, pub_year=2024, journal_id=None):
-    return conn.execute(
-        text(
-            """
-            INSERT INTO publications (title, pub_year, doi, journal_id)
-            VALUES (:title, :py, :doi, :jid) RETURNING id
-            """
-        ),
-        {"title": title, "py": pub_year, "doi": doi, "jid": journal_id},
-    ).scalar_one()
-
-
 # ── DOI case-insensitive (bug corrigé 2026-03-31) ──
 
 
@@ -72,12 +66,12 @@ class TestDoiCaseInsensitive:
     Les lookups doivent aussi être case-insensitive."""
 
     def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
-        create_publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
         with pytest.raises(IntegrityError):
-            create_publication(sa_sync_conn, "Pub B", doi="10.1103/physrevc.111.024905")
+            _publication(sa_sync_conn, "Pub B", doi="10.1103/physrevc.111.024905")
 
     def test_lookup_finds_case_variant(self, sa_sync_conn):
-        create_publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+        _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
         result = sa_sync_conn.execute(
             text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
             {"doi": "10.1103/physrevc.111.024905"},

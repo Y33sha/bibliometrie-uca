@@ -1,21 +1,15 @@
 """Tests d'intégration pour `infrastructure.read_models.persons.detail`."""
 
-from sqlalchemy import text
+from functools import partial
 
 from infrastructure.read_models.persons.detail import person_theses
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
-
-def _authorship(conn, pub_id, person_id, roles):
-    return conn.execute(
-        text(
-            "INSERT INTO authorships (publication_id, person_id, roles, in_perimeter) "
-            "VALUES (:p, :pe, CAST(:r AS text[]), TRUE) RETURNING id"
-        ),
-        {"p": pub_id, "pe": person_id, "r": roles},
-    ).scalar_one()
+# Authorship du périmètre.
+_in_perimeter_authorship = partial(insert_authorship, in_perimeter=True)
 
 
 def _link_theses_source(conn, authorship_id):
@@ -36,9 +30,11 @@ class TestPersonTheses:
         alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
         bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")
         pub = insert_publication(sa_sync_conn)
-        jury_auth = _authorship(sa_sync_conn, pub, jury, ["jury_member"])
-        _authorship(sa_sync_conn, pub, alice, ["author"])
-        _authorship(sa_sync_conn, pub, bruno, ["author"])
+        jury_auth = _in_perimeter_authorship(
+            sa_sync_conn, pub, person_id=jury, roles=["jury_member"]
+        )
+        _in_perimeter_authorship(sa_sync_conn, pub, person_id=alice, roles=["author"])
+        _in_perimeter_authorship(sa_sync_conn, pub, person_id=bruno, roles=["author"])
         _link_theses_source(sa_sync_conn, jury_auth)
 
         res = person_theses(sa_sync_conn, jury)

@@ -1,7 +1,12 @@
 """Tests du router monographs : liste (recherche, type, tri) et fiche."""
 
+from functools import partial
+
 from tests.integration.helpers.db import owner_pool
-from tests.integration.helpers.seeds import uniq
+from tests.integration.helpers.seeds import seed_publication, uniq
+
+# Publication sans titre normalisé.
+_publication = partial(seed_publication, normalize_title=False)
 
 
 def _seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = None) -> int:
@@ -15,12 +20,8 @@ def _seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None =
 
 
 def _seed_publications(monograph_id: int, n: int) -> None:
-    with owner_pool() as cur:
-        for _ in range(n):
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, monograph_id) VALUES ('P', 2024, %s)",
-                (monograph_id,),
-            )
+    for _ in range(n):
+        _publication("P", monograph_id=monograph_id)
 
 
 def _ids(client, **params) -> list[int]:
@@ -143,13 +144,8 @@ class TestMonographPublications:
     def test_publications_filtered_by_monograph(self, client):
         mid = _seed_monograph(uniq("Ouvrage"))
         other = _seed_monograph(uniq("Autre"))
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publications (title, pub_year, monograph_id, in_perimeter)"
-                " VALUES ('Chapitre', 2024, %s, true), ('Ailleurs', 2024, %s, true) RETURNING id",
-                (mid, other),
-            )
-            chapter = cur.fetchone()["id"]
+        chapter = _publication("Chapitre", monograph_id=mid, in_perimeter=True)
+        _publication("Ailleurs", monograph_id=other, in_perimeter=True)
         r = client.get("/api/publications", params={"monograph_id": mid})
         assert r.status_code == 200
         assert [p["id"] for p in r.json()["publications"]] == [chapter]

@@ -12,6 +12,7 @@ import uuid
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
+    seed_authorship,
     seed_person,
     seed_publication,
     seed_source_authorship,
@@ -34,16 +35,6 @@ _cleanup_after_module = truncate_after_module(
     "persons",
     "audit_log",
 )
-
-
-def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO authorships (publication_id, person_id, in_perimeter) "
-            "VALUES (%s, %s, true) RETURNING id",
-            (publication_id, person_id),
-        )
-        return cur.fetchone()["id"]
 
 
 def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]:
@@ -73,7 +64,7 @@ class TestExcludeAuthorship:
     def test_ok(self, auth_client):
         pid = seed_person()
         pub = seed_publication("Exclude test")
-        aid = _seed_authorship(pub, person_id=pid)
+        aid = seed_authorship(pub, person_id=pid, in_perimeter=True)
         r = auth_client.patch(f"/api/authorships/{aid}/exclude")
         assert r.status_code == 200
         assert r.json()["ok"] is True

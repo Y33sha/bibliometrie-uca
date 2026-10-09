@@ -8,24 +8,20 @@ from sqlalchemy import text
 from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons import PgPersonsQueries
+from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure, insert_structure
 
 
 def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perimeter=False):
-    pub = conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES ('X', 'x', 2024, 'article') RETURNING id"
-        )
-    ).scalar_one()
-    aid = conn.execute(
-        text(
-            "INSERT INTO authorships (publication_id, person_id, roles, in_perimeter) "
-            "VALUES (:p, :pe, :roles, :inp) RETURNING id"
-        ),
-        {"p": pub, "pe": person_id, "roles": list(roles), "inp": in_perimeter},
-    ).scalar_one()
+    aid = insert_authorship(
+        conn,
+        insert_publication(conn),
+        person_id=person_id,
+        in_perimeter=in_perimeter,
+        roles=list(roles),
+    )
     if lab_id is not None:
         add_authorship_structure(conn, aid, lab_id)
 

@@ -10,6 +10,7 @@ from application.ports.read_models.addresses_queries import (
 )
 from infrastructure.read_models.addresses import PgAddressesQueries
 from tests.integration.helpers.addresses import ensure_country, insert_address
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
@@ -247,13 +248,7 @@ class TestGetAddressRawText:
 
 class TestGetAddressPublications:
     def test_returns_linked_publications(self, sa_sync_conn):
-        pub_row = sa_sync_conn.execute(
-            text("""
-                INSERT INTO publications (title, title_normalized, pub_year, doc_type, doi)
-                VALUES ('T', 't', 2024, 'article', '10.1/a') RETURNING id
-            """)
-        ).one()
-        pub = pub_row.id
+        pub = insert_publication(sa_sync_conn, "T", doi="10.1/a")
         sd = insert_source_publication(sa_sync_conn, pub, source_id="h-1", title="T")
         sa_id = insert_signature(sa_sync_conn, sd)
         addr = insert_address(sa_sync_conn, "rue X")
