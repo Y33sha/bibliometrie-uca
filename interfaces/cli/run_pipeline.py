@@ -466,20 +466,18 @@ def phase_persons(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transaction et métriques dans `application/pipeline/persons/phase.py`.
     """
-    from application.pipeline.persons.phase import run
+    from application.pipeline.persons.phase import PersonsPhase
     from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
     from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
     from infrastructure.repositories import authorship_repository, person_repository
 
-    return run(
-        open_tx,
+    return PersonsPhase(
         PgPersonsMatchingQueries(),
         PgPersonNameFormsQueries(),
-        log,
-        orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
         person_repo_factory=person_repository,
         authorship_repo_factory=authorship_repository,
-    )
+        orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
+    ).run(_context(options))
 
 
 def phase_authorships(options: RunOptions) -> PhaseMetrics:
