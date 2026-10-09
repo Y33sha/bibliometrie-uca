@@ -50,6 +50,7 @@ from domain.publications.identifiers import (
 )
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
+from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 # =============================================================
@@ -355,16 +356,25 @@ def parse_tei_isbns(label_xml: str | None) -> list[str]:
     return isbns
 
 
+def _tei_root(label_xml: str | None) -> Element | None:
+    """Racine du TEI. `None` si `label_xml` est absent ou mal formé."""
+    if not label_xml:
+        return None
+    try:
+        return _parse_tei(label_xml)
+    except (ParseError, DefusedXmlException):
+        return None
+
+
+def _title_authors(root: Element | None) -> list[Element]:
+    """Éléments `author` du `titleStmt` TEI, dans l'ordre des auteurs."""
+    title_stmt = None if root is None else root.find(".//tei:biblFull/tei:titleStmt", _TEI_NS)
+    return [] if title_stmt is None else title_stmt.findall("tei:author", _TEI_NS)
+
+
 def _tei_title_authors(label_xml: str | None) -> list[Element]:
     """Éléments `author` du `titleStmt` TEI, dans l'ordre des auteurs. Liste vide si `label_xml` est absent ou mal formé."""
-    if not label_xml:
-        return []
-    try:
-        root = _parse_tei(label_xml)
-    except (ParseError, DefusedXmlException):
-        return []
-    title_stmt = root.find(".//tei:biblFull/tei:titleStmt", _TEI_NS)
-    return [] if title_stmt is None else title_stmt.findall("tei:author", _TEI_NS)
+    return _title_authors(_tei_root(label_xml))
 
 
 def parse_tei_author_names(label_xml: str | None) -> list[list[str]]:
@@ -413,6 +423,33 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
                 ids["idhal"] = val
         out.append(ids)
     return out
+
+
+_XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
+
+
+def parse_tei_author_rors(label_xml: str | None) -> list[list[str]]:
+    """ROR des structures d'affiliation de chaque auteur du TEI HAL, dans l'ordre des auteurs.
+
+    Un auteur désigne ses structures par `affiliation/@ref` ; le ROR d'une structure est son `idno` de type `ROR` dans `listOrg`.
+    """
+    root = _tei_root(label_xml)
+    if root is None:
+        return []
+    ror_by_struct: dict[str, str] = {}
+    for org in root.iterfind(".//tei:listOrg/tei:org", _TEI_NS):
+        struct = org.get(_XML_ID)
+        for idno in org.findall("tei:idno", _TEI_NS):
+            if struct and (idno.get("type") or "").upper() == "ROR" and (idno.text or "").strip():
+                ror_by_struct[struct] = (idno.text or "").strip()
+    return [
+        [
+            ror_by_struct[ref]
+            for aff in author.findall("tei:affiliation", _TEI_NS)
+            if (ref := (aff.get("ref") or "").removeprefix("#")) in ror_by_struct
+        ]
+        for author in _title_authors(root)
+    ]
 
 
 # =============================================================
@@ -483,11 +520,12 @@ _HAL_AUTHOR_FIELDS = (
 
 
 def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants et noms par auteur extraits du TEI (`tei_author_identifiers`, `tei_author_names`)."""
+    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants, noms et ROR par auteur extraits du TEI (`tei_author_identifiers`, `tei_author_names`, `tei_author_rors`)."""
     label_xml = hal_text_field(doc.get("label_xml"))
     block: dict[str, JsonValue] = {field: doc.get(field) for field in _HAL_AUTHOR_FIELDS}
     block["tei_author_identifiers"] = cast("JsonValue", parse_tei_author_identifiers(label_xml))
     block["tei_author_names"] = cast("JsonValue", parse_tei_author_names(label_xml))
+    block["tei_author_rors"] = cast("JsonValue", parse_tei_author_rors(label_xml))
     return block
 
 
@@ -496,7 +534,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de structures).
+    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents), `addresses` (noms de structures) et `ror_ids` (ROR des structures d'affiliation du TEI).
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
@@ -504,6 +542,10 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     # Nom et prénom séparés par auteur, extraits du TEI ; à défaut, le nom Solr.
     tei_names = [
         [as_str(p) for p in as_sequence(e)] for e in as_sequence(doc.get("tei_author_names"))
+    ]
+    tei_rors = [
+        parse_ror_ids(as_str(r) for r in as_sequence(e))
+        for e in as_sequence(doc.get("tei_author_rors"))
     ]
 
     # authFullNameFormIDPersonIDIDHal_fs :
@@ -591,6 +633,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                 roles=roles or None,
                 person_identifiers=identifiers,
                 addresses=[AddressRecord(text=part) for part in addr_parts],
+                ror_ids=tei_rors[position] if position < len(tei_rors) else frozenset(),
             )
         )
 
