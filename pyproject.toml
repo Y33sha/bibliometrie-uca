@@ -9,14 +9,14 @@ requires-python = ">=3.14"
 dependencies = [
     "httpx2==2.13.1",            # unique client HTTP : appels synchrones et asynchrones du pipeline
     "psycopg[binary]==3.3.6",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
-    "sqlalchemy==2.1.1",        # query builder Core
+    "sqlalchemy==2.1.3",        # query builder Core
     "alembic==1.20.0",           # migrations DB
-    "fastapi==0.141.1",
+    "fastapi==0.142.2",
     "starlette==1.7.0",         # importé directement (Response, Scope, RequestResponseEndpoint) ; ≥1.3.1 corrige CVE-2026-54282/54283 (≥1.0.1 corrigeait déjà CVE-2026-48710)
     "anyio==4.15.1",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.54.0",           # serveur ASGI ; lancé en ligne de commande, jamais importé
     "bcrypt==5.0.0",
-    "python-dotenv==1.2.3",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
+    "python-dotenv==1.2.4",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
     "pydantic==2.13.5",          # requis par pydantic-settings et utilisé directement
     "pydantic-settings==2.15.0", # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
     "pyahocorasick==2.3.1",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
@@ -35,8 +35,8 @@ dev = [
     "pytest==9.1.1",           # CVE-2025-71176 fixed
     "pytest-asyncio==1.4.0",   # tests des extractions HTTP async du pipeline
     "pytest-cov==7.1.0",
-    "ruff==0.16.9",
-    "mypy==2.3.1",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
     "deptry==0.25.1",
     "pip-audit==2.10.1",
     "pre-commit==4.6.2",
