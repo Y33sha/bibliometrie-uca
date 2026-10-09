@@ -17,7 +17,9 @@ La vérification Sudoc précède la fusion, qui lui prend l'ISSN-L, et l'import 
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
@@ -26,59 +28,87 @@ RunSubstep = Callable[[], PhaseMetrics]
 CredentialsMissing = Callable[[str], str | None]
 
 
-def run(
-    *,
-    resolve_publishers: RunSubstep,
-    enrich_from_openalex: RunSubstep,
-    check_in_sudoc: RunSubstep,
-    merge_duplicates: RunSubstep,
-    delete_empty: RunSubstep,
-    merge_duplicate_monographs: RunSubstep,
-    delete_empty_monographs: RunSubstep,
-    link_monographs_to_collections: RunSubstep,
-    delete_empty_publishers: RunSubstep,
-    type_proceedings: RunSubstep,
-    type_proceedings_volumes: RunSubstep,
-    learn_doi_namespaces: RunSubstep,
-    enrich_from_doaj: RunSubstep,
-    credentials_missing: CredentialsMissing,
+@dataclass(frozen=True)
+class PublishersJournalsPhase:
+    resolve_publishers: RunSubstep
+    enrich_from_openalex: RunSubstep
+    check_in_sudoc: RunSubstep
+    merge_duplicates: RunSubstep
+    delete_empty: RunSubstep
+    merge_duplicate_monographs: RunSubstep
+    delete_empty_monographs: RunSubstep
+    link_monographs_to_collections: RunSubstep
+    delete_empty_publishers: RunSubstep
+    type_proceedings: RunSubstep
+    type_proceedings_volumes: RunSubstep
+    learn_doi_namespaces: RunSubstep
+    enrich_from_doaj: RunSubstep
+    credentials_missing: CredentialsMissing
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Enchaîne les sous-étapes (les deux premières sous garde de config) et assemble les métriques de la phase."""
+        logger = ctx.logger
+        metrics = PhaseMetrics()
+
+        publishers = PhaseMetrics()
+        if filter_configured(
+            ["crossref", "datacite"],
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=logger,
+            phase="publishers_journals",
+        ):
+            publishers = self.resolve_publishers()
+
+        openalex = PhaseMetrics()
+        if filter_configured(
+            ["openalex"],
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=logger,
+            phase="publishers_journals",
+        ):
+            openalex = self.enrich_from_openalex()
+
+        _assemble(
+            metrics,
+            logger,
+            publishers=publishers,
+            openalex=openalex,
+            sudoc=self.check_in_sudoc(),
+            merges=self.merge_duplicates(),
+            deletions=self.delete_empty(),
+            monograph_merges=self.merge_duplicate_monographs(),
+            monograph_deletions=self.delete_empty_monographs(),
+            monograph_links=self.link_monographs_to_collections(),
+            publisher_deletions=self.delete_empty_publishers(),
+            proceedings=self.type_proceedings(),
+            volumes=self.type_proceedings_volumes(),
+            namespaces=self.learn_doi_namespaces(),
+            doaj=self.enrich_from_doaj(),
+        )
+        return metrics
+
+
+def _assemble(
+    metrics: PhaseMetrics,
     logger: logging.Logger,
-) -> PhaseMetrics:
-    """Enchaîne les sous-étapes (les deux premières sous garde de config) et assemble les métriques de la phase."""
-    metrics = PhaseMetrics()
-
-    publishers = PhaseMetrics()
-    if filter_configured(
-        ["crossref", "datacite"],
-        metrics,
-        credentials_missing=credentials_missing,
-        logger=logger,
-        phase="publishers_journals",
-    ):
-        publishers = resolve_publishers()
-
-    openalex = PhaseMetrics()
-    if filter_configured(
-        ["openalex"],
-        metrics,
-        credentials_missing=credentials_missing,
-        logger=logger,
-        phase="publishers_journals",
-    ):
-        openalex = enrich_from_openalex()
-
-    sudoc = check_in_sudoc()
-    merges = merge_duplicates()
-    deletions = delete_empty()
-    monograph_merges = merge_duplicate_monographs()
-    monograph_deletions = delete_empty_monographs()
-    monograph_links = link_monographs_to_collections()
-    publisher_deletions = delete_empty_publishers()
-    proceedings = type_proceedings()
-    volumes = type_proceedings_volumes()
-    namespaces = learn_doi_namespaces()
-    doaj = enrich_from_doaj()
-
+    *,
+    publishers: PhaseMetrics,
+    openalex: PhaseMetrics,
+    sudoc: PhaseMetrics,
+    merges: PhaseMetrics,
+    deletions: PhaseMetrics,
+    monograph_merges: PhaseMetrics,
+    monograph_deletions: PhaseMetrics,
+    monograph_links: PhaseMetrics,
+    publisher_deletions: PhaseMetrics,
+    proceedings: PhaseMetrics,
+    volumes: PhaseMetrics,
+    namespaces: PhaseMetrics,
+    doaj: PhaseMetrics,
+) -> None:
+    """Reporte dans `metrics` les métriques des sous-étapes, dans l'ordre de leur exécution."""
     # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
     for sub in (
         publishers,
@@ -181,4 +211,3 @@ def run(
     metrics.details["summary"] = {"doaj_matched": doaj.extras.get("matched", 0)}
     # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
     metrics.resume = ""
-    return metrics
