@@ -147,9 +147,9 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
 
     La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite : `fetch_missing` adresse ensuite chaque DOI à la bonne. La phase `publishers_journals` reprend les préfixes restants via les API `/prefixes`.
 
-    Séquence et métriques dans `application/pipeline/resolve_ra/phase.py` ; ici, le câblage : connexion, circuit-breaker, user-agent.
+    Séquence, transaction et métriques dans `application/pipeline/resolve_ra/phase.py` ; ici, le câblage : circuit-breaker, user-agent.
     """
-    from application.pipeline.resolve_ra.phase import run
+    from application.pipeline.resolve_ra.phase import ResolveRaPhase
     from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doi_org.registration_agency import fetch_registration_agencies
@@ -157,19 +157,13 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-    with open_tx() as conn:
-        return under_circuit_breaker(
-            "doi.org/ra",
-            lambda _breaker: run(
-                log,
-                repo=PgDoiPrefixesQueries(conn),
-                resolve_ras_fn=lambda prefixes: fetch_registration_agencies(
-                    prefixes, user_agent=user_agent
-                ),
-            ),
-            phase="resolve_ra",
-            logger=log,
-        )
+    with circuit_breaker("doi.org/ra") as breaker:
+        metrics = ResolveRaPhase(
+            PgDoiPrefixesQueries,
+            lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
+        ).run(_context(options))
+    signal_if_tripped(metrics, breaker)
+    return metrics
 
 
 def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
