@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.read_models.persons.detail import person_theses
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 
 
 def _person(conn, last, first):
@@ -14,15 +15,6 @@ def _person(conn, last, first):
             "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
         ),
         {"l": last, "f": first},
-    ).scalar_one()
-
-
-def _pub(conn):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES ('These', 'these', 2024, CAST('article' AS doc_type)) RETURNING id"
-        )
     ).scalar_one()
 
 
@@ -62,7 +54,7 @@ class TestPersonTheses:
         jury = _person(sa_sync_conn, "Jury", "Jean")
         alice = _person(sa_sync_conn, "Doctorant", "Alice")
         bruno = _person(sa_sync_conn, "Doctorant", "Bruno")
-        pub = _pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         jury_auth = _authorship(sa_sync_conn, pub, jury, ["jury_member"])
         _authorship(sa_sync_conn, pub, alice, ["author"])
         _authorship(sa_sync_conn, pub, bruno, ["author"])

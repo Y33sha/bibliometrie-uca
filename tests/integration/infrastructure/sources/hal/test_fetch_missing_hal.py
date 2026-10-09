@@ -8,6 +8,7 @@ from application.ports.pipeline.fetch_missing.hal import NntInsertResult
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
+from tests.integration.helpers.publications import insert_publication
 
 _INSERT_SOURCE_PUB_SQL = text(
     """
@@ -15,16 +16,6 @@ _INSERT_SOURCE_PUB_SQL = text(
     VALUES (CAST(:source AS source_type), :sid, :staging_id, :pub_id, 'titre test', :external_ids)
     """
 ).bindparams(bindparam("external_ids", type_=Jsonb))
-
-
-def _insert_publication(conn, *, in_perimeter=True, doc_type="article") -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, in_perimeter, doc_type) "
-            "VALUES ('titre test', 2020, :perim, CAST(:doc_type AS doc_type)) RETURNING id"
-        ),
-        {"perim": in_perimeter, "doc_type": doc_type},
-    ).scalar_one()
 
 
 def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
@@ -67,7 +58,7 @@ class TestFindMissingHalIds:
     @staticmethod
     def _carry(conn, source, source_id, hal_ids, *, in_perimeter=True):
         external_ids = {"hal_id": hal_ids} if hal_ids is not None else {}
-        publication_id = _insert_publication(conn, in_perimeter=in_perimeter)
+        publication_id = insert_publication(conn, in_perimeter=in_perimeter)
         _insert_sp(conn, source, source_id, external_ids, publication_id=publication_id)
 
     @staticmethod
@@ -117,7 +108,7 @@ class TestFindMissingNnts:
 
     @staticmethod
     def _thesis(conn, nnt) -> int:
-        publication_id = _insert_publication(conn, doc_type="thesis")
+        publication_id = insert_publication(conn, doc_type="thesis", in_perimeter=True)
         _insert_sp(conn, "theses", nnt, {"nnt": nnt}, publication_id=publication_id)
         return publication_id
 
@@ -137,7 +128,7 @@ class TestFindMissingNnts:
     def test_excludes_nnt_carried_by_a_hal_record(self, sa_sync_conn):
         """Un document HAL porte le NNT sans être rattaché à la thèse : HAL le connaît déjà."""
         self._thesis(sa_sync_conn, "2024UCA0001")
-        autre = _insert_publication(sa_sync_conn, doc_type="thesis")
+        autre = insert_publication(sa_sync_conn, doc_type="thesis", in_perimeter=True)
         _insert_sp(sa_sync_conn, "hal", "tel-01", {"nnt": "2024UCA0001"}, publication_id=autre)
         assert self._missing(sa_sync_conn) == []
 

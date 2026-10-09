@@ -9,18 +9,8 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv,
     list_publications,
 )
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure
-
-
-def _create_pub(conn, title="T"):
-    row = conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES (:t, lower(:t), 2024, 'article'::doc_type) RETURNING id"
-        ),
-        {"t": title},
-    ).one()
-    return row.id
 
 
 def _create_lab(conn):
@@ -67,8 +57,8 @@ def _link_subject(conn, pub_id, sid):
 class TestSearch:
     def test_search_matches_title(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn)
-        match = _create_pub(sa_sync_conn, "Quantum entanglement basics")
-        other = _create_pub(sa_sync_conn, "Foo bar baz")
+        match = insert_publication(sa_sync_conn, "Quantum entanglement basics")
+        other = insert_publication(sa_sync_conn, "Foo bar baz")
         _attach(sa_sync_conn, match, lab)
         _attach(sa_sync_conn, other, lab)
 
@@ -87,8 +77,8 @@ class TestSearch:
         """Une publi dont le titre ne contient pas le terme mais qui est
         annotée par un sujet matchant doit remonter dans les résultats."""
         lab = _create_lab(sa_sync_conn)
-        pub = _create_pub(sa_sync_conn, "Foo bar baz")
-        unrelated = _create_pub(sa_sync_conn, "Hello world")
+        pub = insert_publication(sa_sync_conn, "Foo bar baz")
+        unrelated = insert_publication(sa_sync_conn, "Hello world")
         _attach(sa_sync_conn, pub, lab)
         _attach(sa_sync_conn, unrelated, lab)
 
@@ -111,9 +101,9 @@ class TestSearch:
         matchent que via un sujet — quitte à casser l'ordre par défaut."""
         lab = _create_lab(sa_sync_conn)
         # Titre contient "quantum"
-        title_match = _create_pub(sa_sync_conn, "Quantum entanglement basics")
+        title_match = insert_publication(sa_sync_conn, "Quantum entanglement basics")
         # Titre ne contient pas "quantum", mais sujet associé oui
-        subject_match = _create_pub(sa_sync_conn, "Foo bar baz")
+        subject_match = insert_publication(sa_sync_conn, "Foo bar baz")
         _attach(sa_sync_conn, title_match, lab)
         _attach(sa_sync_conn, subject_match, lab)
         sid = _create_subject(sa_sync_conn, "Quantum mechanics")
@@ -133,7 +123,7 @@ class TestSearch:
     def test_search_unaccented_matches_accented_label(self, sa_sync_conn):
         """Les accents ne doivent pas bloquer le match (ILIKE + unaccent)."""
         lab = _create_lab(sa_sync_conn)
-        pub = _create_pub(sa_sync_conn, "Foo")
+        pub = insert_publication(sa_sync_conn, "Foo")
         _attach(sa_sync_conn, pub, lab)
         sid = _create_subject(sa_sync_conn, "Économétrie")
         _link_subject(sa_sync_conn, pub, sid)
@@ -154,7 +144,7 @@ class TestSearch:
         seulement les autres filtres (la facette doit refléter le tableau)."""
         lab = _create_lab(sa_sync_conn)
         for title in ("quantum gravity", "classical mechanics"):
-            pid = _create_pub(sa_sync_conn, title=title)
+            pid = insert_publication(sa_sync_conn, title=title)
             _attach(sa_sync_conn, pid, lab)
             sa_sync_conn.execute(
                 text("UPDATE publications SET in_perimeter = TRUE WHERE id = :id"), {"id": pid}
@@ -202,7 +192,7 @@ class TestHalStatusMultipleHalEntries:
         """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
         non. Doit être exclue du filtre `hors_collection`."""
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
-        pub = _create_pub(sa_sync_conn, "Two HAL deposits")
+        pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
         self._add_hal_source(sa_sync_conn, pub, "hal-CMH", ["CMH", "AO-DROIT"])
         self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT", "SHS"])
@@ -225,7 +215,7 @@ class TestHalStatusMultipleHalEntries:
         """`hal_collections` renvoyé par l'API = union des collections des
         entrées HAL (pas une entrée arbitraire prise au hasard)."""
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
-        pub = _create_pub(sa_sync_conn, "Two HAL deposits")
+        pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
         self._add_hal_source(sa_sync_conn, pub, "hal-CMH", ["CMH", "AO-DROIT"])
         self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT"])
@@ -245,7 +235,7 @@ class TestHalStatusMultipleHalEntries:
         """Cas symétrique : si aucune entrée HAL n'est dans la collection,
         la publi tombe bien dans `hors_collection`."""
         lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
-        pub = _create_pub(sa_sync_conn, "Outside only")
+        pub = insert_publication(sa_sync_conn, "Outside only")
         _attach(sa_sync_conn, pub, lab)
         self._add_hal_source(sa_sync_conn, pub, "hal-PAU", ["UPPA-DROIT"])
 
@@ -268,7 +258,7 @@ class TestHalStatusMultipleHalEntries:
                 "VALUES ('LABNC', 'LABNC', 'labo'::structure_type) RETURNING id"
             )
         ).scalar_one()
-        pub = _create_pub(sa_sync_conn, "Open in HAL")
+        pub = insert_publication(sa_sync_conn, "Open in HAL")
         _attach(sa_sync_conn, pub, lab)
         self._add_hal_source(sa_sync_conn, pub, "hal-x", ["SOME-COL"])
         sa_sync_conn.execute(
@@ -343,7 +333,7 @@ class TestExcludedPersonLab:
             ).scalar_one()
             for code in ("LAB-EXCLUE", "LAB-RETENUE")
         )
-        pub = _create_pub(sa_sync_conn, "Copublication")
+        pub = insert_publication(sa_sync_conn, "Copublication")
         for exclusion, lab in (("out_of_perimeter", lab_excluded), (None, lab_kept)):
             person = sa_sync_conn.execute(
                 text(

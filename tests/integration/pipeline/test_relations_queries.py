@@ -14,6 +14,7 @@ from application.ports.pipeline.relations import DoiPublication, RelationEdge
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.publications import insert_publication
 
 _Q = PgPublicationRelationsQueries()
 
@@ -22,13 +23,13 @@ PARENT_TITLE = "measurement of differential cross sections in proton collisions"
 
 
 def _pub(conn, *, doc_type, title_normalized, doi, pub_year=2024) -> int:
-    return publication_repository(conn).create(
-        title=title_normalized,
+    return insert_publication(
+        conn,
+        title_normalized,
         title_normalized=title_normalized,
         doc_type=doc_type,
-        pub_year=pub_year,
         doi=doi,
-        oa_status="unknown",
+        pub_year=pub_year,
     )
 
 

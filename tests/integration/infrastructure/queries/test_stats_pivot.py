@@ -1,22 +1,8 @@
 """Tests d'intégration du moteur de pivot (`infrastructure.read_models.stats.pivot`)."""
 
-from sqlalchemy import text
-
 from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.stats.pivot import run_pivot
-
-
-def _pub(conn, *, oa_status, sources, year=2024, doc_type="article"):
-    return conn.execute(
-        text("""
-            INSERT INTO publications
-                (title, title_normalized, pub_year, doc_type, oa_status, sources, in_perimeter)
-            VALUES ('X', 'x', :y, CAST(:dt AS doc_type), CAST(:oa AS oa_type),
-                    CAST(:src AS source_type[]), TRUE)
-            RETURNING id
-        """),
-        {"y": year, "dt": doc_type, "oa": oa_status, "src": sources},
-    ).scalar_one()
+from tests.integration.helpers.publications import insert_publication
 
 
 def _piv(conn, measure, groups, doc_types=("article", "review")):
@@ -31,9 +17,13 @@ def _piv(conn, measure, groups, doc_types=("article", "review")):
 
 class TestPivotEngine:
     def test_oa_access_buckets(self, sa_sync_conn):
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal,openalex}")
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
-        _pub(sa_sync_conn, oa_status="gold", sources="{openalex}", year=2023)
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal", "openalex"]
+        )
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"])
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["openalex"], pub_year=2023
+        )
 
         res = _piv(sa_sync_conn, "pub_count", ["oa_access"])
         by_access = {r["oa_access"]: r["value"] for r in res.rows}
@@ -42,9 +32,15 @@ class TestPivotEngine:
     def test_doc_type_grouped_expands_publications(self, sa_sync_conn):
         # Les publications au sens strict se ventilent par type fin ; les autres familles restent
         # agrégées sous leur clé de famille.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")  # → article
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")  # → book
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}", doc_type="thesis")  # → theses
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="article"
+        )  # → article
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="book"
+        )  # → book
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"], doc_type="thesis"
+        )  # → theses
 
         res = _piv(sa_sync_conn, "pub_count", ["doc_type_grouped"], doc_types=())
         by_type = {r["doc_type_grouped"]: r["value"] for r in res.rows}
@@ -54,7 +50,7 @@ class TestPivotEngine:
         # Le groupement par laboratoire compose une requête valide (jointures de rattachement).
         # Smoke test : on vérifie que la requête s'exécute et renvoie la forme attendue, sans
         # dépendre des matviews de rattachement peuplées.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         res = _piv(sa_sync_conn, "pub_count", ["lab"])
         assert isinstance(res.rows, list)
         assert res.groups == ["lab"]
@@ -62,22 +58,26 @@ class TestPivotEngine:
     def test_group_by_publisher_and_journal_execute(self, sa_sync_conn):
         # Éditeur et revue composent des requêtes valides (jointures internes). Smoke test : la
         # requête s'exécute et renvoie la forme attendue, sans dépendre de données peuplées.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         for dim in ("publisher", "journal"):
             res = _piv(sa_sync_conn, "pub_count", [dim])
             assert res.groups == [dim]
 
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"])
 
         res = _piv(sa_sync_conn, "pub_count", [])
         assert res.rows == [{"value": 2}]
 
     def test_doc_type_is_a_filter_not_hardcoded(self, sa_sync_conn):
         # Un type hors article/review est exclu par le filtre, pas par le périmètre du moteur.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="article"
+        )
+        insert_publication(
+            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="book"
+        )
 
         restricted = _piv(sa_sync_conn, "pub_count", [], doc_types=("article", "review"))
         assert restricted.rows == [{"value": 1}]

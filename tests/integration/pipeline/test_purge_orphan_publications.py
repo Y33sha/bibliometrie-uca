@@ -11,18 +11,9 @@ from sqlalchemy import text
 from infrastructure.pipeline.authorships.purge_orphan_publications import (
     PgPurgeOrphanPublicationsQueries,
 )
+from tests.integration.helpers.publications import insert_publication
 
 _Q = PgPurgeOrphanPublicationsQueries()
-
-
-def _create_pub(conn, title="X"):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, doc_type) "
-            "VALUES (:t, 2024, 'article') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
 
 
 def _create_person(conn):
@@ -44,7 +35,7 @@ def _add_authorship(conn, *, pub_id, person_id):
 
 class TestPurgeOrphanPublications:
     def test_deletes_pub_without_authorship(self, sa_sync_conn):
-        orphan = _create_pub(sa_sync_conn, "orphan")
+        orphan = insert_publication(sa_sync_conn, "orphan")
         _Q.purge_orphan_publications(sa_sync_conn)
         still_there = sa_sync_conn.execute(
             text("SELECT 1 FROM publications WHERE id = :id"), {"id": orphan}
@@ -52,7 +43,7 @@ class TestPurgeOrphanPublications:
         assert still_there is None
 
     def test_keeps_pub_with_authorship(self, sa_sync_conn):
-        kept = _create_pub(sa_sync_conn, "kept")
+        kept = insert_publication(sa_sync_conn, "kept")
         person = _create_person(sa_sync_conn)
         _add_authorship(sa_sync_conn, pub_id=kept, person_id=person)
         _Q.purge_orphan_publications(sa_sync_conn)
@@ -66,7 +57,7 @@ class TestPurgeOrphanPublications:
         # un compte déterministe, puis on batche 3 nouvelles par chunks de 2.
         _Q.purge_orphan_publications(sa_sync_conn)
         for title in ("a", "b", "c"):
-            _create_pub(sa_sync_conn, title)
+            insert_publication(sa_sync_conn, title)
         assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 2
         assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 1
         assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 0
@@ -74,7 +65,7 @@ class TestPurgeOrphanPublications:
     def test_cascades_publication_subjects(self, sa_sync_conn):
         # Les sujets d'une orpheline disparaissent par CASCADE : c'est ce qui
         # garde `publication_subjects` scopé périmètre sans filtre dans subjects.
-        orphan = _create_pub(sa_sync_conn, "orphan")
+        orphan = insert_publication(sa_sync_conn, "orphan")
         s_id = sa_sync_conn.execute(
             text("INSERT INTO subjects (label) VALUES ('vaches laitieres') RETURNING id")
         ).scalar_one()

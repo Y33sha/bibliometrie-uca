@@ -5,16 +5,7 @@ import json
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_publications import get_publication_sources
-
-
-def _create_pub(conn, title="Publication"):
-    return conn.execute(
-        text("""
-            INSERT INTO publications (title, title_normalized, pub_year, doc_type)
-            VALUES (:t, lower(:t), 2024, CAST('article' AS doc_type)) RETURNING id
-        """),
-        {"t": title},
-    ).scalar_one()
+from tests.integration.helpers.publications import insert_publication
 
 
 def _create_journal(conn, title, publisher_name):
@@ -73,14 +64,14 @@ class TestGetPublicationSources:
         assert get_publication_sources(sa_sync_conn, 999_999) is None
 
     def test_publication_without_source_publication(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, title="Seule")
+        pub = insert_publication(sa_sync_conn, title="Seule")
         result = get_publication_sources(sa_sync_conn, pub)
         assert result is not None
         assert result.title == "Seule"
         assert result.source_publications == []
 
     def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         journal = _create_journal(sa_sync_conn, "Nature", "Springer Nature")
         _create_source_publication(
             sa_sync_conn,
@@ -106,7 +97,7 @@ class TestGetPublicationSources:
         )
 
     def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_publication(
             sa_sync_conn,
             pub,
@@ -122,7 +113,7 @@ class TestGetPublicationSources:
         assert record.identifiers == {"pmid": ["123"], "isbn": ["978-2", "978-3"]}
 
     def test_bibliographic_fields(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_publication(
             sa_sync_conn,
             pub,
@@ -140,7 +131,7 @@ class TestGetPublicationSources:
         )
 
     def test_pages_as_given_by_source(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_publication(
             sa_sync_conn,
             pub,
@@ -152,7 +143,7 @@ class TestGetPublicationSources:
         assert (record.pages, record.article_number) == ("e1234", "e1234")
 
     def test_language_name_and_source_value(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_publication(sa_sync_conn, pub, source="wos", source_id="WOS:1")
         sa_sync_conn.execute(
             text(

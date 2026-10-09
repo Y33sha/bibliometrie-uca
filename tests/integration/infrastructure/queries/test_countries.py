@@ -4,18 +4,9 @@ from sqlalchemy import text
 
 from infrastructure.pipeline.countries import PgCountryQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 
 _Q = PgCountryQueries()
-
-
-def _create_pub(conn, title="X"):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, doc_type) "
-            "VALUES (:title, 2024, 'article') RETURNING id"
-        ),
-        {"title": title},
-    ).scalar_one()
 
 
 def _create_sd(conn, pub_id, source, source_id, countries=None):
@@ -60,7 +51,7 @@ def _ensure_country(conn, code, name="Test"):
 class TestRefreshAddressSourceCountries:
     def test_propagates_country_from_address(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
-        pub_id = _create_pub(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1")
         sa = _create_sa(sa_sync_conn, sd, "openalex")
         addr = _create_address(sa_sync_conn, "Clermont", ["FR"])
@@ -82,7 +73,7 @@ class TestRefreshAddressSourceCountries:
         assert result == ["FR"]
 
     def test_noop_without_address_countries(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-2")
         sa = _create_sa(sa_sync_conn, sd, "openalex")
         addr = _create_address(sa_sync_conn, "X", None)
@@ -100,7 +91,7 @@ class TestRefreshAddressSourceCountries:
 
 class TestRefreshPublicationCountries:
     def test_unions_all_source_countries(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sd1 = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
         sd2 = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1", countries=["US", "FR"])
         # un sa (dirty par défaut) met la publication dans la portée du refresh.
@@ -122,7 +113,7 @@ class TestRefreshPublicationCountries:
         assert updated == 0
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
         _create_sa(sa_sync_conn, sd, "hal")  # dirty → publication dans la portée
         sa_sync_conn.execute(
@@ -168,7 +159,7 @@ class TestDirtyDrivenSourceCountries:
     `countries_dirty` (pays changé). + orphelin (LEFT JOIN), flag adresse, clear."""
 
     def test_only_dirty_sources_recomputed(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         dirty_sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-dirty")
         clean_sd = _create_sd(sa_sync_conn, pub, "hal", "hal-clean")
         dirty_sa = _create_sa(sa_sync_conn, dirty_sd, "openalex")  # dirty par défaut
@@ -185,7 +176,7 @@ class TestDirtyDrivenSourceCountries:
         assert _sp_countries(sa_sync_conn, clean_sd) is None  # aucun sa dirty → pas recalculé
 
     def test_orphan_dirty_source_reset_to_null(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-o", countries=["FR"])
         sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, adresse sans pays
         _link_sa_address(sa_sync_conn, sa, _create_address(sa_sync_conn, "X", None))
@@ -195,7 +186,7 @@ class TestDirtyDrivenSourceCountries:
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
         # Un document NON dirty est recalculé parce que l'adresse de son sa devient dirty.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-m")
         sa = _create_sa(sa_sync_conn, sd, "openalex")
         sa_sync_conn.execute(
@@ -211,7 +202,7 @@ class TestDirtyDrivenSourceCountries:
         assert _sp_countries(sa_sync_conn, sd) == ["FR"]  # recalculé via l'adresse dirty
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-c")
         sa = _create_sa(sa_sync_conn, sd, "openalex")  # sa dirty par défaut
         addr = _create_address(sa_sync_conn, "Paris", None)

@@ -5,22 +5,12 @@ from sqlalchemy import text
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure
 
 
 def _q(conn) -> PgHalProblemsQueries:
     return PgHalProblemsQueries(conn)
-
-
-def _create_pub(conn, title="T", doi=None, pub_year=2024, title_normalized=None):
-    row = conn.execute(
-        text("""
-            INSERT INTO publications (title, title_normalized, pub_year, doc_type, doi)
-            VALUES (:t, :tn, :y, 'article', :doi) RETURNING id
-        """),
-        {"t": title, "tn": title_normalized or title.lower(), "y": pub_year, "doi": doi},
-    ).one()
-    return row.id
 
 
 def _create_hal_sd(
@@ -93,7 +83,7 @@ def _create_hal_sa_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
     """Crée un sa HAL portant `hal_person_id` sur son identité."""
-    pub = _create_pub(conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}")
+    pub = insert_publication(conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}")
     sd = _create_hal_sd(conn, pub, source_id=source_id)
     identity_id = upsert_identity(conn, person_identifiers={"hal_person_id": hal_person_id})
     conn.execute(
@@ -132,7 +122,7 @@ class TestHalDuplicateAccounts:
 
 class TestHalDuplicatePubsByDoi:
     def test_detects_two_hal_deposits_same_doi(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_hal_sd(sa_sync_conn, pub, "h-1", doi="10.1/shared")
         _create_hal_sd(sa_sync_conn, pub, "h-2", doi="10.1/shared")
 
@@ -144,7 +134,7 @@ class TestHalDuplicatePubsByDoi:
         """Le détail des publications se lit par lot : chaque paire de la page reçoit le sien."""
         expected = {}
         for i in (1, 2, 3):
-            pub = _create_pub(sa_sync_conn, title=f"Doublon {i}", doi=f"10.1/dup-{i}")
+            pub = insert_publication(sa_sync_conn, title=f"Doublon {i}", doi=f"10.1/dup-{i}")
             _create_hal_sd(sa_sync_conn, pub, f"h-dup-{i}-a", doi=f"10.1/dup-{i}")
             _create_hal_sd(sa_sync_conn, pub, f"h-dup-{i}-b", doi=f"10.1/dup-{i}")
             expected[pub] = (f"Doublon {i}", {f"h-dup-{i}-a", f"h-dup-{i}-b"})
@@ -159,7 +149,7 @@ class TestHalDuplicatePubsByDoi:
         assert served == expected
 
     def test_noop_without_duplicates(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_hal_sd(sa_sync_conn, pub, "h-uniq", doi="10.1/u")
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
         assert res.total == 0
@@ -170,8 +160,8 @@ class TestHalDuplicatePubsByMetadata:
         # Titre > 30 chars + même année + même doc_type + taille auteurs ±2
         title = "Article Title That Is Long Enough To Trigger Metadata Detection"
         title_norm = title.lower()
-        p1 = _create_pub(sa_sync_conn, title=title, title_normalized=title_norm)
-        p2 = _create_pub(sa_sync_conn, title=title, title_normalized=title_norm)
+        p1 = insert_publication(sa_sync_conn, title=title, title_normalized=title_norm)
+        p2 = insert_publication(sa_sync_conn, title=title, title_normalized=title_norm)
         _create_hal_sd(sa_sync_conn, p1, "h-meta-1")
         _create_hal_sd(sa_sync_conn, p2, "h-meta-2")
 
@@ -281,7 +271,7 @@ class TestHalAffiliationConflicts:
         assert res.publications == []
 
     def test_detects_conflict_with_openalex(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, title="Conflict OA")
+        pub = insert_publication(sa_sync_conn, title="Conflict OA")
         lab = _create_lab(sa_sync_conn, code="LAB-OA")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-oa-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -296,7 +286,7 @@ class TestHalAffiliationConflicts:
         assert pub in [p.id for p in res.publications]
 
     def test_detects_conflict_with_wos(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, title="Conflict WoS")
+        pub = insert_publication(sa_sync_conn, title="Conflict WoS")
         lab = _create_lab(sa_sync_conn, code="LAB-WOS")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-wos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -314,7 +304,7 @@ class TestHalAffiliationConflicts:
         # Sans adresse sur les authorships OA, la source n'a pas "examiné"
         # l'affiliation — l'absence d'in_perimeter est du silence, pas un
         # désaveu. Garde-fou contre les faux positifs.
-        pub = _create_pub(sa_sync_conn, title="OA no address")
+        pub = insert_publication(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-noaddr-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -330,7 +320,7 @@ class TestHalAffiliationConflicts:
     def test_detects_regardless_of_position(self, sa_sync_conn):
         # La nouvelle logique est au niveau publication, pas par position.
         # HAL UCA en pos 0, OA hors-UCA en pos 1 → conflit détecté.
-        pub = _create_pub(sa_sync_conn, title="Position independent")
+        pub = insert_publication(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-pos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -347,7 +337,7 @@ class TestHalAffiliationConflicts:
     def test_ignores_scanr(self, sa_sync_conn):
         # ScanR moissonne HAL et reproduit ses affiliations — non informatif,
         # exclu de la comparaison.
-        pub = _create_pub(sa_sync_conn, title="ScanR only")
+        pub = insert_publication(sa_sync_conn, title="ScanR only")
         lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-scanr-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -363,7 +353,7 @@ class TestHalAffiliationConflicts:
 
     def test_ignores_when_oa_confirms_uca(self, sa_sync_conn):
         # OA atteste aussi UCA → pas de conflit.
-        pub = _create_pub(sa_sync_conn, title="OA confirms")
+        pub = insert_publication(sa_sync_conn, title="OA confirms")
         lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-confirm-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -380,7 +370,7 @@ class TestHalAffiliationConflicts:
     def test_ignores_when_one_of_wos_oa_confirms(self, sa_sync_conn):
         # OA contredit mais WoS confirme → pas de conflit (la condition NOT EXISTS
         # cherche n'importe quelle SP WoS/OA avec in_perimeter).
-        pub = _create_pub(sa_sync_conn, title="Mixed conf")
+        pub = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-mixed-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -399,7 +389,7 @@ class TestHalAffiliationConflicts:
 
     def test_requires_at_least_one_wos_or_oa(self, sa_sync_conn):
         # Publi vue seulement par HAL → pas de comparaison possible, pas un conflit.
-        pub = _create_pub(sa_sync_conn, title="HAL only")
+        pub = insert_publication(sa_sync_conn, title="HAL only")
         lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-only-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
