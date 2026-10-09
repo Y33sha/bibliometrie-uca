@@ -8,11 +8,12 @@ Quatre sous-étapes, chacune dans sa propre transaction :
 3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
 """
 
-import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
@@ -21,40 +22,42 @@ from application.ports.pipeline.perimeter_structures import (
     EmptyExtractionPerimeterError,
     PerimeterStructuresQueries,
 )
-from application.ports.pipeline.transaction import OpenTransaction
 
 
-def run(
-    open_tx: OpenTransaction,
-    address_queries: AddressResolutionQueries,
-    affiliations_queries: AffiliationsQueries,
-    perimeter_queries: PerimeterStructuresQueries,
-    logger: logging.Logger,
-    *,
-    refresh_ror: Callable[[], PhaseMetrics],
-) -> PhaseMetrics:
-    """Enchaîne les quatre sous-étapes et assemble les métriques de la phase."""
-    ror = refresh_ror()
+@dataclass(frozen=True)
+class AffiliationsPhase:
+    address_queries: AddressResolutionQueries
+    affiliations_queries: AffiliationsQueries
+    perimeter_queries: PerimeterStructuresQueries
+    refresh_ror: Callable[[], PhaseMetrics]
 
-    with open_tx() as conn:
-        perimeter_queries.refresh_perimeter_structures(conn)
-        if perimeter_queries.count_extraction_structures(conn) == 0:
-            raise EmptyExtractionPerimeterError()
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Enchaîne les quatre sous-étapes et assemble les métriques de la phase."""
+        open_tx, logger, perimeter_queries = ctx.open_tx, ctx.logger, self.perimeter_queries
+        ror = self.refresh_ror()
 
-    etape(logger, "Identification des structures dans les adresses institutionnelles")
-    with open_tx() as conn:
-        # Périmètre lu une fois après le refresh, réutilisé par les deux sous-étapes suivantes.
-        perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
-        stats = run_resolution(conn, address_queries, perimeter_ids, logger)
+        with open_tx() as conn:
+            perimeter_queries.refresh_perimeter_structures(conn)
+            if perimeter_queries.count_extraction_structures(conn) == 0:
+                raise EmptyExtractionPerimeterError()
 
-    metrics = PhaseMetrics()
-    metrics.add(total=stats.processed)
-    metrics.details["summary"] = {"adresses": stats.processed, "in_perimeter": stats.in_perimeter}
-    metrics.details.update(ror.details)
+        etape(logger, "Identification des structures dans les adresses institutionnelles")
+        with open_tx() as conn:
+            # Périmètre lu une fois après le refresh, réutilisé par les deux sous-étapes suivantes.
+            perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
+            stats = run_resolution(conn, self.address_queries, perimeter_ids, logger)
 
-    etape(logger, "Rattachement des structures aux auteurs des documents")
-    with open_tx() as conn:
-        run_populate(conn, affiliations_queries, logger, perimeter_ids)
+        metrics = PhaseMetrics()
+        metrics.add(total=stats.processed)
+        metrics.details["summary"] = {
+            "adresses": stats.processed,
+            "in_perimeter": stats.in_perimeter,
+        }
+        metrics.details.update(ror.details)
 
-    metrics.resume = ""
-    return metrics
+        etape(logger, "Rattachement des structures aux auteurs des documents")
+        with open_tx() as conn:
+            run_populate(conn, self.affiliations_queries, logger, perimeter_ids)
+
+        metrics.resume = ""
+        return metrics

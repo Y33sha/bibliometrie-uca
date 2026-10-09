@@ -383,21 +383,19 @@ def phase_affiliations(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
     """
-    from application.pipeline.affiliations.phase import run
+    from application.pipeline.affiliations.phase import AffiliationsPhase
     from infrastructure.pipeline.affiliations.address_resolution import (
         PgAddressResolutionQueries,
     )
     from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
     from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 
-    return run(
-        open_tx,
+    return AffiliationsPhase(
         PgAddressResolutionQueries(),
         PgAffiliationsQueries(),
         PgPerimeterStructuresQueries(),
-        log,
         refresh_ror=_run_refresh_ror,
-    )
+    ).run(_context(options))
 
 
 def _run_refresh_ror() -> PhaseMetrics:
