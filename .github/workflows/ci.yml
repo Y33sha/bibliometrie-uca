@@ -77,7 +77,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --no-cache-dir uv
-          uv sync --locked --extra dev
+          uv sync --locked
 
       - name: Dependency hygiene (deptry)
         run: uv run deptry .
