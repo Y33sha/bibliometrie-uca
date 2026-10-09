@@ -18,6 +18,7 @@ from application.pipeline.subjects.ingestion import run
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 from infrastructure.repositories.publication_repository import PgPublicationRepository
+from tests.integration.helpers.publications import insert_publication
 
 
 class TestExtractors:
@@ -90,16 +91,6 @@ def queries():
     return PgSubjectsIngestionQueries()
 
 
-def _create_pub(conn, title="X"):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, doc_type) "
-            "VALUES (:t, 2024, 'article') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
-
-
 _CREATE_SOURCE_PUB_SQL = text(
     """
     INSERT INTO source_publications (source, source_id, title, publication_id, topics)
@@ -143,7 +134,7 @@ def _publications_updated(metrics):
 
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",
@@ -164,7 +155,7 @@ class TestRunOrchestrator:
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
 
     def test_reingests_on_content_change(self, sa_sync_conn, queries):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",
@@ -194,7 +185,7 @@ class TestRunOrchestrator:
 
     def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
         # Une publication sans sujet est datée comme les autres : elle ne revient pas.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(sa_sync_conn, source="hal", source_id="h1", publication_id=pub)
         logger = logging.getLogger("test")
 
@@ -203,7 +194,7 @@ class TestRunOrchestrator:
 
     def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
         # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",
@@ -222,7 +213,7 @@ class TestRunOrchestrator:
 
     def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
         # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",
@@ -243,7 +234,7 @@ class TestRunOrchestrator:
 
     def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
         # Un même label depuis deux sources → un seul subject, deux liens (un par source).
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",
@@ -269,7 +260,7 @@ class TestRunOrchestrator:
 
     def test_rebuild_reingests_all(self, sa_sync_conn, queries):
         # `rebuild=True` ré-ingère même une publication non modifiée.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
             source="hal",

@@ -16,6 +16,7 @@ from infrastructure.read_models.persons.admin import (
 )
 from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 
 
 def _create_authorship(conn, pub_id, person_id):
@@ -36,17 +37,6 @@ def _create_person(conn, last="A", first="Z", exclusion=None):
             "VALUES (:l, :f, lower(:l), lower(:f), CAST(:e AS person_exclusion)) RETURNING id"
         ),
         {"l": last, "f": first, "e": exclusion},
-    ).one()
-    return row.id
-
-
-def _create_pub(conn, doc_type="article"):
-    row = conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES ('X', 'x', 2024, CAST(:dt AS doc_type)) RETURNING id"
-        ),
-        {"dt": doc_type},
     ).one()
     return row.id
 
@@ -103,7 +93,7 @@ class TestNameFormAuthorships:
     def test_returns_authorships_and_other_persons(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn, last="Dupond")
         other = _create_person(sa_sync_conn, last="Martin")
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j")
         sa_sync_conn.execute(
@@ -216,7 +206,7 @@ class TestIdentifierConflicts:
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = _create_person(sa_sync_conn, last="Smith", first="John")
         p2 = _create_person(sa_sync_conn, last="Smith", first="J")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
@@ -234,7 +224,7 @@ class TestIdentifierConflicts:
         """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
         p1 = _create_person(sa_sync_conn, last="Brown", first="Anne")
         p2 = _create_person(sa_sync_conn, last="Brown", first="A")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
             _sa_with_identifiers(
@@ -253,7 +243,7 @@ class TestIdentifierConflicts:
         """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
         p1 = _create_person(sa_sync_conn, last="Veyssiere", first="Hugo")
         p2 = _create_person(sa_sync_conn, last="Pinard", first="Celeste")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0003-2202-7362"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0003-2202-7362"})
@@ -263,7 +253,7 @@ class TestIdentifierConflicts:
     def test_unattributed_value_excluded(self, sa_sync_conn):
         p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
         p2 = _create_person(sa_sync_conn, last="Lee", first="A")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
 
@@ -272,7 +262,7 @@ class TestIdentifierConflicts:
     def test_excluded_person_excluded(self, sa_sync_conn):
         p1 = _create_person(sa_sync_conn, last="Lee", first="Anna")
         p2 = _create_person(sa_sync_conn, last="Lee", first="A", exclusion="out_of_perimeter")
-        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        sd = _create_sd(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
@@ -290,7 +280,7 @@ class TestNameDuplicates:
         a = _create_person(sa_sync_conn, last="Dupont", first="J")
         b = _create_person(sa_sync_conn, last="Dupont", first="Jean")
         coauthor = _create_person(sa_sync_conn, last="Martin", first="Paul")
-        pub1, pub2 = _create_pub(sa_sync_conn), _create_pub(sa_sync_conn)
+        pub1, pub2 = insert_publication(sa_sync_conn), insert_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub1, a)
         _create_authorship(sa_sync_conn, pub1, coauthor)
         _create_authorship(sa_sync_conn, pub2, b)

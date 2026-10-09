@@ -42,7 +42,7 @@ Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_ru
 
 ### Phase 2 — Tests de requêtes et de services
 
-- [ ] Publications : `_create_pub`, `_pub`, `_insert_publication`.
+- [x] Publications : `_create_pub`, `_pub`, `_insert_publication` (`helpers/publications.insert_publication`).
 - [ ] Personnes : `_create_person`, `_person`.
 - [ ] Notices et signatures : `_create_sd`, `_create_sa`, `_signature`.
 - [ ] Structures, adresses, périmètres et pays : `_create_structure`, `_structure`, `_create_address`, `_perimeter`, `_ensure_country`.

@@ -47,6 +47,7 @@ from infrastructure.repositories import (
     person_repository,
 )
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 
 _BUILD_QUERIES = PgAuthorshipsBuildQueries()
 
@@ -72,13 +73,6 @@ def _insert_person(conn, last="Dupont", first="Jean"):
             "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
         ),
         {"l": last, "f": first},
-    ).scalar_one()
-
-
-def _insert_publication(conn, title="Test"):
-    return conn.execute(
-        text("INSERT INTO publications (title, pub_year) VALUES (:t, 2024) RETURNING id"),
-        {"t": title},
     ).scalar_one()
 
 
@@ -162,7 +156,7 @@ class TestLinkAuthorship:
 
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
@@ -322,7 +316,7 @@ class TestIdentifierStatusPropagation:
 
     def _signature(self, conn, person_id, source, source_id, identifiers, **kw):
         sp = _insert_source_publication(
-            conn, _insert_publication(conn), source=source, source_id=source_id
+            conn, insert_publication(conn), source=source, source_id=source_id
         )
         _insert_source_authorship(
             conn, sp, source=source, person_id=person_id, person_identifiers=identifiers, **kw
@@ -451,10 +445,10 @@ class TestSetExclusion:
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
         excluded = _insert_person(sa_sync_conn, "Exclue", "Ée")
         other = _insert_person(sa_sync_conn, "Autre", "Personne")
-        alone = _insert_publication(sa_sync_conn, "seule")
-        shared = _insert_publication(sa_sync_conn, "partagée")
+        alone = insert_publication(sa_sync_conn, "seule")
+        shared = insert_publication(sa_sync_conn, "partagée")
         # Valeur périmée, hors des publications de la personne exclue : le recalcul ciblé la laisse en place.
-        unrelated = _insert_publication(sa_sync_conn, "sans lien")
+        unrelated = insert_publication(sa_sync_conn, "sans lien")
         for pub, pid in (
             (alone, excluded),
             (shared, excluded),
@@ -640,7 +634,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_hal = _insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="h-1")
         sp_oa = _insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
         sa1 = _insert_source_authorship(
@@ -678,7 +672,7 @@ class TestBatchAssignOrphanAuthorships:
         _setup_uca(sa_sync_conn)
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa1 = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
@@ -704,7 +698,7 @@ class TestBatchAssignOrphanAuthorships:
 class TestDetachAuthorships:
     def test_detaches_and_removes_authorship_if_orphan(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         auth_id = sa_sync_conn.execute(
             text(
@@ -739,7 +733,7 @@ class TestDetachAuthorships:
         """Le rejet porte sur la publication entière : sélectionner une source
         détache toutes les sources de la même paire et peuple le store."""
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         auth_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO authorships (publication_id, person_id) "
@@ -788,7 +782,7 @@ class TestDetachAuthorships:
         """Une forme de nom attestée par une source, devenue sans aucune source
         active après détachement, est supprimée."""
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(
             sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
@@ -815,7 +809,7 @@ class TestDetachAuthorships:
         """Une forme `rejected` devenue orpheline est préservée : la supprimer
         détruirait le blocage de non-retour qu'elle matérialise."""
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(
             sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
@@ -870,8 +864,8 @@ class TestDetachAuthorships:
         """Une forme encore attestée par une source d'une autre publication
         n'est pas supprimée quand on détache une seule publication."""
         person_id = _insert_person(sa_sync_conn)
-        pub1 = _insert_publication(sa_sync_conn, "P1")
-        pub2 = _insert_publication(sa_sync_conn, "P2")
+        pub1 = insert_publication(sa_sync_conn, "P1")
+        pub2 = insert_publication(sa_sync_conn, "P2")
         sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="hal-1")
         sp2 = _insert_source_publication(sa_sync_conn, pub2, source_id="hal-2")
         sa1 = _insert_source_authorship(
@@ -1094,7 +1088,7 @@ class TestUpdateNameFormStatus:
             ),
             {"pid": pid},
         )
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         spid = _insert_source_publication(sa_sync_conn, pub)
         sa_id = _insert_source_authorship(
             sa_sync_conn, spid, person_id=pid, author_name_normalized="intrus etranger"
@@ -1142,7 +1136,7 @@ class TestAssignOrphanAuthorship:
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         other_id = _insert_person(sa_sync_conn, "Other", "Author")
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=other_id)
 
@@ -1162,7 +1156,7 @@ class TestAssignOrphanAuthorship:
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
@@ -1195,7 +1189,7 @@ class TestReassignRejectedPairUnit:
     def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
         _reject_pair(sa_sync_conn, pub_id, person_id)
@@ -1217,7 +1211,7 @@ class TestReassignRejectedPairUnit:
     ):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
         _reject_pair(sa_sync_conn, pub_id, person_id)
@@ -1254,8 +1248,8 @@ class TestReassignRejectedPairUnit:
     def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub1 = _insert_publication(sa_sync_conn, "P1")
-        pub2 = _insert_publication(sa_sync_conn, "P2")
+        pub1 = insert_publication(sa_sync_conn, "P1")
+        pub2 = insert_publication(sa_sync_conn, "P2")
         sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="h-1")
         sp2 = _insert_source_publication(sa_sync_conn, pub2, source_id="h-2")
         sa1 = _insert_source_authorship(sa_sync_conn, sp1)
@@ -1284,7 +1278,7 @@ class TestReassignRejectedPairUnit:
     def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        pub1 = _insert_publication(sa_sync_conn, "P1")
+        pub1 = insert_publication(sa_sync_conn, "P1")
         sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="h-1")
         sa1 = _insert_source_authorship(sa_sync_conn, sp1)
         _reject_pair(sa_sync_conn, pub1, person_id)
@@ -1327,8 +1321,8 @@ class TestMergePersonRejectedAuthorships:
     def test_transfers_and_dedups(self, sa_sync_conn, repo):
         target = _insert_person(sa_sync_conn, "Cible", "T")
         source = _insert_person(sa_sync_conn, "Source", "S")
-        pub_shared = _insert_publication(sa_sync_conn, "Shared")
-        pub_source_only = _insert_publication(sa_sync_conn, "SourceOnly")
+        pub_shared = insert_publication(sa_sync_conn, "Shared")
+        pub_source_only = insert_publication(sa_sync_conn, "SourceOnly")
 
         def _reject(person_id, publication_id):
             sa_sync_conn.execute(

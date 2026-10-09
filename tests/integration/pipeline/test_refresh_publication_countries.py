@@ -15,16 +15,7 @@ from sqlalchemy import text
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.pipeline.countries import PgCountryQueries
 from tests.integration.helpers.authorships import upsert_identity
-
-
-def _insert_publication(conn, title: str = "Test pub", year: int = 2024) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-            "VALUES (:t, lower(:t), :y, 'article') RETURNING id"
-        ),
-        {"t": title, "y": year},
-    ).scalar_one()
+from tests.integration.helpers.publications import insert_publication
 
 
 def _insert_source_publication(
@@ -112,7 +103,7 @@ def log() -> logging.Logger:
 
 class TestCascade:
     def test_single_address_propagates_to_publication(self, sa_sync_conn, queries, log):
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
@@ -126,7 +117,7 @@ class TestCascade:
 
     def test_multi_country_union_propagates(self, sa_sync_conn, queries, log):
         # Deux adresses sur le même sa : union des pays remontée jusqu'à pub.
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
         sa = _insert_source_authorship(sa_sync_conn, sp)
         a1 = _insert_address(sa_sync_conn, "addr FR", countries=["fr"])
@@ -142,7 +133,7 @@ class TestCascade:
     def test_multiple_sources_union_at_publication_level(self, sa_sync_conn, queries, log):
         # Même publication via deux sources distinctes (OA et HAL), chacune
         # avec une adresse dans un pays différent → union au niveau publi.
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp_oa = _insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W1")
         sp_hal = _insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
         sa_oa = _insert_source_authorship(sa_sync_conn, sp_oa, source="openalex")
@@ -159,7 +150,7 @@ class TestCascade:
     def test_returns_zero_when_no_changes(self, sa_sync_conn, queries, log):
         # Base sans adresses avec pays → la refresh ne change rien et
         # retourne 0 publications mises à jour.
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
         _insert_source_authorship(sa_sync_conn, sp)
 
@@ -173,7 +164,7 @@ class TestIdempotence:
     def test_double_run_no_extra_update(self, sa_sync_conn, queries, log):
         # Premier run : la publi passe de NULL à ['fr']. Deuxième run :
         # rien à changer, retour 0 (cf. `IS DISTINCT FROM` côté query).
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
         sa = _insert_source_authorship(sa_sync_conn, sp)
         addr = _insert_address(sa_sync_conn, "addr", countries=["fr"])
@@ -191,7 +182,7 @@ class TestCleanup:
     def test_resets_source_countries_when_address_lost_country(self, sa_sync_conn, queries, log):
         # source_publications.countries=['fr'] déjà persistées, mais l'adresse du sa
         # n'a plus de `countries` (NULL) → le LEFT JOIN remet sp.countries à NULL.
-        pub = _insert_publication(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
         sa = _insert_source_authorship(sa_sync_conn, sp)
         sa_sync_conn.execute(

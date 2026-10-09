@@ -10,18 +10,8 @@ from infrastructure.read_models.publications.detail import (
     get_publication_subjects,
 )
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure
-
-
-def _create_pub(conn, title="T", pub_year=2024, doc_type="article", doi=None):
-    row = conn.execute(
-        text("""
-            INSERT INTO publications (title, title_normalized, pub_year, doc_type, doi)
-            VALUES (:t, lower(:t), :y, CAST(:dt AS doc_type), :doi) RETURNING id
-        """),
-        {"t": title, "y": pub_year, "dt": doc_type, "doi": doi},
-    ).one()
-    return row.id
 
 
 def _create_sd(conn, pub_id, source="hal", source_id="h1"):
@@ -63,7 +53,7 @@ class TestGetPublicationDetail:
             ),
             {"p": publisher},
         ).scalar_one()
-        pub = _create_pub(sa_sync_conn, doc_type="conference_paper")
+        pub = insert_publication(sa_sync_conn, doc_type="conference_paper")
         sa_sync_conn.execute(
             text("UPDATE publications SET monograph_id = :m WHERE id = :id"),
             {"m": monograph, "id": pub},
@@ -76,7 +66,7 @@ class TestGetPublicationDetail:
 
     def test_returns_full_detail(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
-        pub = _create_pub(sa_sync_conn, title="Test Pub", doi="10.1/abc")
+        pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
         sd = _create_sd(sa_sync_conn, pub, source="hal", source_id="hal-1")
         auth_row = sa_sync_conn.execute(
             text(
@@ -108,7 +98,7 @@ class TestGetPublicationDetail:
     def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
         # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
-        pub = _create_pub(sa_sync_conn, doi="10.9001/set")
+        pub = insert_publication(sa_sync_conn, doi="10.9001/set")
         _create_sd(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
         for source_id, corrected_by in (
             ("oa-piece", "DATACITE_PACKAGE_PIECE"),
@@ -138,7 +128,7 @@ class TestGetPublicationDetail:
         }
 
     def test_thesis_meta_populated_for_thesis(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, title="Thèse", doc_type="thesis")
+        pub = insert_publication(sa_sync_conn, title="Thèse", doc_type="thesis")
         sa_sync_conn.execute(
             text("UPDATE publications SET meta = CAST(:m AS jsonb) WHERE id = :id"),
             {"m": json.dumps({"date_soutenance": "2023-05-10"}), "id": pub},
@@ -159,7 +149,7 @@ class TestGetPublicationDetail:
         assert detail.thesis_meta.date_soutenance == "2023-05-10"
 
     def test_thesis_meta_none_for_article(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, doc_type="article")
+        pub = insert_publication(sa_sync_conn, doc_type="article")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
         assert detail.thesis_meta is None
@@ -170,13 +160,13 @@ class TestGetPublicationDetail:
         sa_sync_conn.execute(
             text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
         )
-        pub = _create_pub(sa_sync_conn, doi="10.5281/zenodo.99")
+        pub = insert_publication(sa_sync_conn, doi="10.5281/zenodo.99")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
         assert detail.publication.doi_ra == "DataCite"
 
     def test_doi_ra_none_when_prefix_unknown(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, doi="10.9999/unresolved")
+        pub = insert_publication(sa_sync_conn, doi="10.9999/unresolved")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
         assert detail.publication.doi_ra is None
@@ -189,7 +179,7 @@ class TestGetPublicationDetail:
         - `detail["openalex_authorships"]` ne renvoie que les auteurs de la
           row la plus récente (= rendu unique côté UI).
         """
-        pub = _create_pub(sa_sync_conn, title="Multi-OA")
+        pub = insert_publication(sa_sync_conn, title="Multi-OA")
         # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
         sd_old = _create_sd(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
         sa_sync_conn.execute(
@@ -243,7 +233,7 @@ class TestGetPublicationDetail:
         lab_id = lab_row.id
 
         pid = _create_person(sa_sync_conn)
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         aid = sa_sync_conn.execute(
             text("""
                 INSERT INTO authorships (publication_id, person_id)
@@ -272,7 +262,7 @@ def _create_sd_with_external_ids(conn, pub_id, source, source_id, external_ids):
 
 class TestGetPublicationExternalIdentifiers:
     def test_aggregates_and_dedups(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_sd_with_external_ids(
             sa_sync_conn, pub, "openalex", "W1", {"pmid": "123", "arxiv_id": "2401.001"}
         )
@@ -289,7 +279,7 @@ class TestGetPublicationExternalIdentifiers:
     def test_nnt_omitted_when_covered_by_theses_source(self, sa_sync_conn):
         # Le `source_id` de la source `theses` *est* le NNT : le lien source theses.fr couvre
         # déjà l'identifiant, l'entrée `nnt` externe ferait doublon.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_sd_with_external_ids(
             sa_sync_conn, pub, "theses", "2017CLFAC011", {"nnt": "2017CLFAC011"}
         )
@@ -300,7 +290,7 @@ class TestGetPublicationExternalIdentifiers:
 
     def test_nnt_kept_without_theses_source(self, sa_sync_conn):
         # NNT porté par un enregistrement HAL sans source theses.fr moissonnée : le lien reste utile.
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         _create_sd_with_external_ids(sa_sync_conn, pub, "hal", "tel-1", {"nnt": "2017CLFAC011"})
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
@@ -309,11 +299,11 @@ class TestGetPublicationExternalIdentifiers:
 
 class TestGetPublicationSubjects:
     def test_empty(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         assert get_publication_subjects(sa_sync_conn, pub) == []
 
     def test_dedup_aggregates_sources(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         # Un même libellé annoté par deux sources : 1 row, sources = ['hal', 'openalex'].
         sub_row = sa_sync_conn.execute(
             text("INSERT INTO subjects (label) VALUES ('AI') RETURNING id")
@@ -334,7 +324,7 @@ class TestGetPublicationSubjects:
         assert subjects[0].sources == ["hal", "openalex"]
 
     def test_included_in_publication_detail(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sub_row = sa_sync_conn.execute(
             text("INSERT INTO subjects (label) VALUES ('genomics') RETURNING id")
         ).one()

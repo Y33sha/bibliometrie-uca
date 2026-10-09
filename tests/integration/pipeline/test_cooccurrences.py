@@ -7,18 +7,9 @@ from sqlalchemy import text
 
 from application.pipeline.subjects.cooccurrences import run
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+from tests.integration.helpers.publications import insert_publication
 
 _Q = PgSubjectsIngestionQueries()
-
-
-def _create_pub(conn, title="X"):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, doc_type) "
-            "VALUES (:t, 2024, 'article') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
 
 
 def _create_subject(conn, *, label, **kwargs):
@@ -44,8 +35,8 @@ def _link(conn, *, pub_id, subject_id, source="hal"):
 class TestRecomputeUsageCounts:
     def test_counts_distinct_publications(self, sa_sync_conn):
         s_id = _create_subject(sa_sync_conn, label="ai")
-        p1 = _create_pub(sa_sync_conn, "p1")
-        p2 = _create_pub(sa_sync_conn, "p2")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
         # Même publi liée par 2 sources différentes : ne compte qu'une fois.
         _link(sa_sync_conn, pub_id=p1, subject_id=s_id, source="hal")
         _link(sa_sync_conn, pub_id=p1, subject_id=s_id, source="openalex")
@@ -75,8 +66,8 @@ class TestRefreshCooccurrences:
         a = _create_subject(sa_sync_conn, label="a")
         b = _create_subject(sa_sync_conn, label="b")
         c = _create_subject(sa_sync_conn, label="c")
-        p1 = _create_pub(sa_sync_conn, "p1")
-        p2 = _create_pub(sa_sync_conn, "p2")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
         # a+b co-occurrent dans 2 publis ; a+c seulement 1.
         for s in (a, b):
             _link(sa_sync_conn, pub_id=p1, subject_id=s)
@@ -99,8 +90,8 @@ class TestRefreshCooccurrences:
         # 2+ publications (deux pubs nécessaires pour que le seuil count >= 2
         # ne masque pas l'effet du filtre `subject_id < subject_id`).
         s = _create_subject(sa_sync_conn, label="solo")
-        p1 = _create_pub(sa_sync_conn, "p1")
-        p2 = _create_pub(sa_sync_conn, "p2")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
         _link(sa_sync_conn, pub_id=p1, subject_id=s, source="hal")
         _link(sa_sync_conn, pub_id=p2, subject_id=s, source="hal")
 
@@ -110,8 +101,8 @@ class TestRefreshCooccurrences:
     def test_idempotent(self, sa_sync_conn):
         a = _create_subject(sa_sync_conn, label="a")
         b = _create_subject(sa_sync_conn, label="b")
-        p1 = _create_pub(sa_sync_conn, "p1")
-        p2 = _create_pub(sa_sync_conn, "p2")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
         for p in (p1, p2):
             _link(sa_sync_conn, pub_id=p, subject_id=a)
             _link(sa_sync_conn, pub_id=p, subject_id=b)
@@ -127,8 +118,8 @@ class TestRunOrchestrator:
     def test_full_run(self, sa_sync_conn):
         a = _create_subject(sa_sync_conn, label="a")
         b = _create_subject(sa_sync_conn, label="b")
-        p1 = _create_pub(sa_sync_conn, "p1")
-        p2 = _create_pub(sa_sync_conn, "p2")
+        p1 = insert_publication(sa_sync_conn, "p1")
+        p2 = insert_publication(sa_sync_conn, "p2")
         for s in (a, b):
             _link(sa_sync_conn, pub_id=p1, subject_id=s)
             _link(sa_sync_conn, pub_id=p2, subject_id=s)

@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from application.ports.pipeline.subjects import PublicationSubjectLink
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+from tests.integration.helpers.publications import insert_publication
 
 _Q = PgSubjectsIngestionQueries()
 
@@ -12,16 +13,6 @@ def _link(conn, publication_id, subject_id, source):
     return _Q.link_publication_subjects_bulk(
         conn, source=source, rows=[PublicationSubjectLink(publication_id, subject_id)]
     )
-
-
-def _create_pub(conn, title="X"):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, doc_type) "
-            "VALUES (:t, 2024, 'article') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
 
 
 class TestUpsertSubject:
@@ -67,7 +58,7 @@ class TestUpsertSubject:
 
 class TestLinkAndClear:
     def test_link_creates_row(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         _link(sa_sync_conn, pub, sid, "hal")
         source = sa_sync_conn.execute(
@@ -80,7 +71,7 @@ class TestLinkAndClear:
         assert source == "hal"
 
     def test_link_same_subject_two_sources(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         _link(sa_sync_conn, pub, sid, "hal")
         _link(sa_sync_conn, pub, sid, "openalex")
@@ -91,7 +82,7 @@ class TestLinkAndClear:
         assert n == 2
 
     def test_link_idempotent_same_source(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         _link(sa_sync_conn, pub, sid, "openalex")
         _link(sa_sync_conn, pub, sid, "openalex")
@@ -106,7 +97,7 @@ class TestLinkAndClear:
 
     def test_bulk_dedupes_within_a_batch(self, sa_sync_conn):
         """Deux annotations d'une même source visant le même sujet ne donnent qu'un lien."""
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         sent = _Q.link_publication_subjects_bulk(
             sa_sync_conn,
@@ -117,7 +108,7 @@ class TestLinkAndClear:
 
     def test_bulk_counts_only_new_links(self, sa_sync_conn):
         """Le retour compte les liens réellement insérés, pas ceux déjà présents."""
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         sid2 = _Q.upsert_subject(sa_sync_conn, label="y")
         _Q.link_publication_subjects_bulk(
@@ -133,7 +124,7 @@ class TestLinkAndClear:
 
     def test_clear_preserves_rejected_links(self, sa_sync_conn):
         """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         kept = _Q.upsert_subject(sa_sync_conn, label="rejete")
         dropped = _Q.upsert_subject(sa_sync_conn, label="ordinaire")
         _link(sa_sync_conn, pub, kept, "hal")
@@ -154,7 +145,7 @@ class TestLinkAndClear:
         assert remaining == [kept]
 
     def test_subject_survives_publication_delete(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
+        pub = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="orphan candidate")
         _link(sa_sync_conn, pub, sid, "hal")
         sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": pub})

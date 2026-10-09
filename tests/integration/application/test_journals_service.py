@@ -39,6 +39,7 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
+from tests.integration.helpers.publications import insert_publication
 
 # Stateless (connexion passée aux méthodes) → une instance module suffit.
 _CORRECTION_QUERIES = PgMetadataCorrectionQueries()
@@ -166,16 +167,6 @@ def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
     """`find_or_create_journal` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
     issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
     return find_or_create_journal(title, issns=issns, **kwargs)
-
-
-def _insert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
-    return conn.execute(
-        text(
-            "INSERT INTO publications (title, pub_year, journal_id) "
-            "VALUES (:title, :year, :j_id) RETURNING id"
-        ),
-        {"title": title, "year": pub_year, "j_id": journal_id},
-    ).scalar_one()
 
 
 # ── find_by_id (hydratation aggregates) ────────────────────────────
@@ -695,7 +686,7 @@ class TestMergePublishers:
         source = _insert_publisher(sa_sync_conn, "Source")
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, eissn="1476-4687")
-        _insert_publication(sa_sync_conn, journal_id=js)
+        insert_publication(sa_sync_conn, journal_id=js)
 
         merge_publishers(
             target,
@@ -900,7 +891,7 @@ class TestMergeJournals:
     def test_transfers_publications(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
         source = _insert_journal(sa_sync_conn, "Source")
-        pub_id = _insert_publication(sa_sync_conn, journal_id=source)
+        pub_id = insert_publication(sa_sync_conn, journal_id=source)
         # ≥1 source_publication : sinon `refresh_from_sources` (déclenché par la
         # requalification post-merge) supprimerait la publication comme orpheline.
         sa_sync_conn.execute(
@@ -1037,7 +1028,7 @@ class TestMergeJournals:
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": revue}
         )
-        pub = _insert_publication(sa_sync_conn, journal_id=revue)
+        pub = insert_publication(sa_sync_conn, journal_id=revue)
         sa_sync_conn.execute(
             text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
         )
@@ -1076,7 +1067,7 @@ class TestRequalifyPublicationsForJournal:
         conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
         )
-        pub = _insert_publication(conn, journal_id=journal)
+        pub = insert_publication(conn, journal_id=journal)
         conn.execute(
             text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
         )
