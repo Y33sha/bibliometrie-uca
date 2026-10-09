@@ -1,5 +1,8 @@
 """Semis des revues, de leurs ISSN et formes de nom, des éditeurs et des monographies, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
+from collections.abc import Iterable
+from typing import Any
+
 from sqlalchemy import Connection, text
 
 from tests.integration.helpers.rows import insert_row
@@ -87,6 +90,36 @@ def insert_journal_issn(
         },
         {"support": "issn_support", "status": "issn_status"},
     )
+
+
+def insert_journal_with_issns(
+    conn: Connection,
+    title: str = "X",
+    *,
+    issn: str | None = None,
+    eissn: str | None = None,
+    issnl: str | None = None,
+    rejected: Iterable[str] = (),
+    rejected_status: str = "unverified",
+    sudoc_checked: bool = False,
+    **columns: Any,
+) -> int:
+    """Insère une revue avec ses ISSN et renvoie son `id`.
+
+    `issn` est papier, `eissn` électronique, `issnl` marque l'ISSN de liaison ; un `issnl` distinct des deux autres forme son propre ISSN. Chaque valeur de `rejected` forme un ISSN de statut `rejected_status`. `sudoc_checked` s'applique à tous les ISSN. Les autres mots-clés vont à `insert_journal`.
+    """
+    journal_id = insert_journal(conn, title, **columns)
+    rows = []
+    if issn:
+        rows.append({"issn": issn, "support": "print", "linking": issn == issnl})
+    if eissn and eissn != issn:
+        rows.append({"issn": eissn, "support": "electronic", "linking": eissn == issnl})
+    if issnl and issnl not in (issn, eissn):
+        rows.append({"issn": issnl, "linking": True})
+    rows += [{"issn": value, "status": rejected_status} for value in rejected]
+    for row in rows:
+        insert_journal_issn(conn, journal_id, sudoc_checked=sudoc_checked, **row)
+    return journal_id
 
 
 def insert_journal_name_form(

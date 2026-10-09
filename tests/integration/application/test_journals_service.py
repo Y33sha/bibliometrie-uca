@@ -41,13 +41,15 @@ from infrastructure.repositories import (
     publisher_repository,
 )
 from tests.integration.helpers.journals import (
-    insert_journal,
-    insert_journal_issn,
+    insert_journal_with_issns,
     insert_monograph,
     insert_publisher,
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+
+# Revue « Nature » par défaut, sans devise d'APC.
+_journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
 
 # Stateless (connexion passée aux méthodes) → une instance module suffit.
 _CORRECTION_QUERIES = PgMetadataCorrectionQueries()
@@ -121,33 +123,6 @@ def _columns(conn, journal_id: int) -> SimpleNamespace:
     )
 
 
-def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
-    journal_id = insert_journal(
-        conn,
-        title,
-        publisher_id=publisher_id,
-        openalex_id=kwargs.get("openalex_id"),
-        is_in_doaj=kwargs.get("is_in_doaj", False),
-        oa_model=kwargs.get("oa_model"),
-        apc_amount=kwargs.get("apc_amount"),
-        apc_currency=kwargs.get("apc_currency"),
-    )
-    issn, eissn, issnl = kwargs.get("issn"), kwargs.get("eissn"), kwargs.get("issnl")
-    if issn:
-        insert_journal_issn(conn, journal_id, issn=issn, support="print", linking=issn == issnl)
-    if eissn and eissn != issn:
-        insert_journal_issn(
-            conn, journal_id, issn=eissn, support="electronic", linking=eissn == issnl
-        )
-    if issnl and issnl not in (issn, eissn):
-        insert_journal_issn(conn, journal_id, issn=issnl, linking=True)
-    for value in kwargs.get("rejected", ()):
-        insert_journal_issn(
-            conn, journal_id, issn=value, status=kwargs.get("rejected_status", "unverified")
-        )
-    return journal_id
-
-
 def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
     """`find_or_create_journal` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
     issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
@@ -175,7 +150,7 @@ class TestJournalFindById:
         assert repo.find_by_id(999999) is None
 
     def test_hydrates_minimal(self, sa_sync_conn, repo):
-        jid = _insert_journal(sa_sync_conn, "Nature")
+        jid = _journal(sa_sync_conn)
         j = repo.find_by_id(jid)
         assert j is not None
         assert j.id == jid
@@ -186,18 +161,18 @@ class TestJournalFindById:
 
     def test_hydrates_full(self, sa_sync_conn, repo):
         pub_id = insert_publisher(sa_sync_conn, "PLOS")
-        jid = _insert_journal(
+        jid = _journal(
             sa_sync_conn,
             title="PLOS ONE",
             publisher_id=pub_id,
+            openalex_id="S202381698",
+            is_in_doaj=True,
+            oa_model="full_oa",
+            apc_amount=1700,
+            apc_currency="USD",
             issn="1932-6203",
             eissn="1932-6203",
             issnl="1932-6203",
-            openalex_id="S202381698",
-            apc_amount=1700,
-            apc_currency="USD",
-            is_in_doaj=True,
-            oa_model="full_oa",
         )
         j = repo.find_by_id(jid)
         assert j is not None
@@ -303,22 +278,22 @@ class TestFindOrCreateJournal:
         assert "amp" not in row.title_normalized
 
     def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
-        existing = _insert_journal(sa_sync_conn, "Nature", openalex_id="S137773608")
+        existing = _journal(sa_sync_conn, openalex_id="S137773608")
         found = _find_or_create("Nature Journal", openalex_id="S137773608", repo=gateway)
         assert found == existing
 
     def test_finds_by_issn(self, sa_sync_conn, gateway):
-        existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        existing = _journal(sa_sync_conn, issn="0028-0836")
         found = _find_or_create("Nature Variant", issn="0028-0836", repo=gateway)
         assert found == existing
 
     def test_finds_by_eissn(self, sa_sync_conn, gateway):
-        existing = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
+        existing = _journal(sa_sync_conn, eissn="1476-4687")
         found = _find_or_create("Nature", eissn="1476-4687", repo=gateway)
         assert found == existing
 
     def test_finds_by_issnl(self, sa_sync_conn, gateway):
-        existing = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
+        existing = _journal(sa_sync_conn, issnl="0028-0836")
         found = _find_or_create("Other Title", issnl="0028-0836", repo=gateway)
         assert found == existing
 
@@ -333,7 +308,7 @@ class TestFindOrCreateJournal:
 
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_gateway):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
-        existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        existing = _journal(sa_sync_conn, issn="0028-0836")
         pub_id = find_or_create_publisher("Springer", repo=publisher_gateway)
         _find_or_create(
             "Nature",
@@ -384,7 +359,7 @@ class TestFindOrCreateJournal:
 
     def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
         """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
-        j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
+        j_id = _journal(sa_sync_conn, eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
@@ -394,14 +369,14 @@ class TestFindOrCreateJournal:
 
     def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
         """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
-        j_id = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
+        j_id = _journal(sa_sync_conn, issnl="0028-0836")
         _find_or_create("Nature", issn="0028-0836", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
         assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
 
     def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
         """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
-        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0305-1048", rejected=("1362-4954",))
+        j_id = _journal(sa_sync_conn, issn="0305-1048", rejected=("1362-4954",))
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         found = _find_or_create("Other title", eissn="1362-4954", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
@@ -410,7 +385,7 @@ class TestFindOrCreateJournal:
         assert row.sudoc_checked_at is not None
 
     def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
+        j_id = _journal(sa_sync_conn, eissn="1476-4687")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
@@ -418,7 +393,7 @@ class TestFindOrCreateJournal:
         assert row.sudoc_checked_at is None
 
     def test_new_rejected_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        j_id = _journal(sa_sync_conn, issn="0028-0836")
         _mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
         row = _columns(sa_sync_conn, j_id)
@@ -431,7 +406,7 @@ class TestFindOrCreateJournal:
 
 class TestUpdateJournalApc:
     def test_updates_fields(self, sa_sync_conn, gateway):
-        j_id = _insert_journal(sa_sync_conn, "Nature")
+        j_id = _journal(sa_sync_conn)
         update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR", repo=gateway)
         row = _fetch_one(
             sa_sync_conn,
@@ -444,9 +419,7 @@ class TestUpdateJournalApc:
     def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, gateway):
         """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
         DOAJ) n'est jamais touché par l'enrichissement APC."""
-        j_id = _insert_journal(
-            sa_sync_conn, "Nature", apc_amount=2000.0, apc_currency="USD", is_in_doaj=True
-        )
+        j_id = _journal(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
         update_journal_apc(j_id, apc_currency="EUR", repo=gateway)
         row = _fetch_one(
             sa_sync_conn,
@@ -464,12 +437,12 @@ class TestUpdateJournal:
             update_journal(999999, update=JournalUpdate(title="X"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
-        j = _insert_journal(sa_sync_conn, "Nature")
+        j = _journal(sa_sync_conn)
         with pytest.raises(ValidationError):
             update_journal(j, update=JournalUpdate(), repo=repo)
 
     def test_updates_title_and_normalizes(self, sa_sync_conn, repo):
-        j = _insert_journal(sa_sync_conn, "Old Title")
+        j = _journal(sa_sync_conn, title="Old Title")
         update_journal(j, update=JournalUpdate(title="Nature Medicine"), repo=repo)
         row = _fetch_one(
             sa_sync_conn, "SELECT title, title_normalized FROM journals WHERE id = :id", id=j
@@ -479,7 +452,7 @@ class TestUpdateJournal:
 
     def test_partial_update(self, sa_sync_conn, repo):
         """Les ISSN fournis remplacent ceux de la revue ; un ISSN gardé conserve sa date de vérification."""
-        j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        j = _journal(sa_sync_conn, issn="0028-0836")
         _mark_checked_in_sudoc(sa_sync_conn, j)
         update_journal(
             j,
@@ -504,7 +477,7 @@ class TestUpdateJournal:
         assert row.eissn == "1476-4687"
 
     def test_normalizes_issn(self, sa_sync_conn, repo):
-        j = _insert_journal(sa_sync_conn, "Nature")
+        j = _journal(sa_sync_conn)
         update_journal(
             j,
             update=JournalUpdate(
@@ -516,7 +489,7 @@ class TestUpdateJournal:
         assert row.eissn == "1476-4687"
 
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
-        j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
+        j = _journal(sa_sync_conn, issn="0028-0836")
         with pytest.raises(ValidationError):
             update_journal(
                 j, update=JournalUpdate(issns=[JournalIssnInput(issn="1234-5678")]), repo=repo
@@ -593,7 +566,7 @@ class TestMergePublishers:
     ):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        j1 = _insert_journal(sa_sync_conn, "Journal 1", publisher_id=source)
+        j1 = _journal(sa_sync_conn, title="Journal 1", publisher_id=source)
 
         merge_publishers(
             target,
@@ -663,8 +636,8 @@ class TestMergePublishers:
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
-        js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, eissn="1476-4687")
+        jt = _journal(sa_sync_conn, publisher_id=target, issn="0028-0836")
+        js = _journal(sa_sync_conn, publisher_id=source, eissn="1476-4687")
         insert_publication(sa_sync_conn, journal_id=js)
 
         merge_publishers(
@@ -689,8 +662,8 @@ class TestMergePublishers:
         l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target)
-        js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, openalex_id="S4210225546")
+        jt = _journal(sa_sync_conn, publisher_id=target)
+        js = _journal(sa_sync_conn, publisher_id=source, openalex_id="S4210225546")
 
         merge_publishers(
             target,
@@ -711,8 +684,8 @@ class TestMergePublishers:
     ):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
-        js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, issn="9999-9999")
+        jt = _journal(sa_sync_conn, publisher_id=target, issn="0028-0836")
+        js = _journal(sa_sync_conn, publisher_id=source, issn="9999-9999")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
             merge_publishers(
@@ -742,9 +715,9 @@ class TestMergePublishers:
         N→1 casserait. On flagge ces paires comme blockers."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
-        _insert_journal(sa_sync_conn, "Nature", publisher_id=target, eissn="1476-4687")
-        _insert_journal(sa_sync_conn, "Nature", publisher_id=source)
+        _journal(sa_sync_conn, publisher_id=target, issn="0028-0836")
+        _journal(sa_sync_conn, publisher_id=target, eissn="1476-4687")
+        _journal(sa_sync_conn, publisher_id=source)
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
             merge_publishers(
@@ -768,10 +741,10 @@ class TestMergePublishers:
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
-        _insert_journal(sa_sync_conn, "Rev1", publisher_id=target, issn="1111-1111")
-        _insert_journal(sa_sync_conn, "Rev1", publisher_id=source, issn="2222-2222")
-        _insert_journal(sa_sync_conn, "Rev2", publisher_id=target, eissn="3333-3333")
-        _insert_journal(sa_sync_conn, "Rev2", publisher_id=source, eissn="4444-4444")
+        _journal(sa_sync_conn, title="Rev1", publisher_id=target, issn="1111-1111")
+        _journal(sa_sync_conn, title="Rev1", publisher_id=source, issn="2222-2222")
+        _journal(sa_sync_conn, title="Rev2", publisher_id=target, eissn="3333-3333")
+        _journal(sa_sync_conn, title="Rev2", publisher_id=source, eissn="4444-4444")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
             merge_publishers(
@@ -832,7 +805,7 @@ class TestMergePublishers:
 
 class TestMergeJournals:
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publication_repo):
-        j_id = _insert_journal(sa_sync_conn, "Nature")
+        j_id = _journal(sa_sync_conn)
         with pytest.raises(ValidationError, match="identiques"):
             merge_journals(
                 j_id,
@@ -844,7 +817,7 @@ class TestMergeJournals:
             )
 
     def test_raises_on_missing_target(self, sa_sync_conn, repo, publication_repo):
-        j_id = _insert_journal(sa_sync_conn, "Nature")
+        j_id = _journal(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_journals(
                 999999,
@@ -856,7 +829,7 @@ class TestMergeJournals:
             )
 
     def test_raises_on_missing_source(self, sa_sync_conn, repo, publication_repo):
-        j_id = _insert_journal(sa_sync_conn, "Nature")
+        j_id = _journal(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_journals(
                 j_id,
@@ -868,8 +841,8 @@ class TestMergeJournals:
             )
 
     def test_transfers_publications(self, sa_sync_conn, repo, publication_repo):
-        target = _insert_journal(sa_sync_conn, "Target")
-        source = _insert_journal(sa_sync_conn, "Source")
+        target = _journal(sa_sync_conn, title="Target")
+        source = _journal(sa_sync_conn, title="Source")
         pub_id = insert_publication(sa_sync_conn, journal_id=source)
         # ≥1 source_publication : sinon `refresh_from_sources` (déclenché par la
         # requalification post-merge) supprimerait la publication comme orpheline.
@@ -896,13 +869,13 @@ class TestMergeJournals:
         self, sa_sync_conn, repo, publication_repo
     ):
         """La cible reçoit les valeurs mal formées de la source et redevient à vérifier dans le Sudoc."""
-        target = _insert_journal(
-            sa_sync_conn, "Target", rejected=("1234-5678",), rejected_status="malformed"
+        target = _journal(
+            sa_sync_conn, title="Target", rejected=("1234-5678",), rejected_status="malformed"
         )
         _mark_checked_in_sudoc(sa_sync_conn, target)
-        source = _insert_journal(
+        source = _journal(
             sa_sync_conn,
-            "Source",
+            title="Source",
             rejected=("1234-5678", "(Internet)"),
             rejected_status="malformed",
         )
@@ -922,10 +895,10 @@ class TestMergeJournals:
 
     def test_source_issns_join_the_target(self, sa_sync_conn, repo, publication_repo):
         """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint la cible, qui garde son propre ISSN."""
-        target = _insert_journal(sa_sync_conn, "BMC Primary Care", eissn="2731-4553")
-        source = _insert_journal(
+        target = _journal(sa_sync_conn, title="BMC Primary Care", eissn="2731-4553")
+        source = _journal(
             sa_sync_conn,
-            "BMC Family Practice",
+            title="BMC Family Practice",
             eissn="1471-2296",
             rejected=("2731-4553",),
             rejected_status="related_title",
@@ -945,9 +918,9 @@ class TestMergeJournals:
         assert row.rejected_issns == ["1471-2296"]
 
     def test_enriches_target_metadata(self, sa_sync_conn, repo, publication_repo):
-        target = _insert_journal(sa_sync_conn, "Target")
-        source = _insert_journal(
-            sa_sync_conn, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True
+        target = _journal(sa_sync_conn, title="Target")
+        source = _journal(
+            sa_sync_conn, title="Source", is_in_doaj=True, issn="1234-5678", eissn="9999-0000"
         )
 
         merge_journals(
@@ -969,8 +942,8 @@ class TestMergeJournals:
 
     def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo, publication_repo):
         """COALESCE : les champs renseignés dans la cible sont préservés."""
-        target = _insert_journal(sa_sync_conn, "Target", issn="0028-0836")
-        source = _insert_journal(sa_sync_conn, "Source", issn="1234-5678")
+        target = _journal(sa_sync_conn, title="Target", issn="0028-0836")
+        source = _journal(sa_sync_conn, title="Source", issn="1234-5678")
 
         merge_journals(
             target,
@@ -992,8 +965,8 @@ class TestMergeJournals:
         Régression : avant ce hook, le merge repointait `journal_id` mais laissait
         les `doc_type` des publications absorbées inchangés.
         """
-        media = _insert_journal(sa_sync_conn, "Le Monde")
-        revue = _insert_journal(sa_sync_conn, "Revue X")
+        media = _journal(sa_sync_conn, title="Le Monde")
+        revue = _journal(sa_sync_conn, title="Revue X")
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": media}
         )
@@ -1030,7 +1003,7 @@ class TestMergeJournals:
 class TestRequalifyPublicationsForJournal:
     def _seed(self, conn):
         """Journal 'journal' + une publication 'article' attestée par une SP 'article'."""
-        journal = _insert_journal(conn, "Revue X")
+        journal = _journal(conn, title="Revue X")
         conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
         )
