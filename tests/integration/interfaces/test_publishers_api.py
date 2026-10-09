@@ -15,10 +15,13 @@ from functools import partial
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
+    seed_doi_prefix,
     seed_in_perimeter_authorships,
     seed_journal,
     seed_publication,
+    seed_publication_subject,
     seed_publisher,
+    seed_subject,
     uniq,
 )
 
@@ -28,12 +31,9 @@ _publication = partial(seed_publication, normalize_title=False)
 
 def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
     prefix = f"10.{uuid.uuid4().int % 100000:05d}"
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id)"
-            " VALUES (%s, 'Crossref', %s, %s)",
-            (prefix, publisher_id, crossref_member_id),
-        )
+    seed_doi_prefix(
+        prefix, ra="Crossref", publisher_id=publisher_id, crossref_member_id=crossref_member_id
+    )
     return prefix
 
 
@@ -190,12 +190,8 @@ class TestGetPublisher:
         """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
         name = uniq("PrefixedPub")
         pid = seed_publisher(name)
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
-                "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
-                ("10.9008", "Crossref", pid, 42, "10.9009", "Crossref", pid, 42),
-            )
+        for prefix in ("10.9008", "10.9009"):
+            seed_doi_prefix(prefix, ra="Crossref", publisher_id=pid, crossref_member_id=42)
         r = client.get(f"/api/publishers/{pid}")
         assert r.status_code == 200
         pub = r.json()
@@ -208,11 +204,7 @@ class TestGetPublisher:
         """Régression : la colonne « Préfixes DOI » du tableau des éditeurs restait vide, la liste ne les renvoyant pas."""
         name = uniq("ListedPrefixedPub")
         pid = seed_publisher(name)
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id) VALUES ('10.9010', 'Crossref', %s)",
-                (pid,),
-            )
+        seed_doi_prefix("10.9010", ra="Crossref", publisher_id=pid)
         r = client.get("/api/publishers", params={"search": name})
         assert r.status_code == 200
         mine = next(p for p in r.json()["publishers"] if p["id"] == pid)
@@ -282,25 +274,17 @@ class TestPublisherSubjects:
     def test_returns_top_subjects_excluding_generic(self, client):
         pid = seed_publisher()
         jid = seed_journal(publisher_id=pid)
-        with owner_pool() as cur:
-            pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
-            specific_label = uniq("specific_subject")
-            cur.execute(
-                "INSERT INTO subjects (label, usage_count) VALUES (%s, 100) RETURNING id",
-                (specific_label,),
-            )
-            spec_id = cur.fetchone()["id"]
-            generic_label = uniq("generic_subject")
-            cur.execute(
-                "INSERT INTO subjects (label, usage_count) VALUES (%s, 9999) RETURNING id",
-                (generic_label,),
-            )
-            gen_id = cur.fetchone()["id"]
-            cur.execute(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (%s, %s, 'hal'), (%s, %s, 'hal'), (%s, %s, 'hal')",
-                (pub_ids[0], spec_id, pub_ids[1], spec_id, pub_ids[0], gen_id),
-            )
+        pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
+        specific_label = uniq("specific_subject")
+        spec_id = seed_subject(specific_label, usage_count=100)
+        generic_label = uniq("generic_subject")
+        gen_id = seed_subject(generic_label, usage_count=9999)
+        for pub_id, subject_id in (
+            (pub_ids[0], spec_id),
+            (pub_ids[1], spec_id),
+            (pub_ids[0], gen_id),
+        ):
+            seed_publication_subject(pub_id, subject_id=subject_id)
         seed_in_perimeter_authorships(jid)
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200

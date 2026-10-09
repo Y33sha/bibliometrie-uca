@@ -8,17 +8,12 @@ Couvre :
 from __future__ import annotations
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_publication, uniq
-
-
-def _seed_subject(label: str | None = None, usage_count: int = 1) -> int:
-    label = label or uniq("Subject")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
-            (label, usage_count),
-        )
-        return cur.fetchone()["id"]
+from tests.integration.helpers.seeds import (
+    seed_publication,
+    seed_publication_subject,
+    seed_subject,
+    uniq,
+)
 
 
 def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None:
@@ -30,11 +25,7 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
         for _ in range(count):
             pub_id = seed_publication("cooc-seed", normalize_title=False, doc_type="article")
             for s in (a, b):
-                cur.execute(
-                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                    "VALUES (%s, %s, 'hal')",
-                    (pub_id, s),
-                )
+                seed_publication_subject(pub_id, subject_id=s)
         cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
 
 
@@ -70,15 +61,15 @@ class TestListSubjects:
 
     def test_search_by_label(self, client):
         label = uniq("FindMeSubject")
-        sid = _seed_subject(label=label, usage_count=10)
+        sid = seed_subject(label=label, usage_count=10)
         r = client.get("/api/subjects", params={"search": label.lower()})
         assert r.status_code == 200
         ids = [item["id"] for item in r.json()["items"]]
         assert sid in ids
 
     def test_min_count_filter(self, client):
-        low = _seed_subject(uniq("LowCount"), usage_count=1)
-        high = _seed_subject(uniq("HighCount"), usage_count=50)
+        low = seed_subject(uniq("LowCount"), usage_count=1)
+        high = seed_subject(uniq("HighCount"), usage_count=50)
         # min_count=10 doit filtrer `low` mais retenir `high`.
         r = client.get("/api/subjects", params={"min_count": 10, "per_page": 200})
         assert r.status_code == 200
@@ -94,7 +85,7 @@ class TestGetSubject:
 
     def test_returns_subject_with_empty_neighbors(self, client):
         label = uniq("DetailSubject")
-        sid = _seed_subject(label=label, usage_count=5)
+        sid = seed_subject(label=label, usage_count=5)
         r = client.get(f"/api/subjects/{sid}")
         assert r.status_code == 200
         body = r.json()
@@ -103,9 +94,9 @@ class TestGetSubject:
         assert body["neighbors"] == []
 
     def test_returns_neighbors_when_cooccurrences_exist(self, client):
-        s_main = _seed_subject(uniq("Main"), usage_count=10)
-        s_n1 = _seed_subject(uniq("Neighbor1"), usage_count=8)
-        s_n2 = _seed_subject(uniq("Neighbor2"), usage_count=5)
+        s_main = seed_subject(uniq("Main"), usage_count=10)
+        s_n1 = seed_subject(uniq("Neighbor1"), usage_count=8)
+        s_n2 = seed_subject(uniq("Neighbor2"), usage_count=5)
         _seed_cooccurrence(s_main, s_n1, count=10)
         _seed_cooccurrence(s_main, s_n2, count=5)
 
@@ -117,8 +108,8 @@ class TestGetSubject:
         assert s_n2 in ids
 
     def test_min_cooccurrence_filters(self, client):
-        s_main = _seed_subject(uniq("MainFilter"), usage_count=10)
-        s_weak = _seed_subject(uniq("WeakNeighbor"), usage_count=8)
+        s_main = seed_subject(uniq("MainFilter"), usage_count=10)
+        s_weak = seed_subject(uniq("WeakNeighbor"), usage_count=8)
         _seed_cooccurrence(s_main, s_weak, count=2)
 
         r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 5})
@@ -129,6 +120,6 @@ class TestGetSubject:
 
     def test_neighbors_limit_param_validation(self, client):
         # Query(ge=1, le=100) — > 100 = 422.
-        s = _seed_subject()
+        s = seed_subject()
         r = client.get(f"/api/subjects/{s}", params={"neighbors_limit": 500})
         assert r.status_code == 422

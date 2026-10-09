@@ -14,7 +14,7 @@ from sqlalchemy import text
 from application.ports.pipeline.relations import DoiPublication, RelationEdge
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication
 
 _Q = PgPublicationRelationsQueries()
@@ -190,13 +190,12 @@ class TestRelationTargetDeletionCascades:
         child = _pub(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/child"
         )
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO publication_relations
-                    (from_publication_id, relation_type, target_publication_id, target_doi, source)
-                VALUES (:child, 'is_preprint_of', :parent, NULL, 'title_match')
-            """),
-            {"child": child, "parent": parent},
+        insert_publication_relation(
+            sa_sync_conn,
+            child,
+            relation_type="is_preprint_of",
+            source="title_match",
+            target_publication_id=parent,
         )
 
         # Le chemin qui plantait : refresh_from_sources → repo.delete sur la cible orpheline.
@@ -284,16 +283,18 @@ class TestCountByRelationType:
 
     def test_returns_json_serializable_str_int_pairs(self, sa_sync_conn):
         parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a")
-        sa_sync_conn.execute(
-            text("""
-                INSERT INTO publication_relations
-                    (from_publication_id, relation_type, target_doi, source)
-                VALUES (:p, 'is_preprint_of', '10.9/x', 'crossref'),
-                       (:p, 'is_preprint_of', '10.9/y', 'crossref'),
-                       (:p, 'has_part', '10.9/z', 'datacite')
-            """),
-            {"p": parent},
-        )
+        for relation_type, target_doi, source in (
+            ("is_preprint_of", "10.9/x", "crossref"),
+            ("is_preprint_of", "10.9/y", "crossref"),
+            ("has_part", "10.9/z", "datacite"),
+        ):
+            insert_publication_relation(
+                sa_sync_conn,
+                parent,
+                relation_type=relation_type,
+                source=source,
+                target_doi=target_doi,
+            )
 
         result = _Q.count_by_relation_type(sa_sync_conn)
 

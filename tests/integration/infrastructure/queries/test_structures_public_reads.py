@@ -2,8 +2,6 @@
 
 from functools import partial
 
-from sqlalchemy import text
-
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.structures import PgStructuresQueries
 from tests.integration.helpers.addresses import (
@@ -20,6 +18,7 @@ from tests.integration.helpers.structures import (
     insert_structure,
     insert_tutelle,
 )
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 # Authorship du périmètre, de rôle auteur.
 _lab_author = partial(insert_authorship, in_perimeter=True, roles=["author"])
@@ -177,22 +176,6 @@ class TestGetLaboratorySubjects:
         _setup_perimeter(sa_sync_conn, [lab])
 
         # 3 publications du labo avec sujets variables.
-        def _create_subject(label):
-            row = sa_sync_conn.execute(
-                text("INSERT INTO subjects (label) VALUES (:l) RETURNING id"),
-                {"l": label},
-            ).one()
-            return row.id
-
-        def _link(pub_id, sid):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                    "VALUES (:p, :s, 'hal')"
-                ),
-                {"p": pub_id, "s": sid},
-            )
-
         def _attach(pub_id):
             aid = _lab_author(sa_sync_conn, pub_id)
             add_authorship_structure(sa_sync_conn, aid, lab)
@@ -203,12 +186,12 @@ class TestGetLaboratorySubjects:
         for p in (p1, p2, p3):
             _attach(p)
 
-        ai = _create_subject("AI")
-        bio = _create_subject("Biology")
+        ai = insert_subject(sa_sync_conn, "AI")
+        bio = insert_subject(sa_sync_conn, "Biology")
         # AI sur 3 publis ; Biology sur 1.
         for p in (p1, p2, p3):
-            _link(p, ai)
-        _link(p1, bio)
+            insert_publication_subject(sa_sync_conn, p, subject_id=ai)
+        insert_publication_subject(sa_sync_conn, p1, subject_id=bio)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_subjects(lab, limit=10)
         assert len(res) == 2

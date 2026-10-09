@@ -158,3 +158,40 @@ def insert_monograph(
             "journal_id": journal_id,
         },
     )
+
+
+def insert_doi_prefix(
+    conn: Connection,
+    prefix: str,
+    *,
+    ra: str,
+    publisher_id: int | None = None,
+    crossref_member_id: int | None = None,
+    publisher_checked: bool = False,
+) -> None:
+    """Insère le préfixe DOI `prefix` de l'agence `ra`. `publisher_checked` date la vérification de l'éditeur de l'instant de la transaction."""
+    checked_at = conn.execute(text("SELECT now()")).scalar_one() if publisher_checked else None
+    insert_row(
+        conn,
+        "doi_prefixes",
+        {
+            "prefix": prefix,
+            "ra": ra,
+            "publisher_id": publisher_id,
+            "crossref_member_id": crossref_member_id,
+            "publisher_checked_at": checked_at,
+        },
+        returning=False,
+    )
+
+
+def insert_journal_doi_namespace(
+    conn: Connection, namespace: str, *, journal_id: int, dois: int, share: float
+) -> None:
+    """Insère l'espace de noms DOI `namespace` appris pour la revue `journal_id`."""
+    insert_row(
+        conn,
+        "journal_doi_namespaces",
+        {"namespace": namespace, "journal_id": journal_id, "dois": dois, "share": share},
+        returning=False,
+    )

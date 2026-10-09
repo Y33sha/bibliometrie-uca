@@ -14,6 +14,7 @@ from infrastructure.pipeline.authorships.purge_orphan_publications import (
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 _Q = PgPurgeOrphanPublicationsQueries()
 
@@ -51,16 +52,8 @@ class TestPurgeOrphanPublications:
         # Les sujets d'une orpheline disparaissent par CASCADE : c'est ce qui
         # garde `publication_subjects` scopé périmètre sans filtre dans subjects.
         orphan = insert_publication(sa_sync_conn, "orphan")
-        s_id = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label) VALUES ('vaches laitieres') RETURNING id")
-        ).scalar_one()
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (:p, :s, 'hal')"
-            ),
-            {"p": orphan, "s": s_id},
-        )
+        s_id = insert_subject(sa_sync_conn, "vaches laitieres")
+        insert_publication_subject(sa_sync_conn, orphan, subject_id=s_id)
         _Q.purge_orphan_publications(sa_sync_conn)
         n_links = sa_sync_conn.execute(
             text("SELECT count(*) FROM publication_subjects WHERE publication_id = :p"),

@@ -10,11 +10,12 @@ from infrastructure.read_models.publications.detail import (
     get_publication_subjects,
 )
 from tests.integration.helpers.authorships import insert_authorship
-from tests.integration.helpers.journals import insert_monograph, insert_publisher
+from tests.integration.helpers.journals import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 
 class TestGetPublicationDetail:
@@ -109,9 +110,7 @@ class TestGetPublicationDetail:
     def test_doi_ra_resolved_from_doi_prefixes(self, sa_sync_conn):
         """doi_ra = la RA du préfixe DOI (via doi_prefixes) — discrimine les DOI
         DataCite (Zenodo/figshare/arXiv) pour le choix du lien d'accès."""
-        sa_sync_conn.execute(
-            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
-        )
+        insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         pub = insert_publication(sa_sync_conn, doi="10.5281/zenodo.99")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
@@ -233,18 +232,9 @@ class TestGetPublicationSubjects:
     def test_dedup_aggregates_sources(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
         # Un même libellé annoté par deux sources : 1 row, sources = ['hal', 'openalex'].
-        sub_row = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label) VALUES ('AI') RETURNING id")
-        ).one()
-        sid = sub_row.id
+        sid = insert_subject(sa_sync_conn, "AI")
         for src in ("hal", "openalex"):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                    "VALUES (:p, :s, :src)"
-                ),
-                {"p": pub, "s": sid, "src": src},
-            )
+            insert_publication_subject(sa_sync_conn, pub, subject_id=sid, source=src)
 
         subjects = get_publication_subjects(sa_sync_conn, pub)
         assert len(subjects) == 1
@@ -253,17 +243,8 @@ class TestGetPublicationSubjects:
 
     def test_included_in_publication_detail(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        sub_row = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label) VALUES ('genomics') RETURNING id")
-        ).one()
-        sid = sub_row.id
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (:p, :s, 'wos')"
-            ),
-            {"p": pub, "s": sid},
-        )
+        sid = insert_subject(sa_sync_conn, "genomics")
+        insert_publication_subject(sa_sync_conn, pub, subject_id=sid, source="wos")
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None

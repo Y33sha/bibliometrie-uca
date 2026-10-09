@@ -17,7 +17,7 @@ from tests.integration.helpers.journals import (
     insert_journal_issn,
     insert_journal_with_issns,
 )
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
 # Revue « J » par défaut.
@@ -264,10 +264,7 @@ class TestSudocCheck:
             journal_id=with_record,
         )
         with_payment = _journal(sa_sync_conn, title="Revue test avec paiement")
-        sa_sync_conn.execute(
-            text("INSERT INTO apc_payments (journal_id, open_access_fee) VALUES (:jid, true)"),
-            {"jid": with_payment},
-        )
+        insert_apc_payment(sa_sync_conn, journal_id=with_payment, open_access_fee=True)
         deleted = {j.id: j for j in repo.delete_empty_journals()}
         assert deleted[empty].title == "Revue test vide"
         assert deleted[empty].issns == ("2999-0007", "2999-0015")

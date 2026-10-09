@@ -16,6 +16,7 @@ from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 # Laboratoire « LAB ».
 _lab = partial(insert_structure, code="LAB")
@@ -29,24 +30,6 @@ def _attach(conn, pub_id, lab_id):
     (semée par la chaîne source minimale)."""
     aid = insert_authorship(conn, pub_id, in_perimeter=True, roles=["author"])
     add_authorship_structure(conn, aid, lab_id)
-
-
-def _create_subject(conn, label):
-    row = conn.execute(
-        text("INSERT INTO subjects (label) VALUES (:l) RETURNING id"),
-        {"l": label},
-    ).one()
-    return row.id
-
-
-def _link_subject(conn, pub_id, sid):
-    conn.execute(
-        text(
-            "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-            "VALUES (:pid, :sid, 'hal')"
-        ),
-        {"pid": pub_id, "sid": sid},
-    )
 
 
 class TestSearch:
@@ -77,8 +60,8 @@ class TestSearch:
         _attach(sa_sync_conn, pub, lab)
         _attach(sa_sync_conn, unrelated, lab)
 
-        sid = _create_subject(sa_sync_conn, "Quantum mechanics")
-        _link_subject(sa_sync_conn, pub, sid)
+        sid = insert_subject(sa_sync_conn, "Quantum mechanics")
+        insert_publication_subject(sa_sync_conn, pub, subject_id=sid)
 
         res = list_publications(
             sa_sync_conn,
@@ -101,8 +84,8 @@ class TestSearch:
         subject_match = insert_publication(sa_sync_conn, "Foo bar baz")
         _attach(sa_sync_conn, title_match, lab)
         _attach(sa_sync_conn, subject_match, lab)
-        sid = _create_subject(sa_sync_conn, "Quantum mechanics")
-        _link_subject(sa_sync_conn, subject_match, sid)
+        sid = insert_subject(sa_sync_conn, "Quantum mechanics")
+        insert_publication_subject(sa_sync_conn, subject_match, subject_id=sid)
 
         res = list_publications(
             sa_sync_conn,
@@ -120,8 +103,8 @@ class TestSearch:
         lab = _lab(sa_sync_conn)
         pub = insert_publication(sa_sync_conn, "Foo")
         _attach(sa_sync_conn, pub, lab)
-        sid = _create_subject(sa_sync_conn, "Économétrie")
-        _link_subject(sa_sync_conn, pub, sid)
+        sid = insert_subject(sa_sync_conn, "Économétrie")
+        insert_publication_subject(sa_sync_conn, pub, subject_id=sid)
 
         res = list_publications(
             sa_sync_conn,

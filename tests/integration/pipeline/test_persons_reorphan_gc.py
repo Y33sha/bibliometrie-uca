@@ -7,6 +7,7 @@ from sqlalchemy import text
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 
 _Q = PgPersonsMatchingQueries()
+from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_name_form,
@@ -57,10 +58,7 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     ambiguous = _signature(conn, form="j martin", person_id=a, mode="name")
     unambiguous = _signature(conn, form="jean martin", person_id=b, mode="name")
     pinned = _signature(conn, form="j martin", person_id=a, mode="name")
-    conn.execute(
-        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:s, :p)"),
-        {"s": pinned, "p": a},
-    )
+    insert_confirmed_authorship(conn, pinned, person_id=a)
     by_identifier = _signature(conn, form="j martin", person_id=a, mode="identifier")
 
     assert _Q.reorphan_ambiguous_nominal(conn) == 1
@@ -108,10 +106,7 @@ def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
     nominal = _signature(conn, form="wei zhang", person_id=p, mode="name")
     pinned_cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
-    conn.execute(
-        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:s, :p)"),
-        {"s": pinned_cross, "p": p},
-    )
+    insert_confirmed_authorship(conn, pinned_cross, person_id=p)
 
     # Détache le lot demandé, mais jamais un épinglage admin.
     assert _Q.detach_authorships(conn, [cross, pinned_cross]) == 1
@@ -131,10 +126,7 @@ def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
     )
     nominal = _signature(conn, form="jean martin", person_id=old, mode="name", identifiers=ids)
     pinned = _signature(conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids)
-    conn.execute(
-        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:s, :p)"),
-        {"s": pinned, "p": old},
-    )
+    insert_confirmed_authorship(conn, pinned, person_id=old)
     other_owner = _signature(
         conn, form="marie dupont", person_id=other, mode="identifier", identifiers=ids
     )

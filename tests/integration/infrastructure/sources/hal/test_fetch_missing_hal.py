@@ -9,7 +9,7 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
 def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
@@ -23,16 +23,6 @@ def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None
         title="titre test",
         staging_id=staging_id,
         external_ids=external_ids,
-    )
-
-
-def _insert_failed_lookup(conn, id_type, id_value, *, next_retry_sql="NULL") -> None:
-    conn.execute(
-        text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-            f"VALUES ('hal', :t, :v, now(), {next_retry_sql})"
-        ),
-        {"t": id_type, "v": id_value},
     )
 
 
@@ -68,7 +58,7 @@ class TestFindMissingHalIds:
 
     def test_skips_hal_id_already_searched_in_vain(self, sa_sync_conn):
         self._carry(sa_sync_conn, "scanr", "scanr-1", ["hal-ggg"])
-        _insert_failed_lookup(sa_sync_conn, "hal_id", "hal-ggg")
+        insert_failed_lookup(sa_sync_conn, id_type="hal_id", id_value="hal-ggg")
         assert self._missing(sa_sync_conn) == []
 
     def test_handles_missing_hal_id_key(self, sa_sync_conn):
@@ -117,16 +107,12 @@ class TestFindMissingNnts:
 
     def test_excludes_nnt_waiting_for_retry(self, sa_sync_conn):
         self._thesis(sa_sync_conn, "2024UCA0001")
-        _insert_failed_lookup(
-            sa_sync_conn, "nnt", "2024UCA0001", next_retry_sql="now() + interval '30 days'"
-        )
+        insert_failed_lookup(sa_sync_conn, id_type="nnt", id_value="2024UCA0001", retry_in_days=30)
         assert self._missing(sa_sync_conn) == []
 
     def test_retries_nnt_whose_delay_expired(self, sa_sync_conn):
         self._thesis(sa_sync_conn, "2024UCA0001")
-        _insert_failed_lookup(
-            sa_sync_conn, "nnt", "2024UCA0001", next_retry_sql="now() - interval '1 day'"
-        )
+        insert_failed_lookup(sa_sync_conn, id_type="nnt", id_value="2024UCA0001", retry_in_days=-1)
         assert self._missing(sa_sync_conn) == ["2024UCA0001"]
 
 
