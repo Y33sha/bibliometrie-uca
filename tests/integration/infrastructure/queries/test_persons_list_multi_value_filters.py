@@ -5,28 +5,21 @@ n'acceptait qu'une valeur. La page cochant plusieurs options, ses compteurs de f
 reflétaient la sélection pendant que la liste montrait tout le monde.
 """
 
-from sqlalchemy import text
-
 from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.list import list_persons
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_rh
 
 
 def _create_person(conn, last, department=None, role=None):
     """Personne, avec sa fiche RH quand un département ou un rôle est donné."""
     person_id = insert_person(conn, last)
     if department or role:
-        conn.execute(
-            text(
-                "INSERT INTO persons_rh (person_id, email, department_name, role_title) "
-                "VALUES (:pid, :mail, :dept, :role)"
-            ),
-            {
-                "pid": person_id,
-                "mail": f"{last.lower()}@uca.fr",
-                "dept": department,
-                "role": role,
-            },
+        insert_person_rh(
+            conn,
+            person_id,
+            email=f"{last.lower()}@uca.fr",
+            department_name=department,
+            role_title=role,
         )
     return person_id
 

@@ -8,7 +8,7 @@ from application.services.authorships.assign_orphans import assign_orphan_author
 from application.services.authorships.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -79,12 +79,13 @@ def test_name_form_rejection_spares_pinned_signatures(sa_sync_conn):
     sa_sync_conn.execute(
         text("UPDATE source_authorships SET person_id = :p WHERE id = :s"), {"p": pid, "s": matched}
     )
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-            "VALUES ('jean martin', :p, ARRAY['hal'], 'pending') ON CONFLICT DO NOTHING"
-        ),
-        {"p": pid},
+    insert_person_name_form(
+        sa_sync_conn,
+        pid,
+        name_form="jean martin",
+        sources=["hal"],
+        status="pending",
+        ignore_conflict=True,
     )
 
     update_name_form_status(

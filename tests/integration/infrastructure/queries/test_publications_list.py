@@ -12,6 +12,7 @@ from infrastructure.read_models.publications.list import (
     list_publications,
 )
 from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.structures import add_authorship_structure
@@ -314,14 +315,9 @@ class TestExcludedPersonLab:
         )
         pub = insert_publication(sa_sync_conn, "Copublication")
         for exclusion, lab in (("out_of_perimeter", lab_excluded), (None, lab_kept)):
-            person = sa_sync_conn.execute(
-                text(
-                    "INSERT INTO persons (last_name, first_name, last_name_normalized, "
-                    "first_name_normalized, exclusion) "
-                    "VALUES ('X', 'Y', 'x', 'y', CAST(:e AS person_exclusion)) RETURNING id"
-                ),
-                {"e": exclusion},
-            ).scalar_one()
+            person = insert_person(
+                sa_sync_conn, "X", first_name="Y", exclusion=exclusion, normalizer="lower"
+            )
             aid = insert_authorship(
                 sa_sync_conn, pub, person_id=person, in_perimeter=True, roles=["author"]
             )

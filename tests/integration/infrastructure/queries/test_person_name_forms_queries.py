@@ -5,18 +5,8 @@ from sqlalchemy import text
 from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
 _Q = PgPersonNameFormsQueries()
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
-
-
-def _insert_pnf(conn, name_form, person_id, sources):
-    conn.execute(
-        text("""
-            INSERT INTO person_name_forms (name_form, person_id, sources)
-            VALUES (:nf, :pid, :sources)
-        """),
-        {"nf": name_form, "pid": person_id, "sources": sources},
-    )
 
 
 def _fetch_pnf_for(conn, person_id):
@@ -95,7 +85,7 @@ class TestSyncFromRawForms:
         """Une row en base qui n'est plus attendue (ni dans `_raw_forms`
         ni dans `source_authorships`) est supprimée."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        _insert_pnf(sa_sync_conn, "obsolete", pid, ["persons"])
+        insert_person_name_form(sa_sync_conn, pid, name_form="obsolete", sources=["persons"])
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         # _raw_forms vide + aucune source_authorship → l'attendu est vide
@@ -115,7 +105,7 @@ class TestSyncFromRawForms:
             sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="openalex"
         )
         # Base : sources = ['hal'] (obsolète vs source_authorships qui dit openalex)
-        _insert_pnf(sa_sync_conn, "dupond j", pid, ["hal"])
+        insert_person_name_form(sa_sync_conn, pid, name_form="dupond j", sources=["hal"])
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)

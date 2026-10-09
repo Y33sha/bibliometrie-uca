@@ -7,13 +7,20 @@ Identique à test_addresses_api.py : seed minimal via un pool dédié
 collisions entre cas.
 """
 
+from functools import partial
+
 import pytest
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_person,
+    seed_person_identifier,
+    seed_person_name_form,
     uniq,
 )
+
+# Forme de nom de source « persons ».
+_persons_name_form = partial(seed_person_name_form, sources=["persons"])
 
 _cleanup_after_module = truncate_after_module(
     "authorships",
@@ -26,27 +33,6 @@ _cleanup_after_module = truncate_after_module(
     "person_name_forms",
     "audit_log",
 )
-
-
-def _seed_identifier(person_id: int, id_type: str, id_value: str, status: str = "pending") -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (%s, %s, %s, 'manual', %s::identifier_status) RETURNING id",
-            (person_id, id_type, id_value, status),
-        )
-        return cur.fetchone()["id"]
-
-
-def _seed_name_form(person_id: int, name_form: str, source: str = "persons") -> None:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO person_name_forms (name_form, person_id, sources) VALUES (%s, %s, %s)",
-            (name_form, person_id, [source]),
-        )
-
-
-# ── GET (endpoints de lecture) ───────────────────────────────────
 
 
 class TestPersonsList:
@@ -106,8 +92,12 @@ class TestPersonProfileIdentifiers:
         La règle tient dans la lecture, non dans la page : tout client de l'API en dépend.
         """
         person = seed_person(last="REJECTEDID")
-        _seed_identifier(person, "orcid", "0000-0002-0000-0001", status="rejected")
-        _seed_identifier(person, "orcid", "0000-0002-0000-0002", status="confirmed")
+        seed_person_identifier(
+            person, id_type="orcid", id_value="0000-0002-0000-0001", status="rejected"
+        )
+        seed_person_identifier(
+            person, id_type="orcid", id_value="0000-0002-0000-0002", status="confirmed"
+        )
 
         r = client.get(f"/api/persons/{person}")
 
@@ -264,7 +254,7 @@ class TestAddIdentifier:
 
     def test_already_exists_same_person(self, auth_client):
         pid = seed_person()
-        _seed_identifier(pid, "idhal", "same-person-id")
+        seed_person_identifier(pid, id_type="idhal", id_value="same-person-id")
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "same-person-id"},
@@ -277,7 +267,7 @@ class TestAddIdentifier:
     def test_conflict_other_person_not_rejected(self, auth_client):
         other = seed_person()
         pid = seed_person()
-        _seed_identifier(other, "idhal", "conflict-id", status="confirmed")
+        seed_person_identifier(other, id_type="idhal", id_value="conflict-id", status="confirmed")
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "conflict-id"},
@@ -287,7 +277,9 @@ class TestAddIdentifier:
     def test_reassign_from_rejected(self, auth_client):
         other = seed_person()
         pid = seed_person()
-        _seed_identifier(other, "idhal", "reassignable-id", status="rejected")
+        seed_person_identifier(
+            other, id_type="idhal", id_value="reassignable-id", status="rejected"
+        )
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "reassignable-id"},
@@ -305,7 +297,7 @@ class TestUpdateIdentifierStatus:
 
     def test_ok(self, auth_client):
         pid = seed_person()
-        iid = _seed_identifier(pid, "idhal", uniq("st"))
+        iid = seed_person_identifier(pid, id_type="idhal", id_value=uniq("st"))
         r = auth_client.patch(
             f"/api/persons/identifiers/{iid}/status", json={"status": "confirmed"}
         )
@@ -320,7 +312,7 @@ class TestReassignIdentifier:
 
     def test_target_not_found(self, auth_client):
         pid = seed_person()
-        iid = _seed_identifier(pid, "idhal", uniq("ra"))
+        iid = seed_person_identifier(pid, id_type="idhal", id_value=uniq("ra"))
         r = auth_client.patch(
             f"/api/persons/identifiers/{iid}/reassign", json={"person_id": 999999999}
         )
@@ -329,7 +321,7 @@ class TestReassignIdentifier:
     def test_ok(self, auth_client):
         src = seed_person()
         dst = seed_person()
-        iid = _seed_identifier(src, "idhal", uniq("ra"), status="rejected")
+        iid = seed_person_identifier(src, id_type="idhal", id_value=uniq("ra"), status="rejected")
         r = auth_client.patch(f"/api/persons/identifiers/{iid}/reassign", json={"person_id": dst})
         assert r.status_code == 200
         body = r.json()
@@ -433,7 +425,7 @@ class TestNameFormAuthorships:
     def test_ok(self, client):
         pid = seed_person("Nameform", "Test")
         nf = uniq("Nameform Test")
-        _seed_name_form(pid, nf)
+        _persons_name_form(pid, name_form=nf)
         r = client.get(f"/api/persons/{pid}/name-form-authorships", params={"name_form": nf})
         assert r.status_code == 200
 
@@ -465,7 +457,7 @@ class TestUpdateNameFormStatus:
     def test_reject_sets_status(self, auth_client):
         pid = seed_person("RejectForm", "Nf")
         nf = uniq("RejectForm Nf")
-        _seed_name_form(pid, nf, source="hal")
+        seed_person_name_form(pid, name_form=nf, sources=["hal"])
         r = auth_client.patch(
             f"/api/persons/{pid}/name-forms/status", json={"name_form": nf, "status": "rejected"}
         )
@@ -550,7 +542,7 @@ class TestPersonAdminProjection:
 
     def test_sharing_name_forms_without_sharer(self, client):
         pid = seed_person("Sharing", "Ec")
-        _seed_name_form(pid, uniq("sharing ec"))
+        _persons_name_form(pid, name_form=uniq("sharing ec"))
         r = client.get(f"/api/persons/{pid}/sharing-name-forms")
         assert r.status_code == 200
         assert r.json() == []
@@ -559,8 +551,8 @@ class TestPersonAdminProjection:
         form = uniq("partagee ec")
         a = seed_person("SharedA", "Ec")
         b = seed_person("SharedB", "Ec")
-        _seed_name_form(a, form)
-        _seed_name_form(b, form)
+        _persons_name_form(a, name_form=form)
+        _persons_name_form(b, name_form=form)
         r = client.get(f"/api/persons/{a}/sharing-name-forms")
         assert r.status_code == 200
         assert b in [p["person_id"] for p in r.json()]

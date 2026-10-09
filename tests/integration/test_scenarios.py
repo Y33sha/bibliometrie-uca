@@ -13,8 +13,19 @@ from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository, publication_repository
 from tests.integration.helpers.journals import insert_journal
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_name_form,
+    insert_person_rh,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
+
+# Fiche RH du département « Test » par défaut.
+_rh = partial(insert_person_rh, department_name="Test")
+
+# Personne normalisée par `lower`.
+_person = partial(insert_person, normalizer="lower")
 
 # Publication sans titre normalisé ni type.
 _publication = partial(insert_publication, normalize_title=False, doc_type=None)
@@ -31,25 +42,6 @@ def publication_repo(sa_sync_conn):
 
 
 # ── Helpers ──
-
-
-def create_person(conn, last_name, first_name):
-    return conn.execute(
-        text(
-            """
-            INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized)
-            VALUES (:last, :first, lower(:last), lower(:first)) RETURNING id
-            """
-        ),
-        {"last": last_name, "first": first_name},
-    ).scalar_one()
-
-
-def create_persons_rh(conn, person_id, **kwargs):
-    conn.execute(
-        text("INSERT INTO persons_rh (person_id, department_name) VALUES (:pid, :dept)"),
-        {"pid": person_id, "dept": kwargs.get("department_name", "Test")},
-    )
 
 
 # ── DOI case-insensitive (bug corrigé 2026-03-31) ──
@@ -160,23 +152,11 @@ class TestPgEnumsMatchDb:
 
 class TestMergePersons:
     def test_merge_transfers_name_forms(self, sa_sync_conn, person_repo):
-        target = create_person(sa_sync_conn, "Dupont", "Jean")
-        source = create_person(sa_sync_conn, "Dupont", "J.")
+        target = _person(sa_sync_conn, "Dupont", first_name="Jean")
+        source = _person(sa_sync_conn, "Dupont", first_name="J.")
 
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources) "
-                "VALUES ('jean dupont', :pid, ARRAY['persons'])"
-            ),
-            {"pid": target},
-        )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources) "
-                "VALUES ('j dupont', :pid, ARRAY['hal'])"
-            ),
-            {"pid": source},
-        )
+        insert_person_name_form(sa_sync_conn, target, name_form="jean dupont", sources=["persons"])
+        insert_person_name_form(sa_sync_conn, source, name_form="j dupont", sources=["hal"])
 
         merge_person(target, source, repo=person_repo)
 
@@ -208,10 +188,10 @@ class TestMergePersons:
         )
 
     def test_merge_blocked_if_both_rh(self, sa_sync_conn, person_repo):
-        target = create_person(sa_sync_conn, "Dupont", "Jean")
-        source = create_person(sa_sync_conn, "Dupont", "J.")
-        create_persons_rh(sa_sync_conn, target, matricule="MAT-001")
-        create_persons_rh(sa_sync_conn, source, matricule="MAT-002")
+        target = _person(sa_sync_conn, "Dupont", first_name="Jean")
+        source = _person(sa_sync_conn, "Dupont", first_name="J.")
+        _rh(sa_sync_conn, target)
+        _rh(sa_sync_conn, source)
 
         with pytest.raises(ConflictError, match="REFUS de fusion"):
             merge_person(target, source, repo=person_repo)
@@ -225,9 +205,9 @@ class TestMergePersons:
         )
 
     def test_merge_allowed_if_only_target_has_rh(self, sa_sync_conn, person_repo):
-        target = create_person(sa_sync_conn, "Dupont", "Jean")
-        source = create_person(sa_sync_conn, "Dupont", "J.")
-        create_persons_rh(sa_sync_conn, target, matricule="MAT-001")
+        target = _person(sa_sync_conn, "Dupont", first_name="Jean")
+        source = _person(sa_sync_conn, "Dupont", first_name="J.")
+        _rh(sa_sync_conn, target)
 
         merge_person(target, source, repo=person_repo)
 

@@ -15,6 +15,7 @@ from tests.integration.helpers.seeds import (
     seed_authorship,
     seed_person,
     seed_publication,
+    seed_rejected_authorship,
     seed_source_authorship,
     seed_source_publication,
     uniq,
@@ -47,14 +48,6 @@ def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]
         source="hal", source_pub_id=sp_id, raw_author_name=raw_author_name
     )
     return sa_id, pub_id
-
-
-def _reject_pair(publication_id: int, person_id: int) -> None:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO rejected_authorships (publication_id, person_id) VALUES (%s, %s)",
-            (publication_id, person_id),
-        )
 
 
 # ── PATCH /api/authorships/{id}/exclude ─────────────────────────
@@ -192,7 +185,7 @@ class TestAssignOrphanAuthorship:
     def test_blocked_when_pair_rejected(self, auth_client):
         pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
-        _reject_pair(pub, pid)
+        seed_rejected_authorship(pub, person_id=pid)
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa, "person_id": pid},
@@ -206,7 +199,7 @@ class TestAssignOrphanAuthorship:
     def test_forced_unrejects_and_assigns(self, auth_client):
         pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
-        _reject_pair(pub, pid)
+        seed_rejected_authorship(pub, person_id=pid)
         r = auth_client.post(
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa, "person_id": pid, "force": True},
@@ -247,7 +240,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_blocked_when_pair_rejected(self, auth_client):
         pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
-        _reject_pair(pub, pid)
+        seed_rejected_authorship(pub, person_id=pid)
         r = auth_client.post(
             "/api/authorships/orphans/batch-assign",
             json={"source_authorship_ids": [sa], "person_id": pid},
@@ -258,7 +251,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_forced_unrejects_and_assigns(self, auth_client):
         pid = seed_person()
         sa, pub = _seed_orphan_with_pub()
-        _reject_pair(pub, pid)
+        seed_rejected_authorship(pub, person_id=pid)
         r = auth_client.post(
             "/api/authorships/orphans/batch-assign",
             json={"source_authorship_ids": [sa], "person_id": pid, "force": True},
