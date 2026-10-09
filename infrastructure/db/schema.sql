@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 52G3ADGVgQwBVRe0bGq6I42bgreY7uaAqeUEfxFEU7Co8l8tNkszgFFXWNEooZX
+\restrict 1CIDlRmJrZMi3sa5Bvnr4oGyLtmrAABphPx1GHvvtZzpx0ZmOgamWQLFKWLgJWo
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1658,6 +1658,23 @@ CREATE TABLE public.rejected_authorships (
 
 
 --
+-- Name: ror_dump_imports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ror_dump_imports (
+    version text NOT NULL,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE ror_dump_imports; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ror_dump_imports IS 'Imports du dump ROR : nom de l''archive importée et date de l''import.';
+
+
+--
 -- Name: ror_organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1713,6 +1730,23 @@ CREATE SEQUENCE public.source_authorship_addresses_id_seq
 --
 
 ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_authorship_addresses.id;
+
+
+--
+-- Name: source_authorship_rors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_rors (
+    source_authorship_id integer NOT NULL,
+    ror_id text NOT NULL
+);
+
+
+--
+-- Name: TABLE source_authorship_rors; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.source_authorship_rors IS 'ROR attribués par la source à une signature. ror_id est sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump importé.';
 
 
 --
@@ -2556,6 +2590,14 @@ ALTER TABLE ONLY public.rejected_authorships
 
 
 --
+-- Name: ror_dump_imports ror_dump_imports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ror_dump_imports
+    ADD CONSTRAINT ror_dump_imports_pkey PRIMARY KEY (version);
+
+
+--
 -- Name: ror_organizations ror_organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2585,6 +2627,14 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 ALTER TABLE ONLY public.source_authorship_addresses
     ADD CONSTRAINT source_authorship_addresses_source_authorship_id_address_id_key UNIQUE (source_authorship_id, address_id);
+
+
+--
+-- Name: source_authorship_rors source_authorship_rors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_rors
+    ADD CONSTRAINT source_authorship_rors_pkey PRIMARY KEY (source_authorship_id, ror_id);
 
 
 --
@@ -3416,6 +3466,13 @@ CREATE INDEX ix_ror_relations_child_ror_id ON public.ror_relations USING btree (
 
 
 --
+-- Name: ix_source_authorship_rors_ror_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_source_authorship_rors_ror_id ON public.source_authorship_rors USING btree (ror_id);
+
+
+--
 -- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3844,6 +3901,14 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 
 --
+-- Name: source_authorship_rors source_authorship_rors_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_rors
+    ADD CONSTRAINT source_authorship_rors_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES public.source_authorships(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_authorships source_authorships_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3935,5 +4000,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 52G3ADGVgQwBVRe0bGq6I42bgreY7uaAqeUEfxFEU7Co8l8tNkszgFFXWNEooZX
+\unrestrict 1CIDlRmJrZMi3sa5Bvnr4oGyLtmrAABphPx1GHvvtZzpx0ZmOgamWQLFKWLgJWo
 
