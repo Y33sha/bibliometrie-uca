@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from application.pipeline.context import Phase, PhaseContext
-from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
@@ -39,8 +37,8 @@ class _NormalizeSelonOptions:
         options = ctx.options
         registry = _normalize_builders(archive=options.raw_store, full=options.normalize_full)
 
-        def normalize_one(source: str) -> dict[str, object]:
-            return _run_normalize(source, registry[source])
+        def normalize_one(source: str) -> NormalizeStats:
+            return _run_normalize(registry[source])
 
         return NormalizePhase(
             ordered_sources=list(registry),
@@ -55,12 +53,7 @@ def _run_prune_disappeared() -> int:
     from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
 
     with open_tx() as conn:
-        n = delete_disappeared_source_publications(conn)
-    if n:
-        log.info(
-            "%s (disparus de leur source)", accord(n, "document supprimé", "documents supprimés")
-        )
-    return n
+        return delete_disappeared_source_publications(conn)
 
 
 def _run_cleanup_orphan_identities() -> None:
@@ -82,17 +75,6 @@ def _vacuum_staging(full: bool = False) -> None:
     sql = "VACUUM FULL staging" if full else "VACUUM staging"
     with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         conn.execute(text(sql))
-
-
-def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
-    """Ligne « par source » de la table d'observabilité de la phase normalize."""
-    return {
-        "key": source,
-        "processed": stats.processed,
-        "skipped": stats.skipped,
-        "errors": stats.errors,
-        "duration_s": round(duration_s, 1),
-    }
 
 
 def _normalize_builders(
@@ -149,8 +131,6 @@ def _normalize_builders(
     }
 
 
-def _run_normalize(source: str, build: ConstructeurNormalizer) -> dict[str, object]:
-    t0 = time.time()
+def _run_normalize(build: ConstructeurNormalizer) -> NormalizeStats:
     with open_tx() as conn:
-        stats = build(conn).run()
-    return _normalize_row(source, stats, time.time() - t0)
+        return build(conn).run()
