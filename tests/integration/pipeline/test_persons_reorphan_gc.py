@@ -8,16 +8,7 @@ from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 
 _Q = PgPersonsMatchingQueries()
 from tests.integration.helpers.authorships import upsert_identity
-
-
-def _person(conn, last, first):
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
+from tests.integration.helpers.persons import insert_person
 
 
 def _name_form(conn, form, person_id, status="pending"):
@@ -68,8 +59,8 @@ def _person_exists(conn, person_id):
 
 def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     conn = sa_sync_conn
-    a = _person(conn, "Martin", "Jean")
-    b = _person(conn, "Martin", "Jeanne")
+    a = insert_person(conn, "Martin", first_name="Jean")
+    b = insert_person(conn, "Martin", first_name="Jeanne")
     # « j martin » désigne A et B → ambiguë ; « jean martin » ne désigne que B.
     _name_form(conn, "j martin", a)
     _name_form(conn, "j martin", b)
@@ -108,8 +99,8 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     Régression : la purge comptait toutes les personnes de la forme, et remettait à NULL à chaque run une signature que la cascade rattachait de nouveau.
     """
     conn = sa_sync_conn
-    rejetee = _person(conn, "Tixier", "Laurent")
-    retenue = _person(conn, "Tixier", "Lucie")
+    rejetee = insert_person(conn, "Tixier", first_name="Laurent")
+    retenue = insert_person(conn, "Tixier", first_name="Lucie")
     _name_form(conn, "l tixier", rejetee)
     _name_form(conn, "l tixier", retenue)
 
@@ -128,7 +119,7 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
 
 def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     conn = sa_sync_conn
-    p = _person(conn, "Zhang", "Wei")
+    p = insert_person(conn, "Zhang", first_name="Wei")
     cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
     nominal = _signature(conn, form="wei zhang", person_id=p, mode="name")
     pinned_cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
@@ -147,8 +138,8 @@ def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
 
 def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
     conn = sa_sync_conn
-    old = _person(conn, "Martin", "Jean")
-    other = _person(conn, "Dupont", "Marie")
+    old = insert_person(conn, "Martin", first_name="Jean")
+    other = insert_person(conn, "Dupont", first_name="Marie")
     ids = {"idref": "111"}
     affected = _signature(
         conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids
@@ -177,10 +168,10 @@ def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
 
 def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     conn = sa_sync_conn
-    empty = _person(conn, "Ghost", "G")
-    signed = _person(conn, "Real", "R")
+    empty = insert_person(conn, "Ghost", first_name="G")
+    signed = insert_person(conn, "Real", first_name="R")
     _signature(conn, form="real r", person_id=signed, mode="name")
-    rh = _person(conn, "Prof", "P")
+    rh = insert_person(conn, "Prof", first_name="P")
     conn.execute(text("INSERT INTO persons_rh (person_id) VALUES (:p)"), {"p": rh})
 
     _Q.delete_empty_persons(conn)

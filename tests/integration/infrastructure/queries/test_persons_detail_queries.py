@@ -4,18 +4,8 @@ from sqlalchemy import text
 
 from infrastructure.read_models.persons.detail import person_theses
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-
-
-def _person(conn, last, first):
-    return conn.execute(
-        text(
-            "INSERT INTO persons "
-            "(last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
 
 
 def _authorship(conn, pub_id, person_id, roles):
@@ -51,9 +41,9 @@ class TestPersonTheses:
     def test_author_name_matches_author_person_id(self, sa_sync_conn):
         """Deux doctorants sur la thèse : le nom d'auteur affiché correspond à `author_person_id`
         (une seule ligne pour les deux, plutôt que deux `LIMIT 1` qui pouvaient diverger)."""
-        jury = _person(sa_sync_conn, "Jury", "Jean")
-        alice = _person(sa_sync_conn, "Doctorant", "Alice")
-        bruno = _person(sa_sync_conn, "Doctorant", "Bruno")
+        jury = insert_person(sa_sync_conn, "Jury", first_name="Jean")
+        alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
+        bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")
         pub = insert_publication(sa_sync_conn)
         jury_auth = _authorship(sa_sync_conn, pub, jury, ["jury_member"])
         _authorship(sa_sync_conn, pub, alice, ["author"])

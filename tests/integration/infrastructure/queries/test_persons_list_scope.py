@@ -8,6 +8,7 @@ from sqlalchemy import text
 from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons import PgPersonsQueries
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -18,16 +19,6 @@ def _structure(conn, code):
             "VALUES (:c, :c, 'labo') RETURNING id"
         ),
         {"c": code},
-    ).scalar_one()
-
-
-def _person(conn, last):
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, 'Z', lower(:l), 'z') RETURNING id"
-        ),
-        {"l": last},
     ).scalar_one()
 
 
@@ -52,9 +43,9 @@ def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perim
 class TestListLabScope:
     def test_list_restricted_to_lab(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-DIR")
-        p_in = _person(sa_sync_conn, "Inlab")
+        p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
-        p_out = _person(sa_sync_conn, "Outlab")
+        p_out = insert_person(sa_sync_conn, "Outlab")
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
@@ -67,9 +58,9 @@ class TestListLabScope:
 
     def test_list_unscoped_includes_both(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-DIR2")
-        p_in = _person(sa_sync_conn, "Inlab")
+        p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
-        p_out = _person(sa_sync_conn, "Outlab")
+        p_out = insert_person(sa_sync_conn, "Outlab")
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
@@ -80,7 +71,7 @@ class TestListLabScope:
     def test_signature_counts_scoped_to_lab(self, sa_sync_conn):
         """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
         lab = _structure(sa_sync_conn, "LAB-CNT")
-        person = _person(sa_sync_conn, "Counted")
+        person = insert_person(sa_sync_conn, "Counted")
         _authorship_in_lab(sa_sync_conn, person, lab_id=lab)
         _authorship_in_lab(sa_sync_conn, person, lab_id=None)
 
@@ -96,7 +87,7 @@ class TestListLabScope:
 
     def test_signature_counts_author_role_only(self, sa_sync_conn):
         """Les dénombrements comptent seulement les signatures en tant qu'auteur, dans la liste comme dans la fiche de curation."""
-        person = _person(sa_sync_conn, "Juror")
+        person = insert_person(sa_sync_conn, "Juror")
         _authorship_in_lab(sa_sync_conn, person, in_perimeter=True)
         _authorship_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
 
@@ -116,9 +107,9 @@ class TestListLabScope:
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-FAC")
-        p_in = _person(sa_sync_conn, "Inlab")
+        p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
-        p_out = _person(sa_sync_conn, "Outlab")
+        p_out = insert_person(sa_sync_conn, "Outlab")
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
@@ -132,9 +123,9 @@ class TestListLabScope:
     def test_facets_respect_search(self, sa_sync_conn):
         """Régression : les comptes de facettes suivent la recherche par nom."""
         lab = _structure(sa_sync_conn, "LAB-SRCH")
-        p1 = _person(sa_sync_conn, "Dupont")
+        p1 = insert_person(sa_sync_conn, "Dupont")
         _authorship_in_lab(sa_sync_conn, p1, lab_id=lab)
-        p2 = _person(sa_sync_conn, "Martin")
+        p2 = insert_person(sa_sync_conn, "Martin")
         _authorship_in_lab(sa_sync_conn, p2, lab_id=lab)
 
         q = PgPersonsQueries(sa_sync_conn)
@@ -156,7 +147,7 @@ class TestExclusionFilter:
             ("Fausse", "not_a_person"),
             ("Externe", "out_of_perimeter"),
         ):
-            ids[name] = _person(conn, f"{self.SEARCH}{name}")
+            ids[name] = insert_person(conn, f"{self.SEARCH}{name}")
             conn.execute(
                 text("UPDATE persons SET exclusion = CAST(:r AS person_exclusion) WHERE id = :id"),
                 {"r": reason, "id": ids[name]},
@@ -191,9 +182,9 @@ class TestExclusionFilter:
     def test_excluded_person_leaves_the_lab(self, sa_sync_conn):
         """Une personne exclue n'appartient à aucun laboratoire, dès que les matviews de structures sont rafraîchies."""
         lab = _structure(sa_sync_conn, "LAB-EXCL")
-        p_ok = _person(sa_sync_conn, "Active")
+        p_ok = insert_person(sa_sync_conn, "Active")
         _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
-        p_excl = _person(sa_sync_conn, "Exclue")
+        p_excl = insert_person(sa_sync_conn, "Exclue")
         sa_sync_conn.execute(
             text("UPDATE persons SET exclusion = 'out_of_perimeter' WHERE id = :id"),
             {"id": p_excl},
@@ -210,7 +201,7 @@ class TestPendingFacets:
     """Facette « À confirmer » : formes de nom / identifiants au statut `pending`."""
 
     def test_pending_name_forms_filter(self, sa_sync_conn):
-        p_pending = _person(sa_sync_conn, "Pendingform")
+        p_pending = insert_person(sa_sync_conn, "Pendingform")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -218,7 +209,7 @@ class TestPendingFacets:
             ),
             {"pid": p_pending},
         )
-        p_clean = _person(sa_sync_conn, "Cleanform")
+        p_clean = insert_person(sa_sync_conn, "Cleanform")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
@@ -237,7 +228,7 @@ class TestPendingFacets:
         assert q.persons_facets(filters=PersonFilters()).pending_forms.yes >= 1
 
     def test_pending_identifiers_filter(self, sa_sync_conn):
-        p_pending = _person(sa_sync_conn, "Pendingid")
+        p_pending = insert_person(sa_sync_conn, "Pendingid")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
@@ -245,7 +236,7 @@ class TestPendingFacets:
             ),
             {"pid": p_pending},
         )
-        p_clean = _person(sa_sync_conn, "Cleanid")
+        p_clean = insert_person(sa_sync_conn, "Cleanid")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "

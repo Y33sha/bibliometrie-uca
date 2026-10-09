@@ -5,19 +5,9 @@ from sqlalchemy import text
 from application.ports.read_models.authorships_queries import OrphanFilters
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_source_authorship_structure
-
-
-def _create_person(conn, last="A", first="Z"):
-    return conn.execute(
-        text(
-            "INSERT INTO persons "
-            "(last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
 
 
 def _create_sd(conn, pub_id, source="hal", source_id="h1"):
@@ -74,7 +64,7 @@ class TestOrphanAuthorshipsCount:
         pub = insert_publication(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, author_position=0, person_id=None)  # orpheline
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn)
         _create_sa(sa_sync_conn, sd, author_position=1, person_id=pid)  # attribuée
 
         assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total >= 1

@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.structures import PgStructuresQueries
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -41,17 +42,6 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
     # `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
     refresh_perimeter_structures(conn)
     return root
-
-
-def _create_person(conn, last="A", first="Z"):
-    row = conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).one()
-    return row.id
 
 
 def _create_pub_with_authorship(
@@ -202,7 +192,7 @@ class TestGetLaboratoryDashboard:
             text("INSERT INTO countries (code, name) VALUES ('us', 'USA') ON CONFLICT DO NOTHING")
         )
         lab = _create_structure(sa_sync_conn, code="LAB")
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn)
         pub_id = sa_sync_conn.execute(
             text("""
                 INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, countries)
@@ -228,7 +218,7 @@ class TestGetLaboratoryDashboard:
         """`xx` (Non applicable) ne doit ni gonfler le compte international
         ni apparaître dans le top pays."""
         lab = _create_structure(sa_sync_conn, code="LAB")
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn)
         pub_id = sa_sync_conn.execute(
             text("""
                 INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, countries)

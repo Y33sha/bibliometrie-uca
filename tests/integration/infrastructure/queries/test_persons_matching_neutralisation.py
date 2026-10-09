@@ -8,6 +8,7 @@ from application.ports.pipeline.persons.matching import MisplacedNeutralizations
 from domain.persons.matching import ResolutionMode
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 
 _ORCID = "0000-0001-2345-6789"
 
@@ -58,15 +59,6 @@ def _signature(
     return signature_id, identity_id
 
 
-def _person(conn):
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES ('Dado', 'T', 'dado', 't') RETURNING id"
-        )
-    ).scalar_one()
-
-
 def _carte(conn, signature_id):
     return conn.execute(
         text("SELECT neutralized_identifiers FROM source_authorships WHERE id = :id"),
@@ -106,7 +98,7 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
         None,
         name="t dado",
         source_id="c-requalification",
-        person_id=_person(sa_sync_conn),
+        person_id=insert_person(sa_sync_conn, "Dado", first_name="T"),
         resolution_mode=ResolutionMode.IDENTIFIER.value,
     )
     queries = PgPersonsMatchingQueries()

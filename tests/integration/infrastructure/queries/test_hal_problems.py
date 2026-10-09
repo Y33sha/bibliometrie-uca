@@ -5,6 +5,7 @@ from sqlalchemy import text
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -67,18 +68,6 @@ def _create_lab(conn, code="LAB", hal_collection=None):
     return lab_id
 
 
-def _create_person(conn, last="A", first="Z"):
-    row = conn.execute(
-        text("""
-            INSERT INTO persons
-                (last_name, first_name, last_name_normalized, first_name_normalized)
-            VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id
-        """),
-        {"l": last, "f": first},
-    ).one()
-    return row.id
-
-
 def _create_hal_sa_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
@@ -99,7 +88,7 @@ def _create_hal_sa_with_hal_id(
 
 class TestHalDuplicateAccounts:
     def test_detects_person_with_two_hal_accounts(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn)
         _create_hal_sa_with_hal_id(
             sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1", raw_author_name="A"
         )
@@ -114,7 +103,7 @@ class TestHalDuplicateAccounts:
         assert len(ours.hal_accounts) == 2
 
     def test_ignores_single_account(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn)
+        pid = insert_person(sa_sync_conn)
         _create_hal_sa_with_hal_id(sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1")
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
         assert not any(p.person_id == pid for p in res.persons)

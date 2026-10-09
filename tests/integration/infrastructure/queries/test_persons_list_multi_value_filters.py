@@ -9,21 +9,12 @@ from sqlalchemy import text
 
 from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.list import list_persons
+from tests.integration.helpers.persons import insert_person
 
 
 def _create_person(conn, last, department=None, role=None):
-    person_id = (
-        conn.execute(
-            text(
-                "INSERT INTO persons "
-                "(last_name, first_name, last_name_normalized, first_name_normalized) "
-                "VALUES (:l, 'Z', lower(:l), 'z') RETURNING id"
-            ),
-            {"l": last},
-        )
-        .one()
-        .id
-    )
+    """Personne, avec sa fiche RH quand un département ou un rôle est donné."""
+    person_id = insert_person(conn, last)
     if department or role:
         conn.execute(
             text(
