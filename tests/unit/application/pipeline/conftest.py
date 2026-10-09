@@ -3,9 +3,14 @@
 Un orchestrateur de phase ne connaît ni la base ni les adapters : il reçoit un `OpenTransaction` et des ports. Ces doublures les remplacent, ce qui permet d'exercer l'enchaînement des sous-étapes, les métriques assemblées et les bornes de boucle sans base de données.
 """
 
+import logging
+from collections.abc import Callable
 from contextlib import contextmanager
+from typing import Any
 
 import pytest
+
+from application.pipeline.context import PhaseContext, RunOptions
 
 
 class FakeConnection:
@@ -37,3 +42,15 @@ class FakeOpenTransaction:
 @pytest.fixture
 def open_tx() -> FakeOpenTransaction:
     return FakeOpenTransaction()
+
+
+@pytest.fixture
+def contexte(open_tx: FakeOpenTransaction) -> Callable[..., PhaseContext]:
+    """Fabrique le contexte d'une phase sur `open_tx`, avec les options du run passées en arguments."""
+
+    def fabriquer(**options: Any) -> PhaseContext:
+        return PhaseContext(
+            open_tx=open_tx, logger=logging.getLogger("test"), options=RunOptions(**options)
+        )
+
+    return fabriquer

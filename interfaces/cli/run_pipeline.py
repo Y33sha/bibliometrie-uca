@@ -19,7 +19,6 @@ import tempfile
 import textwrap
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from types import FrameType
 from typing import TYPE_CHECKING, Protocol, cast
@@ -32,10 +31,11 @@ if TYPE_CHECKING:
         AsyncFetchMissingDoiAdapter,
     )
 
+from application.pipeline.context import PhaseContext, RunOptions
 from application.pipeline.exception_chain import failure_message, is_user_interruption
 from application.pipeline.libelles import accord, etape
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.modes import MODE_NAMES, MODES
+from application.pipeline.modes import MODE_NAMES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
@@ -101,25 +101,9 @@ type Phase = Callable[[RunOptions], PhaseMetrics]
 type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 
 
-@dataclass(frozen=True, slots=True)
-class RunOptions:
-    """Options d'un run, telles que la ligne de commande les pose, remises à chaque phase.
-
-    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent.
-
-    `sources` vaut `None` quand le run n'en restreint aucune ; les phases qui attendent une liste explicite y substituent l'ensemble des sources connues.
-    """
-
-    mode: str = "full"
-    sources: set[str] | None = None
-    year: int | None = None
-    start_year: int | None = None
-    include_wos: bool = False
-    rebuild_publications: bool = False
-    rebuild_authorships: bool = False
-    rebuild_subjects: bool = False
-    raw_store: bool = False
-    normalize_full: bool = False
+def _context(options: RunOptions) -> PhaseContext:
+    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run."""
+    return PhaseContext(open_tx=open_tx, logger=log, options=options)
 
 
 def _extraction_structure_count() -> int:
@@ -538,15 +522,10 @@ def phase_countries(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
     """
-    from application.pipeline.countries.phase import run
+    from application.pipeline.countries.phase import CountriesPhase
     from infrastructure.pipeline.countries import PgCountryQueries
 
-    return run(
-        open_tx,
-        PgCountryQueries(),
-        log,
-        retry_empty=MODES[options.mode].retry_empty_country_suggestions,
-    )
+    return CountriesPhase(PgCountryQueries()).run(_context(options))
 
 
 def phase_subjects(options: RunOptions) -> PhaseMetrics:
