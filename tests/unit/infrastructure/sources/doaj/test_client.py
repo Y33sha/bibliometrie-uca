@@ -8,11 +8,8 @@ import logging
 import httpx2
 import pytest
 
-from infrastructure.sources.doaj.client import (
-    DOAJ_CSV_DUMP_URL,
-    DoajDumpError,
-    fetch_doaj_dump,
-)
+from infrastructure.sources.doaj.client import DOAJ_CSV_DUMP_URL, fetch_doaj_dump
+from infrastructure.sources.dump_download import DumpDownloadError
 
 _S3 = "https://doaj-live-journal-csv.s3.amazonaws.com/dump.csv"
 _CSV = b"Journal title,ISSN\nRevue,1234-5678\n"
@@ -47,21 +44,21 @@ class TestDestinationDeLaRedirection:
         ailleurs = http_mock.get("https://ailleurs.example/x").mock(
             return_value=httpx2.Response(200, content=b"charge")
         )
-        with pytest.raises(DoajDumpError, match="ailleurs.example"):
+        with pytest.raises(DumpDownloadError, match="ailleurs.example"):
             _fetch(tmp_path)
         # Le contrôle précède la requête : aucune connexion n'est ouverte vers cet hôte.
         assert not ailleurs.called
 
     def test_refuse_une_redirection_sans_destination(self, tmp_path, http_mock):
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx2.Response(302))
-        with pytest.raises(DoajDumpError, match="sans destination"):
+        with pytest.raises(DumpDownloadError, match="sans destination"):
             _fetch(tmp_path)
 
     def test_refuse_une_redirection_circulaire(self, tmp_path, http_mock):
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(
             return_value=httpx2.Response(302, headers={"location": DOAJ_CSV_DUMP_URL})
         )
-        with pytest.raises(DoajDumpError, match="redirections"):
+        with pytest.raises(DumpDownloadError, match="redirections"):
             _fetch(tmp_path)
 
 
@@ -70,7 +67,7 @@ class TestVolumeAccepte:
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(
             return_value=httpx2.Response(200, content=b"x" * 5000)
         )
-        with pytest.raises(DoajDumpError, match="plafond"):
+        with pytest.raises(DumpDownloadError, match="plafond"):
             _fetch(tmp_path, max_bytes=1024)
 
     def test_accepte_un_corps_au_plafond(self, tmp_path, http_mock):
