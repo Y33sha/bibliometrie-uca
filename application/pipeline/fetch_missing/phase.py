@@ -50,11 +50,13 @@ class FetchMissingPhase:
 
         # Étape 1 : recherche dans HAL, deux canaux distincts (hal-id, NNT).
         if not sources or "hal" in sources:
+            etape(logger, "Recherche dans HAL des documents avec hal-id trouvés ailleurs")
             id_metrics, id_duration = timed_metrics(self.fetch_hal_by_id)
             metrics.merge(id_metrics)
             by_channel["hal-id"] = _summary(id_metrics, id_duration)
 
             if options.mode == "full":
+                etape(logger, "Recherche dans HAL des thèses avec NNT trouvées ailleurs")
                 nnt_metrics, nnt_duration = timed_metrics(self.fetch_hal_by_nnt)
                 metrics.merge(nnt_metrics)
                 by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
