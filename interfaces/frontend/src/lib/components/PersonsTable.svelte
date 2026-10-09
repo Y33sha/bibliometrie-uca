@@ -1,31 +1,19 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { titleCase } from '$lib/utils';
+	import { institution } from '$lib/institution.svelte';
 	import IdentifiersCell from './IdentifiersCell.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import type { components } from '$lib/api/schema';
 
 	export type PersonRow = components['schemas']['PersonOut'];
 
-	/** Colonne numérique triable, placée après les colonnes descriptives. */
-	export interface CountColumn {
-		label: string;
-		sortKey: string;
-		value: (p: PersonRow) => number | null | undefined;
-	}
-
-	const AUTHOR_PUBLICATIONS: CountColumn = {
-		label: 'Publications',
-		sortKey: 'signatures_as_author',
-		value: (p) => p.signature_count_as_author
-	};
-
 	let {
 		persons,
 		loading = false,
 		sort,
 		onSortChange,
-		countColumns = [AUTHOR_PUBLICATIONS],
+		perimeterCount = false,
 		onopen,
 		activeId = null,
 	}: {
@@ -33,11 +21,26 @@
 		loading?: boolean;
 		sort: string;
 		onSortChange: (newSort: string) => void;
-		countColumns?: CountColumn[];
+		/** Ajoute la colonne des publications dans le périmètre de l'établissement. */
+		perimeterCount?: boolean;
 		/** Si fourni, le nom ouvre la personne via ce callback au lieu de lier vers sa fiche. */
 		onopen?: (personId: number) => void;
 		activeId?: number | null;
 	} = $props();
+
+	// Colonnes numériques triables, placées après les colonnes descriptives.
+	const countColumns = $derived([
+		{ label: 'Publications', sortKey: 'signatures', value: (p: PersonRow) => p.signature_count },
+		...(perimeterCount
+			? [
+					{
+						label: institution.name,
+						sortKey: 'in_perimeter_signatures',
+						value: (p: PersonRow) => p.in_perimeter_signature_count
+					}
+				]
+			: [])
+	]);
 
 	function toggleSort(col: string) {
 		onSortChange(sort === `${col}_asc` ? `${col}_desc` : `${col}_asc`);
@@ -115,7 +118,7 @@
 					</td>
 					<td class="muted-cell">{p.department_name || ''}</td>
 					{#each countColumns as col (col.sortKey)}
-						<td class="num-col">{col.value(p) ?? 0}</td>
+						<td class="num-col">{col.value(p)}</td>
 					{/each}
 				</tr>
 			{/each}

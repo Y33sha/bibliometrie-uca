@@ -45,6 +45,11 @@ def signature_display_name(signature: str = "sa") -> str:
     )
 
 
+def has_author_role(signature: str = "sa") -> str:
+    """Condition vraie quand la signature aliasée `signature` tient le rôle d'auteur."""
+    return f"{signature}.roles && ARRAY['author']::text[]"
+
+
 def name_form_holder(form: str, person: str) -> str:
     """Condition vraie quand la personne aliasée `person` porte la forme de nom aliasée `form` : forme non rejetée, personne non exclue."""
     return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND {person}.exclusion IS NULL"

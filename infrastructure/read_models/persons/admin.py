@@ -26,6 +26,7 @@ from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from infrastructure.db.sql_fragments import (
+    has_author_role,
     identifier_neutralized,
     in_clause,
     name_form_holder,
@@ -237,7 +238,8 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
         text(f"""
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh,
-                   (SELECT count(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
+                   (SELECT count(*) FROM authorships a
+                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS signature_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))

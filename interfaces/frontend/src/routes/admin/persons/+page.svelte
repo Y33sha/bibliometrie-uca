@@ -9,7 +9,7 @@
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
-  import PersonsTable, { type CountColumn } from "$lib/components/PersonsTable.svelte";
+  import PersonsTable from "$lib/components/PersonsTable.svelte";
   import type {
     DetachModalState,
     DetachPublication,
@@ -191,15 +191,6 @@
     list.page = 1;
     loadTable();
   }
-
-  const countColumns: CountColumn[] = [
-    { label: "Publications", sortKey: "signatures", value: (p) => p.signature_count },
-    {
-      label: institution.name,
-      sortKey: "in_perimeter_signatures",
-      value: (p) => p.in_perimeter_signature_count,
-    },
-  ];
 
   /* ── URL state ── */
 
@@ -581,7 +572,7 @@
     loading={list.loading}
     sort={sortField}
     onSortChange={changeSort}
-    {countColumns}
+    perimeterCount
     onopen={openDrawer}
     activeId={selectedPersonId}
   />

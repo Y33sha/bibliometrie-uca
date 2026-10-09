@@ -4181,8 +4181,6 @@ export interface components {
             exclusion: components["schemas"]["PersonExclusion"] | null;
             /** Signature Count */
             signature_count: number;
-            /** Signature Count As Author */
-            signature_count_as_author: number;
             /** In Perimeter Signature Count */
             in_perimeter_signature_count: number;
             /** Identifiers */
@@ -6953,7 +6951,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "signatures_as_author_asc" | "signatures_as_author_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
                 search?: string;
                 department?: string;
                 role?: string;
