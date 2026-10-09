@@ -68,11 +68,11 @@ Lecture par source :
 
 ### 2. ROR des sources
 
-- [ ] DataCite : paramètre `affiliation=true` partagé par les trois adaptateurs.
-- [ ] Migration : tables `source_authorship_rors` et `ror_dump_imports`.
-- [ ] Writer partagé : ROR des signatures, dans `content_hash`.
-- [ ] Normalisation OpenAlex, WoS, Crossref, ScanR, HAL et DataCite : lecture des ROR.
-- [ ] Rafraîchissement du référentiel ROR en tête de la phase `affiliations`.
+- [x] DataCite : paramètre `affiliation=true` partagé par les trois adaptateurs.
+- [x] Migration : tables `source_authorship_rors` et `ror_dump_imports`.
+- [x] Writer partagé : ROR des signatures, dans `content_hash`.
+- [x] Normalisation OpenAlex, WoS, Crossref, ScanR, HAL et DataCite : lecture des ROR.
+- [x] Rafraîchissement du référentiel ROR en tête de la phase `affiliations`.
 - [ ] Reprise de l'existant : réextraction DataCite, réhydratation de `staging` depuis le raw store, `normalize` complet.
 - [ ] Mesure de la couverture par source.
 
