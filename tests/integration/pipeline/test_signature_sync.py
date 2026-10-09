@@ -13,21 +13,13 @@ from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+from tests.integration.helpers.sources import insert_source_publication
 
 _Q = PgAuthorshipsBatchQueries()
 
 
 def _rec(position: int, raw: str, **fields) -> AuthorRecord:
     return AuthorRecord(position, SignatureName(raw=raw), **fields)
-
-
-def _source_publication(conn) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title) "
-            "VALUES ('crossref', '10.9999/sync', 't') RETURNING id"
-        )
-    ).scalar_one()
 
 
 def _write(conn, sp: int, records: list[AuthorRecord]) -> None:
@@ -81,7 +73,7 @@ def _pin(conn, sa_id: int) -> int:
 
 def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     xu_id = _signatures(conn, sp)[1][0]
     person = _pin(conn, xu_id)
@@ -115,7 +107,7 @@ def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
 def test_permutation_de_positions(sa_sync_conn):
     """Deux signatures échangent leur position en une instruction (contrainte différable)."""
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     before = _signatures(conn, sp)
 
@@ -128,7 +120,7 @@ def test_permutation_de_positions(sa_sync_conn):
 
 def test_identite_repetee_departagee_par_position(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _write(
         conn,
         sp,
@@ -154,7 +146,7 @@ def test_identite_repetee_departagee_par_position(sa_sync_conn):
 
 def test_auteur_disparu_supprime_avec_son_epinglage(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _write(conn, sp, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
     xu_id = _signatures(conn, sp)[1][0]
     _pin(conn, xu_id)
@@ -173,7 +165,7 @@ def test_auteur_disparu_supprime_avec_son_epinglage(sa_sync_conn):
 
 def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _write(conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
     sa_id = _signatures(conn, sp)[0][0]
 
@@ -199,7 +191,7 @@ def _rors(conn, sa_id: int) -> list[str]:
 
 def test_ror_ecrits_a_l_insertion_et_reecrits_si_modifies(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     univ, labo = RorId("01a8ajp46"), RorId("03vgfxd91")
     _write(conn, sp, [_rec(0, "Dupont, Jean", ror_ids=frozenset({univ, labo}))])
     sa_id = _signatures(conn, sp)[0][0]
@@ -214,7 +206,7 @@ def test_ror_ecrits_a_l_insertion_et_reecrits_si_modifies(sa_sync_conn):
 def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
     """Une signature inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     records = [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
     _write(conn, sp, records)
     sa_id = _signatures(conn, sp)[0][0]
@@ -250,7 +242,7 @@ def _sync(conn, sp: int, names: list[str], build=_build, *, normalize_full: bool
 def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
     """Une règle modifiée reste sans effet tant que le bloc auteurs est inchangé."""
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _sync(conn, sp, ["Dupont, Jean"])
 
     _sync(conn, sp, ["Dupont, Jean"], _build_upper)
@@ -260,7 +252,7 @@ def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
 
 def test_normalize_full_applique_une_regle_modifiee(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _sync(conn, sp, ["Dupont, Jean"])
     sa_id = _signatures(conn, sp)[0][0]
 
@@ -271,7 +263,7 @@ def test_normalize_full_applique_une_regle_modifiee(sa_sync_conn):
 
 def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
     conn = sa_sync_conn
-    sp = _source_publication(conn)
+    sp = insert_source_publication(conn, source="crossref", source_id="10.9999/sync", title="t")
     _sync(conn, sp, ["Dupont, Jean"])
 
     _sync(conn, sp, ["Dupont, Jean", "Martin, Paul"])

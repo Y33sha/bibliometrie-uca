@@ -18,7 +18,7 @@ from application.pipeline.persons.arbitrate_identifiers import arbitrate_identif
 from application.pipeline.persons.cascade import run_cascade
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _LOG = logging.getLogger("test")
 _IDREF = "109964128"  # IdRef réel (valide au regard du value object)
@@ -34,23 +34,23 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
         """),
         {"p": sa_id, "t": f"pub {sa_id}"},
     )
-    conn.execute(
-        text("""
-            INSERT INTO source_publications
-                (id, source, source_id, title, pub_year, doc_type, publication_id)
-            VALUES (:p, 'hal', :sid, :t, 2024, 'ART', :p)
-        """),
-        {"p": sa_id, "sid": f"hal-{sa_id}", "t": f"pub {sa_id}"},
+    insert_source_publication(
+        conn,
+        sa_id,
+        source_id=f"hal-{sa_id}",
+        title=f"pub {sa_id}",
+        row_id=sa_id,
+        pub_year=2024,
+        doc_type="ART",
     )
-    identity = upsert_identity(conn, name_norm, {"idref": idref})
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, author_position, in_perimeter,
-                 person_id, raw_author_name, identity_id)
-            VALUES (:p, 'hal', :p, 0, TRUE, NULL, :raw, :iid)
-        """),
-        {"p": sa_id, "raw": raw_name, "iid": identity},
+    insert_signature(
+        conn,
+        sa_id,
+        row_id=sa_id,
+        raw_author_name=raw_name,
+        author_name_normalized=name_norm,
+        person_identifiers={"idref": idref},
+        in_perimeter=True,
     )
 
 

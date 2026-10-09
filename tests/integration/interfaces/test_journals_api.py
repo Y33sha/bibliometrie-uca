@@ -18,7 +18,12 @@ import uuid
 import pytest
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_journal, seed_publisher, uniq
+from tests.integration.helpers.seeds import (
+    seed_journal,
+    seed_publisher,
+    seed_source_publication,
+    uniq,
+)
 
 
 def _add_in_perimeter_authorships(journal_id: int) -> None:
@@ -301,22 +306,11 @@ def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
     jid = seed_journal()
     with owner_pool() as cur:
         cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
-        for source, raw_type in raw_types:
-            cur.execute(
-                "INSERT INTO source_publications (source, source_id, title, journal_id, doc_type)"
-                " VALUES (%s, %s, 'Doc', %s, %s)",
-                (source, uniq("sp"), jid, raw_type),
-            )
-    return jid
-
-
-def _seed_record(journal_id: int, doi: str, *, source: str = "hal", raw_metadata: str = "{}"):
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, journal_id, doi, raw_metadata)"
-            " VALUES (%s, %s, 'Doc', %s, %s, %s::jsonb)",
-            (source, uniq("sp"), journal_id, doi, raw_metadata),
+    for source, raw_type in raw_types:
+        seed_source_publication(
+            source, title="Doc", pub_year=None, journal_id=jid, doc_type=raw_type
         )
+    return jid
 
 
 class TestDoiNamespaceConflicts:
@@ -331,14 +325,20 @@ class TestDoiNamespaceConflicts:
                 " VALUES (%s, %s, 40, 0.95)",
                 (namespace, journal),
             )
-        _seed_record(journal, f"{namespace}1")
-        _seed_record(parasite, f"{namespace}2", source="openalex")
-        _seed_record(parasite, f"{namespace}3", source="openalex")
+        seed_source_publication(title="Doc", pub_year=None, journal_id=journal, doi=f"{namespace}1")
+        seed_source_publication(
+            "openalex", title="Doc", pub_year=None, journal_id=parasite, doi=f"{namespace}2"
+        )
+        seed_source_publication(
+            "openalex", title="Doc", pub_year=None, journal_id=parasite, doi=f"{namespace}3"
+        )
         # Revue posée par l'espace de noms : ni contradiction, ni témoin.
-        _seed_record(
-            parasite,
-            f"{namespace}4",
-            raw_metadata='{"journal_id": {"raw": null, "corrected_by": "X"}}',
+        seed_source_publication(
+            title="Doc",
+            pub_year=None,
+            journal_id=parasite,
+            doi=f"{namespace}4",
+            raw_metadata={"journal_id": {"raw": None, "corrected_by": "X"}},
         )
 
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
@@ -362,8 +362,12 @@ class TestDoiNamespaceConflicts:
                 (namespace, journal),
             )
         for source in ("hal", "crossref", "scanr"):
-            _seed_record(journal, f"{namespace}1", source=source)
-        _seed_record(other, f"{namespace}1", source="openalex")
+            seed_source_publication(
+                source, title="Doc", pub_year=None, journal_id=journal, doi=f"{namespace}1"
+            )
+        seed_source_publication(
+            "openalex", title="Doc", pub_year=None, journal_id=other, doi=f"{namespace}1"
+        )
 
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]
 

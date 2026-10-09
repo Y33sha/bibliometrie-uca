@@ -15,6 +15,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 
 _Q = PgPublicationRelationsQueries()
 
@@ -207,25 +208,16 @@ class TestRelationTargetDeletionCascades:
 
 def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
     """Notice DataCite dont l'étape de correction a substitué le DOI."""
-    conn.execute(
-        text("""
-            INSERT INTO source_publications
-                (source, source_id, title, doi, doc_type, publication_id, meta, raw_metadata)
-            VALUES ('datacite', :sid, 'T', :doi, :dt, :pub, CAST(:meta AS jsonb),
-                    CAST(:raw AS jsonb))
-        """),
-        {
-            "sid": doi_d_origine,
-            "doi": doi,
-            "dt": doc_type,
-            "pub": publication_id,
-            "meta": json.dumps(
-                {"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]}
-            ),
-            "raw": json.dumps(
-                {"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}}
-            ),
-        },
+    insert_source_publication(
+        conn,
+        publication_id,
+        source="datacite",
+        source_id=doi_d_origine,
+        title="T",
+        doi=doi,
+        doc_type=doc_type,
+        meta={"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]},
+        raw_metadata={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
     )
 
 

@@ -231,24 +231,18 @@ class TestGetPublicationDetail:
         assert detail.structures[str(lab_id)].name == "Labo X"
 
 
-def _create_sd_with_external_ids(conn, pub_id, source, source_id, external_ids):
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id, external_ids) "
-            "VALUES (:src, :sid, 'X', :pid, CAST(:ext AS jsonb))"
-        ),
-        {"src": source, "sid": source_id, "pid": pub_id, "ext": json.dumps(external_ids)},
-    )
-
-
 class TestGetPublicationExternalIdentifiers:
     def test_aggregates_and_dedups(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        _create_sd_with_external_ids(
-            sa_sync_conn, pub, "openalex", "W1", {"pmid": "123", "arxiv_id": "2401.001"}
+        insert_source_publication(
+            sa_sync_conn,
+            pub,
+            source="openalex",
+            source_id="W1",
+            external_ids={"pmid": "123", "arxiv_id": "2401.001"},
         )
         # Même PMID sur une seconde source : dédupliqué.
-        _create_sd_with_external_ids(sa_sync_conn, pub, "hal", "h1", {"pmid": "123"})
+        insert_source_publication(sa_sync_conn, pub, external_ids={"pmid": "123"})
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
         # Ordre = `_EXTERNAL_IDENTIFIER_KEYS` (arxiv avant pmid), une seule entrée par valeur.
@@ -261,10 +255,16 @@ class TestGetPublicationExternalIdentifiers:
         # Le `source_id` de la source `theses` *est* le NNT : le lien source theses.fr couvre
         # déjà l'identifiant, l'entrée `nnt` externe ferait doublon.
         pub = insert_publication(sa_sync_conn)
-        _create_sd_with_external_ids(
-            sa_sync_conn, pub, "theses", "2017CLFAC011", {"nnt": "2017CLFAC011"}
+        insert_source_publication(
+            sa_sync_conn,
+            pub,
+            source="theses",
+            source_id="2017CLFAC011",
+            external_ids={"nnt": "2017CLFAC011"},
         )
-        _create_sd_with_external_ids(sa_sync_conn, pub, "hal", "tel-1", {"nnt": "2017CLFAC011"})
+        insert_source_publication(
+            sa_sync_conn, pub, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
+        )
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
         assert ids == []
@@ -272,7 +272,9 @@ class TestGetPublicationExternalIdentifiers:
     def test_nnt_kept_without_theses_source(self, sa_sync_conn):
         # NNT porté par un enregistrement HAL sans source theses.fr moissonnée : le lien reste utile.
         pub = insert_publication(sa_sync_conn)
-        _create_sd_with_external_ids(sa_sync_conn, pub, "hal", "tel-1", {"nnt": "2017CLFAC011"})
+        insert_source_publication(
+            sa_sync_conn, pub, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
+        )
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
         assert [(i.type, i.value) for i in ids] == [("nnt", "2017CLFAC011")]

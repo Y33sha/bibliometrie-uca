@@ -12,7 +12,11 @@ def _setup_affiliations_test_data(conn):
     """
     from sqlalchemy import text
 
-    from tests.integration.helpers.authorships import upsert_identity
+    from tests.integration.helpers.sources import (
+        insert_signature,
+        insert_signature_address,
+        insert_source_publication,
+    )
 
     conn.execute(
         text("""
@@ -54,34 +58,29 @@ def _setup_affiliations_test_data(conn):
         """)
     )
 
-    conn.execute(
-        text("""
-            INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
-            VALUES (80001, 'hal', 'hal-80000001', 'Pub Affiliation Test', 2024, 'ART', 80001),
-                   (80002, 'openalex', 'W80000001', 'Pub Affiliation Test', 2024, 'article', 80001)
-        """)
-    )
-
-    alice = upsert_identity(conn, "alice dupont")
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, author_position,
-                 in_perimeter, identity_id, raw_author_name)
-            VALUES (80001, 'hal', 80001, 0, FALSE, :iid, 'Alice Dupont')
-        """),
-        {"iid": alice},
-    )
-
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, author_position,
-                 in_perimeter, identity_id, raw_author_name)
-            VALUES (80002, 'openalex', 80002, 0, FALSE, :iid, 'Alice Dupont')
-        """),
-        {"iid": alice},
-    )
+    for row_id, source, source_id, doc_type in (
+        (80001, "hal", "hal-80000001", "ART"),
+        (80002, "openalex", "W80000001", "article"),
+    ):
+        insert_source_publication(
+            conn,
+            80001,
+            source=source,
+            source_id=source_id,
+            title="Pub Affiliation Test",
+            row_id=row_id,
+            pub_year=2024,
+            doc_type=doc_type,
+        )
+        insert_signature(
+            conn,
+            row_id,
+            source=source,
+            row_id=row_id,
+            raw_author_name="Alice Dupont",
+            author_name_normalized="alice dupont",
+            in_perimeter=False,
+        )
 
     conn.execute(
         text("""
@@ -95,12 +94,7 @@ def _setup_affiliations_test_data(conn):
             VALUES (80001, 80001, TRUE)
         """)
     )
-    conn.execute(
-        text("""
-            INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-            VALUES (80002, 80001)
-        """)
-    )
+    insert_signature_address(conn, 80002, address_id=80001)
 
     # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.

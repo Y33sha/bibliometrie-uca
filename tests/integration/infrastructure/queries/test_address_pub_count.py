@@ -6,6 +6,11 @@ from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCo
 
 _Q = PgAddressPubCountQueries()
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 
 
 def _new_pub(conn, title):
@@ -20,21 +25,8 @@ def _new_pub(conn, title):
 
 def _sa_for_pub(conn, pub_id, source_id):
     """source_authorship rattachée à la publication `pub_id`."""
-    sd_id = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
-            "VALUES ('hal', :sid, 'X', 2024, :pub_id) RETURNING id"
-        ),
-        {"sid": source_id, "pub_id": pub_id},
-    ).scalar_one()
-    return conn.execute(
-        text(
-            "INSERT INTO source_authorships"
-            " (source, source_publication_id, author_position, identity_id, raw_author_name) "
-            "VALUES ('hal', :sd_id, 0, :iid, 'X') RETURNING id"
-        ),
-        {"sd_id": sd_id, "iid": upsert_identity(conn)},
-    ).scalar_one()
+    sd_id = insert_source_publication(conn, pub_id, source_id=source_id, pub_year=2024)
+    return insert_signature(conn, sd_id)
 
 
 def _link_address(conn, sa_id, raw_text):
@@ -46,13 +38,7 @@ def _link_address(conn, sa_id, raw_text):
         ),
         {"r": raw_text},
     ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-            "VALUES (:sa, :addr) ON CONFLICT DO NOTHING"
-        ),
-        {"sa": sa_id, "addr": addr_id},
-    )
+    insert_signature_address(conn, sa_id, address_id=addr_id)
     return addr_id
 
 

@@ -3,6 +3,7 @@
 Chaque fonction insère une ligne, valeurs par défaut uniques quand la table l'exige, et renvoie son `id`.
 """
 
+import json
 import uuid
 
 from tests.integration.helpers.authorships import upsert_identity_on_cursor
@@ -91,11 +92,36 @@ def seed_publication(title: str = "T", year: int = 2024) -> int:
     )
 
 
-def seed_source_publication(source: str = "hal", source_id: str | None = None) -> int:
+def seed_source_publication(
+    source: str = "hal",
+    *,
+    source_id: str | None = None,
+    title: str = "T",
+    pub_year: int | None = 2024,
+    publication_id: int | None = None,
+    journal_id: int | None = None,
+    doc_type: str | None = None,
+    doi: str | None = None,
+    raw_metadata: dict[str, object] | None = None,
+) -> int:
+    """Notice d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma."""
+    values = {
+        "source": source,
+        "source_id": source_id or uniq("sid"),
+        "title": title,
+        "pub_year": pub_year,
+        "publication_id": publication_id,
+        "journal_id": journal_id,
+        "doc_type": doc_type,
+        "doi": doi,
+        "raw_metadata": json.dumps(raw_metadata) if raw_metadata is not None else None,
+    }
+    values = {column: value for column, value in values.items() if value is not None}
+    placeholders = ["CAST(%s AS jsonb)" if column == "raw_metadata" else "%s" for column in values]
     return _insert(
-        "INSERT INTO source_publications (source, source_id, title, pub_year) "
-        "VALUES (%s, %s, 'T', 2024) RETURNING id",
-        (source, source_id or uniq("sid")),
+        f"INSERT INTO source_publications ({', '.join(values)}) "
+        f"VALUES ({', '.join(placeholders)}) RETURNING id",
+        tuple(values.values()),
     )
 
 

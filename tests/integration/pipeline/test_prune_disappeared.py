@@ -12,7 +12,7 @@ from infrastructure.pipeline.normalize.staging import (
     delete_disappeared_source_publications,
 )
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.sources import insert_signature
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _publication(conn) -> int:
@@ -45,20 +45,6 @@ def _staging(conn, source_id: str, *, disparu: bool) -> int:
     ).scalar_one()
 
 
-def _source_publication(
-    conn, staging_id: int, source_id: str, *, publication_id: int | None = None
-) -> int:
-    return conn.execute(
-        text("""
-            INSERT INTO source_publications
-                (source, source_id, staging_id, title, publication_id, keys_dirty)
-            VALUES ('hal', :sid, :stg, 'Titre', :pid, FALSE)
-            RETURNING id
-        """),
-        {"sid": source_id, "stg": staging_id, "pid": publication_id},
-    ).scalar_one()
-
-
 def _signature(conn, source_publication_id: int) -> None:
     insert_signature(
         conn,
@@ -70,7 +56,13 @@ def _signature(conn, source_publication_id: int) -> None:
 
 def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-disparu", disparu=True)
-    sp_id = _source_publication(sa_sync_conn_owner, staging_id, "hal-disparu")
+    sp_id = insert_source_publication(
+        sa_sync_conn_owner,
+        source_id="hal-disparu",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
 
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 1
 
@@ -82,7 +74,13 @@ def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
 
 def test_les_signatures_suivent_par_cascade(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-avec-signature", disparu=True)
-    sp_id = _source_publication(sa_sync_conn_owner, staging_id, "hal-avec-signature")
+    sp_id = insert_source_publication(
+        sa_sync_conn_owner,
+        source_id="hal-avec-signature",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
     _signature(sa_sync_conn_owner, sp_id)
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
@@ -98,19 +96,37 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
     """La publication perd une source : ses autres sources la font réconcilier et rafraîchir."""
     conn = sa_sync_conn_owner
     publication = _publication(conn)
-    _source_publication(
-        conn, _staging(conn, "hal-disparu", disparu=True), "hal-disparu", publication_id=publication
-    )
-    soeur = _source_publication(
-        conn, _staging(conn, "hal-soeur", disparu=False), "hal-soeur", publication_id=publication
-    )
-    etrangere = _source_publication(
+    insert_source_publication(
         conn,
-        _staging(conn, "hal-autre", disparu=False),
-        "hal-autre",
-        publication_id=_publication(conn),
+        publication,
+        source_id="hal-disparu",
+        title="Titre",
+        staging_id=_staging(conn, "hal-disparu", disparu=True),
+        keys_dirty=False,
     )
-    orpheline = _source_publication(conn, _staging(conn, "hal-seule", disparu=False), "hal-seule")
+    soeur = insert_source_publication(
+        conn,
+        publication,
+        source_id="hal-soeur",
+        title="Titre",
+        staging_id=_staging(conn, "hal-soeur", disparu=False),
+        keys_dirty=False,
+    )
+    etrangere = insert_source_publication(
+        conn,
+        _publication(conn),
+        source_id="hal-autre",
+        title="Titre",
+        staging_id=_staging(conn, "hal-autre", disparu=False),
+        keys_dirty=False,
+    )
+    orpheline = insert_source_publication(
+        conn,
+        source_id="hal-seule",
+        title="Titre",
+        staging_id=_staging(conn, "hal-seule", disparu=False),
+        keys_dirty=False,
+    )
 
     delete_disappeared_source_publications(conn)
 
@@ -121,7 +137,13 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
 
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-present", disparu=False)
-    sp_id = _source_publication(sa_sync_conn_owner, staging_id, "hal-present")
+    sp_id = insert_source_publication(
+        sa_sync_conn_owner,
+        source_id="hal-present",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
 
@@ -133,7 +155,13 @@ def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
 
 def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, "hal-trace", disparu=True)
-    _source_publication(sa_sync_conn_owner, staging_id, "hal-trace")
+    insert_source_publication(
+        sa_sync_conn_owner,
+        source_id="hal-trace",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
 
     delete_disappeared_source_publications(sa_sync_conn_owner)
 
@@ -146,7 +174,13 @@ def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
 def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
     """Balayage idempotent : rien ne subsiste à retirer au passage suivant."""
     staging_id = _staging(sa_sync_conn_owner, "hal-idempotent", disparu=True)
-    _source_publication(sa_sync_conn_owner, staging_id, "hal-idempotent")
+    insert_source_publication(
+        sa_sync_conn_owner,
+        source_id="hal-idempotent",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
 
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 1
     assert delete_disappeared_source_publications(sa_sync_conn_owner) == 0
@@ -156,9 +190,23 @@ def test_une_notice_sans_metadonnees_minimales_perd_son_enregistrement(sa_sync_c
     """Une notice renormalisée sans année supprime l'enregistrement qu'elle avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
     pub = _publication(sa_sync_conn_owner)
     staging_id = _staging(sa_sync_conn_owner, "W3131333980", disparu=False)
-    sp_id = _source_publication(sa_sync_conn_owner, staging_id, "W3131333980", publication_id=pub)
+    sp_id = insert_source_publication(
+        sa_sync_conn_owner,
+        pub,
+        source_id="W3131333980",
+        title="Titre",
+        staging_id=staging_id,
+        keys_dirty=False,
+    )
     autre_staging = _staging(sa_sync_conn_owner, "hal-soeur", disparu=False)
-    soeur = _source_publication(sa_sync_conn_owner, autre_staging, "hal-soeur", publication_id=pub)
+    soeur = insert_source_publication(
+        sa_sync_conn_owner,
+        pub,
+        source_id="hal-soeur",
+        title="Titre",
+        staging_id=autre_staging,
+        keys_dirty=False,
+    )
 
     PgStagingQueries(raw_store=MagicMock()).discard_source_publication(
         sa_sync_conn_owner, staging_id

@@ -5,7 +5,7 @@ import json
 import logging
 
 import pytest
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 
 from application.pipeline.subjects.extractors import (
     hal_labels,
@@ -15,10 +15,10 @@ from application.pipeline.subjects.extractors import (
     wos_labels,
 )
 from application.pipeline.subjects.ingestion import run
-from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 
 
 class TestExtractors:
@@ -91,26 +91,6 @@ def queries():
     return PgSubjectsIngestionQueries()
 
 
-_CREATE_SOURCE_PUB_SQL = text(
-    """
-    INSERT INTO source_publications (source, source_id, title, publication_id, topics)
-    VALUES (:source, :source_id, 'X', :publication_id, :topics) RETURNING id
-    """
-).bindparams(bindparam("topics", type_=Jsonb))
-
-
-def _create_source_pub(conn, *, source, source_id, publication_id, topics=None):
-    return conn.execute(
-        _CREATE_SOURCE_PUB_SQL,
-        {
-            "source": source,
-            "source_id": source_id,
-            "publication_id": publication_id,
-            "topics": topics,
-        },
-    ).scalar_one()
-
-
 def _subjects_of(conn, pub_id):
     """Sujets liés à une publication, triés par label."""
     return conn.execute(
@@ -135,12 +115,8 @@ def _publications_updated(metrics):
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
 
@@ -156,12 +132,8 @@ class TestRunOrchestrator:
 
     def test_reingests_on_content_change(self, sa_sync_conn, queries):
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
@@ -186,7 +158,7 @@ class TestRunOrchestrator:
     def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
         # Une publication sans sujet est datée comme les autres : elle ne revient pas.
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(sa_sync_conn, source="hal", source_id="h1", publication_id=pub)
+        insert_source_publication(sa_sync_conn, pub)
         logger = logging.getLogger("test")
 
         assert _publications_updated(run(sa_sync_conn, queries, logger)) == 1
@@ -195,12 +167,8 @@ class TestRunOrchestrator:
     def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
         # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
@@ -214,19 +182,11 @@ class TestRunOrchestrator:
     def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
         # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
-        _create_source_pub(
-            sa_sync_conn,
-            source="openalex",
-            source_id="oa1",
-            publication_id=pub,
-            topics=[{"topic": "Physics"}],
+        insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="oa1", topics=[{"topic": "Physics"}]
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
         labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
@@ -235,18 +195,14 @@ class TestRunOrchestrator:
     def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
         # Un même label depuis deux sources → un seul subject, deux liens (un par source).
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
-        _create_source_pub(
+        insert_source_publication(
             sa_sync_conn,
+            pub,
             source="theses",
             source_id="t1",
-            publication_id=pub,
             topics={"discipline": "Informatique"},
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
@@ -261,12 +217,8 @@ class TestRunOrchestrator:
     def test_rebuild_reingests_all(self, sa_sync_conn, queries):
         # `rebuild=True` ré-ingère même une publication non modifiée.
         pub = insert_publication(sa_sync_conn)
-        _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
+        insert_source_publication(
+            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)

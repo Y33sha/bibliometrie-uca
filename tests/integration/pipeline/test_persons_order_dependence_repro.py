@@ -18,7 +18,7 @@ from application.services.persons.core import create_person
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _LOG = logging.getLogger("test")
 
@@ -34,23 +34,22 @@ def _seed_signature(conn, *, pub_id, raw_name, name_norm):
         """),
         {"p": pub_id, "t": f"pub {pub_id}"},
     )
-    conn.execute(
-        text("""
-            INSERT INTO source_publications
-                (id, source, source_id, title, pub_year, doc_type, publication_id)
-            VALUES (:p, 'hal', :sid, :t, 2024, 'ART', :p)
-        """),
-        {"p": pub_id, "sid": f"hal-{pub_id}", "t": f"pub {pub_id}"},
+    insert_source_publication(
+        conn,
+        pub_id,
+        source_id=f"hal-{pub_id}",
+        title=f"pub {pub_id}",
+        row_id=pub_id,
+        pub_year=2024,
+        doc_type="ART",
     )
-    identity = upsert_identity(conn, name_norm, None)
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, author_position, in_perimeter,
-                 person_id, raw_author_name, identity_id)
-            VALUES (:p, 'hal', :p, 0, TRUE, NULL, :raw, :iid)
-        """),
-        {"p": pub_id, "raw": raw_name, "iid": identity},
+    insert_signature(
+        conn,
+        pub_id,
+        row_id=pub_id,
+        raw_author_name=raw_name,
+        author_name_normalized=name_norm,
+        in_perimeter=True,
     )
 
 
@@ -65,33 +64,28 @@ def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, 
         {"p": pub_id, "t": f"pub {pub_id}"},
     )
     for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
-        conn.execute(
-            text("""
-                INSERT INTO source_publications
-                    (id, source, source_id, title, pub_year, doc_type, publication_id)
-                VALUES (:sp, :src, :sid, :t, 2024, 'ART', :p)
-            """),
-            {
-                "sp": sp_id,
-                "src": source,
-                "sid": f"{source}-{sp_id}",
-                "t": f"pub {pub_id}",
-                "p": pub_id,
-            },
+        insert_source_publication(
+            conn,
+            pub_id,
+            source=source,
+            source_id=f"{source}-{sp_id}",
+            title=f"pub {pub_id}",
+            row_id=sp_id,
+            pub_year=2024,
+            doc_type="ART",
         )
     for sa_id, source, raw, norm in (
         (sa1_id, "hal", raw1, norm1),
         (sa2_id, "openalex", raw2, norm2),
     ):
-        identity = upsert_identity(conn, norm, None)
-        conn.execute(
-            text("""
-                INSERT INTO source_authorships
-                    (id, source, source_publication_id, author_position, in_perimeter,
-                     person_id, raw_author_name, identity_id)
-                VALUES (:p, :src, :p, 0, TRUE, NULL, :raw, :iid)
-            """),
-            {"p": sa_id, "src": source, "raw": raw, "iid": identity},
+        insert_signature(
+            conn,
+            sa_id,
+            source=source,
+            row_id=sa_id,
+            raw_author_name=raw,
+            author_name_normalized=norm,
+            in_perimeter=True,
         )
 
 

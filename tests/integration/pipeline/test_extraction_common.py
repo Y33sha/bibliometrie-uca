@@ -9,6 +9,7 @@ from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
+from tests.integration.helpers.sources import insert_source_publication
 
 # ── fingerprint ─────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ class TestCleanDoi:
         assert clean_doi("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
 
 
-def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids="{}"):
+def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
     """Publication `in_perimeter` + source_publication `source` rattaché.
 
     Le pool de la recherche par DOI ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
@@ -141,13 +142,8 @@ def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids="{}"):
             "RETURNING id"
         )
     ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, doi, publication_id, "
-            "external_ids) VALUES (CAST(:source AS source_type), :sid, 'T', :doi, :pub, "
-            "CAST(:ext AS jsonb))"
-        ),
-        {"source": source, "sid": sid, "doi": doi, "pub": pub_id, "ext": external_ids},
+    insert_source_publication(
+        conn, pub_id, source=source, source_id=sid, title="T", doi=doi, external_ids=external_ids
     )
 
 
@@ -171,7 +167,7 @@ class TestGetMissingDois:
             "hal",
             "hal-1",
             doi="10.1234/version-editeur",
-            external_ids='{"related_dois": ["10.1234/preprint"]}',
+            external_ids={"related_dois": ["10.1234/preprint"]},
         )
 
         assert get_missing_dois(sa_sync_conn, "hal") == []
@@ -220,7 +216,7 @@ class TestGetMissingDois:
             "openalex",
             "W1",
             doi="10.1234/primary",
-            external_ids='{"related_dois": ["10.9999/preprint"]}',
+            external_ids={"related_dois": ["10.9999/preprint"]},
         )
         result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.1234/primary" in result
@@ -228,13 +224,13 @@ class TestGetMissingDois:
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """Un arxiv_id d'un source_publication in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids='{"arxiv_id": "2605.02321"}')
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"})
         result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" in result
 
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
         """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
-        _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids='{"arxiv_id": "2605.02321"}')
+        _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids={"arxiv_id": "2605.02321"})
         result = get_missing_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" not in result
 
@@ -348,16 +344,6 @@ def _insert_staging(conn, source, sid, doi, *, seen_days_ago, disappeared=False)
     )
 
 
-def _insert_source_pub(conn, source, sid, pub_year):
-    conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, pub_year) "
-            "VALUES (CAST(:s AS source_type), :sid, 'T', :y)"
-        ),
-        {"s": source, "sid": sid, "y": pub_year},
-    )
-
-
 class TestGetStaleRows:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
         # Le refetch par id natif ne dépend pas du DOI : la row sans DOI est
@@ -386,14 +372,20 @@ class TestGetStaleRows:
         # source_publications → pub_year NULL, conservée (LEFT JOIN conservateur).
         for sid in ("W1", "W2", "W3"):
             _insert_staging(sa_sync_conn, "openalex", sid, None, seen_days_ago=100)
-        _insert_source_pub(sa_sync_conn, "openalex", "W1", 2020)
-        _insert_source_pub(sa_sync_conn, "openalex", "W2", 2023)
+        insert_source_publication(
+            sa_sync_conn, source="openalex", source_id="W1", title="T", pub_year=2020
+        )
+        insert_source_publication(
+            sa_sync_conn, source="openalex", source_id="W2", title="T", pub_year=2023
+        )
         rows = get_stale_rows(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(src_id for _, src_id in rows) == ["W2", "W3"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
-        _insert_source_pub(sa_sync_conn, "openalex", "W1", 2010)
+        insert_source_publication(
+            sa_sync_conn, source="openalex", source_id="W1", title="T", pub_year=2010
+        )
         assert [
             src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex", after_days=90)
         ] == ["W1"]

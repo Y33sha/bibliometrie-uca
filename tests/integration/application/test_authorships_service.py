@@ -19,9 +19,13 @@ from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.addresses import insert_address
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.sources import (
+    insert_signature,
+    insert_signature_address,
+    insert_source_publication,
+)
 from tests.integration.helpers.structures import insert_structure, refresh_structure_matviews
 
 _AFFILIATIONS = PgAffiliationsQueries()
@@ -49,53 +53,10 @@ def _create_publication(conn, title="Test Article", pub_year=2024):
     return row.id
 
 
-def _create_source_publication(conn, publication_id, source="hal", source_id="hal-1", title="Test"):
-    row = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES (:s, :sid, :t, :pid) RETURNING id"
-        ),
-        {"s": source, "sid": source_id, "t": title, "pid": publication_id},
-    ).one()
-    return row.id
-
-
 def _create_authorship(conn, publication_id, person_id=None):
     row = conn.execute(
         text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid) RETURNING id"),
         {"p": publication_id, "pid": person_id},
-    ).one()
-    return row.id
-
-
-def _create_source_authorship(
-    conn,
-    source_publication_id,
-    *,
-    source="hal",
-    author_position=0,
-    person_id=None,
-    authorship_id=None,
-    in_perimeter=False,
-):
-    identity_id = upsert_identity(conn)
-    row = conn.execute(
-        text(
-            "INSERT INTO source_authorships (source, source_publication_id, "
-            "                                author_position, person_id, "
-            "                                authorship_id, in_perimeter, identity_id, "
-            "                                raw_author_name) "
-            "VALUES (:s, :spid, :pos, :pid, :aid, :ip, :iid, 'X') RETURNING id"
-        ),
-        {
-            "s": source,
-            "spid": source_publication_id,
-            "pos": author_position,
-            "pid": person_id,
-            "aid": authorship_id,
-            "ip": in_perimeter,
-            "iid": identity_id,
-        },
     ).one()
     return row.id
 
@@ -120,16 +81,6 @@ def _link_address_structure(conn, address_id, structure_id, is_confirmed=True):
     )
 
 
-def _link_sa_address(conn, source_authorship_id, address_id):
-    conn.execute(
-        text(
-            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
-            "VALUES (:sa, :a)"
-        ),
-        {"sa": source_authorship_id, "a": address_id},
-    )
-
-
 # ── exclude_authorship ────────────────────────────────────────
 
 
@@ -141,9 +92,9 @@ class TestExcludeAuthorship:
     def test_rejects_deletes_row_and_detaches_source(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
+        sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
@@ -178,11 +129,9 @@ class TestExcludeAuthorship:
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        _create_source_authorship(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         exclude_authorship(authorship_id, repo=repo)
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
@@ -203,16 +152,14 @@ class TestExcludeAuthorship:
     def test_does_not_touch_other_authorships(self, sa_sync_conn, repo):
         """Rejeter une authorship ne touche ni les autres paires ni leurs sources."""
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
 
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         a1 = _create_authorship(sa_sync_conn, pub_id, p1)
         a2 = _create_authorship(sa_sync_conn, pub_id, p2)
-        _create_source_authorship(
-            sa_sync_conn, sp_id, author_position=0, person_id=p1, authorship_id=a1
-        )
-        sa2 = _create_source_authorship(
+        insert_signature(sa_sync_conn, sp_id, person_id=p1, authorship_id=a1)
+        sa2 = insert_signature(
             sa_sync_conn, sp_id, author_position=1, person_id=p2, authorship_id=a2
         )
 
@@ -244,14 +191,14 @@ class TestRejectPair:
         pub_id = _create_publication(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         # Deux sources (hal + openalex) attestent la même paire.
-        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
-        sp_oa = _create_source_publication(
-            sa_sync_conn, pub_id, source="openalex", source_id="oa-1"
+        sp_hal = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
+        sp_oa = insert_source_publication(
+            sa_sync_conn, pub_id, source="openalex", source_id="oa-1", title="Test"
         )
-        sa_hal = _create_source_authorship(
-            sa_sync_conn, sp_hal, source="hal", person_id=person_id, authorship_id=authorship_id
+        sa_hal = insert_signature(
+            sa_sync_conn, sp_hal, person_id=person_id, authorship_id=authorship_id
         )
-        sa_oa = _create_source_authorship(
+        sa_oa = insert_signature(
             sa_sync_conn, sp_oa, source="openalex", person_id=person_id, authorship_id=authorship_id
         )
 
@@ -290,8 +237,8 @@ class TestRejectPair:
         """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        sa_id = _create_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
+        sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         reject_pair(pub_id, person_id, repo=repo)
         # Resurrection simulée du lien source (matching non gardé d'un run antérieur).
@@ -311,11 +258,11 @@ class TestRejectPair:
 
     def test_does_not_touch_other_persons_sources(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
-        sa1 = _create_source_authorship(sa_sync_conn, sp_id, author_position=0, person_id=p1)
-        sa2 = _create_source_authorship(sa_sync_conn, sp_id, author_position=1, person_id=p2)
+        sa1 = insert_signature(sa_sync_conn, sp_id, person_id=p1)
+        sa2 = insert_signature(sa_sync_conn, sp_id, author_position=1, person_id=p2)
 
         reject_pair(pub_id, p1, repo=repo)
 
@@ -356,11 +303,9 @@ class TestDeleteOrphanAuthorships:
     def test_keeps_authorship_with_attesting_source(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        _create_source_authorship(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         n = delete_orphan_authorships(person_id, repo=repo)
 
@@ -413,11 +358,9 @@ class TestPruneOrphanAuthorships:
     def test_keeps_attested_pair(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        _create_source_authorship(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
 
         n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
@@ -433,15 +376,13 @@ class TestPruneOrphanAuthorships:
         """Prune toutes les orphelines, pas seulement celles d'une personne ;
         une authorship attestée (autre personne, même pub) est préservée."""
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         p_attested = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         p_orphan1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p_orphan2 = insert_person(sa_sync_conn, "Durand", first_name="Alice")
 
         a_attested = _create_authorship(sa_sync_conn, pub_id, p_attested)
-        _create_source_authorship(
-            sa_sync_conn, sp_id, person_id=p_attested, authorship_id=a_attested
-        )
+        insert_signature(sa_sync_conn, sp_id, person_id=p_attested, authorship_id=a_attested)
         # Deux orphelines sur deux personnes distinctes (aucune source ne les atteste).
         _create_authorship(sa_sync_conn, pub_id, p_orphan1)
         pub2 = _create_publication(sa_sync_conn, title="Autre")
@@ -472,25 +413,15 @@ class TestPropagateAuthorshipAttributes:
     def test_is_corresponding_is_bool_or(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         aid = _create_authorship(sa_sync_conn, pub_id, person_id)
         # Une source dit TRUE (wos), une dit FALSE (hal) → bool_or = TRUE,
         # quelle que soit la « priorité » des sources.
-        sa_wos = _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            source="wos",
-            author_position=0,
-            person_id=person_id,
-            authorship_id=aid,
+        sa_wos = insert_signature(
+            sa_sync_conn, sp_id, source="wos", person_id=person_id, authorship_id=aid
         )
-        sa_hal = _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            source="hal",
-            author_position=1,
-            person_id=person_id,
-            authorship_id=aid,
+        sa_hal = insert_signature(
+            sa_sync_conn, sp_id, author_position=1, person_id=person_id, authorship_id=aid
         )
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET is_corresponding = (id = :w) WHERE id IN (:w, :h)"),
@@ -503,9 +434,9 @@ class TestPropagateAuthorshipAttributes:
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         aid = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
+        sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=aid, in_perimeter=True
         )
         sa_sync_conn.execute(
@@ -598,14 +529,14 @@ class TestPropagateUcaForAddresses:
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
+        sa_id = insert_signature(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
-        _link_sa_address(sa_sync_conn, sa_id, addr_id)
+        insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(
             sa_sync_conn,
@@ -649,19 +580,15 @@ class TestPropagateUcaForAddresses:
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="hal-1", title="Test")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
-        sa_id = _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            person_id=person_id,
-            authorship_id=authorship_id,
-            in_perimeter=True,
+        sa_id = insert_signature(
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id, in_perimeter=True
         )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)
-        _link_sa_address(sa_sync_conn, sa_id, addr_id)
+        insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(
             sa_sync_conn,

@@ -1,7 +1,5 @@
 """Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
 
-import json
-
 import pytest
 from sqlalchemy import text
 
@@ -15,7 +13,6 @@ from infrastructure.read_models.persons.admin import (
     persons_sharing_name_form,
 )
 from infrastructure.read_models.persons.list import person_name_forms
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -107,28 +104,6 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
 # la query est maintenant exposée par PgHalProblemsQueries.
 
 
-def _sa_with_identifiers(conn, sd, position, person_id, identifiers, neutralized=None):
-    """Signature portant `identifiers` : l'identité (nom normalisé absent + identifiants) est
-    upsertée dans `author_identifying_keys`, la signature la référence par `identity_id` et
-    porte la carte `neutralized` de ses identifiants neutralisés."""
-    identity_id = upsert_identity(conn, person_identifiers=identifiers)
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position, person_id,
-                 raw_author_name, identity_id, neutralized_identifiers)
-            VALUES ('hal', :sd, :pos, :pid, 'X', :iid, CAST(:neu AS jsonb))
-        """),
-        {
-            "sd": sd,
-            "pos": position,
-            "pid": person_id,
-            "iid": identity_id,
-            "neu": json.dumps(neutralized) if neutralized else None,
-        },
-    )
-
-
 def _attribute(conn, person_id, id_type, id_value, status):
     """Attribution `person_identifiers` ; le statut `authenticated` exige le drapeau de l'import dédié."""
     if status == "authenticated":
@@ -152,8 +127,16 @@ class TestIdentifierConflicts:
         p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
         sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
-        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
-        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
+        insert_signature(
+            sa_sync_conn, sd, person_identifiers={"orcid": "0000-0001-2345-6789"}, person_id=p1
+        )
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=1,
+            person_identifiers={"orcid": "0000-0001-2345-6789"},
+            person_id=p2,
+        )
 
         assert identifier_conflicts_count(sa_sync_conn) == 1
         res = identifier_conflicts(sa_sync_conn, page=1, per_page=50)
@@ -171,13 +154,13 @@ class TestIdentifierConflicts:
         sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
-            _sa_with_identifiers(
+            insert_signature(
                 sa_sync_conn,
                 sd,
-                position,
-                person,
-                {"orcid": "0000-0009-9999-9999"},
-                neutralized={"orcid": "shared"},
+                author_position=position,
+                person_identifiers={"orcid": "0000-0009-9999-9999"},
+                person_id=person,
+                neutralized_identifiers={"orcid": "shared"},
             )
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
@@ -189,8 +172,16 @@ class TestIdentifierConflicts:
         p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
         sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
-        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0003-2202-7362"})
-        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0003-2202-7362"})
+        insert_signature(
+            sa_sync_conn, sd, person_identifiers={"orcid": "0000-0003-2202-7362"}, person_id=p1
+        )
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=1,
+            person_identifiers={"orcid": "0000-0003-2202-7362"},
+            person_id=p2,
+        )
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
@@ -198,8 +189,16 @@ class TestIdentifierConflicts:
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A")
         sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
-        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
-        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
+        insert_signature(
+            sa_sync_conn, sd, person_identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
+        )
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=1,
+            person_identifiers={"orcid": "0000-0002-1111-2222"},
+            person_id=p2,
+        )
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 
@@ -208,8 +207,16 @@ class TestIdentifierConflicts:
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A", exclusion="out_of_perimeter")
         sd = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
-        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0002-1111-2222"})
-        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0002-1111-2222"})
+        insert_signature(
+            sa_sync_conn, sd, person_identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
+        )
+        insert_signature(
+            sa_sync_conn,
+            sd,
+            author_position=1,
+            person_identifiers={"orcid": "0000-0002-1111-2222"},
+            person_id=p2,
+        )
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 

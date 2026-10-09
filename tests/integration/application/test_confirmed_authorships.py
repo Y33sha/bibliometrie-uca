@@ -8,8 +8,8 @@ from application.services.authorships.assign_orphans import assign_orphan_author
 from application.services.authorships.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
-from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
 def _orphan_sa(conn):
@@ -17,22 +17,14 @@ def _orphan_sa(conn):
     pub = conn.execute(
         text("INSERT INTO publications (title, pub_year) VALUES ('t', 2024) RETURNING id")
     ).scalar_one()
-    sp = conn.execute(
-        text(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
-            "VALUES ('hal', :sid, 't', :p) RETURNING id"
-        ),
-        {"sid": f"hal-{pub}", "p": pub},
-    ).scalar_one()
-    identity = upsert_identity(conn, "jean martin", None)
-    sa = conn.execute(
-        text(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES ('hal', :sp, 0, NULL, TRUE, 'Jean Martin', :iid) RETURNING id"
-        ),
-        {"sp": sp, "iid": identity},
-    ).scalar_one()
+    sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
+    sa = insert_signature(
+        conn,
+        sp,
+        in_perimeter=True,
+        raw_author_name="Jean Martin",
+        author_name_normalized="jean martin",
+    )
     return sa, pub
 
 
