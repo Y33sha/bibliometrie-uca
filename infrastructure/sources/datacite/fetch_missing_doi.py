@@ -28,7 +28,7 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import (
     record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.datacite.nodes import api_headers, record_doi
+from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
 
@@ -61,7 +61,7 @@ class DataciteFetchMissingDoiAdapter:
                     client,
                     "GET",
                     url,
-                    params={"query": clause, "page[size]": len(dois)},
+                    params={"query": clause, "page[size]": len(dois), **RECORD_PARAMS},
                     headers=self.headers,
                     timeout=30,
                     label=f"{len(dois)} DOI",

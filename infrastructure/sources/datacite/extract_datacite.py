@@ -2,7 +2,7 @@
 
 Implémente le port `application.ports.pipeline.extract.datacite.DataciteExtractAdapter`. Interroge `GET /dois` par année de publication, sur les affiliations des créateurs (`creators.affiliation.name`), avec une pagination par curseur. Les mots-clés viennent de `structures.api_ids->'datacite'` pour le périmètre d'extraction. La phase `affiliations` tranche ensuite quelles signatures relèvent du périmètre.
 
-Les paramètres de requête sont ceux de la phase `fetch_missing` (affiliations en chaînes) : un même DOI garde la même forme, quel que soit le chemin qui le ramène.
+Les paramètres de requête comprennent `RECORD_PARAMS`, comme ceux des phases `fetch_missing` et `fetch_stale`. Le lien `next` de la pagination les reprend.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_extraction_api_ids, get_years
-from infrastructure.sources.datacite.nodes import api_headers, record_doi
+from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.http_retry import http_request_with_retry
 
 # Plafond de l'API DataCite pour la taille d'une page.
@@ -62,7 +62,7 @@ class PgDataciteExtractAdapter(DataciteExtractAdapter):
     def count(self, year: int, keywords: list[str]) -> int:
         data = self._get(
             self._url,
-            {"query": build_query(year, keywords), "page[size]": 0},
+            {"query": build_query(year, keywords), "page[size]": 0, **RECORD_PARAMS},
             label=f"({year}, comptage)",
         )
         total = as_mapping(data.get("meta")).get("total")
@@ -76,6 +76,7 @@ class PgDataciteExtractAdapter(DataciteExtractAdapter):
                     "query": build_query(year, keywords),
                     "page[size]": _PAGE_SIZE,
                     "page[cursor]": 1,
+                    **RECORD_PARAMS,
                 },
                 label=f"({year}, première page)",
             )

@@ -17,7 +17,7 @@ from application.ports.pipeline.extract.fetch_stale import (
 )
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.datacite.nodes import api_headers, record_doi
+from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
@@ -43,6 +43,7 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
                     client,
                     "GET",
                     url,
+                    params=RECORD_PARAMS,
                     headers=self.headers,
                     timeout=30,
                     label=f"DOI {source_id}",
