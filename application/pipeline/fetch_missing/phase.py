@@ -4,10 +4,11 @@
 2. **Recherche par DOI** — pour chaque source cible configurée, en parallèle : cherche les DOI vus ailleurs mais absents de la source et les fetche.
 """
 
-import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import etape, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
@@ -32,63 +33,63 @@ def _summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
     }
 
 
-def run(
-    *,
-    mode: str,
-    sources: set[str] | None,
-    include_wos: bool,
-    fetch_hal_by_id: FetchChannel,
-    fetch_hal_by_nnt: FetchChannel,
-    fetch_doi_one: FetchDoiOne,
-    run_parallel: RunParallel,
-    credentials_missing: CredentialsMissing,
-    logger: logging.Logger,
-) -> PhaseMetrics:
-    """Enchaîne les canaux HAL puis la recherche par DOI parallèle, et assemble les métriques."""
-    metrics = PhaseMetrics()
-    by_channel: dict[str, dict[str, float]] = {}
+@dataclass(frozen=True)
+class FetchMissingPhase:
+    fetch_hal_by_id: FetchChannel
+    fetch_hal_by_nnt: FetchChannel
+    fetch_doi_one: FetchDoiOne
+    run_parallel: RunParallel
+    credentials_missing: CredentialsMissing
 
-    # Étape 1 : recherche dans HAL, deux canaux distincts (hal-id, NNT).
-    if not sources or "hal" in sources:
-        id_metrics, id_duration = timed_metrics(fetch_hal_by_id)
-        metrics.merge(id_metrics)
-        by_channel["hal-id"] = _summary(id_metrics, id_duration)
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Enchaîne les canaux HAL puis la recherche par DOI parallèle, et assemble les métriques."""
+        options, logger = ctx.options, ctx.logger
+        sources = options.sources or None
+        metrics = PhaseMetrics()
+        by_channel: dict[str, dict[str, float]] = {}
 
-        if mode == "full":
-            nnt_metrics, nnt_duration = timed_metrics(fetch_hal_by_nnt)
-            metrics.merge(nnt_metrics)
-            by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
+        # Étape 1 : recherche dans HAL, deux canaux distincts (hal-id, NNT).
+        if not sources or "hal" in sources:
+            id_metrics, id_duration = timed_metrics(self.fetch_hal_by_id)
+            metrics.merge(id_metrics)
+            by_channel["hal-id"] = _summary(id_metrics, id_duration)
 
-    # Étape 2 : par DOI. WoS opt-in, filtre `--sources` optionnel, ordre canonique.
-    doi_targets = select_targets(DOI_SEARCHABLE_SOURCES, sources, include_wos=include_wos)
-    configured = filter_configured(
-        doi_targets,
-        metrics,
-        credentials_missing=credentials_missing,
-        logger=logger,
-        phase="fetch_missing",
-    )
+            if options.mode == "full":
+                nnt_metrics, nnt_duration = timed_metrics(self.fetch_hal_by_nnt)
+                metrics.merge(nnt_metrics)
+                by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
 
-    if configured:
-        etape(logger, "Recherche par DOI des documents manquants dans chaque source")
-        outcomes = run_parallel(
-            {
-                target: partial(timed_metrics, partial(fetch_doi_one, target))
-                for target in configured
-            }
+        # Étape 2 : par DOI. WoS opt-in, filtre `--sources` optionnel, ordre du registre des sources.
+        doi_targets = select_targets(
+            DOI_SEARCHABLE_SOURCES, sources, include_wos=options.include_wos
         )
-        for target, (channel_metrics, duration) in outcomes.items():
-            metrics.merge(channel_metrics)
-            by_channel[target] = _summary(channel_metrics, duration)
-        # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
-        if all(m.total == 0 and not m.signals for m, _ in outcomes.values()):
-            rien_a_faire(logger)
+        configured = filter_configured(
+            doi_targets,
+            metrics,
+            credentials_missing=self.credentials_missing,
+            logger=logger,
+            phase="fetch_missing",
+        )
 
-    if by_channel:
-        metrics.details["table"] = {
-            "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
-        }
-    # Les compteurs des trois sous-étapes ne couvrent pas le même ensemble : les rapprocher en une
-    # ligne induirait en erreur. Chaque barre porte son résultat, et la table d'observabilité le détail.
-    metrics.resume = ""
-    return metrics
+        if configured:
+            etape(logger, "Recherche par DOI des documents manquants dans chaque source")
+            outcomes = self.run_parallel(
+                {
+                    target: partial(timed_metrics, partial(self.fetch_doi_one, target))
+                    for target in configured
+                }
+            )
+            for target, (channel_metrics, duration) in outcomes.items():
+                metrics.merge(channel_metrics)
+                by_channel[target] = _summary(channel_metrics, duration)
+            # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
+            if all(m.total == 0 and not m.signals for m, _ in outcomes.values()):
+                rien_a_faire(logger)
+
+        if by_channel:
+            metrics.details["table"] = {
+                "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
+            }
+        # Les compteurs des trois sous-étapes couvrent des ensembles différents : les rapprocher en une ligne induirait en erreur. Chaque barre affiche son résultat, et la table d'observabilité le détail.
+        metrics.resume = ""
+        return metrics
