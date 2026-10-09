@@ -17,7 +17,7 @@ from interfaces.cli.phases import extract, fetch_truncated, normalize
 from interfaces.cli.phases.execution import phase_context
 
 # L'orchestrateur applicatif du refetch, câblé par la phase `fetch_truncated` via `asyncio.run`.
-_REFETCH = "application.pipeline.extract.fetch_truncated.refetch"
+_REFETCH = "application.pipeline.fetch_truncated.phase.refetch"
 
 
 def test_refetch_not_called_in_extract():

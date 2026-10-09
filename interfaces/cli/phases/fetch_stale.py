@@ -10,7 +10,7 @@ from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
 
 if TYPE_CHECKING:
-    from application.ports.pipeline.extract.fetch_stale import FetchStaleAdapter
+    from application.ports.pipeline.fetch_stale import FetchStaleAdapter
 
 
 def build() -> Phase:
@@ -20,9 +20,9 @@ def build() -> Phase:
 
     Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 
-    Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::FetchStalePhase`.
+    Séquence et métriques dans `application/pipeline/fetch_stale/phase.py::FetchStalePhase`.
     """
-    from application.pipeline.extract.fetch_stale import FetchStalePhase
+    from application.pipeline.fetch_stale.phase import FetchStalePhase
 
     return FetchStalePhase(
         refresh_one=_run_fetch_stale,
@@ -71,7 +71,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from application.pipeline.extract.fetch_stale import refresh
+    from application.pipeline.fetch_stale.phase import refresh
     from infrastructure.sources.config import get_fetch_stale_after_days
 
     adapter = _make_fetch_stale_adapter(target)

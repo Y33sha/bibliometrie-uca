@@ -1,4 +1,4 @@
-"""Adapter theses.fr pour `application.pipeline.extract.fetch_stale`.
+"""Adapter theses.fr pour `application.pipeline.fetch_stale.phase`.
 
 Refetch d'une row par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, id theses.fr pour une thèse en cours). L'interrogation passe par le **même** endpoint recherche que le bulk, pour un `raw_data` de forme identique, et retient le hit dont l'`id` correspond exactement. Une réponse valide sans hit correspondant = identifiant confirmé absent.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

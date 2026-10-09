@@ -1,4 +1,4 @@
-"""Adapter CrossRef pour `application.pipeline.extract.fetch_stale`.
+"""Adapter CrossRef pour `application.pipeline.fetch_stale.phase`.
 
 CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
 """
@@ -10,7 +10,7 @@ import urllib.parse
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

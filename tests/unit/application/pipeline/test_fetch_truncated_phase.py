@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.fetch_truncated import FetchTruncatedPhase, refetch
-from application.ports.pipeline.extract.fetch_truncated import TruncatedWork
+from application.pipeline.fetch_truncated.phase import FetchTruncatedPhase, refetch
+from application.ports.pipeline.fetch_truncated import TruncatedWork
 
 _LOGGER = logging.getLogger("test")
 

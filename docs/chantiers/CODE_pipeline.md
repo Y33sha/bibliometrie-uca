@@ -30,8 +30,8 @@ Les refontes des phases `countries` et `subjects` relèvent de leurs fiches resp
 - [x] Factoriser la séquence connexion, circuit breaker, source indisponible, commit dans un contexte d'exécution unique.
 - [x] Définir dans `application/pipeline/` un contrat commun à toutes les phases : `run(contexte) -> PhaseMetrics`. Le contexte regroupe la fabrique de transactions, le logger, le circuit breaker et les options du run.
 - [x] Sortir le câblage de chaque phase de `run_pipeline.py`, dans un module par phase. `run_pipeline.py` sélectionne, enchaîne et affiche.
-- [ ] Déplacer dans `application/` la logique applicative présente dans le câblage.
-- [ ] Ranger `fetch_stale` et `fetch_truncated` dans leur propre package, hors de `extract/`.
+- [x] Déplacer dans `application/` la logique applicative présente dans le câblage. a5924042c, 8238170ae, d6669e4fd, 29f67e81c
+- [x] Ranger `fetch_stale` et `fetch_truncated` dans leur propre package, hors de `extract/`.
 
 ### Phase 2 — Découpage de publishers_journals
 

@@ -1,4 +1,4 @@
-"""Adapter OpenAlex pour `application.pipeline.extract.fetch_stale`.
+"""Adapter OpenAlex pour `application.pipeline.fetch_stale.phase`.
 
 Refetch d'une row par son id OpenAlex (`staging.source_id`) via `GET /works/{id}`, qui renvoie le work complet (tous les auteurs). Un 404 = work confirmé absent (supprimé ou fusionné côté OpenAlex).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

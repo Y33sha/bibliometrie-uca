@@ -96,7 +96,7 @@ def test_run_fetch_stale_installs_circuit_breaker():
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
-                "application.pipeline.extract.fetch_stale.refresh",
+                "application.pipeline.fetch_stale.phase.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )
