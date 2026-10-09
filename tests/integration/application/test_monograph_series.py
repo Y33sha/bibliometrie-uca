@@ -9,6 +9,7 @@ from application.pipeline.publishers_journals.link_monographs_to_collections imp
     run_link_monographs_to_collections,
 )
 from infrastructure.pipeline.containers import PgContainerGatewayQueries
+from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.sources import insert_source_publication
 
 
@@ -18,13 +19,7 @@ def repo(sa_sync_conn):
 
 
 def _volume(conn, repo, title: str, source_id: str) -> int:
-    journal_id = conn.execute(
-        text(
-            "INSERT INTO journals (title, title_normalized, journal_type)"
-            " VALUES (:t, lower(:t), 'proceedings') RETURNING id"
-        ),
-        {"t": title},
-    ).scalar_one()
+    journal_id = insert_journal(conn, title, journal_type="proceedings")
     monograph_id = repo.create_monograph(
         title=title,
         title_normalized=title.lower(),

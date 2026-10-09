@@ -1,0 +1,127 @@
+"""Semis des revues, de leurs ISSN et formes de nom, des éditeurs et des monographies, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
+
+from sqlalchemy import Connection, text
+
+from tests.integration.helpers.rows import insert_row
+
+
+def insert_publisher(
+    conn: Connection,
+    name: str = "X",
+    *,
+    name_normalized: str | None = None,
+    openalex_id: str | None = None,
+    publisher_type: str | None = None,
+) -> int:
+    """Insère un éditeur et renvoie son `id`. Le nom normalisé vaut par défaut le nom en minuscules."""
+    return insert_row(
+        conn,
+        "publishers",
+        {
+            "name": name,
+            "name_normalized": name_normalized if name_normalized is not None else name.lower(),
+            "openalex_id": openalex_id,
+            "publisher_type": publisher_type,
+        },
+        {"publisher_type": "publisher_type"},
+    )
+
+
+def insert_journal(
+    conn: Connection,
+    title: str = "X",
+    *,
+    title_normalized: str | None = None,
+    publisher_id: int | None = None,
+    openalex_id: str | None = None,
+    journal_type: str | None = None,
+    is_in_doaj: bool | None = None,
+    oa_model: str | None = None,
+    apc_amount: float | None = None,
+    apc_currency: str | None = "EUR",
+    doaj_imported_at: object = None,
+) -> int:
+    """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma. `apc_currency` vaut par défaut celle du schéma ; `None` l'écrit NULL."""
+    return insert_row(
+        conn,
+        "journals",
+        {
+            "title": title,
+            "title_normalized": title_normalized if title_normalized is not None else title.lower(),
+            "publisher_id": publisher_id,
+            "openalex_id": openalex_id,
+            "journal_type": journal_type,
+            "is_in_doaj": is_in_doaj,
+            "oa_model": oa_model,
+            "apc_amount": apc_amount,
+            "apc_currency": apc_currency,
+            "doaj_imported_at": doaj_imported_at,
+        },
+        {"journal_type": "journal_type", "oa_model": "oa_model"},
+        nullable=("apc_currency",),
+    )
+
+
+def insert_journal_issn(
+    conn: Connection,
+    journal_id: int | None,
+    *,
+    issn: str,
+    support: str | None = None,
+    linking: bool | None = None,
+    status: str | None = None,
+    sudoc_checked: bool = False,
+) -> int:
+    """Insère un ISSN de la revue `journal_id` et renvoie son `id`. `sudoc_checked` date la vérification Sudoc de l'instant de la transaction."""
+    checked_at = conn.execute(text("SELECT now()")).scalar_one() if sudoc_checked else None
+    return insert_row(
+        conn,
+        "journal_issns",
+        {
+            "issn": issn,
+            "journal_id": journal_id,
+            "support": support,
+            "linking": linking,
+            "status": status,
+            "sudoc_checked_at": checked_at,
+        },
+        {"support": "issn_support", "status": "issn_status"},
+    )
+
+
+def insert_journal_name_form(
+    conn: Connection, journal_id: int, *, form_normalized: str, publisher_id: int | None = None
+) -> int:
+    """Insère une forme de nom de la revue `journal_id` et renvoie son `id`."""
+    return insert_row(
+        conn,
+        "journal_name_forms",
+        {
+            "journal_id": journal_id,
+            "form_normalized": form_normalized,
+            "publisher_id": publisher_id,
+        },
+    )
+
+
+def insert_monograph(
+    conn: Connection,
+    title: str = "X",
+    *,
+    title_normalized: str | None = None,
+    proceedings: bool | None = None,
+    publisher_id: int | None = None,
+    journal_id: int | None = None,
+) -> int:
+    """Insère une monographie et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules."""
+    return insert_row(
+        conn,
+        "monographs",
+        {
+            "title": title,
+            "title_normalized": title_normalized if title_normalized is not None else title.lower(),
+            "proceedings": proceedings,
+            "publisher_id": publisher_id,
+            "journal_id": journal_id,
+        },
+    )

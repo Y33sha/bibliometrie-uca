@@ -40,6 +40,12 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
+from tests.integration.helpers.journals import (
+    insert_journal,
+    insert_journal_issn,
+    insert_monograph,
+    insert_publisher,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
@@ -83,27 +89,6 @@ def _fetch_one(conn, sql_text: str, **params):
 # ── Helpers ──────────────────────────────────────────────────────
 
 
-def _insert_publisher(conn, name="Elsevier", openalex_id=None):
-    return conn.execute(
-        text(
-            "INSERT INTO publishers (name, name_normalized, openalex_id) "
-            "VALUES (:name, lower(:name), :oa_id) RETURNING id"
-        ),
-        {"name": name, "oa_id": openalex_id},
-    ).scalar_one()
-
-
-def _add_issn(conn, journal_id, issn, *, support=None, linking=False, status="active"):
-    conn.execute(
-        text(
-            "INSERT INTO journal_issns (issn, journal_id, support, linking, status) "
-            "VALUES (:issn, :jid, CAST(:support AS issn_support), :linking, "
-            "        CAST(:status AS issn_status))"
-        ),
-        {"issn": issn, "jid": journal_id, "support": support, "linking": linking, "status": status},
-    )
-
-
 def _mark_checked_in_sudoc(conn, journal_id: int) -> None:
     conn.execute(
         text("UPDATE journal_issns SET sudoc_checked_at = now() WHERE journal_id = :id"),
@@ -137,34 +122,29 @@ def _columns(conn, journal_id: int) -> SimpleNamespace:
 
 
 def _insert_journal(conn, title="Nature", publisher_id=None, **kwargs):
-    journal_id = conn.execute(
-        text(
-            "INSERT INTO journals (title, title_normalized, "
-            "                      publisher_id, openalex_id, apc_amount, apc_currency, "
-            "                      is_in_doaj, oa_model) "
-            "VALUES (:title, lower(:title), "
-            "        :pub_id, :oa_id, :apc_amount, :apc_currency, "
-            "        :is_in_doaj, :oa_model) RETURNING id"
-        ),
-        {
-            "title": title,
-            "pub_id": publisher_id,
-            "oa_id": kwargs.get("openalex_id"),
-            "apc_amount": kwargs.get("apc_amount"),
-            "apc_currency": kwargs.get("apc_currency"),
-            "is_in_doaj": kwargs.get("is_in_doaj", False),
-            "oa_model": kwargs.get("oa_model"),
-        },
-    ).scalar_one()
+    journal_id = insert_journal(
+        conn,
+        title,
+        publisher_id=publisher_id,
+        openalex_id=kwargs.get("openalex_id"),
+        is_in_doaj=kwargs.get("is_in_doaj", False),
+        oa_model=kwargs.get("oa_model"),
+        apc_amount=kwargs.get("apc_amount"),
+        apc_currency=kwargs.get("apc_currency"),
+    )
     issn, eissn, issnl = kwargs.get("issn"), kwargs.get("eissn"), kwargs.get("issnl")
     if issn:
-        _add_issn(conn, journal_id, issn, support="print", linking=issn == issnl)
+        insert_journal_issn(conn, journal_id, issn=issn, support="print", linking=issn == issnl)
     if eissn and eissn != issn:
-        _add_issn(conn, journal_id, eissn, support="electronic", linking=eissn == issnl)
+        insert_journal_issn(
+            conn, journal_id, issn=eissn, support="electronic", linking=eissn == issnl
+        )
     if issnl and issnl not in (issn, eissn):
-        _add_issn(conn, journal_id, issnl, linking=True)
+        insert_journal_issn(conn, journal_id, issn=issnl, linking=True)
     for value in kwargs.get("rejected", ()):
-        _add_issn(conn, journal_id, value, status=kwargs.get("rejected_status", "unverified"))
+        insert_journal_issn(
+            conn, journal_id, issn=value, status=kwargs.get("rejected_status", "unverified")
+        )
     return journal_id
 
 
@@ -182,7 +162,7 @@ class TestPublisherFindById:
         assert publisher_repo.find_by_id(999999) is None
 
     def test_hydrates(self, sa_sync_conn, publisher_repo):
-        pub_id = _insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
+        pub_id = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
         p = publisher_repo.find_by_id(pub_id)
         assert p is not None
         assert p.id == pub_id
@@ -205,7 +185,7 @@ class TestJournalFindById:
         assert j.is_in_doaj is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
-        pub_id = _insert_publisher(sa_sync_conn, "PLOS")
+        pub_id = insert_publisher(sa_sync_conn, "PLOS")
         jid = _insert_journal(
             sa_sync_conn,
             title="PLOS ONE",
@@ -246,7 +226,7 @@ class TestFindOrCreatePublisher:
         assert row.name == "Elsevier"
 
     def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_gateway):
-        existing = _insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P4310310871")
+        existing = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P4310310871")
         found = find_or_create_publisher(
             "Elsevier BV", openalex_id="P4310310871", repo=publisher_gateway
         )
@@ -551,12 +531,12 @@ class TestUpdatePublisher:
             update_publisher(999999, update=PublisherUpdate(name="X"), repo=publisher_repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, publisher_repo):
-        p = _insert_publisher(sa_sync_conn, "Elsevier")
+        p = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError):
             update_publisher(p, update=PublisherUpdate(), repo=publisher_repo)
 
     def test_updates_name_and_normalizes(self, sa_sync_conn, publisher_repo):
-        p = _insert_publisher(sa_sync_conn, "Old Name")
+        p = insert_publisher(sa_sync_conn, "Old Name")
         update_publisher(p, update=PublisherUpdate(name="Springer Nature"), repo=publisher_repo)
         row = _fetch_one(
             sa_sync_conn, "SELECT name, name_normalized FROM publishers WHERE id = :id", id=p
@@ -570,7 +550,7 @@ class TestUpdatePublisher:
 
 class TestMergePublishers:
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, publication_repo):
-        p_id = _insert_publisher(sa_sync_conn, "Elsevier")
+        p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError, match="identiques"):
             merge_publishers(
                 p_id,
@@ -583,7 +563,7 @@ class TestMergePublishers:
             )
 
     def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, publication_repo):
-        p_id = _insert_publisher(sa_sync_conn, "Elsevier")
+        p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_publishers(
                 999999,
@@ -596,7 +576,7 @@ class TestMergePublishers:
             )
 
     def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, publication_repo):
-        p_id = _insert_publisher(sa_sync_conn, "Elsevier")
+        p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_publishers(
                 p_id,
@@ -611,8 +591,8 @@ class TestMergePublishers:
     def test_transfers_journals_and_deletes_source(
         self, sa_sync_conn, repo, publisher_repo, publication_repo
     ):
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         j1 = _insert_journal(sa_sync_conn, "Journal 1", publisher_id=source)
 
         merge_publishers(
@@ -633,15 +613,9 @@ class TestMergePublishers:
 
     def test_transfers_monographs(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         """La monographie garde un éditeur, qui la retrouve par son titre."""
-        target = _insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
-        source = _insert_publisher(sa_sync_conn, "PUR")
-        monograph = sa_sync_conn.execute(
-            text(
-                "INSERT INTO monographs (title, title_normalized, publisher_id)"
-                " VALUES ('Livre', 'livre', :s) RETURNING id"
-            ),
-            {"s": source},
-        ).scalar_one()
+        target = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
+        source = insert_publisher(sa_sync_conn, "PUR")
+        monograph = insert_monograph(sa_sync_conn, "Livre", publisher_id=source)
 
         merge_publishers(
             target,
@@ -660,8 +634,8 @@ class TestMergePublishers:
 
     def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
-        target = _insert_publisher(sa_sync_conn, "Elsevier BV")
-        source = _insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
+        target = insert_publisher(sa_sync_conn, "Elsevier BV")
+        source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO doi_prefixes (prefix, ra, publisher_id, publisher_checked_at)"
@@ -687,8 +661,8 @@ class TestMergePublishers:
 
     def test_merges_same_title_journals(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, eissn="1476-4687")
         insert_publication(sa_sync_conn, journal_id=js)
@@ -713,8 +687,8 @@ class TestMergePublishers:
     ):
         """Cible sans openalex_id, source avec : la fusion doit déplacer
         l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target)
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, openalex_id="S4210225546")
 
@@ -735,8 +709,8 @@ class TestMergePublishers:
     def test_raises_blocked_error_on_issn_conflict(
         self, sa_sync_conn, repo, publisher_repo, publication_repo
     ):
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, issn="9999-9999")
 
@@ -766,8 +740,8 @@ class TestMergePublishers:
     ):
         """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
         N→1 casserait. On flagge ces paires comme blockers."""
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
         _insert_journal(sa_sync_conn, "Nature", publisher_id=target, eissn="1476-4687")
         _insert_journal(sa_sync_conn, "Nature", publisher_id=source)
@@ -792,8 +766,8 @@ class TestMergePublishers:
         self, sa_sync_conn, repo, publisher_repo, publication_repo
     ):
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source")
         _insert_journal(sa_sync_conn, "Rev1", publisher_id=target, issn="1111-1111")
         _insert_journal(sa_sync_conn, "Rev1", publisher_id=source, issn="2222-2222")
         _insert_journal(sa_sync_conn, "Rev2", publisher_id=target, eissn="3333-3333")
@@ -816,8 +790,8 @@ class TestMergePublishers:
         self, sa_sync_conn, repo, publisher_repo, publication_repo
     ):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
-        target = _insert_publisher(sa_sync_conn, "Target", openalex_id=None)
-        source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
+        target = insert_publisher(sa_sync_conn, "Target")
+        source = insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
         merge_publishers(
             target,
             source,
@@ -836,8 +810,8 @@ class TestMergePublishers:
         self, sa_sync_conn, repo, publisher_repo, publication_repo
     ):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
-        target = _insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
-        source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
+        target = insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
+        source = insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
         merge_publishers(
             target,
             source,

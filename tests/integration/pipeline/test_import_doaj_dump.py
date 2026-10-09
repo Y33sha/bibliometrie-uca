@@ -8,21 +8,14 @@ from application.pipeline.publishers_journals.import_journals_from_doaj_dump imp
     run_import_doaj_dump,
 )
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
+from tests.integration.helpers.journals import insert_journal, insert_journal_issn
 
 
 def _create_journal(conn, *, issn=None, eissn=None):
-    journal_id = conn.execute(
-        text("INSERT INTO journals (title, title_normalized) VALUES ('J', 'j') RETURNING id")
-    ).scalar_one()
+    journal_id = insert_journal(conn, "J")
     for value, support in ((issn, "print"), (eissn, "electronic")):
         if value:
-            conn.execute(
-                text(
-                    "INSERT INTO journal_issns (issn, journal_id, support)"
-                    " VALUES (:i, :j, CAST(:s AS issn_support))"
-                ),
-                {"i": value, "j": journal_id, "s": support},
-            )
+            insert_journal_issn(conn, journal_id, issn=value, support=support)
     return journal_id
 
 

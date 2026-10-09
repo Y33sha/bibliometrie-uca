@@ -12,6 +12,7 @@ from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository, publication_repository
+from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
@@ -49,13 +50,6 @@ def create_persons_rh(conn, person_id, **kwargs):
         text("INSERT INTO persons_rh (person_id, department_name) VALUES (:pid, :dept)"),
         {"pid": person_id, "dept": kwargs.get("department_name", "Test")},
     )
-
-
-def create_journal(conn, title="Test Journal"):
-    return conn.execute(
-        text("INSERT INTO journals (title, title_normalized) VALUES (:t, lower(:t)) RETURNING id"),
-        {"t": title},
-    ).scalar_one()
 
 
 # ── DOI case-insensitive (bug corrigé 2026-03-31) ──
@@ -105,7 +99,7 @@ def _seed_pub(
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
-        journal_id = create_journal(sa_sync_conn, "Science")
+        journal_id = insert_journal(sa_sync_conn, "Science")
         pub_id = _seed_pub(publication_repo, "Pub", doi="10.5555/enrich-test")
         insert_source_publication(
             sa_sync_conn,

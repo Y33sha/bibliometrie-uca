@@ -6,6 +6,7 @@ Seed via un pool dédié en autocommit, hors du pool partagé par l'API, avec un
 import uuid
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.seeds import seed_journal, seed_publisher
 
 _cleanup_after_module = truncate_after_module("journals", "publishers")
 
@@ -19,24 +20,14 @@ class TestEntityLabels:
 
     def test_journal_reads_its_title(self, client):
         title = f"Revue {uuid.uuid4().hex[:8]}"
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO journals (title, title_normalized) VALUES (%s, lower(%s)) RETURNING id",
-                (title, title),
-            )
-            journal_id = cur.fetchone()["id"]
+        journal_id = seed_journal(title, title_normalized=title.lower())
         r = client.get("/api/entity-labels", params={"kind": "journal", "entity_id": journal_id})
         assert r.json() == {"label": title}
 
     def test_publisher_reads_its_name(self, client):
         """Le libellé d'un éditeur se lit dans `name`, là où celui d'une revue se lit dans `title`."""
         name = f"Editeur {uuid.uuid4().hex[:8]}"
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO publishers (name, name_normalized) VALUES (%s, lower(%s)) RETURNING id",
-                (name, name),
-            )
-            publisher_id = cur.fetchone()["id"]
+        publisher_id = seed_publisher(name, name_normalized=name.lower())
         r = client.get(
             "/api/entity-labels", params={"kind": "publisher", "entity_id": publisher_id}
         )

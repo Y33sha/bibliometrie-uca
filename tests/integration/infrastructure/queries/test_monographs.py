@@ -10,6 +10,7 @@ from application.pipeline.publishers_journals.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
 from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de titre « Chapitre ».
@@ -51,9 +52,7 @@ def test_recherche_par_isbn_papier_ou_electronique(repo):
 
 
 def test_recherche_par_titre_tous_editeurs(repo, sa_sync_conn):
-    publisher = sa_sync_conn.execute(
-        text("INSERT INTO publishers (name, name_normalized) VALUES ('P', 'p') RETURNING id")
-    ).scalar_one()
+    publisher = insert_publisher(sa_sync_conn, "P")
     with_publisher = _create(repo, "Introduction", publisher_id=publisher, isbn=_PAPER)
     without_publisher = _create(repo, "Introduction")
     assert repo.find_monographs_by_title("introduction") == [
@@ -97,15 +96,9 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
 
 
 def _journal(conn, title: str, issn: str | None = None) -> int:
-    journal_id = conn.execute(
-        text("INSERT INTO journals (title, title_normalized) VALUES (:t, lower(:t)) RETURNING id"),
-        {"t": title},
-    ).scalar_one()
+    journal_id = insert_journal(conn, title)
     if issn:
-        conn.execute(
-            text("INSERT INTO journal_issns (issn, journal_id, support) VALUES (:i, :j, 'print')"),
-            {"i": issn, "j": journal_id},
-        )
+        insert_journal_issn(conn, journal_id, issn=issn, support="print")
     return journal_id
 
 
