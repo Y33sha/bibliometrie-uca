@@ -21,11 +21,16 @@ def upgrade() -> None:
     op.execute("""
 CREATE TYPE public.ror_status AS ENUM ('active', 'inactive', 'withdrawn');
 
+CREATE TYPE public.ror_type AS ENUM (
+    'archive', 'company', 'education', 'facility', 'funder', 'government', 'healthcare',
+    'nonprofit', 'other'
+);
+
 CREATE TABLE public.ror_organizations (
     ror_id text NOT NULL,
     name text NOT NULL,
-    country_code character(2),
-    types text[] NOT NULL,
+    country_code character(2) NOT NULL,
+    types public.ror_type[] NOT NULL,
     status public.ror_status NOT NULL,
     CONSTRAINT ror_organizations_pkey PRIMARY KEY (ror_id)
 );
@@ -53,5 +58,6 @@ def downgrade() -> None:
     op.execute("""
 DROP TABLE public.ror_relations;
 DROP TABLE public.ror_organizations;
+DROP TYPE public.ror_type;
 DROP TYPE public.ror_status;
 """)

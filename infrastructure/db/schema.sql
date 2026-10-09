@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uBdIijxcdMjk2djhcGhtcWAaMgrvXJoZqVFW5WENX31172M41UtzpHI4ekGFUSE
+\restrict He5c0PY5KuuLfrGLIn7igND0kMw5LQ0iPmCEk70y4ekXhBeLbGO4flJUZDDgqLU
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -240,6 +240,23 @@ CREATE TYPE public.ror_status AS ENUM (
     'active',
     'inactive',
     'withdrawn'
+);
+
+
+--
+-- Name: ror_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.ror_type AS ENUM (
+    'archive',
+    'company',
+    'education',
+    'facility',
+    'funder',
+    'government',
+    'healthcare',
+    'nonprofit',
+    'other'
 );
 
 
@@ -1647,8 +1664,8 @@ CREATE TABLE public.rejected_authorships (
 CREATE TABLE public.ror_organizations (
     ror_id text NOT NULL,
     name text NOT NULL,
-    country_code character(2),
-    types text[] NOT NULL,
+    country_code character(2) NOT NULL,
+    types public.ror_type[] NOT NULL,
     status public.ror_status NOT NULL
 );
 
@@ -3910,5 +3927,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uBdIijxcdMjk2djhcGhtcWAaMgrvXJoZqVFW5WENX31172M41UtzpHI4ekGFUSE
+\unrestrict He5c0PY5KuuLfrGLIn7igND0kMw5LQ0iPmCEk70y4ekXhBeLbGO4flJUZDDgqLU
 
