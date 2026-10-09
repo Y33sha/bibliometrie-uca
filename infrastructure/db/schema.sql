@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict E5DmgnbcYswCaJ1HagzfsFdyPAdNnoF9LV1JPmv1AbmaEXKEEOVHnAHET6CCtLa
+\restrict uBdIijxcdMjk2djhcGhtcWAaMgrvXJoZqVFW5WENX31172M41UtzpHI4ekGFUSE
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -229,6 +229,17 @@ CREATE TYPE public.resolution_mode AS ENUM (
     'identifier',
     'name',
     'cross_source'
+);
+
+
+--
+-- Name: ror_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.ror_status AS ENUM (
+    'active',
+    'inactive',
+    'withdrawn'
 );
 
 
@@ -1630,6 +1641,44 @@ CREATE TABLE public.rejected_authorships (
 
 
 --
+-- Name: ror_organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ror_organizations (
+    ror_id text NOT NULL,
+    name text NOT NULL,
+    country_code character(2),
+    types text[] NOT NULL,
+    status public.ror_status NOT NULL
+);
+
+
+--
+-- Name: TABLE ror_organizations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ror_organizations IS 'Organisations du Research Organization Registry, chargées depuis son dump. Référentiel externe en lecture seule : structures.ror_id le relie au référentiel interne.';
+
+
+--
+-- Name: ror_relations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ror_relations (
+    parent_ror_id text NOT NULL,
+    child_ror_id text NOT NULL,
+    CONSTRAINT ror_relations_no_self_reference CHECK ((parent_ror_id <> child_ror_id))
+);
+
+
+--
+-- Name: TABLE ror_relations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ror_relations IS 'Relations parent/enfant entre organisations du Research Organization Registry.';
+
+
+--
 -- Name: source_authorship_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -2490,6 +2539,22 @@ ALTER TABLE ONLY public.rejected_authorships
 
 
 --
+-- Name: ror_organizations ror_organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ror_organizations
+    ADD CONSTRAINT ror_organizations_pkey PRIMARY KEY (ror_id);
+
+
+--
+-- Name: ror_relations ror_relations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ror_relations
+    ADD CONSTRAINT ror_relations_pkey PRIMARY KEY (parent_ror_id, child_ror_id);
+
+
+--
 -- Name: source_authorship_addresses source_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3319,6 +3384,13 @@ CREATE INDEX ix_journal_doi_namespaces_journal_id ON public.journal_doi_namespac
 
 
 --
+-- Name: ix_ror_relations_child_ror_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_ror_relations_child_ror_id ON public.ror_relations USING btree (child_ror_id);
+
+
+--
 -- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3715,6 +3787,22 @@ ALTER TABLE ONLY public.rejected_authorships
 
 
 --
+-- Name: ror_relations ror_relations_child_ror_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ror_relations
+    ADD CONSTRAINT ror_relations_child_ror_id_fkey FOREIGN KEY (child_ror_id) REFERENCES public.ror_organizations(ror_id) ON DELETE CASCADE;
+
+
+--
+-- Name: ror_relations ror_relations_parent_ror_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ror_relations
+    ADD CONSTRAINT ror_relations_parent_ror_id_fkey FOREIGN KEY (parent_ror_id) REFERENCES public.ror_organizations(ror_id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_authorship_addresses source_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3822,5 +3910,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E5DmgnbcYswCaJ1HagzfsFdyPAdNnoF9LV1JPmv1AbmaEXKEEOVHnAHET6CCtLa
+\unrestrict uBdIijxcdMjk2djhcGhtcWAaMgrvXJoZqVFW5WENX31172M41UtzpHI4ekGFUSE
 

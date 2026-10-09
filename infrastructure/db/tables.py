@@ -44,6 +44,7 @@ from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
+from domain.structures.ror import RorStatus
 from domain.structures.structure import StructureType
 from infrastructure.db.jsonb import Jsonb
 
@@ -248,6 +249,34 @@ structure_name_forms = Table(
         "char_length(form_text) > 6 OR is_word_boundary",
         name="ck_structure_name_forms_short_word_boundary",
     ),
+)
+
+
+ror_status_enum = PgEnum(*(s.value for s in RorStatus), name="ror_status", create_type=False)
+
+ror_organizations = Table(
+    "ror_organizations",
+    metadata,
+    Column("ror_id", Text, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("country_code", CHAR(2)),
+    Column("types", ARRAY(Text), nullable=False),
+    Column("status", ror_status_enum, nullable=False),
+    comment=(
+        "Organisations du Research Organization Registry, chargées depuis son dump. "
+        "Référentiel externe en lecture seule : structures.ror_id le relie au référentiel interne."
+    ),
+)
+
+
+ror_relations = Table(
+    "ror_relations",
+    metadata,
+    Column("parent_ror_id", Text, nullable=False),
+    Column("child_ror_id", Text, nullable=False),
+    PrimaryKeyConstraint("parent_ror_id", "child_ror_id", name="ror_relations_pkey"),
+    CheckConstraint("parent_ror_id <> child_ror_id", name="ror_relations_no_self_reference"),
+    comment="Relations parent/enfant entre organisations du Research Organization Registry.",
 )
 
 
