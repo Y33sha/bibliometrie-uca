@@ -38,7 +38,7 @@ Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_ru
 ### Phase 1 — Tests d'API
 
 - [x] `helpers/seeds.py` : `uniq`, structure, forme de nom de structure, adresse, périmètre, éditeur, revue, personne, publication, notice, signature. Identité d'auteur partagée avec `helpers/authorships.py`.
-- [ ] Fixture de nettoyage commune, paramétrée par la liste des tables.
+- [x] Fixture de nettoyage commune, paramétrée par la liste des tables (`helpers/db.truncate_after_module`).
 
 ### Phase 2 — Tests de requêtes et de services
 

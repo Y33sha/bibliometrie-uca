@@ -6,9 +6,7 @@ Couvre :
 - /api/feedback/false-positives : idem
 """
 
-import pytest
-
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_address,
     seed_structure,
@@ -32,14 +30,9 @@ def _seed_ast(
         return cur.fetchone()["id"]
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE address_structures, addresses, structure_name_forms, "
-            "structures, audit_log RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module(
+    "address_structures", "addresses", "structure_name_forms", "structures", "audit_log"
+)
 
 
 # ── /api/feedback/stats ───────────────────────────────────

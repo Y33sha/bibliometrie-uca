@@ -8,9 +8,7 @@ Couvre :
 - GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
-import pytest
-
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import seed_structure, seed_structure_name_form, uniq
 
 
@@ -23,14 +21,9 @@ def _seed_tutelle(parent_id: int, child_id: int) -> int:
         return cur.fetchone()["id"]
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE structure_name_forms, structure_tutelles, structures, "
-            "audit_log RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module(
+    "structure_name_forms", "structure_tutelles", "structures", "audit_log"
+)
 
 
 # ── GET /api/structures (list) ──────────────────────────────────

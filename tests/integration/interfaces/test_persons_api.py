@@ -9,25 +9,23 @@ collisions entre cas.
 
 import pytest
 
-from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_person,
     uniq,
 )
 
-
-@pytest.fixture(scope="module", autouse=True)
-def _cleanup_after_module():
-    """Les mutations de ce module committent dans la base (pool autocommit
-    + events admin). Truncate à la fin pour ne pas polluer les suites qui
-    tournent derrière (pipeline, audit)."""
-    yield
-    with owner_pool() as cur:
-        cur.execute(
-            "TRUNCATE TABLE authorships, source_authorships, author_identifying_keys, "
-            "source_publications, publications, persons, person_identifiers, "
-            "person_name_forms, audit_log RESTART IDENTITY CASCADE"
-        )
+_cleanup_after_module = truncate_after_module(
+    "authorships",
+    "source_authorships",
+    "author_identifying_keys",
+    "source_publications",
+    "publications",
+    "persons",
+    "person_identifiers",
+    "person_name_forms",
+    "audit_log",
+)
 
 
 def _seed_identifier(person_id: int, id_type: str, id_value: str, status: str = "pending") -> int:
