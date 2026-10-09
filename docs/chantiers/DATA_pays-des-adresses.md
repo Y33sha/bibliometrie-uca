@@ -4,7 +4,7 @@
 
 Le pays d'une adresse est déduit par plusieurs moyens de fiabilité inégale, et le résultat est rangé dans deux colonnes de `addresses` : `countries` pour ce qui fait autorité, `suggested_countries` pour ce qui attend une confirmation humaine.
 
-Cinq endroits écrivent l'un ou l'autre :
+Six endroits écrivent l'un ou l'autre :
 
 | Site | Moyen | Colonne écrite |
 |---|---|---|
@@ -27,6 +27,8 @@ Le dispositif fonctionne. Ce sont les conséquences de la modélisation en deux 
 
 **Les désaccords sont perdus.** Quand plusieurs lieux reconnus dans une adresse désignent des pays différents, la détection abandonne l'adresse sans conserver ce qu'elle a trouvé.
 
+**Le ROR des signatures donne un pays.** La normalisation rattache aux signatures les organisations ROR fournies par les sources (`source_authorship_rors`). Le référentiel ROR donne le pays de chaque organisation (`ror_organizations.country_code`).
+
 ## Décisions
 
 **Une table de candidats.** Un candidat est un pays proposé pour une adresse par un moyen donné.
@@ -41,7 +43,7 @@ address_country_candidates
   PRIMARY KEY (address_id, country_code, method)
 ```
 
-Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier — elle est un moyen parmi les autres, mesurable comme les autres.
+Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `ror`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier — elle est un moyen parmi les autres, mesurable comme les autres.
 
 Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
 
@@ -63,6 +65,7 @@ Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adre
 
 - [ ] Les six sites d'écriture ajoutent leur candidat, en conservant l'écriture actuelle des deux colonnes.
 - [ ] `detect_by_place_name` enregistre aussi les désaccords, au lieu d'abandonner l'adresse.
+- [ ] Moyen `ror` : le pays des organisations ROR d'une signature devient candidat pour les adresses de cette signature.
 - [ ] Toujours aucun changement de comportement : les colonnes restent la source de vérité.
 
 ### 3. Mesure de la justesse de chaque moyen
@@ -89,4 +92,6 @@ Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adre
 - **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score n'a de sens que si un moyen produit des propositions de qualité inégale, ce que la phase 3 dira.
 - **Désaccords.** Une fois conservés, où sont-ils présentés ? Une adresse dont les moyens se contredisent demande une décision humaine, pas un rejet silencieux — reste à décider si elle rejoint la file existante ou la sienne.
 - **Rétention.** Les candidats d'un moyen retiré sont-ils supprimés, ou conservés comme trace de ce qui a été essayé ?
+- **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
+- **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils alors redondants pour les signatures OpenAlex ?
 - **Volume.** Le nombre de candidats par adresse conditionne la taille de la table ; à mesurer en phase 2 sur le stock réel.

@@ -38,7 +38,7 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 Associe des pays aux adresses pour permettre l'analyse des collaborations internationales. Quatre étapes enchaînées :
 
-1. **Détection par nom de pays.** Parse le dernier segment après la dernière virgule et le matche contre les noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations WoS). Rapide et fiable.
+1. **Détection par nom de pays.** Confronte les derniers mots de l'adresse aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations WoS).
 
 2. **Détection par nom de lieu.** Pour les adresses restées sans pays, cherche dans tout le texte de l'adresse — pas seulement le dernier segment — les noms d'institutions et de villes connus (`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate Aho-Corasick. Le pays n'est posé que si les lieux trouvés désignent un pays unique.
 
