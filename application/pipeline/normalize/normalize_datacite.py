@@ -61,6 +61,7 @@ from domain.sources.datacite import (
     get_publisher_name,
     get_title,
 )
+from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
 
@@ -171,7 +172,7 @@ def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
 
 
 def _creator_affiliation_strings(creator: Mapping[str, JsonValue]) -> list[str]:
-    """Affiliations textuelles. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}` (ROR non exploité ici)."""
+    """Affiliations textuelles. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}`."""
     out: list[str] = []
     for aff in as_sequence(creator.get("affiliation")):
         if (texte := as_str(aff)) and texte.strip():
@@ -181,10 +182,19 @@ def _creator_affiliation_strings(creator: Mapping[str, JsonValue]) -> list[str]:
     return out
 
 
+def _creator_ror_ids(creator: Mapping[str, JsonValue]) -> frozenset[RorId]:
+    """ROR des affiliations : `affiliationIdentifier` de schéma `ROR`."""
+    return parse_ror_ids(
+        as_str(aff.get("affiliationIdentifier"))
+        for aff in (as_mapping(a) for a in as_sequence(creator.get("affiliation")))
+        if aff.get("affiliationIdentifierScheme") == "ROR"
+    )
+
+
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), `roles=['author']` explicite.
+    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR des affiliations → `ror_ids`, `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -214,6 +224,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
                 addresses=[
                     AddressRecord(text=aff) for aff in _creator_affiliation_strings(creator)
                 ],
+                ror_ids=_creator_ror_ids(creator),
             )
         )
     return records

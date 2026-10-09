@@ -46,6 +46,7 @@ from domain.sources.openalex import (
     short_openalex_id,
     should_skip_publisher_journal,
 )
+from domain.structures.identifiers import parse_ror_ids
 from domain.types import (
     JsonValue,
     as_bool,
@@ -395,6 +396,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
     - `country_code` OpenAlex (rattaché à la structure désambiguïsée, algorithmique et faillible) en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
+    - ROR des institutions → `ror_ids` ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
@@ -432,6 +434,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                     AddressRecord(text=part, suggested_countries=suggested_countries or None)
                     for part in addr_parts
                 ],
+                ror_ids=parse_ror_ids(as_str(i.get("ror")) for i in institutions),
             )
         )
     return records
