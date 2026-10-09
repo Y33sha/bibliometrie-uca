@@ -22,6 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
@@ -74,42 +75,44 @@ class _SourceOutcome:
     unavailable: str | None = None
 
 
-def run(
-    *,
-    mode: str,
-    sources: set[str] | None,
-    year: int | None,
-    start_year: int | None,
-    include_wos: bool,
-    count_extraction_structures: Callable[[], int],
-    extract_one: ExtractOne,
-    run_parallel: RunParallel,
-    get_last_daily_extract_date: GetLastDailyExtractDate,
-    logger: logging.Logger,
-) -> PhaseMetrics:
-    """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
-    if count_extraction_structures() == 0:
-        raise EmptyExtractionPerimeterError()
-    policy = MODES[mode]
-    effective = set(policy.extract_sources) | ({"wos"} if include_wos else set())
-    if sources:
-        effective &= sources
-    metrics = PhaseMetrics()
+@dataclass(frozen=True)
+class ExtractPhase:
+    count_extraction_structures: Callable[[], int]
+    extract_one: ExtractOne
+    run_parallel: RunParallel
+    get_last_daily_extract_date: GetLastDailyExtractDate
 
-    if policy.year_selection == "since_last":
-        by_source = _run_since_last(
-            effective, extract_one, get_last_daily_extract_date, metrics, logger
-        )
-    else:
-        by_source = _run_parallel_sources(
-            effective, year, start_year, extract_one, run_parallel, metrics, logger
-        )
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
+        options, logger = ctx.options, ctx.logger
+        if self.count_extraction_structures() == 0:
+            raise EmptyExtractionPerimeterError()
+        policy = MODES[options.mode]
+        effective = set(policy.extract_sources) | ({"wos"} if options.include_wos else set())
+        if options.sources:
+            effective &= options.sources
+        metrics = PhaseMetrics()
 
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+        if policy.year_selection == "since_last":
+            by_source = _run_since_last(
+                effective, self.extract_one, self.get_last_daily_extract_date, metrics, logger
+            )
+        else:
+            by_source = _run_parallel_sources(
+                effective,
+                options.year,
+                options.start_year,
+                self.extract_one,
+                self.run_parallel,
+                metrics,
+                logger,
+            )
+
+        if by_source:
+            metrics.details["table"] = {
+                "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+            }
+        return metrics
 
 
 def _run_since_last(
