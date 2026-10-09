@@ -25,8 +25,6 @@ from types import FrameType
 from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
-    from contextlib import AbstractContextManager
-
     from sqlalchemy import Connection
 
     from application.ports.pipeline.extract.fetch_stale import FetchStaleAdapter
@@ -42,8 +40,7 @@ from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
-from application.pipeline.signals import signal_source_unavailable
-from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from domain.dates import date_to_french
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET
 from infrastructure import PROJECT_ROOT
@@ -61,7 +58,12 @@ from infrastructure.observability.log import (
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
+from interfaces.cli.phases.execution import (
+    circuit_breaker,
+    open_tx,
+    signal_if_tripped,
+    under_circuit_breaker,
+)
 
 # `setup_logger` attache un FileHandler sur `logs/pipeline.log` quand `LOG_TO_FILE=true`.
 log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
@@ -120,20 +122,11 @@ class RunOptions:
     normalize_full: bool = False
 
 
-def _open_tx() -> "AbstractContextManager[Connection]":
-    """Fabrique de transaction gérée (port `OpenTransaction`) : commit sur succès, rollback sur erreur, fermeture, et tolérance aux commits par lots."""
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.transaction import managed_transaction
-
-    return managed_transaction(get_sync_engine())
-
-
 def _extraction_structure_count() -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 
-    with get_sync_engine().connect() as conn:
+    with open_tx() as conn:
         return PgPerimeterStructuresQueries().count_extraction_structures(conn)
 
 
@@ -173,42 +166,26 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
     Séquence et métriques dans `application/pipeline/resolve_ra/phase.py` ; ici, le câblage : connexion, circuit-breaker, user-agent.
     """
     from application.pipeline.resolve_ra.phase import run
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doi_org.registration_agency import fetch_registration_agencies
     from infrastructure.sources.polite_pool import build_user_agent
 
-    conn = get_sync_engine().connect()
-    # Circuit-breaker de doi.org/ra : le client HTTP lit la ContextVar et lève
-    # `SourceUnavailableError` quand doi.org est indisponible.
-    breaker = SourceCircuitBreaker("doi.org/ra")
-    token = set_current_breaker(breaker)
-    try:
-        # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
-        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-        metrics = run(
-            log,
-            repo=PgDoiPrefixesQueries(conn),
-            resolve_ras_fn=lambda prefixes: fetch_registration_agencies(
-                prefixes, user_agent=user_agent
+    # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
+    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    with open_tx() as conn:
+        return under_circuit_breaker(
+            "doi.org/ra",
+            lambda _breaker: run(
+                log,
+                repo=PgDoiPrefixesQueries(conn),
+                resolve_ras_fn=lambda prefixes: fetch_registration_agencies(
+                    prefixes, user_agent=user_agent
+                ),
             ),
+            phase="resolve_ra",
+            logger=log,
         )
-        conn.commit()
-    except SourceUnavailableError:
-        conn.commit()  # préserve les préfixes résolus avant l'indisponibilité (erreur HTTP, pas SQL)
-        metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, "doi.org/ra", logger=log, phase="resolve_ra")
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
@@ -269,10 +246,9 @@ def _credentials_missing(source: str) -> str | None:
 
 def _get_years_for_window(start_year: int | None) -> list[int] | None:
     """Années de la fenêtre du run, de `start_year` à l'année courante. Injecté aux phases qui bornent leurs requêtes par année."""
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_years
 
-    with get_sync_engine().connect() as conn:
+    with open_tx() as conn:
         return get_years(conn, start_year)
 
 
@@ -286,7 +262,6 @@ def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
     import asyncio
 
     from application.pipeline.extract.fetch_truncated import refetch
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
     sources = options.sources if options.sources is not None else set(ALL_SOURCES_SET)
@@ -294,11 +269,8 @@ def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
     # dans tous les modes, dès qu'openalex fait partie des sources.
     if "openalex" not in sources:
         return PhaseMetrics()
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         return asyncio.run(refetch(conn, PgOpenalexFetchTruncatedAdapter(), log))
-    finally:
-        conn.close()
 
 
 def phase_normalize(options: RunOptions) -> PhaseMetrics:
@@ -328,15 +300,10 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
 
 
 def _run_prune_disappeared() -> int:
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
 
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         n = delete_disappeared_source_publications(conn)
-        conn.commit()
-    finally:
-        conn.close()
     if n:
         log.info(
             "%s (disparus de leur source)", accord(n, "document supprimé", "documents supprimés")
@@ -345,15 +312,10 @@ def _run_prune_disappeared() -> int:
 
 
 def _run_cleanup_orphan_identities() -> None:
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.normalize.authorships import delete_orphan_identities
 
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         delete_orphan_identities(conn)
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def _vacuum_staging(full: bool = False) -> None:
@@ -400,67 +362,36 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     )
 
 
-def _signal_if_tripped(metrics: PhaseMetrics, breaker: SourceCircuitBreaker) -> None:
-    """Marque la phase en avertissement quand le circuit-breaker d'une source a coupé, après une série de 429 ou de 5xx. Les phases de rattrapage étant idempotentes, le run suivant reprend les documents non traités."""
-    if breaker.tripped:
-        metrics.signals.append(
-            {
-                "level": "warning",
-                "code": "source_unavailable",
-                "message": (
-                    f"{breaker.source} : arrêt après une série d'échecs (429/5xx), "
-                    "items reportés au prochain run"
-                ),
-            }
-        )
-
-
 def _run_resolve_publishers() -> PhaseMetrics:
     from application.pipeline.publishers_journals.resolve_publishers import (
         run_resolve_publishers,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.crossref.prefixes import fetch_crossref_prefix
     from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
     from infrastructure.sources.polite_pool import build_user_agent
 
-    conn = get_sync_engine().connect()
-    breaker = SourceCircuitBreaker("crossref/datacite prefixes")
-    token = set_current_breaker(breaker)
-    try:
-        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-        metrics = run_resolve_publishers(
-            log,
-            repo=PgDoiPrefixesQueries(conn),
-            publisher_repo=PgPublisherGatewayQueries(conn),
-            fetch_crossref_prefix_fn=lambda prefix, sample_doi: fetch_crossref_prefix(
-                prefix, sample_doi, user_agent=user_agent
+    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    with open_tx() as conn:
+        return under_circuit_breaker(
+            "crossref/datacite prefixes",
+            lambda breaker: run_resolve_publishers(
+                log,
+                repo=PgDoiPrefixesQueries(conn),
+                publisher_repo=PgPublisherGatewayQueries(conn),
+                fetch_crossref_prefix_fn=lambda prefix, sample_doi: fetch_crossref_prefix(
+                    prefix, sample_doi, user_agent=user_agent
+                ),
+                fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
+                    prefix, user_agent=user_agent
+                ),
+                breaker=breaker,
             ),
-            fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
-                prefix, user_agent=user_agent
-            ),
-            breaker=breaker,
+            phase="publishers_journals",
+            logger=log,
         )
-        conn.commit()
-    except SourceUnavailableError:
-        conn.commit()  # préserve les préfixes résolus avant l'indisponibilité (erreur HTTP, pas SQL)
-        metrics = PhaseMetrics()
-        signal_source_unavailable(
-            metrics, "crossref/datacite prefixes", logger=log, phase="publishers_journals"
-        )
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def phase_affiliations(options: RunOptions) -> PhaseMetrics:
@@ -476,7 +407,7 @@ def phase_affiliations(options: RunOptions) -> PhaseMetrics:
     from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 
     return run(
-        _open_tx,
+        open_tx,
         PgAddressResolutionQueries(),
         PgAffiliationsQueries(),
         PgPerimeterStructuresQueries(),
@@ -488,7 +419,6 @@ def phase_affiliations(options: RunOptions) -> PhaseMetrics:
 def _run_refresh_ror() -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
     from application.pipeline.affiliations.refresh_ror import run_refresh_ror
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import ror_repository
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.polite_pool import build_user_agent
@@ -498,7 +428,7 @@ def _run_refresh_ror() -> PhaseMetrics:
     source = ZenodoRorDumpSource(
         user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=log
     )
-    with get_sync_engine().connect() as conn:
+    with open_tx() as conn:
         return run_refresh_ror(conn, source=source, repo=ror_repository(conn), logger=log)
 
 
@@ -510,7 +440,7 @@ def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:
     from application.pipeline.metadata_correction.phase import run
     from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 
-    return run(_open_tx, PgMetadataCorrectionQueries(), log)
+    return run(open_tx, PgMetadataCorrectionQueries(), log)
 
 
 def phase_publications(options: RunOptions) -> PhaseMetrics:
@@ -531,7 +461,7 @@ def phase_publications(options: RunOptions) -> PhaseMetrics:
     from infrastructure.repositories import publication_repository
 
     return run(
-        _open_tx,
+        open_tx,
         PgPublicationsReconciliationQueries(),
         log,
         publication_repo_factory=publication_repository,
@@ -547,7 +477,7 @@ def phase_relations(options: RunOptions) -> PhaseMetrics:
     from application.pipeline.relations.phase import run
     from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 
-    return run(_open_tx, PgPublicationRelationsQueries(), log)
+    return run(open_tx, PgPublicationRelationsQueries(), log)
 
 
 def phase_persons(options: RunOptions) -> PhaseMetrics:
@@ -563,7 +493,7 @@ def phase_persons(options: RunOptions) -> PhaseMetrics:
     from infrastructure.repositories import authorship_repository, person_repository
 
     return run(
-        _open_tx,
+        open_tx,
         PgPersonsMatchingQueries(),
         PgPersonNameFormsQueries(),
         log,
@@ -593,7 +523,7 @@ def phase_authorships(options: RunOptions) -> PhaseMetrics:
     )
 
     return run(
-        _open_tx,
+        open_tx,
         PgAuthorshipsBuildQueries(),
         PgPurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
@@ -612,7 +542,7 @@ def phase_countries(options: RunOptions) -> PhaseMetrics:
     from infrastructure.pipeline.countries import PgCountryQueries
 
     return run(
-        _open_tx,
+        open_tx,
         PgCountryQueries(),
         log,
         retry_empty=MODES[options.mode].retry_empty_country_suggestions,
@@ -633,7 +563,7 @@ def phase_subjects(options: RunOptions) -> PhaseMetrics:
     from application.pipeline.subjects.phase import run
     from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
-    return run(_open_tx, PgSubjectsIngestionQueries(), log, rebuild=options.rebuild_subjects)
+    return run(open_tx, PgSubjectsIngestionQueries(), log, rebuild=options.rebuild_subjects)
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
@@ -702,14 +632,9 @@ def _normalize_builders(
 
 
 def _run_normalize(source: str, build: ConstructeurNormalizer) -> dict[str, object]:
-    from infrastructure.db.engine import get_sync_engine
-
     t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         stats = build(conn).run()
-    finally:
-        conn.close()
     return _normalize_row(source, stats, time.time() - t0)
 
 
@@ -717,98 +642,73 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.config import (
         get_openalex_api_key,
         get_polite_pool_email_optional,
     )
     from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
 
-    conn = get_sync_engine().connect()
-    # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
-    # le run suivant.
-    breaker = SourceCircuitBreaker("openalex sources", threshold=3)
-    token = set_current_breaker(breaker)
-    try:
-        api_key = get_openalex_api_key()
-        mailto = get_polite_pool_email_optional() or ""
-        sources_api = API_BASE_URLS["openalex_sources"]
-        metrics = run_enrich_journals_from_openalex(
-            conn,
-            log,
-            journal_repo=PgJournalGatewayQueries(conn),
-            fetch_batch=lambda oa_ids: fetch_sources_batch(
-                oa_ids, openalex_sources_api=sources_api, api_key=api_key, mailto=mailto
+    api_key = get_openalex_api_key()
+    mailto = get_polite_pool_email_optional() or ""
+    sources_api = API_BASE_URLS["openalex_sources"]
+    with open_tx() as conn:
+        # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
+        # le run suivant.
+        return under_circuit_breaker(
+            "openalex sources",
+            lambda breaker: run_enrich_journals_from_openalex(
+                conn,
+                log,
+                journal_repo=PgJournalGatewayQueries(conn),
+                fetch_batch=lambda oa_ids: fetch_sources_batch(
+                    oa_ids, openalex_sources_api=sources_api, api_key=api_key, mailto=mailto
+                ),
+                breaker=breaker,
+                rate_delay=DOAJ_DELAY,
             ),
-            breaker=breaker,
-            rate_delay=DOAJ_DELAY,
+            phase="publishers_journals",
+            logger=log,
+            threshold=3,
         )
-    except SourceUnavailableError:
-        metrics = PhaseMetrics()
-        signal_source_unavailable(
-            metrics, "openalex sources", logger=log, phase="publishers_journals"
-        )
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def _run_check_journals_in_sudoc() -> PhaseMetrics:
     from application.pipeline.publishers_journals.check_journals_in_sudoc import (
         run_check_journals_in_sudoc,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.api_params import (
         API_BASE_URLS,
         SUDOC_MAX_CONCURRENT,
         SUDOC_MAX_PER_SECOND,
     )
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.sudoc.client import fetch_ppns, fetch_serial_record
 
-    conn = get_sync_engine().connect()
-    # Circuit-breaker de la source : le client HTTP lit la ContextVar, que `asyncio.run` transmet
-    # aux coroutines ; l'orchestrateur consulte `breaker.tripped`.
-    breaker = SourceCircuitBreaker("sudoc", threshold=3)
-    token = set_current_breaker(breaker)
-    try:
-        base_url = API_BASE_URLS["sudoc"]
-        metrics = asyncio.run(
-            run_check_journals_in_sudoc(
-                conn,
-                log,
-                journal_repo=PgJournalGatewayQueries(conn),
-                fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
-                fetch_record=lambda client, ppn: fetch_serial_record(
-                    client, ppn, base_url=base_url
-                ),
-                breaker=breaker,
-                max_concurrent=SUDOC_MAX_CONCURRENT,
-                max_per_second=SUDOC_MAX_PER_SECOND,
-            )
+    base_url = API_BASE_URLS["sudoc"]
+    with open_tx() as conn:
+        # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
+        return under_circuit_breaker(
+            "sudoc",
+            lambda breaker: asyncio.run(
+                run_check_journals_in_sudoc(
+                    conn,
+                    log,
+                    journal_repo=PgJournalGatewayQueries(conn),
+                    fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
+                    fetch_record=lambda client, ppn: fetch_serial_record(
+                        client, ppn, base_url=base_url
+                    ),
+                    breaker=breaker,
+                    max_concurrent=SUDOC_MAX_CONCURRENT,
+                    max_per_second=SUDOC_MAX_PER_SECOND,
+                )
+            ),
+            phase="publishers_journals",
+            logger=log,
+            threshold=3,
         )
-    except SourceUnavailableError:
-        metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, "sudoc", logger=log, phase="publishers_journals")
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def _run_merge_duplicate_journals() -> PhaseMetrics:
@@ -816,13 +716,12 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
         run_merge_duplicate_journals,
     )
     from application.services.journals.commands import merge_journals
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
     from infrastructure.repositories.journal_repository import PgJournalRepository
     from infrastructure.repositories.publication_repository import PgPublicationRepository
 
-    with get_sync_engine().connect() as conn:
+    with open_tx() as conn:
         corrections = PgMetadataCorrectionQueries()
         journal_repository = PgJournalRepository(conn)
         publication_repository = PgPublicationRepository(conn)
@@ -846,115 +745,88 @@ def _run_delete_empty_journals() -> PhaseMetrics:
     from application.pipeline.publishers_journals.delete_empty_journals import (
         run_delete_empty_journals,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_delete_empty_journals(log, journal_repo=PgJournalGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_delete_empty_journals(log, journal_repo=PgJournalGatewayQueries(conn))
 
 
 def _run_merge_duplicate_monographs() -> PhaseMetrics:
     from application.pipeline.publishers_journals.merge_duplicate_monographs import (
         run_merge_duplicate_monographs,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_merge_duplicate_monographs(
-            log, monograph_repo=PgMonographGatewayQueries(conn)
-        )
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_merge_duplicate_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
 
 
 def _run_link_monographs_to_collections() -> PhaseMetrics:
     from application.pipeline.publishers_journals.link_monographs_to_collections import (
         run_link_monographs_to_collections,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_link_monographs_to_collections(
+    with open_tx() as conn:
+        return run_link_monographs_to_collections(
             log, monograph_repo=PgContainerGatewayQueries(conn)
         )
-        conn.commit()
-    return metrics
 
 
 def _run_delete_empty_monographs() -> PhaseMetrics:
     from application.pipeline.publishers_journals.delete_empty_monographs import (
         run_delete_empty_monographs,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_delete_empty_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_delete_empty_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
 
 
 def _run_delete_empty_publishers() -> PhaseMetrics:
     from application.pipeline.publishers_journals.delete_empty_publishers import (
         run_delete_empty_publishers,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_delete_empty_publishers(log, publisher_repo=PgPublisherGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_delete_empty_publishers(log, publisher_repo=PgPublisherGatewayQueries(conn))
 
 
 def _run_type_proceedings_volumes() -> PhaseMetrics:
     from application.pipeline.publishers_journals.type_proceedings_volumes import (
         run_type_proceedings_volumes,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_type_proceedings_volumes(log, monograph_repo=PgMonographGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_type_proceedings_volumes(log, monograph_repo=PgMonographGatewayQueries(conn))
 
 
 def _run_type_proceedings_journals() -> PhaseMetrics:
     from application.pipeline.publishers_journals.type_proceedings_journals import (
         run_type_proceedings_journals,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_type_proceedings_journals(log, journal_repo=PgJournalGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_type_proceedings_journals(log, journal_repo=PgJournalGatewayQueries(conn))
 
 
 def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
     from application.pipeline.publishers_journals.learn_journal_doi_namespaces import (
         run_learn_journal_doi_namespaces,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
-    with get_sync_engine().connect() as conn:
-        metrics = run_learn_journal_doi_namespaces(log, journal_repo=PgJournalGatewayQueries(conn))
-        conn.commit()
-    return metrics
+    with open_tx() as conn:
+        return run_learn_journal_doi_namespaces(log, journal_repo=PgJournalGatewayQueries(conn))
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
         run_import_doaj_dump,
     )
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.config import (
         get_doaj_refresh_after_days,
@@ -963,8 +835,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
     from infrastructure.sources.polite_pool import build_user_agent
 
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         journal_repo = PgJournalGatewayQueries(conn)
         last = journal_repo.doaj_last_import_at()
         delai = datetime.timedelta(days=get_doaj_refresh_after_days(conn))
@@ -997,8 +868,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
             )
         finally:
             Path(dump_path).unlink(missing_ok=True)
-    finally:
-        conn.close()
     return PhaseMetrics(extras={"matched": stats.matched})
 
 
@@ -1007,19 +876,9 @@ def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace)
 
     Le circuit-breaker est posé dans la ContextVar que lit le client HTTP synchrone, et passé à `run`, dont les boucles le consultent pour arrêter une source à bout de budget. Le seuil est plus bas qu'à la phase `fetch_missing`, les extracteurs travaillant sans lots concurrents.
     """
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
-
-    breaker = SourceCircuitBreaker(source, threshold=5)
-    token = set_current_breaker(breaker)
-    try:
+    with circuit_breaker(source, threshold=5) as breaker:
         metrics = extractor.run(args, breaker=breaker)
-    finally:
-        reset_current_breaker(token)
-    _signal_if_tripped(metrics, breaker)
+    signal_if_tripped(metrics, breaker)
     return metrics
 
 
@@ -1091,56 +950,45 @@ def _run_extract(
     source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
 ) -> PhaseMetrics:
     """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous circuit-breaker, fermeture. `make_extractor` porte le câblage propre à la source."""
-    from infrastructure.db.engine import get_sync_engine
-
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
-    conn = get_sync_engine().connect()
-    try:
+    with open_tx() as conn:
         return _run_extractor(source, make_extractor(conn, source_log), args)
-    finally:
-        conn.close()
 
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_id
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     etape(log, "Recherche dans HAL des documents avec hal-id trouvés ailleurs")
-    conn = get_sync_engine().connect()
-    adapter = PgHalFetchMissingAdapter()
-    try:
-        metrics = asyncio.run(
+    with open_tx() as conn:
+        return asyncio.run(
             fetch_missing_hal_by_id(
-                conn, adapter, log, retry_after_days=get_fetch_missing_retry_after_days(conn)
+                conn,
+                PgHalFetchMissingAdapter(),
+                log,
+                retry_after_days=get_fetch_missing_retry_after_days(conn),
             )
         )
-    finally:
-        conn.close()
-    return metrics
 
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
     from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_nnt
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     etape(log, "Recherche dans HAL des thèses avec NNT trouvées ailleurs")
-    conn = get_sync_engine().connect()
-    adapter = PgHalFetchMissingAdapter()
-    try:
-        metrics = asyncio.run(
+    with open_tx() as conn:
+        return asyncio.run(
             fetch_missing_hal_by_nnt(
-                conn, adapter, log, retry_after_days=get_fetch_missing_retry_after_days(conn)
+                conn,
+                PgHalFetchMissingAdapter(),
+                log,
+                retry_after_days=get_fetch_missing_retry_after_days(conn),
             )
         )
-    finally:
-        conn.close()
-    return metrics
 
 
 def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter":
@@ -1178,45 +1026,32 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     from application.pipeline.fetch_missing.doi import run_async
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
     )
 
     adapter = _make_fetch_missing_doi_adapter(target)
-
-    conn = get_sync_engine().connect()
-    # Circuit-breaker de la source : le client HTTP lit la ContextVar, l'orchestrateur consulte
-    # `breaker.tripped`.
-    breaker = SourceCircuitBreaker(target)
-    token = set_current_breaker(breaker)
-    try:
-        metrics = asyncio.run(
-            run_async(
-                conn,
-                adapter,
-                log,
-                missing_dois_reader=get_missing_dois,
-                retry_after_days=get_fetch_missing_retry_after_days(conn),
-                limit=get_fetch_missing_max_per_source(conn),
-                breaker=breaker,
-            )
+    with open_tx() as conn:
+        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        limit = get_fetch_missing_max_per_source(conn)
+        return under_circuit_breaker(
+            target,
+            lambda breaker: asyncio.run(
+                run_async(
+                    conn,
+                    adapter,
+                    log,
+                    missing_dois_reader=get_missing_dois,
+                    retry_after_days=retry_after_days,
+                    limit=limit,
+                    breaker=breaker,
+                )
+            ),
+            phase="fetch_missing",
+            logger=log,
         )
-    except SourceUnavailableError:
-        metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, target, logger=log, phase="fetch_missing")
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def _make_fetch_stale_adapter(source: str) -> "FetchStaleAdapter":
@@ -1251,40 +1086,19 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
     from application.pipeline.extract.fetch_stale import refresh
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
     from infrastructure.sources.config import get_fetch_stale_after_days
 
     adapter = _make_fetch_stale_adapter(target)
-
-    conn = get_sync_engine().connect()
-    # Circuit-breaker de la source, comme à la phase fetch_missing : une série de 429 coupe son
-    # rafraîchissement jusqu'au run suivant.
-    breaker = SourceCircuitBreaker(target)
-    token = set_current_breaker(breaker)
-    try:
-        metrics = asyncio.run(
-            refresh(
-                conn,
-                adapter,
-                log,
-                after_days=get_fetch_stale_after_days(conn),
-                years=years,
-                breaker=breaker,
-            )
+    with open_tx() as conn:
+        after_days = get_fetch_stale_after_days(conn)
+        return under_circuit_breaker(
+            target,
+            lambda breaker: asyncio.run(
+                refresh(conn, adapter, log, after_days=after_days, years=years, breaker=breaker)
+            ),
+            phase="fetch_stale",
+            logger=log,
         )
-    except SourceUnavailableError:
-        metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, target, logger=log, phase="fetch_stale")
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def phase_oa_status(options: RunOptions) -> PhaseMetrics:
@@ -1300,7 +1114,6 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
 
     from application.pipeline.oa_status.phase import run
     from application.pipeline.signals import filter_configured
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import (
@@ -1320,14 +1133,13 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     ):
         return metrics
 
-    conn = get_sync_engine().connect()
-    try:
-        base_url = API_BASE_URLS["unpaywall"]
-        email = get_polite_pool_email_optional() or ""
+    base_url = API_BASE_URLS["unpaywall"]
+    email = get_polite_pool_email_optional() or ""
 
-        async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
-            return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
+        return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
 
+    with open_tx() as conn:
         metrics.merge(
             asyncio.run(
                 run(
@@ -1340,8 +1152,6 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
                 )
             )
         )
-    finally:
-        conn.close()
     return metrics
 
 
@@ -1542,9 +1352,7 @@ def _libelle_de_phase(name: str) -> str | None:
     champs = _CHAMPS_DE_LIBELLE.get(name)
     if libelle is None or champs is None:
         return libelle
-    from infrastructure.db.engine import get_sync_engine
-
-    with get_sync_engine().connect() as conn:
+    with open_tx() as conn:
         return libelle.format(**champs(conn))
 
 
@@ -1731,12 +1539,10 @@ def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Pha
 
     # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
     # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
-    with get_sync_engine().connect() as perimeter_conn:
+    with open_tx() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)
-        perimeter_conn.commit()
 
     t0_total = time.time()
     phase_results = [

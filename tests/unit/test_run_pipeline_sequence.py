@@ -230,19 +230,7 @@ class TestExecutePhases:
 
         monkeypatch.setattr(observabilite, "start_run", _start_run)
         monkeypatch.setattr(perimetre, "refresh_perimeter_structures", lambda conn: None)
-
-        from contextlib import contextmanager
-        from types import SimpleNamespace
-
-        @contextmanager
-        def _connexion():
-            yield SimpleNamespace(commit=lambda: None)
-
-        import infrastructure.db.engine as engine_module
-
-        monkeypatch.setattr(
-            engine_module, "get_sync_engine", lambda: SimpleNamespace(connect=_connexion)
-        )
+        monkeypatch.setattr(run_pipeline, "open_tx", nullcontext)
         return recorder
 
     def test_chaque_phase_consignee_et_journal_clos(self, run_prepare):
