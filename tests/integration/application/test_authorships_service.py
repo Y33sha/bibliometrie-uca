@@ -20,9 +20,10 @@ from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQuer
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
+from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
-from tests.integration.helpers.structures import refresh_structure_matviews
+from tests.integration.helpers.structures import insert_structure, refresh_structure_matviews
 
 _AFFILIATIONS = PgAffiliationsQueries()
 _BUILD = PgAuthorshipsBuildQueries()
@@ -100,17 +101,6 @@ def _create_source_authorship(
     return row.id
 
 
-def _create_structure(conn, code="UCA", name="UCA", structure_type="universite"):
-    row = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (:c, :n, CAST(:st AS structure_type)) RETURNING id"
-        ),
-        {"c": code, "n": name, "st": structure_type},
-    ).one()
-    return row.id
-
-
 def _create_perimeter(conn, code, name, structure_ids):
     row = conn.execute(
         text(
@@ -126,16 +116,6 @@ def _set_config(conn, key, value):
         text("INSERT INTO config (key, value) VALUES (:k, CAST(:v AS jsonb))"),
         {"k": key, "v": json.dumps(value)},
     )
-
-
-def _create_address(conn, raw_text="Université Clermont Auvergne"):
-    row = conn.execute(
-        text(
-            "INSERT INTO addresses (raw_text, normalized_text) VALUES (:r, lower(:r)) RETURNING id"
-        ),
-        {"r": raw_text},
-    ).one()
-    return row.id
 
 
 def _link_address_structure(conn, address_id, structure_id, is_confirmed=True):
@@ -592,7 +572,7 @@ class TestPropagateUcaForAddresses:
         """
         from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
-        uca_id = _create_structure(conn, code="UCA", name="UCA")
+        uca_id = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
         _create_perimeter(conn, "uca", "UCA", [uca_id])
         _set_config(conn, "perimeter_persons", "uca")
         _set_config(conn, "perimeter_extraction", "uca")
@@ -612,7 +592,7 @@ class TestPropagateUcaForAddresses:
 
     def test_noop_if_no_perimeter_configured(self, sa_sync_conn, repo, perimeter_queries):
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
-        addr_id = _create_address(sa_sync_conn)
+        addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         # Aucun set_config perimeter_persons
         propagate_in_perimeter_for_addresses(
             sa_sync_conn,
@@ -631,7 +611,7 @@ class TestPropagateUcaForAddresses:
         sa_id = _create_source_authorship(
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
-        addr_id = _create_address(sa_sync_conn)
+        addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
@@ -687,7 +667,7 @@ class TestPropagateUcaForAddresses:
             authorship_id=authorship_id,
             in_perimeter=True,
         )
-        addr_id = _create_address(sa_sync_conn)
+        addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 

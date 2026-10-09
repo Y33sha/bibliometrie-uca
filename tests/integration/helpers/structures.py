@@ -1,4 +1,4 @@
-"""Helper de test : matérialiser des liens authorship ↔ structure.
+"""Semis de structures et de périmètres, et liens authorship ↔ structure, sur la connexion SQLAlchemy (`sa_sync_conn`).
 
 `authorship_structures` et `source_authorship_structures` sont des
 MATERIALIZED VIEW (migrations a2c6e4f8b1d7, e8f1a3c5d7b9) — les tests ne peuvent
@@ -9,12 +9,63 @@ rollback avec le test).
 """
 
 import itertools
+import json
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
+from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.rows import insert_row
 
 _seq = itertools.count(1)
+
+
+def insert_structure(
+    conn: Connection,
+    code: str = "X",
+    *,
+    name: str | None = None,
+    structure_type: str = "labo",
+    hal_collection: str | None = None,
+    api_ids: dict[str, object] | None = None,
+) -> int:
+    """Insère une structure et renvoie son `id`. Le nom vaut le code par défaut."""
+    return insert_row(
+        conn,
+        "structures",
+        {
+            "code": code,
+            "name": name if name is not None else code,
+            "structure_type": structure_type,
+            "hal_collection": hal_collection,
+            "api_ids": json.dumps(api_ids) if api_ids else None,
+        },
+        {"structure_type": "structure_type", "api_ids": "jsonb"},
+    )
+
+
+def insert_perimeter(
+    conn: Connection,
+    code: str,
+    *,
+    root_structure_ids: list[int],
+    name: str | None = None,
+    materialize: bool = False,
+) -> int:
+    """Insère un périmètre et renvoie son `id`. Le nom vaut le code par défaut. `materialize` calcule sa clôture dans `perimeter_structures`."""
+    perimeter_id = insert_row(
+        conn,
+        "perimeters",
+        {
+            "code": code,
+            "name": name if name is not None else code,
+            "root_structure_ids": root_structure_ids,
+        },
+        {"root_structure_ids": "integer[]"},
+    )
+    if materialize:
+        refresh_perimeter_structures(conn)
+    return perimeter_id
 
 
 def refresh_structure_matviews(conn) -> None:

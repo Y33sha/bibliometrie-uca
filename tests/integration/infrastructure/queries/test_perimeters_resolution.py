@@ -4,13 +4,13 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.perimeters import (
     get_extraction_structure_ids,
     get_persons_perimeter_name,
     get_persons_perimeter_root_ids,
     get_persons_structure_ids,
 )
+from tests.integration.helpers.structures import insert_perimeter, insert_structure
 
 
 def _clear_perimeter_config(conn) -> None:
@@ -29,21 +29,8 @@ def _set_config(conn, key: str, value: str) -> None:
 
 def _perimeter(conn, code: str, name: str) -> int:
     """Crée un périmètre à une racine, matérialise sa clôture et rend l'identifiant de la racine."""
-    root = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (:c, :c, 'universite') RETURNING id"
-        ),
-        {"c": f"{code}_racine"},
-    ).scalar_one()
-    conn.execute(
-        text(
-            "INSERT INTO perimeters (code, name, root_structure_ids) "
-            "VALUES (:c, :n, CAST(:ids AS integer[]))"
-        ),
-        {"c": code, "n": name, "ids": [root]},
-    )
-    refresh_perimeter_structures(conn)
+    root = insert_structure(conn, f"{code}_racine", structure_type="universite")
+    insert_perimeter(conn, code, root_structure_ids=[root], name=name, materialize=True)
     return root
 
 
