@@ -17,9 +17,11 @@ Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de 
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
@@ -30,64 +32,63 @@ from application.pipeline.persons.purge import purge
 from application.pipeline.progression import attente
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries
-from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 
 
-def run(
-    open_tx: OpenTransaction,
-    persons_queries: PersonsMatchingQueries,
-    name_forms_queries: PersonNameFormsQueries,
-    logger: logging.Logger,
-    *,
-    orphans_log: logging.Logger | None = None,
-    person_repo_factory: Callable[[Connection], PersonRepository],
-    authorship_repo_factory: Callable[[Connection], AuthorshipRepository],
-) -> PhaseMetrics:
-    """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques.
+@dataclass(frozen=True)
+class PersonsPhase:
+    persons_queries: PersonsMatchingQueries
+    name_forms_queries: PersonNameFormsQueries
+    person_repo_factory: Callable[[Connection], PersonRepository]
+    authorship_repo_factory: Callable[[Connection], AuthorshipRepository]
+    orphans_log: logging.Logger | None = None
 
-    `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
-    """
-    with open_tx() as conn:
-        person_repo = person_repo_factory(conn)
-        authorship_repo = authorship_repo_factory(conn)
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques.
 
-        n_enforced = persons_queries.enforce_confirmed_authorships(conn)
-        if n_enforced:
-            logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
+        `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
+        """
+        persons_queries, logger = self.persons_queries, ctx.logger
+        with ctx.open_tx() as conn:
+            person_repo = self.person_repo_factory(conn)
+            authorship_repo = self.authorship_repo_factory(conn)
 
-        arbitration = arbitrate_identifier_conflicts(
-            conn, persons_queries, logger, person_repo=person_repo
-        )
-        cascade_result = run_cascade(
-            conn,
-            persons_queries,
-            logger,
-            person_repo=person_repo,
-            authorship_repo=authorship_repo,
-            orphans_log=orphans_log,
-        )
+            n_enforced = persons_queries.enforce_confirmed_authorships(conn)
+            if n_enforced:
+                logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
-        # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
-        stale = sorted(
-            cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
-        )
-        cross_source_detached = persons_queries.detach_authorships(conn, stale)
+            arbitration = arbitrate_identifier_conflicts(
+                conn, persons_queries, logger, person_repo=person_repo
+            )
+            cascade_result = run_cascade(
+                conn,
+                persons_queries,
+                logger,
+                person_repo=person_repo,
+                authorship_repo=authorship_repo,
+                orphans_log=self.orphans_log,
+            )
 
-        etape(logger, "Rafraîchissement des formes de nom associées aux personnes")
-        t0 = time.perf_counter()
-        with attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", logger) as ligne:
-            populate(conn, name_forms_queries, logger)
-            purge_counts = purge(conn, persons_queries, logger)
-            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+            # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
+            stale = sorted(
+                cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
+            )
+            cross_source_detached = persons_queries.detach_authorships(conn, stale)
 
-        metrics = build_metrics(
-            cascade_result,
-            transferred=arbitration["transferred"],
-            cross_source_detached=cross_source_detached,
-            reorphaned=purge_counts["reorphaned"],
-            deleted_persons=purge_counts["deleted_persons"],
-        )
-        metrics.resume = ""
-    return metrics
+            etape(logger, "Rafraîchissement des formes de nom associées aux personnes")
+            t0 = time.perf_counter()
+            with attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", logger) as ligne:
+                populate(conn, self.name_forms_queries, logger)
+                purge_counts = purge(conn, persons_queries, logger)
+                ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+
+            metrics = build_metrics(
+                cascade_result,
+                transferred=arbitration["transferred"],
+                cross_source_detached=cross_source_detached,
+                reorphaned=purge_counts["reorphaned"],
+                deleted_persons=purge_counts["deleted_persons"],
+            )
+            metrics.resume = ""
+        return metrics
