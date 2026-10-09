@@ -193,7 +193,7 @@
   }
 
   const countColumns: CountColumn[] = [
-    { label: "Publis", sortKey: "signatures", value: (p) => p.signature_count },
+    { label: "Publications", sortKey: "signatures", value: (p) => p.signature_count },
     {
       label: institution.name,
       sortKey: "in_perimeter_signatures",
@@ -581,7 +581,7 @@
     loading={list.loading}
     sort={sortField}
     onSortChange={changeSort}
-    extraColumns={countColumns}
+    {countColumns}
     onopen={openDrawer}
     activeId={selectedPersonId}
   />

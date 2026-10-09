@@ -7,19 +7,25 @@
 
 	export type PersonRow = components['schemas']['PersonOut'];
 
-	/** Colonne numérique triable ajoutée après les colonnes communes. */
+	/** Colonne numérique triable, placée après les colonnes descriptives. */
 	export interface CountColumn {
 		label: string;
 		sortKey: string;
 		value: (p: PersonRow) => number | null | undefined;
 	}
 
+	const AUTHOR_PUBLICATIONS: CountColumn = {
+		label: 'Publications',
+		sortKey: 'signatures_as_author',
+		value: (p) => p.signature_count_as_author
+	};
+
 	let {
 		persons,
 		loading = false,
 		sort,
 		onSortChange,
-		extraColumns = [],
+		countColumns = [AUTHOR_PUBLICATIONS],
 		onopen,
 		activeId = null,
 	}: {
@@ -27,7 +33,7 @@
 		loading?: boolean;
 		sort: string;
 		onSortChange: (newSort: string) => void;
-		extraColumns?: CountColumn[];
+		countColumns?: CountColumn[];
 		/** Si fourni, le nom ouvre la personne via ce callback au lieu de lier vers sa fiche. */
 		onopen?: (personId: number) => void;
 		activeId?: number | null;
@@ -64,16 +70,10 @@
 				class:active={sort === 'dept_asc' || sort === 'dept_desc'}
 				onclick={() => toggleSort('dept')}>Département{sortIndicator('dept')}</th
 			>
-			<th
-				class="sortable num-col"
-				style="width:80px"
-				class:active={sort === 'signatures_as_author_asc' || sort === 'signatures_as_author_desc'}
-				onclick={() => toggleSort('signatures_as_author')}
-				>Publications{sortIndicator('signatures_as_author')}</th
-			>
-			{#each extraColumns as col (col.sortKey)}
+			{#each countColumns as col (col.sortKey)}
 				<th
 					class="sortable num-col"
+					style="width:80px"
 					class:active={sort === `${col.sortKey}_asc` || sort === `${col.sortKey}_desc`}
 					onclick={() => toggleSort(col.sortKey)}>{col.label}{sortIndicator(col.sortKey)}</th
 				>
@@ -82,7 +82,7 @@
 	</thead>
 	<tbody>
 		{#if persons.length === 0}
-			<TableStatusRow {loading} colspan={5 + extraColumns.length} emptyText="Aucune personne trouvée" />
+			<TableStatusRow {loading} colspan={4 + countColumns.length} emptyText="Aucune personne trouvée" />
 		{:else}
 			{#each persons as p (p.id)}
 				<tr class:excluded={!!p.exclusion}>
@@ -114,8 +114,7 @@
 						{/if}
 					</td>
 					<td class="muted-cell">{p.department_name || ''}</td>
-					<td class="num-col">{p.signature_count_as_author}</td>
-					{#each extraColumns as col (col.sortKey)}
+					{#each countColumns as col (col.sortKey)}
 						<td class="num-col">{col.value(p) ?? 0}</td>
 					{/each}
 				</tr>
