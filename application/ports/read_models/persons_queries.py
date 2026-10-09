@@ -21,15 +21,13 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 
-# Vocabulaire de tri : le champ, puis le sens. Les trois dénombrements sont triables, comme
+# Vocabulaire de tri : le champ, puis le sens. Les deux dénombrements sont triables, comme
 # la fonction et le département.
 PersonSort = Literal[
     "name_asc",
     "name_desc",
     "signatures_asc",
     "signatures_desc",
-    "signatures_as_author_asc",
-    "signatures_as_author_desc",
     "in_perimeter_signatures_asc",
     "in_perimeter_signatures_desc",
     "dept_asc",
@@ -123,9 +121,7 @@ class PersonOut(BaseModel):
     has_rh: bool
     exclusion: PersonExclusion | None
     signature_count: int
-    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse."""
-    signature_count_as_author: int
-    """Celles de ces signatures où la personne tient le rôle d'auteur."""
+    """Signatures où la personne tient le rôle d'auteur."""
     in_perimeter_signature_count: int
     """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut]
@@ -283,7 +279,7 @@ class CurationPersonOut(BaseModel):
     last_name: str
     has_rh: bool
     signature_count: int
-    """Signatures de la personne, tous rôles — même mesure que la liste de curation."""
+    """Signatures où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
     labs: list[str]
 
 

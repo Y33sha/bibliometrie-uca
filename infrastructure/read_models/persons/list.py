@@ -11,7 +11,11 @@ from application.ports.read_models.persons_queries import (
     PersonSearchResult,
 )
 from domain.sources.registry import AUTHOR_SOURCES
-from infrastructure.db.sql_fragments import in_clause, other_name_form_holders
+from infrastructure.db.sql_fragments import (
+    has_author_role,
+    in_clause,
+    other_name_form_holders,
+)
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -71,16 +75,13 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonS
 
 
 def _signature_counts_sql(*, lab_scoped: bool) -> str:
-    """Les trois dénombrements de signatures, sous la même condition de scope."""
+    """Les deux dénombrements de signatures en tant qu'auteur, sous la même condition de scope."""
     scope = _LAB_SCOPED_SIGNATURES if lab_scoped else ""
     return f"""
         (SELECT COUNT(*) FROM authorships a
-         WHERE a.person_id = p.id{scope}) AS signature_count,
+         WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS signature_count,
         (SELECT COUNT(*) FROM authorships a
-         WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]{scope}
-        ) AS signature_count_as_author,
-        (SELECT COUNT(*) FROM authorships a
-         WHERE a.person_id = p.id AND a.in_perimeter = TRUE{scope}
+         WHERE a.person_id = p.id AND {has_author_role("a")} AND a.in_perimeter = TRUE{scope}
         ) AS in_perimeter_signature_count
     """
 
@@ -153,7 +154,6 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
         has_rh=row.has_rh,
         exclusion=row.exclusion,
         signature_count=row.signature_count,
-        signature_count_as_author=row.signature_count_as_author,
         in_perimeter_signature_count=row.in_perimeter_signature_count,
         identifiers=identifiers,
     )

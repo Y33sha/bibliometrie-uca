@@ -174,7 +174,7 @@
   {/snippet}
 
     <div class="drawer-meta">
-      <span>{person.signature_count ?? 0} signatures</span>
+      <span>{person.signature_count ?? 0} publications</span>
       <span>{person.in_perimeter_signature_count ?? 0} dans le périmètre</span>
       {#if person.exclusion}<span class="tag tag-excluded">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>

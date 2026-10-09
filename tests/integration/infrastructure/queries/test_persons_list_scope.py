@@ -31,7 +31,7 @@ def _person(conn, last):
     ).scalar_one()
 
 
-def _authorship_in_lab(conn, person_id, lab_id=None):
+def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perimeter=False):
     pub = conn.execute(
         text(
             "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
@@ -40,10 +40,10 @@ def _authorship_in_lab(conn, person_id, lab_id=None):
     ).scalar_one()
     aid = conn.execute(
         text(
-            "INSERT INTO authorships (publication_id, person_id, roles) "
-            "VALUES (:p, :pe, ARRAY['author']::text[]) RETURNING id"
+            "INSERT INTO authorships (publication_id, person_id, roles, in_perimeter) "
+            "VALUES (:p, :pe, :roles, :inp) RETURNING id"
         ),
-        {"p": pub, "pe": person_id},
+        {"p": pub, "pe": person_id, "roles": list(roles), "inp": in_perimeter},
     ).scalar_one()
     if lab_id is not None:
         add_authorship_structure(conn, aid, lab_id)
@@ -93,6 +93,26 @@ class TestListLabScope:
         )
         assert next(p for p in scoped.persons if p.id == person).signature_count == 1
         assert next(p for p in unscoped.persons if p.id == person).signature_count == 2
+
+    def test_signature_counts_author_role_only(self, sa_sync_conn):
+        """Les dénombrements comptent seulement les signatures en tant qu'auteur, dans la liste comme dans la fiche de curation."""
+        person = _person(sa_sync_conn, "Juror")
+        _authorship_in_lab(sa_sync_conn, person, in_perimeter=True)
+        _authorship_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
+
+        q = PgPersonsQueries(sa_sync_conn)
+        listed = next(
+            p
+            for p in q.list_persons(
+                filters=PersonFilters(search="juror"), page=1, per_page=50, sort="name_asc"
+            ).persons
+            if p.id == person
+        )
+        curated = q.person_curation(person)
+        assert curated is not None
+        for p in (listed, curated):
+            assert p.signature_count == 1
+            assert p.in_perimeter_signature_count == 1
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-FAC")

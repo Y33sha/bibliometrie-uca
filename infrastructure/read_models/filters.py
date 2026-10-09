@@ -570,8 +570,6 @@ _PERSONS_SORT_MAP = {
     "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
     "signatures_asc": "signature_count ASC, LOWER(p.last_name) ASC",
     "signatures_desc": "signature_count DESC, LOWER(p.last_name) ASC",
-    "signatures_as_author_asc": "signature_count_as_author ASC, LOWER(p.last_name) ASC",
-    "signatures_as_author_desc": "signature_count_as_author DESC, LOWER(p.last_name) ASC",
     "in_perimeter_signatures_asc": "in_perimeter_signature_count ASC, LOWER(p.last_name) ASC",
     "in_perimeter_signatures_desc": "in_perimeter_signature_count DESC, LOWER(p.last_name) ASC",
     "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
