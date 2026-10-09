@@ -74,7 +74,7 @@ def create_structure(
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
-    """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
+    """Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé."""
     return StructureOut.model_validate(
         structure_commands.create_structure(
             conn,

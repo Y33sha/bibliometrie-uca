@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict He5c0PY5KuuLfrGLIn7igND0kMw5LQ0iPmCEk70y4ekXhBeLbGO4flJUZDDgqLU
+\restrict 52G3ADGVgQwBVRe0bGq6I42bgreY7uaAqeUEfxFEU7Co8l8tNkszgFFXWNEooZX
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2676,6 +2676,14 @@ ALTER TABLE ONLY public.structures
 
 
 --
+-- Name: structures structures_ror_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.structures
+    ADD CONSTRAINT structures_ror_id_key UNIQUE (ror_id);
+
+
+--
 -- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3927,5 +3935,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict He5c0PY5KuuLfrGLIn7igND0kMw5LQ0iPmCEk70y4ekXhBeLbGO4flJUZDDgqLU
+\unrestrict 52G3ADGVgQwBVRe0bGq6I42bgreY7uaAqeUEfxFEU7Co8l8tNkszgFFXWNEooZX
 
