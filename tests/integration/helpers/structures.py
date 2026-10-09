@@ -48,18 +48,18 @@ def insert_perimeter(
     conn: Connection,
     code: str,
     *,
-    root_structure_ids: list[int],
+    root_structure_ids: list[int] | None = None,
     name: str | None = None,
     materialize: bool = False,
 ) -> int:
-    """Insère un périmètre et renvoie son `id`. Le nom vaut le code par défaut. `materialize` calcule sa clôture dans `perimeter_structures`."""
+    """Insère un périmètre et renvoie son `id`. Le nom vaut le code par défaut, les racines une liste vide. `materialize` calcule sa clôture dans `perimeter_structures`."""
     perimeter_id = insert_row(
         conn,
         "perimeters",
         {
             "code": code,
             "name": name if name is not None else code,
-            "root_structure_ids": root_structure_ids,
+            "root_structure_ids": root_structure_ids or [],
         },
         {"root_structure_ids": "integer[]"},
     )
