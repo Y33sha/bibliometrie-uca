@@ -8,7 +8,7 @@ Particularités theses.fr :
 """
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -25,7 +25,6 @@ from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationUpsert,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_publications.external_ids import ExternalIdType
@@ -225,7 +224,6 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     batch_queries: AuthorshipsBatchQueries,
 ) -> bool:
@@ -255,30 +253,22 @@ class ThesesNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
-        publication_repo_factory: Callable[[Connection], PublicationRepository],
         batch_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
-        self._publication_repo_factory = publication_repo_factory
-        self._publication_repo: PublicationRepository | None = None
         self._batch_queries = batch_queries
-
-    def preload_caches(self, conn: Connection) -> None:
-        self._publication_repo = self._publication_repo_factory(conn)
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         pub_meta = extract_pub_metadata(row.raw_data)
         return pub_meta.title, pub_meta.pub_year
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        assert self._publication_repo is not None
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            publication_repo=self._publication_repo,
             staging_queries=self._staging,
             batch_queries=self._batch_queries,
         )

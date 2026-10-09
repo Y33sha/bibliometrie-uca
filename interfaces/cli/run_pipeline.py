@@ -668,7 +668,6 @@ def _normalize_builders(
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.raw_store import NullRawStore, get_raw_store
-    from infrastructure.repositories import publication_repository
 
     raw_store = get_raw_store() if archive else NullRawStore()
     sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)
@@ -681,7 +680,6 @@ def _normalize_builders(
             PgSourcePublicationQueries(),
             container_repo_factory=PgContainerGatewayQueries,
             publisher_repo_factory=PgPublisherGatewayQueries,
-            publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),
             sync_settings=sync_settings,
         )
@@ -692,7 +690,6 @@ def _normalize_builders(
             log,
             PgStagingQueries(raw_store),
             PgSourcePublicationQueries(),
-            publication_repo_factory=publication_repository,
             batch_queries=PgAuthorshipsBatchQueries(),
         ),
         "crossref": _biblio(CrossrefNormalizer),

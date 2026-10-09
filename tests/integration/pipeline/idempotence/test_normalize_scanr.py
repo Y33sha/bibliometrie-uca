@@ -173,7 +173,6 @@ def run_normalize_scanr(conn):
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
-    from infrastructure.repositories import publication_repository
 
     queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
@@ -187,7 +186,6 @@ def run_normalize_scanr(conn):
         queries,
         container_repo_factory=PgContainerGatewayQueries,
         publisher_repo_factory=PgPublisherGatewayQueries,
-        publication_repo_factory=publication_repository,
         authorship_queries=authorship_queries,
         sync_settings=SYNC_SETTINGS,
     )

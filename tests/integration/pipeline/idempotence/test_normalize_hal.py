@@ -82,7 +82,6 @@ def run_normalize_hal(conn):
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
-    from infrastructure.repositories import publication_repository
 
     queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
@@ -90,7 +89,6 @@ def run_normalize_hal(conn):
     logger = logging.getLogger("test")
     container_repo = PgContainerGatewayQueries(conn)
     publisher_repo = PgPublisherGatewayQueries(conn)
-    publication_repo = publication_repository(conn)
 
     rows = conn.execute(
         text("""
@@ -113,7 +111,6 @@ def run_normalize_hal(conn):
             staging_row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,
-            publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
             sync_settings=SYNC_SETTINGS,

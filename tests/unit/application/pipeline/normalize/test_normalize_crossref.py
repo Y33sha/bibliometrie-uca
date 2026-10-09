@@ -629,7 +629,6 @@ class TestProcessWork:
             staging_row(staging_id=42, raw=raw),
             container_repo=MagicMock(),
             publisher_repo=MagicMock(),
-            publication_repo=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
             sync_settings=SYNC_SETTINGS,
@@ -677,7 +676,6 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
-        publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
         sync_settings=SYNC_SETTINGS,
     )
