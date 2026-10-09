@@ -13,12 +13,16 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import BRANCHE, accord
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import attente
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
+
+LIBELLE = "Import du DOAJ"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 # Colonnes ISSN du dump CSV DOAJ.
 ISSN_KEYS = (
@@ -109,11 +113,6 @@ def run_import_doaj_dump(
 
     if commit and not dry_run:
         conn.commit()
-    logger.info(
-        "%sTerminé : %s mises à jour",
-        DERNIERE_BRANCHE,
-        accord(stats.matched, "revue", "revues"),
-    )
     return stats
 
 
@@ -129,15 +128,17 @@ def run_enrich_journals_from_doaj(
     last = journal_repo.doaj_last_import_at()
     delai = timedelta(days=refresh_after_days)
     if last is not None and last > datetime.now(UTC) - delai:
-        etape(
-            logger,
-            "Référentiel DOAJ importé le %s : prochain import le %s",
-            date_to_french(last.date()),
-            date_to_french((last + delai).date()),
+        metrics = PhaseMetrics(extras={"skipped": 1})
+        metrics.resume = (
+            f"importé le {date_to_french(last.date())}, "
+            f"prochain import le {date_to_french((last + delai).date())}"
         )
-        return PhaseMetrics(extras={"skipped": 1})
+        return metrics
 
-    etape(logger, "Import du référentiel DOAJ")
-    with download_dump() as rows:
-        stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
-    return PhaseMetrics(extras={"matched": stats.matched})
+    with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
+        ligne.efface()
+        with download_dump() as rows:
+            stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
+    metrics = PhaseMetrics(extras={"matched": stats.matched})
+    metrics.resume = accord(stats.matched, "revue mise à jour", "revues mises à jour")
+    return metrics

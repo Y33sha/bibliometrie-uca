@@ -5,10 +5,13 @@ La nature se recalcule à chaque run d'après les enregistrements, la collection
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.monographs import MonographProceedingsQueries
 from domain.monographs.proceedings import is_proceedings_volume
+
+LIBELLE = "Nature des monographies"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 
 def run_type_proceedings_volumes(
@@ -29,12 +32,6 @@ def run_type_proceedings_volumes(
     changed = len(to_proceedings) + len(to_books)
     if not changed:
         return metrics
-    etape(
-        logger,
-        "Nature des monographies : %s, %s",
-        accord(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus"),
-        accord(len(to_books), "livre reconnu", "livres reconnus"),
-    )
     monograph_repo.set_monographs_proceedings(to_proceedings, True)
     monograph_repo.set_monographs_proceedings(to_books, False)
     for label, ids in (("volume d'actes", to_proceedings), ("livre", to_books)):
@@ -52,9 +49,6 @@ def run_type_proceedings_volumes(
         monographs_to_proceedings=len(to_proceedings),
         monographs_to_books=len(to_books),
     )
-    logger.info(
-        "%sTerminé : %s",
-        DERNIERE_BRANCHE,
-        accord(changed, "monographie retypée", "monographies retypées"),
-    )
+    volumes = accord(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
+    metrics.resume = f"{volumes}, {accord(len(to_books), 'livre reconnu', 'livres reconnus')}"
     return metrics

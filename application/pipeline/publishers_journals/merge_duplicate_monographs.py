@@ -5,10 +5,13 @@ Deux monographies de même titre naissent quand l'éditeur ou l'ISBN manque à l
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.monographs import MonographMergeQueries
 from domain.monographs.matching import duplicate_monographs
+
+LIBELLE = "Fusion des monographies en double"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 
 def run_merge_duplicate_monographs(
@@ -23,10 +26,6 @@ def run_merge_duplicate_monographs(
     metrics = PhaseMetrics()
     if not merges:
         return metrics
-    if len(merges) == 1:
-        etape(logger, "Fusion d'une monographie en double")
-    else:
-        etape(logger, "Fusion de %d monographies en double", len(merges))
     for title, target, source in merges:
         monograph_repo.merge_monograph_into(target, source)
         # Ligne de détail : le terminal la masque, le journal la garde.
@@ -38,9 +37,5 @@ def run_merge_duplicate_monographs(
             extra={"detail": True},
         )
     metrics.add(total=len(merges), monographs_merged=len(merges))
-    logger.info(
-        "%sTerminé : %s",
-        DERNIERE_BRANCHE,
-        accord(len(merges), "monographie fusionnée", "monographies fusionnées"),
-    )
+    metrics.resume = accord(len(merges), "monographie fusionnée", "monographies fusionnées")
     return metrics

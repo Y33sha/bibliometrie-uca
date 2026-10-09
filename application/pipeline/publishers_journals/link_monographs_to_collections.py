@@ -5,7 +5,7 @@ Les monographies sans collection à ISSN se regroupent en séries (`group_series
 
 import logging
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import accord
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.containers import MonographSeriesQueries
 from application.ports.pipeline.monographs import MonographJournalCandidates
@@ -13,6 +13,9 @@ from application.services.journals.core import find_or_create_journal
 from domain.journals.journal import JournalType
 from domain.journals.series import VolumeTitle, group_series
 from domain.monographs.collection import MonographJournalChoice, choose_monograph_journal
+
+LIBELLE = "Rattachement aux collections"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 
 def _series_by_monograph(
@@ -58,7 +61,6 @@ def run_link_monographs_to_collections(
     metrics = PhaseMetrics()
     if not (changes or conflicts):
         return metrics
-    etape(logger, "Rattachement des monographies à leur collection")
     for m, choice in changes:
         monograph_repo.set_monograph_journal(m.monograph_id, choice.journal_id)
         # Ligne de détail : le terminal la masque, le journal la garde.
@@ -84,11 +86,9 @@ def run_link_monographs_to_collections(
         monograph_collection_conflicts=len(conflicts),
         monograph_series=len(set(series.values())),
     )
-    logger.info(
-        "%sTerminé : %s, %s, %s",
-        DERNIERE_BRANCHE,
-        accord(len(set(series.values())), "série sans ISSN", "séries sans ISSN"),
-        accord(len(changes), "monographie rattachée", "monographies rattachées"),
-        accord(len(conflicts), "conflit", "conflits"),
+    metrics.resume = (
+        f"{accord(len(set(series.values())), 'série sans ISSN', 'séries sans ISSN')}, "
+        f"{accord(len(changes), 'monographie rattachée', 'monographies rattachées')}, "
+        f"{accord(len(conflicts), 'conflit', 'conflits')}"
     )
     return metrics

@@ -14,7 +14,7 @@ L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent 
 import logging
 from collections.abc import Callable, Sequence
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from application.pipeline.libelles import BRANCHE, accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.publishers_journals._journal_label import journal_label
@@ -25,6 +25,9 @@ from application.ports.pipeline.journals import (
     JournalTitleRow,
 )
 from domain.journals.titles import compatible_titles, nested_titles
+
+LIBELLE = "Fusion des revues en double"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 MergeJournals = Callable[[int, int], None]
 """`(cible, source)` : fusionne la revue source dans la cible et valide la transaction."""
@@ -53,15 +56,10 @@ def run_merge_duplicate_journals(
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
     issnl, issn_et_titre, titre_successif, titre_et_prefixe, publication_et_titre = _REGLES
-    ouverte = False
 
     def merge_groups(groups: Sequence[MergeGroup], regle: str) -> None:
-        nonlocal ouverte
         if not groups:
             return
-        if not ouverte:
-            etape(logger, "Fusion de revues :")
-            ouverte = True
         _merge_groups(logger, metrics, journal_repo, merge, absorbed, groups, regle)
 
     merge_groups(
@@ -89,12 +87,8 @@ def run_merge_duplicate_journals(
         publication_et_titre,
     )
     if metrics.total:
-        logger.info(
-            "%sTerminé : %s",
-            DERNIERE_BRANCHE,
-            accord(
-                metrics.extras.get("journals_merged", 0), "revue fusionnée", "revues fusionnées"
-            ),
+        metrics.resume = accord(
+            metrics.extras.get("journals_merged", 0), "revue fusionnée", "revues fusionnées"
         )
     return metrics
 
@@ -138,8 +132,9 @@ def _merge_groups(
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
     metrics.add(total=len(groups))
-    logger.info("%s%s", BRANCHE, regle)
-    with progression(len(groups), BRANCHE.rstrip(), logger) as avancement:
+    with progression(
+        len(groups), f"{BRANCHE}{LIBELLE} ({regle})", logger, efface=True
+    ) as avancement:
         for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             sources = [s for s in journal_ids[1:] if s not in absorbed and s != target]
@@ -150,8 +145,9 @@ def _merge_groups(
                 metrics.add(journals_merged=1)
                 # Ligne de détail : le terminal la masque, le journal la garde.
                 logger.info(
-                    "%s : la revue %s absorbe la revue %s",
+                    "%s (%s) : la revue %s absorbe la revue %s",
                     label,
+                    regle,
                     journal_label(summaries[target]),
                     journal_label(summaries[source]),
                     extra={"detail": True},

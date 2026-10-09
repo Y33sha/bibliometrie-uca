@@ -13,7 +13,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import RequestPace, run_fetch_pool
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import BRANCHE, accord, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
@@ -27,6 +27,9 @@ from domain.journals.issn_check import (
 from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord
+
+LIBELLE = "Vérification des ISSN dans le Sudoc"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 COMMIT_EVERY = 50  # revues par commit
 
@@ -95,11 +98,6 @@ async def run_check_journals_in_sudoc(
     if total == 0:
         return metrics
     metrics.add(total=total)
-    etape(
-        logger,
-        "%s : vérification des ISSN dans le Sudoc",
-        accord(total, "revue à vérifier", "revues à vérifier"),
-    )
 
     record_by_ppn: dict[str, SudocSerialRecord | None] = {}
     pace = RequestPace(max_per_second)
@@ -144,7 +142,9 @@ async def run_check_journals_in_sudoc(
         return records
 
     # Le compteur de la barre porte les revues présentes dans le Sudoc.
-    with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
+    with progression(
+        total, f"{BRANCHE}{LIBELLE}", logger, compte_retenus=True, efface=True
+    ) as avancement:
 
         def _write(
             conn: Connection, row: JournalSudocRow, records: dict[str, SudocSerialRecord] | None
@@ -194,11 +194,9 @@ async def run_check_journals_in_sudoc(
             total,
         )
     found = metrics.extras.get("sudoc_found", 0)
-    logger.info(
-        "%sTerminé : %s dans le Sudoc, %d %s",
-        DERNIERE_BRANCHE,
-        accord(found, "revue présente", "revues présentes"),
-        metrics.updated,
-        forme(metrics.updated, "modifiée"),
+    metrics.resume = (
+        f"{accord(total, 'revue vérifiée', 'revues vérifiées')}, "
+        f"{accord(found, 'présente', 'présentes')} dans le Sudoc, "
+        f"{metrics.updated} {forme(metrics.updated, 'modifiée')}"
     )
     return metrics

@@ -13,12 +13,15 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from application.pipeline.libelles import forme
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
 from application.services.journals.core import update_journal_apc
 from domain.journals.journal import JournalType
+
+LIBELLE = "Type des revues sur OpenAlex"
+"""Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
@@ -59,11 +62,6 @@ def run_enrich_journals_from_openalex(
     total = len(journals)
     if total == 0:
         return PhaseMetrics()
-    etape(
-        logger,
-        "%s : identification du type des revues sur OpenAlex",
-        accord(total, "revue sans type", "revues sans type"),
-    )
 
     updated = 0
     with_apc = 0
@@ -78,7 +76,7 @@ def run_enrich_journals_from_openalex(
                 processed,
                 total,
             )
-            return PhaseMetrics(seen=total, updated=updated)
+            return _bilan(total, updated)
 
         id_map = {row[1]: row[0] for row in journals[i : i + BATCH_SIZE]}
         sources = fetch_batch(list(id_map))
@@ -109,11 +107,10 @@ def run_enrich_journals_from_openalex(
             conn.commit()
 
     conn.commit()
-    logger.info(
-        "%sTerminé : %d/%d %s mises à jour",
-        DERNIERE_BRANCHE,
-        updated,
-        total,
-        forme(total, "revue"),
-    )
-    return PhaseMetrics(seen=total, updated=updated)
+    return _bilan(total, updated)
+
+
+def _bilan(total: int, updated: int) -> PhaseMetrics:
+    metrics = PhaseMetrics(seen=total, updated=updated)
+    metrics.resume = f"{updated}/{total} {forme(total, 'revue mise à jour', 'revues mises à jour')}"
+    return metrics
