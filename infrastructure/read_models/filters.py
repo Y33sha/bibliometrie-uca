@@ -17,6 +17,7 @@ from domain.publications.metadata import (
 )
 from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
+from infrastructure.db.sql_fragments import has_author_role
 
 
 def _sql_list(values: Iterable[str]) -> str:
@@ -251,7 +252,7 @@ def _authored_by(person_id: int, bind: str) -> WhereClause:
     return WhereClause(
         f"""EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :{bind}
-                  AND a.roles && ARRAY['author']::text[])""",
+                  AND {has_author_role("a")})""",
         {bind: person_id},
     )
 
@@ -554,12 +555,12 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
     if not lab_id:
         return None
     return WhereClause(
-        """EXISTS (
+        f"""EXISTS (
             SELECT 1 FROM authorships a
             JOIN authorship_structures aus ON aus.authorship_id = a.id
             WHERE a.person_id = p.id
               AND aus.structure_id = :flt_person_lab_id
-              AND a.roles && ARRAY['author']::text[]
+              AND {has_author_role("a")}
         )""",
         {"flt_person_lab_id": lab_id},
     )

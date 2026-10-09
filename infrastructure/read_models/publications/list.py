@@ -18,6 +18,7 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
+from infrastructure.db.sql_fragments import has_author_role
 from infrastructure.read_models.filters import (
     OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
@@ -215,14 +216,14 @@ def list_publications(
                      FROM authorships ath
                      JOIN persons pe ON pe.id = ath.person_id
                      WHERE ath.publication_id = p.id
-                       AND ath.roles && ARRAY['author']::text[]
+                       AND {has_author_role("ath")}
                      LIMIT 1)
                  END) AS thesis_author_name,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT ath.person_id
                      FROM authorships ath
                      WHERE ath.publication_id = p.id
-                       AND ath.roles && ARRAY['author']::text[]
+                       AND {has_author_role("ath")}
                      LIMIT 1)
                  END) AS thesis_author_person_id,
                 (SELECT a.is_corresponding FROM authorships a
