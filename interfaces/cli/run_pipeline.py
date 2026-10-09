@@ -539,10 +539,10 @@ def phase_subjects(options: RunOptions) -> PhaseMetrics:
 
     Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
     """
-    from application.pipeline.subjects.phase import run
+    from application.pipeline.subjects.phase import SubjectsPhase
     from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
-    return run(open_tx, PgSubjectsIngestionQueries(), log, rebuild=options.rebuild_subjects)
+    return SubjectsPhase(PgSubjectsIngestionQueries()).run(_context(options))
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
