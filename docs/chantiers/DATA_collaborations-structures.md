@@ -50,7 +50,7 @@ ror_relations
 
 - [x] Migration : tables `ror_organizations` et `ror_relations`.
 - [x] Script de chargement du dump ROR : `interfaces/cli/imports/import_ror_dump.py`.
-- [ ] Rapport de cohérence entre `structure_tutelles` et `ror_relations`.
+- [x] Rapport de cohérence entre `structure_tutelles` et `ror_relations` : `interfaces/cli/maintenance/report_ror_coherence.py`.
 - [ ] Écarts actuels reportés dans `structures` et `structure_tutelles`.
 
 ### 2. ROR des sources
