@@ -2,7 +2,7 @@
 
 `filter_configured` saute les sources dont les credentials manquent (signal
 `source_unconfigured`) avant toute requête, et ne retourne que les configurées ;
-`phase_oa_status` s'en sert comme garde d'entrée.
+la phase `oa_status` s'en sert comme garde d'entrée.
 """
 
 import logging
@@ -12,7 +12,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
 from interfaces.cli import run_pipeline
 
-_RUN_ENRICH = "application.pipeline.oa_status.phase.run"
+_RUN_ENRICH = "application.pipeline.oa_status.phase._verifier"
 _LOG = logging.getLogger("test")
 
 
