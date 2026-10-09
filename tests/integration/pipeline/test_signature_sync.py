@@ -15,6 +15,7 @@ from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice Crossref « 10.9999/sync », de titre « t ».
@@ -59,12 +60,7 @@ def _addresses(conn, sa_id: int) -> list[str]:
 
 
 def _pin(conn, sa_id: int) -> int:
-    person = conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-            "VALUES ('Xu', 'Zhilu', 'xu', 'zhilu') RETURNING id"
-        )
-    ).scalar_one()
+    person = insert_person(conn, "Xu", first_name="Zhilu", normalizer="lower")
     conn.execute(
         text("UPDATE source_authorships SET person_id = :p WHERE id = :i"),
         {"p": person, "i": sa_id},

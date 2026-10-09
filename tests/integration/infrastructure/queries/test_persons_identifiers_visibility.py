@@ -2,23 +2,11 @@
 
 L'administration voit et arbitre tous les types, `hal_person_id` compris. Le profil public rend seulement les types publics non rejetés."""
 
-from sqlalchemy import text
-
 from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.detail import person_profile
 from infrastructure.read_models.persons.facets import persons_facets
 from infrastructure.read_models.persons.list import list_persons, person_curation
-from tests.integration.helpers.persons import insert_person
-
-
-def _add_identifier(conn, person_id, id_type, id_value, status):
-    conn.execute(
-        text(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (:pid, :t, :v, 'auto', CAST(:s AS identifier_status))"
-        ),
-        {"pid": person_id, "t": id_type, "v": id_value, "s": status},
-    )
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
 
 
 def _pending_identifier_person_ids(conn):
@@ -36,7 +24,9 @@ class TestHalPersonIdVisibility:
     def test_administration_reads_hal_person_id(self, sa_sync_conn):
         """La lecture d'administration rend le `hal_person_id` avec son statut."""
         person = insert_person(sa_sync_conn, "Administered")
-        _add_identifier(sa_sync_conn, person, "hal_person_id", "12345", "pending")
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="hal_person_id", id_value="12345", status="pending"
+        )
 
         out = person_curation(sa_sync_conn, person)
 
@@ -47,9 +37,15 @@ class TestHalPersonIdVisibility:
     def test_public_profile_hides_hal_person_id(self, sa_sync_conn):
         """Le profil public écarte le `hal_person_id` et les attributions rejetées."""
         person = insert_person(sa_sync_conn, "Profiled")
-        _add_identifier(sa_sync_conn, person, "hal_person_id", "12345", "confirmed")
-        _add_identifier(sa_sync_conn, person, "orcid", "0000-0001-2345-6789", "pending")
-        _add_identifier(sa_sync_conn, person, "idref", "123456789", "rejected")
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="hal_person_id", id_value="12345", status="confirmed"
+        )
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="orcid", id_value="0000-0001-2345-6789", status="pending"
+        )
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="idref", id_value="123456789", status="rejected"
+        )
 
         profile = person_profile(sa_sync_conn, person)
 
@@ -60,7 +56,9 @@ class TestPendingIdentifiersQueue:
     def test_pending_hal_person_id_is_listed(self, sa_sync_conn):
         """Un `hal_person_id` en attente fait remonter la personne dans la file « à confirmer »."""
         person = insert_person(sa_sync_conn, "HalOnly")
-        _add_identifier(sa_sync_conn, person, "hal_person_id", "12345", "pending")
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="hal_person_id", id_value="12345", status="pending"
+        )
 
         assert person in _pending_identifier_person_ids(sa_sync_conn)
 
@@ -69,7 +67,9 @@ class TestPendingIdentifiersQueue:
         before = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
 
         person = insert_person(sa_sync_conn, "HalCount")
-        _add_identifier(sa_sync_conn, person, "hal_person_id", "67890", "pending")
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="hal_person_id", id_value="67890", status="pending"
+        )
 
         after = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
         assert after == before + 1
@@ -77,8 +77,18 @@ class TestPendingIdentifiersQueue:
     def test_settled_identifiers_not_pending(self, sa_sync_conn):
         """Une personne dont les identifiants sont tous tranchés est absente de la file « à confirmer »."""
         person = insert_person(sa_sync_conn, "Settled")
-        _add_identifier(sa_sync_conn, person, "orcid", "0000-0002-1111-2222", "confirmed")
-        _add_identifier(sa_sync_conn, person, "idref", "987654321", "rejected")
-        _add_identifier(sa_sync_conn, person, "hal_person_id", "55555", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn,
+            person,
+            id_type="orcid",
+            id_value="0000-0002-1111-2222",
+            status="confirmed",
+        )
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="idref", id_value="987654321", status="rejected"
+        )
+        insert_person_identifier(
+            sa_sync_conn, person, id_type="hal_person_id", id_value="55555", status="confirmed"
+        )
 
         assert person not in _pending_identifier_person_ids(sa_sync_conn)

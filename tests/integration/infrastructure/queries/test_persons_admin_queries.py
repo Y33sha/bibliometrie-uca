@@ -16,9 +16,16 @@ from infrastructure.read_models.persons.admin import (
 )
 from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.authorships import insert_authorship
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_identifier,
+    insert_person_name_form,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Forme de nom de source HAL.
+_hal_name_form = partial(insert_person_name_form, sources=["hal"])
 
 # Authorship de rôle auteur.
 _author = partial(insert_authorship, roles=["author"])
@@ -33,14 +40,8 @@ class TestNameFormAuthorships:
         insert_signature(
             sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", in_perimeter=True
         )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources) "
-                "VALUES ('dupond j', :pid, ARRAY['hal']), "
-                "       ('dupond j', :other, ARRAY['hal'])"
-            ),
-            {"pid": pid, "other": other},
-        )
+        _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
+        _hal_name_form(sa_sync_conn, other, name_form="dupond j")
 
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")
         assert len(res.authorships) >= 1
@@ -50,14 +51,8 @@ class TestNameFormAuthorships:
     def test_exclut_les_personnes_chez_qui_la_forme_est_rejetee(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "Dupond")
         rejetee = insert_person(sa_sync_conn, "Martin")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('dupond j', :pid, ARRAY['hal'], 'pending'), "
-                "       ('dupond j', :rejetee, ARRAY['hal'], 'rejected')"
-            ),
-            {"pid": pid, "rejetee": rejetee},
-        )
+        _hal_name_form(sa_sync_conn, pid, name_form="dupond j", status="pending")
+        _hal_name_form(sa_sync_conn, rejetee, name_form="dupond j", status="rejected")
 
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")
 
@@ -70,21 +65,13 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
     porteur = insert_person(sa_sync_conn, "Martin")
     forme_rejetee = insert_person(sa_sync_conn, "Durand")
     personne_rejetee = insert_person(sa_sync_conn, "Bernard", exclusion="not_a_person")
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-            "VALUES ('dupond j', :pid, ARRAY['hal'], 'pending'), "
-            "       ('dupond j', :porteur, ARRAY['hal'], 'pending'), "
-            "       ('dupond j', :forme_rejetee, ARRAY['hal'], 'rejected'), "
-            "       ('dupond j', :personne_rejetee, ARRAY['hal'], 'pending')"
-        ),
-        {
-            "pid": pid,
-            "porteur": porteur,
-            "forme_rejetee": forme_rejetee,
-            "personne_rejetee": personne_rejetee,
-        },
-    )
+    for person, status in (
+        (pid, "pending"),
+        (porteur, "pending"),
+        (forme_rejetee, "rejected"),
+        (personne_rejetee, "pending"),
+    ):
+        _hal_name_form(sa_sync_conn, person, name_form="dupond j", status=status)
 
     (forme,) = person_name_forms(sa_sync_conn, pid)
     modale = name_form_authorships(sa_sync_conn, pid, "dupond j").other_persons
@@ -104,13 +91,7 @@ def _attribute(conn, person_id, id_type, id_value, status):
     """Attribution `person_identifiers` ; le statut `authenticated` exige le drapeau de l'import dédié."""
     if status == "authenticated":
         conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
-    conn.execute(
-        text(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (:pid, :t, :v, 'auto', CAST(:s AS identifier_status))"
-        ),
-        {"pid": person_id, "t": id_type, "v": id_value, "s": status},
-    )
+    insert_person_identifier(conn, person_id, id_type=id_type, id_value=id_value, status=status)
 
 
 class TestIdentifierConflicts:
@@ -266,15 +247,6 @@ class TestNameDuplicates:
 class TestAmbiguousNameForms:
     """Formes portées par plusieurs personnes, avec au moins un lien à trancher."""
 
-    def _form(self, conn, form, person_id, *, sources="{hal}", status="pending"):
-        conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES (:f, :p, CAST(:src AS text[]), CAST(:st AS identifier_status))"
-            ),
-            {"f": form, "p": person_id, "src": sources, "st": status},
-        )
-
     def _forms(self, conn):
         return {f.name_form: f for f in ambiguous_name_forms(conn, page=1, per_page=500).forms}
 
@@ -282,16 +254,16 @@ class TestAmbiguousNameForms:
         """Une forme partagée seulement comme forme dérivée du nom de chaque personne n'attend aucune décision."""
         a = insert_person(sa_sync_conn, "Martin", first_name="Jean")
         b = insert_person(sa_sync_conn, "Martin", first_name="Jeanne")
-        self._form(sa_sync_conn, "j martin", a, sources="{persons}")
-        self._form(sa_sync_conn, "j martin", b, sources="{persons}")
+        insert_person_name_form(sa_sync_conn, a, name_form="j martin", sources=["persons"])
+        insert_person_name_form(sa_sync_conn, b, name_form="j martin", sources=["persons"])
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_forme_derivee_du_nom_confirmee_d_office(self, sa_sync_conn):
         """Face à une forme bibliographique en attente, la forme dérivée du nom apparaît confirmée et verrouillée."""
         a = insert_person(sa_sync_conn, "Martin", first_name="Jean")
         b = insert_person(sa_sync_conn, "Martin", first_name="Jacques")
-        self._form(sa_sync_conn, "j martin", a, sources="{persons}")
-        self._form(sa_sync_conn, "j martin", b)
+        insert_person_name_form(sa_sync_conn, a, name_form="j martin", sources=["persons"])
+        _hal_name_form(sa_sync_conn, b, name_form="j martin")
         persons = {p.person_id: p for p in self._forms(sa_sync_conn)["j martin"].persons}
         assert (persons[a].canonical, persons[a].status) == (True, "confirmed")
         assert (persons[b].canonical, persons[b].status) == (False, "pending")
@@ -300,15 +272,15 @@ class TestAmbiguousNameForms:
         """En attente chez une personne, rejetée chez l'autre : une seule personne porte la forme."""
         a = insert_person(sa_sync_conn, "Martin")
         b = insert_person(sa_sync_conn, "Durand")
-        self._form(sa_sync_conn, "j martin", a)
-        self._form(sa_sync_conn, "j martin", b, status="rejected")
+        _hal_name_form(sa_sync_conn, a, name_form="j martin")
+        _hal_name_form(sa_sync_conn, b, name_form="j martin", status="rejected")
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_personne_rejetee_ne_compte_pas(self, sa_sync_conn):
         a = insert_person(sa_sync_conn, "Martin")
         b = insert_person(sa_sync_conn, "Durand", exclusion="out_of_perimeter")
-        self._form(sa_sync_conn, "j martin", a)
-        self._form(sa_sync_conn, "j martin", b)
+        _hal_name_form(sa_sync_conn, a, name_form="j martin")
+        _hal_name_form(sa_sync_conn, b, name_form="j martin")
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_seuls_les_porteurs_sont_affiches(self, sa_sync_conn):
@@ -316,8 +288,8 @@ class TestAmbiguousNameForms:
         a = insert_person(sa_sync_conn, "Martin")
         b = insert_person(sa_sync_conn, "Martin", first_name="Jacques")
         c = insert_person(sa_sync_conn, "Durand")
-        self._form(sa_sync_conn, "j martin", a)
-        self._form(sa_sync_conn, "j martin", b, status="confirmed")
-        self._form(sa_sync_conn, "j martin", c, status="rejected")
+        _hal_name_form(sa_sync_conn, a, name_form="j martin")
+        _hal_name_form(sa_sync_conn, b, name_form="j martin", status="confirmed")
+        _hal_name_form(sa_sync_conn, c, name_form="j martin", status="rejected")
         persons = self._forms(sa_sync_conn)["j martin"].persons
         assert sorted(p.person_id for p in persons) == sorted([a, b])

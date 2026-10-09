@@ -20,6 +20,7 @@ from application.services.publications.core import refresh_from_sources
 from domain.normalize import normalize_text
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de 2024, de titre « Test ».
@@ -239,12 +240,7 @@ class TestRefreshFromSources:
         conn = sa_sync_conn
         pid = _insert_pub(conn, doc_type="article", pub_year=2024)
         _notice(conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type="peer_review")
-        person_id = conn.execute(
-            text(
-                "INSERT INTO persons (last_name, first_name, last_name_normalized, "
-                "first_name_normalized) VALUES ('Testauthor', 'A', 'testauthor', 'a') RETURNING id"
-            )
-        ).scalar_one()
+        person_id = insert_person(conn, "Testauthor", first_name="A", normalizer="lower")
         insert_authorship(conn, pid, person_id=person_id, author_position=1)
         refresh_from_sources(pid, repo=publication_repository(conn))
 

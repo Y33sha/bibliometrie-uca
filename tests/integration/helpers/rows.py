@@ -10,10 +10,12 @@ def insert_row(
     casts: dict[str, str] | None = None,
     *,
     nullable: tuple[str, ...] = (),
-) -> int:
-    """Insère `values` dans `table` et renvoie l'`id`.
+    returning: bool = True,
+    ignore_conflict: bool = False,
+) -> int | None:
+    """Insère `values` dans `table` et renvoie l'`id`, ou `None` sans `returning` (table sans colonne `id`).
 
-    Une colonne à `None` est omise et garde la valeur par défaut du schéma, sauf une colonne de `nullable`, écrite NULL. `casts` donne le type SQL des colonnes à convertir, par exemple une énumération.
+    Une colonne à `None` est omise et garde la valeur par défaut du schéma, sauf une colonne de `nullable`, écrite NULL. `casts` donne le type SQL des colonnes à convertir, par exemple une énumération. `ignore_conflict` ignore une ligne déjà présente.
     """
     casts = casts or {}
     values = {
@@ -23,10 +25,10 @@ def insert_row(
         f"CAST(:{column} AS {casts[column]})" if column in casts else f":{column}"
         for column in values
     ]
-    return conn.execute(
-        text(
-            f"INSERT INTO {table} ({', '.join(values)}) "
-            f"VALUES ({', '.join(placeholders)}) RETURNING id"
-        ),
-        values,
-    ).scalar_one()
+    sql = f"INSERT INTO {table} ({', '.join(values)}) VALUES ({', '.join(placeholders)})"
+    if ignore_conflict:
+        sql += " ON CONFLICT DO NOTHING"
+    if not returning:
+        conn.execute(text(sql), values)
+        return None
+    return conn.execute(text(sql + " RETURNING id"), values).scalar_one()

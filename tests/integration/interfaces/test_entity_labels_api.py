@@ -6,7 +6,7 @@ Seed via un pool dédié en autocommit, hors du pool partagé par l'API, avec un
 import uuid
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
-from tests.integration.helpers.seeds import seed_journal, seed_publisher
+from tests.integration.helpers.seeds import seed_journal, seed_person, seed_publisher
 
 _cleanup_after_module = truncate_after_module("journals", "publishers")
 
@@ -35,12 +35,7 @@ class TestEntityLabels:
 
     def test_person_reads_first_then_last_name(self, client):
         """Le libellé d'une personne est celui que propose la facette des auteurs."""
-        with owner_pool() as cur:
-            cur.execute(
-                "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-                "VALUES ('Dupont', 'Jeanne', 'dupont', 'jeanne') RETURNING id"
-            )
-            person_id = cur.fetchone()["id"]
+        person_id = seed_person("Dupont", "Jeanne")
         try:
             r = client.get("/api/entity-labels", params={"kind": "person", "entity_id": person_id})
             assert r.json() == {"label": "Jeanne Dupont"}

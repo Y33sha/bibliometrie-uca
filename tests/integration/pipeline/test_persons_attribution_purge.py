@@ -1,23 +1,19 @@
 """Purge des attributions d'identifiant automatiques qu'aucune signature de leur personne ne porte."""
 
+from functools import partial
+
 from sqlalchemy import text
 
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _ORCID = "0000-0001-2345-6789"
 
 
-def _attribution(conn, person_id, *, status="pending", source="auto"):
-    conn.execute(
-        text(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (:pid, 'orcid', :v, :src, CAST(:st AS identifier_status))"
-        ),
-        {"pid": person_id, "v": _ORCID, "src": source, "st": status},
-    )
+# Attribution de l'ORCID du module.
+_attribution = partial(insert_person_identifier, id_type="orcid", id_value=_ORCID)
 
 
 def _signature(conn, person_id, name, *, neutralized=None):

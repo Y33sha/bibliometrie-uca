@@ -7,19 +7,14 @@ from sqlalchemy import text
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 
 _Q = PgPersonsMatchingQueries()
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_name_form,
+    insert_person_rh,
+    insert_rejected_authorship,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
-
-
-def _name_form(conn, form, person_id, status="pending"):
-    conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, status) "
-            "VALUES (:f, :p, CAST(:s AS identifier_status))"
-        ),
-        {"f": form, "p": person_id, "s": status},
-    )
 
 
 def _signature(conn, *, form, person_id, mode, identifiers=None):
@@ -55,9 +50,9 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     a = insert_person(conn, "Martin", first_name="Jean")
     b = insert_person(conn, "Martin", first_name="Jeanne")
     # « j martin » désigne A et B → ambiguë ; « jean martin » ne désigne que B.
-    _name_form(conn, "j martin", a)
-    _name_form(conn, "j martin", b)
-    _name_form(conn, "jean martin", b)
+    insert_person_name_form(conn, a, name_form="j martin")
+    insert_person_name_form(conn, b, name_form="j martin")
+    insert_person_name_form(conn, b, name_form="jean martin")
 
     ambiguous = _signature(conn, form="j martin", person_id=a, mode="name")
     unambiguous = _signature(conn, form="jean martin", person_id=b, mode="name")
@@ -94,14 +89,11 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     conn = sa_sync_conn
     rejetee = insert_person(conn, "Tixier", first_name="Laurent")
     retenue = insert_person(conn, "Tixier", first_name="Lucie")
-    _name_form(conn, "l tixier", rejetee)
-    _name_form(conn, "l tixier", retenue)
+    insert_person_name_form(conn, rejetee, name_form="l tixier")
+    insert_person_name_form(conn, retenue, name_form="l tixier")
 
     avec_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
-    conn.execute(
-        text("INSERT INTO rejected_authorships (publication_id, person_id) VALUES (:pub, :p)"),
-        {"pub": _publication_of(conn, avec_rejet), "p": rejetee},
-    )
+    insert_rejected_authorship(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
     sans_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
 
     assert _Q.reorphan_ambiguous_nominal(conn) == 1
@@ -165,7 +157,7 @@ def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     signed = insert_person(conn, "Real", first_name="R")
     _signature(conn, form="real r", person_id=signed, mode="name")
     rh = insert_person(conn, "Prof", first_name="P")
-    conn.execute(text("INSERT INTO persons_rh (person_id) VALUES (:p)"), {"p": rh})
+    insert_person_rh(conn, rh)
 
     _Q.delete_empty_persons(conn)
 

@@ -18,6 +18,7 @@ from application.services.persons.core import create_person
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
+from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -91,12 +92,8 @@ def _populate_canonical_forms(conn):
     initiales comprises, ce qui rend « j martin » commune à « J Martin » et « Jean Martin »."""
     for r in conn.execute(text("SELECT id, last_name, first_name FROM persons")).all():
         for form in compute_person_name_forms(r.last_name, r.first_name or ""):
-            conn.execute(
-                text(
-                    "INSERT INTO person_name_forms (name_form, person_id, sources) "
-                    "VALUES (:f, :p, ARRAY['persons']) ON CONFLICT DO NOTHING"
-                ),
-                {"f": form, "p": r.id},
+            insert_person_name_form(
+                conn, r.id, name_form=form, sources=["persons"], ignore_conflict=True
             )
 
 

@@ -5,6 +5,8 @@ Vérifie deux comportements essentiels :
 2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
 """
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 
@@ -15,7 +17,11 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
+from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
+
+# Personne « X X » par défaut, normalisée par `lower`.
+_person = partial(insert_person, last_name="X", first_name="X", normalizer="lower")
 
 
 @pytest.fixture
@@ -134,16 +140,6 @@ class TestEndToEndServiceIntegration:
         """
         return sa_sync_conn_owner
 
-    def _create_person(self, conn, last="X", first="X"):
-        return conn.execute(
-            text(
-                "INSERT INTO persons (last_name, first_name, "
-                "                     last_name_normalized, first_name_normalized) "
-                "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-            ),
-            {"l": last, "f": first},
-        ).scalar_one()
-
     def _last_event(self, conn):
         return conn.execute(
             text(
@@ -157,7 +153,7 @@ class TestEndToEndServiceIntegration:
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
-        person_id = self._create_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         token = set_current_user("admin")
         try:
             set_exclusion(
@@ -187,7 +183,7 @@ class TestEndToEndServiceIntegration:
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
-        person_id = self._create_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         set_exclusion(
             person_id,
             PersonExclusion.NOT_A_PERSON,
@@ -204,18 +200,8 @@ class TestEndToEndServiceIntegration:
         from application.services.persons.core import mark_distinct
         from infrastructure.repositories import person_repository
 
-        def _mk(last):
-            return sa_sync_conn.execute(
-                text(
-                    "INSERT INTO persons (last_name, first_name, "
-                    "last_name_normalized, first_name_normalized) "
-                    "VALUES (:l, :l, lower(:l), lower(:l)) RETURNING id"
-                ),
-                {"l": last},
-            ).scalar_one()
-
-        p1 = _mk("A")
-        p2 = _mk("B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         repo = person_repository(sa_sync_conn)
         audit_repo_ = audit_repository(sa_sync_conn)
         token = set_current_user("admin")
@@ -235,8 +221,8 @@ class TestEndToEndServiceIntegration:
         from application.services.persons.core import merge_person
         from infrastructure.repositories import person_repository
 
-        target = self._create_person(sa_sync_conn, last="A")
-        source = self._create_person(sa_sync_conn, last="B")
+        target = _person(sa_sync_conn, last_name="A")
+        source = _person(sa_sync_conn, last_name="B")
         token = set_current_user("admin")
         try:
             merge_person(
@@ -258,13 +244,9 @@ class TestEndToEndServiceIntegration:
         from application.services.persons.core import update_name_form_status
         from infrastructure.repositories import authorship_repository, person_repository
 
-        person_id = self._create_person(sa_sync_conn)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('x x', :pid, ARRAY['hal'], 'pending')"
-            ),
-            {"pid": person_id},
+        person_id = _person(sa_sync_conn)
+        insert_person_name_form(
+            sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
         )
         token = set_current_user("admin")
         try:
@@ -289,13 +271,9 @@ class TestEndToEndServiceIntegration:
         from application.services.persons.core import update_name_form_status
         from infrastructure.repositories import authorship_repository, person_repository
 
-        person_id = self._create_person(sa_sync_conn)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('x x', :pid, ARRAY['hal'], 'pending')"
-            ),
-            {"pid": person_id},
+        person_id = _person(sa_sync_conn)
+        insert_person_name_form(
+            sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
         )
         token = set_current_user("admin")
         try:
@@ -319,7 +297,7 @@ class TestEndToEndServiceIntegration:
         from application.services.authorships.core import reject_pair
         from infrastructure.repositories import authorship_repository
 
-        person_id = self._create_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         token = set_current_user("admin")
         try:

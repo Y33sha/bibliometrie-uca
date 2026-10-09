@@ -27,6 +27,11 @@ from application.services.persons.core import add_name_form, create_person
 from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.persons import (
+    insert_person_identifier,
+    insert_person_name_form,
+    insert_rejected_authorship,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -38,34 +43,6 @@ _logger = logging.getLogger("test")
 
 
 # ── Helpers ──────────────────────────────────────────────────────
-
-
-def _seed_identifier(conn, person_id, id_type, id_value, status, source="auto"):
-    """Seed direct d'un person_identifiers avec statut arbitraire.
-
-    `application.services.persons.core.add_identifier` ne prend plus de `status` en paramètre
-    (toujours `pending` à l'insertion). Pour préparer un état `confirmed` ou
-    `rejected` en début de test, on passe par SQL.
-    """
-    conn.execute(
-        text("""
-            INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-            VALUES (:pid, :it, :iv, CAST(:src AS identifier_origin),
-                    CAST(:st AS identifier_status))
-        """),
-        {"pid": person_id, "it": id_type, "iv": id_value, "src": source, "st": status},
-    )
-
-
-def _reject_pair(conn, publication_id, person_id):
-    """Seed une paire rejetée dans `rejected_authorships`."""
-    conn.execute(
-        text(
-            "INSERT INTO rejected_authorships (publication_id, person_id) "
-            "VALUES (:pub, :pid) ON CONFLICT DO NOTHING"
-        ),
-        {"pub": publication_id, "pid": person_id},
-    )
 
 
 def _set_name_form_status(conn, person_id, raw_name, status):
@@ -229,7 +206,13 @@ class TestCascadeRun:
         """ORCID confirmé en base → matche la bonne personne."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn,
+            person_id,
+            id_type="orcid",
+            id_value="0000-0001-2345-6789",
+            status="confirmed",
+        )
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W333")
         oa_as = _insert_authorship(
@@ -248,7 +231,9 @@ class TestCascadeRun:
         """`hal_person_id` confirmé en base + nom compatible → matche la bonne personne."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn, person_id, id_type="hal_person_id", id_value="123456", status="confirmed"
+        )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-200")
         hal_as = _insert_authorship(
@@ -270,7 +255,9 @@ class TestCascadeRun:
         name_form (ici inconnu → création), pas sur la personne ciblée par l'identifiant."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn, person_id, id_type="hal_person_id", id_value="123456", status="confirmed"
+        )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-201")
         hal_as = _insert_authorship(
@@ -306,14 +293,12 @@ class TestCascadeRun:
         même avec un nom par ailleurs compatible."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "111222", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn, person_id, id_type="hal_person_id", id_value="111222", status="confirmed"
+        )
         # "Jean Dupond" est compatible avec le nom de la personne, mais rejeté pour elle.
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('jean dupond', :pid, '{hal}', 'rejected')"
-            ),
-            {"pid": person_id},
+        insert_person_name_form(
+            sa_sync_conn, person_id, name_form="jean dupond", sources=["hal"], status="rejected"
         )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-202")
@@ -332,7 +317,9 @@ class TestCascadeRun:
         pub = insert_publication(sa_sync_conn)
         person_a = create_person("Maneval", "Axelle", repo=person_repository(sa_sync_conn))
         person_b = create_person("Vanlander", "Bernard", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_a, "hal_person_id", "987654", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn, person_a, id_type="hal_person_id", id_value="987654", status="confirmed"
+        )
         # "Van Lander" : aucun token commun avec "Maneval Axelle" (le test de tokens
         # échouerait), confirmée pour A ; aussi portée par B → barreau name_form ambigu.
         add_name_form(person_a, "Van Lander", repo=person_repository(sa_sync_conn))
@@ -352,7 +339,13 @@ class TestCascadeRun:
         """ORCID `rejected` en base → ignoré par le matching."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-9999-0000", "rejected")
+        insert_person_identifier(
+            sa_sync_conn,
+            person_id,
+            id_type="orcid",
+            id_value="0000-0001-9999-0000",
+            status="rejected",
+        )
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W444")
         oa_as = _insert_authorship(
@@ -380,7 +373,13 @@ class TestCascadeRun:
         """
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn,
+            person_id,
+            id_type="orcid",
+            id_value="0000-0001-2345-6789",
+            status="confirmed",
+        )
 
         wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:111")
         wos_as = _insert_authorship(
@@ -399,7 +398,13 @@ class TestCascadeRun:
         """ORCID DataCite, déposé avec la notice → signal de matching. Hors périmètre, seul l'identifiant peut rattacher la signature."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+        insert_person_identifier(
+            sa_sync_conn,
+            person_id,
+            id_type="orcid",
+            id_value="0000-0001-2345-6789",
+            status="confirmed",
+        )
 
         dc_sd = _notice(sa_sync_conn, pub, source="datacite", source_id="10.5281/zenodo.1")
         dc_as = _insert_authorship(
@@ -534,8 +539,14 @@ class TestCascadeRun:
         pas le `person_id` rejeté à la `source_authorship`."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
-        _reject_pair(sa_sync_conn, pub, person_id)
+        insert_person_identifier(
+            sa_sync_conn,
+            person_id,
+            id_type="orcid",
+            id_value="0000-0001-2345-6789",
+            status="confirmed",
+        )
+        insert_rejected_authorship(sa_sync_conn, pub, person_id=person_id, ignore_conflict=True)
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W999")
         oa_as = _insert_authorship(
@@ -559,7 +570,7 @@ class TestCascadeRun:
         pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
         add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
-        _reject_pair(sa_sync_conn, pub, pid1)
+        insert_rejected_authorship(sa_sync_conn, pub, person_id=pid1, ignore_conflict=True)
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
         oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")

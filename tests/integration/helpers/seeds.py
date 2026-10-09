@@ -110,12 +110,50 @@ def seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = 
     )
 
 
-def seed_person(last: str = "TEST", first: str = "J") -> int:
+def seed_person(
+    last: str = "TEST",
+    first: str = "J",
+    *,
+    normalizer: str = "lower",
+    first_name_normalized: str | None = None,
+) -> int:
+    """Personne aux nom et prénom normalisés par la fonction SQL `normalizer` (`lower` ou `normalize_name_form`). `first_name_normalized` impose le prénom normalisé."""
+    assert normalizer in ("lower", "normalize_name_form"), normalizer
     return _insert(
         "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-        "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
-        (last, first, last, first),
+        f"VALUES (%s, %s, {normalizer}(%s), COALESCE(%s, {normalizer}(%s))) RETURNING id",
+        (last, first, last, first_name_normalized, first),
     )
+
+
+def seed_person_identifier(
+    person_id: int, *, id_type: str, id_value: str, source: str = "manual", status: str = "pending"
+) -> int:
+    """Identifiant de la personne `person_id`. Le statut par défaut est celui du schéma."""
+    return _insert(
+        "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+        "VALUES (%s, %s, %s, CAST(%s AS identifier_origin), CAST(%s AS identifier_status)) "
+        "RETURNING id",
+        (person_id, id_type, id_value, source, status),
+    )
+
+
+def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str]) -> None:
+    """Forme de nom de la personne `person_id`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO person_name_forms (name_form, person_id, sources) VALUES (%s, %s, %s)",
+            (name_form, person_id, sources),
+        )
+
+
+def seed_rejected_authorship(publication_id: int, *, person_id: int) -> None:
+    """Rejet de la paire publication ↔ personne."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO rejected_authorships (publication_id, person_id) VALUES (%s, %s)",
+            (publication_id, person_id),
+        )
 
 
 def seed_publication(
@@ -169,16 +207,13 @@ def seed_in_perimeter_authorships(journal_id: int) -> None:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
         for pid in pub_ids:
-            name = uniq("Author")
-            cur.execute(
-                "INSERT INTO persons "
-                "(last_name, first_name, last_name_normalized, first_name_normalized) "
-                "VALUES (%s, 'Jane', normalize_name_form(%s), 'jane') RETURNING id",
-                (name, name),
+            person_id = seed_person(
+                uniq("Author"),
+                "Jane",
+                normalizer="normalize_name_form",
+                first_name_normalized="jane",
             )
-            seed_authorship(
-                pid, person_id=cur.fetchone()["id"], in_perimeter=True, roles=["author"]
-            )
+            seed_authorship(pid, person_id=person_id, in_perimeter=True, roles=["author"])
         cur.execute(
             "UPDATE publications p SET in_perimeter = EXISTS ("
             "SELECT 1 FROM authorships a JOIN persons pe "

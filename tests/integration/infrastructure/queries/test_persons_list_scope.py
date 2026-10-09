@@ -9,7 +9,11 @@ from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons import PgPersonsQueries
 from tests.integration.helpers.authorships import insert_authorship
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_identifier,
+    insert_person_name_form,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import add_authorship_structure, insert_structure
 
@@ -188,20 +192,12 @@ class TestPendingFacets:
 
     def test_pending_name_forms_filter(self, sa_sync_conn):
         p_pending = insert_person(sa_sync_conn, "Pendingform")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('pf', :pid, ARRAY['hal'], 'pending')"
-            ),
-            {"pid": p_pending},
+        insert_person_name_form(
+            sa_sync_conn, p_pending, name_form="pf", sources=["hal"], status="pending"
         )
         p_clean = insert_person(sa_sync_conn, "Cleanform")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('cf', :pid, ARRAY['hal'], 'confirmed')"
-            ),
-            {"pid": p_clean},
+        insert_person_name_form(
+            sa_sync_conn, p_clean, name_form="cf", sources=["hal"], status="confirmed"
         )
 
         q = PgPersonsQueries(sa_sync_conn)
@@ -215,20 +211,20 @@ class TestPendingFacets:
 
     def test_pending_identifiers_filter(self, sa_sync_conn):
         p_pending = insert_person(sa_sync_conn, "Pendingid")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:pid, 'orcid', '0000-0000-0000-0001', 'auto', 'pending')"
-            ),
-            {"pid": p_pending},
+        insert_person_identifier(
+            sa_sync_conn,
+            p_pending,
+            id_type="orcid",
+            id_value="0000-0000-0000-0001",
+            status="pending",
         )
         p_clean = insert_person(sa_sync_conn, "Cleanid")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:pid, 'orcid', '0000-0000-0000-0002', 'auto', 'confirmed')"
-            ),
-            {"pid": p_clean},
+        insert_person_identifier(
+            sa_sync_conn,
+            p_clean,
+            id_type="orcid",
+            id_value="0000-0000-0000-0002",
+            status="confirmed",
         )
 
         q = PgPersonsQueries(sa_sync_conn)

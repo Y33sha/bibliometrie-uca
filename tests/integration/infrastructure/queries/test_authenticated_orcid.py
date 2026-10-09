@@ -6,25 +6,20 @@ le pose) et immuable (aucune dégradation, même admin). L'écriture passe exclu
 `begin_authenticated_orcid_import` + `authenticate_orcid`.
 """
 
+from functools import partial
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from infrastructure.repositories import person_repository
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
+
+# Identifiant ORCID.
+_orcid = partial(insert_person_identifier, id_type="orcid")
 
 _ORCID = "0000-0001-5100-3736"
 _ORCID_B = "0000-0001-5166-5617"
-
-
-def _insert_orcid(conn, person_id, orcid, status):
-    conn.execute(
-        text(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (:p, 'orcid', :v, 'auto', CAST(:s AS identifier_status))"
-        ),
-        {"p": person_id, "v": orcid, "s": status},
-    )
 
 
 def _status_of(conn, person_id, orcid):
@@ -42,11 +37,11 @@ class TestTriggerGuard:
         person = insert_person(sa_sync_conn)
         with pytest.raises(DBAPIError):
             with sa_sync_conn.begin_nested():
-                _insert_orcid(sa_sync_conn, person, _ORCID, "authenticated")
+                _orcid(sa_sync_conn, person, id_value=_ORCID, status="authenticated")
 
     def test_update_to_authenticated_blocked_without_flag(self, sa_sync_conn):
         person = insert_person(sa_sync_conn)
-        _insert_orcid(sa_sync_conn, person, _ORCID, "pending")
+        _orcid(sa_sync_conn, person, id_value=_ORCID, status="pending")
         with pytest.raises(DBAPIError):
             with sa_sync_conn.begin_nested():
                 sa_sync_conn.execute(
@@ -109,7 +104,7 @@ class TestAuthenticateOrcid:
 
     def test_upgrades_same_person(self, sa_sync_conn):
         person = insert_person(sa_sync_conn)
-        _insert_orcid(sa_sync_conn, person, _ORCID, "confirmed")
+        _orcid(sa_sync_conn, person, id_value=_ORCID, status="confirmed")
         repo = person_repository(sa_sync_conn)
         repo.begin_authenticated_orcid_import()
         assert repo.authenticate_orcid(person, _ORCID) == "upgraded"
@@ -118,7 +113,7 @@ class TestAuthenticateOrcid:
     def test_reassigns_other_person(self, sa_sync_conn):
         holder = insert_person(sa_sync_conn, "Holder")
         owner = insert_person(sa_sync_conn, "Owner")
-        _insert_orcid(sa_sync_conn, holder, _ORCID, "pending")
+        _orcid(sa_sync_conn, holder, id_value=_ORCID, status="pending")
         repo = person_repository(sa_sync_conn)
         repo.begin_authenticated_orcid_import()
         assert repo.authenticate_orcid(owner, _ORCID) == "reassigned"
@@ -139,7 +134,7 @@ class TestAuthenticateOrcid:
 
         p1 = insert_person(sa_sync_conn, "One")
         p2 = insert_person(sa_sync_conn, "Two")
-        _insert_orcid(sa_sync_conn, p2, _ORCID_B, "pending")
+        _orcid(sa_sync_conn, p2, id_value=_ORCID_B, status="pending")
         entries = [(p1, _ORCID), (p2, _ORCID_B)]
 
         repo = person_repository(sa_sync_conn)

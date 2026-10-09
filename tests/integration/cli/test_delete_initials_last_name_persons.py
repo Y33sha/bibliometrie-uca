@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from interfaces.cli.oneshot.delete_initials_last_name_persons import delete_persons
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_name_form
 
 
 def _exists(conn, person_id: int) -> bool:
@@ -24,12 +24,8 @@ def test_supprime_la_personne_au_nom_fait_d_initiales(sa_sync_conn):
 
 def test_epargne_une_personne_a_verdict(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "D.", first_name="Lancierini")
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-            "VALUES ('lancierini d', :p, ARRAY['hal'], 'confirmed')"
-        ),
-        {"p": pid},
+    insert_person_name_form(
+        sa_sync_conn, pid, name_form="lancierini d", sources=["hal"], status="confirmed"
     )
 
     assert delete_persons(sa_sync_conn, apply=True) == []

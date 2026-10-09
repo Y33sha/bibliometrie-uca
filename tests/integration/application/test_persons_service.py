@@ -48,8 +48,20 @@ from infrastructure.repositories import (
     person_repository,
 )
 from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_identifier,
+    insert_person_name_form,
+    insert_rejected_authorship,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+# Forme de nom de source HAL.
+_hal_name_form = partial(insert_person_name_form, sources=["hal"])
+
+# Personne « Dupont Jean » par défaut, normalisée par `lower`.
+_person = partial(insert_person, last_name="Dupont", first_name="Jean", normalizer="lower")
 
 # Signature de forme « jean dupont » par défaut.
 _jean_dupont_signature = partial(insert_signature, author_name_normalized="jean dupont")
@@ -71,17 +83,6 @@ def authorship_repo(sa_sync_conn):
 
 
 # ── Helpers ─────────────────────────────────────────────────
-
-
-def _insert_person(conn, last="Dupont", first="Jean"):
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, "
-            "                     last_name_normalized, first_name_normalized) "
-            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
-        ),
-        {"l": last, "f": first},
-    ).scalar_one()
 
 
 def _setup_uca(conn):
@@ -117,7 +118,7 @@ class TestLinkAuthorship:
             link_authorship(1, "invalid", 1, repo=authorship_repo, resolution_mode="name")
 
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
@@ -144,13 +145,13 @@ class TestLinkAuthorship:
 class TestAddIdentifier:
     def test_manual_source_refuses_hal_person_id(self, sa_sync_conn, repo):
         """`hal_person_id` est la référence d'un compte HAL, que l'extraction observe : personne ne l'attribue à la main."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="id_type"):
             add_identifier(person_id, "hal_person_id", "12345", source="manual", repo=repo)
 
     def test_auto_source_accepts_hal_person_id(self, sa_sync_conn, repo):
         """La promotion depuis les signatures reste libre de le poser."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
         assert result.outcome is AddIdentifierOutcome.ADDED
 
@@ -160,7 +161,7 @@ class TestAddIdentifier:
             add_identifier(999999, "orcid", "0000-0001-2345-6789", source="manual", repo=repo)
 
     def test_inserts_new(self, sa_sync_conn, repo):
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
         assert result.outcome is AddIdentifierOutcome.ADDED
         assert result.id_value == "0000-0001-2345-6789"
@@ -172,8 +173,8 @@ class TestAddIdentifier:
         assert status == "pending"
 
     def test_reassigns_if_rejected(self, sa_sync_conn, repo):
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
         sa_sync_conn.execute(
             text(
@@ -201,8 +202,8 @@ class TestAddIdentifier:
 
         from domain.errors import CannotAttributeConflict
 
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
 
         with pytest.raises(CannotAttributeConflict):
@@ -219,7 +220,7 @@ class TestAddIdentifier:
 
     def test_idempotent_on_same_person(self, sa_sync_conn, repo):
         """Réappliquer add_identifier sur la même personne ne change rien."""
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)
         result = add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
         assert result.outcome is AddIdentifierOutcome.ALREADY_EXISTS
@@ -236,14 +237,10 @@ class TestAddIdentifier:
 
 class TestUpdateIdentifierStatus:
     def test_sets_status(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
-        ident_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id"
-            ),
-            {"p": p},
-        ).scalar_one()
+        p = _person(sa_sync_conn)
+        ident_id = insert_person_identifier(
+            sa_sync_conn, p, id_type="orcid", id_value="0000-0001", status="pending"
+        )
 
         result = update_identifier_status(ident_id, "confirmed", repo=repo)
 
@@ -261,16 +258,6 @@ class TestIdentifierStatusPropagation:
     ORCID = "0000-0002-1633-8730"
     HAL_ACCOUNT = {"hal_person_id": 11581, "idhal": "nina-radosevic-robin", "orcid": ORCID}
 
-    def _ident(self, conn, person_id, id_type, value, status="pending"):
-        return conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:p, :t, :v, 'auto', "
-                "CAST(:s AS identifier_status)) RETURNING id"
-            ),
-            {"p": person_id, "t": id_type, "v": value, "s": status},
-        ).scalar_one()
-
     def _status(self, conn, ident_id):
         return _scalar(
             conn, "SELECT status::text FROM person_identifiers WHERE id = :i", i=ident_id
@@ -283,18 +270,24 @@ class TestIdentifierStatusPropagation:
         )
 
     def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         self._signature(sa_sync_conn, p, "hal", "hal-a", {**self.HAL_ACCOUNT, "idref": "181370662"})
         # Même compte, sans l'ORCID : son idHAL suit le compte.
         self._signature(sa_sync_conn, p, "hal", "hal-b", {"hal_person_id": 11581, "idhal": "nr2"})
         # ScanR associe l'ORCID à un autre IdRef : cette association n'entre pas dans le groupe.
         self._signature(sa_sync_conn, p, "scanr", "scanr-a", {"orcid": self.ORCID, "idref": "999"})
-        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
-        account = self._ident(sa_sync_conn, p, "hal_person_id", "11581")
-        idhal = self._ident(sa_sync_conn, p, "idhal", "nina-radosevic-robin")
-        idhal_2 = self._ident(sa_sync_conn, p, "idhal", "nr2")
-        idref_confirmed = self._ident(sa_sync_conn, p, "idref", "181370662", status="confirmed")
-        idref_scanr = self._ident(sa_sync_conn, p, "idref", "999")
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+        account = insert_person_identifier(
+            sa_sync_conn, p, id_type="hal_person_id", id_value="11581"
+        )
+        idhal = insert_person_identifier(
+            sa_sync_conn, p, id_type="idhal", id_value="nina-radosevic-robin"
+        )
+        idhal_2 = insert_person_identifier(sa_sync_conn, p, id_type="idhal", id_value="nr2")
+        idref_confirmed = insert_person_identifier(
+            sa_sync_conn, p, id_type="idref", id_value="181370662", status="confirmed"
+        )
+        idref_scanr = insert_person_identifier(sa_sync_conn, p, id_type="idref", id_value="999")
 
         result = update_identifier_status(orcid, "rejected", repo=repo)
 
@@ -306,19 +299,21 @@ class TestIdentifierStatusPropagation:
         assert self._status(sa_sync_conn, idref_scanr) == "pending"
 
     def test_other_persons_are_untouched(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
-        other = _insert_person(sa_sync_conn, "Autre", "Personne")
+        p = _person(sa_sync_conn)
+        other = _person(sa_sync_conn, last_name="Autre", first_name="Personne")
         self._signature(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
         self._signature(sa_sync_conn, other, "hal", "hal-b", {"hal_person_id": 11581})
-        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
-        other_account = self._ident(sa_sync_conn, other, "idhal", "nina-radosevic-robin")
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+        other_account = insert_person_identifier(
+            sa_sync_conn, other, id_type="idhal", id_value="nina-radosevic-robin"
+        )
 
         update_identifier_status(orcid, "confirmed", repo=repo)
 
         assert self._status(sa_sync_conn, other_account) == "pending"
 
     def test_neutralized_identifier_does_not_designate_the_account(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         self._signature(
             sa_sync_conn,
             p,
@@ -327,17 +322,21 @@ class TestIdentifierStatusPropagation:
             self.HAL_ACCOUNT,
             neutralized_identifiers={"orcid": "shared"},
         )
-        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID)
-        account = self._ident(sa_sync_conn, p, "hal_person_id", "11581")
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+        account = insert_person_identifier(
+            sa_sync_conn, p, id_type="hal_person_id", id_value="11581"
+        )
 
         assert update_identifier_status(orcid, "rejected", repo=repo).propagated == 0
         assert self._status(sa_sync_conn, account) == "pending"
 
     def test_back_to_pending_is_not_propagated(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         self._signature(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
-        orcid = self._ident(sa_sync_conn, p, "orcid", self.ORCID, status="rejected")
-        self._ident(sa_sync_conn, p, "hal_person_id", "11581")
+        orcid = insert_person_identifier(
+            sa_sync_conn, p, id_type="orcid", id_value=self.ORCID, status="rejected"
+        )
+        insert_person_identifier(sa_sync_conn, p, id_type="hal_person_id", id_value="11581")
 
         assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
 
@@ -345,27 +344,19 @@ class TestIdentifierStatusPropagation:
 class TestReassignIdentifier:
     def test_raises_on_unknown_target_person(self, sa_sync_conn, repo):
         """Sans cette garde, la réattribution heurterait la clé étrangère."""
-        person_id = _insert_person(sa_sync_conn)
-        ident_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'rejected') RETURNING id"
-            ),
-            {"p": person_id},
-        ).scalar_one()
+        person_id = _person(sa_sync_conn)
+        ident_id = insert_person_identifier(
+            sa_sync_conn, person_id, id_type="orcid", id_value="0000-0001", status="rejected"
+        )
         with pytest.raises(NotFoundError):
             reassign_identifier(ident_id, 999999, repo=repo)
 
     def test_reassigns(self, sa_sync_conn, repo):
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
-        ident_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id"
-            ),
-            {"p": p1},
-        ).scalar_one()
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
+        ident_id = insert_person_identifier(
+            sa_sync_conn, p1, id_type="orcid", id_value="0000-0001", status="pending"
+        )
 
         reassign_identifier(ident_id, p2, repo=repo)
 
@@ -377,7 +368,7 @@ class TestReassignIdentifier:
         assert row.status == "pending"
 
     def test_raises_not_found(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             reassign_identifier(999999, p, repo=repo)
 
@@ -387,13 +378,13 @@ class TestSetExclusion:
         return _scalar(conn, "SELECT exclusion::text FROM persons WHERE id = :p", p=p)
 
     def test_excludes(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER, repo=repo)
         assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
         assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
 
     def test_retains(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         set_exclusion(p, PersonExclusion.NOT_A_PERSON, repo=repo)
         set_exclusion(p, None, repo=repo)
         assert self._exclusion(sa_sync_conn, p) is None
@@ -403,8 +394,8 @@ class TestSetExclusion:
             set_exclusion(999999, PersonExclusion.NOT_A_PERSON, repo=repo)
 
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
-        excluded = _insert_person(sa_sync_conn, "Exclue", "Ée")
-        other = _insert_person(sa_sync_conn, "Autre", "Personne")
+        excluded = _person(sa_sync_conn, last_name="Exclue", first_name="Ée")
+        other = _person(sa_sync_conn, last_name="Autre", first_name="Personne")
         alone = insert_publication(sa_sync_conn, "seule")
         shared = insert_publication(sa_sync_conn, "partagée")
         # Valeur périmée, hors des publications de la personne exclue : le recalcul ciblé la laisse en place.
@@ -435,14 +426,8 @@ class TestSetExclusion:
 
 class TestUpdateName:
     def test_updates_name_and_refreshes_forms(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources) "
-                "VALUES ('dupont jean', :pid, ARRAY['persons'])"
-            ),
-            {"pid": p},
-        )
+        p = _person(sa_sync_conn)
+        insert_person_name_form(sa_sync_conn, p, name_form="dupont jean", sources=["persons"])
 
         update_name(p, "Martin", "Sophie", repo=repo)
 
@@ -477,7 +462,7 @@ class TestUpdateName:
             update_name(999999, "X", "X", repo=repo)
 
     def test_strips_surrounding_space(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        p = _person(sa_sync_conn)
         update_name(p, "  Martin  ", "  Sophie  ", repo=repo)
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
@@ -487,12 +472,12 @@ class TestUpdateName:
 
     def test_raises_without_last_name(self, sa_sync_conn, repo):
         """Effacer le patronyme retirerait à la personne les formes que seul son nom canonique porte."""
-        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="nom est requis"):
             update_name(p, "", "Jean", repo=repo)
 
     def test_raises_on_blank_last_name(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="nom est requis"):
             update_name(p, "   ", "Jean", repo=repo)
 
@@ -530,38 +515,38 @@ class TestCreatePerson:
 
 class TestMergePerson:
     def test_raises_on_self_merge(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="identiques"):
             merge_person(p, p, repo=repo)
 
     def test_raises_not_found(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             merge_person(p, 999999, repo=repo)
 
     def test_absorbed_verdict_kept(self, sa_sync_conn, repo):
         """Le rejet d'une forme de la personne absorbée survit à la fusion."""
-        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
-        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
-        _insert_name_form(sa_sync_conn, "intrus x", source, status="rejected")
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        _hal_name_form(sa_sync_conn, source, name_form="intrus x", status="rejected")
         merge_person(target, source, repo=repo)
         assert _name_form_status(sa_sync_conn, "intrus x", target) == "rejected"
 
     def test_target_verdict_prevails(self, sa_sync_conn, repo):
         """Sur une forme commune, le verdict de la personne qui absorbe l'emporte."""
-        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
-        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
-        _insert_name_form(sa_sync_conn, "forme commune", target, status="confirmed")
-        _insert_name_form(sa_sync_conn, "forme commune", source, status="rejected")
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        _hal_name_form(sa_sync_conn, target, name_form="forme commune", status="confirmed")
+        _hal_name_form(sa_sync_conn, source, name_form="forme commune", status="rejected")
         merge_person(target, source, repo=repo)
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "confirmed"
 
     def test_pending_target_takes_absorbed_verdict(self, sa_sync_conn, repo):
         """Une forme commune en attente chez la personne qui absorbe reprend le verdict de l'autre."""
-        target = _insert_person(sa_sync_conn, "Dupont", "Jean")
-        source = _insert_person(sa_sync_conn, "Dupond", "Jean")
-        _insert_name_form(sa_sync_conn, "forme commune", target)
-        _insert_name_form(sa_sync_conn, "forme commune", source, status="rejected")
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        _hal_name_form(sa_sync_conn, target, name_form="forme commune")
+        _hal_name_form(sa_sync_conn, source, name_form="forme commune", status="rejected")
         merge_person(target, source, repo=repo)
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "rejected"
 
@@ -572,7 +557,7 @@ class TestMergePerson:
 class TestBatchAssignOrphanAuthorships:
     def test_empty_list_returns_zero(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         assert (
             batch_assign_orphan_authorships(
                 person_id,
@@ -587,7 +572,7 @@ class TestBatchAssignOrphanAuthorships:
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_hal = _notice(sa_sync_conn, pub_id, source_id="h-1")
         sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1")
@@ -617,8 +602,8 @@ class TestBatchAssignOrphanAuthorships:
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa1 = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=p1)
@@ -644,7 +629,7 @@ class TestBatchAssignOrphanAuthorships:
 
 class TestDetachAuthorships:
     def test_detaches_and_removes_authorship_if_orphan(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         auth_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
@@ -673,7 +658,7 @@ class TestDetachAuthorships:
     ):
         """Le rejet porte sur la publication entière : sélectionner une source
         détache toutes les sources de la même paire et peuple le store."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         auth_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         sp_hal = _notice(sa_sync_conn, pub_id)
@@ -712,7 +697,7 @@ class TestDetachAuthorships:
     def test_cleans_orphan_source_name_form(self, sa_sync_conn, repo, authorship_repo):
         """Une forme de nom attestée par une source, devenue sans aucune source
         active après détachement, est supprimée."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(
@@ -739,7 +724,7 @@ class TestDetachAuthorships:
     def test_preserves_rejected_orphan_name_form(self, sa_sync_conn, repo, authorship_repo):
         """Une forme `rejected` devenue orpheline est préservée : la supprimer
         détruirait le blocage de non-retour qu'elle matérialise."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(
@@ -794,7 +779,7 @@ class TestDetachAuthorships:
     def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, authorship_repo):
         """Une forme encore attestée par une source d'une autre publication
         n'est pas supprimée quand on détache une seule publication."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
         sp1 = _notice(sa_sync_conn, pub1)
@@ -878,13 +863,13 @@ class TestImportRhPerson:
 
 class TestMarkDistinctPersons:
     def test_raises_on_same_id(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
+        p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="elle-même"):
             mark_distinct(p, p, repo=repo)
 
     def test_inserts_ordered_pair(self, sa_sync_conn, repo):
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         mark_distinct(p2, p1, repo=repo)
         n = sa_sync_conn.execute(
             text(
@@ -896,8 +881,8 @@ class TestMarkDistinctPersons:
         assert n == 1
 
     def test_idempotent(self, sa_sync_conn, repo):
-        p1 = _insert_person(sa_sync_conn, "A", "A")
-        p2 = _insert_person(sa_sync_conn, "B", "B")
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         mark_distinct(p1, p2, repo=repo)
         mark_distinct(p1, p2, repo=repo)
         n = sa_sync_conn.execute(
@@ -912,7 +897,7 @@ class TestMarkDistinctPersons:
 
 class TestAddIdentifiersFromAuthorships:
     def test_adds_orcid_idhal_idref_once(self, sa_sync_conn, repo):
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         authorships = [
             {"source": "hal", "orcid": "0000-0001-2345-6789", "idhal": "jdupont"},
             {"source": "scanr", "orcid": "0000-0001-2345-6789", "idref": "252404955"},
@@ -932,7 +917,7 @@ class TestAddIdentifiersFromAuthorships:
     def test_skips_malformed_and_keeps_valid(self, sa_sync_conn, repo):
         """Un identifiant source mal formé est ignoré (log, pas d'exception) ; la
         promotion continue pour les identifiants valides du même lot."""
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         authorships = [
             {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},
         ]
@@ -948,16 +933,6 @@ class TestAddIdentifiersFromAuthorships:
 # ── update_name_form_status ────────────────────────────────────────
 
 
-def _insert_name_form(conn, form, person_id, *, status="pending", sources="{hal}"):
-    conn.execute(
-        text(
-            "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-            "VALUES (:f, :p, CAST(:src AS text[]), CAST(:st AS identifier_status))"
-        ),
-        {"f": form, "p": person_id, "src": sources, "st": status},
-    )
-
-
 def _name_form_status(conn, form, person_id):
     return conn.execute(
         text("SELECT status::text FROM person_name_forms WHERE name_form = :f AND person_id = :p"),
@@ -968,8 +943,8 @@ def _name_form_status(conn, form, person_id):
 class TestUpdateNameFormStatus:
     def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo, authorship_repo):
         """Rejeter une forme conserve la row (tombstone du verrou de non-retour)."""
-        person_id = _insert_person(sa_sync_conn, "Unique", "Name")
-        _insert_name_form(sa_sync_conn, "intrus unique", person_id)
+        person_id = _person(sa_sync_conn, last_name="Unique", first_name="Name")
+        _hal_name_form(sa_sync_conn, person_id, name_form="intrus unique")
 
         row = update_name_form_status(
             person_id, "intrus unique", "rejected", repo=repo, authorship_repo=authorship_repo
@@ -979,8 +954,8 @@ class TestUpdateNameFormStatus:
         assert _name_form_status(sa_sync_conn, "intrus unique", person_id) == "rejected"
 
     def test_confirm_overrides_previous_status(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _insert_person(sa_sync_conn, "Alpha", "Beta")
-        _insert_name_form(sa_sync_conn, "alpha b", person_id)
+        person_id = _person(sa_sync_conn, last_name="Alpha", first_name="Beta")
+        _hal_name_form(sa_sync_conn, person_id, name_form="alpha b")
 
         update_name_form_status(
             person_id, "alpha b", "rejected", repo=repo, authorship_repo=authorship_repo
@@ -1011,14 +986,8 @@ class TestUpdateNameFormStatus:
     def test_reject_detaches_authorships(self, sa_sync_conn, repo, authorship_repo):
         """Rejeter une forme détache ses signatures (source_authorships → NULL) et
         supprime les authorships canoniques devenues sans source ; le verrou reste posé."""
-        pid = _insert_person(sa_sync_conn, "Foreign", "Form")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
-                "VALUES ('intrus etranger', :pid, '{hal}', 'pending')"
-            ),
-            {"pid": pid},
-        )
+        pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
+        _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
         pub = insert_publication(sa_sync_conn)
         spid = _notice(sa_sync_conn, pub)
         sa_id = _jean_dupont_signature(
@@ -1062,8 +1031,8 @@ class TestAssignOrphanAuthorship:
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Une signature déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
-        other_id = _insert_person(sa_sync_conn, "Other", "Author")
+        person_id = _person(sa_sync_conn)
+        other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=other_id)
@@ -1077,13 +1046,13 @@ class TestAssignOrphanAuthorship:
         )
 
     def test_raises_if_source_authorship_missing(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             assign_orphan_authorship(person_id, 999999, repo=repo, authorship_repo=authorship_repo)
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
@@ -1104,23 +1073,16 @@ class TestAssignOrphanAuthorship:
         assert row is not None
 
 
-def _reject_pair(conn, pub_id, person_id):
-    conn.execute(
-        text("INSERT INTO rejected_authorships (publication_id, person_id) VALUES (:p, :pid)"),
-        {"p": pub_id, "pid": person_id},
-    )
-
-
 class TestReassignRejectedPairUnit:
     """Pré-contrôle de rejet sur les chemins de réassignation orphan-authorships."""
 
     def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
-        _reject_pair(sa_sync_conn, pub_id, person_id)
+        insert_rejected_authorship(sa_sync_conn, pub_id, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
             assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
@@ -1138,11 +1100,11 @@ class TestReassignRejectedPairUnit:
         self, sa_sync_conn, repo, authorship_repo
     ):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
-        _reject_pair(sa_sync_conn, pub_id, person_id)
+        insert_rejected_authorship(sa_sync_conn, pub_id, person_id=person_id)
 
         assign_orphan_authorship(
             person_id, sa_id, repo=repo, authorship_repo=authorship_repo, force=True
@@ -1175,14 +1137,14 @@ class TestReassignRejectedPairUnit:
 
     def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
         sp1 = _notice(sa_sync_conn, pub1, source_id="h-1")
         sp2 = _notice(sa_sync_conn, pub2, source_id="h-2")
         sa1 = _jean_dupont_signature(sa_sync_conn, sp1)
         sa2 = _jean_dupont_signature(sa_sync_conn, sp2)
-        _reject_pair(sa_sync_conn, pub1, person_id)
+        insert_rejected_authorship(sa_sync_conn, pub1, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
             batch_assign_orphan_authorships(
@@ -1205,11 +1167,11 @@ class TestReassignRejectedPairUnit:
 
     def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         sp1 = _notice(sa_sync_conn, pub1, source_id="h-1")
         sa1 = _jean_dupont_signature(sa_sync_conn, sp1)
-        _reject_pair(sa_sync_conn, pub1, person_id)
+        insert_rejected_authorship(sa_sync_conn, pub1, person_id=person_id)
 
         assigned = batch_assign_orphan_authorships(
             person_id,
@@ -1247,23 +1209,20 @@ class TestMergePersonRejectedAuthorships:
     identique), avec dédoublonnage sur conflit de PK."""
 
     def test_transfers_and_dedups(self, sa_sync_conn, repo):
-        target = _insert_person(sa_sync_conn, "Cible", "T")
-        source = _insert_person(sa_sync_conn, "Source", "S")
+        target = _person(sa_sync_conn, last_name="Cible", first_name="T")
+        source = _person(sa_sync_conn, last_name="Source", first_name="S")
         pub_shared = insert_publication(sa_sync_conn, "Shared")
         pub_source_only = insert_publication(sa_sync_conn, "SourceOnly")
 
-        def _reject(person_id, publication_id):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO rejected_authorships (publication_id, person_id) "
-                    "VALUES (:pub, :pid)"
-                ),
-                {"pub": publication_id, "pid": person_id},
-            )
-
-        _reject(target, pub_shared)  # conflit : déjà rejeté côté cible
-        _reject(source, pub_shared)  # doit être dédoublonné
-        _reject(source, pub_source_only)  # doit migrer vers la cible
+        insert_rejected_authorship(
+            sa_sync_conn, pub_shared, person_id=target
+        )  # conflit : déjà rejeté côté cible
+        insert_rejected_authorship(
+            sa_sync_conn, pub_shared, person_id=source
+        )  # doit être dédoublonné
+        insert_rejected_authorship(
+            sa_sync_conn, pub_source_only, person_id=source
+        )  # doit migrer vers la cible
 
         merge_person(target, source, repo=repo)
 
