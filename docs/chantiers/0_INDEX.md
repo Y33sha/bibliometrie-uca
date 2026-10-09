@@ -18,7 +18,6 @@
 - [Modularité du pipeline](CODE_pipeline.md)
 - [Monographies](DATA_monographies.md)
 - [Normalisation par lots de documents](CODE_batch-normalize.md)
-- [Nom et prénom scindés dès la normalisation](DATA_noms-prenoms-scindes.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
@@ -28,6 +27,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-09 — [Nom et prénom scindés dès la normalisation](archived/2026-10-09_DATA_noms-prenoms-scindes.md)
 - 2026-10-01 — [Dépôts HAL distincts fusionnés par une notice OpenAlex ou ScanR](archived/2026-10-01_DATA_identifiant-hal-cle-de-fusion.md)
 - 2026-09-30 — [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md)
 - 2026-09-30 — [Signatures conservées à la renormalisation](archived/2026-09-30_DATA_signatures-conservees.md)
