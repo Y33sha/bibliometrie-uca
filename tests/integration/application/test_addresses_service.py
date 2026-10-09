@@ -21,7 +21,9 @@ from domain.errors import NotFoundError, ValidationError
 from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
+from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.structures import insert_structure
 
 _GATEWAY = PgCountryQueries()
 
@@ -44,17 +46,6 @@ def authorship_repo(sa_sync_conn):
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
 
 
-def _create_structure(conn, code="UCA", name="UCA", structure_type="universite"):
-    result = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (:code, :name, CAST(:st AS structure_type)) RETURNING id"
-        ),
-        {"code": code, "name": name, "st": structure_type},
-    )
-    return result.scalar_one()
-
-
 def _create_perimeter(conn, code, structure_ids):
     conn.execute(
         text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:code, :name, :ids)"),
@@ -67,17 +58,6 @@ def _set_config(conn, key, value):
         text("INSERT INTO config (key, value) VALUES (:key, CAST(:val AS jsonb))"),
         {"key": key, "val": json.dumps(value)},
     )
-
-
-def _create_address(conn, raw_text="Université Clermont Auvergne"):
-    result = conn.execute(
-        text(
-            "INSERT INTO addresses (raw_text, normalized_text) "
-            "VALUES (:raw, lower(:raw)) RETURNING id"
-        ),
-        {"raw": raw_text},
-    )
-    return result.scalar_one()
 
 
 def _insert_address_structure(
@@ -96,7 +76,7 @@ def _insert_address_structure(
 
 def _setup_uca_perimeter(conn):
     """Monte un périmètre UCA minimal pour que propagate_in_perimeter_for_addresses marche."""
-    uca = _create_structure(conn, code="UCA", name="UCA", structure_type="universite")
+    uca = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
     _create_perimeter(conn, "uca", [uca])
     _set_config(conn, "perimeter_persons", "uca")
     return uca
@@ -120,7 +100,7 @@ def _get_link(conn, address_id, structure_id):
 class TestReviewStructureLink:
     def test_confirm_creates_link_if_absent(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         review_structure_link(addr, uca, True, repo=repo)
 
@@ -130,7 +110,7 @@ class TestReviewStructureLink:
 
     def test_reject_creates_link_if_absent(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         review_structure_link(addr, uca, False, repo=repo)
 
@@ -139,7 +119,7 @@ class TestReviewStructureLink:
 
     def test_confirm_updates_existing_link(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
 
         review_structure_link(addr, uca, True, repo=repo)
@@ -149,7 +129,7 @@ class TestReviewStructureLink:
     def test_reset_deletes_manual_link(self, sa_sync_conn, repo):
         """Reset supprime le lien manuel (matched_form_id IS NULL)."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)  # manuel
 
         review_structure_link(addr, uca, None, repo=repo)
@@ -159,7 +139,7 @@ class TestReviewStructureLink:
     def test_reset_preserves_auto_link_but_clears_confirmation(self, sa_sync_conn, repo):
         """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         form_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
@@ -191,7 +171,7 @@ class TestBatchReviewStructureLink:
 
     def test_confirm_upserts_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addrs = [_create_address(sa_sync_conn, raw_text=f"adr{i}") for i in range(3)]
+        addrs = [insert_address(sa_sync_conn, f"adr{i}") for i in range(3)]
 
         updated, _ = batch_review_structure_link(addrs, uca, True, repo=repo)
 
@@ -201,7 +181,7 @@ class TestBatchReviewStructureLink:
 
     def test_reject_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addrs = [_create_address(sa_sync_conn, raw_text=f"x{i}") for i in range(2)]
+        addrs = [insert_address(sa_sync_conn, f"x{i}") for i in range(2)]
 
         batch_review_structure_link(addrs, uca, False, repo=repo)
 
@@ -210,8 +190,8 @@ class TestBatchReviewStructureLink:
 
     def test_reset_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        a1 = _create_address(sa_sync_conn, raw_text="a1")
-        a2 = _create_address(sa_sync_conn, raw_text="a2")
+        a1 = insert_address(sa_sync_conn, "a1")
+        a2 = insert_address(sa_sync_conn, "a2")
         _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=True)
         _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
 
@@ -226,13 +206,6 @@ class TestBatchReviewStructureLink:
 # ── set_country ─────────────────────────────────────────────────────
 
 
-def _ensure_country(conn, code, name="Test"):
-    conn.execute(
-        text("INSERT INTO countries (code, name) VALUES (:code, :name) ON CONFLICT DO NOTHING"),
-        {"code": code, "name": name},
-    )
-
-
 def _get_countries(conn, address_id):
     result = conn.execute(
         text("SELECT countries FROM addresses WHERE id = :id"), {"id": address_id}
@@ -243,44 +216,44 @@ def _get_countries(conn, address_id):
 
 class TestSetCountry:
     def test_assigns_countries(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        addr = _create_address(sa_sync_conn)
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         affected = set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
         assert affected == [addr]
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
         """`addresses.countries` est un tableau : aucune clé étrangère n'en garde les éléments."""
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             set_country(sa_sync_conn, addr, ["ZZ"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_raises_on_unknown_address(self, sa_sync_conn, repo):
         """L'`UPDATE` n'apparie aucune ligne : sans cette garde, l'API répondrait 200 sans rien faire."""
-        _ensure_country(sa_sync_conn, "FR")
+        ensure_country(sa_sync_conn, "FR")
         with pytest.raises(NotFoundError):
             set_country(sa_sync_conn, 999999, ["FR"], repo=repo, country_queries=_GATEWAY)
 
     def test_raises_on_one_unknown_among_known(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        addr = _create_address(sa_sync_conn)
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="ZZ"):
             set_country(sa_sync_conn, addr, ["FR", "ZZ"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_none_clears_countries(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        addr = _create_address(sa_sync_conn)
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
         set_country(sa_sync_conn, addr, None, repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_propagates_to_same_normalized_text(self, sa_sync_conn, repo):
         """Les adresses avec même normalized_text héritent des countries."""
-        _ensure_country(sa_sync_conn, "FR")
-        a1 = _create_address(sa_sync_conn, raw_text="UCA A")
-        a2 = _create_address(sa_sync_conn, raw_text="UCA B")
+        ensure_country(sa_sync_conn, "FR")
+        a1 = insert_address(sa_sync_conn, "UCA A")
+        a2 = insert_address(sa_sync_conn, "UCA B")
         # Forcer le même normalized_text (simule le pipeline de normalisation)
         sa_sync_conn.execute(
             text(
@@ -295,9 +268,9 @@ class TestSetCountry:
 
     def test_propagates_on_short_normalized(self, sa_sync_conn, repo):
         """Deux adresses de même normalized_text court héritent aussi des countries."""
-        _ensure_country(sa_sync_conn, "FR")
-        a1 = _create_address(sa_sync_conn, raw_text="Lyon A")
-        a2 = _create_address(sa_sync_conn, raw_text="Lyon B")
+        ensure_country(sa_sync_conn, "FR")
+        a1 = insert_address(sa_sync_conn, "Lyon A")
+        a2 = insert_address(sa_sync_conn, "Lyon B")
         sa_sync_conn.execute(
             text("UPDATE addresses SET normalized_text = 'lyon' WHERE id = ANY(:ids)"),
             {"ids": [a1, a2]},
@@ -311,8 +284,8 @@ class TestSetCountry:
 
 class TestBatchSetCountryByIds:
     def test_adds_to_empty_countries(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        addrs = [_create_address(sa_sync_conn, raw_text=f"a{i}") for i in range(3)]
+        ensure_country(sa_sync_conn, "FR")
+        addrs = [insert_address(sa_sync_conn, f"a{i}") for i in range(3)]
         modified = batch_set_country_by_ids(
             sa_sync_conn, "FR", addrs, repo=repo, country_queries=_GATEWAY
         )
@@ -321,7 +294,7 @@ class TestBatchSetCountryByIds:
             assert _get_countries(sa_sync_conn, a) == ["FR"]
 
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_ids(
                 sa_sync_conn, "ZZ", [addr], repo=repo, country_queries=_GATEWAY
@@ -329,22 +302,22 @@ class TestBatchSetCountryByIds:
 
     def test_raises_on_empty_country_code(self, sa_sync_conn, repo):
         """La chaîne vide ne figure pas au référentiel : le contrôle référentiel la couvre."""
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_ids(sa_sync_conn, "", [addr], repo=repo, country_queries=_GATEWAY)
 
     def test_appends_to_existing_countries(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        _ensure_country(sa_sync_conn, "US")
-        addr = _create_address(sa_sync_conn)
+        ensure_country(sa_sync_conn, "FR")
+        ensure_country(sa_sync_conn, "US")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
         batch_set_country_by_ids(sa_sync_conn, "US", [addr], repo=repo, country_queries=_GATEWAY)
         countries = _get_countries(sa_sync_conn, addr)
         assert "FR" in countries and "US" in countries
 
     def test_idempotent_if_already_present(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        addr = _create_address(sa_sync_conn)
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
         batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) == ["FR"]  # pas de doublon
@@ -355,9 +328,9 @@ class TestBatchSetCountryByIds:
 
 class TestBatchSetCountryByFilter:
     def test_filter_by_search(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        match = _create_address(sa_sync_conn, raw_text="Université Clermont")
-        other = _create_address(sa_sync_conn, raw_text="MIT Boston")
+        ensure_country(sa_sync_conn, "FR")
+        match = insert_address(sa_sync_conn, "Université Clermont")
+        other = insert_address(sa_sync_conn, "MIT Boston")
         modified = batch_set_country_by_filter(
             sa_sync_conn, "FR", search="Clermont", repo=repo, country_queries=_GATEWAY
         )
@@ -365,17 +338,17 @@ class TestBatchSetCountryByFilter:
         assert other not in modified
 
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
-        _create_address(sa_sync_conn, raw_text="Université Clermont")
+        insert_address(sa_sync_conn, "Université Clermont")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_filter(
                 sa_sync_conn, "ZZ", search="Clermont", repo=repo, country_queries=_GATEWAY
             )
 
     def test_filter_has_country_no(self, sa_sync_conn, repo):
-        _ensure_country(sa_sync_conn, "FR")
-        _ensure_country(sa_sync_conn, "US")
-        addr_no = _create_address(sa_sync_conn, raw_text="sans pays")
-        addr_yes = _create_address(sa_sync_conn, raw_text="avec pays")
+        ensure_country(sa_sync_conn, "FR")
+        ensure_country(sa_sync_conn, "US")
+        addr_no = insert_address(sa_sync_conn, "sans pays")
+        addr_yes = insert_address(sa_sync_conn, "avec pays")
         set_country(sa_sync_conn, addr_yes, ["US"], repo=repo, country_queries=_GATEWAY)
         modified = batch_set_country_by_filter(
             sa_sync_conn, "FR", has_country=False, repo=repo, country_queries=_GATEWAY
@@ -396,9 +369,9 @@ class TestPropagateCountriesToSimilar:
     def test_propagates_divergent_values_from_modified_source(self, sa_sync_conn, repo):
         """Deux adresses de même normalized_text avec countries différents :
         la 2e reçoit les countries de la 1ère quand a1 est dans modified_ids."""
-        _ensure_country(sa_sync_conn, "FR")
-        a1 = _create_address(sa_sync_conn, raw_text="UCA AA")
-        a2 = _create_address(sa_sync_conn, raw_text="UCA BB")
+        ensure_country(sa_sync_conn, "FR")
+        a1 = insert_address(sa_sync_conn, "UCA AA")
+        a2 = insert_address(sa_sync_conn, "UCA BB")
         sa_sync_conn.execute(
             text(
                 "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
@@ -421,9 +394,9 @@ class TestPropagateCountriesToSimilar:
 
     def test_does_not_propagate_from_unmodified_sources(self, sa_sync_conn, repo):
         """Seules les adresses passées en modified_ids servent de source de propagation : une adresse `a1` avec pays mais hors `modified_ids` ne doit PAS propager vers `a2` similaire. Régression : avant le ciblage, la propagation balayait toute la table et propageait depuis n'importe quelle adresse avec un pays, ce qui rendait la query O(n²) sur 475k lignes."""
-        _ensure_country(sa_sync_conn, "FR")
-        a1 = _create_address(sa_sync_conn, raw_text="UCA CC")
-        a2 = _create_address(sa_sync_conn, raw_text="UCA DD")
+        ensure_country(sa_sync_conn, "FR")
+        a1 = insert_address(sa_sync_conn, "UCA CC")
+        a2 = insert_address(sa_sync_conn, "UCA DD")
         sa_sync_conn.execute(
             text(
                 "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
@@ -463,7 +436,7 @@ class TestPropagateCountriesToPublications:
     def test_propagates_to_source_pub_and_publication(self, sa_sync_conn, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
         une source_authorship, le pays doit remonter jusqu'à publications.countries."""
-        _ensure_country(sa_sync_conn, "FR")
+        ensure_country(sa_sync_conn, "FR")
         pub_id = sa_sync_conn.execute(
             text("INSERT INTO publications (title, pub_year) VALUES ('Test', 2024) RETURNING id")
         ).scalar_one()
@@ -483,7 +456,7 @@ class TestPropagateCountriesToPublications:
             ),
             {"sp": sp_id, "iid": identity_id},
         ).scalar_one()
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         sa_sync_conn.execute(
             text("UPDATE addresses SET countries = :c WHERE id = :id"),
             {"c": ["FR"], "id": addr},
@@ -527,7 +500,7 @@ class TestPropagationSkipsNoOp:
     def test_confirm_auto_detected_skips_propagation(self, sa_sync_conn, repo):
         """Click Relier sur une adresse auto-détectée (NULL → TRUE) = no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         # Lien auto-détecté, is_confirmed=NULL (cas reproducteur du bug initial)
         form_id = sa_sync_conn.execute(
             text(
@@ -549,7 +522,7 @@ class TestPropagationSkipsNoOp:
     def test_reconfirm_already_confirmed_skips_propagation(self, sa_sync_conn, repo):
         """Cliquer Relier sur un lien déjà TRUE = no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
 
         changed = review_structure_link(addr, uca, True, repo=repo)
@@ -559,7 +532,7 @@ class TestPropagationSkipsNoOp:
     def test_confirm_rejected_triggers_propagation(self, sa_sync_conn, repo):
         """FALSE → TRUE : vrai changement, propagation attendue."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
 
         changed = review_structure_link(addr, uca, True, repo=repo)
@@ -569,7 +542,7 @@ class TestPropagationSkipsNoOp:
     def test_reject_confirmed_triggers_propagation(self, sa_sync_conn, repo):
         """TRUE → FALSE : vrai changement (sort du périmètre), propagation."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
 
         changed = review_structure_link(addr, uca, False, repo=repo)
@@ -579,7 +552,7 @@ class TestPropagationSkipsNoOp:
     def test_reject_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → FALSE : pas de contribution avant ni après, no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = review_structure_link(addr, uca, False, repo=repo)
 
@@ -590,7 +563,7 @@ class TestPropagationSkipsNoOp:
     def test_confirm_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → TRUE : contribue maintenant, propagation attendue."""
         uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = review_structure_link(addr, uca, True, repo=repo)
 
@@ -603,9 +576,9 @@ class TestPropagationSkipsNoOp:
         # a1 : auto-détectée NULL → TRUE (no-op)
         # a2 : rejetée FALSE → TRUE (changement)
         # a3 : pas de lien → TRUE (changement)
-        a1 = _create_address(sa_sync_conn, raw_text="a1")
-        a2 = _create_address(sa_sync_conn, raw_text="a2")
-        a3 = _create_address(sa_sync_conn, raw_text="a3")
+        a1 = insert_address(sa_sync_conn, "a1")
+        a2 = insert_address(sa_sync_conn, "a2")
+        a3 = insert_address(sa_sync_conn, "a3")
         form_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "

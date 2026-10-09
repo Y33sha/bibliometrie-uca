@@ -9,17 +9,7 @@ from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons import PgPersonsQueries
 from tests.integration.helpers.persons import insert_person
-from tests.integration.helpers.structures import add_authorship_structure
-
-
-def _structure(conn, code):
-    return conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (:c, :c, 'labo') RETURNING id"
-        ),
-        {"c": code},
-    ).scalar_one()
+from tests.integration.helpers.structures import add_authorship_structure, insert_structure
 
 
 def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perimeter=False):
@@ -42,7 +32,7 @@ def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perim
 
 class TestListLabScope:
     def test_list_restricted_to_lab(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-DIR")
+        lab = insert_structure(sa_sync_conn, "LAB-DIR")
         p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
@@ -57,7 +47,7 @@ class TestListLabScope:
         assert p_out not in ids
 
     def test_list_unscoped_includes_both(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-DIR2")
+        lab = insert_structure(sa_sync_conn, "LAB-DIR2")
         p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
@@ -70,7 +60,7 @@ class TestListLabScope:
 
     def test_signature_counts_scoped_to_lab(self, sa_sync_conn):
         """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
-        lab = _structure(sa_sync_conn, "LAB-CNT")
+        lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
         _authorship_in_lab(sa_sync_conn, person, lab_id=lab)
         _authorship_in_lab(sa_sync_conn, person, lab_id=None)
@@ -106,7 +96,7 @@ class TestListLabScope:
             assert p.in_perimeter_signature_count == 1
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
-        lab = _structure(sa_sync_conn, "LAB-FAC")
+        lab = insert_structure(sa_sync_conn, "LAB-FAC")
         p_in = insert_person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
@@ -122,7 +112,7 @@ class TestListLabScope:
 
     def test_facets_respect_search(self, sa_sync_conn):
         """Régression : les comptes de facettes suivent la recherche par nom."""
-        lab = _structure(sa_sync_conn, "LAB-SRCH")
+        lab = insert_structure(sa_sync_conn, "LAB-SRCH")
         p1 = insert_person(sa_sync_conn, "Dupont")
         _authorship_in_lab(sa_sync_conn, p1, lab_id=lab)
         p2 = insert_person(sa_sync_conn, "Martin")
@@ -181,7 +171,7 @@ class TestExclusionFilter:
 
     def test_excluded_person_leaves_the_lab(self, sa_sync_conn):
         """Une personne exclue n'appartient à aucun laboratoire, dès que les matviews de structures sont rafraîchies."""
-        lab = _structure(sa_sync_conn, "LAB-EXCL")
+        lab = insert_structure(sa_sync_conn, "LAB-EXCL")
         p_ok = insert_person(sa_sync_conn, "Active")
         _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
         p_excl = insert_person(sa_sync_conn, "Exclue")

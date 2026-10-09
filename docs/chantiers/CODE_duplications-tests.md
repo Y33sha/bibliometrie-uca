@@ -45,7 +45,7 @@ Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_ru
 - [x] Publications : `_create_pub`, `_pub`, `_insert_publication` (`helpers/publications.insert_publication`).
 - [x] Personnes : `_create_person`, `_person` (`helpers/persons.insert_person`).
 - [x] Notices et signatures : `_create_sd`, `_create_sa`, `_signature` (`helpers/sources`). Insertion commune aux fonctions de semis : `helpers/rows.insert_row`.
-- [ ] Structures, adresses, périmètres et pays : `_create_structure`, `_structure`, `_create_address`, `_perimeter`, `_ensure_country`.
+- [x] Structures, adresses, périmètres et pays : `_create_structure`, `_structure`, `_create_address`, `_perimeter`, `_ensure_country` (`helpers/structures`, `helpers/addresses`).
 - [ ] Configuration : `_set_config`, à aligner sur `helpers/config.insert_config`.
 
 ### Phase 3 — Tests des extracteurs

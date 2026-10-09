@@ -3,36 +3,22 @@
 from sqlalchemy import text
 
 from infrastructure.pipeline.countries import PgCountryQueries
+from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 _Q = PgCountryQueries()
 
 
-def _create_address(conn, raw_text, countries):
-    return conn.execute(
-        text(
-            "INSERT INTO addresses (raw_text, normalized_text, countries) "
-            "VALUES (:raw, :norm, :countries) RETURNING id"
-        ),
-        {"raw": raw_text, "norm": raw_text, "countries": countries},
-    ).scalar_one()
-
-
-def _ensure_country(conn, code, name="Test"):
-    conn.execute(
-        text("INSERT INTO countries (code, name) VALUES (:code, :name) ON CONFLICT DO NOTHING"),
-        {"code": code, "name": name},
-    )
-
-
 class TestRefreshAddressSourceCountries:
     def test_propagates_country_from_address(self, sa_sync_conn):
-        _ensure_country(sa_sync_conn, "FR")
+        ensure_country(sa_sync_conn, "FR")
         pub_id = insert_publication(sa_sync_conn)
         sd = insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
         sa = insert_signature(sa_sync_conn, sd, source="openalex")
-        addr = _create_address(sa_sync_conn, "Clermont", ["FR"])
+        addr = insert_address(
+            sa_sync_conn, "Clermont", countries=["FR"], normalized_text="Clermont"
+        )
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
@@ -54,7 +40,7 @@ class TestRefreshAddressSourceCountries:
         pub_id = insert_publication(sa_sync_conn)
         sd = insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="oa-2")
         sa = insert_signature(sa_sync_conn, sd, source="openalex")
-        addr = _create_address(sa_sync_conn, "X", None)
+        addr = insert_address(sa_sync_conn, "X", countries=None, normalized_text="X")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
@@ -156,8 +142,16 @@ class TestDirtyDrivenSourceCountries:
             text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"),
             {"i": clean_sa},
         )
-        _link_sa_address(sa_sync_conn, dirty_sa, _create_address(sa_sync_conn, "Lyon", ["FR"]))
-        _link_sa_address(sa_sync_conn, clean_sa, _create_address(sa_sync_conn, "Boston", ["US"]))
+        _link_sa_address(
+            sa_sync_conn,
+            dirty_sa,
+            insert_address(sa_sync_conn, "Lyon", countries=["FR"], normalized_text="Lyon"),
+        )
+        _link_sa_address(
+            sa_sync_conn,
+            clean_sa,
+            insert_address(sa_sync_conn, "Boston", countries=["US"], normalized_text="Boston"),
+        )
 
         _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, dirty_sd) == ["FR"]
@@ -169,7 +163,9 @@ class TestDirtyDrivenSourceCountries:
             sa_sync_conn, pub, source="openalex", source_id="oa-o", countries=["FR"]
         )
         sa = insert_signature(sa_sync_conn, sd, source="openalex")  # dirty, adresse sans pays
-        _link_sa_address(sa_sync_conn, sa, _create_address(sa_sync_conn, "X", None))
+        _link_sa_address(
+            sa_sync_conn, sa, insert_address(sa_sync_conn, "X", countries=None, normalized_text="X")
+        )
 
         _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) is None  # orphelin → NULL
@@ -182,7 +178,7 @@ class TestDirtyDrivenSourceCountries:
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"), {"i": sa}
         )
-        addr = _create_address(sa_sync_conn, "Nantes", None)
+        addr = insert_address(sa_sync_conn, "Nantes", countries=None, normalized_text="Nantes")
         _link_sa_address(sa_sync_conn, sa, addr)
 
         # write_countries(countries) pose addresses.countries_dirty sur la ligne changée.
@@ -195,7 +191,7 @@ class TestDirtyDrivenSourceCountries:
         pub = insert_publication(sa_sync_conn)
         sd = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="oa-c")
         sa = insert_signature(sa_sync_conn, sd, source="openalex")  # sa dirty par défaut
-        addr = _create_address(sa_sync_conn, "Paris", None)
+        addr = insert_address(sa_sync_conn, "Paris", countries=None, normalized_text="Paris")
         _Q.write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")  # addr dirty
         _Q.clear_countries_dirty(sa_sync_conn)
         assert _sa_dirty(sa_sync_conn, sa) is False
