@@ -282,6 +282,15 @@ ror_relations = Table(
 )
 
 
+ror_dump_imports = Table(
+    "ror_dump_imports",
+    metadata,
+    Column("version", Text, primary_key=True),
+    Column("imported_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    comment="Imports du dump ROR : nom de l'archive importée et date de l'import.",
+)
+
+
 journals = Table(
     "journals",
     metadata,
@@ -726,6 +735,19 @@ source_authorship_addresses = Table(
         "source_authorship_id",
         "address_id",
         name="source_authorship_addresses_source_authorship_id_address_id_key",
+    ),
+)
+
+
+source_authorship_rors = Table(
+    "source_authorship_rors",
+    metadata,
+    Column("source_authorship_id", Integer, nullable=False),
+    Column("ror_id", Text, nullable=False),
+    PrimaryKeyConstraint("source_authorship_id", "ror_id", name="source_authorship_rors_pkey"),
+    comment=(
+        "ROR attribués par la source à une signature. ror_id est sans clé étrangère vers "
+        "ror_organizations : une source peut citer un ROR absent du dump importé."
     ),
 )
 
