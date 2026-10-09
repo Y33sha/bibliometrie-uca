@@ -9,9 +9,15 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 
+from sqlalchemy import Connection
+
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import accord, forme
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.signals import signal_source_unavailable
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
 from domain.publications.identifiers import DoiPrefix
 
@@ -19,11 +25,31 @@ ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 """Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""
 
 
-def run(
-    log: logging.Logger,
-    *,
-    repo: DoiPrefixesQueries,
-    resolve_ras_fn: ResolveRasFn,
+@dataclass(frozen=True)
+class ResolveRaPhase:
+    """`repo_factory` construit le repository des préfixes sur la connexion de la phase."""
+
+    repo_factory: Callable[[Connection], DoiPrefixesQueries]
+    resolve_ras_fn: ResolveRasFn
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Résout les préfixes dans une transaction.
+
+        Une indisponibilité de doi.org donne des métriques vides, signalées : la transaction commit les préfixes insérés avant l'indisponibilité.
+        """
+        with ctx.open_tx() as conn:
+            try:
+                return _resolve(ctx.logger, self.repo_factory(conn), self.resolve_ras_fn)
+            except SourceUnavailableError:
+                metrics = PhaseMetrics()
+                signal_source_unavailable(
+                    metrics, "doi.org/ra", logger=ctx.logger, phase="resolve_ra"
+                )
+                return metrics
+
+
+def _resolve(
+    log: logging.Logger, repo: DoiPrefixesQueries, resolve_ras_fn: ResolveRasFn
 ) -> PhaseMetrics:
     """Résout l'agence des préfixes absents de `doi_prefixes` (`doi.org/ra`) et l'insère.
 
