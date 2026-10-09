@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.fetch_truncated import refetch
+from application.pipeline.extract.fetch_truncated import FetchTruncatedPhase, refetch
 from application.ports.pipeline.extract.fetch_truncated import TruncatedWork
 
 _LOGGER = logging.getLogger("test")
@@ -95,3 +95,18 @@ async def test_lot_mele():
     metrics = await refetch(MagicMock(), adapter, _LOGGER)
     assert (metrics.seen, metrics.updated, metrics.errors) == (4, 2, 1)
     assert metrics.extras.get("already_complete") == 1
+
+
+def test_phase_sautee_sans_openalex_dans_les_sources(open_tx, contexte):
+    adapter = _adapter({"W1": _work(150)})
+    metrics = FetchTruncatedPhase(adapter).run(contexte(sources={"hal"}))
+    assert metrics.seen == 0
+    assert open_tx.transactions == 0
+
+
+@pytest.mark.parametrize("sources", [None, {"openalex"}])
+def test_phase_tourne_avec_openalex_dans_les_sources(open_tx, contexte, sources):
+    adapter = _adapter({"W1": _work(150)})
+    metrics = FetchTruncatedPhase(adapter).run(contexte(sources=sources))
+    assert metrics.updated == 1
+    assert open_tx.transactions == 1

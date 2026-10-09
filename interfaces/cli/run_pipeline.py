@@ -243,18 +243,10 @@ def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
 
     Séquence et métriques dans `application/pipeline/extract/fetch_truncated.py`.
     """
-    import asyncio
-
-    from application.pipeline.extract.fetch_truncated import refetch
+    from application.pipeline.extract.fetch_truncated import FetchTruncatedPhase
     from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
-    sources = options.sources if options.sources is not None else set(ALL_SOURCES_SET)
-    # La phase repère les seules lignes openalex à 100 auteurs restées à traiter : elle tourne
-    # dans tous les modes, dès qu'openalex fait partie des sources.
-    if "openalex" not in sources:
-        return PhaseMetrics()
-    with open_tx() as conn:
-        return asyncio.run(refetch(conn, PgOpenalexFetchTruncatedAdapter(), log))
+    return FetchTruncatedPhase(PgOpenalexFetchTruncatedAdapter()).run(_context(options))
 
 
 def phase_normalize(options: RunOptions) -> PhaseMetrics:

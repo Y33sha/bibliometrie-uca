@@ -9,13 +9,16 @@ Implémentation async : pool de `adapter.max_concurrent` workers (`run_fetch_poo
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
+from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
@@ -24,9 +27,24 @@ from application.ports.pipeline.extract.fetch_truncated import (
     TruncatedWork,
 )
 from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
+from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 
 COMMIT_EVERY = 50
+
+
+@dataclass(frozen=True)
+class FetchTruncatedPhase:
+    adapter: OpenalexFetchTruncatedAdapter
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Re-fetche les works tronqués dans une transaction, dès qu'openalex fait partie des sources du run."""
+        sources = ctx.options.sources if ctx.options.sources is not None else ALL_SOURCES_SET
+        # La phase repère les seules lignes openalex à 100 auteurs restées à traiter : elle tourne dans tous les modes.
+        if "openalex" not in sources:
+            return PhaseMetrics()
+        with ctx.open_tx() as conn:
+            return asyncio.run(refetch(conn, self.adapter, ctx.logger))
 
 
 async def refetch(
@@ -89,4 +107,4 @@ async def refetch(
     return metrics
 
 
-__all__ = ["refetch"]
+__all__ = ["FetchTruncatedPhase", "refetch"]
