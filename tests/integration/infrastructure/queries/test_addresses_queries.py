@@ -1,6 +1,6 @@
 """Tests d'intégration pour `infrastructure.read_models.addresses`."""
 
-from sqlalchemy import text
+from functools import partial
 
 from application.ports.read_models.addresses_queries import (
     AddressCountriesFilters,
@@ -9,50 +9,46 @@ from application.ports.read_models.addresses_queries import (
     TextPredicate,
 )
 from infrastructure.read_models.addresses import PgAddressesQueries
-from tests.integration.helpers.addresses import ensure_country, insert_address
+from tests.integration.helpers.addresses import (
+    ensure_country,
+    insert_address,
+    insert_address_structure,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
     insert_source_publication,
 )
-from tests.integration.helpers.structures import insert_structure
+from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
+
+# Forme de nom « f ».
+_f_form = partial(insert_structure_name_form, form_text="f")
 
 
 def _q(conn) -> PgAddressesQueries:
     return PgAddressesQueries(conn)
 
 
-def _link_addr_struct(conn, addr_id, struct_id, *, is_confirmed=None, matched_form_id=None):
-    conn.execute(
-        text("""
-            INSERT INTO address_structures
-                (address_id, structure_id, is_confirmed, matched_form_id)
-            VALUES (:aid, :sid, :ic, :mfi)
-        """),
-        {"aid": addr_id, "sid": struct_id, "ic": is_confirmed, "mfi": matched_form_id},
-    )
-
-
 class TestListAddresses:
     def test_lists_detected_and_pending_by_default(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
         # Form pour matched_form_id
-        form_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:s, 'x', true) RETURNING id"
-            ),
-            {"s": struct},
-        ).one()
-        form_id = form_row.id
+        form_row_id = insert_structure_name_form(sa_sync_conn, struct, form_text="x")
+        form_id = form_row_id
 
         addr_pending = insert_address(sa_sync_conn, "a-pending")
-        _link_addr_struct(sa_sync_conn, addr_pending, struct, matched_form_id=form_id)
+        insert_address_structure(
+            sa_sync_conn, addr_pending, structure_id=struct, matched_form_id=form_id
+        )
 
         addr_confirmed = insert_address(sa_sync_conn, "a-confirmed")
-        _link_addr_struct(
-            sa_sync_conn, addr_confirmed, struct, matched_form_id=form_id, is_confirmed=True
+        insert_address_structure(
+            sa_sync_conn,
+            addr_confirmed,
+            structure_id=struct,
+            is_confirmed=True,
+            matched_form_id=form_id,
         )
 
         res = _q(sa_sync_conn).list_addresses(
@@ -64,16 +60,12 @@ class TestListAddresses:
 
     def test_lists_confirmed_only(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
-        form_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:s, 'x', true) RETURNING id"
-            ),
-            {"s": struct},
-        ).one()
-        form_id = form_row.id
+        form_row_id = insert_structure_name_form(sa_sync_conn, struct, form_text="x")
+        form_id = form_row_id
         addr = insert_address(sa_sync_conn, "A")
-        _link_addr_struct(sa_sync_conn, addr, struct, matched_form_id=form_id, is_confirmed=True)
+        insert_address_structure(
+            sa_sync_conn, addr, structure_id=struct, is_confirmed=True, matched_form_id=form_id
+        )
 
         res = _q(sa_sync_conn).list_addresses(
             structure_id=struct,
@@ -85,18 +77,12 @@ class TestListAddresses:
 
     def test_search_filter(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
-        form_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:s, 'x', true) RETURNING id"
-            ),
-            {"s": struct},
-        ).one()
-        form_id = form_row.id
+        form_row_id = insert_structure_name_form(sa_sync_conn, struct, form_text="x")
+        form_id = form_row_id
         a1 = insert_address(sa_sync_conn, "Université Clermont")
         a2 = insert_address(sa_sync_conn, "Université Paris")
-        _link_addr_struct(sa_sync_conn, a1, struct, matched_form_id=form_id)
-        _link_addr_struct(sa_sync_conn, a2, struct, matched_form_id=form_id)
+        insert_address_structure(sa_sync_conn, a1, structure_id=struct, matched_form_id=form_id)
+        insert_address_structure(sa_sync_conn, a2, structure_id=struct, matched_form_id=form_id)
 
         res = _q(sa_sync_conn).list_addresses(
             structure_id=struct,
@@ -137,30 +123,23 @@ class TestListAddresses:
 class TestStructurePredicates:
     """Prédicats « structure reconnue » (reconnue = lien pending ou confirmé)."""
 
-    def _form(self, conn, struct_id):
-        return (
-            conn.execute(
-                text(
-                    "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                    "VALUES (:s, 'f', true) RETURNING id"
-                ),
-                {"s": struct_id},
-            )
-            .one()
-            .id
-        )
-
     def test_recognized_matches_pending_and_confirmed_only(self, sa_sync_conn):
         scope = insert_structure(sa_sync_conn, "SCOPE-R", name="X", structure_type="universite")
         k = insert_structure(sa_sync_conn, "CNRS-R", name="X", structure_type="universite")
-        form_id = self._form(sa_sync_conn, k)
+        form_id = _f_form(sa_sync_conn, k)
 
         a_pending = insert_address(sa_sync_conn, "pending")
-        _link_addr_struct(sa_sync_conn, a_pending, k, matched_form_id=form_id)  # détecté, non revu
+        insert_address_structure(
+            sa_sync_conn, a_pending, structure_id=k, matched_form_id=form_id
+        )  # détecté, non revu
         a_confirmed = insert_address(sa_sync_conn, "confirmed")
-        _link_addr_struct(sa_sync_conn, a_confirmed, k, is_confirmed=True)  # relié manuel
+        insert_address_structure(
+            sa_sync_conn, a_confirmed, structure_id=k, is_confirmed=True
+        )  # relié manuel
         a_rejected = insert_address(sa_sync_conn, "rejected")
-        _link_addr_struct(sa_sync_conn, a_rejected, k, matched_form_id=form_id, is_confirmed=False)
+        insert_address_structure(
+            sa_sync_conn, a_rejected, structure_id=k, is_confirmed=False, matched_form_id=form_id
+        )
         a_none = insert_address(sa_sync_conn, "none")
 
         res = _q(sa_sync_conn).list_addresses(
@@ -183,12 +162,16 @@ class TestStructurePredicates:
     def test_not_recognized_is_complement(self, sa_sync_conn):
         scope = insert_structure(sa_sync_conn, "SCOPE-N", name="X", structure_type="universite")
         k = insert_structure(sa_sync_conn, "CNRS-N", name="X", structure_type="universite")
-        form_id = self._form(sa_sync_conn, k)
+        form_id = _f_form(sa_sync_conn, k)
 
         a_recognized = insert_address(sa_sync_conn, "rec")
-        _link_addr_struct(sa_sync_conn, a_recognized, k, matched_form_id=form_id)
+        insert_address_structure(
+            sa_sync_conn, a_recognized, structure_id=k, matched_form_id=form_id
+        )
         a_rejected = insert_address(sa_sync_conn, "rej")
-        _link_addr_struct(sa_sync_conn, a_rejected, k, matched_form_id=form_id, is_confirmed=False)
+        insert_address_structure(
+            sa_sync_conn, a_rejected, structure_id=k, is_confirmed=False, matched_form_id=form_id
+        )
         a_none = insert_address(sa_sync_conn, "non")
 
         res = _q(sa_sync_conn).list_addresses(
@@ -211,13 +194,13 @@ class TestStructurePredicates:
         scope = insert_structure(sa_sync_conn, "SCOPE-M", name="X", structure_type="universite")
         k1 = insert_structure(sa_sync_conn, "CNRS-M", name="X", structure_type="universite")
         k2 = insert_structure(sa_sync_conn, "INSERM-M", name="X", structure_type="universite")
-        f1 = self._form(sa_sync_conn, k1)
-        f2 = self._form(sa_sync_conn, k2)
+        f1 = _f_form(sa_sync_conn, k1)
+        f2 = _f_form(sa_sync_conn, k2)
 
         a_k1 = insert_address(sa_sync_conn, "k1")
-        _link_addr_struct(sa_sync_conn, a_k1, k1, matched_form_id=f1)
+        insert_address_structure(sa_sync_conn, a_k1, structure_id=k1, matched_form_id=f1)
         a_k2 = insert_address(sa_sync_conn, "k2")
-        _link_addr_struct(sa_sync_conn, a_k2, k2, matched_form_id=f2)
+        insert_address_structure(sa_sync_conn, a_k2, structure_id=k2, matched_form_id=f2)
         a_none = insert_address(sa_sync_conn, "neither")
 
         res = _q(sa_sync_conn).list_addresses(
@@ -263,7 +246,7 @@ class TestGetAddressStructures:
     def test_returns_structures(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
         addr = insert_address(sa_sync_conn)
-        _link_addr_struct(sa_sync_conn, addr, struct, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, addr, structure_id=struct, is_confirmed=True)
 
         rows = _q(sa_sync_conn).get_address_structures(addr)
         assert len(rows) == 1
@@ -279,7 +262,7 @@ class TestGetStructureLink:
     def test_returns_status(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
         addr = insert_address(sa_sync_conn)
-        _link_addr_struct(sa_sync_conn, addr, struct, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, addr, structure_id=struct, is_confirmed=True)
 
         link = _q(sa_sync_conn).get_structure_link(addr, struct)
         assert link is not None

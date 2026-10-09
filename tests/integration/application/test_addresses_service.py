@@ -19,15 +19,21 @@ from domain.errors import NotFoundError, ValidationError
 from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
-from tests.integration.helpers.addresses import ensure_country, insert_address
-from tests.integration.helpers.config import set_config
+from tests.integration.helpers.addresses import (
+    ensure_country,
+    insert_address,
+    insert_address_structure,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
     insert_source_publication,
 )
-from tests.integration.helpers.structures import insert_structure
+from tests.integration.helpers.structures import (
+    insert_persons_perimeter,
+    insert_structure_name_form,
+)
 
 _GATEWAY = PgCountryQueries()
 
@@ -50,35 +56,6 @@ def authorship_repo(sa_sync_conn):
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
 
 
-def _create_perimeter(conn, code, structure_ids):
-    conn.execute(
-        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:code, :name, :ids)"),
-        {"code": code, "name": code.upper(), "ids": structure_ids},
-    )
-
-
-def _insert_address_structure(
-    conn, address_id, structure_id, *, is_confirmed=None, matched_form_id=None
-):
-    result = conn.execute(
-        text(
-            "INSERT INTO address_structures "
-            "(address_id, structure_id, is_confirmed, matched_form_id) "
-            "VALUES (:aid, :sid, :ic, :mf) RETURNING id"
-        ),
-        {"aid": address_id, "sid": structure_id, "ic": is_confirmed, "mf": matched_form_id},
-    )
-    return result.scalar_one()
-
-
-def _setup_uca_perimeter(conn):
-    """Monte un périmètre UCA minimal pour que propagate_in_perimeter_for_addresses marche."""
-    uca = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
-    _create_perimeter(conn, "uca", [uca])
-    set_config(conn, "perimeter_persons", "uca")
-    return uca
-
-
 def _get_link(conn, address_id, structure_id):
     result = conn.execute(
         text(
@@ -96,7 +73,7 @@ def _get_link(conn, address_id, structure_id):
 
 class TestReviewStructureLink:
     def test_confirm_creates_link_if_absent(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         review_structure_link(addr, uca, True, repo=repo)
@@ -106,7 +83,7 @@ class TestReviewStructureLink:
         assert link["is_confirmed"] is True
 
     def test_reject_creates_link_if_absent(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         review_structure_link(addr, uca, False, repo=repo)
@@ -115,9 +92,9 @@ class TestReviewStructureLink:
         assert link["is_confirmed"] is False
 
     def test_confirm_updates_existing_link(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=False)
 
         review_structure_link(addr, uca, True, repo=repo)
 
@@ -125,9 +102,9 @@ class TestReviewStructureLink:
 
     def test_reset_deletes_manual_link(self, sa_sync_conn, repo):
         """Reset supprime le lien manuel (matched_form_id IS NULL)."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)  # manuel
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)  # manuel
 
         review_structure_link(addr, uca, None, repo=repo)
 
@@ -135,17 +112,11 @@ class TestReviewStructureLink:
 
     def test_reset_preserves_auto_link_but_clears_confirmation(self, sa_sync_conn, repo):
         """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        form_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:sid, 'uca', true) RETURNING id"
-            ),
-            {"sid": uca},
-        ).scalar_one()
-        _insert_address_structure(
-            sa_sync_conn, addr, uca, is_confirmed=False, matched_form_id=form_id
+        form_id = insert_structure_name_form(sa_sync_conn, uca, form_text="uca")
+        insert_address_structure(
+            sa_sync_conn, addr, structure_id=uca, is_confirmed=False, matched_form_id=form_id
         )
 
         review_structure_link(addr, uca, None, repo=repo)
@@ -161,13 +132,13 @@ class TestReviewStructureLink:
 
 class TestBatchReviewStructureLink:
     def test_empty_returns_zero(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         updated, changed = batch_review_structure_link([], uca, True, repo=repo)
         assert updated == 0
         assert changed == []
 
     def test_confirm_upserts_lot(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addrs = [insert_address(sa_sync_conn, f"adr{i}") for i in range(3)]
 
         updated, _ = batch_review_structure_link(addrs, uca, True, repo=repo)
@@ -177,7 +148,7 @@ class TestBatchReviewStructureLink:
             assert _get_link(sa_sync_conn, aid, uca)["is_confirmed"] is True
 
     def test_reject_lot(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addrs = [insert_address(sa_sync_conn, f"x{i}") for i in range(2)]
 
         batch_review_structure_link(addrs, uca, False, repo=repo)
@@ -186,11 +157,11 @@ class TestBatchReviewStructureLink:
             assert _get_link(sa_sync_conn, aid, uca)["is_confirmed"] is False
 
     def test_reset_lot(self, sa_sync_conn, repo):
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         a1 = insert_address(sa_sync_conn, "a1")
         a2 = insert_address(sa_sync_conn, "a2")
-        _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=True)
-        _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
+        insert_address_structure(sa_sync_conn, a1, structure_id=uca, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, a2, structure_id=uca, is_confirmed=False)
 
         updated, _ = batch_review_structure_link([a1, a2], uca, None, repo=repo)
 
@@ -474,19 +445,11 @@ class TestPropagationSkipsNoOp:
 
     def test_confirm_auto_detected_skips_propagation(self, sa_sync_conn, repo):
         """Click Relier sur une adresse auto-détectée (NULL → TRUE) = no-op."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         # Lien auto-détecté, is_confirmed=NULL (cas reproducteur du bug initial)
-        form_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:sid, 'uca', true) RETURNING id"
-            ),
-            {"sid": uca},
-        ).scalar_one()
-        _insert_address_structure(
-            sa_sync_conn, addr, uca, is_confirmed=None, matched_form_id=form_id
-        )
+        form_id = insert_structure_name_form(sa_sync_conn, uca, form_text="uca")
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, matched_form_id=form_id)
 
         changed = review_structure_link(addr, uca, True, repo=repo)
 
@@ -496,9 +459,9 @@ class TestPropagationSkipsNoOp:
 
     def test_reconfirm_already_confirmed_skips_propagation(self, sa_sync_conn, repo):
         """Cliquer Relier sur un lien déjà TRUE = no-op."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)
 
         changed = review_structure_link(addr, uca, True, repo=repo)
 
@@ -506,9 +469,9 @@ class TestPropagationSkipsNoOp:
 
     def test_confirm_rejected_triggers_propagation(self, sa_sync_conn, repo):
         """FALSE → TRUE : vrai changement, propagation attendue."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=False)
 
         changed = review_structure_link(addr, uca, True, repo=repo)
 
@@ -516,9 +479,9 @@ class TestPropagationSkipsNoOp:
 
     def test_reject_confirmed_triggers_propagation(self, sa_sync_conn, repo):
         """TRUE → FALSE : vrai changement (sort du périmètre), propagation."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)
 
         changed = review_structure_link(addr, uca, False, repo=repo)
 
@@ -526,7 +489,7 @@ class TestPropagationSkipsNoOp:
 
     def test_reject_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → FALSE : pas de contribution avant ni après, no-op."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = review_structure_link(addr, uca, False, repo=repo)
@@ -537,7 +500,7 @@ class TestPropagationSkipsNoOp:
 
     def test_confirm_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → TRUE : contribue maintenant, propagation attendue."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = review_structure_link(addr, uca, True, repo=repo)
@@ -547,22 +510,16 @@ class TestPropagationSkipsNoOp:
     def test_batch_only_propagates_changed(self, sa_sync_conn, repo):
         """Batch mixte : certaines adresses changent, d'autres non.
         `changed` restreint aux adresses effectivement impactées."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
+        uca = insert_persons_perimeter(sa_sync_conn)
         # a1 : auto-détectée NULL → TRUE (no-op)
         # a2 : rejetée FALSE → TRUE (changement)
         # a3 : pas de lien → TRUE (changement)
         a1 = insert_address(sa_sync_conn, "a1")
         a2 = insert_address(sa_sync_conn, "a2")
         a3 = insert_address(sa_sync_conn, "a3")
-        form_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-                "VALUES (:sid, 'uca2', true) RETURNING id"
-            ),
-            {"sid": uca},
-        ).scalar_one()
-        _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=None, matched_form_id=form_id)
-        _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
+        form_id = insert_structure_name_form(sa_sync_conn, uca, form_text="uca2")
+        insert_address_structure(sa_sync_conn, a1, structure_id=uca, matched_form_id=form_id)
+        insert_address_structure(sa_sync_conn, a2, structure_id=uca, is_confirmed=False)
 
         _, changed = batch_review_structure_link([a1, a2, a3], uca, True, repo=repo)
 

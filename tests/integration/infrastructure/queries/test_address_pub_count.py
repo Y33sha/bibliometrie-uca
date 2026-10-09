@@ -5,6 +5,7 @@ from sqlalchemy import text
 from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
 
 _Q = PgAddressPubCountQueries()
+from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
@@ -21,13 +22,7 @@ def _sa_for_pub(conn, pub_id, source_id):
 
 def _link_address(conn, sa_id, raw_text):
     """Rattache une adresse (créée à la volée, dédupliquée par md5) à une signature via `source_authorship_addresses`."""
-    addr_id = conn.execute(
-        text(
-            "INSERT INTO addresses (raw_text, normalized_text) VALUES (:r, lower(:r)) "
-            "ON CONFLICT (md5(raw_text)) DO UPDATE SET raw_text = EXCLUDED.raw_text RETURNING id"
-        ),
-        {"r": raw_text},
-    ).scalar_one()
+    addr_id = insert_address(conn, raw_text, reuse=True)
     insert_signature_address(conn, sa_id, address_id=addr_id)
     return addr_id
 
@@ -52,12 +47,7 @@ class TestRecomputePubCount:
 
     def test_resets_orphan_to_zero(self, sa_sync_conn):
         """Une adresse sans lien mais au pub_count figé (cache périmé) repasse à 0."""
-        addr = sa_sync_conn.execute(
-            text(
-                "INSERT INTO addresses (raw_text, normalized_text, pub_count) "
-                "VALUES ('Stale', 'stale', 42) RETURNING id"
-            )
-        ).scalar_one()
+        addr = insert_address(sa_sync_conn, "Stale", pub_count=42)
 
         _Q.recompute_pub_count(sa_sync_conn)
 

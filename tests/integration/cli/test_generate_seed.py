@@ -3,19 +3,14 @@
 Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comme celui-ci ont un smoke test, pour qu'un renommage de schéma ne les casse pas silencieusement — mypy et ruff ne voient pas les identifiants SQL portés par les chaînes `text()`.
 """
 
-from sqlalchemy import text
-
 from interfaces.cli.dev.generate_seed import COMMON_SEED, INSTITUTION_SEED, generate_seed
+from tests.integration.helpers.config import set_config
+from tests.integration.helpers.structures import insert_perimeter, insert_structure
 
 
 def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
     # Une ligne dans `perimeters` exerce la sérialisation d'un array integer[] et le recalage de séquence.
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO perimeters (code, name, root_structure_ids) "
-            "VALUES ('smoke', 'Smoke', '{1,2}')"
-        )
-    )
+    insert_perimeter(sa_sync_conn, "smoke", root_structure_ids=[1, 2], name="Smoke")
     common = tmp_path / "common.sql"
     institution = tmp_path / "institution.sql"
 
@@ -35,12 +30,12 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
 
 def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
     # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les porter.
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type, api_ids) "
-            "VALUES ('smoke', 'Smoke', 'universite', CAST(:api_ids AS jsonb))"
-        ),
-        {"api_ids": '{"openalex": ["I1"]}'},
+    insert_structure(
+        sa_sync_conn,
+        "smoke",
+        name="Smoke",
+        structure_type="universite",
+        api_ids={"openalex": ["I1"]},
     )
     out = tmp_path / "seed.sql"
 
@@ -53,13 +48,8 @@ def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
 
 def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
     # Les clés de périmètre désignent des périmètres de l'établissement : elles suivent son seed, les autres clés vont au seed commun.
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO config (key, value) "
-            "VALUES ('perimeter_persons', '\"smoke\"'), ('unpaywall_max_per_run', '5') "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
-        )
-    )
+    set_config(sa_sync_conn, "perimeter_persons", "smoke")
+    set_config(sa_sync_conn, "unpaywall_max_per_run", 5)
     common = tmp_path / "common.sql"
     institution = tmp_path / "institution.sql"
 

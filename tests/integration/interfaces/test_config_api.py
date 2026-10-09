@@ -8,6 +8,7 @@ La valeur antérieure n'est pas consignée : le journal la porte déjà, sous la
 import pytest
 
 from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.seeds import seed_config
 
 _CLE = "test_audit_config_key"
 
@@ -15,12 +16,7 @@ _CLE = "test_audit_config_key"
 @pytest.fixture
 def cle_posee(client):
     """Un paramètre existant : la route refuse une clé inconnue, qu'elle ne crée pas."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES (%s, to_jsonb('avant'::text)) "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (_CLE,),
-        )
+    seed_config(_CLE, "avant")
     yield _CLE
     with owner_pool() as cur:
         cur.execute("DELETE FROM config WHERE key = %s", (_CLE,))

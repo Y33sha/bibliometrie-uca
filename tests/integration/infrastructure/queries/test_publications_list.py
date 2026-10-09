@@ -15,20 +15,13 @@ from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
-from tests.integration.helpers.structures import add_authorship_structure
+from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+
+# Laboratoire « LAB ».
+_lab = partial(insert_structure, code="LAB")
 
 # Notice de titre « T ».
 _notice = partial(insert_source_publication, title="T")
-
-
-def _create_lab(conn):
-    row = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES ('LAB', 'LAB', 'labo'::structure_type) RETURNING id"
-        )
-    ).one()
-    return row.id
 
 
 def _attach(conn, pub_id, lab_id):
@@ -58,7 +51,7 @@ def _link_subject(conn, pub_id, sid):
 
 class TestSearch:
     def test_search_matches_title(self, sa_sync_conn):
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         match = insert_publication(sa_sync_conn, "Quantum entanglement basics")
         other = insert_publication(sa_sync_conn, "Foo bar baz")
         _attach(sa_sync_conn, match, lab)
@@ -78,7 +71,7 @@ class TestSearch:
     def test_search_matches_subject_label(self, sa_sync_conn):
         """Une publi dont le titre ne contient pas le terme mais qui est
         annotée par un sujet matchant doit remonter dans les résultats."""
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         pub = insert_publication(sa_sync_conn, "Foo bar baz")
         unrelated = insert_publication(sa_sync_conn, "Hello world")
         _attach(sa_sync_conn, pub, lab)
@@ -101,7 +94,7 @@ class TestSearch:
     def test_title_match_ranks_before_subject_only_match(self, sa_sync_conn):
         """Les publis dont le titre matche remontent avant celles qui ne
         matchent que via un sujet — quitte à casser l'ordre par défaut."""
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         # Titre contient "quantum"
         title_match = insert_publication(sa_sync_conn, "Quantum entanglement basics")
         # Titre ne contient pas "quantum", mais sujet associé oui
@@ -124,7 +117,7 @@ class TestSearch:
 
     def test_search_unaccented_matches_accented_label(self, sa_sync_conn):
         """Les accents ne doivent pas bloquer le match (ILIKE + unaccent)."""
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         pub = insert_publication(sa_sync_conn, "Foo")
         _attach(sa_sync_conn, pub, lab)
         sid = _create_subject(sa_sync_conn, "Économétrie")
@@ -144,7 +137,7 @@ class TestSearch:
     def test_facets_respect_search(self, sa_sync_conn):
         """Régression : les comptes de facettes suivent la recherche titre, pas
         seulement les autres filtres (la facette doit refléter le tableau)."""
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         for title in ("quantum gravity", "classical mechanics"):
             pid = insert_publication(sa_sync_conn, title=title)
             _attach(sa_sync_conn, pid, lab)
@@ -168,21 +161,10 @@ class TestHalStatusMultipleHalEntries:
     une de ses entrées HAL contient la collection du labo. Et le champ
     `hal_collections` renvoyé doit fusionner les collections des entrées."""
 
-    @staticmethod
-    def _make_lab_with_collection(conn, collection: str) -> int:
-        row = conn.execute(
-            text(
-                "INSERT INTO structures (code, name, structure_type, hal_collection) "
-                "VALUES ('LAB', 'LAB', 'labo'::structure_type, :col) RETURNING id"
-            ),
-            {"col": collection},
-        ).one()
-        return row.id
-
     def test_pub_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
         non. Doit être exclue du filtre `hors_collection`."""
-        lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
+        lab = _lab(sa_sync_conn, hal_collection="CMH")
         pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
         _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
@@ -205,7 +187,7 @@ class TestHalStatusMultipleHalEntries:
     def test_hal_collections_unions_all_hal_entries(self, sa_sync_conn):
         """`hal_collections` renvoyé par l'API = union des collections des
         entrées HAL (pas une entrée arbitraire prise au hasard)."""
-        lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
+        lab = _lab(sa_sync_conn, hal_collection="CMH")
         pub = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, pub, lab)
         _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
@@ -225,7 +207,7 @@ class TestHalStatusMultipleHalEntries:
     def test_pub_only_outside_collection_is_hors_collection(self, sa_sync_conn):
         """Cas symétrique : si aucune entrée HAL n'est dans la collection,
         la publi tombe bien dans `hors_collection`."""
-        lab = self._make_lab_with_collection(sa_sync_conn, "CMH")
+        lab = _lab(sa_sync_conn, hal_collection="CMH")
         pub = insert_publication(sa_sync_conn, "Outside only")
         _attach(sa_sync_conn, pub, lab)
         _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT"])
@@ -243,12 +225,7 @@ class TestHalStatusMultipleHalEntries:
     def test_ok_without_declared_collection_matches_nothing(self, sa_sync_conn):
         """Labo dont la collection HAL est absente : le filtre `ok` (en collection + accès
         ouvert) rend zéro publication."""
-        lab = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structures (code, name, structure_type) "
-                "VALUES ('LABNC', 'LABNC', 'labo'::structure_type) RETURNING id"
-            )
-        ).scalar_one()
+        lab = insert_structure(sa_sync_conn, "LABNC")
         pub = insert_publication(sa_sync_conn, "Open in HAL")
         _attach(sa_sync_conn, pub, lab)
         _notice(sa_sync_conn, pub, source_id="hal-x", hal_collections=["SOME-COL"])
@@ -272,7 +249,7 @@ class TestThesesExport:
     """Export CSV des thèses : la boucle de rendu lit chaque colonne du SELECT, donc un test avec données garde le contrat SQL du CSV et son projeté d'accord."""
 
     def test_renders_a_thesis_with_each_source_url(self, sa_sync_conn):
-        lab = _create_lab(sa_sync_conn)
+        lab = _lab(sa_sync_conn)
         pub = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
         _attach(sa_sync_conn, pub, lab)
         for src, sid in (
@@ -304,14 +281,7 @@ class TestExcludedPersonLab:
 
     def test_lab_of_excluded_person_drops_the_publication(self, sa_sync_conn):
         lab_excluded, lab_kept = (
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO structures (code, name, structure_type) "
-                    "VALUES (:c, :c, 'labo'::structure_type) RETURNING id"
-                ),
-                {"c": code},
-            ).scalar_one()
-            for code in ("LAB-EXCLUE", "LAB-RETENUE")
+            insert_structure(sa_sync_conn, code) for code in ("LAB-EXCLUE", "LAB-RETENUE")
         )
         pub = insert_publication(sa_sync_conn, "Copublication")
         for exclusion, lab in (("out_of_perimeter", lab_excluded), (None, lab_kept)):

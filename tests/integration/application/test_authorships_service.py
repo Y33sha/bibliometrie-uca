@@ -20,7 +20,7 @@ from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQuer
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
-from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
@@ -30,7 +30,10 @@ from tests.integration.helpers.sources import (
     insert_signature_address,
     insert_source_publication,
 )
-from tests.integration.helpers.structures import insert_structure, refresh_structure_matviews
+from tests.integration.helpers.structures import (
+    insert_persons_perimeter,
+    refresh_structure_matviews,
+)
 
 # Publication « Test Article » sans titre normalisé ni type.
 _publication = partial(
@@ -55,26 +58,6 @@ def repo(sa_sync_conn):
 
 
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
-
-
-def _create_perimeter(conn, code, name, structure_ids):
-    row = conn.execute(
-        text(
-            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:c, :n, :sids) RETURNING id"
-        ),
-        {"c": code, "n": name, "sids": structure_ids},
-    ).one()
-    return row.id
-
-
-def _link_address_structure(conn, address_id, structure_id, is_confirmed=True):
-    conn.execute(
-        text(
-            "INSERT INTO address_structures (address_id, structure_id, is_confirmed) "
-            "VALUES (:aid, :sid, :ic)"
-        ),
-        {"aid": address_id, "sid": structure_id, "ic": is_confirmed},
-    )
 
 
 # ── exclude_authorship ────────────────────────────────────────
@@ -489,9 +472,7 @@ class TestPropagateUcaForAddresses:
         """
         from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
-        uca_id = insert_structure(conn, "UCA", name="UCA", structure_type="universite")
-        _create_perimeter(conn, "uca", "UCA", [uca_id])
-        set_config(conn, "perimeter_persons", "uca")
+        uca_id = insert_persons_perimeter(conn)
         set_config(conn, "perimeter_extraction", "uca")
         refresh_perimeter_structures(conn)
         return uca_id
@@ -529,7 +510,7 @@ class TestPropagateUcaForAddresses:
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
+        insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=True)
         insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(
@@ -581,7 +562,7 @@ class TestPropagateUcaForAddresses:
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id, in_perimeter=True
         )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)
+        insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=False)
         insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(

@@ -1,11 +1,14 @@
 """Idempotence : phase `populate_affiliations` (propagation périmètre/structures)."""
 
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
     insert_source_publication,
 )
+from tests.integration.helpers.structures import insert_perimeter, insert_structure, insert_tutelle
 
 
 def _setup_affiliations_test_data(conn):
@@ -17,40 +20,23 @@ def _setup_affiliations_test_data(conn):
     au labo via une adresse résolue. Un authorship HAL coexiste sans
     résolution d'adresse (sert pour l'idempotence des comptages).
     """
-    from sqlalchemy import text
 
-    conn.execute(
-        text("""
-            INSERT INTO config (key, value) VALUES
-                ('perimeter_extraction', '"alliance_uca"'),
-                ('perimeter_persons', '"uca"')
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """)
+    set_config(conn, "perimeter_extraction", "alliance_uca")
+    set_config(conn, "perimeter_persons", "uca")
+    insert_perimeter(conn, "uca", root_structure_ids=[80000], name="UCA restreint", replace=True)
+    insert_perimeter(
+        conn, "alliance_uca", root_structure_ids=[80000], name="UCA large", replace=True
     )
-
-    conn.execute(
-        text("""
-            INSERT INTO perimeters (code, name, root_structure_ids) VALUES
-                ('uca', 'UCA restreint', ARRAY[80000]),
-                ('alliance_uca', 'UCA large', ARRAY[80000])
-            ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids
-        """)
+    insert_structure(
+        conn,
+        "UCA",
+        row_id=80000,
+        name="Université Clermont Auvergne",
+        acronym="UCA",
+        structure_type="universite",
     )
-
-    conn.execute(
-        text("""
-            INSERT INTO structures (id, code, name, acronym, structure_type)
-            VALUES (80000, 'UCA', 'Université Clermont Auvergne', 'UCA', 'universite'),
-                   (80001, 'LABO-TEST', 'Laboratoire Test', 'LT', 'labo')
-        """)
-    )
-
-    conn.execute(
-        text("""
-            INSERT INTO structure_tutelles (parent_id, child_id)
-            VALUES (80000, 80001)
-        """)
-    )
+    insert_structure(conn, "LABO-TEST", row_id=80001, name="Laboratoire Test", acronym="LT")
+    insert_tutelle(conn, 80000, child_id=80001)
 
     insert_publication(conn, "Pub Affiliation Test", row_id=80001)
 
@@ -78,18 +64,13 @@ def _setup_affiliations_test_data(conn):
             in_perimeter=False,
         )
 
-    conn.execute(
-        text("""
-            INSERT INTO addresses (id, raw_text, normalized_text)
-            VALUES (80001, 'Laboratoire Test, UCA, Clermont-Ferrand', 'laboratoire test uca clermont ferrand')
-        """)
+    insert_address(
+        conn,
+        "Laboratoire Test, UCA, Clermont-Ferrand",
+        row_id=80001,
+        normalized_text="laboratoire test uca clermont ferrand",
     )
-    conn.execute(
-        text("""
-            INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-            VALUES (80001, 80001, TRUE)
-        """)
-    )
+    insert_address_structure(conn, 80001, structure_id=80001, is_confirmed=True)
     insert_signature_address(conn, 80002, address_id=80001)
 
     # `source_authorship_structures` (matview) filtre par `perimeter_structures` :

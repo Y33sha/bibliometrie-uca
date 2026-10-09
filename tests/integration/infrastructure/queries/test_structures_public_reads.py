@@ -6,34 +6,30 @@ from sqlalchemy import text
 
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.structures import PgStructuresQueries
+from tests.integration.helpers.addresses import (
+    ensure_country,
+    insert_address,
+    insert_address_structure,
+)
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.structures import (
+    add_authorship_structure,
+    insert_persons_perimeter,
+    insert_structure,
+    insert_tutelle,
+)
 
 # Authorship du périmètre, de rôle auteur.
 _lab_author = partial(insert_authorship, in_perimeter=True, roles=["author"])
 
 
 def _setup_perimeter(conn, lab_ids, code="uca"):
-    root = insert_structure(conn, code.upper(), structure_type="universite")
-    all_ids = [root] + list(lab_ids)
-    conn.execute(
-        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:c, :n, :ids)"),
-        {"c": code, "n": code.upper(), "ids": all_ids},
-    )
-    conn.execute(
-        text(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', to_jsonb(CAST(:c AS text)))"
-        ),
-        {"c": code},
-    )
+    root = insert_persons_perimeter(conn, code, extra_root_ids=lab_ids)
     # tutelle de la racine sur chaque descendant
     for lab in lab_ids:
-        conn.execute(
-            text("INSERT INTO structure_tutelles (parent_id, child_id) VALUES (:p, :c)"),
-            {"p": root, "c": lab},
-        )
+        insert_tutelle(conn, root, child_id=lab)
     # Matérialise la clôture du périmètre : `get_perimeter_structure_ids` lit la table
     # `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
     refresh_perimeter_structures(conn)
@@ -121,16 +117,8 @@ class TestGetLaboratory:
 class TestGetLaboratoryAddresses:
     def test_lists_linked_addresses(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB")
-        addr = sa_sync_conn.execute(
-            text("INSERT INTO addresses (raw_text, normalized_text) VALUES ('A', 'a') RETURNING id")
-        ).scalar_one()
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_structures (address_id, structure_id, is_confirmed) "
-                "VALUES (:a, :s, TRUE)"
-            ),
-            {"a": addr, "s": lab},
-        )
+        addr = insert_address(sa_sync_conn, "A")
+        insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=True)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
@@ -138,16 +126,8 @@ class TestGetLaboratoryAddresses:
 
     def test_excludes_rejected_links(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB")
-        addr = sa_sync_conn.execute(
-            text("INSERT INTO addresses (raw_text, normalized_text) VALUES ('R', 'r') RETURNING id")
-        ).scalar_one()
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_structures (address_id, structure_id, is_confirmed) "
-                "VALUES (:a, :s, FALSE)"
-            ),
-            {"a": addr, "s": lab},
-        )
+        addr = insert_address(sa_sync_conn, "R")
+        insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=False)
         res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr not in ids
@@ -163,9 +143,7 @@ class TestGetLaboratoryDashboard:
         assert res.top_countries == []
 
     def test_aggregates_oa_and_countries(self, sa_sync_conn):
-        sa_sync_conn.execute(
-            text("INSERT INTO countries (code, name) VALUES ('us', 'USA') ON CONFLICT DO NOTHING")
-        )
+        ensure_country(sa_sync_conn, "us", "USA")
         lab = insert_structure(sa_sync_conn, "LAB")
         pid = insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"])

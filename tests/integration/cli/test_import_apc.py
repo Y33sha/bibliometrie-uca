@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.repositories import publication_repository
 from interfaces.cli.imports.import_apc import import_payments
+from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
 
 
 def _payment(
@@ -76,25 +77,13 @@ def test_reimport_sans_doublon(sa_sync_conn):
 def test_laboratoire_et_payeur_rattaches_par_les_formes_de_noms(sa_sync_conn):
     """Le payeur sert de contexte à une forme de laboratoire valable seulement en présence de son établissement."""
     _publication(sa_sync_conn, "10.9/apc-d")
-    university, lab = (
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO structures (code, name, structure_type)"
-                " VALUES (:c, :n, CAST(:t AS structure_type)) RETURNING id"
-            ),
-            {"c": code, "n": name, "t": kind},
-        ).scalar_one()
-        for code, name, kind in (
-            ("TEST_APC_U", "Université test APC", "universite"),
-            ("TEST_APC_L", "Labo test APC", "labo"),
-        )
+    university = insert_structure(
+        sa_sync_conn, "TEST_APC_U", name="Université test APC", structure_type="universite"
     )
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary, requires_context_of)"
-            " VALUES (:u, 'universite test apc', false, NULL), (:l, 'ltapc', true, ARRAY[:u])"
-        ),
-        {"u": university, "l": lab},
+    lab = insert_structure(sa_sync_conn, "TEST_APC_L", name="Labo test APC")
+    insert_structure_name_form(sa_sync_conn, university, form_text="universite test apc")
+    insert_structure_name_form(
+        sa_sync_conn, lab, form_text="ltapc", requires_context_of=[university]
     )
     payment = {
         **_payment("10.9/apc-d", institution="Université Test APC", open_access_fee=False),

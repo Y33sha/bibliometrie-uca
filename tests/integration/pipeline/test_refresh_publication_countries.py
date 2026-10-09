@@ -15,6 +15,7 @@ from sqlalchemy import text
 
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.pipeline.countries import PgCountryQueries
+from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
@@ -47,16 +48,6 @@ def _insert_source_authorship(
     )
 
 
-def _insert_address(conn, raw_text: str, countries: list[str] | None) -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO addresses (raw_text, normalized_text, countries) "
-            "VALUES (:r, lower(:r), :c) RETURNING id"
-        ),
-        {"r": raw_text, "c": countries},
-    ).scalar_one()
-
-
 def _get_pub_countries(conn, pub_id: int) -> list[str] | None:
     return conn.execute(
         text("SELECT countries FROM publications WHERE id = :id"), {"id": pub_id}
@@ -84,7 +75,7 @@ class TestCascade:
         pub = insert_publication(sa_sync_conn)
         sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
-        addr = _insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
+        addr = insert_address(sa_sync_conn, "1 rue X, Paris, FR", countries=["fr"])
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         updated = refresh(sa_sync_conn, queries, log)
@@ -98,8 +89,8 @@ class TestCascade:
         pub = insert_publication(sa_sync_conn)
         sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
-        a1 = _insert_address(sa_sync_conn, "addr FR", countries=["fr"])
-        a2 = _insert_address(sa_sync_conn, "addr US", countries=["us"])
+        a1 = insert_address(sa_sync_conn, "addr FR", countries=["fr"])
+        a2 = insert_address(sa_sync_conn, "addr US", countries=["us"])
         insert_signature_address(sa_sync_conn, sa, address_id=a1)
         insert_signature_address(sa_sync_conn, sa, address_id=a2)
 
@@ -116,8 +107,8 @@ class TestCascade:
         sp_hal = _notice(sa_sync_conn, pub, source_id="hal-1", source="hal")
         sa_oa = _insert_source_authorship(sa_sync_conn, sp_oa, source="openalex")
         sa_hal = _insert_source_authorship(sa_sync_conn, sp_hal, source="hal", position=1)
-        a_fr = _insert_address(sa_sync_conn, "addr Paris", countries=["fr"])
-        a_de = _insert_address(sa_sync_conn, "addr Berlin", countries=["de"])
+        a_fr = insert_address(sa_sync_conn, "addr Paris", countries=["fr"])
+        a_de = insert_address(sa_sync_conn, "addr Berlin", countries=["de"])
         insert_signature_address(sa_sync_conn, sa_oa, address_id=a_fr)
         insert_signature_address(sa_sync_conn, sa_hal, address_id=a_de)
 
@@ -145,7 +136,7 @@ class TestIdempotence:
         pub = insert_publication(sa_sync_conn)
         sp = _notice(sa_sync_conn, pub, source_id="W1")
         sa = _insert_source_authorship(sa_sync_conn, sp)
-        addr = _insert_address(sa_sync_conn, "addr", countries=["fr"])
+        addr = insert_address(sa_sync_conn, "addr", countries=["fr"])
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         first = refresh(sa_sync_conn, queries, log)
@@ -167,7 +158,7 @@ class TestCleanup:
             text("UPDATE source_publications SET countries = ARRAY['fr'] WHERE id = :id"),
             {"id": sp},
         )
-        addr = _insert_address(sa_sync_conn, "addr no country", countries=None)
+        addr = insert_address(sa_sync_conn, "addr no country")
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
         refresh(sa_sync_conn, queries, log)

@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import text
 
 from domain.config import PUBLIC_CONFIG_KEYS
+from tests.integration.helpers.config import set_config
 from tests.integration.interfaces.conftest import _build_test_sync_engine
 
 
@@ -34,17 +35,7 @@ def config_keys_seeded():
     # Pose sous l'identité propriétaire : l'API, qui se connecte sous le rôle restreint, met à
     # jour la configuration sans jamais y ajouter de clé.
     with _owner_engine().begin() as conn:
-        added = [
-            k
-            for k in keys
-            if conn.execute(
-                text(
-                    "INSERT INTO config (key, value) VALUES (:k, to_jsonb('x'::text)) "
-                    "ON CONFLICT (key) DO NOTHING RETURNING key"
-                ),
-                {"k": k},
-            ).scalar_one_or_none()
-        ]
+        added = [k for k in keys if set_config(conn, k, "x", replace=False)]
     yield
     if added:
         with _owner_engine().begin() as conn:
@@ -57,9 +48,7 @@ def reserved_config_key():
     key = "reglage_hors_liste_blanche"
     assert key not in PUBLIC_CONFIG_KEYS
     with _owner_engine().begin() as conn:
-        conn.execute(
-            text("INSERT INTO config (key, value) VALUES (:k, to_jsonb('x'::text))"), {"k": key}
-        )
+        set_config(conn, key, "x")
     yield key
     with _owner_engine().begin() as conn:
         conn.execute(text("DELETE FROM config WHERE key = :k"), {"k": key})

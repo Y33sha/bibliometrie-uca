@@ -1,13 +1,11 @@
 """Tests d'intégration pour `infrastructure.read_models.authorships`."""
 
-from sqlalchemy import text
-
 from application.ports.read_models.authorships_queries import OrphanFilters
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
-from tests.integration.helpers.structures import add_source_authorship_structure
+from tests.integration.helpers.structures import add_source_authorship_structure, insert_structure
 
 
 class TestOrphanAuthorshipsCount:
@@ -116,13 +114,7 @@ class TestListOrphanAuthorships:
     def _labs_setup(self, conn):
         """Signature « Zzorph Avec » au labo LAB et à une équipe ; « Zzorph Autre » au labo AUTRE ; « Zzorph Sans » sans structure."""
         lab, other_lab, team = (
-            conn.execute(
-                text(
-                    "INSERT INTO structures (code, name, acronym, structure_type) "
-                    "VALUES (:c, :c, :a, CAST(:t AS structure_type)) RETURNING id"
-                ),
-                {"c": code, "a": acronym, "t": stype},
-            ).scalar_one()
+            insert_structure(conn, code, acronym=acronym, structure_type=stype)
             for code, acronym, stype in (
                 ("ORPH-LAB", "LAB", "labo"),
                 ("ORPH-OTHER", "AUTRE", "labo"),

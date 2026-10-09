@@ -14,7 +14,7 @@ from tests.integration.helpers.journals import insert_monograph, insert_publishe
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
-from tests.integration.helpers.structures import add_authorship_structure
+from tests.integration.helpers.structures import add_authorship_structure, insert_structure
 
 
 class TestGetPublicationDetail:
@@ -162,13 +162,7 @@ class TestGetPublicationDetail:
         assert [a.full_name for a in detail.openalex_authorships] == ["Bob"]
 
     def test_aggregates_structures(self, sa_sync_conn):
-        lab_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structures (code, name, structure_type) "
-                "VALUES ('LAB-X', 'Labo X', 'labo') RETURNING id"
-            )
-        ).one()
-        lab_id = lab_row.id
+        lab_id = insert_structure(sa_sync_conn, "LAB-X", name="Labo X")
 
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn)

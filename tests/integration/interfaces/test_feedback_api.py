@@ -6,29 +6,14 @@ Couvre :
 - /api/feedback/false-positives : idem
 """
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_address,
+    seed_address_structure,
     seed_structure,
     seed_structure_name_form,
     uniq,
 )
-
-
-def _seed_ast(
-    address_id: int,
-    structure_id: int,
-    matched_form_id: int | None = None,
-    is_confirmed: bool | None = None,
-) -> int:
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO address_structures (address_id, structure_id, matched_form_id, is_confirmed) "
-            "VALUES (%s, %s, %s, %s) RETURNING id",
-            (address_id, structure_id, matched_form_id, is_confirmed),
-        )
-        return cur.fetchone()["id"]
-
 
 _cleanup_after_module = truncate_after_module(
     "address_structures", "addresses", "structure_name_forms", "structures", "audit_log"
@@ -57,23 +42,23 @@ class TestFeedbackStats:
 
         # concordant_valid : confirmed + detected
         a1 = seed_address(uniq("a1"))
-        _seed_ast(a1, sid, matched_form_id=fid, is_confirmed=True)
+        seed_address_structure(a1, structure_id=sid, matched_form_id=fid, is_confirmed=True)
 
         # concordant_rejected : rejected + not detected
         a2 = seed_address(uniq("a2"))
-        _seed_ast(a2, sid, matched_form_id=None, is_confirmed=False)
+        seed_address_structure(a2, structure_id=sid, is_confirmed=False)
 
         # false_negative : confirmed mais non détectée
         a3 = seed_address(uniq("a3"))
-        _seed_ast(a3, sid, matched_form_id=None, is_confirmed=True)
+        seed_address_structure(a3, structure_id=sid, is_confirmed=True)
 
         # false_positive : détectée mais rejetée
         a4 = seed_address(uniq("a4"))
-        _seed_ast(a4, sid, matched_form_id=fid, is_confirmed=False)
+        seed_address_structure(a4, structure_id=sid, matched_form_id=fid, is_confirmed=False)
 
         # pending : détectée mais pas encore review
         a5 = seed_address(uniq("a5"))
-        _seed_ast(a5, sid, matched_form_id=fid, is_confirmed=None)
+        seed_address_structure(a5, structure_id=sid, matched_form_id=fid)
 
         r = client.get("/api/feedback/stats", params={"structure_id": sid})
         assert r.status_code == 200
@@ -106,7 +91,7 @@ class TestFeedbackFalseNegatives:
     def test_with_results(self, client):
         sid = seed_structure()
         a = seed_address("Université de Clermont-Ferrand FN")
-        _seed_ast(a, sid, matched_form_id=None, is_confirmed=True)
+        seed_address_structure(a, structure_id=sid, is_confirmed=True)
 
         r = client.get("/api/feedback/false-negatives", params={"structure_id": sid})
         assert r.status_code == 200
@@ -116,10 +101,10 @@ class TestFeedbackFalseNegatives:
     def test_search_filter(self, client):
         sid = seed_structure()
         target = seed_address("Marqueur Unique Search Target")
-        _seed_ast(target, sid, matched_form_id=None, is_confirmed=True)
+        seed_address_structure(target, structure_id=sid, is_confirmed=True)
         # Bruit non matché
         other = seed_address("Paris")
-        _seed_ast(other, sid, matched_form_id=None, is_confirmed=True)
+        seed_address_structure(other, structure_id=sid, is_confirmed=True)
 
         r = client.get(
             "/api/feedback/false-negatives",
@@ -152,7 +137,7 @@ class TestFeedbackFalsePositives:
         sid = seed_structure()
         fid = seed_structure_name_form(sid)
         a = seed_address("Adresse FP détectée mais rejetée")
-        _seed_ast(a, sid, matched_form_id=fid, is_confirmed=False)
+        seed_address_structure(a, structure_id=sid, matched_form_id=fid, is_confirmed=False)
 
         r = client.get("/api/feedback/false-positives", params={"structure_id": sid})
         assert r.status_code == 200
@@ -163,9 +148,9 @@ class TestFeedbackFalsePositives:
         sid = seed_structure()
         fid = seed_structure_name_form(sid)
         target = seed_address("FPUnique Target Address")
-        _seed_ast(target, sid, matched_form_id=fid, is_confirmed=False)
+        seed_address_structure(target, structure_id=sid, matched_form_id=fid, is_confirmed=False)
         other = seed_address("Lyon")
-        _seed_ast(other, sid, matched_form_id=fid, is_confirmed=False)
+        seed_address_structure(other, structure_id=sid, matched_form_id=fid, is_confirmed=False)
 
         r = client.get(
             "/api/feedback/false-positives",
