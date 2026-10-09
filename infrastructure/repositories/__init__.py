@@ -20,6 +20,7 @@ from application.ports.repositories.perimeter_repository import PerimeterReposit
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.ror_repository import RorRepository
 from application.ports.repositories.structure_repository import StructureRepository
 
 from .address_repository import PgAddressRepository
@@ -31,6 +32,7 @@ from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
+from .ror_repository import PgRorRepository
 from .structure_repository import PgStructureRepository
 
 
@@ -68,6 +70,10 @@ def publication_repository(conn: Connection) -> PublicationRepository:
 
 def publisher_repository(conn: Connection) -> PublisherRepository:
     return PgPublisherRepository(conn)
+
+
+def ror_repository(conn: Connection) -> RorRepository:
+    return PgRorRepository(conn)
 
 
 def structure_repository(conn: Connection) -> StructureRepository:

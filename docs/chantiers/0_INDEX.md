@@ -8,6 +8,7 @@
 
 ### Non commencé
 
+- [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](METIER_conferences-et-actes.md)
 - [Duplications dans les tests](CODE_duplications-tests.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)

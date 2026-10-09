@@ -25,6 +25,8 @@ API_BASE_URLS: dict[str, str] = {
     "doaj": "https://doaj.org/api",
     # Sudoc : racine, l'adapter compose `/services/issn2ppn/<ISSN>` et `/<ppn>.xml`.
     "sudoc": "https://www.sudoc.fr",
+    # Versions du dump ROR publiées sur Zenodo, communauté `ror-data`.
+    "zenodo_ror": "https://zenodo.org/api/communities/ror-data/records",
 }
 
 
