@@ -27,16 +27,11 @@ def sortie_capturee(monkeypatch):
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
 
 
-class _MoteurSansBase:
-    def connect(self):
-        return contextlib.nullcontext()
-
-
 @pytest.fixture
 def delai_de_rafraichissement(monkeypatch):
     """Configuration lue par les libellés de phase, sans base : les documents se rafraîchissent après 7 jours."""
     delai = {"jours": 7}
-    monkeypatch.setattr("infrastructure.db.engine.get_sync_engine", _MoteurSansBase)
+    monkeypatch.setattr("interfaces.cli.run_pipeline.open_tx", contextlib.nullcontext)
     monkeypatch.setattr(
         "infrastructure.sources.config.get_fetch_stale_after_days", lambda conn: delai["jours"]
     )
