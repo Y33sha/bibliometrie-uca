@@ -1,4 +1,4 @@
-"""Adapter WoS pour `application.pipeline.extract.fetch_stale`.
+"""Adapter WoS pour `application.pipeline.fetch_stale.phase`.
 
 Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced Search `UT=(<ut>)`. Un lot sans correspondance (HTTP 400) ou une réponse valide sans record = UT confirmé absent.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

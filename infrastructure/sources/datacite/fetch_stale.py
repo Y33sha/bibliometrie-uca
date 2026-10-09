@@ -1,4 +1,4 @@
-"""Adapter DataCite pour `application.pipeline.extract.fetch_stale`.
+"""Adapter DataCite pour `application.pipeline.fetch_stale.phase`.
 
 DataCite est native du DOI pour ses préfixes : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /dois/{doi}` (nœud JSON:API unique). Un 404 = DOI confirmé absent.
 """
@@ -10,7 +10,7 @@ import urllib.parse
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

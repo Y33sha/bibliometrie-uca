@@ -1,6 +1,6 @@
 """Port : refetch d'une row `staging` stale par son identifiant natif.
 
-La phase `fetch_stale` (cf. `application.pipeline.extract.fetch_stale.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
+La phase `fetch_stale` (cf. `application.pipeline.fetch_stale.phase.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
 
 `fetch_by_native_id` a trois issues, portées par le type de retour :
 

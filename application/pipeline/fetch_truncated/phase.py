@@ -22,7 +22,7 @@ from application.pipeline.context import PhaseContext
 from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
-from application.ports.pipeline.extract.fetch_truncated import (
+from application.ports.pipeline.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )

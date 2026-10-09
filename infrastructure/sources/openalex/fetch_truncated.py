@@ -1,8 +1,8 @@
-"""Adapter OpenAlex pour `application.pipeline.extract.fetch_truncated`.
+"""Adapter OpenAlex pour `application.pipeline.fetch_truncated.phase`.
 
 HTTP (un appel par work) + SELECT (works marqués `staging.authors_truncated`) + UPDATE staging.raw_data (efface le flag, sans recalcul de raw_hash).
 
-L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `application.pipeline.extract.fetch_truncated`.
+L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `application.pipeline.fetch_truncated.phase`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.extract.fetch_truncated import (
+from application.ports.pipeline.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )

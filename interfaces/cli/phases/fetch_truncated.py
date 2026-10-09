@@ -10,9 +10,9 @@ def build() -> Phase:
 
     L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. La phase repère les lignes staging openalex à 100 auteurs restées `processed=FALSE`, et les re-télécharge en paginant leurs auteurs. Sa position, après `fetch_stale` et avant `normalize`, lui donne à voir les works tronqués que les phases de rattrapage viennent de ramener.
 
-    Séquence et métriques dans `application/pipeline/extract/fetch_truncated.py`.
+    Séquence et métriques dans `application/pipeline/fetch_truncated/phase.py`.
     """
-    from application.pipeline.extract.fetch_truncated import FetchTruncatedPhase
+    from application.pipeline.fetch_truncated.phase import FetchTruncatedPhase
     from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
     return FetchTruncatedPhase(PgOpenalexFetchTruncatedAdapter())

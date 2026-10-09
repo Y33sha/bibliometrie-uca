@@ -6,8 +6,8 @@ from sqlalchemy import text
 from domain.publications.identifiers import clean_doi
 from infrastructure.fingerprint import fingerprint
 from infrastructure.pipeline.change_detection import change_detection_hash
-from infrastructure.pipeline.extract.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
+from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 # ── fingerprint ─────────────────────────────────────────────────

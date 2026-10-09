@@ -2,7 +2,7 @@
 
 import logging
 
-from application.pipeline.extract.fetch_stale import FetchStalePhase
+from application.pipeline.fetch_stale.phase import FetchStalePhase
 from application.pipeline.metrics import PhaseMetrics
 
 

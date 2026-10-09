@@ -10,8 +10,8 @@ import asyncio
 import logging
 from unittest.mock import MagicMock
 
-from application.pipeline.extract.fetch_stale import refresh
-from application.ports.pipeline.extract.fetch_stale import (
+from application.pipeline.fetch_stale.phase import refresh
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     StaleRow,
@@ -88,7 +88,7 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch):
     """Le compteur de la barre porte les documents retrouvés à la source ; une disparition ou une erreur fait seulement avancer la barre."""
     from contextlib import contextmanager
 
-    from application.pipeline.extract import fetch_stale
+    from application.pipeline.fetch_stale import phase as fetch_stale
 
     class _Spy:
         avances = 0

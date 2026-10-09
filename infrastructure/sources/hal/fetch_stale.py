@@ -1,4 +1,4 @@
-"""Adapter HAL pour `application.pipeline.extract.fetch_stale`.
+"""Adapter HAL pour `application.pipeline.fetch_stale.phase`.
 
 Refetch d'une row par son hal-id (`staging.source_id`) via une requête Solr `halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro doc.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

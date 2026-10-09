@@ -2,7 +2,7 @@
 
 Sélectionne les rows dont `last_seen_at` date de plus que le délai `fetch_stale_after_days` et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
 
-Trois issues par row (cf. `application.ports.pipeline.extract.fetch_stale`) :
+Trois issues par row (cf. `application.ports.pipeline.fetch_stale`) :
 
 - record trouvé → UPSERT (`raw_data` rafraîchi si le hash change, `last_seen_at` toujours bumpé) ;
 - absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
@@ -31,7 +31,7 @@ from application.pipeline.modes import MODES
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.extract.fetch_stale import (
+from application.ports.pipeline.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,

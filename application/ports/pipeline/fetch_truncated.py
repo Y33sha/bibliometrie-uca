@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.sources.openalex.fetch_truncated.PgOpenalexFetchTruncatedAdapter`.
 
-L'orchestrateur (`application.pipeline.extract.fetch_truncated.refetch`) consomme ce Protocol pour piloter une boucle async qui appelle l'API work-par-work.
+L'orchestrateur (`application.pipeline.fetch_truncated.phase.refetch`) consomme ce Protocol pour piloter une boucle async qui appelle l'API work-par-work.
 """
 
 from __future__ import annotations
