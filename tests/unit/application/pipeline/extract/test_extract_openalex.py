@@ -5,7 +5,6 @@ Pas de réseau ni de base : un faux `OpenalexExtractAdapter` sert des pages scri
 
 from __future__ import annotations
 
-import argparse
 import logging
 from unittest.mock import MagicMock
 
@@ -16,7 +15,7 @@ from application.pipeline.extract.extract_openalex import OpenalexExtractor, ext
 from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.openalex import OpenalexExtractConfig
-from tests.helpers.extractors import extracteur
+from tests.helpers.extractors import arguments_du_run, extracteur
 
 _LOGGER = logging.getLogger("test")
 
@@ -80,22 +79,18 @@ def _config(**surcharges) -> OpenalexExtractConfig:
     return OpenalexExtractConfig(**valeurs)
 
 
-def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"year": None, "start_year": None, "since": None}
-    valeurs.update(surcharges)
-    return argparse.Namespace(**valeurs)
-
-
 def test_run_parcourt_les_annees_de_la_configuration():
     adapter = _adapter([_page(1, count=1), _page(1, count=1)])
-    metrics = extracteur(OpenalexExtractor, adapter, _config(), [2023, 2024]).run(_args())
+    metrics = extracteur(OpenalexExtractor, adapter, _config(), [2023, 2024]).run(
+        arguments_du_run()
+    )
     assert metrics.new == 2
     assert [appel.kwargs["year"] for appel in adapter.count.call_args_list] == [2023, 2024]
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration():
     adapter = _adapter([_page(1, count=1)])
-    extracteur(OpenalexExtractor, adapter, _config(), [2020, 2021]).run(_args(year=2024))
+    extracteur(OpenalexExtractor, adapter, _config(), [2020, 2021]).run(arguments_du_run(year=2024))
     assert adapter.fetch_page.call_args.kwargs["year"] == 2024
 
 
@@ -103,7 +98,7 @@ def test_run_incremental_fait_une_seule_passe_sur_la_date():
     """Avec `--since`, l'extraction porte sur les documents modifiés depuis cette date, sans parcours par année."""
     adapter = _adapter([_page(1, count=1)])
     extracteur(OpenalexExtractor, adapter, _config(), [2020, 2021, 2022]).run(
-        _args(since="2026-01-01")
+        arguments_du_run(since="2026-01-01")
     )
     assert adapter.fetch_page.call_count == 1
     assert adapter.fetch_page.call_args.kwargs["since"] == "2026-01-01"
@@ -113,7 +108,7 @@ def test_run_incremental_fait_une_seule_passe_sur_la_date():
 def test_run_sans_institution_refuse():
     with pytest.raises(ExtractionConfigError, match="aucun institution_id"):
         extracteur(OpenalexExtractor, _adapter([]), _config(institution_ids=[]), [2024]).run(
-            _args()
+            arguments_du_run()
         )
 
 
@@ -124,7 +119,7 @@ def test_run_sans_identifiants_de_connexion_refuse():
             _adapter([]),
             _config(credentials_missing="clé API OpenAlex absente"),
             [],
-        ).run(_args())
+        ).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout():
@@ -132,7 +127,7 @@ def test_run_s_arrete_quand_la_source_est_a_bout():
     breaker = MagicMock()
     breaker.tripped = True
     metrics = extracteur(OpenalexExtractor, adapter, _config(), [2023, 2024]).run(
-        _args(), breaker=breaker
+        arguments_du_run(), breaker=breaker
     )
     assert metrics.total == 0
     assert adapter.fetch_page.call_count == 0

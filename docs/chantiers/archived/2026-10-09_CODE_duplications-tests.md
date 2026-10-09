@@ -25,7 +25,7 @@ Familles recensées, hors tests d'API :
 
 S'y ajoutent les fonctions communes aux tests des extracteurs (`_config`, `_avancement`, `_page`, `_extracteur`) et la fixture `_cleanup_after_module` des tests d'API, dont seule la liste des tables à vider change.
 
-Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_run`, `_row`, `_adapter`, `_args`, `_record`.
+Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_run`, `_row`, `_adapter`, `_record`. Seul `_args` recoupe quatre tests d'extracteurs.
 
 ## Décisions
 
@@ -50,8 +50,4 @@ Certains noms couvrent des fonctions sans rapport d'un fichier à l'autre : `_ru
 
 ### Phase 3 — Tests des extracteurs
 
-- [x] `_extracteur` (OpenAlex, ScanR, WoS) : `tests/helpers/extractors.extracteur`. `_page` et `_config` construisent la réponse et la configuration propres à chaque source. `_avancement` tient en une ligne qui nomme la source.
-
-## Questions ouvertes
-
-- `_run`, `_row`, `_adapter`, `_args`, `_record` : homonymes seulement, ou duplications partielles ?
+- [x] `_extracteur` (OpenAlex, ScanR, WoS) et `_args` (HAL, OpenAlex, ScanR, WoS) : `tests/helpers/extractors`. `_page` et `_config` construisent la réponse et la configuration propres à chaque source. `_avancement` tient en une ligne qui nomme la source.
