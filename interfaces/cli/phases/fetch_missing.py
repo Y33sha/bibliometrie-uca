@@ -6,7 +6,6 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from application.pipeline.context import Phase
-from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
 
@@ -43,7 +42,6 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    etape(log, "Recherche dans HAL des documents avec hal-id trouvés ailleurs")
     with open_tx() as conn:
         return asyncio.run(
             fetch_missing_hal_by_id(
@@ -61,7 +59,6 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    etape(log, "Recherche dans HAL des thèses avec NNT trouvées ailleurs")
     with open_tx() as conn:
         return asyncio.run(
             fetch_missing_hal_by_nnt(
