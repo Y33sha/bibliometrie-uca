@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import csv
 import logging
+import tempfile
 from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 import httpx2
 
@@ -92,3 +95,20 @@ def read_doaj_dump_rows(path: str) -> Iterator[dict[str, str]]:
     Générateur : le fichier reste ouvert tant qu'on itère (l'import consomme tout en une passe). Mutualisé entre la CLI (fichier local) et le pipeline (dump téléchargé)."""
     with open(path, encoding="utf-8") as f:
         yield from csv.DictReader(f)
+
+
+@contextmanager
+def downloaded_doaj_dump(
+    *, user_agent: str, logger: logging.Logger
+) -> Iterator[Iterator[dict[str, str]]]:
+    """Télécharge le dump CSV DOAJ et rend ses rows, le temps du bloc.
+
+    Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement peut contenir des sauts de ligne dans ses champs. Le répertoire temporaire est le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`). Le fichier est supprimé à la sortie du bloc.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        dump_path = tmp.name
+    try:
+        fetch_doaj_dump(dump_path, user_agent=user_agent, logger=logger)
+        yield read_doaj_dump_rows(dump_path)
+    finally:
+        Path(dump_path).unlink(missing_ok=True)

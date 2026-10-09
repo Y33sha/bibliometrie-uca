@@ -3,14 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
-import tempfile
-from pathlib import Path
 
 from application.pipeline.context import Phase
-from application.pipeline.libelles import etape
 from application.pipeline.metrics import PhaseMetrics
-from domain.dates import date_to_french
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
 
 
@@ -262,47 +257,23 @@ def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
-        run_import_doaj_dump,
+        run_enrich_journals_from_doaj,
     )
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.config import (
         get_doaj_refresh_after_days,
         get_polite_pool_email_optional,
     )
-    from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
+    from infrastructure.sources.doaj.client import downloaded_doaj_dump
     from infrastructure.sources.polite_pool import build_user_agent
 
+    # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
+    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
-        journal_repo = PgJournalGatewayQueries(conn)
-        last = journal_repo.doaj_last_import_at()
-        delai = datetime.timedelta(days=get_doaj_refresh_after_days(conn))
-        if last is not None and last > datetime.datetime.now(datetime.UTC) - delai:
-            prochain = last + delai
-            etape(
-                log,
-                "Référentiel DOAJ importé le %s : prochain import le %s",
-                date_to_french(last.date()),
-                date_to_french(prochain.date()),
-            )
-            return PhaseMetrics(extras={"skipped": 1})
-
-        etape(log, "Import du référentiel DOAJ")
-
-        # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
-        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-        # Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement
-        # peut contenir des sauts de ligne dans ses champs. Le répertoire temporaire est le seul
-        # emplacement en écriture du conteneur (`tmpfs` sur `/tmp`).
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            dump_path = tmp.name
-        try:
-            fetch_doaj_dump(dump_path, user_agent=user_agent, logger=log)
-            stats = run_import_doaj_dump(
-                conn,
-                log,
-                journal_repo=journal_repo,
-                rows=read_doaj_dump_rows(dump_path),
-            )
-        finally:
-            Path(dump_path).unlink(missing_ok=True)
-    return PhaseMetrics(extras={"matched": stats.matched})
+        return run_enrich_journals_from_doaj(
+            conn,
+            log,
+            journal_repo=PgJournalGatewayQueries(conn),
+            refresh_after_days=get_doaj_refresh_after_days(conn),
+            download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
+        )

@@ -2,18 +2,21 @@
 
 Bulk, set-based : indexe les `journals` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
-Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump (cf. `infrastructure.sources.doaj.fetch_doaj_dump`) — les deux passent un itérable de dicts `{colonne CSV: valeur}`.
+Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_journals_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: valeur}`.
 """
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord
+from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.journals import JournalDoajQueries
+from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
 
@@ -24,6 +27,9 @@ ISSN_KEYS = (
 )
 
 COMMIT_EVERY = 1000
+
+DownloadDump = Callable[[], AbstractContextManager[Iterable[dict[str, str]]]]
+"""Télécharge le dump DOAJ et rend ses rows, le temps du bloc."""
 
 
 @dataclass
@@ -109,3 +115,29 @@ def run_import_doaj_dump(
         accord(stats.matched, "revue", "revues"),
     )
     return stats
+
+
+def run_enrich_journals_from_doaj(
+    conn: Connection,
+    logger: logging.Logger,
+    *,
+    journal_repo: JournalDoajQueries,
+    refresh_after_days: int,
+    download_dump: DownloadDump,
+) -> PhaseMetrics:
+    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours."""
+    last = journal_repo.doaj_last_import_at()
+    delai = timedelta(days=refresh_after_days)
+    if last is not None and last > datetime.now(UTC) - delai:
+        etape(
+            logger,
+            "Référentiel DOAJ importé le %s : prochain import le %s",
+            date_to_french(last.date()),
+            date_to_french((last + delai).date()),
+        )
+        return PhaseMetrics(extras={"skipped": 1})
+
+    etape(logger, "Import du référentiel DOAJ")
+    with download_dump() as rows:
+        stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
+    return PhaseMetrics(extras={"matched": stats.matched})
