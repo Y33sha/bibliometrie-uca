@@ -5,8 +5,10 @@ La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, en
 
 from unittest.mock import patch
 
+from application.pipeline.context import RunOptions
 from application.pipeline.metrics import PhaseMetrics
-from interfaces.cli import run_pipeline
+from interfaces.cli.phases import publishers_journals
+from interfaces.cli.phases.execution import phase_context
 
 
 def _patch_credentials_present():
@@ -25,12 +27,16 @@ def test_phase_aggregates_substep_counters():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         _patch_credentials_present(),
-        patch.object(run_pipeline, "_run_resolve_publishers", return_value=publishers),
-        patch.object(run_pipeline, "_run_enrich_journals_from_openalex", return_value=openalex),
-        patch.object(run_pipeline, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()),
-        patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=doaj),
+        patch.object(publishers_journals, "_run_resolve_publishers", return_value=publishers),
+        patch.object(
+            publishers_journals, "_run_enrich_journals_from_openalex", return_value=openalex
+        ),
+        patch.object(
+            publishers_journals, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()
+        ),
+        patch.object(publishers_journals, "_run_enrich_journals_from_doaj", return_value=doaj),
     ):
-        metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
+        metrics = publishers_journals.build().run(phase_context(RunOptions()))
 
     # Les compteurs des sous-étapes sont remontés : le résumé n'est pas « no-op ».
     assert metrics.new == 1
@@ -48,15 +54,19 @@ def test_phase_propagates_substep_signals():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         _patch_credentials_present(),
-        patch.object(run_pipeline, "_run_resolve_publishers", return_value=publishers),
+        patch.object(publishers_journals, "_run_resolve_publishers", return_value=publishers),
         patch.object(
-            run_pipeline,
+            publishers_journals,
             "_run_enrich_journals_from_openalex",
             return_value=PhaseMetrics(),
         ),
-        patch.object(run_pipeline, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()),
-        patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()),
+        patch.object(
+            publishers_journals, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()
+        ),
+        patch.object(
+            publishers_journals, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()
+        ),
     ):
-        metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
+        metrics = publishers_journals.build().run(phase_context(RunOptions()))
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

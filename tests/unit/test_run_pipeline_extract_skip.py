@@ -1,4 +1,4 @@
-"""Skip propre des sources d'extraction non configurées (`phase_extract`).
+"""Skip propre des sources d'extraction non configurées (phase `extract`).
 
 Une source dont la config d'extraction manque (`ExtractionConfigError`) est
 sautée avec un signal `source_unconfigured` (warning), sans interrompre le run :
@@ -9,9 +9,11 @@ incrémentale (daily).
 
 from unittest.mock import patch
 
+from application.pipeline.context import RunOptions
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.metrics import PhaseMetrics
-from interfaces.cli import run_pipeline
+from interfaces.cli.phases import extract
+from interfaces.cli.phases.execution import phase_context
 
 
 def _table_keys(metrics: PhaseMetrics) -> set[str]:
@@ -26,11 +28,11 @@ def test_phase_extract_full_skips_unconfigured_source():
         return PhaseMetrics(new=7)
 
     with (
-        patch.object(run_pipeline, "_extraction_structure_count", return_value=1),
-        patch.object(run_pipeline, "_run_extract", side_effect=_extract),
+        patch.object(extract, "_extraction_structure_count", return_value=1),
+        patch.object(extract, "_run_extract", side_effect=_extract),
     ):
-        metrics = run_pipeline.phase_extract(
-            run_pipeline.RunOptions(mode="full", sources={"openalex", "theses"})
+        metrics = extract.build().run(
+            phase_context(RunOptions(mode="full", sources={"openalex", "theses"}))
         )
 
     assert _table_keys(metrics) == {"theses"}
@@ -47,10 +49,10 @@ def test_phase_extract_daily_hal_unconfigured():
             "infrastructure.observability.phase_executions.get_last_daily_extract_date",
             return_value=None,
         ),
-        patch.object(run_pipeline, "_extraction_structure_count", return_value=1),
-        patch.object(run_pipeline, "_run_extract", side_effect=_extract),
+        patch.object(extract, "_extraction_structure_count", return_value=1),
+        patch.object(extract, "_run_extract", side_effect=_extract),
     ):
-        metrics = run_pipeline.phase_extract(run_pipeline.RunOptions(mode="daily"))
+        metrics = extract.build().run(phase_context(RunOptions(mode="daily")))
 
     assert _table_keys(metrics) == set()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

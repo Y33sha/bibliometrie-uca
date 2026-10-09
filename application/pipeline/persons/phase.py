@@ -11,7 +11,7 @@ Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) :
 
 Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
-Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
+`open_tx` gère le commit : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `interfaces/cli/phases/persons.py` s'y réduit au câblage.
 """
 
 import logging
