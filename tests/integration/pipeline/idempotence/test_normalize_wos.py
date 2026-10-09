@@ -74,7 +74,6 @@ def run_normalize_wos(conn):
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
-    from infrastructure.repositories import publication_repository
 
     queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
@@ -82,7 +81,6 @@ def run_normalize_wos(conn):
     logger = logging.getLogger("test")
     container_repo = PgContainerGatewayQueries(conn)
     publisher_repo = PgPublisherGatewayQueries(conn)
-    publication_repo = publication_repository(conn)
 
     rows = staging_queries.fetch_pending_staging(conn, "wos", limit=10_000)
     processed = 0
@@ -94,7 +92,6 @@ def run_normalize_wos(conn):
             row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,
-            publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
             sync_settings=SYNC_SETTINGS,

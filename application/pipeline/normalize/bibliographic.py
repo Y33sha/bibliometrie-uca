@@ -1,6 +1,6 @@
 """Base des normaliseurs de sources bibliographiques.
 
-Étend `SourceNormalizer` avec la plomberie commune aux sources qui alimentent les référentiels des revues, des monographies, des éditeurs et des publications (crossref, datacite, scanr, hal, openalex, wos) : les factories de repository, instanciées au `preload_caches` quand la connexion est prête, et un accès typé garanti chargé. Chaque source concrète n'implémente que `process_work`, qui délègue à sa logique de normalisation propre.
+Étend `SourceNormalizer` avec la plomberie commune aux sources qui alimentent les référentiels des revues, des monographies et des éditeurs (crossref, datacite, scanr, hal, openalex, wos) : les factories de repository, instanciées au `preload_caches` quand la connexion est prête, et un accès typé garanti chargé. Chaque source concrète n'implémente que `process_work`, qui délègue à sa logique de normalisation propre.
 """
 
 from __future__ import annotations
@@ -17,11 +17,10 @@ from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQue
 from application.ports.pipeline.normalize.source_publications import SourcePublicationQueries
 from application.ports.pipeline.normalize.staging import StagingQueries
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.ports.repositories.publication_repository import PublicationRepository
 
 
 class BibliographicNormalizer(SourceNormalizer):
-    """Normaliseur d'une source bibliographique : `SourceNormalizer` doté des repositories conteneur (revue et monographie) / éditeur / publication."""
+    """Normaliseur d'une source bibliographique : `SourceNormalizer` doté des repositories conteneur (revue et monographie) / éditeur."""
 
     def __init__(
         self,
@@ -31,7 +30,6 @@ class BibliographicNormalizer(SourceNormalizer):
         queries: SourcePublicationQueries,
         container_repo_factory: Callable[[Connection], ContainerFindOrCreateQueries],
         publisher_repo_factory: Callable[[Connection], PublisherFindOrCreateQueries],
-        publication_repo_factory: Callable[[Connection], PublicationRepository],
         authorship_queries: AuthorshipsBatchQueries,
         sync_settings: SignatureSyncSettings,
     ) -> None:
@@ -41,8 +39,6 @@ class BibliographicNormalizer(SourceNormalizer):
         self._container_repo: ContainerFindOrCreateQueries | None = None
         self._publisher_repo_factory = publisher_repo_factory
         self._publisher_repo: PublisherFindOrCreateQueries | None = None
-        self._publication_repo_factory = publication_repo_factory
-        self._publication_repo: PublicationRepository | None = None
         self._authorship_queries = authorship_queries
         self._sync_settings = sync_settings
 
@@ -50,15 +46,12 @@ class BibliographicNormalizer(SourceNormalizer):
         """Instancie les repositories sur la connexion prête, une fois avant la boucle de traitement."""
         self._container_repo = self._container_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
-        self._publication_repo = self._publication_repo_factory(conn)
 
     def _require_repos(
         self,
-    ) -> tuple[ContainerFindOrCreateQueries, PublisherFindOrCreateQueries, PublicationRepository]:
-        """Les trois repositories, garantis chargés par `preload_caches`."""
-        assert (
-            self._container_repo is not None
-            and self._publisher_repo is not None
-            and self._publication_repo is not None
-        ), "preload_caches doit être appelé avant process_work"
-        return self._container_repo, self._publisher_repo, self._publication_repo
+    ) -> tuple[ContainerFindOrCreateQueries, PublisherFindOrCreateQueries]:
+        """Les deux repositories, garantis chargés par `preload_caches`."""
+        assert self._container_repo is not None and self._publisher_repo is not None, (
+            "preload_caches doit être appelé avant process_work"
+        )
+        return self._container_repo, self._publisher_repo

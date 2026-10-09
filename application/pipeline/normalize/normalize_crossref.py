@@ -28,7 +28,6 @@ from application.ports.pipeline.normalize.source_publications import (
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
@@ -361,7 +360,6 @@ def process_work(
     *,
     container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
-    publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,
@@ -423,7 +421,7 @@ class CrossrefNormalizer(BibliographicNormalizer):
         return get_title(row.raw_data), get_pub_year(row.raw_data)
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
@@ -431,7 +429,6 @@ class CrossrefNormalizer(BibliographicNormalizer):
             row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,
-            publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
             sync_settings=self._sync_settings,

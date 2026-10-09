@@ -335,7 +335,6 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourcePublicationQueries(),
             "logger": logging.getLogger("test"),
-            "publication_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "batch_queries": MagicMock(),
         }
@@ -369,7 +368,6 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        publication_repo_factory=lambda c: MagicMock(),
         batch_queries=MagicMock(),
     )
 
@@ -377,11 +375,6 @@ def _make_normalizer():
 class TestThesesNormalizerClass:
     def test_metadonnees_minimales(self):
         assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
-
-    def test_preload_caches_sets_publication_repo(self):
-        norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
-        assert norm._publication_repo is not None
 
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()

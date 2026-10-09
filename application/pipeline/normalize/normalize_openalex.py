@@ -22,7 +22,6 @@ from application.ports.pipeline.normalize.source_publications import (
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.monographs.containers import Containers, find_or_create_containers
 from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
@@ -478,7 +477,6 @@ def process_work(
     *,
     container_repo: ContainerFindOrCreateQueries,
     publisher_repo: PublisherFindOrCreateQueries,
-    publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,
@@ -518,7 +516,7 @@ class OpenalexNormalizer(BibliographicNormalizer):
         return title, as_int(work.get("publication_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo, publication_repo = self._require_repos()
+        container_repo, publisher_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
@@ -526,7 +524,6 @@ class OpenalexNormalizer(BibliographicNormalizer):
             row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,
-            publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
             sync_settings=self._sync_settings,

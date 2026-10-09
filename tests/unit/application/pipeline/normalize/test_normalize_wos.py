@@ -8,7 +8,7 @@ Couvre :
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
 - `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
 
-Mocks : `WosNormalizeQueries`, `StagingQueries`, `JournalRepository`, `PublisherRepository`, `PublicationRepository`. `find_or_create_journal` / `find_or_create_publisher` monkeypatchés pour isoler la logique de wiring.
+Mocks : `WosNormalizeQueries`, `StagingQueries`, `JournalRepository`, `PublisherRepository`. `find_or_create_journal` / `find_or_create_publisher` monkeypatchés pour isoler la logique de wiring.
 """
 
 from __future__ import annotations
@@ -1081,7 +1081,6 @@ class TestProcessRecord:
             row,
             container_repo=MagicMock(),
             publisher_repo=MagicMock(),
-            publication_repo=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
             sync_settings=SYNC_SETTINGS,
@@ -1135,7 +1134,6 @@ class TestProcessRecord:
             row,
             container_repo=MagicMock(),
             publisher_repo=MagicMock(),
-            publication_repo=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
             sync_settings=SYNC_SETTINGS,
@@ -1160,7 +1158,6 @@ class TestProcessRecord:
                 row,
                 container_repo=MagicMock(),
                 publisher_repo=MagicMock(),
-                publication_repo=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
                 sync_settings=SYNC_SETTINGS,
@@ -1174,7 +1171,6 @@ class TestWosNormalizer:
     def test_preload_caches_instantiates_repos(self, logger):
         journal_factory = MagicMock(return_value="j-repo")
         publisher_factory = MagicMock(return_value="p-repo")
-        pub_factory = MagicMock(return_value="pub-repo")
         norm = WosNormalizer(
             MagicMock(),
             logger,
@@ -1182,7 +1178,6 @@ class TestWosNormalizer:
             queries=MagicMock(),
             container_repo_factory=journal_factory,
             publisher_repo_factory=publisher_factory,
-            publication_repo_factory=pub_factory,
             authorship_queries=MagicMock(),
             sync_settings=SYNC_SETTINGS,
         )
@@ -1192,10 +1187,8 @@ class TestWosNormalizer:
 
         journal_factory.assert_called_once_with(conn2)
         publisher_factory.assert_called_once_with(conn2)
-        pub_factory.assert_called_once_with(conn2)
         assert norm._container_repo == "j-repo"
         assert norm._publisher_repo == "p-repo"
-        assert norm._publication_repo == "pub-repo"
 
     def test_process_work_delegates_to_process_record(self, logger, monkeypatch):
         norm = WosNormalizer(
@@ -1205,7 +1198,6 @@ class TestWosNormalizer:
             queries=MagicMock(),
             container_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
-            publication_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
             sync_settings=SYNC_SETTINGS,
         )
@@ -1225,11 +1217,10 @@ class TestWosNormalizer:
 
         assert result is True
         assert captured["row"] == row
-        # Les 4 dépendances (3 repos + staging) sont propagées.
+        # Les dépendances injectées sont propagées.
         assert set(captured["kwargs"].keys()) == {
             "container_repo",
             "publisher_repo",
-            "publication_repo",
             "staging_queries",
             "authorship_queries",
             "sync_settings",
