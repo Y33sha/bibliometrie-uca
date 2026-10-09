@@ -3,11 +3,12 @@
 from collections.abc import Iterable, Sequence
 from itertools import batched
 
-from sqlalchemy import Connection, delete, insert
+from sqlalchemy import Connection, delete, func, insert, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization
-from infrastructure.db.tables import ror_organizations, ror_relations
+from infrastructure.db.tables import ror_dump_imports, ror_organizations, ror_relations
 
 _BATCH_SIZE = 5000
 
@@ -22,6 +23,8 @@ class PgRorRepository:
         self,
         organizations: Sequence[RorOrganization],
         relations: Iterable[tuple[RorId, RorId]],
+        *,
+        version: str,
     ) -> None:
         self._conn.execute(delete(ror_relations))
         self._conn.execute(delete(ror_organizations))
@@ -47,3 +50,17 @@ class PgRorRepository:
                     for parent, child in batch
                 ],
             )
+        self._conn.execute(
+            pg_insert(ror_dump_imports)
+            .values(version=version, imported_at=func.clock_timestamp())
+            .on_conflict_do_update(
+                index_elements=["version"], set_={"imported_at": func.clock_timestamp()}
+            )
+        )
+
+    def last_imported_version(self) -> str | None:
+        return self._conn.execute(
+            select(ror_dump_imports.c.version)
+            .order_by(ror_dump_imports.c.imported_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()

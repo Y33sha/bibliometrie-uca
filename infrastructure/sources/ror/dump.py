@@ -8,12 +8,17 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import tempfile
 import zipfile
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx2
 
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from application.ports.pipeline.ror_dump import RorDumpUnavailableError
+from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
 from domain.types import as_mapping, as_sequence, as_str
@@ -75,14 +80,26 @@ def fetch_ror_dump(
     *,
     user_agent: str,
     logger: logging.Logger,
+) -> RorDumpFile:
+    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la rend."""
+    dump = find_latest_ror_dump(user_agent=user_agent)
+    download_ror_dump(dump, dest_path, user_agent=user_agent, logger=logger)
+    return dump
+
+
+def download_ror_dump(
+    dump: RorDumpFile,
+    dest_path: str,
+    *,
+    user_agent: str,
+    logger: logging.Logger,
     timeout: float = 180.0,
     max_bytes: int = MAX_DUMP_BYTES,
-) -> RorDumpFile:
-    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la rend.
+) -> None:
+    """Télécharge l'archive `dump` vers `dest_path`.
 
     Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, redirection comprise, et `DumpDownloadError` au-delà de `max_bytes`.
     """
-    dump = find_latest_ror_dump(user_agent=user_agent)
     logger.info("Téléchargement du dump ROR %s …", dump.name)
     with (
         httpx2.Client(timeout=timeout, follow_redirects=False) as client,
@@ -91,13 +108,12 @@ def fetch_ror_dump(
         raise_for_status(resp)
         written = write_capped(resp, dest_path, max_bytes, label="ROR")
     logger.info("Dump ROR téléchargé : %s (%d octets)", dest_path, written)
-    return dump
 
 
 def read_ror_dump(archive_path: str) -> Iterator[RorOrganization]:
     """Itère les organisations du CSV de l'archive.
 
-    Lève `ValueError` sur une ligne inexploitable : un dump incomplet ne doit pas remplacer le référentiel.
+    Lève `ValueError` ou `ValidationError` sur une ligne inexploitable : un dump incomplet ne doit pas remplacer le référentiel.
     """
     with zipfile.ZipFile(archive_path) as archive:
         member = next((n for n in archive.namelist() if n.endswith(_CSV_SUFFIX)), None)
@@ -131,3 +147,43 @@ def _parse_relationships(cell: str) -> dict[str, frozenset[RorId]]:
         if ids:
             relations[kind.strip()] = ids
     return relations
+
+
+class ZenodoRorDumpSource:
+    """Implémentation de `application.ports.pipeline.ror_dump.RorDumpSource` : versions du dump publiées sur Zenodo."""
+
+    def __init__(self, *, user_agent: str, logger: logging.Logger) -> None:
+        self._user_agent = user_agent
+        self._logger = logger
+        self._latest: RorDumpFile | None = None
+
+    def latest_version(self) -> str:
+        try:
+            self._latest = find_latest_ror_dump(user_agent=self._user_agent)
+        except _UNAVAILABLE as e:
+            raise RorDumpUnavailableError(str(e)) from e
+        return self._latest.name
+
+    def organizations(self, version: str) -> Iterator[RorOrganization]:
+        if self._latest is None or self._latest.name != version:
+            raise RorDumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = str(Path(tmp) / version)
+            try:
+                download_ror_dump(
+                    self._latest, archive, user_agent=self._user_agent, logger=self._logger
+                )
+                yield from read_ror_dump(archive)
+            except _UNAVAILABLE as e:
+                raise RorDumpUnavailableError(str(e)) from e
+
+
+_UNAVAILABLE = (
+    httpx2.HTTPError,
+    DumpDownloadError,
+    SourceUnavailableError,
+    ValueError,
+    ValidationError,
+    zipfile.BadZipFile,
+)
+"""Échecs qui rendent le dump inaccessible : réseau, serveur, archive ou ligne inexploitable."""

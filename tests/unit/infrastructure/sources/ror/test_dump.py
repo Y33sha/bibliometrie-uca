@@ -8,11 +8,13 @@ import zipfile
 import httpx2
 import pytest
 
+from application.ports.pipeline.ror_dump import RorDumpUnavailableError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.dump_download import DumpDownloadError
 from infrastructure.sources.ror.dump import (
+    ZenodoRorDumpSource,
     fetch_ror_dump,
     find_latest_ror_dump,
     parse_ror_row,
@@ -65,17 +67,49 @@ class TestParseRorRow:
             parse_ror_row({**_ROW, "types": "laboratory"})
 
 
+def _archive_bytes(rows=(_ROW,)) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(_ROW))
+    writer.writeheader()
+    writer.writerows(rows)
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("v2.14-2026-10-06-ror-data.csv", buffer.getvalue())
+        z.writestr("v2.14-2026-10-06-ror-data.json", "[]")
+    return archive.getvalue()
+
+
 class TestReadRorDump:
     def test_lit_le_csv_de_l_archive(self, tmp_path):
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=list(_ROW))
-        writer.writeheader()
-        writer.writerow(_ROW)
         archive = tmp_path / "dump.zip"
-        with zipfile.ZipFile(archive, "w") as z:
-            z.writestr("v2.14-2026-10-06-ror-data.csv", buffer.getvalue())
-            z.writestr("v2.14-2026-10-06-ror-data.json", "[]")
+        archive.write_bytes(_archive_bytes())
         assert [o.ror_id for o in read_ror_dump(str(archive))] == [RorId("01bch8q67")]
+
+
+class TestZenodoRorDumpSource:
+    def _source(self, http_mock, archive=None, status=200):
+        http_mock.get(API_BASE_URLS["zenodo_ror"]).mock(
+            return_value=httpx2.Response(status, json=_zenodo_body([_archive_file()]))
+        )
+        if archive is not None:
+            http_mock.get(_ARCHIVE_URL).mock(return_value=httpx2.Response(200, content=archive))
+        return ZenodoRorDumpSource(user_agent="test", logger=log)
+
+    def test_lit_les_organisations_de_la_derniere_version(self, http_mock):
+        source = self._source(http_mock, _archive_bytes())
+        version = source.latest_version()
+        assert version == "v2.14-2026-10-06-ror-data.zip"
+        assert [o.ror_id for o in source.organizations(version)] == [RorId("01bch8q67")]
+
+    def test_api_en_erreur(self, http_mock):
+        source = self._source(http_mock, status=404)
+        with pytest.raises(RorDumpUnavailableError):
+            source.latest_version()
+
+    def test_ligne_inexploitable(self, http_mock):
+        source = self._source(http_mock, _archive_bytes([{**_ROW, "types": "laboratory"}]))
+        with pytest.raises(RorDumpUnavailableError):
+            list(source.organizations(source.latest_version()))
 
 
 class TestFindLatestRorDump:

@@ -10,6 +10,7 @@ import pytest
 
 from application.pipeline.affiliations import phase
 from application.pipeline.affiliations.resolve_addresses import ResolutionStats
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 
 _LOG = logging.getLogger("test")
@@ -50,7 +51,7 @@ def _run(open_tx, *, processed=7, in_perimeter=3):
             side_effect=lambda conn, queries, logger, ids: vus.__setitem__("populate", ids),
         ),
     ):
-        metrics = phase.run(open_tx, object(), object(), perimeter, _LOG)
+        metrics = phase.run(open_tx, object(), object(), perimeter, _LOG, refresh_ror=PhaseMetrics)
     return metrics, perimeter, vus
 
 
@@ -81,6 +82,31 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(open_tx):
         patch.object(phase, "run_resolution") as resolution,
         pytest.raises(EmptyExtractionPerimeterError),
     ):
-        phase.run(open_tx, object(), object(), _FakePerimeterQueries(extraction_structures=0), _LOG)
+        phase.run(
+            open_tx,
+            object(),
+            object(),
+            _FakePerimeterQueries(extraction_structures=0),
+            _LOG,
+            refresh_ror=PhaseMetrics,
+        )
 
     resolution.assert_not_called()
+
+
+def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(open_tx):
+    ror = PhaseMetrics()
+    ror.details["ror"] = {"version": "v2.14", "imported": True}
+    with (
+        patch.object(
+            phase,
+            "run_resolution",
+            return_value=ResolutionStats(processed=0, in_perimeter=0, affiliations=0),
+        ),
+        patch.object(phase, "run_populate"),
+    ):
+        metrics = phase.run(
+            open_tx, object(), object(), _FakePerimeterQueries(), _LOG, refresh_ror=lambda: ror
+        )
+
+    assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

@@ -1,13 +1,15 @@
 """Orchestrateur de la phase `affiliations` : résolution des affiliations sur les `source_authorships`.
 
-Trois sous-étapes, chacune dans sa propre transaction :
+Quatre sous-étapes, chacune dans sa propre transaction :
 
+0. **refresh_ror** — importe la dernière version du dump ROR si elle n'est pas déjà importée (`refresh_ror.py`). Le runner est injecté par le composition root.
 1. **refresh_perimeter_structures** — rafraîchit la table `perimeter_structures`. La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure.
 2. **resolve_addresses** — matche les adresses vers les structures connues (commits par lots).
 3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
 """
 
 import logging
+from collections.abc import Callable
 
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
@@ -28,8 +30,12 @@ def run(
     affiliations_queries: AffiliationsQueries,
     perimeter_queries: PerimeterStructuresQueries,
     logger: logging.Logger,
+    *,
+    refresh_ror: Callable[[], PhaseMetrics],
 ) -> PhaseMetrics:
-    """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
+    """Enchaîne les quatre sous-étapes et assemble les métriques de la phase."""
+    ror = refresh_ror()
+
     with open_tx() as conn:
         perimeter_queries.refresh_perimeter_structures(conn)
         if perimeter_queries.count_extraction_structures(conn) == 0:
@@ -44,6 +50,7 @@ def run(
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed)
     metrics.details["summary"] = {"adresses": stats.processed, "in_perimeter": stats.in_perimeter}
+    metrics.details.update(ror.details)
 
     etape(logger, "Rattachement des structures aux auteurs des documents")
     with open_tx() as conn:

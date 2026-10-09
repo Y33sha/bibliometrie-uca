@@ -23,8 +23,8 @@ def test_ecrit_les_organisations_et_leurs_relations_puis_commite():
     conn, repo = MagicMock(), MagicMock()
     orgs = [_org(UNIV, children=[LABO]), _org(LABO)]
 
-    stats = import_ror_dump(conn, iter(orgs), repo=repo)
+    stats = import_ror_dump(conn, iter(orgs), version="v2.14", repo=repo)
 
-    repo.replace_all.assert_called_once_with(orgs, frozenset({(UNIV, LABO)}))
+    repo.replace_all.assert_called_once_with(orgs, frozenset({(UNIV, LABO)}), version="v2.14")
     conn.commit.assert_called_once()
     assert (stats.organizations, stats.relations) == (2, 1)
