@@ -7,7 +7,6 @@ Pas de réseau ni de base : un faux `HalExtractAdapter` sert une page vide, et l
 
 from __future__ import annotations
 
-import argparse
 import logging
 from unittest.mock import MagicMock
 
@@ -16,6 +15,7 @@ import pytest
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_hal import HalExtractor
 from application.ports.pipeline.extract.hal import HalExtractConfig
+from tests.helpers.extractors import arguments_du_run
 
 _LOGGER = logging.getLogger("test")
 
@@ -38,35 +38,29 @@ def _adapter(collections: dict[str, str], annees: list[int]) -> MagicMock:
     return a
 
 
-def _args(**surcharges) -> argparse.Namespace:
-    valeurs: dict = {"year": None, "start_year": None, "since": None}
-    valeurs.update(surcharges)
-    return argparse.Namespace(**valeurs)
-
-
 def test_une_passe_par_annee_de_la_configuration():
     adapter = _adapter({"C": "Coll"}, [2023, 2024])
-    HalExtractor(MagicMock(), _LOGGER, adapter).run(_args())
+    HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run())
     requetes = [appel.args[0] for appel in adapter.fetch_page_cursor.call_args_list]
     assert requetes == ["q[2023]", "q[2024]"]
 
 
 def test_chaque_annee_est_comptee_avant_l_extraction():
     adapter = _adapter({"C": "Coll"}, [2023, 2024])
-    HalExtractor(MagicMock(), _LOGGER, adapter).run(_args())
+    HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run())
     comptees = [appel.args for appel in adapter.count.call_args_list]
     assert comptees == [("q[2023]", "collCode_s:(…)"), ("q[2024]", "collCode_s:(…)")]
 
 
 def test_une_annee_demandee_ignore_la_configuration():
     adapter = _adapter({"C": "Coll"}, [2020, 2021])
-    HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(year=2024))
+    HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run(year=2024))
     assert adapter.build_query.call_args.kwargs.get("years") == [2024]
 
 
 def test_mode_incremental_fait_une_seule_passe_sur_la_date():
     adapter = _adapter({"C": "Coll"}, [2020, 2021, 2022])
-    HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(since="2026-01-01"))
+    HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run(since="2026-01-01"))
     assert adapter.fetch_page_cursor.call_count == 1
     assert adapter.build_query.call_args.kwargs.get("since") == "2026-01-01"
     assert adapter.count.call_args.args[0] == "q2026-01-01"
@@ -75,13 +69,13 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date():
 def test_sans_collection_refuse():
     adapter = _adapter({}, [2024])
     with pytest.raises(ExtractionConfigError, match="aucune collection HAL"):
-        HalExtractor(MagicMock(), _LOGGER, adapter).run(_args())
+        HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run())
 
 
 def test_s_arrete_quand_la_source_est_a_bout():
     adapter = _adapter({"C": "Coll"}, [2023, 2024])
     breaker = MagicMock()
     breaker.tripped = True
-    metrics = HalExtractor(MagicMock(), _LOGGER, adapter).run(_args(), breaker=breaker)
+    metrics = HalExtractor(MagicMock(), _LOGGER, adapter).run(arguments_du_run(), breaker=breaker)
     assert metrics.total == 0
     adapter.fetch_page_cursor.assert_not_called()
