@@ -8,7 +8,6 @@
 
 ### Non commencé
 
-- [Clients HTTP des sources : gestion d'erreur commune](CODE_clients-http-dry.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
@@ -27,6 +26,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-10 — [Clients HTTP des sources : gestion d'erreur commune](archived/2026-10-10_CODE_clients-http-dry.md)
 - 2026-10-09 — [Duplications dans les tests](archived/2026-10-09_CODE_duplications-tests.md)
 - 2026-10-09 — [Nom et prénom scindés dès la normalisation](archived/2026-10-09_DATA_noms-prenoms-scindes.md)
 - 2026-10-01 — [Dépôts HAL distincts fusionnés par une notice OpenAlex ou ScanR](archived/2026-10-01_DATA_identifiant-hal-cle-de-fusion.md)
