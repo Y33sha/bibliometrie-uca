@@ -77,14 +77,8 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     )
     from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
-    from infrastructure.sources.config import (
-        get_openalex_api_key,
-        get_polite_pool_email_optional,
-    )
     from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
 
-    api_key = get_openalex_api_key()
-    mailto = get_polite_pool_email_optional() or ""
     sources_api = API_BASE_URLS["openalex_sources"]
     with open_tx() as conn:
         # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
@@ -96,7 +90,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
                 log,
                 journal_repo=PgJournalGatewayQueries(conn),
                 fetch_batch=lambda oa_ids: fetch_sources_batch(
-                    oa_ids, openalex_sources_api=sources_api, api_key=api_key, mailto=mailto
+                    oa_ids, openalex_sources_api=sources_api
                 ),
                 breaker=breaker,
                 rate_delay=DOAJ_DELAY,

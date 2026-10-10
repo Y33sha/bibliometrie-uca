@@ -23,10 +23,6 @@ from infrastructure.sources.circuit_breaker import (
     reset_current_breaker,
     set_current_breaker,
 )
-from infrastructure.sources.config import (
-    get_openalex_api_key,
-    get_polite_pool_email_optional,
-)
 from infrastructure.sources.openalex.publisher_enrichment import fetch_publishers_batch
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))
@@ -48,8 +44,6 @@ def main() -> int:
     # quota OpenAlex du jour est épuisé et à reporter le reste à la prochaine exécution.
     breaker = SourceCircuitBreaker("openalex publishers", threshold=3)
     token = set_current_breaker(breaker)
-    api_key = get_openalex_api_key()
-    mailto = get_polite_pool_email_optional() or ""
     publishers_api = API_BASE_URLS["openalex_publishers"]
     try:
         run_enrich_publishers_from_openalex(
@@ -59,8 +53,6 @@ def main() -> int:
             fetch_batch=lambda oa_ids: fetch_publishers_batch(
                 oa_ids,
                 openalex_publishers_api=publishers_api,
-                api_key=api_key,
-                mailto=mailto,
             ),
             breaker=breaker,
             limit=args.limit,
