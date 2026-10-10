@@ -1,5 +1,7 @@
 from domain.sources.openalex import (
+    BULK_AUTHORSHIPS_CAP,
     OpenalexLocation,
+    authors_may_be_truncated,
     extract_external_ids_from_urls,
     extract_nnt_from_location,
     full_openalex_id,
@@ -298,3 +300,14 @@ class TestExtractNntFromLocation:
         # « pmh:oai:HAL:hal-04677016v1 ». Les deux-points cassent le motif
         # alphanumérique → pas de NNT (sinon lien theses.fr mort sur la fiche).
         assert extract_nnt_from_location(_loc(location_id="pmh:oai:HAL:hal-04677016v1")) is None
+
+
+class TestAuthorsMayBeTruncated:
+    def test_cap_reached(self):
+        assert authors_may_be_truncated({"authorships": [{}] * BULK_AUTHORSHIPS_CAP})
+
+    def test_under_cap(self):
+        assert not authors_may_be_truncated({"authorships": [{}] * 3})
+
+    def test_without_authorships(self):
+        assert not authors_may_be_truncated({})

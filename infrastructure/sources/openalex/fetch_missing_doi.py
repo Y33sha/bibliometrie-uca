@@ -14,6 +14,7 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
 from application.ports.pipeline.lookup import NotFound, Unavailable
+from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_mapping, as_sequence
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
@@ -77,6 +78,8 @@ class OpenalexFetchMissingDoiAdapter:
             source_id=extract_openalex_id(record),
             doi=doi,
             raw_data=record,
+            # La recherche par DOI passe par l'endpoint de liste, plafonné comme le moissonnage.
+            authors_truncated=authors_may_be_truncated(record),
             entry_mode="fetch_missing_doi",
         )
         forget_failed_doi_lookups(conn, "openalex", [doi])

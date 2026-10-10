@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from infrastructure.fingerprint import fingerprint
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
+from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from tests.integration.helpers.staging import insert_staging
 
 _adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
@@ -191,6 +192,11 @@ class TestAuthorsTruncatedFlag:
         """Bulk à 100 auteurs (plafond OpenAlex) → authors_truncated = TRUE."""
         insert_batch(sa_sync_conn, [_make_work("W200", 100)])
         assert _get_staging(sa_sync_conn, "W200").authors_truncated is True
+
+    def test_fetch_missing_100_authors_flags_truncated(self, sa_sync_conn):
+        """La recherche par DOI passe par l'endpoint de liste : un work à 100 auteurs est marqué comme au moissonnage."""
+        OpenalexFetchMissingDoiAdapter().insert(sa_sync_conn, _make_work("W210", 100))
+        assert _get_staging(sa_sync_conn, "W210").authors_truncated is True
 
     def test_bulk_under_100_not_flagged(self, sa_sync_conn):
         """Bulk sous le plafond → flag FALSE."""
