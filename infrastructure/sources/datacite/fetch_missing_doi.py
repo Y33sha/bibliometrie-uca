@@ -11,25 +11,22 @@ DataCite est la source native du DOI pour ses préfixes : un DOI absent de la r�
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_missing.doi import (
-    is_not_found_marker,
-    not_found_marker,
-)
+from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
+from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_mapping, as_str
+from domain.types import JsonValue, as_mapping
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
-    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class DataciteFetchMissingDoiAdapter:
@@ -49,54 +46,36 @@ class DataciteFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["datacite"]
         self.headers = api_headers()
 
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Iterable[Mapping[str, JsonValue]]:
+    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         # Batch : `query=doi:"a" OR doi:"b" …`. Le champ `doi` est requêté en phrase exacte ; on remappe ensuite les nœuds reçus aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume.
         clause = " OR ".join(f'doi:"{d}"' for d in dois)
-        url = f"{self.base_url}/dois"
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    url,
-                    params={"query": clause, "page[size]": len(dois), **RECORD_PARAMS},
-                    headers=self.headers,
-                    timeout=30,
-                    label=f"{len(dois)} DOI",
-                )
-            )
-        except (httpx2.HTTPStatusError, httpx2.RequestError):
-            # Échec du batch entier : rien remonté, les DOI restent hors staging et seront retentés au prochain run (pool convergent).
-            return []
-
-        records = data.get("data")
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            f"{self.base_url}/dois",
+            params={"query": clause, "page[size]": len(dois), **RECORD_PARAMS},
+            headers=self.headers,
+            timeout=30,
+            not_found_statuses=frozenset(),
+            label=f"{len(dois)} DOI",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return DoiBatchResult()
+        records = as_mapping(outcome).get("data")
         if not isinstance(records, list):
-            return []
+            return DoiBatchResult()
 
-        # DOI demandés non retournés = confirmés absents de DataCite. insert() les inscrit dans failed_lookups.
+        # DOI demandés non retournés = confirmés absents de DataCite.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for rec in records:
             if doi := record_doi(as_mapping(rec)):
                 found[doi] = as_mapping(rec)
-        out: list[Mapping[str, JsonValue]] = list(found.values())
-        out.extend(not_found_marker(d) for d in dois if clean_doi(d) not in found)
-        return out
+        return DoiBatchResult(
+            records=list(found.values()),
+            not_found=[d for d in dois if clean_doi(d) not in found],
+        )
 
-    def insert(
-        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
-    ) -> bool:
-        if is_not_found_marker(record):
-            record_failed_lookup(
-                conn,
-                "datacite",
-                "doi",
-                as_str(record["_doi"]) or "",
-                retry_after_days=retry_after_days,
-            )
-            return False
-
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.
         doi = record_doi(record)
         if not doi:

@@ -7,24 +7,21 @@ Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme embarrassingly para
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_missing.doi import (
-    is_not_found_marker,
-    not_found_marker,
-)
+from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
+from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
-    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class HalFetchMissingDoiAdapter:
@@ -41,43 +38,31 @@ class HalFetchMissingDoiAdapter:
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["hal"]
 
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Iterable[Mapping[str, JsonValue]]:
+    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         doi = dois[0]
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self.base_url,
-                    params={
-                        "q": f'doiId_s:"{doi}"',
-                        "fl": HAL_FIELDS_STR,
-                        "wt": "json",
-                        "rows": "1",
-                    },
-                    timeout=15,
-                    label=f"DOI {doi}",
-                )
-            )
-        except (httpx2.RequestError, httpx2.HTTPStatusError):
-            return []
-        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            self.base_url,
+            params={
+                "q": f'doiId_s:"{doi}"',
+                "fl": HAL_FIELDS_STR,
+                "wt": "json",
+                "rows": "1",
+            },
+            timeout=15,
+            not_found_statuses=frozenset(),
+            label=f"DOI {doi}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return DoiBatchResult()
+        docs = [as_mapping(d) for d in as_sequence(at_path(outcome, "response").get("docs"))]
         if not docs:
             # Réponse Solr valide, zéro doc : DOI confirmé absent de HAL.
-            return [not_found_marker(doi)]
-        return docs[:1]
+            return DoiBatchResult(not_found=[doi])
+        return DoiBatchResult(records=docs[:1])
 
-    def insert(
-        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
-    ) -> bool:
-        if is_not_found_marker(record):
-            record_failed_lookup(
-                conn, "hal", "doi", as_str(record["_doi"]) or "", retry_after_days=retry_after_days
-            )
-            return False
-
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         hal_id = hal_text_field(record.get("halId_s"))
         if not hal_id:
             return False

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
@@ -26,10 +25,10 @@ from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_missing.doi import (
     AsyncFetchMissingDoiAdapter,
+    DoiBatchResult,
+    FailedDoiRecorder,
     MissingDoisReader,
-    is_not_found_marker,
 )
-from domain.types import JsonValue
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "MissingDoisReader", "run_async"]
 
@@ -40,6 +39,7 @@ async def run_async(
     log: logging.Logger,
     *,
     missing_dois_reader: MissingDoisReader,
+    record_not_found: FailedDoiRecorder,
     retry_after_days: int,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
@@ -48,13 +48,14 @@ async def run_async(
 
     Les fetchs HTTP tournent concurremment via `run_fetch_pool` (pool de `adapter.max_concurrent` workers), ce qui borne le débit au rate-limit de l'API. Les inserts DB restent sync, sérialisés par le pool sous un lock (la `Connection` SA sync n'est pas thread-safe) ; chaque lot est committé en une transaction (l'adapter source ne commite pas).
 
-    Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui l'inscrit dans `failed_lookups`.
+    `fetch_async` rend les notices trouvées et les DOI dont la source a confirmé l'absence. `record_not_found` inscrit ces derniers dans `failed_lookups`. Un DOI ni trouvé ni absent attend le run suivant.
 
     Args:
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
         missing_dois_reader: callable `(conn, source) -> list[doi]`.
+        record_not_found: callable `(conn, source, doi, retry_after_days)`.
         retry_after_days: délai, en jours, avant de chercher de nouveau un DOI confirmé absent.
         limit: nombre max de DOI à traiter.
 
@@ -82,40 +83,35 @@ async def run_async(
     request_delay = getattr(adapter, "request_delay_s", 0.0)
     items = list(enumerate(batches))
 
-    async def _fetch(
-        client: httpx2.AsyncClient, item: tuple[int, list[str]]
-    ) -> list[Mapping[str, JsonValue]]:
+    async def _fetch(client: httpx2.AsyncClient, item: tuple[int, list[str]]) -> DoiBatchResult:
         batch_idx, batch = item
         try:
-            records = list(await adapter.fetch_async(client, batch))
+            result = await adapter.fetch_async(client, batch)
         except Exception as e:
-            # Breaker tripé pendant le fetch (source indisponible) : abandon silencieux, le log unique vient après le pool.
-            if not (breaker is not None and breaker.tripped):
-                slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
-            records = []
+            slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
+            result = DoiBatchResult()
         if request_delay:
             await asyncio.sleep(request_delay)
-        return records
+        return result
 
     with progression(
         total, branche_de_source(adapter.source_key), slog, compte_retenus=True
     ) as avancement:
 
-        def _write(
-            conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]
-        ) -> None:
+        def _write(conn: Connection, item: tuple[int, list[str]], result: DoiBatchResult) -> None:
             batch_idx, batch = item
-            real = [r for r in records if not is_not_found_marker(r)]
-            progress["fetched"] += len(real)
-            progress["not_found"] += len(records) - len(real)
+            progress["fetched"] += len(result.records)
+            progress["not_found"] += len(result.not_found)
 
             # Un lot = une transaction (le pool commite après ce write). Sur erreur,
             # rollback (désempoisonne la connexion), le lot repartira au prochain run.
             batch_inserted = 0
             try:
-                for record in records:
-                    if adapter.insert(conn, record, retry_after_days=retry_after_days):
+                for record in result.records:
+                    if adapter.insert(conn, record):
                         batch_inserted += 1
+                for doi in result.not_found:
+                    record_not_found(conn, adapter.source_key, doi, retry_after_days)
                 progress["inserted"] += batch_inserted
             except Exception as e:
                 conn.rollback()
