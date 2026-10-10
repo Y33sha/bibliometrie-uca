@@ -68,6 +68,25 @@ def test_first_import_downloads():
     assert downloads == [True]
 
 
+def test_dump_without_recognized_journal_is_signaled():
+    """Aucune revue reconnue : rien n'est écrit, la sous-étape le signale."""
+
+    @contextmanager
+    def download_dump():
+        yield [{"Colonne renommée": "0028-0836"}]
+
+    repo = _FakeJournalRepo(None)
+    metrics = run_enrich_journals_from_doaj(
+        MagicMock(),
+        logging.getLogger("test"),
+        journal_repo=repo,
+        refresh_after_days=30,
+        download_dump=download_dump,
+    )
+    assert repo.updated == []
+    assert [s["code"] for s in metrics.signals] == ["dump_unrecognized"]
+
+
 def test_unavailable_dump_leaves_referential_unchanged():
     """Dump inaccessible : aucune écriture, la source est signalée indisponible et la phase continue."""
 
