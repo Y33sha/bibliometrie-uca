@@ -10,11 +10,8 @@ import urllib.parse
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -52,10 +49,10 @@ class CrossrefFetchStaleAdapter(BaseFetchStaleAdapter):
                 )
             )
         except httpx2.HTTPStatusError as e:
-            return NOT_FOUND if e.response.status_code == 404 else None
+            return NOT_FOUND if e.response.status_code == 404 else UNAVAILABLE
         except httpx2.RequestError:
-            return None
+            return UNAVAILABLE
         message = data.get("message")
         if not isinstance(message, dict):
-            return None
+            return UNAVAILABLE
         return FetchedRecord(doi=clean_doi(as_str(message.get("DOI"))), raw_data=message)

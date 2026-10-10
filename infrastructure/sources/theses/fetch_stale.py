@@ -8,11 +8,8 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
@@ -47,7 +44,7 @@ class ThesesFetchStaleAdapter(BaseFetchStaleAdapter):
                 )
             )
         except (httpx2.RequestError, httpx2.HTTPStatusError):
-            return None
+            return UNAVAILABLE
         for entree in as_sequence(data.get("theses")):
             these = as_mapping(entree)
             if as_str(these.get("id")) == source_id:

@@ -32,12 +32,12 @@ from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
     FetchStaleAdapter,
     StaleRow,
 )
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.sources.registry import ALL_SOURCES
 
 __all__ = ["FetchStalePhase", "refresh"]
@@ -139,7 +139,7 @@ async def refresh(
             # Breaker tripé pendant le fetch : abandon silencieux, le log unique vient après le pool.
             if not (breaker is not None and breaker.tripped):
                 slog.error("erreur sur %s : %s", row.source_id, e)
-            outcome = None
+            outcome = UNAVAILABLE
         if request_delay:
             await asyncio.sleep(request_delay)
         return outcome
@@ -150,7 +150,7 @@ async def refresh(
 
         def _write(conn: Connection, row: StaleRow, outcome: FetchOutcome) -> None:
             nonlocal processed
-            if outcome is None:
+            if outcome is UNAVAILABLE:
                 metrics.add(errors=1)
             elif outcome is NOT_FOUND:
                 adapter.mark_disappeared(conn, row.source_id)
