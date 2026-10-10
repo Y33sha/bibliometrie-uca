@@ -73,9 +73,7 @@ class TestExcludeAuthorship:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
+        sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         exclude_authorship(authorship_id, repo=repo)
 
@@ -110,7 +108,7 @@ class TestExcludeAuthorship:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         exclude_authorship(authorship_id, repo=repo)
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
@@ -137,10 +135,8 @@ class TestExcludeAuthorship:
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         a1 = insert_authorship(sa_sync_conn, pub_id, person_id=p1)
         a2 = insert_authorship(sa_sync_conn, pub_id, person_id=p2)
-        insert_signature(sa_sync_conn, sp_id, person_id=p1, authorship_id=a1)
-        sa2 = insert_signature(
-            sa_sync_conn, sp_id, author_position=1, person_id=p2, authorship_id=a2
-        )
+        insert_signature(sa_sync_conn, sp_id, person_id=p1)
+        sa2 = insert_signature(sa_sync_conn, sp_id, author_position=1, person_id=p2)
 
         exclude_authorship(a1, repo=repo)
 
@@ -172,12 +168,8 @@ class TestRejectPair:
         # Deux sources (hal + openalex) attestent la même paire.
         sp_hal = _notice(sa_sync_conn, pub_id)
         sp_oa = _notice(sa_sync_conn, pub_id, source="openalex", source_id="oa-1")
-        sa_hal = insert_signature(
-            sa_sync_conn, sp_hal, person_id=person_id, authorship_id=authorship_id
-        )
-        sa_oa = insert_signature(
-            sa_sync_conn, sp_oa, source="openalex", person_id=person_id, authorship_id=authorship_id
-        )
+        sa_hal = insert_signature(sa_sync_conn, sp_hal, person_id=person_id)
+        sa_oa = insert_signature(sa_sync_conn, sp_oa, source="openalex", person_id=person_id)
 
         result = reject_pair(pub_id, person_id, repo=repo)
 
@@ -282,7 +274,7 @@ class TestDeleteOrphanAuthorships:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         n = delete_orphan_authorships(person_id, repo=repo)
 
@@ -337,7 +329,7 @@ class TestPruneOrphanAuthorships:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        insert_signature(sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id)
+        insert_signature(sa_sync_conn, sp_id, person_id=person_id)
 
         n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
@@ -358,8 +350,8 @@ class TestPruneOrphanAuthorships:
         p_orphan1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p_orphan2 = insert_person(sa_sync_conn, "Durand", first_name="Alice")
 
-        a_attested = insert_authorship(sa_sync_conn, pub_id, person_id=p_attested)
-        insert_signature(sa_sync_conn, sp_id, person_id=p_attested, authorship_id=a_attested)
+        insert_authorship(sa_sync_conn, pub_id, person_id=p_attested)
+        insert_signature(sa_sync_conn, sp_id, person_id=p_attested)
         # Deux orphelines sur deux personnes distinctes (aucune source ne les atteste).
         insert_authorship(sa_sync_conn, pub_id, person_id=p_orphan1)
         pub2 = _publication(sa_sync_conn, title="Autre")
@@ -394,12 +386,8 @@ class TestPropagateAuthorshipAttributes:
         aid = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         # Une source dit TRUE (wos), une dit FALSE (hal) → bool_or = TRUE,
         # quelle que soit la « priorité » des sources.
-        sa_wos = insert_signature(
-            sa_sync_conn, sp_id, source="wos", person_id=person_id, authorship_id=aid
-        )
-        sa_hal = insert_signature(
-            sa_sync_conn, sp_id, author_position=1, person_id=person_id, authorship_id=aid
-        )
+        sa_wos = insert_signature(sa_sync_conn, sp_id, source="wos", person_id=person_id)
+        sa_hal = insert_signature(sa_sync_conn, sp_id, author_position=1, person_id=person_id)
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET is_corresponding = (id = :w) WHERE id IN (:w, :h)"),
             {"w": sa_wos, "h": sa_hal},
@@ -413,9 +401,7 @@ class TestPropagateAuthorshipAttributes:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         aid = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=aid, in_perimeter=True
-        )
+        sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id, in_perimeter=True)
         sa_sync_conn.execute(
             text(
                 "UPDATE source_authorships "
@@ -506,9 +492,7 @@ class TestPropagateUcaForAddresses:
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
+        sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id)
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=True)
         insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)
@@ -556,11 +540,9 @@ class TestPropagateUcaForAddresses:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
+        insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
-        sa_id = insert_signature(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id, in_perimeter=True
-        )
+        sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id, in_perimeter=True)
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=False)
         insert_signature_address(sa_sync_conn, sa_id, address_id=addr_id)

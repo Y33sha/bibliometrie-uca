@@ -131,14 +131,6 @@ class AuthorshipRepository(Protocol):
         """Crée la ligne consolidée de la paire si elle manque. Écarte les paires figurant dans `rejected_authorships`."""
         ...
 
-    def link_source_authorships_to_authorship(
-        self,
-        publication_id: int,
-        person_id: int,
-    ) -> None:
-        """Pose `source_authorships.authorship_id` vers la ligne consolidée de la paire, sur les signatures encore non liées."""
-        ...
-
     def recompute_authorship_author_position_and_corresponding(
         self,
         publication_id: int,

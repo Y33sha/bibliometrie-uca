@@ -40,11 +40,6 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def purge_authorships(self, conn: Connection) -> int:
         n = scalar_int(conn.execute(text("SELECT COUNT(*) FROM authorships")))
-        conn.execute(
-            text(
-                "UPDATE source_authorships SET authorship_id = NULL WHERE authorship_id IS NOT NULL"
-            )
-        )
         # DELETE plutôt que TRUNCATE : Postgres refuse TRUNCATE dès qu'une FK existe (même `SET NULL`).
         # La séquence des ids continue : un rollback restaure les lignes supprimées, pas une
         # séquence remise à zéro.
@@ -94,43 +89,34 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     def analyze_authorships(self, conn: Connection) -> None:
         conn.execute(text("ANALYZE authorships"))
 
-    def link_source_authorships_to_authorships(self, conn: Connection) -> int:
-        return conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET authorship_id = a.id
-                FROM source_publications sd
-                JOIN authorships a ON a.publication_id = sd.publication_id
-                WHERE sd.id = sa.source_publication_id
-                  AND sa.person_id IS NOT NULL
-                  AND a.person_id = sa.person_id
-                  AND sa.authorship_id IS NULL
-            """)
-        ).rowcount
-
     def analyze_source_authorships(self, conn: Connection) -> None:
         conn.execute(text("ANALYZE source_authorships"))
 
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         return conn.execute(
             text(f"""
-                WITH scal AS (
-                    SELECT sa.authorship_id AS aid,
-                           (array_agg(sa.author_position ORDER BY
-                               {case_priority(SOURCE_PRIORITY, "sa.source")})
-                               FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
-                           bool_or(sa.is_corresponding)              AS is_corr,
-                           COALESCE(bool_or(sa.in_perimeter), FALSE) AS in_perim
+                WITH linked AS (
+                    SELECT a.id AS aid, sa.source, sa.author_position, sa.is_corresponding,
+                           sa.in_perimeter, sa.roles
                     FROM source_authorships sa
-                    WHERE sa.authorship_id IS NOT NULL
-                    GROUP BY sa.authorship_id
+                    JOIN source_publications sp ON sp.id = sa.source_publication_id
+                    JOIN authorships a ON a.publication_id = sp.publication_id
+                                      AND a.person_id = sa.person_id
+                ),
+                scal AS (
+                    SELECT l.aid,
+                           (array_agg(l.author_position ORDER BY
+                               {case_priority(SOURCE_PRIORITY, "l.source")})
+                               FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
+                           bool_or(l.is_corresponding)              AS is_corr,
+                           COALESCE(bool_or(l.in_perimeter), FALSE) AS in_perim
+                    FROM linked l
+                    GROUP BY l.aid
                 ),
                 rol AS (
-                    SELECT sa.authorship_id AS aid,
-                           array_agg(DISTINCT r ORDER BY r) AS roles
-                    FROM source_authorships sa, LATERAL unnest(sa.roles) AS r
-                    WHERE sa.authorship_id IS NOT NULL
-                    GROUP BY sa.authorship_id
+                    SELECT l.aid, array_agg(DISTINCT r ORDER BY r) AS roles
+                    FROM linked l, LATERAL unnest(l.roles) AS r
+                    GROUP BY l.aid
                 )
                 UPDATE authorships a
                 SET author_position = scal.pos,
@@ -213,21 +199,3 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
             {"pid": person_id},
         )
         conn.execute(text("DROP TABLE _chosen_sa"))
-
-    def link_source_authorships_batch(
-        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
-    ) -> None:
-        if not source_authorship_ids:
-            return
-        conn.execute(
-            text("""
-                UPDATE source_authorships sa SET authorship_id = a.id
-                FROM source_publications sd, authorships a
-                WHERE sa.id = ANY(:ids)
-                  AND sd.id = sa.source_publication_id
-                  AND a.publication_id = sd.publication_id
-                  AND a.person_id = :pid
-                  AND sa.authorship_id IS NULL
-            """),
-            {"ids": source_authorship_ids, "pid": person_id},
-        )

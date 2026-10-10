@@ -576,10 +576,10 @@ class TestBatchAssignOrphanAuthorships:
         ).first()
         assert row is not None
         rows = sa_sync_conn.execute(
-            text("SELECT authorship_id FROM source_authorships WHERE id = ANY(:ids)"),
+            text("SELECT person_id FROM source_authorships WHERE id = ANY(:ids)"),
             {"ids": [sa1, sa2]},
         ).all()
-        assert all(r.authorship_id is not None for r in rows)
+        assert all(r.person_id == person_id for r in rows)
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         insert_persons_perimeter(sa_sync_conn)
@@ -1041,11 +1041,10 @@ class TestAssignOrphanAuthorship:
         assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
 
         row = sa_sync_conn.execute(
-            text("SELECT person_id, authorship_id FROM source_authorships WHERE id = :i"),
+            text("SELECT person_id FROM source_authorships WHERE id = :i"),
             {"i": sa_id},
         ).one()
         assert row.person_id == person_id
-        assert row.authorship_id is not None
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM authorships WHERE publication_id = :pub AND person_id = :pid"),

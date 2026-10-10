@@ -175,7 +175,6 @@ def batch_assign_orphan_authorships(
     assigned = build_queries.assign_orphan_source_authorships_to_person(conn, person_id, sa_ids)
     authorship_repo.pin_authorships(sa_ids, person_id)
     build_queries.create_authorships_from_sources(conn, person_id, sa_ids, SOURCE_PRIORITY)
-    build_queries.link_source_authorships_batch(conn, person_id, sa_ids)
 
     for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
@@ -205,12 +204,10 @@ def _refresh_authorship_from_sources(
 
     Chaîne :
     1. INSERT IF MISSING dans authorships
-    2. Pose la FK source_authorships.source_authorship_id (sources non exclues)
-    3. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
-    4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
+    2. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
+    3. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
     """
     authorship_repo.insert_authorship_if_missing(publication_id, person_id)
-    authorship_repo.link_source_authorships_to_authorship(publication_id, person_id)
     authorship_repo.recompute_authorship_author_position_and_corresponding(
         publication_id,
         person_id,

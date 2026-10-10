@@ -23,7 +23,7 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.dates import today
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
-from infrastructure.db.sql_fragments import has_author_role
+from infrastructure.db.sql_fragments import authorship_has_signature_from, has_author_role
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
 
@@ -116,10 +116,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
             ) author ON TRUE
             WHERE a.person_id = :pid
               AND NOT ({has_author_role("a")})
-              AND EXISTS (
-                  SELECT 1 FROM source_authorships sa
-                  WHERE sa.authorship_id = a.id AND sa.source = '{Source.THESES.value}'
-              )
+              AND {authorship_has_signature_from(Source.THESES.value)}
             ORDER BY p.pub_year DESC NULLS LAST, p.title
         """),
         {"pid": person_id},

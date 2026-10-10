@@ -2,6 +2,8 @@
 
 from functools import partial
 
+from sqlalchemy import text
+
 from infrastructure.read_models.persons.detail import person_theses
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
@@ -13,13 +15,19 @@ _in_perimeter_authorship = partial(insert_authorship, in_perimeter=True)
 
 
 def _link_theses_source(conn, authorship_id):
-    """source_authorship `source = 'theses'` liée à l'authorship, pour l'EXISTS de `person_theses`."""
+    """source_authorship `source = 'theses'` qui atteste l'authorship (même publication, même personne), pour l'EXISTS de `person_theses`."""
+    publication_id, person_id = conn.execute(
+        text("SELECT publication_id, person_id FROM authorships WHERE id = :id"),
+        {"id": authorship_id},
+    ).one()
     source_pub = insert_source_publication(
-        conn, source="theses", source_id=f"theses-{authorship_id}", title="These"
+        conn,
+        publication_id,
+        source="theses",
+        source_id=f"theses-{authorship_id}",
+        title="These",
     )
-    insert_signature(
-        conn, source_pub, source="theses", author_position=None, authorship_id=authorship_id
-    )
+    insert_signature(conn, source_pub, source="theses", author_position=None, person_id=person_id)
 
 
 class TestPersonTheses:
