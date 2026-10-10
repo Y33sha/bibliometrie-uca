@@ -9,13 +9,13 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import NOT_FOUND, NotFound, Unavailable
 from domain.types import as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class HalFetchStaleAdapter(BaseFetchStaleAdapter):
@@ -28,24 +28,23 @@ class HalFetchStaleAdapter(BaseFetchStaleAdapter):
         self.base_url = API_BASE_URLS["hal"]
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self.base_url,
-                    params={
-                        "q": f"halId_s:{source_id}",
-                        "fl": HAL_FIELDS_STR,
-                        "wt": "json",
-                        "rows": "1",
-                    },
-                    timeout=15,
-                    label=f"halId {source_id}",
-                )
-            )
-        except (httpx2.RequestError, httpx2.HTTPStatusError):
-            return UNAVAILABLE
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            self.base_url,
+            params={
+                "q": f"halId_s:{source_id}",
+                "fl": HAL_FIELDS_STR,
+                "wt": "json",
+                "rows": "1",
+            },
+            timeout=15,
+            not_found_statuses=frozenset(),
+            label=f"halId {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        data = as_mapping(outcome)
         docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         if not docs:
             return NOT_FOUND

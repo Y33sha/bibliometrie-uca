@@ -1,4 +1,4 @@
-# Chantier — Issues des requêtes aux sources
+# Chantier — Clients HTTP des sources : gestion d'erreur commune
 
 ## Contexte
 
@@ -18,7 +18,7 @@ Les nouvelles tentatives, le disjoncteur et le pool de workers sont communs (`in
 ## Décisions
 
 - **Un type commun à trois issues** dans `application/ports/pipeline/lookup.py` : la valeur trouvée, `NOT_FOUND`, `UNAVAILABLE`.
-- **Une fonction commune classe les exceptions d'une requête** : 404 donne `NOT_FOUND`, toute autre erreur donne `UNAVAILABLE`. Les règles propres à une source (400 de WoS) restent dans son client.
+- **Une fonction commune classe les exceptions d'une requête** : un statut d'absence donne `NOT_FOUND`, toute autre erreur donne `UNAVAILABLE`. Le statut d'absence vaut 404 par défaut ; chaque client fixe le sien (aucun pour un endpoint de recherche, 400 pour WoS).
 
 ## Phasage
 
@@ -38,6 +38,6 @@ Les nouvelles tentatives, le disjoncteur et le pool de workers sont communs (`in
 
 ### Phase 4 — Autres clients
 
-- [ ] `fetch_stale` : les adapters utilisent la fonction de classement.
+- [x] `fetch_stale` : les adapters utilisent `lookup_json_async`. Les endpoints de recherche (HAL, theses.fr, ScanR) ne lisent pas un 404 comme une absence.
 - [ ] `fetch_missing` : recherche par DOI et par identifiant HAL.
 - [ ] `fetch_truncated`.

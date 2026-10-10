@@ -9,11 +9,11 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import NOT_FOUND, NotFound, Unavailable
 from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.theses.extract_theses import extract_doi
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.
@@ -32,19 +32,18 @@ class ThesesFetchStaleAdapter(BaseFetchStaleAdapter):
         self.url = API_BASE_URLS["theses"]
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self.url,
-                    params={"q": source_id, "debut": 0, "nombre": _SEARCH_SIZE},
-                    timeout=30,
-                    label=f"these {source_id}",
-                )
-            )
-        except (httpx2.RequestError, httpx2.HTTPStatusError):
-            return UNAVAILABLE
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            self.url,
+            params={"q": source_id, "debut": 0, "nombre": _SEARCH_SIZE},
+            timeout=30,
+            not_found_statuses=frozenset(),
+            label=f"these {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        data = as_mapping(outcome)
         for entree in as_sequence(data.get("theses")):
             these = as_mapping(entree)
             if as_str(these.get("id")) == source_id:

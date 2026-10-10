@@ -335,6 +335,33 @@ class TestLookupJsonAsync:
         assert outcome is UNAVAILABLE
 
     @pytest.mark.asyncio
+    async def test_search_endpoint_404_is_unavailable(self, http_mock):
+        """Sur un endpoint de recherche, un 404 désigne l'endpoint : l'absence de l'élément n'est pas établie."""
+        http_mock.get("https://api.example/search").mock(return_value=httpx2.Response(404))
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(
+                client,
+                "GET",
+                "https://api.example/search",
+                not_found_statuses=frozenset(),
+                label="t",
+            )
+        assert outcome is UNAVAILABLE
+
+    @pytest.mark.asyncio
+    async def test_source_specific_not_found_status(self, http_mock):
+        http_mock.get("https://api.example/a").mock(return_value=httpx2.Response(400))
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(
+                client,
+                "GET",
+                "https://api.example/a",
+                not_found_statuses=frozenset({400}),
+                label="t",
+            )
+        assert outcome is NOT_FOUND
+
+    @pytest.mark.asyncio
     async def test_network_error_is_unavailable(self, http_mock):
         http_mock.get("https://api.example/a").mock(side_effect=httpx2.ConnectError("refused"))
         async with httpx2.AsyncClient() as client:

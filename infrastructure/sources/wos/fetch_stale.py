@@ -9,12 +9,12 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE, NotFound, Unavailable
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.wos.parsing import extract_doi, get_records
 
 
@@ -32,30 +32,27 @@ class WosFetchStaleAdapter(BaseFetchStaleAdapter):
         self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self.base_url,
-                    headers=self.headers,
-                    params={
-                        "databaseId": "WOS",
-                        "usrQuery": f"UT=({source_id})",
-                        "count": 1,
-                        "firstRecord": 1,
-                    },
-                    timeout=60,
-                    initial_backoff=4.0,
-                    retry_on_empty_body=True,
-                    label=f"UT {source_id}",
-                )
-            )
-        except httpx2.HTTPStatusError as e:
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            self.base_url,
+            headers=self.headers,
+            params={
+                "databaseId": "WOS",
+                "usrQuery": f"UT=({source_id})",
+                "count": 1,
+                "firstRecord": 1,
+            },
+            timeout=60,
+            initial_backoff=4.0,
+            retry_on_empty_body=True,
             # 400 = requête sans correspondance : UT confirmé absent de WoS.
-            return NOT_FOUND if e.response.status_code == 400 else UNAVAILABLE
-        except httpx2.RequestError:
-            return UNAVAILABLE
+            not_found_statuses=frozenset({400}),
+            label=f"UT {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        data = as_mapping(outcome)
         if not data:
             return UNAVAILABLE
         records = get_records(data)
