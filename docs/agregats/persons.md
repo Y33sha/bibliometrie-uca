@@ -38,7 +38,7 @@ Ce qu'une exécution inscrit devient ce que la suivante lit, si bien que la conv
 
 Routeur `interfaces/api/routers/persons.py`, commandes dans `application/services/persons/commands.py`, adaptateur `PgPersonRepository`. Une commande vaut une transaction.
 
-**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, authorships, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. La fusion est refusée si les deux portent chacune une fiche annuaire distincte.
+**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, authorships, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses signatures y sont détachées et l'authorship supprimée. La fusion est refusée si les deux portent chacune une fiche annuaire distincte.
 
 **Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
 

@@ -92,12 +92,8 @@ class AuthorshipRepository(Protocol):
         """Lève le rejet d'une paire (publication, personne) : la retire de `rejected_authorships`. Idempotent."""
         ...
 
-    def unlink_all_source_authorships_for_pair(
-        self,
-        publication_id: int,
-        person_id: int,
-    ) -> int:
-        """Détache (person_id → NULL) toutes les signatures de la personne sur cette publication. Retourne le nombre de signatures détachées."""
+    def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
+        """Détache toutes les signatures de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de signatures détachées."""
         ...
 
     def delete_authorship(self, authorship_id: int) -> None: ...
@@ -110,10 +106,6 @@ class AuthorshipRepository(Protocol):
 
     def pin_authorships(self, source_authorship_ids: list[int], person_id: int) -> None:
         """Épingle des signatures à une personne dans `confirmed_authorships` (résolution admin d'orphelines). Upsert par signature : le dernier épinglage l'emporte."""
-        ...
-
-    def unpin_authorships_for_pair(self, publication_id: int, person_id: int) -> int:
-        """Retire les épinglages des signatures de la paire (publication, personne) — détachement admin. Retourne le nombre d'épinglages retirés."""
         ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────

@@ -13,6 +13,55 @@ from application.ports.repositories.authorship_repository import (
 from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR, case_priority
 
 
+def detach_rejected_signatures(
+    conn: Connection, person_id: int, publication_id: int | None = None
+) -> int:
+    """Détache les signatures de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de signatures détachées.
+
+    Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
+    """
+    scope = "AND r.publication_id = :pub" if publication_id is not None else ""
+    params = {"pid": person_id, "pub": publication_id}
+    conn.execute(
+        text(f"""
+            DELETE FROM confirmed_authorships ca
+            USING source_authorships sa, source_publications sp, rejected_authorships r
+            WHERE ca.source_authorship_id = sa.id
+              AND sa.source_publication_id = sp.id
+              AND r.publication_id = sp.publication_id
+              AND r.person_id = :pid AND ca.person_id = :pid {scope}
+        """),
+        params,
+    )
+    return conn.execute(
+        text(f"""
+            UPDATE source_authorships sa
+            SET person_id = NULL
+            FROM source_publications sp, rejected_authorships r
+            WHERE sa.source_publication_id = sp.id
+              AND r.publication_id = sp.publication_id
+              AND r.person_id = :pid AND sa.person_id = :pid {scope}
+        """),
+        params,
+    ).rowcount
+
+
+def delete_orphan_authorships(conn: Connection, person_id: int) -> int:
+    """Supprime les lignes consolidées de la personne qu'aucune signature n'atteste. Retourne le nombre supprimé."""
+    return conn.execute(
+        text("""
+            DELETE FROM authorships a
+            WHERE a.person_id = :pid
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  JOIN source_publications sd ON sd.id = sa.source_publication_id
+                  WHERE sa.person_id = :pid AND sd.publication_id = a.publication_id
+              )
+        """),
+        {"pid": person_id},
+    ).rowcount
+
+
 class PgAuthorshipRepository(AuthorshipRepository):
     """Accès PostgreSQL sync aux authorships canoniques et à leurs signatures sources."""
 
@@ -199,23 +248,8 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def unlink_all_source_authorships_for_pair(
-        self,
-        publication_id: int,
-        person_id: int,
-    ) -> int:
-        result = self._conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET person_id = NULL
-                FROM source_publications sp
-                WHERE sa.source_publication_id = sp.id
-                  AND sp.publication_id = :pub
-                  AND sa.person_id = :pid
-            """),
-            {"pub": publication_id, "pid": person_id},
-        )
-        return result.rowcount
+    def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
+        return detach_rejected_signatures(self._conn, person_id, publication_id)
 
     def delete_authorship(self, authorship_id: int) -> None:
         self._conn.execute(
@@ -224,19 +258,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
         )
 
     def delete_orphan_authorships_for_person(self, person_id: int) -> int:
-        result = self._conn.execute(
-            text("""
-                DELETE FROM authorships a
-                WHERE a.person_id = :pid
-                  AND NOT EXISTS (
-                      SELECT 1 FROM source_authorships sa
-                      JOIN source_publications sd ON sd.id = sa.source_publication_id
-                      WHERE sa.person_id = :pid AND sd.publication_id = a.publication_id
-                  )
-            """),
-            {"pid": person_id},
-        )
-        return result.rowcount
+        return delete_orphan_authorships(self._conn, person_id)
 
     # ── confirmed_authorships (épinglage admin, must-link grain signature) ──
 
@@ -252,20 +274,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
             """),
             {"ids": source_authorship_ids, "pid": person_id},
         )
-
-    def unpin_authorships_for_pair(self, publication_id: int, person_id: int) -> int:
-        result = self._conn.execute(
-            text("""
-                DELETE FROM confirmed_authorships ca
-                USING source_authorships sa, source_publications sp
-                WHERE ca.source_authorship_id = sa.id
-                  AND sa.source_publication_id = sp.id
-                  AND sp.publication_id = :pub
-                  AND ca.person_id = :pid
-            """),
-            {"pub": publication_id, "pid": person_id},
-        )
-        return result.rowcount
 
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 
