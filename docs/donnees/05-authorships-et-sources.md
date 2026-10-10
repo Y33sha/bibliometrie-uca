@@ -13,7 +13,7 @@ Colonnes notables :
 - `in_perimeter` : TRUE si l'auteur signe cette publication depuis une structure du périmètre
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures reliées à l'authorship, rafraîchie par le pipeline en fin de phase `authorships`.
+`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures qui attestent l'authorship (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `authorships`.
 
 **Une édition d'administration ne la rafraîchit pas.** La review d'un lien adresse ↔ structure et l'assignation d'une signature orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
 
@@ -31,7 +31,7 @@ Deux stores portent les arbitrages saisis à la main, et survivent aux reconstru
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref, datacite).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta).
-- **`source_authorships`** : une signature — un auteur sur un document source. `person_id` et `authorship_id` la relient à la personne et à l'authorship consolidés, `identity_id` à son identité d'auteur. Ses adresses passent par `source_authorship_addresses`, d'où la matview `source_authorship_structures` dérive ses structures.
+- **`source_authorships`** : une signature — un auteur sur un document source. `person_id` la relie à la personne, `identity_id` à son identité d'auteur. L'authorship qu'elle atteste se déduit de sa notice et de sa personne : celle du couple (publication de la notice, personne). Ses adresses passent par `source_authorship_addresses`, d'où la matview `source_authorship_structures` dérive ses structures.
 - **`author_identifying_keys`** : les attributs d'identité d'une signature — nom normalisé et identifiants. Une ligne par identité distincte, que `source_authorships.identity_id` référence : toutes les signatures de même identité la partagent.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 - **`staging`** : une ligne par document moissonné. Porte le payload brut de la source, vidé après normalisation, et `disappeared_at` quand la source cesse de rendre le document. Son cycle de vie relève du [moissonnage](../pipeline/02-extract.md).
@@ -45,7 +45,7 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 | `failed_lookups` | pipeline | phase `fetch_missing` (`infrastructure/sources/*/fetch_missing_*.py`) |
 | `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
 | `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
-| `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |
+| `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations` ; `person_id` par le pipeline ou en admin (orphan-assign) |
 | `source_authorship_addresses` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
 | `rejected_authorships` | admin | `application/services/authorships/core.py` |

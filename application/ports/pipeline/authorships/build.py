@@ -12,7 +12,7 @@ class AuthorshipsBuildQueries(Protocol):
     """Promotion des `source_authorships` en `authorships` consolidées (phase `authorships`), et variantes par lot de cette construction pour l'attribution admin d'orphelines à une personne."""
 
     def purge_authorships(self, conn: Connection) -> int:
-        """Vide `authorships` et délie les `source_authorships` qui y pointaient. Retourne le nombre de lignes purgées.
+        """Vide `authorships`. Retourne le nombre de lignes purgées.
 
         Réservé au mode `full`, qui repart de zéro ; le build incrémental s'en passe, sa logique étant idempotente.
         """
@@ -35,23 +35,19 @@ class AuthorshipsBuildQueries(Protocol):
     def analyze_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `authorships`.
 
-        À appeler après l'insertion (`insert_missing_authorships`) pour que le planner SQL des étapes suivantes (`link_source_authorships_to_authorships`, `propagate_authorship_attributes`) ait des estimations correctes sur les lignes fraîchement insérées. Sans ça, Postgres garde des stats périmées (`null_frac = 0`) et choisit un Nested Loop O(n×m) au lieu d'un Hash Join, ce qui peut bloquer indéfiniment.
+        À appeler après l'insertion (`insert_missing_authorships`) pour que le planner SQL des étapes suivantes (`propagate_authorship_attributes`) ait des estimations correctes sur les lignes fraîchement insérées. Sans ça, Postgres garde des stats périmées (`null_frac = 0`) et choisit un Nested Loop O(n×m) au lieu d'un Hash Join, ce qui peut bloquer indéfiniment.
         """
-        ...
-
-    def link_source_authorships_to_authorships(self, conn: Connection) -> int:
-        """Pose `source_authorships.authorship_id` sur les signatures encore non liées, toutes sources confondues. Retourne le nombre de lignes reliées."""
         ...
 
     def analyze_source_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `source_authorships`.
 
-        À appeler avant une requête qui filtre sur une colonne réécrite en masse : `person_id` (phases normalize et persons) avant `insert_missing_authorships`, `authorship_id` (`link_source_authorships_to_authorships`) avant `propagate_authorship_attributes`. Avec des stats périmées (`null_frac ≈ 1`), le planner estime `rows = 1` sur `WHERE ... IS NOT NULL` et part en Nested Loop. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante.
+        À appeler avant une requête qui filtre sur une colonne réécrite en masse : `person_id` (phases normalize et persons) avant `insert_missing_authorships`. Avec des stats périmées (`null_frac ≈ 1`), le planner estime `rows = 1` sur `WHERE ... IS NOT NULL` et part en Nested Loop. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante.
         """
         ...
 
     def propagate_authorship_attributes(self, conn: Connection) -> int:
-        """Recompose les attributs dérivés de chaque authorship depuis ses `source_authorships` liées. Retourne le nombre d'authorships modifiées.
+        """Recompose les attributs dérivés de chaque authorship depuis les `source_authorships` qui l'attestent : même publication par leur notice, même personne. Retourne le nombre d'authorships modifiées.
 
         - `author_position` : valeur de la source la plus prioritaire qui la renseigne (`SOURCE_PRIORITY`) — seul attribut qui départage les sources.
         - `is_corresponding` et `in_perimeter` : `bool_or`. Aucune source n'émet de FALSE explicite ; son silence ne saurait écraser l'affirmation d'une autre.
@@ -96,10 +92,4 @@ class AuthorshipsBuildQueries(Protocol):
         source_priority: tuple[str, ...],
     ) -> None:
         """Crée les lignes consolidées manquantes pour la personne, une par publication couverte par le lot, depuis la signature la plus prioritaire (`source_priority`) — variante par lot de la construction. Écarte les paires figurant dans `rejected_authorships`."""
-        ...
-
-    def link_source_authorships_batch(
-        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
-    ) -> None:
-        """Pose `source_authorships.authorship_id` vers la ligne consolidée de la personne, pour un lot de signatures désignées par id."""
         ...

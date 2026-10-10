@@ -45,6 +45,16 @@ def signature_display_name(signature: str = "sa") -> str:
     )
 
 
+def authorship_has_signature_from(source: str, authorship: str = "a") -> str:
+    """Condition vraie quand l'authorship aliasée `authorship` est attestée par une signature de `source` : même publication par sa notice, même personne."""
+    return (
+        "EXISTS (SELECT 1 FROM source_authorships sa_src"
+        " JOIN source_publications sp_src ON sp_src.id = sa_src.source_publication_id"
+        f" WHERE sp_src.publication_id = {authorship}.publication_id"
+        f" AND sa_src.person_id = {authorship}.person_id AND sa_src.source = '{source}')"
+    )
+
+
 def has_author_role(signature: str = "sa") -> str:
     """Condition vraie quand la signature aliasée `signature` tient le rôle d'auteur."""
     return f"{signature}.roles && ARRAY['author']::text[]"

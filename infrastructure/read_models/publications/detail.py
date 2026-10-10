@@ -20,7 +20,11 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
-from infrastructure.db.sql_fragments import active_issns, signature_display_name
+from infrastructure.db.sql_fragments import (
+    active_issns,
+    authorship_has_signature_from,
+    signature_display_name,
+)
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
@@ -189,14 +193,10 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
                    (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
                     FROM authorship_structures aus
                     WHERE aus.authorship_id = a.id) AS structure_ids,
-                   EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.HAL.value}') AS source_hal,
-                   EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.OPENALEX.value}') AS source_openalex,
-                   EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.WOS.value}') AS source_wos,
-                   EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.SCANR.value}') AS source_scanr,
+                   {authorship_has_signature_from(Source.HAL.value)} AS source_hal,
+                   {authorship_has_signature_from(Source.OPENALEX.value)} AS source_openalex,
+                   {authorship_has_signature_from(Source.WOS.value)} AS source_wos,
+                   {authorship_has_signature_from(Source.SCANR.value)} AS source_scanr,
                    pe.id AS person_id, pe.last_name, pe.first_name,
                    EXISTS (SELECT 1 FROM persons_rh pr WHERE pr.person_id = pe.id) AS has_rh
             FROM authorships a

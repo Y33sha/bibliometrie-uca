@@ -43,8 +43,8 @@ class TestGetPublicationDetail:
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
         sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
-        auth_id = insert_authorship(sa_sync_conn, pub, person_id=pid)
-        insert_signature(sa_sync_conn, sd, person_id=pid, authorship_id=auth_id)
+        insert_authorship(sa_sync_conn, pub, person_id=pid)
+        insert_signature(sa_sync_conn, sd, person_id=pid)
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None

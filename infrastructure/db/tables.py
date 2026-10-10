@@ -680,7 +680,6 @@ source_authorships = Table(
     Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
-    Column("authorship_id", Integer),
     # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute
     # (contrainte `source_authorships_name_form`).
     Column("raw_author_name", Text),

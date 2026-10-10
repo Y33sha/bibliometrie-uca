@@ -26,8 +26,10 @@ def _count_authorships_tables(conn) -> dict:
     ).scalar_one()
     counts["hal_fk"] = conn.execute(
         text(
-            "SELECT COUNT(*) AS cnt FROM source_authorships "
-            "WHERE authorship_id IS NOT NULL AND source = 'hal'"
+            "SELECT COUNT(*) AS cnt FROM source_authorships sa "
+            "JOIN source_publications sp ON sp.id = sa.source_publication_id "
+            "JOIN authorships a ON a.publication_id = sp.publication_id "
+            "AND a.person_id = sa.person_id WHERE sa.source = 'hal'"
         )
     ).scalar_one()
     counts["with_structs"] = conn.execute(
@@ -182,14 +184,14 @@ class TestIncrementalEqualsFull:
             text(
                 "UPDATE source_authorships SET is_corresponding = NOT is_corresponding "
                 "WHERE id = (SELECT min(id) FROM source_authorships "
-                "            WHERE authorship_id IS NOT NULL)"
+                "            WHERE person_id IS NOT NULL)"
             )
         )
         sa_sync_conn.execute(
             text(
                 "DELETE FROM source_authorships "
                 "WHERE id = (SELECT max(id) FROM source_authorships "
-                "            WHERE authorship_id IS NOT NULL)"
+                "            WHERE person_id IS NOT NULL)"
             )
         )
 

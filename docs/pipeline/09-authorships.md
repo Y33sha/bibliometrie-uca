@@ -19,10 +19,9 @@ La phase `authorships` consolide en une table les signatures que rapportent tout
 
 1. **Insertion** des paires (publication, personne) manquantes, **sauf** celles présentes dans `rejected_authorships` (rejet manuel, anti-join).
 2. **Élagage** des authorships orphelines : les paires que plus aucune `source_authorship` n'atteste sont supprimées.
-3. **Rattachement** : chaque `source_authorship` pointe vers son authorship via `source_authorships.authorship_id`.
-4. **Recomposition des attributs**, en une passe. `author_position` vient de la source la plus prioritaire qui le renseigne : theses > Crossref > DataCite > HAL > OpenAlex > ScanR > WoS. `is_corresponding`, `in_perimeter` et `roles` sont des unions : les booléens sont vrais dès qu'une source les porte.
-5. **Report sur les publications** : `publications.in_perimeter` est matérialisé, pour que les filtres de liste lisent un drapeau au lieu de recalculer l'appartenance au périmètre à chaque requête.
-6. **Rafraîchissement des vues matérialisées** `authorship_structures` et `publication_structures`, qui rattachent authorships et publications à leurs structures.
+3. **Recomposition des attributs**, en une passe, depuis les signatures qui attestent chaque authorship : même publication par leur notice, même personne. `author_position` vient de la source la plus prioritaire qui le renseigne : theses > Crossref > DataCite > HAL > OpenAlex > ScanR > WoS. `is_corresponding`, `in_perimeter` et `roles` sont des unions : les booléens sont vrais dès qu'une source les porte.
+4. **Report sur les publications** : `publications.in_perimeter` est matérialisé, pour que les filtres de liste lisent un drapeau au lieu de recalculer l'appartenance au périmètre à chaque requête.
+5. **Rafraîchissement des vues matérialisées** `authorship_structures` et `publication_structures`, qui rattachent authorships et publications à leurs structures.
 
 ## Opérations finales
 

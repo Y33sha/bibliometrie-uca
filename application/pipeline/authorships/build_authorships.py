@@ -1,10 +1,9 @@
 """Construit la table consolidée `authorships` à partir des `source_authorships`.
 
 Étape 1 : insérer les authorships manquantes puis supprimer les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste).
-Étape 2 : peupler les FK (`source_authorships.authorship_id` → `authorships.id`).
-Étape 3 : recomposer les attributs en une passe convergente (`author_position`, `is_corresponding`, `in_perimeter`, `roles`).
-Étape 4 : matérialiser `publications.in_perimeter` (rollup depuis authorships).
-Étape 5 : rafraîchir les matviews `authorship_structures` + `publication_structures`.
+Étape 2 : recomposer les attributs en une passe convergente (`author_position`, `is_corresponding`, `in_perimeter`, `roles`), depuis les signatures qui attestent chaque authorship.
+Étape 3 : matérialiser `publications.in_perimeter` (rollup depuis authorships).
+Étape 4 : rafraîchir les matviews `authorship_structures` + `publication_structures`.
 """
 
 import logging
@@ -27,7 +26,7 @@ def build(
 ) -> PhaseMetrics:
     """Reconstruit la table `authorships` depuis les `source_authorships`.
 
-    Le build est idempotent et convergent : un appel répété sans `rebuild_full` converge vers le même résultat (l'étape 3 réécrit tout attribut divergent, l'étape 1 supprime les orphelines). `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
+    Le build est idempotent et convergent : un appel répété sans `rebuild_full` converge vers le même résultat (l'étape 2 réécrit tout attribut divergent, l'étape 1 supprime les orphelines). `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
     """
     # Reset optionnel : repart d'une table vide.
     if rebuild_full:
@@ -55,23 +54,17 @@ def build(
     etape(logger, "Synchronisation des tables")
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}synchronisation en cours", logger) as ligne:
-        # Stats fraîches avant l'UPDATE de l'étape 3 (sinon Nested Loop sur rows=1).
+        # Stats fraîches avant l'UPDATE de l'étape 2 (sinon Nested Loop sur rows=1).
         queries.analyze_authorships(conn)
 
-        # Étape 2 : Pose la FK source_authorship → authorship.
-        queries.link_source_authorships_to_authorships(conn)
-
-        # Stats fraîches sur authorship_id avant l'étape 3 (qui filtre IS NOT NULL).
-        queries.analyze_source_authorships(conn)
-
-        # Étape 3 : Recompose les attributs dérivés, convergent (n'écrit que les valeurs changées).
+        # Étape 2 : Recompose les attributs dérivés, convergent (n'écrit que les valeurs changées).
         queries.propagate_authorship_attributes(conn)
         total_in_perimeter = queries.count_authorships_in_perimeter(conn)
 
-        # Étape 4 : Rollup vers publications.in_perimeter.
+        # Étape 3 : Rollup vers publications.in_perimeter.
         queries.refresh_publications_in_perimeter(conn)
 
-        # Étape 5 : Rafraîchit les matviews dérivées d'authorships.
+        # Étape 4 : Rafraîchit les matviews dérivées d'authorships.
         queries.refresh_authorship_structures(conn)
         queries.refresh_publication_structures(conn)
 
