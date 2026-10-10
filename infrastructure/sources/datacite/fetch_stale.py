@@ -11,12 +11,12 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import UNAVAILABLE, NotFound, Unavailable
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
@@ -34,22 +34,18 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/dois/{urllib.parse.quote(source_id, safe='/()')}"
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    url,
-                    params=RECORD_PARAMS,
-                    headers=self.headers,
-                    timeout=30,
-                    label=f"DOI {source_id}",
-                )
-            )
-        except httpx2.HTTPStatusError as e:
-            return NOT_FOUND if e.response.status_code == 404 else UNAVAILABLE
-        except httpx2.RequestError:
-            return UNAVAILABLE
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            url,
+            params=RECORD_PARAMS,
+            headers=self.headers,
+            timeout=30,
+            label=f"DOI {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        data = as_mapping(outcome)
         node = data.get("data")
         if not isinstance(node, dict):
             return UNAVAILABLE

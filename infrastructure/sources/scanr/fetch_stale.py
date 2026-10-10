@@ -9,13 +9,13 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import NOT_FOUND, NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
@@ -35,20 +35,19 @@ class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
             "size": 1,
             "query": {"term": {"id.keyword": source_id}},
         }
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "POST",
-                    self.url,
-                    json_body=query,
-                    auth=self.auth,
-                    timeout=30,
-                    label=f"id {source_id}",
-                )
-            )
-        except httpx2.RequestError:
-            return UNAVAILABLE
+        outcome = await lookup_json_async(
+            client,
+            "POST",
+            self.url,
+            json_body=query,
+            auth=self.auth,
+            timeout=30,
+            not_found_statuses=frozenset(),
+            label=f"id {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        data = as_mapping(outcome)
         hits = as_sequence(as_mapping(data.get("hits")).get("hits"))
         if not hits:
             return NOT_FOUND

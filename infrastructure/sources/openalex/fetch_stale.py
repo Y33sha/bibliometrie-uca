@@ -9,7 +9,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from application.ports.pipeline.lookup import UNAVAILABLE, NotFound, Unavailable
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
@@ -17,7 +17,7 @@ from infrastructure.sources.config import (
     get_polite_pool_email,
 )
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import extract_doi
 
@@ -35,21 +35,17 @@ class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
         self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            work = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    f"{self.base_url}/{source_id}",
-                    params={"select": SELECT_FIELDS, **auth_params()},
-                    timeout=30,
-                    label=f"OA {source_id}",
-                )
-            )
-        except httpx2.HTTPStatusError as e:
-            return NOT_FOUND if e.response.status_code == 404 else UNAVAILABLE
-        except httpx2.RequestError:
-            return UNAVAILABLE
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            f"{self.base_url}/{source_id}",
+            params={"select": SELECT_FIELDS, **auth_params()},
+            timeout=30,
+            label=f"OA {source_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        work = as_mapping(outcome)
         if not isinstance(work, dict) or not work:
             return UNAVAILABLE
         return FetchedRecord(doi=extract_doi(work), raw_data=work)

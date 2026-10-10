@@ -8,12 +8,12 @@
 
 ### Non commencé
 
+- [Clients HTTP des sources : gestion d'erreur commune](CODE_clients-http-dry.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
-- [Issues des requêtes aux sources](CODE_issues-des-requetes-aux-sources.md)
 - [Licences des publications](DATA_licences.md)
 - [Modularité du pipeline](CODE_pipeline.md)
 - [Monographies](DATA_monographies.md)

@@ -212,11 +212,14 @@ async def lookup_json_async(
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
+    not_found_statuses: frozenset[int] = frozenset({404}),
     label: str = "",
 ) -> LookupOutcome[JsonValue]:
     """Requête d'un élément par `http_request_with_retry_async`, classée en issue (cf. `application.ports.pipeline.lookup`).
 
-    Un 404 donne `NOT_FOUND`. Toute autre erreur HTTP, une erreur réseau, une réponse illisible ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
+    Un statut de `not_found_statuses` donne `NOT_FOUND`. Toute autre erreur HTTP, une erreur réseau, une réponse illisible ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
+
+    `not_found_statuses` vaut 404 pour une ressource adressée par son identifiant. Il est vide pour un endpoint de recherche, où un 404 désigne l'endpoint et non l'élément : l'absence s'y lit dans une réponse sans résultat.
     """
     try:
         return await http_request_with_retry_async(
@@ -234,7 +237,7 @@ async def lookup_json_async(
             label=label,
         )
     except httpx2.HTTPStatusError as e:
-        if e.response.status_code == 404:
+        if e.response.status_code in not_found_statuses:
             return NOT_FOUND
         logger.warning("Indisponible %s : HTTP %s", label, e.response.status_code)
         return UNAVAILABLE
