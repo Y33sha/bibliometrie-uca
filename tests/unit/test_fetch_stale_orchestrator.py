@@ -3,7 +3,7 @@
 Les trois issues d'un refetch par id natif sont routées correctement :
 - record trouvé (hash changé / inchangé) → `save_refreshed` (updated / unchanged) ;
 - absence confirmée (`NOT_FOUND`) → `mark_disappeared` ;
-- échec transitoire (`None`) → no-op, compté en `errors`, ni sauvé ni marqué disparu.
+- source indisponible (`UNAVAILABLE`) → no-op, compté en `errors`, ni sauvé ni marqué disparu.
 """
 
 import asyncio
@@ -11,11 +11,8 @@ import logging
 from unittest.mock import MagicMock
 
 from application.pipeline.fetch_stale.phase import refresh
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    StaleRow,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, StaleRow
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 
 
 class _FakeAdapter:
@@ -54,7 +51,7 @@ def test_routes_each_outcome():
             "A": FetchedRecord(doi="10.1/a", raw_data={"changed": True}),
             "B": FetchedRecord(doi="10.1/b", raw_data={"changed": False}),
             "C": NOT_FOUND,
-            "D": None,
+            "D": UNAVAILABLE,
         }
     )
     metrics = _run(adapter)
@@ -70,7 +67,7 @@ def test_routes_each_outcome():
 
 def test_transient_failure_is_noop():
     # Un échec transitoire ne marque jamais la row disparue (l'absence n'est pas prouvée).
-    adapter = _FakeAdapter({"X": None})
+    adapter = _FakeAdapter({"X": UNAVAILABLE})
     metrics = _run(adapter)
     assert adapter.saved == []
     assert adapter.disappeared == []
@@ -115,7 +112,7 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch):
                 "A": FetchedRecord(doi="10.1/a", raw_data={"changed": True}),
                 "B": FetchedRecord(doi="10.1/b", raw_data={"changed": False}),
                 "C": NOT_FOUND,
-                "D": None,
+                "D": UNAVAILABLE,
             }
         )
     )

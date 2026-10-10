@@ -2,11 +2,11 @@
 
 La phase `fetch_stale` (cf. `application.pipeline.fetch_stale.phase.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
 
-`fetch_by_native_id` a trois issues, portées par le type de retour :
+`fetch_by_native_id` rend une issue de `application.ports.pipeline.lookup` :
 
 - `FetchedRecord` : record trouvé → refresh de `raw_data` + bump `last_seen_at` ;
-- `NOT_FOUND` : absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
-- `None` : échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant. L'absence n'est pas prouvée, on ne marque rien.
+- `NOT_FOUND` : absence confirmée → `disappeared_at` ;
+- `UNAVAILABLE` : source indisponible → no-op, retry au run suivant.
 
 Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont génériques : ils sont factorisés dans une classe de base infra (`BaseFetchStaleAdapter`), le Protocol ne fixe que leur contrat.
 """
@@ -20,6 +20,7 @@ from typing import Protocol
 import httpx2
 from sqlalchemy import Connection
 
+from application.ports.pipeline.lookup import LookupOutcome
 from domain.types import JsonValue
 
 
@@ -39,19 +40,7 @@ class FetchedRecord:
     raw_data: Mapping[str, JsonValue]
 
 
-class _NotFound:
-    """Sentinelle : absence confirmée par la source (réponse valide, zéro record)."""
-
-    __slots__ = ()
-
-    def __repr__(self) -> str:
-        return "NOT_FOUND"
-
-
-NOT_FOUND = _NotFound()
-
-# Issue d'un fetch : record trouvé, absence confirmée, ou échec transitoire (None).
-FetchOutcome = FetchedRecord | _NotFound | None
+type FetchOutcome = LookupOutcome[FetchedRecord]
 
 
 class FetchStaleAdapter(Protocol):

@@ -8,11 +8,8 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
@@ -50,9 +47,9 @@ class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
                 )
             )
         except httpx2.HTTPStatusError as e:
-            return NOT_FOUND if e.response.status_code == 404 else None
+            return NOT_FOUND if e.response.status_code == 404 else UNAVAILABLE
         except httpx2.RequestError:
-            return None
+            return UNAVAILABLE
         if not isinstance(work, dict) or not work:
-            return None
+            return UNAVAILABLE
         return FetchedRecord(doi=extract_doi(work), raw_data=work)

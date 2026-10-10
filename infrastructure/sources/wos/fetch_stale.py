@@ -8,11 +8,8 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_wos_api_key
@@ -56,11 +53,11 @@ class WosFetchStaleAdapter(BaseFetchStaleAdapter):
             )
         except httpx2.HTTPStatusError as e:
             # 400 = requête sans correspondance : UT confirmé absent de WoS.
-            return NOT_FOUND if e.response.status_code == 400 else None
+            return NOT_FOUND if e.response.status_code == 400 else UNAVAILABLE
         except httpx2.RequestError:
-            return None
+            return UNAVAILABLE
         if not data:
-            return None
+            return UNAVAILABLE
         records = get_records(data)
         if not records:
             return NOT_FOUND

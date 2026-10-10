@@ -8,11 +8,8 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.types import as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
@@ -48,7 +45,7 @@ class HalFetchStaleAdapter(BaseFetchStaleAdapter):
                 )
             )
         except (httpx2.RequestError, httpx2.HTTPStatusError):
-            return None
+            return UNAVAILABLE
         docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         if not docs:
             return NOT_FOUND

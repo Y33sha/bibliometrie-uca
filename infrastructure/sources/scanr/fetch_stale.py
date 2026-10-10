@@ -8,11 +8,8 @@ from __future__ import annotations
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_stale import (
-    NOT_FOUND,
-    FetchedRecord,
-    FetchOutcome,
-)
+from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -51,7 +48,7 @@ class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
                 )
             )
         except httpx2.RequestError:
-            return None
+            return UNAVAILABLE
         hits = as_sequence(as_mapping(data.get("hits")).get("hits"))
         if not hits:
             return NOT_FOUND
