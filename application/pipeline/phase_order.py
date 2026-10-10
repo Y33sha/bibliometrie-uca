@@ -50,9 +50,9 @@ Les champs entre accolades reçoivent une valeur de configuration au lancement d
 
 
 EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
-"""Enrichissements terminaux, hors résolution d'entités : `--no-extras` les omet.
+"""Enrichissements, hors résolution d'entités : `--no-extras` les omet.
 
-Rien en amont ne les lit — ni `persons`, ni `authorships` — et rien entre elles ne dépend d'une autre.
+Aucune ne dépend d'une autre. Des phases placées avant elles lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
 """
 
 if len(set(PHASE_ORDER)) != len(PHASE_ORDER):
