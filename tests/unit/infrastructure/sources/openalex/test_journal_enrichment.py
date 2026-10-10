@@ -20,7 +20,14 @@ class TestExtractApc:
         assert mod.extract_apc({"apc_usd": 2500}) == (2500, "USD")
 
     def test_none_when_absent(self):
-        assert mod.extract_apc({}) == (None, "EUR")
+        assert mod.extract_apc({}) is None
+
+    def test_price_without_amount_is_ignored(self):
+        """Une entrée EUR sans prix ne masque pas le prix d'une autre devise."""
+        source = {
+            "apc_prices": [{"currency": "EUR", "price": None}, {"currency": "USD", "price": 2000}]
+        }
+        assert mod.extract_apc(source) == (2000, "USD")
 
 
 class TestFetchSourcesBatch:
