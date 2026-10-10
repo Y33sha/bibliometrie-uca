@@ -77,11 +77,22 @@ class TestImportDoajDump:
     def test_reset_clears_journals_absent_from_dump(self, sa_sync_conn):
         # Un journal marqué is_in_doaj mais absent du dump repasse à FALSE.
         jid = _create_journal(sa_sync_conn, issn="0036-8075")
+        _create_journal(sa_sync_conn, issn="0028-0836")
         sa_sync_conn.execute(
             text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
-        _run(sa_sync_conn, [_row(issn="1095-9203")])  # dump sans notre ISSN
+        _run(sa_sync_conn, [_row(issn="0028-0836")])  # dump sans notre premier ISSN
         assert _is_in_doaj(sa_sync_conn, jid) is False
+
+    def test_dump_without_recognized_journal_changes_nothing(self, sa_sync_conn):
+        """Aucune revue reconnue (format du dump changé, par exemple) : les revues restent en l'état."""
+        jid = _create_journal(sa_sync_conn, issn="0036-8075")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
+        )
+        stats = _run(sa_sync_conn, [{"Colonne renommée": "0036-8075"}])
+        assert stats.matched == 0
+        assert _is_in_doaj(sa_sync_conn, jid) is True
 
     def test_orphan_rows_counted_not_matched(self, sa_sync_conn):
         stats = _run(sa_sync_conn, [_row(issn="2049-3630")])  # ISSN inconnu en local

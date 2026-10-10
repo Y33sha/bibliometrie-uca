@@ -79,17 +79,17 @@ def run_import_doaj_dump(
 ) -> DoajImportStats:
     """Importe les rows du dump DOAJ. L'orchestrateur gère la transaction
     (commits par batch) sauf si `commit=False` (tests sous transaction
-    rollbackée). Retourne les stats."""
+    rollbackée). Retourne les stats.
+
+    Un dump où aucune revue n'est reconnue laisse les revues en l'état : il signale un format de dump changé plutôt qu'un DOAJ vidé.
+    """
     # Index ISSN normalisé → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
     for indexed_journal_id, issn in journal_repo.find_journal_issn_index():
         issn_to_journal_id.setdefault(issn, indexed_journal_id)
-    # Le dump fait autorité : reset global avant de re-poser les TRUE.
-    if not dry_run:
-        journal_repo.reset_is_in_doaj()
 
     stats = DoajImportStats()
-    now = datetime.now(UTC)
+    matches: list[tuple[int, dict[str, str]]] = []
     seen: set[int] = set()
     for row in rows:
         stats.total_rows += 1
@@ -106,14 +106,20 @@ def run_import_doaj_dump(
             continue
         seen.add(journal_id)
         stats.matched += 1
-        if not dry_run:
-            journal_repo.update_journal_doaj(
-                journal_id, payload=clean_doaj_row(row), imported_at=now, is_in_doaj=True
-            )
-            if commit and stats.matched % COMMIT_EVERY == 0:
-                conn.commit()
+        matches.append((journal_id, row))
 
-    if commit and not dry_run:
+    if dry_run or not matches:
+        return stats
+    # Le dump fait autorité : reset global avant de re-poser les TRUE.
+    journal_repo.reset_is_in_doaj()
+    now = datetime.now(UTC)
+    for written, (journal_id, row) in enumerate(matches, 1):
+        journal_repo.update_journal_doaj(
+            journal_id, payload=clean_doaj_row(row), imported_at=now, is_in_doaj=True
+        )
+        if commit and written % COMMIT_EVERY == 0:
+            conn.commit()
+    if commit:
         conn.commit()
     return stats
 
@@ -153,5 +159,13 @@ def run_enrich_journals_from_doaj(
         metrics.resume = "dump inaccessible, import repris au prochain run"
         return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})
+    if stats.matched == 0:
+        message = f"DOAJ : aucune revue reconnue parmi {stats.total_rows} lignes de l'export, revues inchangées"
+        logger.warning(message)
+        metrics.signals.append(
+            {"level": "warning", "code": "dump_unrecognized", "message": message}
+        )
+        metrics.resume = "aucune revue reconnue, revues inchangées"
+        return metrics
     metrics.resume = accord(stats.matched, "revue mise à jour", "revues mises à jour")
     return metrics
