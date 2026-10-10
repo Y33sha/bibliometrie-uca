@@ -17,7 +17,7 @@ Une personne au prénom réduit à des initiales prend le prénom plein compatib
 
 Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures dont la source sépare nom et prénom passent en premier : une personne créée prend le découpage de la source plutôt que celui du parseur. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch.
+`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures dont la source sépare nom et prénom passent en premier : une personne créée prend le découpage de la source plutôt que celui du parseur. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch. La cascade écrit les personnes et les rattachements des signatures ; `person_name_forms` est synchronisée après elle (`populate_person_name_forms`).
 
 Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
@@ -45,10 +45,7 @@ from application.ports.repositories.authorship_repository import AuthorshipRepos
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
-    add_name_form,
-    create_person,
     link_authorship,
-    update_name,
 )
 from domain.normalize import normalize_name
 from domain.persons.identifiers import PersonIdentifierType
@@ -66,6 +63,7 @@ from domain.persons.matching import (
 )
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, initials_extend
+from domain.persons.person import validated_name
 
 # ---------------------------------------------------------------------------
 # Passe de cascade
@@ -268,7 +266,6 @@ class _Cascade:
             repo=self._authorship_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
-        add_name_form(pid, a.author_name_normalized or "", repo=self._person_repo)
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
         add_identifiers(pid, [a.identifiers], repo=self._person_repo)
         self._complete_first_name(pid, a)
@@ -286,9 +283,8 @@ class _Cascade:
         if a.current_person_id is not None:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.source_authorship_id)
-        last = a.last_name or a.name.display()
-        first = a.first_name or ""
-        marker = create_person(last, first, repo=self._person_repo)
+        last, first = validated_name(a.last_name or a.name.display(), a.first_name or "")
+        marker = self._person_repo.create(last, first)
         link_authorship(
             marker,
             a.source,
@@ -297,7 +293,6 @@ class _Cascade:
             resolution_mode="name",
         )
         add_identifiers(marker, [a.identifiers], repo=self._person_repo)
-        add_name_form(marker, a.author_name_normalized or "", repo=self._person_repo)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
         if a.publication_id is not None:
@@ -336,7 +331,7 @@ class _Cascade:
             or not initials_extend(initials, first_name)
         ):
             return
-        update_name(pid, namesake.last_name, first_name, repo=self._person_repo)
+        self._person_repo.update_name(pid, *validated_name(namesake.last_name, first_name))
         self._index_namesake(namesake._replace(first_name=first_name))
         self.first_names_completed += 1
 
