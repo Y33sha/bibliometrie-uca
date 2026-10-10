@@ -8,9 +8,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from application.pipeline.context import PhaseContext, RunOptions
+from application.pipeline.context import Phase, PhaseContext, RunOptions
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
@@ -99,3 +100,17 @@ def under_circuit_breaker(
             signal_source_unavailable(metrics, source, logger=logger, phase=phase)
     signal_if_tripped(metrics, breaker)
     return metrics
+
+
+@dataclass(frozen=True)
+class UnderCircuitBreaker:
+    """Exécute une phase sous le circuit-breaker de `source`, et la signale quand il a coupé."""
+
+    source: str
+    phase: Phase
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        with circuit_breaker(self.source) as breaker:
+            metrics = self.phase.run(ctx)
+        signal_if_tripped(metrics, breaker)
+        return metrics

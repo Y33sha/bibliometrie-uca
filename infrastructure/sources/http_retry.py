@@ -1,6 +1,6 @@
 """Requêtes HTTP avec retry, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-`http_request_with_retry` émet une requête httpx2 synchrone (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` s'appuie sur un `httpx2.AsyncClient` partagé entre coroutines (recherche par DOI de la phase `fetch_missing`, enrichissements concurrents), et `http_get_text_with_retry_async` rend le corps de la réponse en texte (notices XML du Sudoc). La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
+`http_request_with_retry` émet une requête httpx2 synchrone (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` s'appuie sur un `httpx2.AsyncClient` partagé entre coroutines (recherche par DOI de la phase `fetch_missing`, enrichissements concurrents), et `http_get_text_with_retry_async` rend le corps de la réponse en texte (notices XML du Sudoc). `lookup_json_async` classe la requête d'un élément en issue : trouvé, absent, source indisponible. La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
 
 Politique de retry :
   - 429 (Too Many Requests) et 5xx (panne source) : pause `initial_backoff * 2^attempt` puis retry, jusqu'à `max_retries` ; l'épuisement compte un échec au circuit-breaker. À l'épuisement sous breaker, la version sync coupe la source (`SourceUnavailableError`, l'appelant page à page ne peut pas avancer) ; la version async laisse remonter l'erreur brute, que les appelants concurrents attrapent par requête, l'accumulation coupant au seuil.
@@ -25,6 +25,7 @@ from typing import cast
 import httpx2
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from domain.types import JsonValue
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, get_current_breaker
 from infrastructure.sources.http_status import raise_for_status
@@ -196,6 +197,52 @@ async def http_request_with_retry_async(
         retry_on_empty_body=retry_on_empty_body,
         label=label,
     )
+
+
+async def lookup_json_async(
+    client: httpx2.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    params: Mapping[str, str | int | float | bool | None] | None = None,
+    json_body: Mapping[str, JsonValue] | None = None,
+    headers: Mapping[str, str] | None = None,
+    auth: tuple[str, str] | None = None,
+    timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx2, le timeout est passé au client
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+    retry_on_empty_body: bool = False,
+    label: str = "",
+) -> LookupOutcome[JsonValue]:
+    """Requête d'un élément par `http_request_with_retry_async`, classée en issue (cf. `application.ports.pipeline.lookup`).
+
+    Un 404 donne `NOT_FOUND`. Toute autre erreur HTTP, une erreur réseau, une réponse illisible ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
+    """
+    try:
+        return await http_request_with_retry_async(
+            client,
+            method,
+            url,
+            params=params,
+            json_body=json_body,
+            headers=headers,
+            auth=auth,
+            timeout=timeout,
+            max_retries=max_retries,
+            initial_backoff=initial_backoff,
+            retry_on_empty_body=retry_on_empty_body,
+            label=label,
+        )
+    except httpx2.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            return NOT_FOUND
+        logger.warning("Indisponible %s : HTTP %s", label, e.response.status_code)
+        return UNAVAILABLE
+    except SourceUnavailableError:
+        return UNAVAILABLE
+    except (httpx2.RequestError, json.JSONDecodeError) as e:
+        logger.warning("Indisponible %s : %s", label, e)
+        return UNAVAILABLE
 
 
 async def http_get_text_with_retry_async(

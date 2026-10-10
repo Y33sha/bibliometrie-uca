@@ -8,10 +8,12 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from infrastructure.sources import http_retry
 from infrastructure.sources.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
+    lookup_json_async,
 )
 
 _API_KEY = "cle-secrete-de-test"
@@ -301,3 +303,73 @@ class TestRedirections:
                     client, "GET", "https://api.example/foo", initial_backoff=0.01, label="test"
                 )
         assert ailleurs.call_count == 0  # la destination n'est pas jointe
+
+
+class TestLookupJsonAsync:
+    """Classement d'une requête d'élément : trouvé, absent (404), source indisponible."""
+
+    @pytest.mark.asyncio
+    async def test_found_returns_body(self, http_mock):
+        http_mock.get("https://api.example/a").mock(
+            return_value=httpx2.Response(200, json={"ok": True})
+        )
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(client, "GET", "https://api.example/a", label="t")
+        assert outcome == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_404_is_not_found(self, http_mock):
+        http_mock.get("https://api.example/a").mock(return_value=httpx2.Response(404))
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(client, "GET", "https://api.example/a", label="t")
+        assert outcome is NOT_FOUND
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [403, 503])
+    async def test_other_http_error_is_unavailable(self, http_mock, status):
+        http_mock.get("https://api.example/a").mock(return_value=httpx2.Response(status))
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(
+                client, "GET", "https://api.example/a", initial_backoff=0.01, label="t"
+            )
+        assert outcome is UNAVAILABLE
+
+    @pytest.mark.asyncio
+    async def test_network_error_is_unavailable(self, http_mock):
+        http_mock.get("https://api.example/a").mock(side_effect=httpx2.ConnectError("refused"))
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(
+                client, "GET", "https://api.example/a", initial_backoff=0.01, label="t"
+            )
+        assert outcome is UNAVAILABLE
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_is_unavailable(self, http_mock):
+        http_mock.get("https://api.example/a").mock(
+            return_value=httpx2.Response(200, text="pas du JSON")
+        )
+        async with httpx2.AsyncClient() as client:
+            outcome = await lookup_json_async(
+                client, "GET", "https://api.example/a", initial_backoff=0.01, label="t"
+            )
+        assert outcome is UNAVAILABLE
+
+    @pytest.mark.asyncio
+    async def test_tripped_breaker_is_unavailable_without_request(self, http_mock):
+        from infrastructure.sources.circuit_breaker import (
+            SourceCircuitBreaker,
+            reset_current_breaker,
+            set_current_breaker,
+        )
+
+        route = http_mock.get("https://api.example/a").mock(return_value=httpx2.Response(200))
+        breaker = SourceCircuitBreaker("test", threshold=1)
+        breaker.record_failure()
+        token = set_current_breaker(breaker)
+        try:
+            async with httpx2.AsyncClient() as client:
+                outcome = await lookup_json_async(client, "GET", "https://api.example/a", label="t")
+        finally:
+            reset_current_breaker(token)
+        assert outcome is UNAVAILABLE
+        assert route.call_count == 0

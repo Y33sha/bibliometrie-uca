@@ -3,18 +3,17 @@
 API: https://api.unpaywall.org/v2/{doi}?email=...
 Rate limit: 100 000 req/jour, ~10 req/s recommandé.
 
-Implémentation async sur `httpx2.AsyncClient` + retry/backoff via `http_request_with_retry_async`. Le client httpx2 est passé en paramètre pour être partagé sur toute la boucle d'enrichissement.
+Implémentation async sur `httpx2.AsyncClient` + retry/backoff via `lookup_json_async`. Le client httpx2 est passé en paramètre pour être partagé sur toute la boucle d'enrichissement.
 """
 
 from __future__ import annotations
 
-import logging
-
 import httpx2
 
+from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {
@@ -32,32 +31,25 @@ async def fetch_oa_status(
     *,
     base_url: str,
     email: str,
-    logger: logging.Logger,
-) -> str | None:
-    """Interroge Unpaywall pour un DOI. Retourne le statut OA mappé ou None (DOI inconnu / erreur)."""
+) -> LookupOutcome[str]:
+    """Statut OA d'un DOI selon Unpaywall, ramené au vocabulaire `oa_type`.
+
+    `NOT_FOUND` couvre un DOI inexploitable, un DOI absent d'Unpaywall et un statut hors vocabulaire.
+    """
     # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source peut porter un DOI non normalisé. Un DOI inexploitable → pas d'appel.
     cleaned = clean_doi(doi)
     if not cleaned:
-        return None
-    url = f"{base_url}/{cleaned}"
-    try:
-        data = as_mapping(
-            await http_request_with_retry_async(
-                client,
-                "GET",
-                url,
-                params={"email": email},
-                timeout=10,
-                label=f"DOI {doi}",
-            )
-        )
-    except httpx2.HTTPStatusError as e:
-        if e.response.status_code != 404:
-            logger.warning("  HTTP %s pour %s", e.response.status_code, doi)
-        return None
-    except httpx2.RequestError as e:
-        logger.warning("  Erreur réseau pour %s: %s", doi, e)
-        return None
-
-    raw_status = data.get("oa_status")
-    return OA_MAP.get(raw_status) if isinstance(raw_status, str) else None
+        return NOT_FOUND
+    outcome = await lookup_json_async(
+        client,
+        "GET",
+        f"{base_url}/{cleaned}",
+        params={"email": email},
+        timeout=10,
+        label=f"DOI {doi}",
+    )
+    if isinstance(outcome, NotFound | Unavailable):
+        return outcome
+    raw_status = as_mapping(outcome).get("oa_status")
+    status = OA_MAP.get(raw_status) if isinstance(raw_status, str) else None
+    return NOT_FOUND if status is None else status
