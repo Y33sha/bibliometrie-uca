@@ -21,12 +21,8 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import (
-    get_openalex_api_key,
-    get_polite_pool_email,
-)
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 
@@ -43,7 +39,6 @@ class OpenalexFetchMissingDoiAdapter:
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:

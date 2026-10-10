@@ -25,7 +25,7 @@ from infrastructure.sources.circuit_breaker import (
 )
 from infrastructure.sources.config import (
     get_openalex_api_key,
-    get_polite_pool_email,
+    get_polite_pool_email_optional,
 )
 from infrastructure.sources.openalex.publisher_enrichment import fetch_publishers_batch
 
@@ -49,7 +49,7 @@ def main() -> int:
     breaker = SourceCircuitBreaker("openalex publishers", threshold=3)
     token = set_current_breaker(breaker)
     api_key = get_openalex_api_key()
-    mailto = get_polite_pool_email()
+    mailto = get_polite_pool_email_optional() or ""
     publishers_api = API_BASE_URLS["openalex_publishers"]
     try:
         run_enrich_publishers_from_openalex(
