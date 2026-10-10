@@ -11,6 +11,7 @@ from typing import NotRequired, TypedDict, cast
 from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import as_mapping
 from infrastructure.sources.http_retry import http_request_with_retry
+from infrastructure.sources.openalex import credential_params
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,6 @@ def fetch_publishers_batch(
     openalex_ids: list[str],
     *,
     openalex_publishers_api: str,
-    api_key: str | None,
-    mailto: str,
 ) -> dict[str, str | None]:
     """Interroge OpenAlex Publishers pour un lot d'IDs.
 
@@ -49,11 +48,8 @@ def fetch_publishers_batch(
         "filter": f"ids.openalex:{'|'.join(full_ids)}",
         "per_page": str(len(openalex_ids)),
         "select": _SELECT,
+        **credential_params(),
     }
-    if api_key:
-        params["api_key"] = api_key
-    else:
-        params["mailto"] = mailto
 
     try:
         data = as_mapping(

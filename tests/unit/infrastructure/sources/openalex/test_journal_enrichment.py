@@ -36,7 +36,7 @@ class TestFetchSourcesBatch:
             "results": [{"id": "https://openalex.org/S1", "type": "journal", "apc_usd": 1000}]
         }
         monkeypatch.setattr(mod, "http_request_with_retry", lambda *a, **k: payload)
-        out = mod.fetch_sources_batch(["S1"], openalex_sources_api="x", api_key=None, mailto="m")
+        out = mod.fetch_sources_batch(["S1"], openalex_sources_api="x")
         assert out == {"S1": (1000, "USD", "journal")}
 
     def test_returns_empty_on_failure(self, monkeypatch):
@@ -44,5 +44,5 @@ class TestFetchSourcesBatch:
             raise RuntimeError("network down")
 
         monkeypatch.setattr(mod, "http_request_with_retry", boom)
-        out = mod.fetch_sources_batch(["S1"], openalex_sources_api="x", api_key=None, mailto="m")
+        out = mod.fetch_sources_batch(["S1"], openalex_sources_api="x")
         assert out == {}

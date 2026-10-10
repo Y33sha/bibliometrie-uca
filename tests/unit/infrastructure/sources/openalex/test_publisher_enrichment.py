@@ -1,5 +1,6 @@
 """Adapter OpenAlex Publishers → enrichissement du pays des éditeurs : extraction et fetch batch."""
 
+from infrastructure.sources import openalex
 from infrastructure.sources.openalex import publisher_enrichment as mod
 
 
@@ -24,18 +25,14 @@ class TestFetchPublishersBatch:
             {"id": "https://openalex.org/P2", "country_codes": []},
         )
         monkeypatch.setattr(mod, "http_request_with_retry", lambda *a, **k: payload)
-        out = mod.fetch_publishers_batch(
-            ["P1", "P2"], openalex_publishers_api="x", api_key=None, mailto="m"
-        )
+        out = mod.fetch_publishers_batch(["P1", "P2"], openalex_publishers_api="x")
         assert out == {"P1": "nl", "P2": None}
 
     def test_un_editeur_absent_de_la_reponse_reste_absent(self, monkeypatch):
         """`None` dit « la source ne connaît pas de pays » ; l'absence de clé dit « la source n'a rien répondu ». L'orchestrateur distingue les deux."""
         payload = self._payload({"id": "https://openalex.org/P1", "country_codes": ["FR"]})
         monkeypatch.setattr(mod, "http_request_with_retry", lambda *a, **k: payload)
-        out = mod.fetch_publishers_batch(
-            ["P1", "P2"], openalex_publishers_api="x", api_key=None, mailto="m"
-        )
+        out = mod.fetch_publishers_batch(["P1", "P2"], openalex_publishers_api="x")
         assert out == {"P1": "fr"}
 
     def test_dictionnaire_vide_sur_echec(self, monkeypatch):
@@ -45,9 +42,7 @@ class TestFetchPublishersBatch:
             raise RuntimeError("network down")
 
         monkeypatch.setattr(mod, "http_request_with_retry", boom)
-        out = mod.fetch_publishers_batch(
-            ["P1"], openalex_publishers_api="x", api_key=None, mailto="m"
-        )
+        out = mod.fetch_publishers_batch(["P1"], openalex_publishers_api="x")
         assert out == {}
 
     def test_la_cle_d_api_prime_sur_l_adresse_polite_pool(self, monkeypatch):
@@ -58,8 +53,8 @@ class TestFetchPublishersBatch:
             return {"results": []}
 
         monkeypatch.setattr(mod, "http_request_with_retry", capture)
-        mod.fetch_publishers_batch(
-            ["P1"], openalex_publishers_api="x", api_key="cle", mailto="m@example.org"
-        )
+        monkeypatch.setattr(openalex, "get_openalex_api_key", lambda: "cle")
+        monkeypatch.setattr(openalex, "get_polite_pool_email_optional", lambda: "m@example.org")
+        mod.fetch_publishers_batch(["P1"], openalex_publishers_api="x")
         assert captured["api_key"] == "cle"
         assert "mailto" not in captured
