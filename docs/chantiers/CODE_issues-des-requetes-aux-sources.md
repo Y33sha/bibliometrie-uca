@@ -34,7 +34,7 @@ Les nouvelles tentatives, le disjoncteur et le pool de workers sont communs (`in
 
 ### Phase 3 — Préfixes DOI
 
-- [ ] Les clients de préfixes Crossref et DataCite rendent le type commun. `publisher_checked_at` est posé seulement sur un préfixe trouvé ou absent.
+- [x] Les clients de préfixes Crossref et DataCite passent en asynchrone et rendent le type commun. `resolve_publishers` les interroge en concurrence par `run_fetch_pool`. `publisher_checked_at` est posé seulement sur un préfixe trouvé ou absent.
 
 ### Phase 4 — Autres clients
 

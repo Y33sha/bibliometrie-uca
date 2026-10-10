@@ -13,10 +13,13 @@ Usage :
 from __future__ import annotations
 
 import argparse
+import asyncio
 import os
 
+import httpx2
 from sqlalchemy import text
 
+from application.ports.pipeline.lookup import NotFound, Unavailable
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.config import get_polite_pool_email
@@ -45,7 +48,7 @@ _REOPEN = text("""
 _PROGRESS = 100
 
 
-def _reset(dry_run: bool) -> None:
+async def _reset(dry_run: bool) -> None:
     user_agent = build_user_agent(get_polite_pool_email())
     engine = get_sync_engine()
     with engine.connect() as conn:
@@ -54,15 +57,18 @@ def _reset(dry_run: bool) -> None:
 
     idle: list[int] = []
     unreachable = 0
-    for done, row in enumerate(members, 1):
-        profile = member_profile(row.member, user_agent=user_agent)
-        if profile is None:
-            unreachable += 1
-        elif profile[1] == 0:
-            idle.append(row.member)
-            log.info("Membre %d sans dépôt, %d préfixe(s) : %s", row.member, row.prefixes, row.noms)
-        if done % _PROGRESS == 0:
-            log.info("%d / %d membres vérifiés", done, len(members))
+    async with httpx2.AsyncClient() as client:
+        for done, row in enumerate(members, 1):
+            profile = await member_profile(client, row.member, user_agent=user_agent)
+            if isinstance(profile, NotFound | Unavailable):
+                unreachable += 1
+            elif profile[1] == 0:
+                idle.append(row.member)
+                log.info(
+                    "Membre %d sans dépôt, %d préfixe(s) : %s", row.member, row.prefixes, row.noms
+                )
+            if done % _PROGRESS == 0:
+                log.info("%d / %d membres vérifiés", done, len(members))
 
     log.info(
         "%d membres sans dépôt, %d injoignables%s",
@@ -80,7 +86,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Vérifie sans écrire.")
     args = parser.parse_args()
-    _reset(args.dry_run)
+    asyncio.run(_reset(args.dry_run))
     return 0
 
 

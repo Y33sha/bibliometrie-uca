@@ -54,14 +54,15 @@ def _run_resolve_publishers() -> PhaseMetrics:
         return under_circuit_breaker(
             "crossref/datacite prefixes",
             lambda breaker: run_resolve_publishers(
+                conn,
                 log,
                 repo=PgDoiPrefixesQueries(conn),
                 publisher_repo=PgPublisherGatewayQueries(conn),
-                fetch_crossref_prefix_fn=lambda prefix, sample_doi: fetch_crossref_prefix(
-                    prefix, sample_doi, user_agent=user_agent
+                fetch_crossref_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
+                    client, prefix, sample_doi, user_agent=user_agent
                 ),
-                fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
-                    prefix, user_agent=user_agent
+                fetch_datacite_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
+                    client, prefix, user_agent=user_agent
                 ),
                 breaker=breaker,
             ),

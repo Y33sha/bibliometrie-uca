@@ -15,6 +15,8 @@ class PendingPublisherPrefix(NamedTuple):
     ra: str
     publisher_name_raw: str | None
     publisher_name_normalized: str | None
+    sample_doi: str | None = None
+    """DOI du préfixe porté par un enregistrement, lu juste avant d'interroger Crossref."""
 
 
 class DoiPrefixesQueries(Protocol):
@@ -60,5 +62,5 @@ class DoiPrefixesQueries(Protocol):
         ...
 
     def mark_publisher_checked(self, prefix: str) -> None:
-        """Pose `publisher_checked_at = now()` : `/prefixes` a été tenté (succès ou échec) → la row ne sera plus reprise par le volet. Borne le travail à une tentative par row."""
+        """Pose `publisher_checked_at = now()` : `/prefixes` a répondu, préfixe trouvé ou absent → la row ne sera plus reprise par le volet."""
         ...

@@ -7,46 +7,42 @@ Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 
+import httpx2
+
+from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.publications.identifiers import DoiPrefix
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.http_retry import http_request_with_retry
-
-logger = logging.getLogger(__name__)
-
-
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
+from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.http_retry import lookup_json_async
 
 
-def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, str] | None:
+async def fetch_datacite_prefix(
+    client: httpx2.AsyncClient, prefix: str, *, user_agent: str
+) -> LookupOutcome[tuple[str, str, str]]:
     """Interroge `api.datacite.org/prefixes/<prefix>` pour récupérer provider + client.
 
-    Renvoie `(provider_name, client_name, client_symbol)` ou `None` si l'appel échoue ou si la structure attendue est incomplète.
+    Renvoie `(provider_name, client_name, client_symbol)`. `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite, ou une réponse sans provider ni client.
     """
     parsed = DoiPrefix.try_parse(prefix)
     cleaned = str(parsed) if parsed else None
     if not cleaned:
-        return None
-    url = f"{API_BASE_URLS['datacite']}/prefixes/{cleaned}"
-    headers = {"User-Agent": user_agent, "Accept": "application/vnd.api+json"}
-    try:
-        data = as_mapping(
-            http_request_with_retry(
-                "GET",
-                url,
-                params={"include": "clients,providers"},
-                headers=headers,
-                timeout=15,
-                max_retries=3,
-                label=f"datacite prefix {cleaned}",
-            )
-        )
-    except Exception as exc:
-        logger.warning("api.datacite.org/prefixes/%s : %r", cleaned, exc)
-        return None
-    return _parse_datacite_prefix_payload(data)
+        return NOT_FOUND
+    outcome = await lookup_json_async(
+        client,
+        "GET",
+        f"{API_BASE_URLS['datacite']}/prefixes/{cleaned}",
+        params={"include": "clients,providers"},
+        headers={"User-Agent": user_agent, "Accept": "application/vnd.api+json"},
+        timeout=15,
+        max_retries=3,
+        label=f"datacite prefix {cleaned}",
+    )
+    if isinstance(outcome, NotFound | Unavailable):
+        return outcome
+    parsed_payload = _parse_datacite_prefix_payload(outcome)
+    return NOT_FOUND if parsed_payload is None else parsed_payload
 
 
 def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | None:

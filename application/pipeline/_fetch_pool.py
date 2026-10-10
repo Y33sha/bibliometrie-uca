@@ -2,6 +2,8 @@
 
 Motif partagé par les orchestrateurs async du pipeline (phase `fetch_missing` par hal-id, NNT et DOI, re-fetch des works tronqués) : un client `httpx2` partagé, un pool borné de workers qui se répartissent les items via un itérateur commun (aucune barrière — un fetch lent n'occupe que son propre worker, les autres continuent), des écritures sérialisées sous un lock (la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` s'exécute dans un pool de threads), et un commit tous les `commit_every` items plus un commit final.
 
+`prepare`, facultatif, complète un item par une lecture en base avant son fetch, sous le même lock que les écritures.
+
 `write` ne commite pas : c'est cet helper qui porte le commit, par lot. `should_continue`
 permet un arrêt anticipé (coupe-circuit d'une source indisponible) : dès qu'il rend `False`,
 les workers cessent de tirer de nouveaux items.
@@ -49,6 +51,7 @@ async def run_fetch_pool[Item, Fetched](
     fetch: Callable[[httpx2.AsyncClient, Item], Awaitable[Fetched]],
     write: Callable[[Connection, Item, Fetched], None],
     should_continue: Callable[[], bool] = lambda: True,
+    prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
     """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent
     puis `write` sync sérialisé, commit tous les `commit_every` items."""
@@ -63,6 +66,9 @@ async def run_fetch_pool[Item, Fetched](
             for item in item_iter:
                 if not should_continue():
                     return
+                if prepare is not None:
+                    async with db_lock:
+                        item = await asyncio.to_thread(prepare, conn, item)
                 fetched = await fetch(client, item)
                 async with db_lock:
                     await asyncio.to_thread(write, conn, item, fetched)
