@@ -192,6 +192,21 @@ class TestRunOnePhase:
         assert record["signals"][0]["message"] == "la source est à bout de budget"
         assert "run_pipeline --from persons" in caplog.text
 
+    def test_toute_exception_consignee_comme_un_echec(self):
+        """Une exception imprévue (erreur HTTP, clé absente…) termine la phase consignée, au lieu d'une trace d'appels sans enregistrement."""
+
+        def _en_echec(ctx):
+            raise KeyError("champ")
+
+        recorder = _FakeRecorder()
+        with pytest.raises(SystemExit) as sortie:
+            self._executer(_en_echec, recorder=recorder)
+
+        assert sortie.value.code == 1
+        (record,) = recorder.records
+        assert record["status"] == "error"
+        assert record["signals"][0]["code"] == "exception"
+
     def test_perte_de_la_base_consignee_comme_un_echec(self, caplog):
         """Un serveur redémarré coupe les connexions : la phase se consigne et dit par où reprendre, au lieu d'une trace d'appels."""
 

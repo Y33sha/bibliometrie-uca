@@ -365,9 +365,7 @@ def _run_one_phase(
 ) -> tuple[str, float]:
     """Construit et exécute une phase, et enregistre son observabilité. Rend son nom et sa durée.
 
-    Une interruption clavier, une `RuntimeError` ou une erreur de base est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
-    from sqlalchemy.exc import SQLAlchemyError
-
+    Une interruption clavier ou une exception est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
     # Injecte le nom de phase dans tous les records émis pendant la phase (logger `normalize:`
     # plutôt que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
     phase_token = set_log_phase(name)
@@ -395,7 +393,7 @@ def _run_one_phase(
                     )
                 )
             )
-        except (KeyboardInterrupt, RuntimeError, SQLAlchemyError) as e:
+        except (KeyboardInterrupt, Exception) as e:
             # Une interruption en pleine requête invalide la connexion : le nettoyage qui suit lève une erreur SQLAlchemy à la place du `KeyboardInterrupt`, que la chaîne des exceptions garde.
             interrupted = is_user_interruption(e)
             if interrupted:
