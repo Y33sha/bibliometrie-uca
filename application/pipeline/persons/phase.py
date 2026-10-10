@@ -74,7 +74,7 @@ class PersonsPhase:
             stale = sorted(
                 cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
             )
-            cross_source_detached = persons_queries.detach_authorships(conn, stale)
+            cross_source_detached = persons_queries.detach_source_authorships(conn, stale)
 
             etape(logger, "Rafraîchissement des formes de nom associées aux personnes")
             t0 = time.perf_counter()

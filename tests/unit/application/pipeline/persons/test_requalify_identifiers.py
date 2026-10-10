@@ -30,10 +30,10 @@ def test_identite_contredisant_le_consensus_neutralisee_et_detachee():
     queries.write_misplaced_neutralizations.return_value = MisplacedNeutralizations(
         neutralized=3, to_detach=[10]
     )
-    queries.detach_authorships.return_value = 1
+    queries.detach_source_authorships.return_value = 1
 
     result = requalify_misplaced_identifiers(MagicMock(), {("orcid", "X"): "s dahbi"}, queries)
 
     queries.write_misplaced_neutralizations.assert_called_once_with(ANY, {2: ["orcid"]})
-    queries.detach_authorships.assert_called_once_with(ANY, [10])
+    queries.detach_source_authorships.assert_called_once_with(ANY, [10])
     assert result == {"neutralized": 3, "detached": 1}

@@ -359,7 +359,6 @@ def seed_source_authorship(
     source: str = "hal",
     source_pub_id: int | None = None,
     person_id: int | None = None,
-    authorship_id: int | None = None,
     in_perimeter: bool = True,
     raw_author_name: str = "Test Author",
     author_position: int = 0,
@@ -370,14 +369,13 @@ def seed_source_authorship(
         iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, authorship_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            "person_id, in_perimeter, raw_author_name, identity_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 source,
                 sp,
                 author_position,
                 person_id,
-                authorship_id,
                 in_perimeter,
                 raw_author_name,
                 iid,

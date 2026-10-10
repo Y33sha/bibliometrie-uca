@@ -22,7 +22,7 @@ class BareUnlinkedAuthorship(NamedTuple):
     `in_perimeter` reflète la détection d'une structure du périmètre sur cette signature. Les candidats `in_perimeter = FALSE` ne sont rattachables que par les barreaux non-nominaux de la cascade (identifiants forts, cross-source) — le matching/création par forme de nom reste réservé au périmètre (cf. `decide_name_form_outcome` et l'orchestrateur).
     """
 
-    authorship_id: int
+    source_authorship_id: int
     source: str
     name: SignatureName
     author_name_normalized: str | None
@@ -156,7 +156,7 @@ class PersonsMatchingQueries(Protocol):
         """Re-orpheline les signatures résolues par forme de nom (non épinglées) dont la forme désigne au moins deux personnes. Retourne le nombre détaché."""
         ...
 
-    def detach_authorships(self, conn: Connection, authorship_ids: list[int]) -> int:
+    def detach_source_authorships(self, conn: Connection, source_authorship_ids: list[int]) -> int:
         """Détache un lot de signatures par id (`person_id` et `resolution_mode` → NULL). Retourne le nombre détaché."""
         ...
 
