@@ -26,6 +26,7 @@ from application.ports.pipeline.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )
+from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
@@ -54,7 +55,7 @@ async def refetch(
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
-    `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
+    `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `not_found` (extras) ceux qu'OpenAlex ne connaît plus (flag effacé) ; `errors` les fetchs échoués.
     """
     adapter.configure(conn)
 
@@ -75,17 +76,21 @@ async def refetch(
 
     async def _fetch(
         client: httpx2.AsyncClient, ref: TruncatedWork
-    ) -> Mapping[str, JsonValue] | None:
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
         return await adapter.fetch_work(client, ref.openalex_id)
 
     with progression(total, DERNIERE_BRANCHE.rstrip(), log) as avancement:
 
         def _write(
-            conn: Connection, ref: TruncatedWork, work: Mapping[str, JsonValue] | None
+            conn: Connection, ref: TruncatedWork, work: LookupOutcome[Mapping[str, JsonValue]]
         ) -> None:
-            if not work:
-                # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
+            if isinstance(work, Unavailable):
+                # OpenAlex indisponible : on garde le flag → retry au prochain run.
                 metrics.add(errors=1)
+            elif isinstance(work, NotFound):
+                # Work supprimé ou fusionné dans OpenAlex : plus rien à re-télécharger.
+                adapter.clear_truncated(conn, ref.staging_id)
+                metrics.add(not_found=1)
             elif len(as_sequence(work.get("authorships"))) <= BULK_AUTHORSHIPS_CAP:
                 # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
                 adapter.clear_truncated(conn, ref.staging_id)

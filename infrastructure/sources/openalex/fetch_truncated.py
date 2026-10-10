@@ -16,6 +16,7 @@ from application.ports.pipeline.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )
+from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.types import JsonValue, as_mapping
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -23,7 +24,7 @@ from infrastructure.sources.config import (
     get_openalex_api_key,
     get_polite_pool_email,
 )
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 
 MAX_CONCURRENT = 3
@@ -80,26 +81,19 @@ class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
 
     async def fetch_work(
         self, client: httpx2.AsyncClient, openalex_id: str
-    ) -> Mapping[str, JsonValue] | None:
-        """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs).
-
-        Retourne le dict ou None si l'API renvoie 404 ou si la requête a échoué après tous les retries.
-        """
-        url = f"{self._base_url}/{openalex_id}"
-        params = {"select": SELECT_FIELDS, **auth_params()}
-        try:
-            return as_mapping(
-                await http_request_with_retry_async(
-                    client, "GET", url, params=params, timeout=30, label=f"OA {openalex_id}"
-                )
-            )
-        except httpx2.HTTPStatusError as e:
-            if e.response.status_code != 404:
-                # On laisse l'orchestrateur logger ; on remonte juste None.
-                return None
-            return None
-        except httpx2.RequestError:
-            return None
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs)."""
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            f"{self._base_url}/{openalex_id}",
+            params={"select": SELECT_FIELDS, **auth_params()},
+            timeout=30,
+            label=f"OA {openalex_id}",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        return as_mapping(outcome)
 
     def update_raw_data(
         self, conn: Connection, staging_id: int, work: Mapping[str, JsonValue]
