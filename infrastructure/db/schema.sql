@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1CIDlRmJrZMi3sa5Bvnr4oGyLtmrAABphPx1GHvvtZzpx0ZmOgamWQLFKWLgJWo
+\restrict fBxArnUQnka5coIforplBBV2FmJmXz7HZkK6mjELPvCRSr0HIhSQnnS6UfVDaKT
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -752,7 +752,6 @@ CREATE TABLE public.source_authorships (
     person_id integer,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
-    authorship_id integer,
     raw_author_name text,
     created_at timestamp with time zone DEFAULT now(),
     countries_dirty boolean DEFAULT true NOT NULL,
@@ -781,15 +780,66 @@ COMMENT ON COLUMN public.source_authorships.content_hash IS 'Empreinte des champ
 
 
 --
+-- Name: source_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_publications (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    title text NOT NULL,
+    pub_year smallint,
+    doc_type text,
+    publication_id integer,
+    staging_id integer,
+    created_at timestamp with time zone DEFAULT now(),
+    countries text[],
+    hal_collections text[],
+    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
+    urls text[],
+    journal_id integer,
+    oa_status text,
+    language text,
+    container_title text,
+    is_retracted boolean,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb,
+    meta jsonb,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    title_normalized text,
+    keys_dirty boolean DEFAULT true NOT NULL,
+    embargo_until date,
+    monograph_id integer,
+    authors_hash text,
+    impact jsonb,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
+    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+);
+
+
+--
+-- Name: COLUMN source_publications.authors_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
+
+
+--
 -- Name: authorship_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
 CREATE MATERIALIZED VIEW public.authorship_structures AS
- SELECT DISTINCT sa.authorship_id,
+ SELECT DISTINCT a.id AS authorship_id,
     sas.structure_id
-   FROM ((public.source_authorship_structures sas
+   FROM (((public.source_authorship_structures sas
      JOIN public.source_authorships sa ON ((sa.id = sas.source_authorship_id)))
-     JOIN public.authorships a ON ((a.id = sa.authorship_id)))
+     JOIN public.source_publications sp ON ((sp.id = sa.source_publication_id)))
+     JOIN public.authorships a ON (((a.publication_id = sp.publication_id) AND (a.person_id = sa.person_id))))
   WHERE (NOT (EXISTS ( SELECT 1
            FROM public.persons pe
           WHERE ((pe.id = a.person_id) AND (pe.exclusion IS NOT NULL)))))
@@ -857,56 +907,6 @@ CREATE TABLE public.publications (
     subjects_ingested_at timestamp with time zone,
     monograph_id integer
 );
-
-
---
--- Name: source_publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_publications (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    title text NOT NULL,
-    pub_year smallint,
-    doc_type text,
-    publication_id integer,
-    staging_id integer,
-    created_at timestamp with time zone DEFAULT now(),
-    countries text[],
-    hal_collections text[],
-    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
-    urls text[],
-    journal_id integer,
-    oa_status text,
-    language text,
-    container_title text,
-    is_retracted boolean,
-    abstract text,
-    keywords text[],
-    topics jsonb,
-    biblio jsonb,
-    meta jsonb,
-    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    title_normalized text,
-    keys_dirty boolean DEFAULT true NOT NULL,
-    embargo_until date,
-    monograph_id integer,
-    authors_hash text,
-    impact jsonb,
-    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
-    CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
-    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
-);
-
-
---
--- Name: COLUMN source_publications.authors_hash; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
 
 
 --
@@ -3242,13 +3242,6 @@ CREATE INDEX idx_publishers_name_trgm ON public.publishers USING gin (name publi
 
 
 --
--- Name: idx_sa_authorship; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authorship_id) WHERE (authorship_id IS NOT NULL);
-
-
---
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3909,14 +3902,6 @@ ALTER TABLE ONLY public.source_authorship_rors
 
 
 --
--- Name: source_authorships source_authorships_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_authorship_id_fkey FOREIGN KEY (authorship_id) REFERENCES public.authorships(id) ON DELETE SET NULL;
-
-
---
 -- Name: source_authorships source_authorships_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4000,5 +3985,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1CIDlRmJrZMi3sa5Bvnr4oGyLtmrAABphPx1GHvvtZzpx0ZmOgamWQLFKWLgJWo
+\unrestrict fBxArnUQnka5coIforplBBV2FmJmXz7HZkK6mjELPvCRSr0HIhSQnnS6UfVDaKT
 
