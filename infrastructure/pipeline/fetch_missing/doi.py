@@ -42,7 +42,7 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
     join_clause = (
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + `NOT IN (staging du target)` + `NOT IN (DOI que la cible porte déjà)`.
+    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + absent du staging du target + absent des DOI que la cible porte déjà. `NOT EXISTS` plutôt que `NOT IN` : un NULL dans la sous-requête viderait la sélection.
     prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
     query = f"""
@@ -61,10 +61,10 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
         FROM candidate_dois c
         {join_clause}
         WHERE c.source IS DISTINCT FROM :target
-          AND c.doi NOT IN (
-                  SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
+          AND NOT EXISTS (
+                  SELECT 1 FROM staging s WHERE s.source = :target AND s.doi = c.doi
               ){prefix_filter}
-          AND c.doi NOT IN (SELECT doi FROM deja_connus)
+          AND NOT EXISTS (SELECT 1 FROM deja_connus k WHERE k.doi = c.doi)
           AND NOT {pending}
         ORDER BY c.doi
     """

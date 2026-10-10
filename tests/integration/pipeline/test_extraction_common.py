@@ -176,6 +176,19 @@ class TestGetMissingDois:
 
         assert get_missing_dois(sa_sync_conn, "hal") == []
 
+    def test_un_doi_secondaire_nul_n_empeche_pas_la_selection(self, sa_sync_conn):
+        """Un `null` parmi les DOI secondaires de la cible n'écarte pas les autres candidats."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/manquant")
+        _add_inperim_sp(
+            sa_sync_conn,
+            "hal",
+            "hal-1",
+            doi="10.1234/autre",
+            external_ids={"related_dois": [None]},
+        )
+
+        assert get_missing_dois(sa_sync_conn, "hal") == ["10.1234/manquant"]
+
     def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
         pub_id = _publication(sa_sync_conn, "T", in_perimeter=False)
