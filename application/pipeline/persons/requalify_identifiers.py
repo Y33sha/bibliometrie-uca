@@ -43,5 +43,7 @@ def requalify_misplaced_identifiers(
                 misplaced[identity.identity_id].append(id_type)
 
     written = queries.write_misplaced_neutralizations(conn, misplaced)
-    detached = queries.detach_authorships(conn, written.to_detach) if written.to_detach else 0
+    detached = (
+        queries.detach_source_authorships(conn, written.to_detach) if written.to_detach else 0
+    )
     return {"neutralized": written.neutralized, "detached": detached}

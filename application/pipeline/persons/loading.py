@@ -20,7 +20,7 @@ from domain.persons.signature_name import SignatureName
 class EnrichedAuthorship(NamedTuple):
     """`BareUnlinkedAuthorship` enrichie côté Python : nom découpé, normalisations, flag de création autorisée."""
 
-    authorship_id: int
+    source_authorship_id: int
     source: str
     name: SignatureName
     author_name_normalized: str | None
@@ -46,7 +46,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
     allow_create = allow_person_creation(row.source, row.roles or [])
 
     return EnrichedAuthorship(
-        authorship_id=row.authorship_id,
+        source_authorship_id=row.source_authorship_id,
         source=row.source,
         name=row.name,
         author_name_normalized=row.author_name_normalized,

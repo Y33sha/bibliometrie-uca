@@ -40,7 +40,6 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def purge_authorships(self, conn: Connection) -> int:
         n = scalar_int(conn.execute(text("SELECT COUNT(*) FROM authorships")))
-        # DELETE plutôt que TRUNCATE : Postgres refuse TRUNCATE dès qu'une FK existe (même `SET NULL`).
         # La séquence des ids continue : un rollback restaure les lignes supprimées, pas une
         # séquence remise à zéro.
         conn.execute(text("DELETE FROM authorships"))

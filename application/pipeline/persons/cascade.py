@@ -97,7 +97,7 @@ class _Cascade:
         self.in_perimeter_total = len(in_perimeter)
         self.out_of_perimeter_total = len(out_of_perimeter)
         # Signatures déjà liées en cross-source, re-jugées ce run. Celles qu'aucune passe ne re-résout (absentes de `resolved_cross_source_ids`) ont perdu leur ancre : la phase les détache.
-        self.cross_source_candidate_ids = {a.authorship_id for a in cross_source}
+        self.cross_source_candidate_ids = {a.source_authorship_id for a in cross_source}
         self.resolved_cross_source_ids: set[int] = set()
 
         self._linked_index = load_linked_authorships_by_pub(conn, queries)
@@ -244,7 +244,7 @@ class _Cascade:
             forms = {f: self._name_form_map.get(f) for f in a.name_forms}
             orphans_log.info(
                 "signature %d (%s) « %s » : %s ; formes %s ; initiales compatibles %s ; rejetées pour la publication %s",
-                a.authorship_id,
+                a.source_authorship_id,
                 a.source,
                 a.name.display(),
                 reason,
@@ -258,13 +258,13 @@ class _Cascade:
         assert pid is not None  # garanti par decide_person_match action=match
         if a.current_person_id is not None:
             # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
-            self.resolved_cross_source_ids.add(a.authorship_id)
+            self.resolved_cross_source_ids.add(a.source_authorship_id)
             if reason == "cross_source" and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
         link_authorship(
             pid,
             a.source,
-            a.authorship_id,
+            a.source_authorship_id,
             repo=self._authorship_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
@@ -285,12 +285,16 @@ class _Cascade:
     def apply_create(self, a: EnrichedAuthorship) -> None:
         if a.current_person_id is not None:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
-            self.resolved_cross_source_ids.add(a.authorship_id)
+            self.resolved_cross_source_ids.add(a.source_authorship_id)
         last = a.last_name or a.name.display()
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
         link_authorship(
-            marker, a.source, a.authorship_id, repo=self._authorship_repo, resolution_mode="name"
+            marker,
+            a.source,
+            a.source_authorship_id,
+            repo=self._authorship_repo,
+            resolution_mode="name",
         )
         add_identifiers(marker, [a.identifiers], repo=self._person_repo)
         add_name_form(marker, a.author_name_normalized or "", repo=self._person_repo)
@@ -413,10 +417,10 @@ def run_cascade(
     non_identifiees = [a for a in sans_personne if a.allow_create]
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme ambiguë le reste.
     indecidables = [a for a in non_identifiees if c.name_form_ambiguous(a)]
-    indecidables_ids = {a.authorship_id for a in indecidables}
+    indecidables_ids = {a.source_authorship_id for a in indecidables}
     # Les signatures au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
     a_creer = sorted(
-        (a for a in non_identifiees if a.authorship_id not in indecidables_ids),
+        (a for a in non_identifiees if a.source_authorship_id not in indecidables_ids),
         key=lambda a: not a.name.split_by_source,
     )
 

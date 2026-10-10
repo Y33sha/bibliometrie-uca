@@ -89,10 +89,10 @@ def _insert_authorship(
     )
 
 
-def _get_person_id(conn, authorship_id):
+def _get_person_id(conn, source_authorship_id):
     return conn.execute(
         text("SELECT person_id FROM source_authorships WHERE id = :id"),
-        {"id": authorship_id},
+        {"id": source_authorship_id},
     ).scalar_one_or_none()
 
 

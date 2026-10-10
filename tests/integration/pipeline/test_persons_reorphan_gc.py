@@ -100,7 +100,7 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     assert _row(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
 
 
-def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
+def test_detach_source_authorships_by_id_protects_confirmed(sa_sync_conn):
     conn = sa_sync_conn
     p = insert_person(conn, "Zhang", first_name="Wei")
     cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
@@ -109,7 +109,7 @@ def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     insert_confirmed_authorship(conn, pinned_cross, person_id=p)
 
     # Détache le lot demandé, mais jamais un épinglage admin.
-    assert _Q.detach_authorships(conn, [cross, pinned_cross]) == 1
+    assert _Q.detach_source_authorships(conn, [cross, pinned_cross]) == 1
 
     assert _row(conn, cross) == (None, None)  # détachée
     assert _row(conn, pinned_cross).person_id == p  # épinglée admin, protégée

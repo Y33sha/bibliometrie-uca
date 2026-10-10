@@ -47,7 +47,7 @@ def _usable(id_type: str) -> str:
 def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
     """Mappe une ligne SQL (projection partagée) vers `BareUnlinkedAuthorship`."""
     return BareUnlinkedAuthorship(
-        authorship_id=r.authorship_id,
+        source_authorship_id=r.source_authorship_id,
         source=r.source,
         name=SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
         author_name_normalized=r.author_name_normalized,
@@ -65,7 +65,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
 # `identifiers` porte un objet jsonb par type de `PersonIdentifierType`, sans les identifiants absents ou neutralisés par la signature.
 _IDENTIFIERS_OBJECT = ", ".join(f"'{t.value}', {_usable(t.value)}" for t in PersonIdentifierType)
 _BARE_PROJECTION_HEAD = f"""
-    sa_auth.id AS authorship_id,
+    sa_auth.id AS source_authorship_id,
     sa_auth.source::text AS source,
     sa_auth.raw_author_name,
     sa_auth.raw_last_name,
@@ -571,9 +571,9 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
             """)
         ).rowcount
 
-    def detach_authorships(self, conn: Connection, authorship_ids: list[int]) -> int:
+    def detach_source_authorships(self, conn: Connection, source_authorship_ids: list[int]) -> int:
         """Sert aux liens cross-source devenus sans appui : une signature dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
-        if not authorship_ids:
+        if not source_authorship_ids:
             return 0
         return conn.execute(
             text("""
@@ -584,7 +584,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
                   )
             """),
-            {"ids": authorship_ids},
+            {"ids": source_authorship_ids},
         ).rowcount
 
     def delete_empty_persons(self, conn: Connection) -> int:

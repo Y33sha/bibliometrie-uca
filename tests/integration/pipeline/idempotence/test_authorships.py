@@ -60,10 +60,7 @@ class TestBuildAuthorshipsIdempotence:
 
 
 class TestBuildAuthorshipsRebuildFull:
-    """`rebuild_full=True` purge la table et reconstruit sans erreur FK.
-
-    Régression : `TRUNCATE TABLE authorships` était refusé par Postgres à cause de la FK `source_authorships.authorship_id`, même après avoir mis cette FK à NULL et même si la table était vide. Le fix remplace `TRUNCATE` par `DELETE`.
-    """
+    """`rebuild_full=True` purge la table, la reconstruit, et converge vers l'état du build incrémental."""
 
     def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
         import logging
