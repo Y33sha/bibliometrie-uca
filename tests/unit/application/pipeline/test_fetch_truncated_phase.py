@@ -1,6 +1,6 @@
 """Tests unitaires du re-fetch des works OpenAlex tronqués.
 
-Pas de réseau ni de base : un faux `OpenalexFetchTruncatedAdapter` sert des works scriptés, et la connexion est un mock. Ce qui est éprouvé ici est l'arbitrage du triage — le work qui dépasse cent auteurs est réécrit, celui qui en compte cent pile perd son marqueur sans réécriture, celui dont le fetch échoue garde le sien pour le run suivant.
+Pas de réseau ni de base : un faux `OpenalexFetchTruncatedAdapter` sert des works scriptés, et la connexion est un mock. Ce qui est éprouvé ici est l'arbitrage du triage — le work qui dépasse cent auteurs est réécrit, celui qui en compte cent pile perd son marqueur sans réécriture, celui qu'OpenAlex ne connaît plus perd le sien, celui dont OpenAlex est indisponible garde le sien pour le run suivant.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import pytest
 
 from application.pipeline.fetch_truncated.phase import FetchTruncatedPhase, refetch
 from application.ports.pipeline.fetch_truncated import TruncatedWork
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 
 _LOGGER = logging.getLogger("test")
 
@@ -20,8 +21,8 @@ def _work(nb_auteurs: int) -> dict:
     return {"authorships": [{"author": {"id": f"A{i}"}} for i in range(nb_auteurs)]}
 
 
-def _adapter(works: dict[str, dict | None]) -> MagicMock:
-    """Faux adapter servant `works` indexé par identifiant OpenAlex ; `None` figure un fetch échoué."""
+def _adapter(works: dict) -> MagicMock:
+    """Faux adapter servant `works` indexé par identifiant OpenAlex : un work, `NOT_FOUND` ou `UNAVAILABLE`."""
     a = MagicMock()
     a.max_concurrent = 2
     a.find_truncated.return_value = [
@@ -64,11 +65,21 @@ async def test_work_a_cent_auteurs_pile_perd_son_marqueur():
 
 
 @pytest.mark.asyncio
-async def test_fetch_echoue_garde_le_marqueur():
-    adapter = _adapter({"W1": None})
+async def test_openalex_indisponible_garde_le_marqueur():
+    adapter = _adapter({"W1": UNAVAILABLE})
     metrics = await refetch(MagicMock(), adapter, _LOGGER)
     assert metrics.errors == 1
     adapter.clear_truncated.assert_not_called()
+    adapter.update_raw_data.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_work_inconnu_d_openalex_perd_son_marqueur():
+    """Work supprimé ou fusionné dans OpenAlex : le marqueur s'efface, le work n'est plus redemandé."""
+    adapter = _adapter({"W1": NOT_FOUND})
+    metrics = await refetch(MagicMock(), adapter, _LOGGER)
+    assert metrics.extras.get("not_found") == 1
+    adapter.clear_truncated.assert_called_once()
     adapter.update_raw_data.assert_not_called()
 
 
@@ -91,7 +102,7 @@ async def test_l_etape_annonce_les_documents_a_verifier(works, titre, caplog):
 
 @pytest.mark.asyncio
 async def test_lot_mele():
-    adapter = _adapter({"W1": _work(150), "W2": _work(100), "W3": None, "W4": _work(200)})
+    adapter = _adapter({"W1": _work(150), "W2": _work(100), "W3": UNAVAILABLE, "W4": _work(200)})
     metrics = await refetch(MagicMock(), adapter, _LOGGER)
     assert (metrics.seen, metrics.updated, metrics.errors) == (4, 2, 1)
     assert metrics.extras.get("already_complete") == 1

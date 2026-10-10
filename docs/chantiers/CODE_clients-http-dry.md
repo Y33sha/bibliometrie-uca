@@ -40,4 +40,4 @@ Les nouvelles tentatives, le disjoncteur et le pool de workers sont communs (`in
 
 - [x] `fetch_stale` : les adapters utilisent `lookup_json_async`. Les endpoints de recherche (HAL, theses.fr, ScanR) ne lisent pas un 404 comme une absence.
 - [ ] `fetch_missing` : recherche par DOI et par identifiant HAL.
-- [ ] `fetch_truncated`.
+- [x] `fetch_truncated` : un work inconnu d'OpenAlex perd son marqueur ; la phase tourne sous circuit-breaker.

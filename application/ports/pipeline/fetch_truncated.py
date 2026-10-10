@@ -14,6 +14,7 @@ from typing import Protocol
 import httpx2
 from sqlalchemy import Connection
 
+from application.ports.pipeline.lookup import LookupOutcome
 from domain.types import JsonValue
 
 
@@ -41,8 +42,8 @@ class OpenalexFetchTruncatedAdapter(Protocol):
 
     async def fetch_work(
         self, client: httpx2.AsyncClient, openalex_id: str
-    ) -> Mapping[str, JsonValue] | None:
-        """Fetch un work individuel via l'API OpenAlex (auteurs complets)."""
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        """Fetch un work individuel via l'API OpenAlex (auteurs complets). `NOT_FOUND` : work supprimé ou fusionné dans OpenAlex."""
 
     def update_raw_data(
         self, conn: Connection, staging_id: int, work: Mapping[str, JsonValue]

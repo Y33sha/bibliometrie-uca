@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from application.pipeline.context import Phase
+from interfaces.cli.phases.execution import UnderCircuitBreaker
 
 
 def build() -> Phase:
     """Re-télécharge les works OpenAlex tronqués à 100 auteurs.
 
-    L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. La phase repère les lignes staging openalex à 100 auteurs restées `processed=FALSE`, et les re-télécharge en paginant leurs auteurs. Sa position, après `fetch_stale` et avant `normalize`, lui donne à voir les works tronqués que les phases de rattrapage viennent de ramener.
+    L'API OpenAlex plafonne la liste des auteurs à 100 par réponse de liste. La phase repère les lignes staging openalex marquées `authors_truncated` à l'extraction, et les re-télécharge une à une par `/works/{id}`, qui rend tous les auteurs. Elle tourne sous le circuit-breaker d'OpenAlex.
 
     Séquence et métriques dans `application/pipeline/fetch_truncated/phase.py`.
     """
     from application.pipeline.fetch_truncated.phase import FetchTruncatedPhase
     from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
-    return FetchTruncatedPhase(PgOpenalexFetchTruncatedAdapter())
+    return UnderCircuitBreaker("openalex", FetchTruncatedPhase(PgOpenalexFetchTruncatedAdapter()))
