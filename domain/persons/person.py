@@ -14,9 +14,17 @@ La logique métier touchant à une personne (fusion, matching cross-source, cré
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from domain.errors import ConflictError
+from domain.errors import ConflictError, ValidationError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.name_forms import PersonNameForm
+
+
+def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
+    """Nom et prénom débarrassés de leurs espaces de bord. Lève `ValidationError` sans patronyme : c'est de lui que dérivent les formes qui rendent une personne matchable."""
+    last_name, first_name = last_name.strip(), first_name.strip()
+    if not last_name:
+        raise ValidationError("Le nom est requis")
+    return last_name, first_name
 
 
 class PersonExclusion(StrEnum):

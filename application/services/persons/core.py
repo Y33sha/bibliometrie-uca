@@ -31,7 +31,7 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person import PersonExclusion
+from domain.persons.person import PersonExclusion, validated_name
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
@@ -56,20 +56,12 @@ class DetachResult(TypedDict):
 # ── Création / mise à jour personne ──
 
 
-def _validated_name(last_name: str, first_name: str) -> tuple[str, str]:
-    """Nom et prénom débarrassés de leurs espaces de bord, patronyme exigé."""
-    last_name, first_name = last_name.strip(), first_name.strip()
-    if not last_name:
-        raise ValidationError("Le nom est requis")
-    return last_name, first_name
-
-
 def create_person(last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
     """Crée une personne et retourne son id.
 
     Lève `ValidationError` sans patronyme : c'est de lui que `compute_person_name_forms` dérive les formes qui rendent la personne matchable, et une personne qui n'en a pas n'est atteignable par aucun nom.
     """
-    last_name, first_name = _validated_name(last_name, first_name)
+    last_name, first_name = validated_name(last_name, first_name)
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
@@ -110,7 +102,7 @@ def update_name(
 
     Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
     """
-    last_name, first_name = _validated_name(last_name, first_name)
+    last_name, first_name = validated_name(last_name, first_name)
     repo.update_name(person_id, last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     emit_event(
