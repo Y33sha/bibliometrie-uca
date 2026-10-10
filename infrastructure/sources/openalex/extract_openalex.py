@@ -21,13 +21,11 @@ from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.config import (
     get_extraction_api_ids,
-    get_openalex_api_key,
-    get_polite_pool_email_optional,
     get_years,
     source_credentials_missing,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 
@@ -59,7 +57,7 @@ def build_params(
 class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexExtractAdapter`.
 
-    Construit avec une `base_url` (endpoint `/works`). L'auth (api_key ou email polite pool) est initialisée via `init_auth(...)` lors du `load_config` — état global du module `infrastructure.sources.openalex` partagé avec `fetch_truncated` et `fetch_missing_doi`.
+    Construit avec une `base_url` (endpoint `/works`). L'auth (clé d'API ou adresse polite pool) vient d'`auth_params()`, qui lit la configuration.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -88,7 +86,6 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
-        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email_optional() or "")
         return OpenalexExtractConfig(
             base_url=self._url,
             institution_ids=institution_ids,

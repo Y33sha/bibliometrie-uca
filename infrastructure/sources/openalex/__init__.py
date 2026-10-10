@@ -2,28 +2,19 @@
 
 L'URL de base de l'API est un invariant exposé par `infrastructure.sources.api_params.API_BASE_URLS["openalex"]`.
 
-Le parsing pur des works (`extract_openalex_id`, `extract_doi`) vit dans `parsing.py` et est couvert par tests unitaires. Ce module ne garde que l'état d'auth (mutable via `init_auth`) et la liste des champs demandés à l'API (`SELECT_FIELDS`, analogue d'`HAL_FIELDS`).
+Le parsing pur des works (`extract_openalex_id`, `extract_doi`) vit dans `parsing.py` et est couvert par tests unitaires. Ce module ne garde que les paramètres d'authentification (`auth_params`) et la liste des champs demandés à l'API (`SELECT_FIELDS`, analogue d'`HAL_FIELDS`).
 """
 
-# Paramètres d'authentification — initialisés par le premier script lancé
-_api_key = None
-_email = ""
-
-
-def init_auth(api_key: str | None = None, email: str = "") -> None:
-    """Initialise les paramètres d'authentification OpenAlex."""
-    global _api_key, _email
-    _api_key = api_key
-    _email = email
+from infrastructure.sources.config import get_openalex_api_key, get_polite_pool_email_optional
 
 
 def auth_params() -> dict[str, str]:
-    """Retourne les paramètres d'authentification pour une requête OpenAlex."""
+    """Paramètres d'une requête OpenAlex sur les works : la clé d'API, sinon l'adresse du polite pool, l'une et l'autre facultatives."""
     params = {"include_xpac": "true"}
-    if _api_key:
-        params["api_key"] = _api_key
-    elif _email:
-        params["mailto"] = _email
+    if api_key := get_openalex_api_key():
+        params["api_key"] = api_key
+    elif email := get_polite_pool_email_optional():
+        params["mailto"] = email
     return params
 
 

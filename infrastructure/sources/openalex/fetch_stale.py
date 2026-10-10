@@ -12,13 +12,9 @@ from application.ports.pipeline.fetch_stale import FetchedRecord, FetchOutcome
 from application.ports.pipeline.lookup import UNAVAILABLE, NotFound, Unavailable
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import (
-    get_openalex_api_key,
-    get_polite_pool_email,
-)
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 from infrastructure.sources.openalex.parsing import extract_doi
 
 
@@ -31,7 +27,6 @@ class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:

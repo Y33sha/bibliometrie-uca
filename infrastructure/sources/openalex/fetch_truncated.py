@@ -20,12 +20,8 @@ from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailab
 from domain.types import JsonValue, as_mapping
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import (
-    get_openalex_api_key,
-    get_polite_pool_email,
-)
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 
 MAX_CONCURRENT = 3
 
@@ -61,7 +57,7 @@ _SELECT_TRUNCATED_SQL = text(
 class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexFetchTruncatedAdapter`.
 
-    `base_url` est résolu lors de `configure()` (depuis la BDD), au même endroit que `init_auth()` — la connexion DB est nécessaire aux deux et l'orchestrateur la passe déjà.
+    `base_url` est résolu lors de `configure()`.
     """
 
     max_concurrent: int = MAX_CONCURRENT
@@ -70,7 +66,6 @@ class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
         self._base_url: str = ""
 
     def configure(self, conn: Connection) -> None:
-        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self._base_url = API_BASE_URLS["openalex"]
 
     def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
