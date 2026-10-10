@@ -28,9 +28,9 @@ Les nouvelles tentatives, le disjoncteur et le pool de workers sont communs (`in
 
 ### Phase 2 — Unpaywall
 
-- [ ] Fonction de classement des exceptions dans `http_retry.py`.
-- [ ] Le client Unpaywall rend le type commun. La phase `oa_status` pose `unpaywall_checked_at` seulement sur un élément trouvé ou absent.
-- [ ] La phase `oa_status` tourne sous disjoncteur.
+- [x] Fonction de classement des exceptions dans `http_retry.py` : `lookup_json_async`.
+- [x] Le client Unpaywall rend le type commun. La phase `oa_status` pose `unpaywall_checked_at` seulement sur un élément trouvé ou absent.
+- [x] La phase `oa_status` tourne sous disjoncteur.
 
 ### Phase 3 — Préfixes DOI
 

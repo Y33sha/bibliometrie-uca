@@ -4,6 +4,7 @@ Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
 end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.client` :
 - happy path (3 publis, statuts mappés, update DB)
 - 404 Unpaywall → `not_found`
+- Unpaywall indisponible → publication laissée dans la file
 - préservation `diamond` quand Unpaywall renvoie `gold`
 - statut inchangé → `skipped`, pas d'update
 - 429 retry transparent (géré par `http_request_with_retry_async`)
@@ -25,19 +26,18 @@ import pytest
 from application.pipeline.context import PhaseContext, RunOptions
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.oa_status.phase import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
+from application.ports.pipeline.lookup import LookupOutcome
 from infrastructure.sources.unpaywall.client import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"
 
 
-def _make_fetcher(logger: logging.Logger):
+def _make_fetcher():
     """Compose le fetcher infrastructure pour les tests (couverture end-to-end)."""
 
-    async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
-        return await fetch_oa_status(
-            client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL, logger=logger
-        )
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
+        return await fetch_oa_status(client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL)
 
     return fetcher
 
@@ -126,7 +126,7 @@ def test_happy_path_updates_each_pub(logger, http_mock):
     _route(http_mock, "10.1/c", status="bronze")
 
     queries = _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3})
-    metrics = _run(queries, _make_fetcher(logger), logger)
+    metrics = _run(queries, _make_fetcher(), logger)
 
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
     assert sorted(queries.updates) == [(1, "gold"), (2, "green")]
@@ -149,9 +149,22 @@ def test_404_marks_as_not_found(logger, http_mock):
     _route(http_mock, "10.1/x", http_status=404)
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == []
     assert queries.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
+
+
+def test_unavailable_leaves_publication_unchecked(logger, http_mock):
+    """Unpaywall indisponible : ni statut ni date de vérification, la publication reste dans la file."""
+    pubs = [(1, "10.1/x", "closed", False)]
+    _route(http_mock, "10.1/x", http_status=403)
+
+    queries = _FakeQueries(pubs)
+    metrics = _run(queries, _make_fetcher(), logger)
+    assert queries.updates == []
+    assert queries.checked == []
+    assert metrics.errors == 1
+    assert metrics.extras["not_found"] == 0
 
 
 def test_diamond_not_replaced_by_gold(logger, http_mock):
@@ -160,7 +173,7 @@ def test_diamond_not_replaced_by_gold(logger, http_mock):
     _route(http_mock, "10.1/diamond", status="gold")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == []
 
 
@@ -170,7 +183,7 @@ def test_diamond_replaced_by_other_status(logger, http_mock):
     _route(http_mock, "10.1/diamond", status="bronze")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == [(1, "bronze")]
 
 
@@ -181,7 +194,7 @@ def test_embargoed_not_downgraded_to_closed(logger, http_mock):
     _route(http_mock, "10.1/emb", status="closed")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == []
 
 
@@ -191,7 +204,7 @@ def test_embargoed_replaced_by_open_status(logger, http_mock):
     _route(http_mock, "10.1/emb", status="green")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == [(1, "green")]
 
 
@@ -202,7 +215,7 @@ def test_open_archive_deposit_not_downgraded_to_closed(logger, http_mock):
     _route(http_mock, "10.1/deposit", status="closed")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == []
     assert queries.checked == [1]
 
@@ -214,7 +227,7 @@ def test_open_archive_deposit_upgraded_by_unpaywall(logger, http_mock):
     _route(http_mock, "10.1/deposit", status="gold")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == [(1, "gold")]
 
 
@@ -223,7 +236,7 @@ def test_unchanged_status_skipped(logger, http_mock):
     _route(http_mock, "10.1/same", status="gold")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == []
     assert queries.checked == [1]  # statut inchangé mais marqué vérifié
 
@@ -238,7 +251,7 @@ def test_429_retries_transparently(logger, http_mock):
     )
 
     queries = _FakeQueries([(1, "10.1/r", "closed", False)])
-    _run(queries, _make_fetcher(logger), logger)
+    _run(queries, _make_fetcher(), logger)
     assert queries.updates == [(1, "green")]
 
 
@@ -272,7 +285,7 @@ def test_skips_without_unpaywall_configuration(logger):
 
     metrics = OaStatusPhase(
         queries,
-        _make_fetcher(logger),
+        _make_fetcher(),
         credentials_missing=lambda source: "email polite pool absent",  # noqa: ARG005
         staleness_days=lambda conn: 15,  # noqa: ARG005
         max_per_run=lambda conn: None,  # noqa: ARG005

@@ -1,7 +1,7 @@
 """
 Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
-Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' n'est pas remplacé par 'gold' ; 'embargoed' n'est pas remplacé par 'closed' ou 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
+Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Une publication est marquée vérifiée seulement si Unpaywall a répondu ; quand Unpaywall est indisponible, elle attend le run suivant. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' n'est pas remplacé par 'gold' ; 'embargoed' n'est pas remplacé par 'closed' ou 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
 
 Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
@@ -26,11 +26,12 @@ from application.pipeline.libelles import (
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured
+from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from application.ports.pipeline.oa_status import OaStatusQueries
 from domain.publications.metadata import decide_oa_status
 
-type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[str | None]]
-"""Signature : `(client, doi) → statut OA mappé (str) | None`."""
+type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
+"""Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""
 
 # Constantes opérationnelles.
 BATCH_SIZE = 50
@@ -98,7 +99,7 @@ async def _verifier(
     stale_total = queries.count_stale_publications(conn, staleness_days=staleness_days)
     before_dist = queries.count_publications_by_oa_status(conn)
 
-    progress = {"updated": 0, "skipped": 0, "not_found": 0}
+    progress = {"updated": 0, "skipped": 0, "not_found": 0, "unavailable": 0}
 
     def _result() -> PhaseMetrics:
         # Indicateurs : synthèse du run (backlog, vérifiées, ventilation) puis répartition des publications par statut OA avec le delta du run (avant → après).
@@ -107,6 +108,7 @@ async def _verifier(
             updated=progress["updated"],
             unchanged=progress["skipped"],
             not_found=progress["not_found"],
+            errors=progress["unavailable"],
         )
         after_dist = queries.count_publications_by_oa_status(conn)
         statuses = sorted(
@@ -120,6 +122,7 @@ async def _verifier(
             "updated": progress["updated"],
             "unchanged": progress["skipped"],
             "not_found": progress["not_found"],
+            "unavailable": progress["unavailable"],
         }
         metrics.details["table"] = {
             "rows": [
@@ -170,11 +173,15 @@ async def _verifier(
             async with sem:
                 status = await fetcher(client, doi)
 
+            # Unpaywall indisponible : rien n'est écrit, la publication reste dans la file.
+            if isinstance(status, Unavailable):
+                progress["unavailable"] += 1
+                return
             # `new_status` non None = on écrit un nouveau statut ; sinon on pose seulement
             # `unpaywall_checked_at`, que la publication soit absente d'Unpaywall ou que son
             # statut y soit inchangé — dans les deux cas elle sort de la file jusqu'à péremption.
             new_status: str | None = None
-            if status is None:
+            if isinstance(status, NotFound):
                 progress["not_found"] += 1
             else:
                 new_status = decide_oa_status(current_status, status, has_open_deposit)
@@ -198,7 +205,7 @@ async def _verifier(
                 avancement.avance(len(chunk))
 
     logger.info(
-        "%s%s %s, %s %s, %s non %s",
+        "%s%s %s, %s %s, %s non %s, %s %s faute de réponse d'Unpaywall",
         DERNIERE_BRANCHE,
         progress["updated"],
         forme(progress["updated"], "mise à jour", "mises à jour"),
@@ -206,6 +213,8 @@ async def _verifier(
         forme(progress["skipped"], "inchangée"),
         progress["not_found"],
         forme(progress["not_found"], "trouvée"),
+        progress["unavailable"],
+        forme(progress["unavailable"], "reportée"),
     )
 
     return _result()

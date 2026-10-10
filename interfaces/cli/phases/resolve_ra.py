@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from application.pipeline.context import Phase, PhaseContext
-from application.pipeline.metrics import PhaseMetrics
-from interfaces.cli.phases.execution import circuit_breaker, signal_if_tripped
+from application.pipeline.context import Phase
+from interfaces.cli.phases.execution import UnderCircuitBreaker
 
 
 def build() -> Phase:
@@ -24,22 +21,10 @@ def build() -> Phase:
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-    return _UnderDoiOrgBreaker(
+    return UnderCircuitBreaker(
+        "doi.org/ra",
         ResolveRaPhase(
             PgDoiPrefixesQueries,
             lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
-        )
+        ),
     )
-
-
-@dataclass(frozen=True)
-class _UnderDoiOrgBreaker:
-    """Exécute la phase sous le circuit-breaker de `doi.org/ra`."""
-
-    phase: Phase
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        with circuit_breaker("doi.org/ra") as breaker:
-            metrics = self.phase.run(ctx)
-        signal_if_tripped(metrics, breaker)
-        return metrics
