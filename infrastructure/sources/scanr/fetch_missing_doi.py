@@ -9,25 +9,22 @@ Adapter async (`AsyncFetchMissingDoiAdapter`).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_missing.doi import (
-    is_not_found_marker,
-    not_found_marker,
-)
+from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
+from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
-    record_failed_lookup,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 
 class ScanrFetchMissingDoiAdapter:
@@ -46,31 +43,26 @@ class ScanrFetchMissingDoiAdapter:
         username, password = get_scanr_credentials()
         self.auth = (username, password)
 
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Iterable[Mapping[str, JsonValue]]:
+    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         query: dict[str, JsonValue] = {
             "size": len(dois),
             "query": {"terms": {"externalIds.id.keyword": dois}},
         }
-        try:
-            data = as_mapping(
-                await http_request_with_retry_async(
-                    client,
-                    "POST",
-                    self.url,
-                    json_body=query,
-                    auth=self.auth,
-                    timeout=30,
-                    label=f"batch {len(dois)} DOI",
-                )
-            )
-        except (httpx2.RequestError, httpx2.HTTPStatusError):
-            # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI n'est pas prouvée). Comportement uniforme à toutes les sources.
-            return []
+        outcome = await lookup_json_async(
+            client,
+            "POST",
+            self.url,
+            json_body=query,
+            auth=self.auth,
+            timeout=30,
+            not_found_statuses=frozenset(),
+            label=f"batch {len(dois)} DOI",
+        )
+        if isinstance(outcome, NotFound | Unavailable):
+            return DoiBatchResult()
         records = [
             as_mapping(as_mapping(hit).get("_source"))
-            for hit in as_sequence(as_mapping(data.get("hits")).get("hits"))
+            for hit in as_sequence(as_mapping(as_mapping(outcome).get("hits")).get("hits"))
         ]
         # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_missing_dois`.
         found = {
@@ -79,22 +71,9 @@ class ScanrFetchMissingDoiAdapter:
             for ext in as_sequence(rec.get("externalIds"))
             if as_str((champs := as_mapping(ext)).get("type")) == "doi"
         }
-        missed = [not_found_marker(d) for d in dois if d not in found]
-        return records + missed
+        return DoiBatchResult(records=records, not_found=[d for d in dois if d not in found])
 
-    def insert(
-        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
-    ) -> bool:
-        if is_not_found_marker(record):
-            record_failed_lookup(
-                conn,
-                "scanr",
-                "doi",
-                as_str(record["_doi"]) or "",
-                retry_after_days=retry_after_days,
-            )
-            return False
-
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         scanr_id = as_str(record.get("id")) or ""
         if not scanr_id:
             return False

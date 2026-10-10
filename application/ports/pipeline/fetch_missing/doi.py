@@ -10,7 +10,8 @@ sources.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import httpx2
@@ -24,20 +25,19 @@ MissingDoisReader = Callable[[Connection, str], list[str]]
 La fonction elle-même (`infrastructure.pipeline.fetch_missing.doi.get_missing_dois`) est injectée dans `run_async` : la couche application ne dépend pas d'`infrastructure` pour lire la liste des DOI manquants.
 """
 
-_NOT_FOUND_STATUS = "not_found"
+FailedDoiRecorder = Callable[[Connection, str, str, int], None]
+"""Signature : `(conn, source, doi, retry_after_days) -> None`. Inscrit dans `failed_lookups` un DOI dont la source a confirmé l'absence."""
 
 
-def not_found_marker(doi: str) -> Mapping[str, JsonValue]:
-    """Sentinelle « DOI introuvable » émise par `fetch_async`.
+@dataclass(frozen=True, slots=True)
+class DoiBatchResult:
+    """Réponse d'une source à un lot de DOI : notices trouvées, et DOI dont la source a confirmé l'absence.
 
-    Un adapter émet ce marqueur, au lieu d'un record API, pour un DOI que la source a **confirmé** absent (réponse vide ou 404). Sur une erreur transitoire (réseau, timeout), il retourne `[]` sans rien émettre. `insert()` inscrit le marqueur dans `failed_lookups`. L'orchestrateur l'exclut du compteur `fetched`.
+    Un DOI du lot présent dans aucune des deux listes attend le run suivant : la source était indisponible, ou sa réponse ne permet pas de conclure.
     """
-    return {"_status": _NOT_FOUND_STATUS, "_doi": doi}
 
-
-def is_not_found_marker(record: Mapping[str, JsonValue]) -> bool:
-    """True si `record` est une sentinelle `not_found_marker`."""
-    return record.get("_status") == _NOT_FOUND_STATUS
+    records: list[Mapping[str, JsonValue]] = field(default_factory=list)
+    not_found: list[str] = field(default_factory=list)
 
 
 class AsyncFetchMissingDoiAdapter(Protocol):
@@ -58,13 +58,8 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
 
-    def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Awaitable[Iterable[Mapping[str, JsonValue]]]:
-        """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
-        async partagé. Retourne les records trouvés (vide si rien trouvé)."""
+    def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> Awaitable[DoiBatchResult]:
+        """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client async partagé."""
 
-    def insert(
-        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
-    ) -> bool:
-        """Insère le record dans staging. Retourne True si nouveau, False si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Une sentinelle `not_found_marker` inscrit l'échec dans `failed_lookups`, repris après `retry_after_days` jours. Ne commite pas : `run_async` commite par lot."""
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
+        """Insère le record dans staging. Retourne True si nouveau, False si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Ne commite pas : `run_async` commite par lot."""

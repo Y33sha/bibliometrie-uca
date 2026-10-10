@@ -49,6 +49,13 @@ def record_failed_lookup(
     )
 
 
+def record_failed_doi_lookup(
+    conn: Connection, source: str, doi: str, retry_after_days: int
+) -> None:
+    """Inscrit l'échec de la recherche d'un DOI dans `source` (cf. `record_failed_lookup`). Ne commit pas."""
+    record_failed_lookup(conn, source, "doi", doi, retry_after_days=retry_after_days)
+
+
 _FORGET_DOIS_SQL = text(
     """
     DELETE FROM failed_lookups

@@ -109,6 +109,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> AsyncFetchMissingDoiAdapter:
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     from application.pipeline.fetch_missing.doi import run_async
     from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
+    from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_doi_lookup
     from infrastructure.sources.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
@@ -126,6 +127,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                     adapter,
                     log,
                     missing_dois_reader=get_missing_dois,
+                    record_not_found=record_failed_doi_lookup,
                     retry_after_days=retry_after_days,
                     limit=limit,
                     breaker=breaker,

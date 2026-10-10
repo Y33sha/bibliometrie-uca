@@ -11,21 +11,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fetch_missing.doi import (
-    is_not_found_marker,
-    not_found_marker,
-)
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
+from application.ports.pipeline.lookup import NotFound, Unavailable
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_lookup
+from infrastructure.pipeline.fetch_missing.failed_lookups import forget_failed_doi_lookups
 from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import get_wos_api_key
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.wos.parsing import extract_doi, extract_ut, filter_doi_for_wos
 
 log = logging.getLogger(__name__)
@@ -48,9 +46,7 @@ class WosFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
-    async def fetch_async(
-        self, client: httpx2.AsyncClient, dois: list[str]
-    ) -> Iterable[Mapping[str, JsonValue]]:
+    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
@@ -67,36 +63,28 @@ class WosFetchMissingDoiAdapter:
                 "count": WOS_PER_PAGE,
                 "firstRecord": first_record,
             }
-            try:
-                data = as_mapping(
-                    await http_request_with_retry_async(
-                        client,
-                        "GET",
-                        self.base_url,
-                        headers=self.headers,
-                        params=params,
-                        timeout=60,
-                        # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
-                        initial_backoff=4.0,
-                        retry_on_empty_body=True,
-                        label=f"rec {first_record}",
-                    )
-                )
-            except httpx2.HTTPStatusError as e:
+            outcome = await lookup_json_async(
+                client,
+                "GET",
+                self.base_url,
+                headers=self.headers,
+                params=params,
+                timeout=60,
+                # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
+                initial_backoff=4.0,
+                retry_on_empty_body=True,
+                not_found_statuses=frozenset({400}),
+                label=f"rec {first_record}",
+            )
+            if isinstance(outcome, NotFound):
                 # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).
-                if e.response.status_code == 400:
-                    log.warning("WoS 400 rec %d, lot ignoré", first_record)
-                    break
-                # Toute autre erreur HTTP (401/403/5xx après retries) : lot non
-                # fiable, on rend ce qu'on a sans calculer de not-found (uniforme
-                # aux autres sources). Le circuit-breaker (SourceUnavailableError,
-                # non-HTTP) reste propagé et géré par l'orchestrateur.
+                log.warning("WoS 400 rec %d, lot ignoré", first_record)
+                break
+            if isinstance(outcome, Unavailable):
+                # Lot non fiable : on rend ce qu'on a sans calculer de not-found.
                 complete = False
                 break
-            except httpx2.RequestError:
-                complete = False
-                break
-
+            data = as_mapping(outcome)
             if not data:
                 complete = False
                 break
@@ -113,27 +101,22 @@ class WosFetchMissingDoiAdapter:
             await asyncio.sleep(WOS_DELAY)
 
         if not complete:
-            return records
+            return DoiBatchResult(records=records)
         # Lot complet : tout DOI interrogé sans record correspondant est confirmé absent de WoS. `extract_doi` et les candidats sont tous deux normalisés par `clean_doi`, donc comparables directement.
         found = {d for r in records if (d := extract_doi(r))}
-        missed = [not_found_marker(orig) for orig, c in queried if c and c not in found]
-        return records + missed
+        return DoiBatchResult(
+            records=records, not_found=[orig for orig, c in queried if c and c not in found]
+        )
 
-    def insert(
-        self, conn: Connection, record: Mapping[str, JsonValue], *, retry_after_days: int
-    ) -> bool:
-        if is_not_found_marker(record):
-            record_failed_lookup(
-                conn, "wos", "doi", as_str(record["_doi"]) or "", retry_after_days=retry_after_days
-            )
-            return False
-
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
+        doi = extract_doi(record)
         inserted, _ = upsert_staging(
             conn,
             source="wos",
             source_id=extract_ut(record),
-            doi=extract_doi(record),
+            doi=doi,
             raw_data=record,
             entry_mode="fetch_missing_doi",
         )
+        forget_failed_doi_lookups(conn, "wos", [doi])
         return inserted
