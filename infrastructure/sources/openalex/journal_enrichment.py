@@ -17,21 +17,24 @@ logger = logging.getLogger(__name__)
 _SELECT = "id,apc_usd,apc_prices,type"
 
 
-def extract_apc(source: Mapping[str, JsonValue]) -> tuple[float | None, str]:
-    """Montant et devise APC d'un objet source OpenAlex.
+def extract_apc(source: Mapping[str, JsonValue]) -> tuple[float, str] | None:
+    """Montant et devise APC d'un objet source OpenAlex, ou `None` quand OpenAlex ne donne aucun montant.
 
-    Priorité : EUR dans `apc_prices` > première devise disponible > `apc_usd` en USD.
+    Priorité, parmi les prix renseignés : EUR dans `apc_prices` > première devise disponible > `apc_usd` en USD.
     """
-    apc_prices = [as_mapping(e) for e in as_sequence(source.get("apc_prices"))]
-    for entry in apc_prices:
-        if as_str(entry.get("currency")) == "EUR":
-            return _montant(entry.get("price")), "EUR"
-    if apc_prices:
-        entry = apc_prices[0]
-        return _montant(entry.get("price")), as_str(entry.get("currency")) or "USD"
+    prices = [
+        (amount, as_str(entry.get("currency")) or "USD")
+        for entree in as_sequence(source.get("apc_prices"))
+        if (amount := _montant((entry := as_mapping(entree)).get("price"))) is not None
+    ]
+    for amount, currency in prices:
+        if currency == "EUR":
+            return amount, currency
+    if prices:
+        return prices[0]
     if (apc_usd := _montant(source.get("apc_usd"))) is not None:
         return apc_usd, "USD"
-    return None, "EUR"
+    return None
 
 
 def _montant(valeur: JsonValue) -> float | None:
@@ -47,10 +50,10 @@ def fetch_sources_batch(
     openalex_sources_api: str,
     api_key: str | None,
     mailto: str,
-) -> dict[str, tuple[float | None, str, str | None]]:
+) -> dict[str, tuple[float | None, str | None, str | None]]:
     """Interroge OpenAlex Sources pour un lot d'IDs.
 
-    Retourne `short_id → (apc_amount, apc_currency, raw_type)`. En cas d'échec (le circuit-breaker de source a enregistré l'échec via `http_request_with_retry`), retourne `{}` — l'appelant consulte l'état du breaker pour décider d'arrêter.
+    Retourne `short_id → (apc_amount, apc_currency, raw_type)`, montant et devise à `None` quand OpenAlex ne donne pas d'APC. En cas d'échec (le circuit-breaker de source a enregistré l'échec via `http_request_with_retry`), retourne `{}` — l'appelant consulte l'état du breaker pour décider d'arrêter.
     """
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     params: dict[str, str] = {
@@ -73,10 +76,10 @@ def fetch_sources_batch(
         logger.warning("OpenAlex sources batch : %r", exc)
         return {}
 
-    result: dict[str, tuple[float | None, str, str | None]] = {}
+    result: dict[str, tuple[float | None, str | None, str | None]] = {}
     for entree in as_sequence(data.get("results")):
         source = as_mapping(entree)
-        apc_amount, apc_currency = extract_apc(source)
+        apc_amount, apc_currency = extract_apc(source) or (None, None)
         identifiant = short_openalex_id(as_str(source.get("id")) or "")
         result[identifiant] = (apc_amount, apc_currency, as_str(source.get("type")))
     return result

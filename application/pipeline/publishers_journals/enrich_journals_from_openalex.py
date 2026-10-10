@@ -45,7 +45,7 @@ def map_openalex_source_type(raw: str | None) -> JournalType | None:
     return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
 
 
-FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str, str | None]]]
+FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str | None, str | None]]]
 """Signature du fetch injecté : `(openalex_ids) -> {short_id: (apc_amount, apc_currency, raw_type)}`."""
 
 
@@ -89,9 +89,11 @@ def run_enrich_journals_from_openalex(
                 continue
             apc_amount, apc_currency, raw_type = data
 
-            update_journal_apc(
-                journal_id, apc_amount=apc_amount, apc_currency=apc_currency, repo=journal_repo
-            )
+            # Sans APC dans OpenAlex, montant et devise de la revue restent tels quels.
+            if apc_amount is not None:
+                update_journal_apc(
+                    journal_id, apc_amount=apc_amount, apc_currency=apc_currency, repo=journal_repo
+                )
             # journal_type : seules les revues `unknown` sont traitées (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
             mapped_type = map_openalex_source_type(raw_type)
             if mapped_type is not None:
