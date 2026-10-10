@@ -43,13 +43,16 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     with open_tx() as conn:
-        return asyncio.run(
-            fetch_missing_hal_by_id(
-                conn,
-                PgHalFetchMissingAdapter(),
-                log,
-                retry_after_days=get_fetch_missing_retry_after_days(conn),
-            )
+        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        return under_circuit_breaker(
+            "hal",
+            lambda _breaker: asyncio.run(
+                fetch_missing_hal_by_id(
+                    conn, PgHalFetchMissingAdapter(), log, retry_after_days=retry_after_days
+                )
+            ),
+            phase="fetch_missing",
+            logger=log,
         )
 
 
@@ -60,13 +63,16 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
     with open_tx() as conn:
-        return asyncio.run(
-            fetch_missing_hal_by_nnt(
-                conn,
-                PgHalFetchMissingAdapter(),
-                log,
-                retry_after_days=get_fetch_missing_retry_after_days(conn),
-            )
+        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        return under_circuit_breaker(
+            "hal",
+            lambda _breaker: asyncio.run(
+                fetch_missing_hal_by_nnt(
+                    conn, PgHalFetchMissingAdapter(), log, retry_after_days=retry_after_days
+                )
+            ),
+            phase="fetch_missing",
+            logger=log,
         )
 
 

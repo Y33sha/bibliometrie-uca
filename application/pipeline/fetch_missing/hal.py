@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import NamedTuple
 
 import httpx2
 from sqlalchemy import Connection
@@ -23,18 +22,12 @@ from application.pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import HalFetchMissingAdapter
+from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.types import JsonValue
 
 __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
 
 _COMMIT_EVERY = 50
-
-
-class _Fetched(NamedTuple):
-    """Issue d'une requête HAL : `reached` est faux quand la requête a échoué, `doc` vaut `None` quand la réponse est vide."""
-
-    reached: bool
-    doc: Mapping[str, JsonValue] | None
 
 
 async def _fetch_ids_async(
@@ -45,33 +38,36 @@ async def _fetch_ids_async(
     libelle: str,
     max_concurrent: int,
     delay_s: float,
-    fetch_one: Callable[[httpx2.AsyncClient, str], Awaitable[Mapping[str, JsonValue] | None]],
+    fetch_one: Callable[
+        [httpx2.AsyncClient, str], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]
+    ],
     insert_one: Callable[[Connection, str, Mapping[str, JsonValue] | None], tuple[int, int]],
 ) -> tuple[int, int]:
     """Fetch concurrent puis insert sérialisé, via `run_fetch_pool`.
 
     `insert_one` retourne `(fetched, not_found)` en incréments (0/1) : la sémantique de comptage propre à chaque piste vit dans la closure appelante. Retourne les totaux `(fetched, not_found)`.
 
-    Une requête en échec (erreur réseau ou HTTP) laisse l'identifiant de côté : ni insertion, ni comptage. Il reste dans la sélection du run suivant.
+    HAL indisponible laisse l'identifiant de côté : ni insertion, ni comptage. Il reste dans la sélection du run suivant.
     """
     counts = {"fetched": 0, "not_found": 0, "done": 0}
     total = len(ids)
 
-    async def _fetch(client: httpx2.AsyncClient, identifier: str) -> _Fetched:
-        try:
-            fetched = _Fetched(reached=True, doc=await fetch_one(client, identifier))
-        except httpx2.HTTPError as e:
-            log.warning("%s : requête en échec, reprise au prochain run (%s)", identifier, e)
-            fetched = _Fetched(reached=False, doc=None)
+    async def _fetch(
+        client: httpx2.AsyncClient, identifier: str
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        fetched = await fetch_one(client, identifier)
         if delay_s:
             await asyncio.sleep(delay_s)
         return fetched
 
     with progression(total, libelle, log, compte_retenus=True) as avancement:
 
-        def _write(conn: Connection, identifier: str, result: _Fetched) -> None:
-            if result.reached:
-                fetched, not_found = insert_one(conn, identifier, result.doc)
+        def _write(
+            conn: Connection, identifier: str, result: LookupOutcome[Mapping[str, JsonValue]]
+        ) -> None:
+            if not isinstance(result, Unavailable):
+                doc = None if isinstance(result, NotFound) else result
+                fetched, not_found = insert_one(conn, identifier, doc)
                 counts["fetched"] += fetched
                 counts["not_found"] += not_found
                 avancement.retient(fetched)

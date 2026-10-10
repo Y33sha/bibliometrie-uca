@@ -7,14 +7,13 @@ Le pool réel est exercé : seule la source HTTP est doublée.
 
 import logging
 
-import httpx2
-
 from application.pipeline.fetch_missing.hal import (
     fetch_missing_hal_by_id,
     fetch_missing_hal_by_nnt,
 )
 from application.pipeline.libelles import DERNIERE_BRANCHE
 from application.ports.pipeline.fetch_missing.hal import NntInsertResult
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 
 _LOG = logging.getLogger("test")
 
@@ -30,7 +29,7 @@ class _FakeConnection:
 class _FakeHalAdapter:
     """Doublure du port : les documents rendus sont posés par `docs`, indexés par identifiant.
 
-    Une clé absente vaut « introuvable côté HAL ». `en_echec` désigne les identifiants dont la requête échoue. `deja_en_staging` désigne les NNT dont le document existe déjà, que HAL rend pourtant.
+    Une clé absente vaut « introuvable côté HAL ». `en_echec` désigne les identifiants pour lesquels HAL est indisponible. `deja_en_staging` désigne les NNT dont le document existe déjà, que HAL rend pourtant.
     """
 
     max_concurrent = 2
@@ -60,8 +59,8 @@ class _FakeHalAdapter:
     def _rendu(self, identifiant: str):
         self.telecharges.append(identifiant)
         if identifiant in self.en_echec:
-            raise httpx2.ConnectError("connexion refusée")
-        return self.docs.get(identifiant)
+            return UNAVAILABLE
+        return self.docs.get(identifiant, NOT_FOUND)
 
     async def fetch_by_halid(self, client, hal_id: str):
         return self._rendu(hal_id)
@@ -96,8 +95,8 @@ class TestParHalId:
         assert metrics.extras["not_found"] == 1
         assert adapter.configure_appels == 1
 
-    async def test_une_requete_en_echec_n_est_ni_inseree_ni_comptee(self):
-        # Une erreur réseau ne prouve pas l'absence : l'identifiant attend le run suivant.
+    async def test_hal_indisponible_ni_insere_ni_compte(self):
+        # Une source indisponible ne prouve pas l'absence : l'identifiant attend le run suivant.
         adapter = _FakeHalAdapter(
             hal_ids=["hal-1", "hal-2"], docs={"hal-1": {}}, en_echec={"hal-2"}
         )
