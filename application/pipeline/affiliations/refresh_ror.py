@@ -9,7 +9,8 @@ from sqlalchemy import Connection
 
 from application.pipeline.libelles import DERNIERE_BRANCHE, etape
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.ror_dump import RorDumpSource, RorDumpUnavailableError
+from application.ports.pipeline.dump import DumpUnavailableError
+from application.ports.pipeline.ror_dump import RorDumpSource
 from application.ports.repositories.ror_repository import RorRepository
 from application.services.structures.ror import import_ror_dump
 
@@ -31,7 +32,7 @@ def run_refresh_ror(
             metrics.details["ror"] = {"version": latest, "imported": False}
             return metrics
         stats = import_ror_dump(conn, source.organizations(latest), version=latest, repo=repo)
-    except RorDumpUnavailableError as e:
+    except DumpUnavailableError as e:
         conn.rollback()
         logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", DERNIERE_BRANCHE, e)
         metrics.details["ror"] = {"imported": False, "error": str(e)}

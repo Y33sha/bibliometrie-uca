@@ -4,7 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 from application.pipeline.affiliations.refresh_ror import run_refresh_ror
-from application.ports.pipeline.ror_dump import RorDumpUnavailableError
+from application.ports.pipeline.dump import DumpUnavailableError
 
 _LOG = logging.getLogger("test")
 
@@ -48,7 +48,7 @@ def test_version_plus_recente_importee():
 
 def test_dump_inaccessible_laisse_le_referentiel_inchange():
     conn = MagicMock()
-    source, repo = _FakeSource(error=RorDumpUnavailableError("HTTP 502")), _repo(None)
+    source, repo = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
     metrics = run_refresh_ror(conn, source=source, repo=repo, logger=_LOG)
     repo.replace_all.assert_not_called()
     conn.rollback.assert_called_once()

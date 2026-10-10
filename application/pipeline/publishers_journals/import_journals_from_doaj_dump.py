@@ -16,6 +16,8 @@ from sqlalchemy import Connection
 from application.pipeline.libelles import BRANCHE, accord
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.progression import attente
+from application.pipeline.signals import signal_source_unavailable
+from application.ports.pipeline.dump import DumpUnavailableError
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
@@ -124,7 +126,10 @@ def run_enrich_journals_from_doaj(
     refresh_after_days: int,
     download_dump: DownloadDump,
 ) -> PhaseMetrics:
-    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours."""
+    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours.
+
+    Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
+    """
     last = journal_repo.doaj_last_import_at()
     delai = timedelta(days=refresh_after_days)
     if last is not None and last > datetime.now(UTC) - delai:
@@ -135,10 +140,18 @@ def run_enrich_journals_from_doaj(
         )
         return metrics
 
-    with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
-        ligne.efface()
-        with download_dump() as rows:
-            stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
+    try:
+        with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
+            ligne.efface()
+            with download_dump() as rows:
+                stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
+    except DumpUnavailableError as e:
+        # Le téléchargement précède toute écriture : le référentiel reste celui du dernier import.
+        metrics = PhaseMetrics()
+        logger.warning("Dump DOAJ inaccessible, référentiel inchangé : %s", e)
+        signal_source_unavailable(metrics, "DOAJ", logger=logger, phase="publishers_journals")
+        metrics.resume = "dump inaccessible, import repris au prochain run"
+        return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})
     metrics.resume = accord(stats.matched, "revue mise à jour", "revues mises à jour")
     return metrics

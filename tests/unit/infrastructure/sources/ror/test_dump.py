@@ -8,7 +8,7 @@ import zipfile
 import httpx2
 import pytest
 
-from application.ports.pipeline.ror_dump import RorDumpUnavailableError
+from application.ports.pipeline.dump import DumpUnavailableError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -103,12 +103,12 @@ class TestZenodoRorDumpSource:
 
     def test_api_en_erreur(self, http_mock):
         source = self._source(http_mock, status=404)
-        with pytest.raises(RorDumpUnavailableError):
+        with pytest.raises(DumpUnavailableError):
             source.latest_version()
 
     def test_ligne_inexploitable(self, http_mock):
         source = self._source(http_mock, _archive_bytes([{**_ROW, "types": "laboratory"}]))
-        with pytest.raises(RorDumpUnavailableError):
+        with pytest.raises(DumpUnavailableError):
             list(source.organizations(source.latest_version()))
 
 

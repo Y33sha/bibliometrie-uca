@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx2
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.ror_dump import RorDumpUnavailableError
+from application.ports.pipeline.dump import DumpUnavailableError
 from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
@@ -161,12 +161,12 @@ class ZenodoRorDumpSource:
         try:
             self._latest = find_latest_ror_dump(user_agent=self._user_agent)
         except _UNAVAILABLE as e:
-            raise RorDumpUnavailableError(str(e)) from e
+            raise DumpUnavailableError(str(e)) from e
         return self._latest.name
 
     def organizations(self, version: str) -> Iterator[RorOrganization]:
         if self._latest is None or self._latest.name != version:
-            raise RorDumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
+            raise DumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
         with tempfile.TemporaryDirectory() as tmp:
             archive = str(Path(tmp) / version)
             try:
@@ -175,7 +175,7 @@ class ZenodoRorDumpSource:
                 )
                 yield from read_ror_dump(archive)
             except _UNAVAILABLE as e:
-                raise RorDumpUnavailableError(str(e)) from e
+                raise DumpUnavailableError(str(e)) from e
 
 
 _UNAVAILABLE = (
