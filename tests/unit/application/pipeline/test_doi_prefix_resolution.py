@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from unittest.mock import MagicMock
 
 from application.pipeline.publishers_journals.resolve_publishers import run_resolve_publishers
 from application.pipeline.resolve_ra.phase import ResolveRaPhase
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.doi_prefixes import PendingPublisherPrefix
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 
 
 @dataclass
@@ -140,22 +142,28 @@ class StubResolveRas:
 
 @dataclass
 class StubCrossref:
-    answers: dict[str, tuple[str, int | None] | None] = field(default_factory=dict)
-    calls: list[str] = field(default_factory=list)
+    """Rend la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
 
-    def __call__(self, prefix: str, sample_doi: str | None = None) -> tuple[str, int | None] | None:
+    answers: dict[str, object] = field(default_factory=dict)
+    calls: list[str] = field(default_factory=list)
+    sample_dois: list[str | None] = field(default_factory=list)
+
+    async def __call__(self, client, prefix: str, sample_doi: str | None = None):  # noqa: ARG002
         self.calls.append(prefix)
-        return self.answers.get(prefix)
+        self.sample_dois.append(sample_doi)
+        return self.answers.get(prefix, NOT_FOUND)
 
 
 @dataclass
 class StubDataCite:
-    answers: dict[str, tuple[str, str, str] | None] = field(default_factory=dict)
+    """Rend la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
+
+    answers: dict[str, object] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
 
-    def __call__(self, prefix: str) -> tuple[str, str, str] | None:
+    async def __call__(self, client, prefix: str):  # noqa: ARG002
         self.calls.append(prefix)
-        return self.answers.get(prefix)
+        return self.answers.get(prefix, NOT_FOUND)
 
 
 _LOG = logging.getLogger("test")
@@ -167,6 +175,7 @@ def _run_ra(contexte, repo, ras_fn):
 
 def _run_pub(repo, pubrepo, cr=None, dc=None, **kw):
     return run_resolve_publishers(
+        MagicMock(),
         _LOG,
         repo=repo,
         publisher_repo=pubrepo,
@@ -319,7 +328,7 @@ def test_publishers_unknown_tries_both_and_corrects_ra():
     """ra=unknown → tente crossref (muet) puis datacite (répond) → RA corrigée."""
     repo = FakeDoiPrefixRepo(rows={"10.14758": _Row("10.14758", "unknown")})
     pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.14758": None})
+    cr = StubCrossref()
     dc = StubDataCite(answers={"10.14758": ("INRAE", "INRAE Repo", "inist.inra")})
 
     _run_pub(repo, pubrepo, cr, dc)
@@ -336,8 +345,8 @@ def test_publishers_unknown_both_muet_marks_checked_no_publisher():
     (garde : ne sera plus reprise au run suivant)."""
     repo = FakeDoiPrefixRepo(rows={"10.9012": _Row("10.9012", "unknown")})
     pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.9012": None})
-    dc = StubDataCite(answers={"10.9012": None})
+    cr = StubCrossref()
+    dc = StubDataCite()
 
     metrics = _run_pub(repo, pubrepo, cr, dc)
 
@@ -402,3 +411,52 @@ def test_publishers_dedup_same_name_one_creation():
     assert repo.rows["10.9009"].publisher_id == cid
     assert metrics.extras.get("publisher_created") == 1
     assert metrics.extras.get("publisher_matched") == 1
+
+
+def test_publishers_crossref_sample_doi_read_before_call():
+    """Le DOI témoin d'un préfixe Crossref est lu juste avant de l'interroger ; un préfixe DataCite n'en a pas besoin."""
+    repo = FakeDoiPrefixRepo(
+        rows={"10.1038": _Row("10.1038", "Crossref"), "10.5281": _Row("10.5281", "DataCite")}
+    )
+    cr = StubCrossref(answers={"10.1038": ("Nature", 297)})
+
+    _run_pub(repo, FakePublisherRepo(), cr)
+
+    assert cr.sample_dois == ["10.1038/temoin"]
+
+
+def test_publishers_crossref_unavailable_leaves_prefix_pending():
+    """API indisponible : ni métadonnées ni marque de vérification, le préfixe est repris au run suivant."""
+    repo = FakeDoiPrefixRepo(rows={"10.1038": _Row("10.1038", "Crossref")})
+    cr = StubCrossref(answers={"10.1038": UNAVAILABLE})
+
+    metrics = _run_pub(repo, FakePublisherRepo(), cr)
+
+    row = repo.rows["10.1038"]
+    assert row.checked is False
+    assert row.publisher_id is None
+    assert metrics.errors == 1
+    assert [r.prefix for r in repo.get_prefixes_pending_publisher()] == ["10.1038"]
+
+
+def test_publishers_unknown_crossref_unavailable_does_not_ask_datacite():
+    """RA inconnue et Crossref indisponible : l'absence chez Crossref n'est pas établie, DataCite n'est pas interrogé et la RA reste inconnue."""
+    repo = FakeDoiPrefixRepo(rows={"10.14758": _Row("10.14758", "unknown")})
+    cr = StubCrossref(answers={"10.14758": UNAVAILABLE})
+    dc = StubDataCite(answers={"10.14758": ("INRAE", "INRAE Repo", "inist.inra")})
+
+    _run_pub(repo, FakePublisherRepo(), cr, dc)
+
+    assert dc.calls == []
+    row = repo.rows["10.14758"]
+    assert row.ra == "unknown"
+    assert row.checked is False
+
+
+def test_publishers_datacite_unavailable_leaves_prefix_pending():
+    repo = FakeDoiPrefixRepo(rows={"10.5281": _Row("10.5281", "DataCite")})
+    dc = StubDataCite(answers={"10.5281": UNAVAILABLE})
+
+    _run_pub(repo, FakePublisherRepo(), dc=dc)
+
+    assert repo.rows["10.5281"].checked is False

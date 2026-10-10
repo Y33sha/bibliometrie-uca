@@ -8,7 +8,7 @@ Les sous-étapes forment quatre groupes, chacun sous son titre dans le journal :
 
 ## Éditeurs
 
-1. **`resolve_publishers`** — interroge `/prefixes/{prefix}` chez Crossref ou DataCite pour connaître le détenteur d'un préfixe DOI, puis rattache le `publisher_id` correspondant à ce préfixe. Le routage vers l'une ou l'autre API suit l'agence d'enregistrement posée par la phase [resolve_ra](02-extract.md#agences-denregistrement-doi-resolve_ra) ; un préfixe dont l'agence est `unknown` est présenté aux deux, et celle qui répond la corrige. Crossref rend l'éditeur ; DataCite rend le provider, avec l'entrepôt (Zenodo, NAKALA…) qui a déposé les DOI. Sont repris les préfixes sans éditeur et jamais interrogés (`publisher_id` et `publisher_checked_at` nuls) : chaque préfixe est marqué interrogé, succès ou échec, pour qu'un préfixe non trouvé ne soit pas retenté.
+1. **`resolve_publishers`** — interroge `/prefixes/{prefix}` chez Crossref ou DataCite pour connaître le détenteur d'un préfixe DOI, puis rattache le `publisher_id` correspondant à ce préfixe. Le routage vers l'une ou l'autre API suit l'agence d'enregistrement posée par la phase [resolve_ra](02-extract.md#agences-denregistrement-doi-resolve_ra) ; un préfixe dont l'agence est `unknown` est présenté aux deux, et celle qui répond la corrige. Crossref rend l'éditeur ; DataCite rend le provider, avec l'entrepôt (Zenodo, NAKALA…) qui a déposé les DOI. Sont repris les préfixes sans éditeur et jamais interrogés (`publisher_id` et `publisher_checked_at` nuls) : un préfixe est marqué interrogé quand l'API a répondu, qu'elle le connaisse ou non, et n'est pas retenté. Un préfixe dont l'API est indisponible est repris au run suivant.
 
 ## Revues
 

@@ -1,26 +1,18 @@
 """Tests du client `api.datacite.org/prefixes` (`fetch_datacite_prefix`, `_parse_datacite_prefix_payload`).
 
-Mockent `httpx2.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
+Les requêtes HTTP passent par la fixture `http_mock`.
 """
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import httpx2
+import pytest
 
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from infrastructure.sources.datacite.prefixes import (
     _parse_datacite_prefix_payload,
     fetch_datacite_prefix,
 )
-
-
-def _mock_response(status_code: int = 200, json_data=None):
-    resp = MagicMock()
-    resp.status_code = status_code
-    resp.text = "x"
-    resp.json.return_value = json_data
-    return resp
 
 
 def _datacite_payload(
@@ -92,21 +84,33 @@ def test_parse_datacite_prefix_payload_non_dict_returns_none():
     assert _parse_datacite_prefix_payload("nope") is None
 
 
-def test_fetch_datacite_prefix_ok(monkeypatch):
+async def _fetch(prefix: str):
+    async with httpx2.AsyncClient() as client:
+        return await fetch_datacite_prefix(client, prefix, user_agent="ua")
+
+
+@pytest.mark.asyncio
+async def test_fetch_datacite_prefix_ok(http_mock):
     payload = _datacite_payload(
         "10.14758", "inist.inra", "INRAE", "gkjj", "Institut national de recherche"
     )
-    monkeypatch.setattr(httpx2, "request", lambda *a, **kw: _mock_response(200, payload))
-    assert fetch_datacite_prefix("10.14758", user_agent="ua") == (
-        "Institut national de recherche",
-        "INRAE",
-        "inist.inra",
+    http_mock.get("https://api.datacite.org/prefixes/10.14758").mock(
+        return_value=httpx2.Response(200, json=payload)
     )
+    assert await _fetch("10.14758") == ("Institut national de recherche", "INRAE", "inist.inra")
 
 
-def test_fetch_datacite_prefix_http_error_returns_none(monkeypatch):
-    def raising(*a, **kw):
-        raise httpx2.ConnectError("boom")
+@pytest.mark.asyncio
+async def test_fetch_datacite_prefix_404_is_not_found(http_mock):
+    http_mock.get("https://api.datacite.org/prefixes/10.5281").mock(
+        return_value=httpx2.Response(404)
+    )
+    assert await _fetch("10.5281") is NOT_FOUND
 
-    monkeypatch.setattr(httpx2, "request", raising)
-    assert fetch_datacite_prefix("10.5281", user_agent="ua") is None
+
+@pytest.mark.asyncio
+async def test_fetch_datacite_prefix_network_error_is_unavailable(http_mock):
+    http_mock.get("https://api.datacite.org/prefixes/10.5281").mock(
+        side_effect=httpx2.ConnectError("boom")
+    )
+    assert await _fetch("10.5281") is UNAVAILABLE
