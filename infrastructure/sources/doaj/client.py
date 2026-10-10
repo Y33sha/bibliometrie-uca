@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx2
 
+from application.ports.pipeline.dump import DumpUnavailableError
 from infrastructure.sources.dump_download import DumpDownloadError, write_capped
 from infrastructure.sources.http_status import raise_for_status
 
@@ -106,11 +107,16 @@ def downloaded_doaj_dump(
     """Télécharge le dump CSV DOAJ et rend ses rows, le temps du bloc.
 
     Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement peut contenir des sauts de ligne dans ses champs. Le répertoire temporaire est le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`). Le fichier est supprimé à la sortie du bloc.
+
+    Lève `DumpUnavailableError` quand le téléchargement échoue, avant que le bloc ne commence.
     """
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         dump_path = tmp.name
     try:
-        fetch_doaj_dump(dump_path, user_agent=user_agent, logger=logger)
+        try:
+            fetch_doaj_dump(dump_path, user_agent=user_agent, logger=logger)
+        except (httpx2.HTTPError, DumpDownloadError) as e:
+            raise DumpUnavailableError(str(e)) from e
         yield read_doaj_dump_rows(dump_path)
     finally:
         Path(dump_path).unlink(missing_ok=True)
