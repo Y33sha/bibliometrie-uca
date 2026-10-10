@@ -10,6 +10,10 @@ from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person, PersonExclusion
 from infrastructure.db.scalars import scalar_int
 from infrastructure.pipeline.authorships.build import refresh_publications_in_perimeter
+from infrastructure.repositories.authorship_repository import (
+    delete_orphan_authorships,
+    detach_rejected_signatures,
+)
 from infrastructure.repositories.person_repository import _name_forms
 
 
@@ -196,11 +200,12 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Séquence, dans la transaction du caller :
     1. Transfert source_authorships
     2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
-    3. Dédoublonnage + transfert identifiants
-    4. Transfert conditionnel fiche RH
-    5. person_name_forms : bascule source_id → target_id
-    6. Recalcul des formes source 'persons' pour la cible
-    7. Suppression de la personne source
+    3. Sur une publication où la cible est rejetée, le rejet l'emporte : signatures détachées, authorship supprimée
+    4. Dédoublonnage + transfert identifiants
+    5. Transfert conditionnel fiche RH
+    6. person_name_forms : bascule source_id → target_id
+    7. Recalcul des formes source 'persons' pour la cible
+    8. Suppression de la personne source
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
@@ -235,6 +240,9 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         text("UPDATE rejected_authorships SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )
+    # La fusion peut réunir sur la cible une contribution de l'une et le rejet de l'autre, pour la même publication : le rejet l'emporte, comme au rejet d'une paire.
+    detach_rejected_signatures(conn, target_id)
+    delete_orphan_authorships(conn, target_id)
     conn.execute(
         text("UPDATE person_identifiers SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},

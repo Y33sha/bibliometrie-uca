@@ -1215,3 +1215,24 @@ class TestMergePersonRejectedAuthorships:
             (pub_shared, target),
             (pub_source_only, target),
         }
+
+    def test_rejection_prevails_over_merged_contribution(self, sa_sync_conn, repo):
+        """L'absorbée signe une publication où l'absorbante est rejetée : après fusion, le rejet l'emporte."""
+        target = _person(sa_sync_conn, last_name="Cible", first_name="T")
+        source = _person(sa_sync_conn, last_name="Source", first_name="S")
+        pub = insert_publication(sa_sync_conn, "Conflit")
+        sp = _notice(sa_sync_conn, pub)
+        sa = insert_signature(sa_sync_conn, sp, person_id=source)
+        insert_authorship(sa_sync_conn, pub, person_id=source)
+        insert_rejected_authorship(sa_sync_conn, pub, person_id=target)
+
+        merge_person(target, source, repo=repo)
+
+        person = sa_sync_conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa}
+        ).scalar_one()
+        authorships = sa_sync_conn.execute(
+            text("SELECT count(*) FROM authorships WHERE publication_id = :pub"), {"pub": pub}
+        ).scalar_one()
+        assert person is None
+        assert authorships == 0
