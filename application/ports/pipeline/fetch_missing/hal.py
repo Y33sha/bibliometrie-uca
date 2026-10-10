@@ -11,6 +11,7 @@ from typing import NamedTuple, Protocol
 import httpx2
 from sqlalchemy import Connection
 
+from application.ports.pipeline.lookup import LookupOutcome
 from domain.types import JsonValue
 
 
@@ -42,13 +43,13 @@ class HalFetchMissingAdapter(Protocol):
 
     async def fetch_by_halid(
         self, client: httpx2.AsyncClient, hal_id: str
-    ) -> Mapping[str, JsonValue] | None:
-        """Fetch un document HAL par halId. Retourne `None` quand la réponse de HAL est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        """Fetch un document HAL par halId. `NOT_FOUND` quand la réponse de HAL est vide."""
 
     async def fetch_by_nnt(
         self, client: httpx2.AsyncClient, nnt: str
-    ) -> Mapping[str, JsonValue] | None:
-        """Fetch un document HAL par NNT (thèse). Retourne `None` quand la réponse de HAL est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        """Fetch un document HAL par NNT (thèse). `NOT_FOUND` quand la réponse de HAL est vide."""
 
     # ── SQL (inserts) ──────────────────────────────────────────
 

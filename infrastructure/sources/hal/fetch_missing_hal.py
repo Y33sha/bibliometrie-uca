@@ -16,6 +16,7 @@ from application.ports.pipeline.fetch_missing.hal import (
     HalFetchMissingAdapter,
     NntInsertResult,
 )
+from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_lookup
@@ -23,7 +24,7 @@ from infrastructure.pipeline.fetch_missing.hal import get_missing_hal_ids, get_m
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
-from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.http_retry import lookup_json_async
 
 # HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.
@@ -72,30 +73,31 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
 
     async def fetch_by_halid(
         self, client: httpx2.AsyncClient, hal_id: str
-    ) -> Mapping[str, JsonValue] | None:
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
         return await self._search_one(client, f"halId_s:{hal_id}", label=f"halId {hal_id}")
 
     async def fetch_by_nnt(
         self, client: httpx2.AsyncClient, nnt: str
-    ) -> Mapping[str, JsonValue] | None:
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
         return await self._search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}")
 
     async def _search_one(
         self, client: httpx2.AsyncClient, query: str, *, label: str
-    ) -> Mapping[str, JsonValue] | None:
-        """Premier document de la recherche Solr `query`, ou `None` quand la réponse est vide. Une erreur réseau ou HTTP lève `httpx2.HTTPError`."""
-        data = as_mapping(
-            await http_request_with_retry_async(
-                client,
-                "GET",
-                self._base_url,
-                params={"q": query, "fl": HAL_FIELDS_STR, "wt": "json", "rows": "1"},
-                timeout=15,
-                label=label,
-            )
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
+        """Premier document de la recherche Solr `query`, ou `NOT_FOUND` quand la réponse est vide."""
+        outcome = await lookup_json_async(
+            client,
+            "GET",
+            self._base_url,
+            params={"q": query, "fl": HAL_FIELDS_STR, "wt": "json", "rows": "1"},
+            timeout=15,
+            not_found_statuses=frozenset(),
+            label=label,
         )
-        docs = as_sequence(as_mapping(data.get("response")).get("docs"))
-        return as_mapping(docs[0]) if docs else None
+        if isinstance(outcome, NotFound | Unavailable):
+            return outcome
+        docs = as_sequence(as_mapping(as_mapping(outcome).get("response")).get("docs"))
+        return as_mapping(docs[0]) if docs else NOT_FOUND
 
     # ── SQL (inserts) ──────────────────────────────────────────
 

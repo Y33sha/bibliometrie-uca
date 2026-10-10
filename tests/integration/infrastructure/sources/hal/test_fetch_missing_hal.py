@@ -1,10 +1,10 @@
 """Tests d'intégration pour `infrastructure.sources.hal.fetch_missing_hal`."""
 
 import httpx2
-import pytest
 from sqlalchemy import text
 
 from application.ports.pipeline.fetch_missing.hal import NntInsertResult
+from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 from tests.integration.helpers.publications import insert_publication
@@ -161,16 +161,15 @@ class TestSearchOne:
         adapter.configure(None)
         return adapter
 
-    async def test_une_reponse_vide_rend_none(self, http_mock):
+    async def test_une_reponse_vide_est_une_absence(self, http_mock):
         http_mock.get(API_BASE_URLS["hal"]).mock(
             return_value=httpx2.Response(200, json={"response": {"docs": []}})
         )
         async with httpx2.AsyncClient() as client:
-            assert await self._adapter().fetch_by_halid(client, "hal-01234567") is None
+            assert await self._adapter().fetch_by_halid(client, "hal-01234567") is NOT_FOUND
 
-    async def test_une_erreur_http_remonte(self, http_mock):
-        """Une erreur ne prouve pas l'absence : elle remonte à l'orchestrateur, qui reporte la recherche."""
+    async def test_une_erreur_http_rend_hal_indisponible(self, http_mock):
+        """Un 404 de l'endpoint de recherche ne prouve pas l'absence : la recherche est reportée."""
         http_mock.get(API_BASE_URLS["hal"]).mock(return_value=httpx2.Response(404))
         async with httpx2.AsyncClient() as client:
-            with pytest.raises(httpx2.HTTPError):
-                await self._adapter().fetch_by_nnt(client, "2024UCA0001")
+            assert await self._adapter().fetch_by_nnt(client, "2024UCA0001") is UNAVAILABLE
