@@ -60,6 +60,12 @@ BULK_AUTHORSHIPS_CAP = 100
 """Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en porte autant est peut-être tronqué ; sa requête individuelle rend tous ses auteurs."""
 
 
+def authors_may_be_truncated(work: Mapping[str, JsonValue]) -> bool:
+    """Vrai quand un work reçu d'une réponse de liste d'OpenAlex (`/works?filter=…`) compte autant d'auteurs que le plafond : sa liste est peut-être tronquée."""
+    authorships = work.get("authorships")
+    return isinstance(authorships, list) and len(authorships) == BULK_AUTHORSHIPS_CAP
+
+
 # =============================================================
 # LOCATIONS
 # =============================================================

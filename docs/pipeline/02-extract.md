@@ -54,6 +54,6 @@ La sélection se borne aux années de la fenêtre courante, lues sur `source_pub
 
 L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
-Les works de 100 auteurs sont marqués à l'extraction par le flag `staging.authors_truncated`. Cette phase retélécharge un par un les works marqués, récupère la liste complète des auteurs et supprime le flag. Un work qu'OpenAlex ne connaît plus perd aussi son flag. Quand OpenAlex est indisponible, le flag reste et le work est repris au run suivant.
+Les works de 100 auteurs sont marqués par le flag `staging.authors_truncated`, au moissonnage comme à la recherche par DOI de `fetch_missing`, qui passent toutes deux par l'endpoint de liste. Cette phase retélécharge un par un les works marqués, récupère la liste complète des auteurs et supprime le flag. Un work qu'OpenAlex ne connaît plus perd aussi son flag. Quand OpenAlex est indisponible, le flag reste et le work est repris au run suivant.
 
 On ne met pas à jour `raw_hash`, qui reste l'empreinte du payload initial : tant que le moissonnage par lot renvoie le même payload, `raw_data` n'est pas écrasé.

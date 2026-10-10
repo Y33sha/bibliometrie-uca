@@ -15,7 +15,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
-from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
+from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, at_path
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
@@ -148,17 +148,13 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         unchanged_count = 0
         for work in works:
             # Plafond bulk OpenAlex atteint → tronqué probable (`fetch_truncated` vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
-            authorships = work.get("authorships")
-            authors_truncated = (
-                isinstance(authorships, list) and len(authorships) == BULK_AUTHORSHIPS_CAP
-            )
             inserted, changed = upsert_staging(
                 conn,
                 source="openalex",
                 source_id=extract_openalex_id(work),
                 doi=extract_doi(work),
                 raw_data=work,
-                authors_truncated=authors_truncated,
+                authors_truncated=authors_may_be_truncated(work),
             )
             if inserted:
                 new_count += 1
