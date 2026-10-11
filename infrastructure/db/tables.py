@@ -791,7 +791,6 @@ persons_rh = Table(
     Column("email", Text),
     Column("role_title", Text),
     Column("department_name", Text),
-    Column("structure_id", Integer),
     Column("start_date", Date),
     Column("end_date", Date),
     Column("hr_export_date", Date),
