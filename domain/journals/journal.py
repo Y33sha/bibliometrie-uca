@@ -63,6 +63,8 @@ class ManualField(StrEnum):
     """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Un champ saisi à la main n'est plus écrit par le pipeline."""
 
     JOURNAL_TYPE = "journal_type"
+    # Montant et devise.
+    APC = "apc"
 
 
 @dataclass(slots=True)

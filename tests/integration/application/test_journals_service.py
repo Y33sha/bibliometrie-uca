@@ -504,6 +504,36 @@ class TestUpdateJournal:
         )
         assert (row.journal_type, row.manual_fields) == ("journal", ["journal_type"])
 
+    def test_champ_resoumis_sans_changement_non_marque(self, sa_sync_conn, repo):
+        """Le formulaire renvoie tous les champs : seul un champ modifié devient saisi à la main."""
+        j = _journal(sa_sync_conn, title="Old", journal_type="journal")
+        update_journal(
+            j, update=JournalUpdate(title="New", journal_type=JournalType.JOURNAL), repo=repo
+        )
+        assert (
+            _fetch_one(
+                sa_sync_conn, "SELECT manual_fields FROM journals WHERE id = :id", id=j
+            ).manual_fields
+            == []
+        )
+
+    def test_apc_saisi_en_euros_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
+        j = _journal(sa_sync_conn, apc_amount=1000, apc_currency="USD")
+        update_journal(j, update=JournalUpdate(apc_amount=2499.99), repo=repo)
+
+        gateway.update_journal_apc(j, apc_amount=3000, apc_currency="GBP")
+
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT apc_amount, apc_currency, manual_fields FROM journals WHERE id = :id",
+            id=j,
+        )
+        assert (float(row.apc_amount), row.apc_currency, row.manual_fields) == (
+            2499.99,
+            "EUR",
+            ["apc"],
+        )
+
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
         j = _journal(sa_sync_conn, issn="0028-0836")
         with pytest.raises(ValidationError):
