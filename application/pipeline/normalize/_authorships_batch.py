@@ -8,6 +8,7 @@ Coût : un nombre constant d'allers-retours Python↔PG par document.
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
 
@@ -21,6 +22,7 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipsBatchQueries,
     SignatureNameFields,
     SourceAuthorshipItem,
+    StoredSourceAuthorship,
 )
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.identifiers import shared_identifier_neutralizations
@@ -52,10 +54,10 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature.
+    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature.
     """
 
-    position: int
+    position: int | None
     name: SignatureName
     is_corresponding: bool = False
     roles: list[str] | None = None
@@ -111,99 +113,99 @@ def write_source_authorships(
 ) -> None:
     """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
+    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
 
-    Les `author_position` de `records` sont uniques : elles identifient les signatures entrantes. Chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
+    Une signature entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
     neutralizations = shared_identifier_neutralizations([rec.person_identifiers for rec in records])
-    record_by_position: dict[int, AuthorRecord] = {}
-    item_by_position: dict[int, SourceAuthorshipItem] = {}
+    items: list[SourceAuthorshipItem] = []
     for rec, neutralized in zip(records, neutralizations, strict=True):
-        record_by_position[rec.position] = rec
-        item_by_position[rec.position] = {
-            "source": source,
-            "source_publication_id": source_publication_id,
-            "author_position": rec.position,
-            **signature_name_fields(rec.name),
-            "is_corresponding": rec.is_corresponding,
-            "roles": rec.roles,
-            "person_identifiers": rec.person_identifiers,
-            "neutralized_identifiers": neutralized,
-            "content_hash": fingerprint(
-                signature_content(
-                    position=rec.position,
-                    name=(rec.name.raw, rec.name.last_name, rec.name.first_name),
-                    is_corresponding=rec.is_corresponding,
-                    roles=rec.roles,
-                    neutralized_identifiers=neutralized,
-                    addresses=[
-                        (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
-                        for a in rec.addresses
-                    ],
-                    ror_ids=[r.value for r in rec.ror_ids],
-                )
-            ),
-        }
+        items.append(
+            {
+                "source": source,
+                "source_publication_id": source_publication_id,
+                "author_position": rec.position,
+                **signature_name_fields(rec.name),
+                "is_corresponding": rec.is_corresponding,
+                "roles": rec.roles,
+                "person_identifiers": rec.person_identifiers,
+                "neutralized_identifiers": neutralized,
+                "content_hash": fingerprint(
+                    signature_content(
+                        position=rec.position,
+                        name=(rec.name.raw, rec.name.last_name, rec.name.first_name),
+                        is_corresponding=rec.is_corresponding,
+                        roles=rec.roles,
+                        neutralized_identifiers=neutralized,
+                        addresses=[
+                            (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
+                            for a in rec.addresses
+                        ],
+                        ror_ids=[r.value for r in rec.ror_ids],
+                    )
+                ),
+            }
+        )
 
     stored = queries.fetch_stored_source_authorships(conn, source_publication_id)
     plan = plan_signature_sync(
         [
-            StoredSignature(
-                s.id,
-                s.author_position,
-                _identity(s.last_name_normalized, s.first_name_normalized, s.person_identifiers),
-                s.content_hash,
-            )
+            StoredSignature(s.id, s.author_position, _stored_identity(s), s.content_hash)
             for s in stored
         ],
         [
             IncomingSignature(
-                position,
-                _identity(
-                    item["last_name_normalized"],
-                    item["first_name_normalized"],
-                    item["person_identifiers"],
-                ),
-                item["content_hash"] or "",
+                key, item["author_position"], _item_identity(item), item["content_hash"] or ""
             )
-            for position, item in item_by_position.items()
+            for key, item in enumerate(items)
         ],
     )
 
     queries.delete_source_authorships(conn, list(plan.deletes))
     queries.update_source_authorships_batch(
-        conn, [{**item_by_position[position], "id": sa_id} for sa_id, position in plan.updates]
+        conn, [{**items[key], "id": sa_id} for sa_id, key in plan.updates]
     )
     queries.delete_source_authorship_addresses(conn, [sa_id for sa_id, _ in plan.updates])
     queries.delete_source_authorship_rors(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.upsert_source_authorships_batch(
-        conn, [item_by_position[position] for position in plan.inserts]
-    )
+    queries.upsert_source_authorships_batch(conn, [items[key] for key in plan.inserts])
 
-    sa_id_by_position = {position: sa_id for sa_id, position in plan.updates}
+    sa_id_by_key = {key: sa_id for sa_id, key in plan.updates}
     if plan.inserts:
-        sa_id_by_position |= queries.fetch_source_authorship_ids_by_position(
-            conn,
-            source=source,
-            source_publication_id=source_publication_id,
-            positions=list(plan.inserts),
+        sa_id_by_key |= _inserted_ids(
+            queries.fetch_stored_source_authorships(conn, source_publication_id),
+            known_ids={s.id for s in stored},
+            inserted={key: items[key] for key in plan.inserts},
         )
     write_addresses(
         conn,
         queries,
-        [
-            (sa_id_by_position.get(position), record_by_position[position].addresses)
-            for position in sorted(sa_id_by_position)
-        ],
+        [(sa_id_by_key[key], records[key].addresses) for key in sorted(sa_id_by_key)],
     )
     queries.insert_source_authorship_rors_batch(
         conn,
         [
             AuthorshipRorItem(sa_id=sa_id, ror_id=ror_id.value)
-            for position, sa_id in sorted(sa_id_by_position.items())
-            for ror_id in sorted(record_by_position[position].ror_ids, key=str)
+            for key, sa_id in sorted(sa_id_by_key.items())
+            for ror_id in sorted(records[key].ror_ids, key=str)
         ],
     )
+
+
+def _inserted_ids(
+    rows: list[StoredSourceAuthorship],
+    *,
+    known_ids: set[int],
+    inserted: Mapping[int, SourceAuthorshipItem],
+) -> dict[int, int]:
+    """Identifiants des signatures insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une signature insérée de même position et de même identité. Deux signatures de même position et de même identité sont indiscernables : l'ordre de leur rapprochement est indifférent."""
+    new_ids: dict[Hashable, list[int]] = defaultdict(list)
+    for row in sorted(rows, key=lambda r: r.id):
+        if row.id not in known_ids:
+            new_ids[(row.author_position, _stored_identity(row))].append(row.id)
+    return {
+        key: new_ids[(item["author_position"], _item_identity(item))].pop(0)
+        for key, item in inserted.items()
+    }
 
 
 def signature_name_fields(name: SignatureName) -> SignatureNameFields:
@@ -224,6 +226,16 @@ def _identity(
     """Clé d'identité d'une signature : nom et prénom normalisés, et identifiants, comme `author_identifying_keys`."""
     ids = json.dumps(person_identifiers, sort_keys=True) if person_identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids)
+
+
+def _stored_identity(row: StoredSourceAuthorship) -> Hashable:
+    return _identity(row.last_name_normalized, row.first_name_normalized, row.person_identifiers)
+
+
+def _item_identity(item: SourceAuthorshipItem) -> Hashable:
+    return _identity(
+        item["last_name_normalized"], item["first_name_normalized"], item["person_identifiers"]
+    )
 
 
 def write_addresses(

@@ -623,7 +623,7 @@ def build_wos_author_records(
             )
         )
     # `author_position` lue du payload WoS : dédup (première occurrence gagne).
-    by_position: dict[int, AuthorRecord] = {}
+    by_position: dict[int | None, AuthorRecord] = {}
     for r in records:
         by_position.setdefault(r.position, r)
     return list(by_position.values())

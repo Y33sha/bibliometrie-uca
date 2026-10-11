@@ -3,6 +3,7 @@
 Un normalizer verse ses documents dans `source_publications`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
+from application.ports.pipeline.normalize.authorships import StoredSourceAuthorship
 from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from application.ports.pipeline.normalize.staging import StagingRow
 
@@ -39,18 +40,18 @@ class FakeStagingQueries:
 
 
 class FakeAuthorshipsBatchQueries:
-    """Port `AuthorshipsBatchQueries` : retient les documents dont les signatures sont synchronisées.
+    """Port `AuthorshipsBatchQueries` : retient les signatures insérées, et les restitue comme signatures en base.
 
-    Le writer partagé lit les signatures en base du document, puis les identifiants posés pour y rattacher les adresses. Rien n'étant écrit ici, ces lectures rendent des tables vides.
+    `synced_for` retient les documents dont les signatures sont synchronisées. Les adresses ne sont pas retenues : leurs lectures rendent des tables vides.
     """
 
     def __init__(self) -> None:
         self.synced_for: list[int] = []
         self.upserted_batches: list[list] = []
+        self._rows: list[StoredSourceAuthorship] = []
 
     def fetch_stored_source_authorships(self, conn, source_publication_id: int) -> list:
-        self.synced_for.append(source_publication_id)
-        return []
+        return list(self._rows)
 
     def delete_source_authorships(self, conn, ids) -> None: ...
 
@@ -63,13 +64,22 @@ class FakeAuthorshipsBatchQueries:
     def fetch_authors_hash(self, conn, source_publication_id: int) -> None:
         return None
 
-    def set_authors_hash(self, conn, source_publication_id: int, authors_hash: str) -> None: ...
+    def set_authors_hash(self, conn, source_publication_id: int, authors_hash: str) -> None:
+        self.synced_for.append(source_publication_id)
 
     def upsert_source_authorships_batch(self, conn, values) -> None:
         self.upserted_batches.append(list(values))
-
-    def fetch_source_authorship_ids_by_position(self, conn, **kw) -> dict[int, int]:
-        return {}
+        for v in values:
+            self._rows.append(
+                StoredSourceAuthorship(
+                    100 + len(self._rows),
+                    v["author_position"],
+                    v["last_name_normalized"],
+                    v["first_name_normalized"],
+                    v["person_identifiers"],
+                    v["content_hash"],
+                )
+            )
 
     def upsert_addresses_batch(self, conn, values) -> None: ...
 

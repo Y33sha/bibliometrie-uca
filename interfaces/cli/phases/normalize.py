@@ -121,6 +121,7 @@ def _normalize_builders(
             PgStagingQueries(raw_store),
             PgSourcePublicationQueries(),
             batch_queries=PgAuthorshipsBatchQueries(),
+            sync_settings=sync_settings,
         ),
         "crossref": _biblio(CrossrefNormalizer),
         "datacite": _biblio(DataciteNormalizer),

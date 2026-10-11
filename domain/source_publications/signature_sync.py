@@ -21,9 +21,10 @@ class StoredSignature(NamedTuple):
 
 
 class IncomingSignature(NamedTuple):
-    """Signature issue de la notice renormalisée : position, identité et empreinte."""
+    """Signature issue de la notice renormalisée : clé (rang dans la notice), position d'auteur, identité et empreinte. Une signature sans rôle d'auteur n'a pas de position."""
 
-    position: int
+    key: int
+    position: int | None
     identity: Hashable
     content_hash: str
 
@@ -32,7 +33,7 @@ class IncomingSignature(NamedTuple):
 class SignatureSyncPlan:
     """Ce que la renormalisation fait des signatures d'une notice.
 
-    `updates` : couples (identifiant en base, position entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : positions entrantes sans correspondant. `deletes` : identifiants en base sans correspondant.
+    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant.
     """
 
     updates: tuple[tuple[int, int], ...]
@@ -46,7 +47,7 @@ def plan_signature_sync(
 ) -> SignatureSyncPlan:
     """Rapproche les signatures entrantes de celles en base.
 
-    Une identité portée par une seule signature de chaque côté rapproche les deux. Une identité répétée rapproche les signatures de même position. Une identité absente d'un côté, ou répétée sans position commune, ne rapproche rien.
+    Une identité portée par une seule signature de chaque côté rapproche les deux. Une identité répétée rapproche les signatures de même position d'auteur. Une identité absente d'un côté, ou répétée sans position commune, ne rapproche rien.
     """
     stored_by_identity: dict[Hashable, list[StoredSignature]] = defaultdict(list)
     for s in stored:
@@ -61,24 +62,26 @@ def plan_signature_sync(
         if len(existing) == 1 and len(candidates) == 1:
             pairs.append((existing[0], candidates[0]))
             continue
-        by_position = {s.position: s for s in existing}
-        pairs.extend((by_position[i.position], i) for i in candidates if i.position in by_position)
+        by_position = {s.position: s for s in existing if s.position is not None}
+        pairs.extend(
+            (by_position[i.position], i)
+            for i in candidates
+            if i.position is not None and i.position in by_position
+        )
 
     matched_stored = {s.id for s, _ in pairs}
-    matched_incoming = {i.position for _, i in pairs}
+    matched_incoming = {i.key for _, i in pairs}
     return SignatureSyncPlan(
-        updates=tuple(
-            sorted((s.id, i.position) for s, i in pairs if s.content_hash != i.content_hash)
-        ),
+        updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.content_hash != i.content_hash)),
         kept=tuple(sorted(s.id for s, i in pairs if s.content_hash == i.content_hash)),
-        inserts=tuple(sorted(i.position for i in incoming if i.position not in matched_incoming)),
+        inserts=tuple(sorted(i.key for i in incoming if i.key not in matched_incoming)),
         deletes=tuple(sorted(s.id for s in stored if s.id not in matched_stored)),
     )
 
 
 def signature_content(
     *,
-    position: int,
+    position: int | None,
     name: tuple[str | None, str | None, str | None],
     is_corresponding: bool,
     roles: Sequence[str] | None,

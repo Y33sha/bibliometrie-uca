@@ -274,3 +274,46 @@ def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
     assert _Q.fetch_authors_hash(conn, sp) == fingerprint(
         {"names": ["Dupont, Jean", "Martin, Paul"]}
     )
+
+
+def test_signature_sans_position_garde_sa_confirmation(sa_sync_conn):
+    """Thèse renormalisée avec un rapporteur de plus : le directeur, sans position d'auteur, garde son identifiant et sa confirmation ; les signatures insérées reçoivent leurs adresses."""
+    conn = sa_sync_conn
+    sp = insert_source_publication(conn, source="theses", source_id="s123", title="t")
+    lab = [AddressRecord(text="LIMOS")]
+
+    def thesis(*extra: AuthorRecord) -> list[AuthorRecord]:
+        return [
+            _rec(0, "Dupont, Marie", roles=["author"], addresses=lab),
+            AuthorRecord(
+                None, SignatureName(raw="Xu, Z."), roles=["thesis_director"], addresses=lab
+            ),
+            *extra,
+        ]
+
+    write_source_authorships(conn, _Q, fingerprint, "theses", sp, thesis())
+    director_id = _signatures(conn, sp)[None][0]
+    person = _pin(conn, director_id)
+
+    reviewer = AuthorRecord(
+        None, SignatureName(raw="Durand, Paul"), roles=["reviewer"], addresses=lab
+    )
+    write_source_authorships(conn, _Q, fingerprint, "theses", sp, thesis(reviewer))
+
+    rows = conn.execute(
+        text(
+            "SELECT id, raw_author_name FROM source_authorships "
+            "WHERE source_publication_id = :sp AND author_position IS NULL ORDER BY id"
+        ),
+        {"sp": sp},
+    ).all()
+    assert [r.id for r in rows][0] == director_id
+    assert (
+        conn.execute(
+            text("SELECT person_id FROM confirmed_authorships WHERE source_authorship_id = :i"),
+            {"i": director_id},
+        ).scalar()
+        == person
+    )
+    reviewer_id = next(r.id for r in rows if r.raw_author_name == "Durand, Paul")
+    assert _addresses(conn, reviewer_id) == ["LIMOS"]
