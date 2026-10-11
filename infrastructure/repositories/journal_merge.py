@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.journals.journal import JournalType
+from domain.journals.journal import JournalType, ManualField
 from infrastructure.pipeline.authorships.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
@@ -39,6 +39,29 @@ def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
     )
 
 
+def _merge_journal_type(conn: Connection, target_id: int, source_id: int) -> None:
+    """Remplir si vide, le type inconnu comptant comme vide. Un type repris de l'absorbée garde son marqueur de saisie à la main."""
+    conn.execute(
+        text("""
+            UPDATE journals t
+            SET journal_type = s.journal_type,
+                manual_fields = CASE
+                    WHEN :field = ANY(s.manual_fields) AND NOT :field = ANY(t.manual_fields)
+                    THEN t.manual_fields || CAST(:field AS text)
+                    ELSE t.manual_fields
+                END
+            FROM journals s
+            WHERE t.id = :t AND s.id = :s AND t.journal_type = CAST(:unknown AS journal_type)
+        """),
+        {
+            "t": target_id,
+            "s": source_id,
+            "field": ManualField.JOURNAL_TYPE.value,
+            "unknown": JournalType.UNKNOWN.value,
+        },
+    )
+
+
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
     conn.execute(
         text("""
@@ -66,11 +89,13 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "openalex_id": fill_empty_unique("journals", "openalex_id"),
     "oa_model": fill_empty("journals", "oa_model"),
     "apc": fill_empty("journals", "apc_amount", "apc_currency"),
-    "journal_type": fill_empty("journals", "journal_type", empty=JournalType.UNKNOWN.value),
+    "journal_type": MergeStep((("journals", "journal_type"),), _merge_journal_type),
     "is_academic": untouched("journals", "is_academic"),
     "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),
     "pub_count": untouched("journals", "pub_count"),
+    # Un champ repris de l'absorbée y apporte son marqueur (`_merge_journal_type`).
+    "manual_fields": untouched("journals", "manual_fields"),
 }
 
 

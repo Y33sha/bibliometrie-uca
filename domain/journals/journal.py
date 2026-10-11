@@ -59,6 +59,12 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
 }
 
 
+class ManualField(StrEnum):
+    """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Un champ saisi à la main n'est plus écrit par le pipeline."""
+
+    JOURNAL_TYPE = "journal_type"
+
+
 @dataclass(slots=True)
 class Journal:
     """Journal, conférence ou autre support de publication (aggregate root)."""
@@ -74,3 +80,4 @@ class Journal:
     oa_model: OaModel | None = None
     journal_type: JournalType = JournalType.UNKNOWN
     is_academic: bool = True
+    manual_fields: frozenset[ManualField] = frozenset()

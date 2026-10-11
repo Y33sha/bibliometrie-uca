@@ -562,17 +562,17 @@ class TestUpdateJournal:
             f"/api/journals/{jid}",
             json={
                 "title": "UpdatedTitle",
-                "is_in_doaj": True,
+                "is_academic": False,
             },
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
         # Vérifier en base que seuls les champs envoyés sont écrits.
         with owner_pool() as cur:
-            cur.execute("SELECT title, is_in_doaj FROM journals WHERE id = %s", (jid,))
+            cur.execute("SELECT title, is_academic FROM journals WHERE id = %s", (jid,))
             row = cur.fetchone()
             assert row["title"] == "UpdatedTitle"
-            assert row["is_in_doaj"] is True
+            assert row["is_academic"] is False
 
 
 class TestTypeChangeImpact:

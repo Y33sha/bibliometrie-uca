@@ -37,4 +37,9 @@ JOURNAL_DATA: dict[str, MergedData] = {
         MergeRule.RECOMPUTED, DataNature.DERIVED, "Notice DOAJ et date de son import."
     ),
     "pub_count": MergedData(MergeRule.RECOMPUTED, DataNature.DERIVED, "Nombre de publications."),
+    "manual_fields": MergedData(
+        MergeRule.COMBINE,
+        DataNature.DECISION,
+        "Champs saisis à la main. Un champ repris de l'absorbée garde son marqueur.",
+    ),
 }

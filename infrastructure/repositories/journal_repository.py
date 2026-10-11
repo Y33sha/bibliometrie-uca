@@ -17,7 +17,7 @@ from application.ports.repositories.journal_repository import (
 )
 from domain.errors import NotFoundError
 from domain.journals.issns import JournalIssn
-from domain.journals.journal import Journal, JournalType, OaModel
+from domain.journals.journal import Journal, JournalType, ManualField, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.db.rows import row_as
@@ -38,6 +38,7 @@ class _JournalRow(NamedTuple):
     oa_model: str | None
     journal_type: str | None
     is_academic: bool | None
+    manual_fields: list[str]
 
 
 def _journal_from_row(row: _JournalRow, issns: Sequence[JournalIssn]) -> Journal:
@@ -59,6 +60,7 @@ def _journal_from_row(row: _JournalRow, issns: Sequence[JournalIssn]) -> Journal
         if row.journal_type is not None
         else JournalType.UNKNOWN,
         is_academic=row.is_academic if row.is_academic is not None else True,
+        manual_fields=frozenset(ManualField(f) for f in row.manual_fields),
     )
 
 
@@ -83,6 +85,7 @@ class PgJournalRepository(JournalRepository):
                 journals.c.oa_model,
                 journals.c.journal_type,
                 journals.c.is_academic,
+                journals.c.manual_fields,
             ).where(journals.c.id == journal_id)
         ).first()
         if row is None:
@@ -93,7 +96,7 @@ class PgJournalRepository(JournalRepository):
     # ── Persistance de l'agrégat ───────────────────────────────────
 
     def save(self, journal: Journal) -> None:
-        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API et de ses ISSN. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`) ne sont pas touchées. Un ISSN gardé conserve sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
+        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API et de ses ISSN. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`, `is_in_doaj`) ne sont pas touchées. Un ISSN gardé conserve sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(journals)
             .where(journals.c.id == journal.id)
@@ -103,8 +106,8 @@ class PgJournalRepository(JournalRepository):
                 oa_model=journal.oa_model,
                 journal_type=journal.journal_type,
                 is_academic=journal.is_academic,
-                is_in_doaj=journal.is_in_doaj,
                 apc_amount=journal.apc_amount,
+                manual_fields=sorted(journal.manual_fields),
             )
         )
         if result.rowcount == 0:

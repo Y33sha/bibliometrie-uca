@@ -312,6 +312,8 @@ journals = Table(
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_pubs` / le tri / l'affichage.
     Column("pub_count", Integer, nullable=False, server_default="0"),
+    # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
+    Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
 )
 

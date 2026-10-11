@@ -82,7 +82,7 @@
 		id: number; title: string; issns: EditedIssn[];
 		oa_model: string;
 		journal_type: string; original_journal_type: string;
-		is_academic: boolean; is_in_doaj: boolean;
+		is_academic: boolean;
 		apc_amount: string;
 	} | null = $state(null);
 
@@ -106,7 +106,6 @@
 			oa_model: detail.oa_model || '',
 			journal_type: jt, original_journal_type: jt,
 			is_academic: detail.is_academic ?? true,
-			is_in_doaj: detail.is_in_doaj,
 			apc_amount: detail.apc_amount ? String(detail.apc_amount) : '',
 		};
 	}
@@ -142,7 +141,6 @@
 		body.oa_model = editModal.oa_model || null;
 		body.journal_type = editModal.journal_type;
 		body.is_academic = editModal.is_academic;
-		body.is_in_doaj = editModal.is_in_doaj;
 		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
 		try {
 			await journalsApi.update(editModal.id, body);
@@ -267,7 +265,6 @@
 		</div>
 		<div style="display:flex;gap:12px;margin-top:8px">
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
-			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
 		</div>
 		<label>APC (€) <input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" /></label>
 		{#snippet actions()}
