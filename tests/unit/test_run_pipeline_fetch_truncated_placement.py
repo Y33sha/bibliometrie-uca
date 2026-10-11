@@ -16,8 +16,8 @@ from interfaces.cli.phases.execution import phase_context
 from pipeline.context import RunOptions
 from pipeline.metrics import PhaseMetrics
 
-# L'orchestrateur applicatif du refetch, câblé par la phase `fetch_truncated` via `asyncio.run`.
-_REFETCH = "application.pipeline.fetch_truncated.phase.refetch"
+# Le nœud de la phase `fetch_truncated`, lancé via `asyncio.run`.
+_REFETCH = "pipeline.sources.openalex.fetch_truncated.refetch_openalex"
 
 
 def test_refetch_not_called_in_extract():
@@ -45,7 +45,6 @@ def test_refetch_not_called_in_normalize():
 def test_refetch_called_in_own_phase_when_openalex_present():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch("infrastructure.sources.openalex.fetch_truncated.PgOpenalexFetchTruncatedAdapter"),
         patch(_REFETCH, new_callable=AsyncMock, return_value=PhaseMetrics()) as refetch,
     ):
         fetch_truncated.build().run(

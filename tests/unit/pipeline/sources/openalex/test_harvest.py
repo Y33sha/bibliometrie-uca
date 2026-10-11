@@ -12,7 +12,7 @@ import pytest
 
 from pipeline.progression import Progression
 from pipeline.sources.harvest import ExtractionConfigError
-from pipeline.sources.openalex import credentials, harvest
+from pipeline.sources.openalex import api, harvest
 from pipeline.sources.openalex.harvest import OpenalexExtractor, build_params, extract_period
 from pipeline.sources.staging import UpsertOutcome
 from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
@@ -22,8 +22,8 @@ _LOGGER = logging.getLogger("test")
 
 def _auth(monkeypatch, *, api_key=None, email=None):
     """Pose la clé d'API et l'adresse polite pool que lit `auth_params()`."""
-    monkeypatch.setattr(credentials, "get_openalex_api_key", lambda: api_key)
-    monkeypatch.setattr(credentials, "get_polite_pool_email_optional", lambda: email)
+    monkeypatch.setattr(api, "get_openalex_api_key", lambda: api_key)
+    monkeypatch.setattr(api, "get_polite_pool_email_optional", lambda: email)
 
 
 @pytest.fixture(autouse=True)

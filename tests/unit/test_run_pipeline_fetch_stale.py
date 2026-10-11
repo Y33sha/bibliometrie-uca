@@ -96,16 +96,14 @@ def test_run_fetch_stale_installs_circuit_breaker():
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
-                "application.pipeline.fetch_stale.phase.refresh",
+                "pipeline.sources.fetch_stale.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )
         stack.enter_context(
             patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock())
         )
-        stack.enter_context(
-            patch.object(fetch_stale, "_make_fetch_stale_adapter", return_value=MagicMock())
-        )
+        stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))
         fetch_stale._run_fetch_stale("hal", None)
 
     breaker = refresh.call_args.kwargs["breaker"]
