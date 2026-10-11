@@ -258,14 +258,14 @@ class TestDecideNameFormOutcome:
             [42], allow_create=True, rejected_person_ids=frozenset({42})
         )
         assert decision.action == "skip"
-        assert decision.reason == "ambiguous_name_form"
+        assert decision.reason == "all_candidates_rejected"
 
     def test_all_candidates_rejected_skips(self):
         decision = decide_name_form_outcome(
             [42, 17], allow_create=True, rejected_person_ids=frozenset({42, 17})
         )
         assert decision.action == "skip"
-        assert decision.reason == "ambiguous_name_form"
+        assert decision.reason == "all_candidates_rejected"
 
     def test_unknown_form_single_compatible_person_matches(self):
         """Forme inconnue, une seule personne aux initiales compatibles : rattachement, pas de création."""
@@ -281,7 +281,7 @@ class TestDecideNameFormOutcome:
         decision = decide_name_form_outcome(
             None, allow_create=True, rejected_person_ids=frozenset({42}), compatible_person_ids=[42]
         )
-        assert decision == NameFormDecision(action="skip", reason="ambiguous_name_form")
+        assert decision == NameFormDecision(action="skip", reason="all_candidates_rejected")
 
     def test_known_form_ignores_compatible_persons(self):
         decision = decide_name_form_outcome([7], allow_create=True, compatible_person_ids=[42])

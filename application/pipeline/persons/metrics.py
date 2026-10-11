@@ -74,6 +74,7 @@ def build_metrics(
         "created": created,
         "first_names_completed": result.first_names_completed,
         "skipped_ambiguous": skipped.get("ambiguous_name_form", 0),
+        "skipped_all_rejected": skipped.get("all_candidates_rejected", 0),
         "corroboration_rejected": result.corroboration_rejected,
         "corroboration_rejected_distinct": result.corroboration_rejected_distinct,
         "identifiers_transferred": transferred,

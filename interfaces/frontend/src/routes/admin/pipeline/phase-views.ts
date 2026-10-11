@@ -188,6 +188,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "created", label: "Personnes créées" },
       { key: "first_names_completed", label: "Prénoms complétés" },
       { key: "skipped_ambiguous", label: "Ignorées (nom ambigu)" },
+      { key: "skipped_all_rejected", label: "Ignorées (candidats rejetés)" },
       { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
       { key: "corroboration_rejected_distinct", label: "dont identifiants distincts" },
       { key: "cross_source_detached", label: "Cross-source détachés (sans appui)" },
