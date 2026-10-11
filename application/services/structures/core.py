@@ -128,16 +128,11 @@ def delete_structure(
 
     La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). Le nettoyage du périmètre (retrait des racines de `perimeters.root_structure_ids`, rematérialisation de la clôture) relève du command handler.
     """
-    row = repo.delete_structure(structure_id)
-    if not row:
+    snapshot = repo.delete_structure(structure_id)
+    if snapshot is None:
         raise NotFoundError(f"Structure {structure_id} introuvable")
-    emit_event(
-        audit_repo,
-        "structure.deleted",
-        "structure",
-        structure_id,
-        {"code": row["code"], "name": row["name"]},
-    )
+    # L'instantané garde ce que la cascade emporte : une suppression par erreur reste réparable à la main.
+    emit_event(audit_repo, "structure.deleted", "structure", structure_id, snapshot)
 
 
 # ── structure_tutelles ────────────────────────────────────────────

@@ -8,6 +8,8 @@ Couvre :
 - GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
+import json
+
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_structure,
@@ -177,6 +179,28 @@ class TestDeleteStructure:
         r = auth_client.delete(f"/api/structures/{sid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
+
+    def test_audit_keeps_a_snapshot(self, auth_client):
+        """L'événement d'audit garde ce que la cascade emporte."""
+        parent = seed_structure(type_="universite")
+        sid = seed_structure(type_="labo")
+        seed_tutelle(parent, child_id=sid)
+        form = uniq("Forme")
+        seed_structure_name_form(sid, form)
+
+        assert auth_client.delete(f"/api/structures/{sid}").status_code == 200
+
+        with owner_pool() as cur:
+            cur.execute(
+                "SELECT payload::text AS payload FROM audit_log"
+                " WHERE event_type = 'structure.deleted' AND aggregate_id = %s",
+                (sid,),
+            )
+            payload = json.loads(cur.fetchone()["payload"])
+        assert payload["structure"]["id"] == sid
+        assert [f["form_text"] for f in payload["name_forms"]] == [form]
+        assert payload["parent_ids"] == [parent]
+        assert payload["confirmed_address_ids"] == []
 
 
 class TestDeletionImpact:

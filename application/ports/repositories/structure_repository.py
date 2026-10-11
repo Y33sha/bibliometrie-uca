@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Protocol, TypedDict
 
 from domain.structures.structure import Structure
+from domain.types import JsonValue
 
 
 class StructureNameFormUpdateFields(TypedDict, total=False):
@@ -30,13 +31,6 @@ class StructureRow(TypedDict):
     rnsr_id: str | None
     hal_collection: str | None
     api_ids: dict[str, list[str]] | None
-
-
-class StructureDeletedRow(TypedDict):
-    """Sous-ensemble renvoyé par delete (identification pour l'audit)."""
-
-    code: str
-    name: str
 
 
 class StructureTutelleRow(TypedDict):
@@ -90,7 +84,9 @@ class StructureRepository(Protocol):
         """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
         ...
 
-    def delete_structure(self, structure_id: int) -> StructureDeletedRow | None: ...
+    def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:
+        """Supprime la structure et retourne son instantané, pris avant la suppression : la ligne `structures`, ses formes de nom, ses tutelles (`parent_ids`, `child_ids`), ses liens adresse-structure confirmés, rejetés ou manuels (listes d'`address_id`) et les périmètres dont elle est une racine. `None` si elle n'existe pas."""
+        ...
 
     # ── structure_tutelles ─────────────────────────────────────────
 

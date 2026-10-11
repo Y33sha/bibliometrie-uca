@@ -7,7 +7,6 @@ from sqlalchemy import Connection, Text, bindparam, cast as sql_cast, delete, se
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.structure_repository import (
-    StructureDeletedRow,
     StructureNameFormDeletedRow,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
@@ -19,6 +18,7 @@ from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 from domain.structures.structure import Structure, StructureType
+from domain.types import JsonValue
 from infrastructure.db.rows import row_as, rows_as
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
@@ -189,15 +189,39 @@ class PgStructureRepository(StructureRepository):
         if result.rowcount == 0:
             raise NotFoundError(f"Structure {structure.id} introuvable")
 
-    def delete_structure(self, structure_id: int) -> StructureDeletedRow | None:
-        stmt = (
-            delete(structures)
-            .where(structures.c.id == structure_id)
-            .returning(structures.c.code, structures.c.name)
-        )
-        result = self._conn.execute(stmt)
-        row = result.first()
-        return cast(StructureDeletedRow, dict(row._mapping)) if row else None
+    def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:
+        snapshot = self._conn.execute(
+            text("""
+                SELECT jsonb_build_object(
+                    'structure', to_jsonb(s),
+                    'name_forms', COALESCE(
+                        (SELECT jsonb_agg(to_jsonb(f) - 'structure_id' ORDER BY f.id)
+                         FROM structure_name_forms f WHERE f.structure_id = s.id),
+                        '[]'::jsonb),
+                    'parent_ids', ARRAY(
+                        SELECT parent_id FROM structure_tutelles WHERE child_id = s.id),
+                    'child_ids', ARRAY(
+                        SELECT child_id FROM structure_tutelles WHERE parent_id = s.id),
+                    'confirmed_address_ids', ARRAY(
+                        SELECT address_id FROM address_structures
+                        WHERE structure_id = s.id AND is_confirmed),
+                    'rejected_address_ids', ARRAY(
+                        SELECT address_id FROM address_structures
+                        WHERE structure_id = s.id AND NOT is_confirmed),
+                    'manual_address_ids', ARRAY(
+                        SELECT address_id FROM address_structures
+                        WHERE structure_id = s.id AND matched_form_id IS NULL),
+                    'perimeter_codes', ARRAY(
+                        SELECT code FROM perimeters WHERE s.id = ANY(root_structure_ids))
+                )
+                FROM structures s WHERE s.id = :id
+            """),
+            {"id": structure_id},
+        ).scalar()
+        if snapshot is None:
+            return None
+        self._conn.execute(delete(structures).where(structures.c.id == structure_id))
+        return cast(dict[str, JsonValue], snapshot)
 
     # ── structure_tutelles ─────────────────────────────────────────
 
