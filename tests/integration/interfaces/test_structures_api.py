@@ -179,6 +179,29 @@ class TestDeleteStructure:
         assert r.json()["deleted"] is True
 
 
+class TestDeletionImpact:
+    def test_404(self, client):
+        r = client.get("/api/structures/999999999/deletion-impact")
+        assert r.status_code == 404
+
+    def test_counts_what_deletion_removes(self, client):
+        parent = seed_structure(type_="universite")
+        sid = seed_structure(type_="labo")
+        seed_tutelle(parent, child_id=sid)
+        seed_structure_name_form(sid, uniq("Forme"))
+
+        r = client.get(f"/api/structures/{sid}/deletion-impact")
+
+        assert r.status_code == 200
+        assert r.json() == {
+            "name_forms": 1,
+            "tutelles": 1,
+            "confirmed_links": 0,
+            "rejected_links": 0,
+            "perimeter_codes": [],
+        }
+
+
 # ── structure-relations ─────────────────────────────────────────
 
 

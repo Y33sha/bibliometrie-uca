@@ -19,10 +19,13 @@
     type Structure,
     type StructureDetail,
   } from "../types";
+  import type { components } from "$lib/api/schema";
   import RelationsSection from "../RelationsSection.svelte";
   import NameFormsSection from "../NameFormsSection.svelte";
   import EditFormModal from "../EditFormModal.svelte";
   import StructureFormModal from "../StructureFormModal.svelte";
+
+  type StructureDeletionImpact = components["schemas"]["StructureDeletionImpact"];
 
   /* ── State ── */
 
@@ -303,9 +306,20 @@
   /* ── Delete structure ── */
 
   async function deleteStructure() {
+    const impact = await api<StructureDeletionImpact>(
+      `/api/structures/${id}/deletion-impact`,
+    );
+    const lines = [
+      `${impact.name_forms} forme(s) de nom`,
+      `${impact.tutelles} tutelle(s)`,
+      `${impact.confirmed_links} lien(s) adresse-structure confirmé(s)`,
+      `${impact.rejected_links} lien(s) adresse-structure rejeté(s)`,
+    ];
+    if (impact.perimeter_codes.length)
+      lines.push(`racine des périmètres : ${impact.perimeter_codes.join(", ")}`);
     if (
       !(await confirmDialog({
-        message: "Supprimer cette structure, ses formes de nom et ses tutelles ?",
+        message: `Supprimer cette structure ? La suppression emporte :\n${lines.map((l) => `• ${l}`).join("\n")}`,
         danger: true,
       }))
     )
