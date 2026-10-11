@@ -30,8 +30,9 @@ from domain.persons.identifiers import (
     IdentifierOrigin,
     normalized_identifier_value,
 )
+from domain.persons.merge import merge_roles
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person import PersonExclusion, merge_roles, validated_name
+from domain.persons.person import PersonExclusion, validated_name
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 

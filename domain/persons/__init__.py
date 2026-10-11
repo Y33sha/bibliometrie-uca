@@ -1,7 +1,8 @@
 """Concept métier Personne — value objects et règles d'entité.
 
 Sous-modules :
-- `person` : aggregate root `Person` (l'invariant de fusion vit sur `merge_roles`)
+- `person` : aggregate root `Person`
+- `merge` : fusion de deux personnes, données d'une personne et règle de fusion de chacune (`PERSON_DATA`)
 - `identifier_attribution` : aggregate `IdentifierAttribution` (identité naturelle `(id_type, id_value)`)
 - `identifiers` : VOs ORCID/IdHAL/IdRef + helpers de normalisation
 - `name_forms` : VO `PersonNameForm`

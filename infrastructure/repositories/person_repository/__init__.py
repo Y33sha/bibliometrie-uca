@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'agrégat Person.
 
-Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un point d'agrégation qui borne la connexion et délègue.
+Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un point d'agrégation qui borne la connexion et délègue.
 
 Usage :
     repo = PgPersonRepository(conn)
@@ -15,6 +15,7 @@ from application.ports.repositories.person_repository import PersonRepository
 from infrastructure.repositories.person_repository import (
     _core,
     _identifiers,
+    _merge,
     _name_forms,
 )
 
@@ -86,7 +87,7 @@ class PgPersonRepository(PersonRepository):
         return _core.ids_with_rh(self._conn, person_ids)
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        _core.merge_into(self._conn, target_id, source_id)
+        _merge.merge_into(self._conn, target_id, source_id)
 
     # ── distinct_persons ───────────────────────────────────────────
 
