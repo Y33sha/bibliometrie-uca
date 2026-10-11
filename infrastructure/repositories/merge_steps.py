@@ -59,18 +59,35 @@ def transfer_unique(table: str, column: str, *key: str) -> MergeStep:
     return MergeStep(((table, column),), apply)
 
 
-def fill_empty(table: str, *columns: str) -> MergeStep:
-    """Colonnes de l'entité prises ensemble : si la première est nulle chez l'entité conservée, toutes prennent la valeur de l'absorbée."""
+def fill_empty(table: str, *columns: str, empty: str | None = None) -> MergeStep:
+    """Colonnes de l'entité prises ensemble : si la première est vide chez l'entité conservée, toutes prennent la valeur de l'absorbée. Vide : nulle, ou égale à `empty`."""
     assignments = ", ".join(f"{c} = s.{c}" for c in columns)
+    is_empty = f"t.{columns[0]} IS NULL" + (f" OR t.{columns[0]}::text = :empty" if empty else "")
 
     def apply(conn: Connection, target_id: int, source_id: int) -> None:
         conn.execute(
             text(f"""
                 UPDATE {table} t SET {assignments}
                 FROM {table} s
-                WHERE t.id = :t AND s.id = :s AND t.{columns[0]} IS NULL
+                WHERE t.id = :t AND s.id = :s AND ({is_empty})
             """),
-            {"t": target_id, "s": source_id},
+            {"t": target_id, "s": source_id, "empty": empty},
         )
 
     return MergeStep(tuple((table, c) for c in columns), apply)
+
+
+def fill_empty_unique(table: str, column: str) -> MergeStep:
+    """Remplir si vide, pour une colonne unique : la valeur de l'absorbée lui est d'abord retirée."""
+
+    def apply(conn: Connection, target_id: int, source_id: int) -> None:
+        value = conn.execute(
+            text(f"SELECT {column} FROM {table} WHERE id = :s"), {"s": source_id}
+        ).scalar()
+        conn.execute(text(f"UPDATE {table} SET {column} = NULL WHERE id = :s"), {"s": source_id})
+        conn.execute(
+            text(f"UPDATE {table} SET {column} = COALESCE({column}, :v) WHERE id = :t"),
+            {"v": value, "t": target_id},
+        )
+
+    return MergeStep(((table, column),), apply)
