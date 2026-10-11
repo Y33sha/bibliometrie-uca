@@ -126,7 +126,7 @@ def delete_structure(
 ) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas.
 
-    Cascade DB via FK `ON DELETE CASCADE` sur `authorship_structures` et `source_authorship_structures`. Le nettoyage du périmètre (retrait des racines de `perimeters.root_structure_ids`, rematérialisation de la clôture) relève du command handler.
+    La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). Le nettoyage du périmètre (retrait des racines de `perimeters.root_structure_ids`, rematérialisation de la clôture) relève du command handler.
     """
     row = repo.delete_structure(structure_id)
     if not row:

@@ -13,6 +13,7 @@ from application.ports.read_models.structures_queries import (
     NameFormOut,
     StructureAddressesResponse,
     StructureDashboardResponse,
+    StructureDeletionImpact,
     StructureDetailResponse,
     StructureListItem,
     StructureOut,
@@ -254,6 +255,18 @@ def get_structure_subjects(
     return queries.get_structure_subjects(structure_id, limit=limit)
 
 
+@router.get("/{structure_id}/deletion-impact", response_model=StructureDeletionImpact)
+def get_structure_deletion_impact(
+    structure_id: int,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructureDeletionImpact:
+    """Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. 404 si la structure n'existe pas."""
+    impact = queries.get_deletion_impact(structure_id)
+    if impact is None:
+        raise HTTPException(status_code=404, detail="Structure introuvable")
+    return impact
+
+
 @router.put("/{structure_id}", response_model=StructureOut)
 def update_structure(
     structure_id: int,
@@ -283,7 +296,7 @@ def delete_structure(
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
-    """Supprime une structure. Cascade sur les tutelles et formes de noms liées. 404 si inconnue."""
+    """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
     structure_commands.delete_structure(
         conn,
         structure_id,

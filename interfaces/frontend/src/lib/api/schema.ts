@@ -738,7 +738,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Structure
-         * @description Supprime une structure. Cascade sur les tutelles et formes de noms liées. 404 si inconnue.
+         * @description Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue.
          */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
         options?: never;
@@ -798,6 +798,26 @@ export interface paths {
          * @description Sujets les plus fréquents des publications de la structure (nuage de mots).
          */
         get: operations["get_structure_subjects_api_structures__structure_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/deletion-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Deletion Impact
+         * @description Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. 404 si la structure n'existe pas.
+         */
+        get: operations["get_structure_deletion_impact_api_structures__structure_id__deletion_impact_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5115,6 +5135,22 @@ export interface components {
             top_countries: components["schemas"]["StructureTopCountry"][];
         };
         /**
+         * StructureDeletionImpact
+         * @description Ce que la suppression d'une structure emporte.
+         */
+        StructureDeletionImpact: {
+            /** Name Forms */
+            name_forms: number;
+            /** Tutelles */
+            tutelles: number;
+            /** Confirmed Links */
+            confirmed_links: number;
+            /** Rejected Links */
+            rejected_links: number;
+            /** Perimeter Codes */
+            perimeter_codes: string[];
+        };
+        /**
          * StructureDetailResponse
          * @description Détail complet renvoyé par GET /api/structures/{id}.
          */
@@ -6901,6 +6937,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectFrequency"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_deletion_impact_api_structures__structure_id__deletion_impact_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureDeletionImpact"];
                 };
             };
             /** @description Validation Error */

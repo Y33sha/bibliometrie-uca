@@ -10,6 +10,7 @@ from application.ports.read_models.structures_queries import (
     StructureAddressOut,
     StructureCollaborations,
     StructureDashboardResponse,
+    StructureDeletionImpact,
     StructureDetailResponse,
     StructureListItem,
     StructureOut,
@@ -366,3 +367,23 @@ class PgStructuresQueries(StructuresQueries):
             {"id": form_id},
         ).one_or_none()
         return _name_form_from_row(row) if row else None
+
+    def get_deletion_impact(self, structure_id: int) -> StructureDeletionImpact | None:
+        row = self._conn.execute(
+            text("""
+                SELECT
+                    (SELECT count(*) FROM structure_name_forms WHERE structure_id = s.id)
+                        AS name_forms,
+                    (SELECT count(*) FROM structure_tutelles
+                     WHERE s.id IN (parent_id, child_id)) AS tutelles,
+                    (SELECT count(*) FROM address_structures
+                     WHERE structure_id = s.id AND is_confirmed) AS confirmed_links,
+                    (SELECT count(*) FROM address_structures
+                     WHERE structure_id = s.id AND NOT is_confirmed) AS rejected_links,
+                    ARRAY(SELECT code FROM perimeters
+                          WHERE s.id = ANY(root_structure_ids) ORDER BY code) AS perimeter_codes
+                FROM structures s WHERE s.id = :id
+            """),
+            {"id": structure_id},
+        ).one_or_none()
+        return StructureDeletionImpact.model_validate(row._mapping) if row else None

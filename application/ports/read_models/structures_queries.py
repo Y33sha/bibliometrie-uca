@@ -108,6 +108,16 @@ class StructureDashboardResponse(BaseModel):
     top_countries: list[StructureTopCountry]
 
 
+class StructureDeletionImpact(BaseModel):
+    """Ce que la suppression d'une structure emporte."""
+
+    name_forms: int
+    tutelles: int
+    confirmed_links: int
+    rejected_links: int
+    perimeter_codes: list[str]
+
+
 class StructuresQueries(Protocol):
     """Lectures sur les structures, relations et formes de noms."""
 
@@ -128,3 +138,7 @@ class StructuresQueries(Protocol):
     def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse: ...
 
     def get_name_form(self, form_id: int) -> NameFormOut | None: ...
+
+    def get_deletion_impact(self, structure_id: int) -> StructureDeletionImpact | None:
+        """Formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, et périmètres dont la structure est une racine. `None` si la structure n'existe pas."""
+        ...
