@@ -87,6 +87,11 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bibliometrie_app;
 --
 -- Cette liste est vérifiée : les tests d'API se connectent sous ce rôle, si bien qu'un point
 -- d'entrée écrivant hors de ces droits échoue en erreur de permission avant d'être déployé.
+--
+-- Toute écriture est d'abord retirée : rejouer le fichier aligne les droits sur cette liste,
+-- y compris quand une table en sort.
+
+REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM bibliometrie_app;
 
 GRANT INSERT, UPDATE, DELETE ON
     address_structures, authorships, perimeters, person_name_forms,
@@ -127,7 +132,7 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE ON
-    addresses, apc_payments, config, doi_prefixes, monographs, persons_rh, source_authorships,
+    addresses, apc_payments, config, doi_prefixes, monographs, source_authorships,
     source_publications
 TO bibliometrie_app;
 
