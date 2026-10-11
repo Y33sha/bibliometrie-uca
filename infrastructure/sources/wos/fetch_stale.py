@@ -15,7 +15,7 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.wos.parsing import extract_doi, get_records
+from pipeline.sources.wos.fields import extract_doi, get_records
 
 
 class WosFetchStaleAdapter(BaseFetchStaleAdapter):

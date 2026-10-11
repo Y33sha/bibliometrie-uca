@@ -7,9 +7,9 @@ from collections.abc import Callable, Mapping
 
 from domain.types import JsonValue
 from infrastructure.fingerprint import fingerprint
-from infrastructure.sources.datacite import hash_normalize as datacite_hash
-from infrastructure.sources.wos import hash_normalize as wos_hash
+from pipeline.sources.datacite import hash_normalize as datacite_hash
 from pipeline.sources.hal import hash_normalize as hal_hash
+from pipeline.sources.wos import hash_normalize as wos_hash
 
 # Neutralisation, par source, du bruit volatil avant calcul du hash de détection de changement. Une source absente n'est pas normalisée (hash sur le payload fidèle).
 # HAL : horodatage de génération enfoui dans le TEI `label_xml`.

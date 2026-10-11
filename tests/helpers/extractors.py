@@ -1,4 +1,4 @@
-"""Extracteur de source sur un adaptateur simulé, et arguments de son run, pour les tests des extracteurs."""
+"""Moissonneur sur un client simulé, et arguments de son run, pour les tests des moissonneurs."""
 
 import argparse
 import logging
@@ -6,13 +6,14 @@ from collections.abc import Callable
 from unittest.mock import MagicMock
 
 
-def extracteur[E](
-    cls: Callable[..., E], adapter: MagicMock, config: object, annees: list[int]
-) -> E:
-    """Extracteur `cls` sur `adapter`, qui rend la configuration `config` et les années `annees`."""
-    adapter.load_config.return_value = config
-    adapter.get_years.return_value = annees
-    return cls(MagicMock(), logging.getLogger("test"), adapter)
+def extracteur[E](cls: Callable[..., E], client: MagicMock) -> E:
+    """Moissonneur `cls` sur le client `client` et une connexion simulée."""
+    return cls(MagicMock(), logging.getLogger("test"), client)
+
+
+def source_a_bout() -> MagicMock:
+    """Circuit-breaker déclenché."""
+    return MagicMock(tripped=True)
 
 
 def arguments_du_run(**surcharges: object) -> argparse.Namespace:

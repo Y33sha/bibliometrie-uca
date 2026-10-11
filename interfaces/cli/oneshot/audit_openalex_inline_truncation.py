@@ -28,9 +28,9 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.sources.api_params import API_BASE_URLS, OPENALEX_DELAY
 from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
-from infrastructure.sources.openalex.extract_openalex import build_params
-from infrastructure.sources.openalex.parsing import extract_openalex_id
+from pipeline.sources.openalex.credentials import auth_params
+from pipeline.sources.openalex.fields import SELECT_FIELDS, extract_openalex_id
+from pipeline.sources.openalex.harvest import build_params
 
 log = setup_logger("audit_openalex_inline_truncation", os.path.dirname(__file__))
 

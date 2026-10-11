@@ -1,8 +1,8 @@
-"""Base class pour les orchestrateurs d'extraction de sources.
+"""Socle des moissonneurs : patron commun, écriture d'un document dans `staging`.
 
-Capture le boilerplate commun aux extracteurs : logs de header et de résumé, exécution sous circuit-breaker. Chaque source hérite et implémente `load_config()` et `extract_all()` ; l'itération (cursor / search_after / firstRecord / cursorMark × pages) reste spécifique à chaque source, sans template trop contraignant.
+Le patron porte l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur circuit-breaker. Chaque source hérite de `SourceExtractor` et implémente `load_config()` et `extract_all()` ; la pagination (curseur, `search_after`, `firstRecord`, `cursorMark`) reste propre à chaque source.
 
-Entry point unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
+Point d'entrée unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
 """
 
 from __future__ import annotations
@@ -10,21 +10,29 @@ from __future__ import annotations
 import argparse
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import ClassVar
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
+from domain.types import JsonValue
+from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
 from pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression, progression
+from pipeline.sources.staging import UpsertOutcome, upsert_staging
 
-__all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
+__all__ = [
+    "ExtractLogger",
+    "ExtractionConfigError",
+    "SourceExtractor",
+    "scoped_logger",
+    "stage_document",
+]
 
 
-# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
+# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition est dans `pipeline.logging_scope`.
 ExtractLogger = ScopedOrPlainLogger
 
 
@@ -48,6 +56,34 @@ _FORMES_DU_BILAN: dict[bool, tuple[Formes, Formes, Formes, Formes]] = {
 """Mots du bilan d'une source, au masculin puis au féminin."""
 
 
+def stage_document(
+    conn: Connection,
+    metrics: PhaseMetrics,
+    *,
+    source: str,
+    source_id: str,
+    doi: str | None,
+    raw_data: Mapping[str, JsonValue],
+    authors_truncated: bool = False,
+) -> None:
+    """Écrit un document dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé."""
+    inserted, changed = upsert_staging(
+        conn,
+        source=source,
+        source_id=source_id,
+        doi=doi,
+        raw_data=raw_data,
+        authors_truncated=authors_truncated,
+    )
+    match UpsertOutcome.of(inserted=inserted, changed=changed):
+        case UpsertOutcome.NEW:
+            metrics.add(new=1)
+        case UpsertOutcome.UPDATED:
+            metrics.add(updated=1)
+        case UpsertOutcome.UNCHANGED:
+            metrics.add(unchanged=1)
+
+
 class ExtractionConfigError(Exception):
     """Configuration d'extraction incomplète (IDs/affiliations manquants).
 
@@ -58,12 +94,12 @@ class ExtractionConfigError(Exception):
     """
 
 
-class SourceExtractor[ConfigT, AdapterT](ABC):
+class SourceExtractor[ConfigT, ClientT](ABC):
     """Template pour l'extraction API → staging.
 
     `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`, propre à chaque source. Permet aux sous-classes de retourner une dataclass typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu de la config — il la passe à `extract_all` qui sait l'interpréter.
 
-    `AdapterT` (paramètre PEP 695) = type de l'adapter infra injecté à la construction, stocké en `self._adapter` et consommé par les hooks de la sous-classe.
+    `ClientT` (paramètre PEP 695) = type du client HTTP de la source, injecté à la construction et stocké en `self._client`.
 
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
@@ -84,13 +120,13 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         self,
         conn: Connection,
         logger: logging.Logger,
-        adapter: AdapterT,
+        client: ClientT,
     ) -> None:
         self.conn = conn
         self.logger = logger
-        self._adapter = adapter
+        self._client = client
         # Circuit-breaker de la source (posé par `run`) : les boucles `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
-        self._breaker: CircuitBreaker | None = None
+        self._breaker: SourceCircuitBreaker | None = None
 
     def _breaker_tripped(self) -> bool:
         """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`extract_all` pour stopper la source)."""
@@ -203,7 +239,7 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
         self,
         args: argparse.Namespace,
         *,
-        breaker: CircuitBreaker | None = None,
+        breaker: SourceCircuitBreaker | None = None,
     ) -> PhaseMetrics:
         """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`.
 

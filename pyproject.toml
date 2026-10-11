@@ -90,7 +90,6 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
     "application.pipeline.** -> pipeline.**",
-    "application.ports.pipeline.** -> pipeline.**",
 ]
 
 [[tool.importlinter.contracts]]
@@ -117,7 +116,6 @@ forbidden_modules = ["pipeline"]
 # est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
 ignore_imports = [
     "application.pipeline.** -> pipeline.**",
-    "application.ports.pipeline.** -> pipeline.**",
     "infrastructure.pipeline.** -> pipeline.**",
     "infrastructure.sources.** -> pipeline.**",
 ]
@@ -374,7 +372,7 @@ combine-as-imports = true
 # Génération d'illustrations : la disposition d'un graphe tire au sort des positions.
 "docs/img/graphs/*" = ["S311"]
 # `S101` vise l'assertion qui porte une décision de sécurité, effacée par l'interpréteur en
-# mode optimisé. Ces couches s'en servent pour des invariants internes — cohérence d'un
+# mode optimisé. Ces couches et le pipeline s'en servent pour des invariants internes — cohérence d'un
 # registre au chargement, resserrement d'un type — sans qu'aucune autorisation en dépende.
 # La règle reste active sur `interfaces/` et `application/services/`, où une décision
 # d'autorisation pourrait naître.
@@ -385,6 +383,7 @@ combine-as-imports = true
 # composé à partir de fragments écrits en dur.
 "interfaces/cli/*" = ["E402", "S608"]
 "application/pipeline/*" = ["S101"]
+"pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------
@@ -414,17 +413,12 @@ omit = [
     "interfaces/cli/oneshot/*",
     # Wiring HTTP des adapters sources : les règles de lecture des formats sources vivent
     # dans `domain/sources/<source>.py`, mesurées ; ce qui reste ici = httpx2 + pagination
-    # + sleep + implémentation du port `<Source>ExtractAdapter`.
-    "infrastructure/sources/hal/extract_hal.py",
-    "infrastructure/sources/hal/fetch_missing_hal_id.py",
+    # + sleep + implémentation du port de rattrapage.
+    "infrastructure/sources/hal/fetch_missing_hal.py",
     "infrastructure/sources/hal/fetch_missing_doi.py",
-    "infrastructure/sources/openalex/extract_openalex.py",
     "infrastructure/sources/openalex/fetch_missing_doi.py",
     "infrastructure/sources/openalex/fetch_truncated.py",
-    "infrastructure/sources/scanr/extract_scanr.py",
     "infrastructure/sources/scanr/fetch_missing_doi.py",
-    "infrastructure/sources/theses/extract_theses.py",
-    "infrastructure/sources/wos/extract_wos.py",
     "infrastructure/sources/wos/fetch_missing_doi.py",
     "infrastructure/sources/crossref/fetch_missing_doi.py",
     # Refetch des documents stale par source : même nature d'adapter HTTP

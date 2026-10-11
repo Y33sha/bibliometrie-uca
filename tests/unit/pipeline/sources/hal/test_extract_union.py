@@ -1,6 +1,6 @@
 """Moissonnage HAL d'un périmètre temporel (`extract_union`).
 
-Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée par une fonction qui renvoie l'issue portée par le document. On vérifie la pagination (jusqu'à stabilisation du marqueur), la ventilation new/updated/unchanged et l'arrêt sur disjoncteur.
+Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). On vérifie la pagination (jusqu'à stabilisation du marqueur), la ventilation new/updated/unchanged et l'arrêt sur disjoncteur.
 """
 
 from __future__ import annotations
@@ -8,35 +8,12 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
 from pipeline.progression import Progression
-from pipeline.sources.hal import harvest
 from pipeline.sources.hal.harvest import HalExtractConfig, extract_union
 from pipeline.sources.staging import UpsertOutcome
 
 _LOGGER = logging.getLogger("test")
 _CONFIG = HalExtractConfig(all_collections={"C": "Coll"})
-
-# Signaux `(inserted, changed)` d'`upsert_staging` pour chaque issue.
-_SIGNAUX = {
-    UpsertOutcome.NEW: (True, False),
-    UpsertOutcome.UPDATED: (False, True),
-    UpsertOutcome.UNCHANGED: (False, False),
-}
-
-
-@pytest.fixture
-def ecritures(monkeypatch) -> list[str]:
-    """Remplace l'écriture dans `staging` ; renvoie la liste des identifiants écrits."""
-    ecrits: list[str] = []
-
-    def _upsert(conn, *, source, source_id, doi, raw_data):
-        ecrits.append(source_id)
-        return _SIGNAUX[raw_data.get("_route", UpsertOutcome.NEW)]
-
-    monkeypatch.setattr(harvest, "upsert_staging", _upsert)
-    return ecrits
 
 
 def _page(docs: list[dict], next_cursor: str) -> dict:
@@ -128,7 +105,7 @@ class TestRouting:
         metrics = _extrait(client)
 
         assert metrics.total == 1
-        assert ecritures == ["hal-ok"]
+        assert [e.source_id for e in ecritures] == ["hal-ok"]
 
 
 def test_breaker_interrupts_pagination(ecritures):
