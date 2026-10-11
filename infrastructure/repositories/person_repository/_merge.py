@@ -3,7 +3,7 @@
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.merge import merged_exclusion
+from domain.persons.merge import PERSON_DATA, merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories.authorship_repository import (
@@ -15,6 +15,7 @@ from infrastructure.repositories.merge_steps import (
     transfer,
     transfer_unique,
     untouched,
+    without_decision_sql,
 )
 from infrastructure.repositories.person_repository import _name_forms
 
@@ -111,3 +112,8 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     detach_rejected_signatures(conn, target_id)
     delete_orphan_authorships(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
+
+
+def person_without_decision_sql(alias: str) -> str:
+    """Condition SQL vraie quand la personne `alias` n'a aucune décision humaine : rejet, confirmation, non-doublon, exclusion (données de nature décision de `PERSON_DATA`)."""
+    return without_decision_sql("persons", alias, PERSON_DATA, MERGE_STEPS)

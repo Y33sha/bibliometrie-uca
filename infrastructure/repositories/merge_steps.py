@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
+from domain.merge import DataNature, MergedData
+
 type MergeApply = Callable[[Connection, int, int], None]
 
 
@@ -91,3 +93,21 @@ def fill_empty_unique(table: str, column: str) -> MergeStep:
         )
 
     return MergeStep(((table, column),), apply)
+
+
+def without_decision_sql(
+    table: str, alias: str, data: dict[str, MergedData], steps: dict[str, MergeStep]
+) -> str:
+    """Condition SQL vraie quand l'entité `alias` (ligne de `table`) n'a aucune donnée de nature décision. Les colonnes de chaque donnée viennent de son étape de fusion : une colonne de `table` est nulle, une clé étrangère n'a aucune ligne."""
+    clauses = []
+    for name, merged in data.items():
+        if merged.nature != DataNature.DECISION:
+            continue
+        for column_table, column in steps[name].columns:
+            if column_table == table:
+                clauses.append(f"{alias}.{column} IS NULL")
+            else:
+                clauses.append(
+                    f"NOT EXISTS (SELECT 1 FROM {column_table} WHERE {column} = {alias}.id)"
+                )
+    return " AND ".join(clauses)

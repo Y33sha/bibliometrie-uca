@@ -18,6 +18,9 @@ from infrastructure.repositories.person_repository import (
     _merge,
     _name_forms,
 )
+from infrastructure.repositories.person_repository._merge import (
+    person_without_decision_sql as person_without_decision_sql,
+)
 
 if TYPE_CHECKING:
     from application.ports.repositories.person_repository import (

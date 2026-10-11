@@ -31,6 +31,7 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.signature_name import SignatureName
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.sql_fragments import identifier_neutralized, usable_identifier
+from infrastructure.repositories.person_repository import person_without_decision_sql
 
 # Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
 _ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
@@ -588,12 +589,16 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         ).rowcount
 
     def delete_empty_persons(self, conn: Connection) -> int:
-        """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_authorships` — typiquement une forme réduite dont les signatures ont rejoint la forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant. Une personne vide est nécessairement non curée (la curation ne vit que sur des personnes à publications) ; les notices RH sont protégées, personnes légitimes sans publication dans le corpus."""
+        """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_authorships` — typiquement une forme réduite dont les signatures ont rejoint la forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
+
+        Une personne vide est conservée si elle a une notice RH, ou une décision humaine (`person_without_decision_sql`). Une personne rejetée reste ainsi un candidat connu, écarté par son rejet, au lieu d'être recréée à l'identique par la cascade.
+        """
         return conn.execute(
-            text("""
+            text(f"""
                 DELETE FROM persons p
                 WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.person_id = p.id)
                   AND NOT EXISTS (SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id)
+                  AND {person_without_decision_sql("p")}
             """)
         ).rowcount
 
