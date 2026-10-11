@@ -275,11 +275,11 @@ def seed_publication(
 def seed_authorship(
     publication_id: int,
     *,
-    person_id: int | None = None,
+    person_id: int,
     in_perimeter: bool = False,
     roles: list[str] | None = None,
 ) -> int:
-    """Authorship de `publication_id`. Les valeurs par défaut sont celles du schéma."""
+    """Authorship de `publication_id` et `person_id`. Les valeurs par défaut sont celles du schéma."""
     return _insert(
         "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
         "VALUES (%s, %s, %s, %s) RETURNING id",

@@ -175,9 +175,11 @@ class TestGetLaboratorySubjects:
         lab = insert_structure(sa_sync_conn, "L1")
         _setup_perimeter(sa_sync_conn, [lab])
 
+        pid = insert_person(sa_sync_conn)
+
         # 3 publications du labo avec sujets variables.
         def _attach(pub_id):
-            aid = _lab_author(sa_sync_conn, pub_id)
+            aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
             add_authorship_structure(sa_sync_conn, aid, lab)
 
         p1 = insert_publication(sa_sync_conn, "p1")
