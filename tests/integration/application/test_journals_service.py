@@ -6,6 +6,7 @@ par le pipeline) et les fonctions async (update_journal, update_publisher,
 merge_*).
 """
 
+from datetime import UTC, datetime
 from functools import partial
 from types import SimpleNamespace
 
@@ -55,6 +56,9 @@ _journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
 
 # Stateless (connexion passée aux méthodes) → une instance module suffit.
 _CORRECTION_QUERIES = PgMetadataCorrectionQueries()
+
+# Date de vérification Sudoc des tests.
+_NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 # Notice OpenAlex de 2024, de titre « T ».
 _openalex_notice = partial(insert_source_publication, source="openalex", title="T", pub_year=2024)
@@ -506,9 +510,9 @@ class TestUpdateJournal:
 
     def test_champ_resoumis_sans_changement_non_marque(self, sa_sync_conn, repo):
         """Le formulaire renvoie tous les champs : seul un champ modifié devient saisi à la main."""
-        j = _journal(sa_sync_conn, title="Old", journal_type="journal")
+        j = _journal(sa_sync_conn, title="Same", journal_type="journal")
         update_journal(
-            j, update=JournalUpdate(title="New", journal_type=JournalType.JOURNAL), repo=repo
+            j, update=JournalUpdate(title="Same", journal_type=JournalType.JOURNAL), repo=repo
         )
         assert (
             _fetch_one(
@@ -533,6 +537,29 @@ class TestUpdateJournal:
             "EUR",
             ["apc"],
         )
+
+    def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(self, sa_sync_conn, repo, gateway):
+        """Des ISSN saisis à la main sortent de la vérification Sudoc et des ajouts par les notices ; un titre saisi reste."""
+        j = _journal(sa_sync_conn, title="Old", issn="0028-0836")
+        update_journal(
+            j,
+            update=JournalUpdate(
+                title="New",
+                issns=[JournalIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC)],
+            ),
+            repo=repo,
+        )
+
+        assert j not in {r.id for r in gateway.find_journals_to_check_in_sudoc(also=[j])}
+        gateway.add_journal_issns(j, [JournalIssn(issn="0028-0836", support=IssnSupport.PRINT)])
+        gateway.record_sudoc_check(j, issns=[], released=[], checked_at=_NOW, title="Sudoc")
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT title, manual_fields FROM journals WHERE id = :id", id=j
+        )
+        assert (row.title, sorted(row.manual_fields)) == ("New", ["issns", "title"])
+        assert _columns(sa_sync_conn, j).eissn == "1476-4687"
+        assert _columns(sa_sync_conn, j).issn is None
 
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
         j = _journal(sa_sync_conn, issn="0028-0836")

@@ -63,13 +63,13 @@ _JOURNALS_WITH_UNCHECKED_ISSNS = text("""
     WHERE journal_id IS NOT NULL AND sudoc_checked_at IS NULL
 """)
 
-# Revues vérifiées dans le Sudoc : tous leurs ISSN portent une date de vérification.
+# Revues aux ISSN établis : tous vérifiés dans le Sudoc, ou saisis à la main.
 _VERIFIED = """
     verifiees AS (
-        SELECT journal_id AS id FROM journal_issns
-        WHERE journal_id IS NOT NULL
-        GROUP BY journal_id
-        HAVING bool_and(sudoc_checked_at IS NOT NULL)
+        SELECT i.journal_id AS id FROM journal_issns i
+        JOIN journals j ON j.id = i.journal_id
+        GROUP BY i.journal_id
+        HAVING bool_and(i.sudoc_checked_at IS NOT NULL) OR bool_or('issns' = ANY(j.manual_fields))
     )
 """
 
@@ -380,7 +380,19 @@ class PgJournalGatewayQueries(
             )
         )
 
+    def _issns_are_manual(self, journal_id: int) -> bool:
+        """Les ISSN de la revue sont saisis à la main : ils font autorité, le pipeline ne les écrit pas."""
+        return bool(
+            self._conn.execute(
+                select(journals.c.manual_fields.any(ManualField.ISSNS.value)).where(
+                    journals.c.id == journal_id
+                )
+            ).scalar()
+        )
+
     def add_journal_issns(self, journal_id: int, issns: Sequence[JournalIssn]) -> None:
+        if self._issns_are_manual(journal_id):
+            return
         has_linking = self._conn.execute(
             select(
                 exists().where(journal_issns.c.journal_id == journal_id, journal_issns.c.linking)
@@ -444,9 +456,13 @@ class PgJournalGatewayQueries(
             | set(documents)
             | set(also)
         )
+        # Des ISSN saisis à la main font autorité : la vérification Sudoc passe à côté.
         rows = self._conn.execute(
             select(journals.c.id, journals.c.title, journals.c.journal_type)
-            .where(journals.c.id.in_(ids))
+            .where(
+                journals.c.id.in_(ids),
+                ~journals.c.manual_fields.any(ManualField.ISSNS.value),
+            )
             .order_by(journals.c.id)
         ).all()
         return [
@@ -469,7 +485,12 @@ class PgJournalGatewayQueries(
         checked_at: datetime,
         title: str | None = None,
     ) -> None:
-        self._conn.execute(delete(journal_issns).where(journal_issns.c.journal_id == journal_id))
+        if self._issns_are_manual(journal_id):
+            issns, released = [], []
+        else:
+            self._conn.execute(
+                delete(journal_issns).where(journal_issns.c.journal_id == journal_id)
+            )
         if issns:
             self._conn.execute(
                 journal_issns.insert(),
@@ -484,12 +505,18 @@ class PgJournalGatewayQueries(
                     set_={"sudoc_checked_at": checked_at},
                 )
             )
-        if title:
-            self._conn.execute(
+        # Un titre saisi à la main reste.
+        if (
+            title
+            and self._conn.execute(
                 update(journals)
-                .where(journals.c.id == journal_id)
+                .where(
+                    journals.c.id == journal_id,
+                    ~journals.c.manual_fields.any(ManualField.TITLE.value),
+                )
                 .values(title=title, title_normalized=normalize_text(title))
-            )
+            ).rowcount
+        ):
             publisher_id: int | None = self._conn.execute(
                 select(journals.c.publisher_id).where(journals.c.id == journal_id)
             ).scalar_one()
