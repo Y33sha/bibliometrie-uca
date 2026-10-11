@@ -150,7 +150,11 @@ NODES: tuple[Node, ...] = (
                 "config",
                 "staging",
                 "failed_lookups",
-                "source_publications",
+                "source_publications.id",
+                "source_publications.source",
+                "source_publications.doi",
+                "source_publications.external_ids",
+                "source_publications.publication_id",
                 "publications.in_perimeter",
                 "publications.doc_type",
                 "doi_prefixes.ra",
@@ -198,10 +202,16 @@ NODES: tuple[Node, ...] = (
             "normalize",
             reads=(
                 "staging",
-                "source_publications",
-                "source_authorships",
+                "source_publications.id",
+                "source_publications.authors_hash",
+                "source_authorships.id",
+                "source_authorships.author_position",
+                "source_authorships.identity_id",
+                "source_authorships.content_hash",
                 "author_identifying_keys",
-                "addresses",
+                "addresses.id",
+                "addresses.countries",
+                "addresses.suggested_countries",
                 "language_forms",
                 *_CONTAINERS,
             ),
@@ -495,11 +505,30 @@ NODES: tuple[Node, ...] = (
         "metadata_correction.unary",
         "metadata_correction",
         reads=(
-            "source_publications",
+            *(
+                f"source_publications.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "source_id",
+                    "title",
+                    "doc_type",
+                    "doi",
+                    "journal_id",
+                    "monograph_id",
+                    "oa_status",
+                    "language",
+                    "urls",
+                    "external_ids",
+                    "raw_metadata",
+                    "embargo_until",
+                    "meta",
+                )
+            ),
             "journals.journal_type",
             "journals.oa_model",
             "monographs.proceedings",
-            "doi_prefixes",
+            "doi_prefixes.publisher_id",
             "publishers.publisher_type",
             "language_forms",
         ),
@@ -516,7 +545,18 @@ NODES: tuple[Node, ...] = (
     _node(
         "metadata_correction.cluster",
         "metadata_correction",
-        reads=("source_publications",),
+        reads=tuple(
+            f"source_publications.{column}"
+            for column in (
+                "id",
+                "source",
+                "doc_type",
+                "doi",
+                "title_normalized",
+                "raw_metadata",
+                "meta",
+            )
+        ),
         writes=(
             "source_publications.doi",
             "source_publications.raw_metadata",
@@ -659,7 +699,17 @@ NODES: tuple[Node, ...] = (
         "relations.rebuild",
         "relations",
         reads=(
-            "source_publications",
+            *(
+                f"source_publications.{column}"
+                for column in (
+                    "meta",
+                    "raw_metadata",
+                    "doi",
+                    "external_ids",
+                    "doc_type",
+                    "publication_id",
+                )
+            ),
             "publications.id",
             "publications.doc_type",
             "publications.doi",
@@ -668,7 +718,7 @@ NODES: tuple[Node, ...] = (
             "publication_relations",
         ),
         writes=("publication_relations",),
-        previous_run=("source_publications", "publications"),
+        previous_run=("publications",),
     ),
     _node(
         "subjects.ingest",
