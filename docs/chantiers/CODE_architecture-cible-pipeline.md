@@ -38,19 +38,13 @@ Quelles entités gardent leur identifiant d'un run à l'autre, et que devient l'
 Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité par le chantier [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md).
 
 **Acquis**
-- Recensement des décisions, de leur rattachement et des chemins qui les détruisent.
-- Une fusion de personnes applique les rejets de la personne absorbée et de la personne absorbante.
+- Trois formes de stockage : tables dédiées (rejets, confirmations, non-doublons) ; statuts dans des tables que le pipeline remplit aussi (identifiants, formes de nom, liens adresse-structure) ; marqueurs dans la ligne (`journals.manual_fields`, `persons.exclusion`).
+- Un champ saisi à la main n'est plus écrit par le pipeline. Le journal d'audit garde l'auteur et la date.
+- Un rejet vise les notices d'une publication : il survit aux fusions et scissions de la réconciliation. Une signature confirmée l'emporte sur le rejet.
+- Une entité visée par un lien confirmé ou rejeté, ou par une exclusion, n'est pas supprimée quand elle se vide.
+- Chaque fusion (personnes, revues, éditeurs) applique la règle de fusion de chaque donnée de l'entité, recensée dans le domaine ; un test confronte ce recensement au schéma.
 
-**Hypothèses**
-- Une décision vise un lien ou un champ, jamais une liste entière.
-- Chaque rattachement enregistre son origine : règle, décision humaine, modèle.
-
-**Ouvert**
-- Classement des interventions par nature : valeur d'un champ, lien, création d'entité, référentiel tenu à la main.
-- Mécanisme pour chacune : source prioritaire, contrainte imposée à la résolution, ou verrouillage.
-- Identifiant auquel rattacher une décision pour qu'elle survive aux fusions et aux dissolutions.
-- Cycle de vie des entités : fusion, suppression des entités vides, sort des décisions qui s'y rattachent.
-- Fusions automatiques (revues, publications) : veto humain après coup, ou fusion proposée puis validée ?
+- Fusions automatiques : aucun besoin de veto constaté pour les revues. Pour les publications, des verdicts durables de scission et de fusion forcée, relus par la réconciliation : chantier [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md).
 
 ### 3. Nature de chaque table
 
@@ -63,7 +57,9 @@ Chaque table relève d'une catégorie :
 - **dérivé recalculable** : tout le reste ;
 - **diffusion** : ce que lisent les consommateurs en lecture seule, construit à partir du dérivé et des référentiels. L'API publique d'abord ; d'autres consommateurs ensuite, si la trajectoire se confirme.
 
-**Hypothèse : un schéma PostgreSQL par catégorie.** Le schéma rend visible, à la lecture de la base, la nature d'une table. Les droits (`GRANT`) rendent vérifiable qui écrit quoi : le pipeline écrit le brut, l'état, le dérivé et la diffusion ; l'API écrit les décisions et les référentiels ; les consommateurs en lecture seule lisent la diffusion seulement. Une table dérivée peut alors changer sans toucher les consommateurs.
+**Décision : un schéma PostgreSQL par domaine.** Les tables centrales (personnes, revues, publications, signatures) sont mixtes : un découpage par catégorie les rangerait toutes dans le dérivé, sans dire qui écrit quoi. Le découpage par domaine suit la lecture du modèle. La catégorie de chaque table reste documentée ; les droits la vérifient là où elle est nette (décisions, référentiels).
+
+**Décision : la diffusion est un schéma de vues.** Les consommateurs en lecture seule lisent un schéma `diffusion` fait de vues sur les tables des domaines, et n'ont aucun droit ailleurs. Les vues fixent le contrat (noms, colonnes, filtres) : les tables internes changent sans toucher les consommateurs. Reporté : ce n'est pas urgent.
 
 **Contrat de la résolution** : en entrée, les notices et les signatures sources, plus les décisions ; en sortie, une table de correspondance entre chaque notice ou signature et son entité. Le contrat tient quel que soit l'algorithme.
 
@@ -78,29 +74,39 @@ Une forme possible, celle des modèles par paires (dnet-dedup, Splink). Chaque �
 La table des paires est du dérivé recalculable. C'est la sortie d'un modèle probabiliste comme de règles déterministes.
 
 **Acquis**
-- L'inventaire des lectures et écritures de chaque table : [CODE_pipeline-dag_inventaire.md](CODE_pipeline-dag_inventaire.md).
+- L'inventaire des lectures et écritures de chaque table : [inventaire](archived/2026-10-11_CODE_pipeline-dag_inventaire.md).
+
+**Classement proposé** (51 tables et vues matérialisées)
+- **brut** : `staging`, `ror_organizations`, `ror_relations`, `ror_dump_imports`, `persons_rh`, `apc_payments`.
+- **référentiel tenu à la main** : `structures`, `structure_name_forms`, `structure_tutelles`, `perimeters`, `config`, `countries`, `languages`, `language_forms`, `place_name_forms`.
+- **décision** : `rejected_authorships`, `confirmed_authorships`, `distinct_persons`, `audit_log`.
+- **état conservé** : `failed_lookups`, `pipeline_phase_executions`, `alembic_version`.
+- **dérivé, sans décision** : `source_publications`, `author_identifying_keys`, `source_authorship_addresses`, `source_authorship_rors`, `publications_detail`, `authorships`, `publication_relations`, `publication_subjects`, `subjects`, `journal_doi_namespaces`, `journal_name_forms`, `publisher_name_forms`, `doi_prefixes`, `monographs`, `perimeter_structures`.
+- **dérivé, avec des décisions dans la ligne** : `persons` (exclusion, nom), `person_identifiers` et `person_name_forms` (statuts), `address_structures` (lien confirmé ou rejeté), `addresses` (pays), `journals` (`manual_fields`), `journal_issns`, `publishers`, `source_authorships` (personne d'une signature confirmée), `publications`.
+- **vues matérialisées, lues par l'API** : `source_authorship_structures`, `authorship_structures`, `publication_structures`, `subject_cooccurrences`.
+
+Les tables mixtes sont les entités centrales : un schéma par catégorie les range dans le dérivé, et les droits ne disent plus qui écrit quoi. Seules les tables de décision et les référentiels tenus à la main relèvent de l'API seule.
 
 **Ouvert**
-- Le classement de chaque table.
-- Les tables mixtes, qu'écrivent à la fois le pipeline et l'API : les scinder, ou leur attribuer une catégorie dominante ?
+- Liste des schémas de domaine et rattachement de chaque table. Proposition : `sources`, `persons`, `publications`, `containers` (revues, éditeurs, monographies), `structures` (structures, adresses, périmètres), `ref` (pays, langues, ROR, configuration), `ops` (audit, exécutions, migrations).
 - Forme par paires : les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
 - Forme par paires : les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de signatures. Leur traduction en contraintes sur les signatures dépend de la question 2.
 - La cascade des personnes rattache une signature à une personne existante, sans comparer les signatures entre elles : forme de ReCiter, autre que la forme par paires.
 
 ### 4. Graphe
 
-Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](CODE_pipeline-dag.md).
+Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md) ; la déclaration est `application/pipeline/graph.py`.
 
 **Acquis**
-- Les nœuds, et un verdict sur chaque sortie partagée par plusieurs nœuds.
-- Les lectures du run précédent, recensées par l'inventaire.
+- Les nœuds, avec les données qu'ils lisent et écrivent et leurs lectures du run précédent ; un test vérifie que l'ordre d'exécution les respecte.
+- Une seule boucle d'acquisition ciblée, gardée : `fetch_missing` cherche les documents des publications du périmètre établi au run précédent.
+- `resolve_ra` résout les DOI du run, juste avant `publishers_journals`. Les référentiels vides sont supprimés dans le run qui les vide.
 
 **Ouvert**
-- Chaque lecture du run précédent : boucle voulue, ou accident d'ordre ? Hypothèse : une boucle unique et déclarée, d'acquisition ciblée (`resolve_ra`, `fetch_missing`) d'après le résultat de la résolution.
 - Recalcul complet ou incrémental, nœud par nœud, d'après la nature de ses tables. Dépend de la durée d'un recalcul complet. Le pipeline de Stanford est passé du recalcul complet à l'incrémental.
 - `publications.reconcile`, aujourd'hui un seul nœud : le scinder selon les étapes de la forme par paires, si elle est retenue.
 - Place des appels réseau. Hypothèse : acquisition séparée de la transformation, qui se rejoue alors sur une copie de la base.
-- Phases réduites à des groupes d'affichage.
+- Phases réduites à des groupes d'affichage ; exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
 
 ### 5. Organisation du code
 

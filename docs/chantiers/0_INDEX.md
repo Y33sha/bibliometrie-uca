@@ -5,7 +5,6 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
-- [Graphe de dépendances du pipeline](CODE_pipeline-dag.md)
 
 ### En pause
 
@@ -17,6 +16,7 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
+- [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Licences des publications](DATA_licences.md)
 - [Modularité du pipeline](CODE_pipeline.md)
@@ -31,6 +31,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-11 — [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md)
 - 2026-10-11 — [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md)
 - 2026-10-10 — [Clients HTTP des sources : gestion d'erreur commune](archived/2026-10-10_CODE_clients-http-dry.md)
 - 2026-10-09 — [Duplications dans les tests](archived/2026-10-09_CODE_duplications-tests.md)

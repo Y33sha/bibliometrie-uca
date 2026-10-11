@@ -28,7 +28,7 @@ Sous-étapes et nœuds diffèrent parfois. Une sous-étape peut produire plusieu
 
 ### Phase 1 — Inventaire
 
-Inventaire en annexe : [CODE_pipeline-dag_inventaire.md](CODE_pipeline-dag_inventaire.md).
+Inventaire en annexe : [inventaire](2026-10-11_CODE_pipeline-dag_inventaire.md).
 
 - [x] Recenser, pour chaque phase, ses sous-étapes au grain le plus fin.
 - [x] Pour chacune, établir :
@@ -49,10 +49,32 @@ Inventaire en annexe : [CODE_pipeline-dag_inventaire.md](CODE_pipeline-dag_inven
 
 ### Phase 3 — Graphe
 
-Attend les questions 2 et 3 de la [réflexion sur l'architecture cible](CODE_architecture-cible-pipeline.md) : décisions humaines et nature des tables.
+Déclaration des nœuds et des dépendances : `application/pipeline/graph.py`.
 
-- [ ] Déduire les dépendances réelles entre nœuds, des tables et colonnes lues et écrites.
-- [ ] Repérer les cycles, les colonnes à plusieurs écrivains et les lectures de données du run précédent.
-- [ ] Confronter le graphe au découpage en phases : dépendances fausses, regroupements par domaine possibles.
+- [x] Déclarer chaque nœud avec les données qu'il lit et écrit, ses appels réseau et ses lectures du run précédent.
+- [x] Déduire les dépendances des lectures et écritures ; vérifier qu'aucun nœud ne lit une donnée écrite après lui sans la déclarer lue au run précédent.
+- [x] Confronter le graphe au découpage en phases : dépendances fausses, regroupements par domaine possibles.
+
+## Confrontation aux phases
+
+D'après `application/pipeline/graph.py`. Les lectures du run précédent entre phases se rangent en quatre catégories.
+
+**Boucle d'acquisition ciblée, voulue et gardée.** `fetch_missing` lit `candidate_dois` : les DOI des publications du périmètre, établi par `authorships` au run précédent. Les documents d'une publication nouvelle sont cherchés au run suivant ; au premier run sur base vide, la recherche ne fait rien. `resolve_ra`, placé après `affiliations`, résout les préfixes de tous les DOI connus dans le run ; `fetch_missing` n'interroge que les DOI dont le préfixe est résolu.
+
+Le délai coûte peu : environ 70 publications sur 62 000 à la mesure de 2026-07. Les remèdes coûtent plus :
+- ajouter les DOI moissonnés dans le run ferait chercher pour rien les DOI des documents moissonnés hors périmètre : 28 243 sur 140 982 en base locale, et 20 % de chaque moisson ;
+- juger le périmètre par notice après `affiliations` imposerait de normaliser et de résoudre les affiliations une seconde fois à chaque run.
+
+**Boucles d'apprentissage, voulues.** Les espaces de noms DOI s'apprennent des notices dont la correction a fixé la revue au run précédent. Le typage des actes lit les types bruts rangés par la correction.
+
+**Retards sans conséquence.** `affiliations` marque à réconcilier les notices sans publication d'après le rattachement que la réconciliation précédente a laissé : c'est l'état qu'il doit lire. La fusion des revues choisit sa cible d'après le nombre de publications du run précédent. Les référentiels vides sont supprimés dans `authorships`, après les dernières suppressions de publications : dans le run qui les vide.
+
+**Lectures déclarées par colonne.** Normalisation, correction, recherche des documents manquants et relations déclarent les colonnes qu'elles lisent. Aucun autre retard n'apparaît : les lectures restantes relèvent des verdicts sur les sorties partagées (statut open access, pays, référentiels créés par la normalisation).
+
+**Ordres arbitraires.** `affiliations` et `publishers_journals` ne dépendent pas l'une de l'autre, ni `relations`, `subjects`, `countries` et `oa_status` entre elles.
+
+## Reporté
+
+- Vérification des déclarations contre le code : phase 3 du chantier [Jeu de données commun aux tests du pipeline](../CODE_jeu-de-donnees-commun.md).
 
 ## Questions ouvertes

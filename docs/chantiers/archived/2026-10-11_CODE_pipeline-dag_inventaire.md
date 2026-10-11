@@ -1,6 +1,6 @@
 # Inventaire des sous-étapes du pipeline
 
-Annexe de la fiche [Graphe de dépendances du pipeline](CODE_pipeline-dag.md). Établi par lecture du code au 2026-10-10, sans exécution.
+Annexe de la fiche [Graphe de dépendances du pipeline](2026-10-11_CODE_pipeline-dag.md). Établi par lecture du code au 2026-10-10, sans exécution.
 
 Rubriques de chaque sous-étape :
 
@@ -560,4 +560,4 @@ Application du critère de la fiche aux sous-étapes ci-dessus. Chaque nœud est
 Constatées par les inventaires. Les lignes marquées ✓ sont vérifiées dans le code ; les autres restent à confirmer.
 
 - `publications.reconcile` : une publication peut disparaître sans successeur, avec perte du lien de ses `apc_payments`, quand le DOI d'une de ses notices est corrigé entre deux runs (source ou nouvelle règle de correction). Cas marginal, non constaté en base locale ; laissé en l'état.
-- Décisions humaines effacées par cascade ou écrasées par le pipeline : traitées par le chantier [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md).
+- Décisions humaines effacées par cascade ou écrasées par le pipeline : traitées par le chantier [Décisions humaines durables](2026-10-11_DATA_decisions-humaines-durables.md).
