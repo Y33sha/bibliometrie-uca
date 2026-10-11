@@ -24,8 +24,8 @@ from pathlib import Path
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.wos.parsing import extract_doi
 from pipeline.sources.staging import upsert_staging
+from pipeline.sources.wos.fields import extract_doi
 
 log = setup_logger("import_wos_export", os.path.dirname(__file__))
 

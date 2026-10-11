@@ -24,8 +24,8 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.http_retry import lookup_json_async
+from pipeline.sources.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 from pipeline.sources.staging import upsert_staging
 
 

@@ -14,7 +14,7 @@ from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.theses.extract_theses import extract_doi
+from pipeline.sources.theses.fields import extract_doi
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.
 _SEARCH_SIZE = 20

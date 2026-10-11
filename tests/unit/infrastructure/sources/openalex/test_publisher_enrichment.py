@@ -1,7 +1,7 @@
 """Adapter OpenAlex Publishers → enrichissement du pays des éditeurs : extraction et fetch batch."""
 
-from infrastructure.sources import openalex
 from infrastructure.sources.openalex import publisher_enrichment as mod
+from pipeline.sources.openalex import credentials
 
 
 class TestExtractCountry:
@@ -53,8 +53,8 @@ class TestFetchPublishersBatch:
             return {"results": []}
 
         monkeypatch.setattr(mod, "http_request_with_retry", capture)
-        monkeypatch.setattr(openalex, "get_openalex_api_key", lambda: "cle")
-        monkeypatch.setattr(openalex, "get_polite_pool_email_optional", lambda: "m@example.org")
+        monkeypatch.setattr(credentials, "get_openalex_api_key", lambda: "cle")
+        monkeypatch.setattr(credentials, "get_polite_pool_email_optional", lambda: "m@example.org")
         mod.fetch_publishers_batch(["P1"], openalex_publishers_api="x")
         assert captured["api_key"] == "cle"
         assert "mailto" not in captured

@@ -8,7 +8,6 @@ Le routage new/updated/unchanged vient de l'écriture dans `staging`, pilotée p
 from __future__ import annotations
 
 import argparse
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -26,8 +25,9 @@ from pipeline.sources.harvest import (
     ExtractLogger,
     SourceExtractor,
     scoped_logger,
+    stage_document,
 )
-from pipeline.sources.staging import UpsertOutcome, upsert_staging
+from pipeline.sources.throttle import Throttle
 
 type SolrParams = dict[str, str | int | float | bool | None]
 
@@ -65,26 +65,17 @@ def build_collections_fq(collection_codes: list[str]) -> str:
 
 
 class HalClient:
-    """Client de l'API de recherche HAL (Solr), limité à un appel toutes les `HAL_DELAY` secondes.
-
-    Le temps passé entre deux appels (analyse, écriture, commit) est décompté du délai.
-    """
+    """Client de l'API de recherche HAL (Solr), limité à un appel toutes les `HAL_DELAY` secondes."""
 
     def __init__(self, base_url: str) -> None:
         self._url = f"{base_url.rstrip('/')}/"
-        self._last_request_at: float | None = None
+        self._throttle = Throttle(HAL_DELAY)
 
     def _get(self, params: SolrParams, label: str) -> Mapping[str, JsonValue]:
-        if self._last_request_at is not None:
-            wait = HAL_DELAY - (time.monotonic() - self._last_request_at)
-            if wait > 0:
-                time.sleep(wait)
-        try:
+        with self._throttle.request():
             return as_mapping(
                 http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
             )
-        finally:
-            self._last_request_at = time.monotonic()
 
     def count(self, query: str, fq: str) -> int:
         """Nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
@@ -141,16 +132,9 @@ def extract_union(
             hal_id = extract_id(doc)
             if not hal_id:
                 continue
-            inserted, changed = upsert_staging(
-                conn, source="hal", source_id=hal_id, doi=extract_doi(doc), raw_data=doc
+            stage_document(
+                conn, metrics, source="hal", source_id=hal_id, doi=extract_doi(doc), raw_data=doc
             )
-            outcome = UpsertOutcome.of(inserted=inserted, changed=changed)
-            if outcome is UpsertOutcome.NEW:
-                metrics.add(new=1, total=1)
-            elif outcome is UpsertOutcome.UPDATED:
-                metrics.add(updated=1, total=1)
-            else:
-                metrics.add(unchanged=1, total=1)
         conn.commit()
 
         avancement.avance(len(docs))
@@ -183,7 +167,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
 
         En mode incrémental, un seul périmètre : les dépôts depuis la date. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
         """
-        client = self._adapter
+        client = self._client
         fq = build_collections_fq(list(config.all_collections))
 
         if args.since:

@@ -1,1 +1,1 @@
-"""Adapter Web of Science (Clarivate) : extracteur API Expanded + fetch DOI manquants."""
+"""Web of Science : rattrapage par DOI et rafraîchissement."""

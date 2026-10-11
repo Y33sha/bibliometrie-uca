@@ -1,0 +1,22 @@
+"""Champs des documents ScanR : identifiant et DOI."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
+
+
+def extract_id(doc: Mapping[str, JsonValue]) -> str:
+    """Identifiant ScanR d'un document (champ `id`)."""
+    return as_str(doc.get("id")) or ""
+
+
+def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
+    """Premier DOI nettoyé des `externalIds` d'un document ScanR."""
+    for entree in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entree)
+        if as_str(ext.get("type")) == "doi":
+            return clean_doi(as_str(ext.get("id")))
+    return None

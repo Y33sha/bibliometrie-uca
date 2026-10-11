@@ -21,8 +21,8 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import (
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
-from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
+from pipeline.sources.openalex.credentials import auth_params
+from pipeline.sources.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
 from pipeline.sources.staging import upsert_staging
 
 

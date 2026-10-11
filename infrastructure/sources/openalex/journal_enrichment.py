@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.http_retry import http_request_with_retry
-from infrastructure.sources.openalex import credential_params
+from pipeline.sources.openalex.credentials import credential_params
 
 logger = logging.getLogger(__name__)
 

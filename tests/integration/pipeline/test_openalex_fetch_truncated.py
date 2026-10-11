@@ -15,15 +15,17 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 from sqlalchemy import text
 
 from infrastructure.fingerprint import fingerprint
-from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
+from pipeline.metrics import PhaseMetrics
+from pipeline.sources.openalex.harvest import stage_work
 from tests.integration.helpers.staging import insert_staging
-
-_adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
 
 
 def insert_batch(conn, works):
-    return _adapter.insert_batch(conn, works)
+    metrics = PhaseMetrics()
+    for work in works:
+        stage_work(conn, metrics, work)
+    return metrics
 
 
 def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=10):

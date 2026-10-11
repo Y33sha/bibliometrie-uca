@@ -21,7 +21,8 @@ from domain.types import JsonValue, as_mapping
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
+from pipeline.sources.openalex.credentials import auth_params
+from pipeline.sources.openalex.fields import SELECT_FIELDS
 
 MAX_CONCURRENT = 3
 

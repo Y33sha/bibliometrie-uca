@@ -14,8 +14,8 @@ from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
-from infrastructure.sources.openalex.parsing import extract_doi
+from pipeline.sources.openalex.credentials import auth_params
+from pipeline.sources.openalex.fields import SELECT_FIELDS, extract_doi
 
 
 class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):

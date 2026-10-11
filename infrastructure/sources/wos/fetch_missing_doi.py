@@ -23,8 +23,8 @@ from infrastructure.pipeline.fetch_missing.failed_lookups import forget_failed_d
 from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.wos.parsing import extract_doi, extract_ut, filter_doi_for_wos
 from pipeline.sources.staging import upsert_staging
+from pipeline.sources.wos.fields import extract_doi, extract_ut, filter_doi_for_wos
 
 log = logging.getLogger(__name__)
 
