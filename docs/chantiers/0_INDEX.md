@@ -2,6 +2,12 @@
 
 ## Chantiers non archivés
 
+### En cours
+
+- [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
+- [Décisions humaines durables](DATA_decisions-humaines-durables.md)
+- [Graphe de dépendances du pipeline](CODE_pipeline-dag.md)
+
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)

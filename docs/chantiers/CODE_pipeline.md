@@ -13,7 +13,8 @@ Certaines phases lisent des données qu'une phase située plus loin dans l'ordre
 - `fetch_missing` fait une jointure sur `publications` pour la recherche par identifiant HAL ;
 - `publications` lit `source_publications.countries` ;
 - la fusion des revues en double (`publishers_journals`) lit `publications.in_perimeter` et met à jour `publications.monograph_id` ;
-- `relations` lit ses propres lignes du run précédent avant de purger sa table.
+- `relations` lit ses propres lignes du run précédent avant de purger sa table ;
+- le rattachement des monographies à leur collection (`publishers_journals`) lit `source_publications.journal_id`, que `metadata_correction` complète par l'espace de noms du DOI. Après la renormalisation d'une notice sans revue dans sa source, sa monographie reste sans collection jusqu'au run suivant.
 
 D'autres données sont différées au run suivant sans lecture à rebours. Par exemple, `fetch_missing` n'est pas récursif : un document trouvé par DOI peut fournir un identifiant HAL que seul le run suivant recherche.
 
@@ -37,7 +38,7 @@ Les refontes des phases `countries` et `subjects` relèvent de leurs fiches resp
 
 `publishers_journals` enchaîne treize sous-étapes qui touchent tour à tour éditeurs, revues et monographies.
 
-- [x] Réordonner les sous-étapes en quatre groupes : éditeurs, revues, monographies, nettoyage. Une ligne de journal par sous-étape, sous le titre de son groupe.
+- [x] Réordonner les sous-étapes en quatre groupes : éditeurs, revues, monographies, nettoyage. Une ligne de journal par sous-étape, sous le titre de son groupe. ea45c0dbd
 - [ ] Examiner le découpage en plusieurs phases, une par référentiel.
 
 ### Phase 3 — Reports au run suivant
