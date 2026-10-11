@@ -7029,6 +7029,7 @@ export interface operations {
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
                 exclusion?: string;
+                active?: boolean | null;
                 lab_id?: number | null;
             };
             header?: never;
@@ -7070,6 +7071,7 @@ export interface operations {
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
                 exclusion?: string;
+                active?: boolean | null;
                 lab_id?: number | null;
             };
             header?: never;

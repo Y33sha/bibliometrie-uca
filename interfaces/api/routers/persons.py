@@ -89,11 +89,12 @@ def person_filters(
     has_pending_forms: bool | None = Query(None),
     has_pending_identifiers: bool | None = Query(None),
     exclusion: str = Query(""),
+    active: bool | None = Query(None),
     lab_id: int | None = Query(None),
 ) -> PersonFilters:
     """Filtres communs à la liste des personnes et à ses facettes.
 
-    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
+    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `active=true` retient les personnes qui ont une authorship ou une fiche RH ; l'annuaire public le pose aussi. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
     """
     return PersonFilters(
         search=search,
@@ -113,6 +114,7 @@ def person_filters(
                 param="exclusion",
             )
         ],
+        active=active,
         lab_id=lab_id,
     )
 

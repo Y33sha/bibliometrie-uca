@@ -19,6 +19,7 @@ from infrastructure.db.sql_fragments import (
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
+    person_active_clause,
     person_department_clause,
     person_exclusion_clause,
     person_has_identifier_clause,
@@ -105,6 +106,7 @@ def list_persons(
         person_has_pending_name_forms_clause(filters.has_pending_forms),
         person_has_pending_identifiers_clause(filters.has_pending_identifiers),
         person_exclusion_clause(filters.exclusions),
+        person_active_clause(filters.active),
         person_in_lab_clause(filters.lab_id),
     ]
 

@@ -13,9 +13,11 @@ import pytest
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
+    seed_authorship,
     seed_person,
     seed_person_identifier,
     seed_person_name_form,
+    seed_publication,
     uniq,
 )
 
@@ -83,6 +85,17 @@ class TestPersonsList:
             },
         )
         assert r.status_code == 200
+
+    def test_active_keeps_persons_with_a_publication(self, client):
+        """`active=true` écarte une personne sans authorship ni fiche RH, conservée pour ses décisions."""
+        name = uniq("Actif")
+        with_publication = seed_person(name, "A")
+        seed_authorship(seed_publication(), person_id=with_publication)
+        seed_person(name, "B")
+
+        r = client.get("/api/persons", params={"search": name, "active": "true"})
+
+        assert [p["id"] for p in r.json()["persons"]] == [with_publication]
 
 
 class TestPersonProfileIdentifiers:

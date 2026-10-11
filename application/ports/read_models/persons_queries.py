@@ -57,6 +57,8 @@ class PersonFilters:
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
     exclusions: list[PersonExclusion | None] = field(default_factory=list)
+    # Personne qui a au moins une authorship ou une fiche RH. Une personne conservée pour ses seules décisions ne l'est pas.
+    active: bool | None = None
     lab_id: int | None = None
 
 
