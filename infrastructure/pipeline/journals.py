@@ -193,6 +193,8 @@ _JOURNAL_SUMMARIES = text(f"""
 _TYPE_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.JOURNAL_TYPE.value)
 # L'APC n'est pas saisi à la main : le pipeline peut l'écrire.
 _APC_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.APC.value)
+# Le modèle OA n'est pas saisi à la main : le pipeline peut l'écrire.
+_OA_MODEL_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.OA_MODEL.value)
 
 _EMPTY_JOURNALS = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
@@ -374,8 +376,15 @@ class PgJournalGatewayQueries(
                 openalex_id=func.coalesce(journals.c.openalex_id, openalex_id),
                 # Le littéral est lié au type de la colonne : `coalesce` ne le lui emprunte pas, et
                 # `oa_model` est une enum, qu'un paramètre texte ne rejoint pas.
-                oa_model=func.coalesce(
-                    journals.c.oa_model, literal(oa_model, journals.c.oa_model.type)
+                # Un modèle OA saisi à la main reste, même vide.
+                oa_model=case(
+                    (
+                        _OA_MODEL_NOT_MANUAL,
+                        func.coalesce(
+                            journals.c.oa_model, literal(oa_model, journals.c.oa_model.type)
+                        ),
+                    ),
+                    else_=journals.c.oa_model,
                 ),
             )
         )
