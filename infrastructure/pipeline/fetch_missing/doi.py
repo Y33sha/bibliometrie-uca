@@ -29,7 +29,7 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
 
     Exclut les DOI dont la recherche dans la cible a échoué et attend encore sa reprise (`failed_lookups`). Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance de son délai, ou définitivement quand il est l'identifiant natif de la cible.
 
-    Pour les cibles présentes dans `_TARGET_RA`, ajoute un LEFT JOIN sur `doi_prefixes` pour filtrer les DOIs dont la RA résolue ne correspond pas (les NULL — préfixe non résolu — sont conservés).
+    Pour les cibles présentes dans `_TARGET_RA`, retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
 
     Args:
         conn: `Connection` SA.
@@ -40,10 +40,10 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
 
     target_ra = _TARGET_RA.get(target)
     join_clause = (
-        "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
+        "JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
     # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + absent du staging du target + absent des DOI que la cible porte déjà. `NOT EXISTS` plutôt que `NOT IN` : un NULL dans la sous-requête viderait la sélection.
-    prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
+    prefix_filter = " AND dp.ra = :target_ra" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
     query = f"""
         WITH deja_connus AS (

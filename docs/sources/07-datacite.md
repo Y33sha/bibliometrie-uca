@@ -27,7 +27,7 @@ Les deux routes rendent un même DOI sous deux formes. Le hash de détection de 
 - *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Pas de quota contractuel. L'adaptateur reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#agences-denregistrement-doi-resolve_ra).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishers-journals.md#agences-denregistrement-doi-resolve_ra).
 
 ## Données récupérées
 

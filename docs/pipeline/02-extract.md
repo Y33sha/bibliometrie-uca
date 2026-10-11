@@ -16,14 +16,6 @@ En mode `daily`, seul HAL est moissonné : les notices modifiées depuis la dern
 - Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
 - Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
 
-## Agences d'enregistrement DOI (`resolve_ra`)
-
-Résolution de l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) de chaque DOI, pour que [la phase suivante](#documents-absents-dune-source-fetch_missing) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
-
-Interroge `doi.org/ra` sur les préfixes absents de la table `doi_prefixes`, par lots de 100 préfixes, et enregistre leur agence. Un préfixe que doi.org ne connaît pas reçoit l'agence `unknown`. Un préfixe d'une requête en échec reste à résoudre.
-
-Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; la phase [publishers_journals](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
-
 ## Documents absents d'une source (`fetch_missing`)
 
 Le moissonnage interroge les sources sur le critère de l'affiliation : un document peut être présent dans une source et ne pas être trouvé par moissonnage, si l'affiliation n'y est pas correctement renseignée. On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
@@ -33,6 +25,8 @@ Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'a
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les sources Crossref et DataCite sont seulement interrogées ici : elles sont omises du moissonnage initial car non interrogeables par affiliation.
+
+Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
 
 Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`.
 
