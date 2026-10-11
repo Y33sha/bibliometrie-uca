@@ -1,95 +1,57 @@
-"""Fusion de deux personnes : rôles, données d'une personne et règle de fusion de chacune.
-
-`PERSON_DATA` recense tout ce qui s'attache à une personne. La fusion applique la règle de chaque donnée ; un test confronte le recensement au schéma de la base.
-"""
+"""Fusion de deux personnes : rôles, et données d'une personne avec leur règle de fusion (`PERSON_DATA`)."""
 
 from collections.abc import Collection
-from dataclasses import dataclass
-from enum import StrEnum
 
 from domain.errors import ConflictError
+from domain.merge import DataNature, MergedData, MergeRule
 from domain.persons.person import PersonExclusion
 
-
-class MergeRule(StrEnum):
-    """Sort d'une donnée de la personne absorbée."""
-
-    # Rattachée à la personne conservée.
-    TRANSFER = "transfer"
-    # Rattachée à la personne conservée, sauf si celle-ci a déjà la même.
-    TRANSFER_UNIQUE = "transfer_unique"
-    # Combinée avec la donnée de la personne conservée, selon une règle propre.
-    COMBINE = "combine"
-    # La personne conservée garde la sienne ; celle de l'absorbée est perdue.
-    KEEP_TARGET = "keep_target"
-    # La personne absorbée n'en a jamais : la personne qui en a une est conservée (`merge_roles`).
-    ABSENT_FROM_SOURCE = "absent_from_source"
-
-
-class DataNature(StrEnum):
-    """Origine d'une donnée."""
-
-    # Posée par l'administration.
-    DECISION = "decision"
-    # Calculée par le pipeline ou importée.
-    DERIVED = "derived"
-    # Décision ou donnée dérivée selon la ligne : statut, origine, édition.
-    MIXED = "mixed"
-
-
-@dataclass(frozen=True, slots=True)
-class PersonData:
-    rule: MergeRule
-    nature: DataNature
-    description: str
-
-
-PERSON_DATA: dict[str, PersonData] = {
-    "signatures": PersonData(
+PERSON_DATA: dict[str, MergedData] = {
+    "signatures": MergedData(
         MergeRule.TRANSFER, DataNature.DERIVED, "Signatures rattachées à la personne."
     ),
-    "authorships": PersonData(
+    "authorships": MergedData(
         MergeRule.TRANSFER_UNIQUE,
         DataNature.DERIVED,
         "Authorships, une par publication.",
     ),
-    "rejected_authorships": PersonData(
+    "rejected_authorships": MergedData(
         MergeRule.TRANSFER_UNIQUE,
         DataNature.DECISION,
         "Rejets d'une paire publication-personne, un par publication.",
     ),
-    "confirmed_signatures": PersonData(
+    "confirmed_signatures": MergedData(
         MergeRule.TRANSFER,
         DataNature.DECISION,
         "Confirmations d'une signature.",
     ),
-    "distinct_persons": PersonData(
+    "distinct_persons": MergedData(
         MergeRule.COMBINE,
         DataNature.DECISION,
         "Non-doublons. Ceux de l'absorbée passent à la conservée ; celui qui oppose les deux personnes fusionnées est supprimé.",
     ),
-    "identifiers": PersonData(
+    "identifiers": MergedData(
         MergeRule.TRANSFER,
         DataNature.MIXED,
         "Identifiants et leur statut.",
     ),
-    "name_forms": PersonData(
+    "name_forms": MergedData(
         MergeRule.COMBINE,
         DataNature.MIXED,
         "Formes de nom et leur statut. Sur une forme commune, le statut de la conservée l'emporte, sauf s'il est en attente.",
     ),
-    "rh_record": PersonData(
+    "rh_record": MergedData(
         MergeRule.ABSENT_FROM_SOURCE,
         DataNature.DERIVED,
         "Fiche de l'annuaire RH.",
     ),
-    "name": PersonData(
+    "name": MergedData(
         MergeRule.KEEP_TARGET,
         DataNature.MIXED,
         "Nom et prénom. Les formes de nom de l'absorbée restent.",
     ),
-    "created_at": PersonData(MergeRule.KEEP_TARGET, DataNature.DERIVED, "Date de création."),
-    "exclusion": PersonData(
+    "created_at": MergedData(MergeRule.KEEP_TARGET, DataNature.DERIVED, "Date de création."),
+    "exclusion": MergedData(
         MergeRule.COMBINE,
         DataNature.DECISION,
         "Exclusion. La plus forte des deux l'emporte (`merged_exclusion`).",

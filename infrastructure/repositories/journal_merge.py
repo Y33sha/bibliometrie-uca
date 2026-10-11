@@ -1,0 +1,119 @@
+"""SQL de la fusion de deux revues : une étape par donnée de `domain.journals.merge.JOURNAL_DATA`."""
+
+from sqlalchemy import Connection, text
+
+from domain.journals.journal import JournalType
+from domain.journals.merge import merged_journal_type
+from infrastructure.pipeline.authorships.pub_counts import (
+    refresh_journal_pub_count,
+    refresh_publisher_pub_count,
+)
+from infrastructure.repositories.merge_steps import (
+    MergeStep,
+    fill_empty,
+    transfer,
+    transfer_unique,
+    untouched,
+)
+
+
+def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
+    conn.execute(
+        text("""
+            DELETE FROM journal_issns s
+            WHERE s.journal_id = :s
+              AND EXISTS (SELECT 1 FROM journal_issns t WHERE t.journal_id = :t AND t.issn = s.issn)
+        """),
+        {"t": target_id, "s": source_id},
+    )
+    conn.execute(
+        text("""
+            UPDATE journal_issns
+            SET journal_id = :t, sudoc_checked_at = NULL,
+                linking = linking AND NOT EXISTS (
+                    SELECT 1 FROM journal_issns WHERE journal_id = :t AND linking
+                )
+            WHERE journal_id = :s
+        """),
+        {"t": target_id, "s": source_id},
+    )
+
+
+def _merge_openalex_id(conn: Connection, target_id: int, source_id: int) -> None:
+    """Remplir si vide. L'identifiant de l'absorbée est d'abord retiré : `openalex_id` est unique."""
+    openalex_id = conn.execute(
+        text("SELECT openalex_id FROM journals WHERE id = :s"), {"s": source_id}
+    ).scalar()
+    conn.execute(text("UPDATE journals SET openalex_id = NULL WHERE id = :s"), {"s": source_id})
+    conn.execute(
+        text("UPDATE journals SET openalex_id = COALESCE(openalex_id, :v) WHERE id = :t"),
+        {"v": openalex_id, "t": target_id},
+    )
+
+
+def _merge_journal_type(conn: Connection, target_id: int, source_id: int) -> None:
+    types: dict[int, str] = {
+        r.id: r.journal_type
+        for r in conn.execute(
+            text("SELECT id, journal_type FROM journals WHERE id IN (:t, :s)"),
+            {"t": target_id, "s": source_id},
+        )
+    }
+    merged = merged_journal_type(JournalType(types[target_id]), JournalType(types[source_id]))
+    conn.execute(
+        text("UPDATE journals SET journal_type = CAST(:v AS journal_type) WHERE id = :t"),
+        {"v": merged.value, "t": target_id},
+    )
+
+
+def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
+    conn.execute(
+        text("""
+            UPDATE journals t SET is_in_doaj = COALESCE(t.is_in_doaj OR s.is_in_doaj, false)
+            FROM journals s
+            WHERE t.id = :t AND s.id = :s
+        """),
+        {"t": target_id, "s": source_id},
+    )
+
+
+MERGE_STEPS: dict[str, MergeStep] = {
+    "publications": transfer("publications", "journal_id"),
+    "source_publications": transfer("source_publications", "journal_id"),
+    "apc_payments": transfer("apc_payments", "journal_id"),
+    "monographs": transfer("monographs", "journal_id"),
+    "issns": MergeStep((("journal_issns", "journal_id"),), _merge_issns),
+    "name_forms": transfer_unique(
+        "journal_name_forms", "journal_id", "form_normalized", "publisher_id"
+    ),
+    "doi_namespaces": untouched("journal_doi_namespaces", "journal_id"),
+    "title": untouched("journals", "title", "title_normalized"),
+    "created_at": untouched("journals", "created_at"),
+    "publisher": fill_empty("journals", "publisher_id"),
+    "openalex_id": MergeStep((("journals", "openalex_id"),), _merge_openalex_id),
+    "oa_model": fill_empty("journals", "oa_model"),
+    "apc": fill_empty("journals", "apc_amount", "apc_currency"),
+    "journal_type": MergeStep((("journals", "journal_type"),), _merge_journal_type),
+    "is_academic": untouched("journals", "is_academic"),
+    "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj),
+    "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),
+    "pub_count": untouched("journals", "pub_count"),
+}
+
+
+def merge_journal_into(conn: Connection, target_id: int, source_id: int) -> None:
+    """Applique chaque étape de `MERGE_STEPS`, supprime la revue absorbée, puis recalcule les nombres de publications de la revue conservée et des éditeurs concernés."""
+    source_publisher_id = conn.execute(
+        text("SELECT publisher_id FROM journals WHERE id = :s"), {"s": source_id}
+    ).scalar()
+    for step in MERGE_STEPS.values():
+        step.apply(conn, target_id, source_id)
+    conn.execute(text("DELETE FROM journals WHERE id = :s"), {"s": source_id})
+
+    refresh_journal_pub_count(conn, target_id)
+    target_publisher_id = conn.execute(
+        text("SELECT publisher_id FROM journals WHERE id = :t"), {"t": target_id}
+    ).scalar()
+    for publisher_id in {target_publisher_id, source_publisher_id}:
+        if publisher_id is not None:
+            refresh_publisher_pub_count(conn, publisher_id)
