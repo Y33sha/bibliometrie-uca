@@ -99,7 +99,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "created_at": untouched("journals", "created_at"),
     "publisher": fill_empty("journals", "publisher_id"),
     "openalex_id": fill_empty_unique("journals", "openalex_id"),
-    "oa_model": fill_empty("journals", "oa_model"),
+    "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "apc": _fill_empty_with_marker(
         ManualField.APC, ("apc_amount", "apc_currency"), "t.apc_amount IS NULL"
     ),

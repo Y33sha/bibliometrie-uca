@@ -146,7 +146,7 @@ def update_journal(
 
     L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
 
-    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un titre, des ISSN, un type ou un APC modifiés deviennent des champs saisis à la main (`ManualField`) : le pipeline ne les écrit plus. L'APC saisi est en euros.
+    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un titre, des ISSN, un type, un modèle OA ou un APC modifiés deviennent des champs saisis à la main (`ManualField`) : le pipeline ne les écrit plus. L'APC saisi est en euros.
 
     Lève `ValidationError` si aucun champ n'est fourni ou si les ISSN sont invalides, `NotFoundError` si la revue n'existe pas.
     """
@@ -160,6 +160,7 @@ def update_journal(
     old_title = journal.title
     old_issns = list(journal.issns)
     old_type = journal.journal_type
+    old_oa_model = journal.oa_model
     old_apc_amount = journal.apc_amount
     champs = update.model_dump(exclude_unset=True, mode="json")
     # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
@@ -183,6 +184,8 @@ def update_journal(
         journal.manual_fields |= {ManualField.ISSNS}
     if journal.journal_type != old_type:
         journal.manual_fields |= {ManualField.JOURNAL_TYPE}
+    if journal.oa_model != old_oa_model:
+        journal.manual_fields |= {ManualField.OA_MODEL}
     if journal.apc_amount != old_apc_amount:
         # Le formulaire saisit l'APC en euros.
         journal.apc_currency = "EUR" if journal.apc_amount is not None else None

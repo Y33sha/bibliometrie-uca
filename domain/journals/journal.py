@@ -64,6 +64,7 @@ class ManualField(StrEnum):
 
     TITLE = "title"
     JOURNAL_TYPE = "journal_type"
+    OA_MODEL = "oa_model"
     # Montant et devise.
     APC = "apc"
     # La liste des ISSN, avec leur support, leur statut et l'ISSN de liaison.

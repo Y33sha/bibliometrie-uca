@@ -33,7 +33,7 @@ from domain.errors import (
     ValidationError,
 )
 from domain.journals.issns import IssnSupport, JournalIssn, source_issns
-from domain.journals.journal import JournalType
+from domain.journals.journal import JournalType, OaModel
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -560,6 +560,17 @@ class TestUpdateJournal:
         assert (row.title, sorted(row.manual_fields)) == ("New", ["issns", "title"])
         assert _columns(sa_sync_conn, j).eissn == "1476-4687"
         assert _columns(sa_sync_conn, j).issn is None
+
+    def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, repo, gateway):
+        j = _journal(sa_sync_conn, oa_model="full_oa")
+        update_journal(j, update=JournalUpdate(oa_model=None), repo=repo)
+
+        gateway.enrich_journal(j, oa_model=OaModel.SUBSCRIPTION)
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT oa_model, manual_fields FROM journals WHERE id = :id", id=j
+        )
+        assert (row.oa_model, row.manual_fields) == (None, ["oa_model"])
 
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
         j = _journal(sa_sync_conn, issn="0028-0836")
