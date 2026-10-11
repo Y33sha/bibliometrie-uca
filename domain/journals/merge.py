@@ -1,6 +1,5 @@
 """Fusion de deux revues : données d'une revue avec leur règle de fusion (`JOURNAL_DATA`)."""
 
-from domain.journals.journal import JournalType
 from domain.merge import DataNature, MergedData, MergeRule
 
 JOURNAL_DATA: dict[str, MergedData] = {
@@ -28,7 +27,7 @@ JOURNAL_DATA: dict[str, MergedData] = {
     "journal_type": MergedData(
         MergeRule.FILL_EMPTY,
         DataNature.MIXED,
-        "Type de revue. Le type inconnu compte comme vide (`merged_journal_type`).",
+        "Type de revue. Le type inconnu compte comme vide.",
     ),
     "is_academic": MergedData(MergeRule.KEEP_TARGET, DataNature.MIXED, "Caractère académique."),
     "is_in_doaj": MergedData(
@@ -39,8 +38,3 @@ JOURNAL_DATA: dict[str, MergedData] = {
     ),
     "pub_count": MergedData(MergeRule.RECOMPUTED, DataNature.DERIVED, "Nombre de publications."),
 }
-
-
-def merged_journal_type(target: JournalType, source: JournalType) -> JournalType:
-    """Type de la revue fusionnée : celui de la conservée, sauf s'il est inconnu."""
-    return source if target == JournalType.UNKNOWN else target

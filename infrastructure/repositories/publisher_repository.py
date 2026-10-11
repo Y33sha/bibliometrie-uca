@@ -2,20 +2,20 @@
 
 Séparé de `journal_repository.py` (principe ISP). Le trouve-ou-crée, alimenté par le pipeline, vit dans `infrastructure/pipeline/publishers.py`. Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/`.
 
-La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion d'éditeurs ; la détection préalable des journaux à titre partagé (étape 1) est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
+La fusion d'éditeurs applique la règle de fusion de chaque donnée d'un éditeur (`publisher_merge`) ; la détection préalable des revues homonymes est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
 """
 
 from typing import NamedTuple
 
-from sqlalchemy import Connection, ScalarResult, delete, func, select, text, update
+from sqlalchemy import Connection, ScalarResult, select, update
 
 from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.rows import row_as
-from infrastructure.db.tables import doi_prefixes, publisher_name_forms, publishers
-from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
+from infrastructure.db.tables import doi_prefixes, publishers
+from infrastructure.repositories import publisher_merge
 
 
 class _PublisherRow(NamedTuple):
@@ -104,76 +104,4 @@ class PgPublisherRepository(PublisherRepository):
         return tuple(sorted(rows))
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
-        self._conn.execute(
-            text("UPDATE journals SET publisher_id = :t WHERE publisher_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        self._conn.execute(
-            text("""
-                UPDATE publisher_name_forms SET publisher_id = :t
-                WHERE publisher_id = :s
-                  AND form_normalized NOT IN (
-                      SELECT form_normalized FROM publisher_name_forms
-                      WHERE publisher_id = :t
-                  )
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            delete(publisher_name_forms).where(publisher_name_forms.c.publisher_id == source_id)
-        )
-
-        # journal_name_forms : supprime d'abord les doublons avec target, puis transfère le reste.
-        self._conn.execute(
-            text("""
-                DELETE FROM journal_name_forms
-                WHERE publisher_id = :s
-                  AND form_normalized IN (
-                      SELECT form_normalized FROM journal_name_forms
-                      WHERE publisher_id = :t
-                  )
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("UPDATE journal_name_forms SET publisher_id = :t WHERE publisher_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        self._conn.execute(
-            text("UPDATE apc_payments SET publisher_id = :t WHERE publisher_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("UPDATE doi_prefixes SET publisher_id = :t WHERE publisher_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("UPDATE monographs SET publisher_id = :t WHERE publisher_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte UNIQUE) → enrich target → delete source.
-        src = self._conn.execute(
-            select(
-                publishers.c.openalex_id,
-                publishers.c.country,
-            ).where(publishers.c.id == source_id)
-        ).one()
-        self._conn.execute(
-            update(publishers).where(publishers.c.id == source_id).values(openalex_id=None)
-        )
-        self._conn.execute(
-            update(publishers)
-            .where(publishers.c.id == target_id)
-            .values(
-                openalex_id=func.coalesce(publishers.c.openalex_id, src.openalex_id),
-                country=func.coalesce(publishers.c.country, src.country),
-            )
-        )
-
-        self._conn.execute(delete(publishers).where(publishers.c.id == source_id))
-
-        # pub_count : la cible a absorbé les revues de la source (les pub_count des revues sont inchangés) → recalcule la somme côté éditeur cible.
-        refresh_publisher_pub_count(self._conn, target_id)
+        publisher_merge.merge_publisher_into(self._conn, target_id, source_id)

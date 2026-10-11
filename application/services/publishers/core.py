@@ -192,7 +192,7 @@ def merge_publishers(
             audit_repo=audit_repo,
         )
 
-    # 2-6. Le reste de la fusion (transferts, enrichissement, delete).
+    # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
     publisher_repo.merge_publisher_into(target_id, source_id)
 
     emit_event(audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id})

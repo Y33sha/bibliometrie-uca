@@ -3,7 +3,6 @@
 from sqlalchemy import Connection, text
 
 from domain.journals.journal import JournalType
-from domain.journals.merge import merged_journal_type
 from infrastructure.pipeline.authorships.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
@@ -11,6 +10,7 @@ from infrastructure.pipeline.authorships.pub_counts import (
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty,
+    fill_empty_unique,
     transfer,
     transfer_unique,
     untouched,
@@ -39,33 +39,6 @@ def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
     )
 
 
-def _merge_openalex_id(conn: Connection, target_id: int, source_id: int) -> None:
-    """Remplir si vide. L'identifiant de l'absorbée est d'abord retiré : `openalex_id` est unique."""
-    openalex_id = conn.execute(
-        text("SELECT openalex_id FROM journals WHERE id = :s"), {"s": source_id}
-    ).scalar()
-    conn.execute(text("UPDATE journals SET openalex_id = NULL WHERE id = :s"), {"s": source_id})
-    conn.execute(
-        text("UPDATE journals SET openalex_id = COALESCE(openalex_id, :v) WHERE id = :t"),
-        {"v": openalex_id, "t": target_id},
-    )
-
-
-def _merge_journal_type(conn: Connection, target_id: int, source_id: int) -> None:
-    types: dict[int, str] = {
-        r.id: r.journal_type
-        for r in conn.execute(
-            text("SELECT id, journal_type FROM journals WHERE id IN (:t, :s)"),
-            {"t": target_id, "s": source_id},
-        )
-    }
-    merged = merged_journal_type(JournalType(types[target_id]), JournalType(types[source_id]))
-    conn.execute(
-        text("UPDATE journals SET journal_type = CAST(:v AS journal_type) WHERE id = :t"),
-        {"v": merged.value, "t": target_id},
-    )
-
-
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
     conn.execute(
         text("""
@@ -90,10 +63,10 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "title": untouched("journals", "title", "title_normalized"),
     "created_at": untouched("journals", "created_at"),
     "publisher": fill_empty("journals", "publisher_id"),
-    "openalex_id": MergeStep((("journals", "openalex_id"),), _merge_openalex_id),
+    "openalex_id": fill_empty_unique("journals", "openalex_id"),
     "oa_model": fill_empty("journals", "oa_model"),
     "apc": fill_empty("journals", "apc_amount", "apc_currency"),
-    "journal_type": MergeStep((("journals", "journal_type"),), _merge_journal_type),
+    "journal_type": fill_empty("journals", "journal_type", empty=JournalType.UNKNOWN.value),
     "is_academic": untouched("journals", "is_academic"),
     "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),

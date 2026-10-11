@@ -523,6 +523,38 @@ class TestUpdatePublisher:
 
 
 class TestMergePublishers:
+    @pytest.mark.parametrize(
+        ("target_type", "source_type", "expected"),
+        [("unknown", "commercial", "commercial"), ("media", "commercial", "media")],
+    )
+    def test_unknown_type_takes_source_type(
+        self,
+        sa_sync_conn,
+        repo,
+        publisher_repo,
+        publication_repo,
+        target_type,
+        source_type,
+        expected,
+    ):
+        target = insert_publisher(sa_sync_conn, "Target", publisher_type=target_type)
+        source = insert_publisher(sa_sync_conn, "Source", publisher_type=source_type)
+        merge_publishers(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=publisher_repo,
+            journal_repo=repo,
+            publication_repo=publication_repo,
+        )
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT publisher_type::text AS publisher_type FROM publishers WHERE id = :id",
+            id=target,
+        )
+        assert row.publisher_type == expected
+
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, publication_repo):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError, match="identiques"):
