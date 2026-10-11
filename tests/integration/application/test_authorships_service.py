@@ -16,12 +16,13 @@ from application.services.authorships.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
+from infrastructure.db.sql_fragments import REJECTED_PAIRS
 from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -88,7 +89,7 @@ class TestExcludeAuthorship:
         assert (
             sa_sync_conn.execute(
                 text(
-                    "SELECT 1 FROM rejected_authorships "
+                    f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
                     "WHERE publication_id = :pub AND person_id = :pid"
                 ),
                 {"pub": pub_id, "pid": person_id},
@@ -179,7 +180,7 @@ class TestRejectPair:
         assert (
             sa_sync_conn.execute(
                 text(
-                    "SELECT 1 FROM rejected_authorships "
+                    f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
                     "WHERE publication_id = :pub AND person_id = :pid"
                 ),
                 {"pub": pub_id, "pid": person_id},
@@ -568,3 +569,83 @@ class TestPropagateUcaForAddresses:
         ).one()
         assert sa.in_perimeter is False
         assert sa.structure_ids is None
+
+
+class TestRejectionAnchoredOnNotices:
+    """Un rejet vise les notices : il suit leurs regroupements, et une publication est rejetée dès qu'une de ses notices l'est."""
+
+    def _rejected(self, conn, pub_id, person_id) -> bool:
+        return (
+            conn.execute(
+                text(
+                    f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
+                    "WHERE publication_id = :pub AND person_id = :pid LIMIT 1"
+                ),
+                {"pub": pub_id, "pid": person_id},
+            ).first()
+            is not None
+        )
+
+    def _has_authorship(self, conn, pub_id, person_id) -> bool:
+        return (
+            conn.execute(
+                text("SELECT 1 FROM authorships WHERE publication_id = :pub AND person_id = :pid"),
+                {"pub": pub_id, "pid": person_id},
+            ).first()
+            is not None
+        )
+
+    def test_rejection_follows_its_notice_into_another_publication(self, sa_sync_conn, repo):
+        """La notice rejetée rejoint une autre publication, qui devient rejetée ; l'ancienne publication peut disparaître sans emporter le rejet."""
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        pub_a = _publication(sa_sync_conn)
+        pub_b = _publication(sa_sync_conn)
+        notice_b = _notice(sa_sync_conn, pub_b, source_id="hal-b")
+        repo.reject_authorship(pub_b, person_id)
+
+        sa_sync_conn.execute(
+            text("UPDATE source_publications SET publication_id = :a WHERE id = :n"),
+            {"a": pub_a, "n": notice_b},
+        )
+        sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :b"), {"b": pub_b})
+
+        assert self._rejected(sa_sync_conn, pub_a, person_id)
+
+    def test_confirmed_signature_prevails_over_rejection_of_another_notice(self, sa_sync_conn):
+        """Une notice rejetée pour P, une autre dont la signature est confirmée à P, dans la même publication : l'authorship existe."""
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        pub_id = _publication(sa_sync_conn)
+        rejected_notice = _notice(sa_sync_conn, pub_id, source_id="hal-rejet")
+        confirmed_notice = _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO rejected_authorships (source_publication_id, person_id) "
+                "VALUES (:n, :p)"
+            ),
+            {"n": rejected_notice, "p": person_id},
+        )
+        confirmed = insert_signature(sa_sync_conn, confirmed_notice, person_id=person_id)
+        insert_confirmed_authorship(sa_sync_conn, confirmed, person_id=person_id)
+
+        _BUILD.insert_missing_authorships(sa_sync_conn)
+
+        assert self._has_authorship(sa_sync_conn, pub_id, person_id)
+
+    def test_unconfirmed_signature_blocked_by_rejection_of_another_notice(self, sa_sync_conn):
+        """Une notice qui rejoint une publication rejetée pour P ne la rattache pas à P."""
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        pub_id = _publication(sa_sync_conn)
+        rejected_notice = _notice(sa_sync_conn, pub_id, source_id="hal-rejet")
+        new_notice = _notice(sa_sync_conn, pub_id, source="openalex", source_id="W2")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO rejected_authorships (source_publication_id, person_id) "
+                "VALUES (:n, :p)"
+            ),
+            {"n": rejected_notice, "p": person_id},
+        )
+        insert_signature(sa_sync_conn, new_notice, person_id=person_id)
+
+        _BUILD.insert_missing_authorships(sa_sync_conn)
+
+        assert not self._has_authorship(sa_sync_conn, pub_id, person_id)

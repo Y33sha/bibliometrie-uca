@@ -81,15 +81,15 @@ class AuthorshipRepository(Protocol):
         ...
 
     def reject_authorship(self, publication_id: int, person_id: int) -> None:
-        """Enregistre le rejet d'une paire (publication, personne) dans `rejected_authorships`. Idempotent."""
+        """Enregistre le rejet d'une paire (publication, personne) sur chaque notice de la publication (`rejected_authorships`) : le rejet suit les notices quand la réconciliation regroupe autrement les publications. Idempotent."""
         ...
 
     def find_rejected_authorship(self, publication_id: int, person_id: int) -> datetime | None:
-        """Date du rejet de la paire (publication, personne) dans `rejected_authorships`, ou None si la paire y est absente."""
+        """Date du premier rejet de la personne sur une notice de la publication, ou None si la publication n'est pas rejetée pour elle."""
         ...
 
     def delete_rejected_authorship(self, publication_id: int, person_id: int) -> None:
-        """Lève le rejet d'une paire (publication, personne) : la retire de `rejected_authorships`. Idempotent."""
+        """Lève le rejet d'une paire (publication, personne) sur toutes les notices de la publication. Idempotent."""
         ...
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:

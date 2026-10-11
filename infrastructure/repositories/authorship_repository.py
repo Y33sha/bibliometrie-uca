@@ -10,7 +10,12 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipPersonRow,
     AuthorshipRepository,
 )
-from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR, case_priority
+from infrastructure.db.sql_fragments import (
+    AUTHORSHIP_IN_PERIMETER_EXPR,
+    REJECTED_PAIRS,
+    case_priority,
+    publication_rejected_for,
+)
 
 
 def detach_rejected_signatures(
@@ -25,7 +30,7 @@ def detach_rejected_signatures(
     conn.execute(
         text(f"""
             DELETE FROM confirmed_authorships ca
-            USING source_authorships sa, source_publications sp, rejected_authorships r
+            USING source_authorships sa, source_publications sp, ({REJECTED_PAIRS}) r
             WHERE ca.source_authorship_id = sa.id
               AND sa.source_publication_id = sp.id
               AND r.publication_id = sp.publication_id
@@ -37,7 +42,7 @@ def detach_rejected_signatures(
         text(f"""
             UPDATE source_authorships sa
             SET person_id = NULL
-            FROM source_publications sp, rejected_authorships r
+            FROM source_publications sp, ({REJECTED_PAIRS}) r
             WHERE sa.source_publication_id = sp.id
               AND r.publication_id = sp.publication_id
               AND r.person_id = :pid AND sa.person_id = :pid {scope}
@@ -72,13 +77,10 @@ class PgAuthorshipRepository(AuthorshipRepository):
 
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
-            text("""
+            text(f"""
                 INSERT INTO authorships (publication_id, person_id)
                 SELECT :pub, :pid
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM rejected_authorships rj
-                    WHERE rj.publication_id = :pub AND rj.person_id = :pid
-                )
+                WHERE NOT {publication_rejected_for(":pub", ":pid")}
                 ON CONFLICT (publication_id, person_id) DO NOTHING
             """),
             {"pub": publication_id, "pid": person_id},
@@ -224,27 +226,32 @@ class PgAuthorshipRepository(AuthorshipRepository):
 
     def reject_authorship(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
-            text(
-                "INSERT INTO rejected_authorships (publication_id, person_id) "
-                "VALUES (:pub, :pid) ON CONFLICT DO NOTHING"
-            ),
+            text("""
+                INSERT INTO rejected_authorships (source_publication_id, person_id)
+                SELECT id, :pid FROM source_publications WHERE publication_id = :pub
+                ON CONFLICT DO NOTHING
+            """),
             {"pub": publication_id, "pid": person_id},
         )
 
     def find_rejected_authorship(self, publication_id: int, person_id: int) -> datetime | None:
         return self._conn.execute(
-            text(
-                "SELECT created_at FROM rejected_authorships "
-                "WHERE publication_id = :pub AND person_id = :pid"
-            ),
+            text("""
+                SELECT min(r.created_at) FROM rejected_authorships r
+                JOIN source_publications sp ON sp.id = r.source_publication_id
+                WHERE sp.publication_id = :pub AND r.person_id = :pid
+            """),
             {"pub": publication_id, "pid": person_id},
         ).scalar_one_or_none()
 
     def delete_rejected_authorship(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
-            text(
-                "DELETE FROM rejected_authorships WHERE publication_id = :pub AND person_id = :pid"
-            ),
+            text("""
+                DELETE FROM rejected_authorships r
+                USING source_publications sp
+                WHERE sp.id = r.source_publication_id
+                  AND sp.publication_id = :pub AND r.person_id = :pid
+            """),
             {"pub": publication_id, "pid": person_id},
         )
 

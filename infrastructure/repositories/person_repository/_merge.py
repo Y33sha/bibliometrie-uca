@@ -85,7 +85,9 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 MERGE_STEPS: dict[str, MergeStep] = {
     "signatures": transfer("source_authorships", "person_id"),
     "authorships": transfer_unique("authorships", "person_id", "publication_id"),
-    "rejected_authorships": transfer_unique("rejected_authorships", "person_id", "publication_id"),
+    "rejected_authorships": transfer_unique(
+        "rejected_authorships", "person_id", "source_publication_id"
+    ),
     "confirmed_signatures": transfer("confirmed_authorships", "person_id"),
     "distinct_persons": MergeStep(
         (("distinct_persons", "person_id_a"), ("distinct_persons", "person_id_b")),

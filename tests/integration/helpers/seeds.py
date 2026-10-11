@@ -234,11 +234,18 @@ def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str])
 
 
 def seed_rejected_authorship(publication_id: int, *, person_id: int) -> None:
-    """Rejet de la paire publication ↔ personne."""
+    """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par notice de la publication. Une publication sans notice en reçoit une."""
     with owner_pool() as cur:
         cur.execute(
-            "INSERT INTO rejected_authorships (publication_id, person_id) VALUES (%s, %s)",
-            (publication_id, person_id),
+            "INSERT INTO source_publications (source, source_id, title, publication_id) "
+            "SELECT 'hal', 'rejet-' || %s, 'X', %s "
+            "WHERE NOT EXISTS (SELECT 1 FROM source_publications WHERE publication_id = %s)",
+            (publication_id, publication_id, publication_id),
+        )
+        cur.execute(
+            "INSERT INTO rejected_authorships (source_publication_id, person_id) "
+            "SELECT id, %s FROM source_publications WHERE publication_id = %s",
+            (person_id, publication_id),
         )
 
 
