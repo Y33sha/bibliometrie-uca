@@ -52,15 +52,15 @@
 
 ## Phases du pipeline
 
-A jour au 2026-09-06
+A jour au 2026-10-11
 
 `extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses/DataCite
-`resolve_ra` — Résolution Registration Agency des DOI
 `fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
 `fetch_stale` — Rafraîchissement des docs stale
 `fetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
 `normalize` — Normalisation staging → source_publications, source_authorships, addresses
 `affiliations` — Résolution adresses → structures UCA
+`resolve_ra` — Résolution Registration Agency des DOI
 `publishers_journals` — Enrichissement journals (DOI, APC, DOAJ)
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
