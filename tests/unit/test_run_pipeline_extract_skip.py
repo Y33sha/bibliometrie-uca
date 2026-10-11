@@ -9,11 +9,11 @@ incrémentale (daily).
 
 from unittest.mock import patch
 
-from application.pipeline.extract.base import ExtractionConfigError
 from interfaces.cli.phases import extract
 from interfaces.cli.phases.execution import phase_context
 from pipeline.context import RunOptions
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.harvest import ExtractionConfigError
 
 
 def _table_keys(metrics: PhaseMetrics) -> set[str]:

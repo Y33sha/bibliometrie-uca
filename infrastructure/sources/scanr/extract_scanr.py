@@ -10,14 +10,12 @@ from collections.abc import Mapping, Sequence
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import (
     ScanrExtractAdapter,
     ScanrExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.config import (
     get_extraction_api_ids,
@@ -25,6 +23,7 @@ from infrastructure.sources.config import (
     source_credentials_missing,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.sources.staging import UpsertOutcome, upsert_staging
 
 
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:

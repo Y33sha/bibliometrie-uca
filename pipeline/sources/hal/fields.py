@@ -1,7 +1,13 @@
-"""Configuration de l'adapter HAL Solr.
+"""Champs des notices HAL.
 
-Liste des champs Solr à récupérer lors des requêtes HAL (staging). Si un champ est ajouté, il doit être référencé ici pour être extrait de l'API.
+Champs Solr à récupérer dans les requêtes HAL : un champ absent de la liste n'est pas extrait de l'API. Lecture de l'identifiant et du DOI d'une notice.
 """
+
+from collections.abc import Mapping
+
+from domain.publications.identifiers import clean_doi
+from domain.sources.hal import hal_text_field
+from domain.types import JsonValue
 
 HAL_FIELDS = [
     "halId_s",
@@ -52,3 +58,16 @@ HAL_FIELDS = [
 ]
 
 HAL_FIELDS_STR = ",".join(HAL_FIELDS)
+
+
+def extract_id(doc: Mapping[str, JsonValue]) -> str:
+    """Identifiant HAL d'une notice (champ `halId_s`), chaîne vide s'il manque."""
+    return hal_text_field(doc.get("halId_s")) or ""
+
+
+def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
+    """DOI nettoyé d'une notice HAL (champ `doiId_s`).
+
+    `doiId_s` arrive en scalaire depuis le moissonnage, en liste depuis la recherche par identifiant HAL : les deux formes sont gérées avant nettoyage.
+    """
+    return clean_doi(hal_text_field(doc.get("doiId_s")))

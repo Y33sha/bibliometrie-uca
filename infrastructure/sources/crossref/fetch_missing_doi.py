@@ -19,7 +19,6 @@ from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
 from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
 )
@@ -27,6 +26,7 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import lookup_json_async
 from infrastructure.sources.polite_pool import build_user_agent
+from pipeline.sources.staging import upsert_staging
 
 
 class CrossrefFetchMissingDoiAdapter:

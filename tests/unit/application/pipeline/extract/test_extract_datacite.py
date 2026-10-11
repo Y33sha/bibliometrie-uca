@@ -11,12 +11,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_datacite import DataciteExtractor
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.datacite import DataciteExtractConfig, DatacitePage
 from infrastructure.sources.datacite.extract_datacite import build_query
+from pipeline.sources.harvest import ExtractionConfigError
+from pipeline.sources.staging import BatchInsertCounts
 
 _LOGGER = logging.getLogger("test")
 _CONFIG = DataciteExtractConfig(keywords=["Clermont", "Auvergne"])

@@ -41,7 +41,7 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `staging` | pipeline | adaptateurs des phases `extract`, `fetch_missing` et `fetch_stale` (`infrastructure/sources/*`) |
+| `staging` | pipeline | phases `extract`, `fetch_missing` et `fetch_stale` (`pipeline/sources/staging.py`) |
 | `failed_lookups` | pipeline | phase `fetch_missing` (`infrastructure/sources/*/fetch_missing_*.py`) |
 | `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
 | `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |

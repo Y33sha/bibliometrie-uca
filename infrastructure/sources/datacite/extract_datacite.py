@@ -11,18 +11,17 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import BatchInsertCounts, UpsertOutcome
 from application.ports.pipeline.extract.datacite import (
     DataciteExtractAdapter,
     DataciteExtractConfig,
     DatacitePage,
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_extraction_api_ids, get_years
 from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.sources.staging import BatchInsertCounts, UpsertOutcome, upsert_staging
 
 # Plafond de l'API DataCite pour la taille d'une page.
 _PAGE_SIZE = 1000

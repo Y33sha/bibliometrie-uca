@@ -2,7 +2,7 @@
 
 import copy
 
-from infrastructure.pipeline.change_detection import change_detection_hash
+from pipeline.sources.change_detection import change_detection_hash
 
 # Forme rendue par la route de liste (`/dois?query=…`).
 _LISTED = {

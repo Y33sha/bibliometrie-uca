@@ -85,7 +85,13 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # peut en importer les dataclasses de transport pour typer ses
 # signatures. Les Protocols restent implémentés via duck typing.
 #
-ignore_imports = ["infrastructure.** -> application.ports.**"]
+# Exception transitoire : le code du pipeline encore dans `application/` importe ce qui est déjà
+# migré dans `pipeline/`, qui importe `infrastructure/`, jusqu'à sa propre migration.
+ignore_imports = [
+    "infrastructure.** -> application.ports.**",
+    "application.pipeline.** -> pipeline.**",
+    "application.ports.pipeline.** -> pipeline.**",
+]
 
 [[tool.importlinter.contracts]]
 name = "Pipeline : hors des couches hexagonales"
@@ -94,6 +100,12 @@ source_modules = ["pipeline"]
 forbidden_modules = ["application", "interfaces"]
 # Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
 # réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
+# Exceptions : `infrastructure/` importe `application.ports` (voir le contrat des couches) ; le
+# code du pipeline encore dans les couches hexagonales, jusqu'à sa migration dans `pipeline/`.
+ignore_imports = [
+    "infrastructure.** -> application.ports.**",
+    "pipeline.** -> application.ports.pipeline.**",
+]
 
 [[tool.importlinter.contracts]]
 name = "Pipeline : importé par interfaces seulement"
@@ -101,9 +113,14 @@ type = "forbidden"
 source_modules = ["domain", "application", "infrastructure"]
 forbidden_modules = ["pipeline"]
 # L'API et l'orchestrateur (`interfaces/`) sont les seuls clients du pipeline.
-# Exception transitoire : les phases encore dans `application/pipeline` importent le socle
-# déjà migré dans `pipeline/`, jusqu'à leur propre migration.
-ignore_imports = ["application.pipeline.** -> pipeline.**"]
+# Exception transitoire : le code du pipeline encore dans les couches hexagonales importe ce qui
+# est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
+ignore_imports = [
+    "application.pipeline.** -> pipeline.**",
+    "application.ports.pipeline.** -> pipeline.**",
+    "infrastructure.pipeline.** -> pipeline.**",
+    "infrastructure.sources.** -> pipeline.**",
+]
 
 [[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"

@@ -13,9 +13,8 @@ from application.ports.pipeline.lookup import NOT_FOUND, NotFound, Unavailable
 from domain.types import as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
-from infrastructure.sources.hal.extract_hal import extract_doi
-from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import lookup_json_async
+from pipeline.sources.hal.fields import HAL_FIELDS_STR, extract_doi
 
 
 class HalFetchStaleAdapter(BaseFetchStaleAdapter):

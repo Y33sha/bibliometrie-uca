@@ -14,8 +14,8 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import UpsertOutcome
 from domain.types import JsonValue
+from pipeline.sources.staging import UpsertOutcome
 
 
 @dataclass(frozen=True)

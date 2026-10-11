@@ -11,11 +11,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_theses import ThesesExtractor, extract_theses
-from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import ThesesExtractConfig
 from pipeline.progression import Progression
+from pipeline.sources.harvest import ExtractionConfigError
+from pipeline.sources.staging import UpsertOutcome
 
 _LOGGER = logging.getLogger("test")
 

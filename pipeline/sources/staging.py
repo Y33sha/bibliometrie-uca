@@ -1,16 +1,20 @@
 """Écriture `staging` : UPSERT des documents rendus par les sources, commun à toutes les voies d'entrée.
 
-Appelée par les adapters d'extraction, de la phase `fetch_missing` et de la phase `fetch_stale` (`infrastructure/sources/*`). Le commit est à la charge de l'appelant.
+Appelée par les phases `extract`, `fetch_missing` et `fetch_stale`. Le commit est à la charge de l'appelant.
 """
 
+from __future__ import annotations
+
 from collections.abc import Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 
 from sqlalchemy import Connection, bindparam, text
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.pipeline.change_detection import change_detection_hash
+from pipeline.sources.change_detection import change_detection_hash
 
 _UPSERT_STAGING_SQL = text(
     """
@@ -83,3 +87,41 @@ def upsert_staging(
         },
     ).one()
     return (bool(row.inserted), bool(row.changed))
+
+
+class UpsertOutcome(StrEnum):
+    """Issue de l'UPSERT d'une ligne `staging` unique, dérivée des signaux `(inserted, changed)` du helper canonique.
+
+    - `NEW` : vraie insertion (`RETURNING (xmax = 0)`).
+    - `UPDATED` : ligne existante dont le **contenu a changé** (`raw_data` réécrit, `raw_hash` distinct de celui en base).
+    - `UNCHANGED` : ligne re-vue à contenu identique (seul `last_seen_at` bumpé).
+    """
+
+    NEW = "new"
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
+
+    @classmethod
+    def of(cls, *, inserted: bool, changed: bool) -> UpsertOutcome:
+        """Classe le résultat d'`upsert_staging` : `inserted` prime, le `changed` d'une insertion étant sans objet."""
+        if inserted:
+            return cls.NEW
+        return cls.UPDATED if changed else cls.UNCHANGED
+
+
+@dataclass(frozen=True)
+class BatchInsertCounts:
+    """Résultat d'un `insert_batch`, ventilé en trois.
+
+    - `new` : vraie insertion (`RETURNING (xmax = 0)`).
+    - `updated` : row existante dont le **contenu a changé** (`raw_data` réécrit, `raw_hash` distinct de l'ancien — capté via une CTE qui lit l'ancien hash avant l'UPSERT, comparé au nouveau dans le `RETURNING`).
+    - `unchanged` : row re-vue à contenu identique (seul `last_seen_at` bumpé).
+    """
+
+    new: int
+    updated: int
+    unchanged: int
+
+    @property
+    def total(self) -> int:
+        return self.new + self.updated + self.unchanged

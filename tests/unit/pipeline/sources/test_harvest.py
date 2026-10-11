@@ -1,4 +1,4 @@
-"""Tests unitaires de `application.pipeline.extract.base.SourceExtractor`.
+"""Tests unitaires de `pipeline.sources.harvest.SourceExtractor`.
 
 Couvre le cycle `run` (load_config → setup_logging → extract_all) et le log de résumé.
 
@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.base import SourceExtractor
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.harvest import SourceExtractor
 
 
 class _FakeExtractor(SourceExtractor):

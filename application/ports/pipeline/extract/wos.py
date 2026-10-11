@@ -14,8 +14,8 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import BatchInsertCounts
 from domain.types import JsonValue
+from pipeline.sources.staging import BatchInsertCounts
 
 
 @dataclass(frozen=True)

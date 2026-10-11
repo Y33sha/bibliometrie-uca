@@ -10,14 +10,12 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, at_path
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.config import (
     get_extraction_api_ids,
@@ -27,6 +25,7 @@ from infrastructure.sources.config import (
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
+from pipeline.sources.staging import BatchInsertCounts, upsert_staging
 
 
 def build_params(

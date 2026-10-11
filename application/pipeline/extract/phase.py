@@ -22,7 +22,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from application.pipeline.extract.base import ExtractionConfigError
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.parallel import RunParallel
 from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
@@ -36,6 +35,7 @@ from pipeline.signals import (
     signal_source_unconfigured,
     timed_metrics,
 )
+from pipeline.sources.harvest import ExtractionConfigError
 
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
 GetLastDailyExtractDate = Callable[[], date | None]

@@ -10,17 +10,16 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.sources.staging import UpsertOutcome, upsert_staging
 
 
 def extract_doi(these: Mapping[str, JsonValue]) -> str | None:
