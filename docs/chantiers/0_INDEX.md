@@ -5,7 +5,6 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
-- [Décisions humaines durables](DATA_decisions-humaines-durables.md)
 - [Graphe de dépendances du pipeline](CODE_pipeline-dag.md)
 
 ### En pause
@@ -32,6 +31,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-11 — [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md)
 - 2026-10-10 — [Clients HTTP des sources : gestion d'erreur commune](archived/2026-10-10_CODE_clients-http-dry.md)
 - 2026-10-09 — [Duplications dans les tests](archived/2026-10-09_CODE_duplications-tests.md)
 - 2026-10-09 — [Nom et prénom scindés dès la normalisation](archived/2026-10-09_DATA_noms-prenoms-scindes.md)
