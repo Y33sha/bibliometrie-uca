@@ -10,8 +10,9 @@ from domain.source_publications.signature_sync import (
 
 
 def _plan(stored, incoming) -> SignatureSyncPlan:
+    """`incoming` : (position, identité, empreinte) ; la clé entrante vaut la position."""
     return plan_signature_sync(
-        [StoredSignature(*s) for s in stored], [IncomingSignature(*i) for i in incoming]
+        [StoredSignature(*s) for s in stored], [IncomingSignature(i[0], *i) for i in incoming]
     )
 
 
@@ -58,6 +59,30 @@ class TestPlanSignatureSync:
         """Le nom normalisé fait partie de l'identité : un nom corrigé donne une signature nouvelle."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
         assert plan == SignatureSyncPlan(updates=(), kept=(), inserts=(0,), deletes=(10,))
+
+    def test_signature_sans_position_rapprochee_par_identite(self):
+        """Un directeur de thèse n'a pas de position d'auteur : son identité suffit."""
+        plan = plan_signature_sync(
+            [
+                StoredSignature(10, 0, "doctorant", "h0"),
+                StoredSignature(11, None, "directeur", "h1"),
+            ],
+            [
+                IncomingSignature(0, 0, "doctorant", "h0"),
+                IncomingSignature(1, None, "directeur", "h1"),
+            ],
+        )
+        assert plan == SignatureSyncPlan(updates=(), kept=(10, 11), inserts=(), deletes=())
+
+    def test_identite_repetee_sans_position_ne_rapproche_rien(self):
+        plan = plan_signature_sync(
+            [StoredSignature(10, None, "dupont", "h1"), StoredSignature(11, None, "dupont", "h2")],
+            [
+                IncomingSignature(0, None, "dupont", "h1"),
+                IncomingSignature(1, None, "dupont", "h2"),
+            ],
+        )
+        assert plan == SignatureSyncPlan(updates=(), kept=(), inserts=(0, 1), deletes=(10, 11))
 
     def test_empreinte_absente_en_base(self):
         """Une signature écrite avant l'empreinte est réécrite à sa première synchronisation."""

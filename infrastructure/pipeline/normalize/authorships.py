@@ -22,7 +22,6 @@ from application.ports.pipeline.normalize.authorships import (
     StoredSourceAuthorship,
 )
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.db.scalars import scalar_int
 
 # Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash` :
 # `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les champs — des octets de contrôle absents des
@@ -45,32 +44,6 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(IDENTITY_KEY_COLUMNS)
 
-_UPSERT_IDENTITY_SQL = text(f"""
-    INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
-    VALUES (:last_name_normalized, :first_name_normalized, :person_identifiers)
-    ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
-""").bindparams(bindparam("person_identifiers", type_=Jsonb))
-
-_INSERT_AUTHORSHIP_SQL = text(
-    """
-    INSERT INTO source_authorships
-        (source, source_publication_id, author_position,
-         is_corresponding, roles, raw_author_name, raw_last_name, raw_first_name,
-         identity_id, neutralized_identifiers, content_hash)
-    VALUES (:source, :source_publication_id, :author_position,
-            :is_corresponding, :roles, :raw_author_name, :raw_last_name, :raw_first_name,
-            (SELECT id FROM author_identifying_keys
-             WHERE key_hash = """
-    + key_hash_sql([f":{c}" for c in IDENTITY_KEY_COLUMNS])
-    + """),
-            :neutralized_identifiers, :content_hash)
-    RETURNING id
-"""
-).bindparams(
-    bindparam("person_identifiers", type_=Jsonb),
-    bindparam("neutralized_identifiers", type_=Jsonb),
-)
-
 
 def delete_orphan_identities(conn: Connection) -> int:
     """Supprime les identités de `author_identifying_keys` que plus aucune signature ne référence.
@@ -89,15 +62,6 @@ def delete_orphan_identities(conn: Connection) -> int:
 
 class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     """Adapter PostgreSQL pour `AuthorshipsBatchQueries`."""
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None:
-        # `source_publications.id` étant unique pour un couple (source, source_id), seuls les authorships de la source concernée sont touchés ; le re-traitement d'un document ne laisse pas de rows fantômes.
-        conn.execute(
-            text("DELETE FROM source_authorships WHERE source_publication_id = :spid"),
-            {"spid": source_publication_id},
-        )
 
     def upsert_source_authorships_batch(
         self, conn: Connection, values: list[SourceAuthorshipItem]
@@ -259,27 +223,6 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 text("DELETE FROM source_authorship_rors WHERE source_authorship_id = ANY(:ids)"),
                 {"ids": ids},
             )
-
-    def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
-        # Même mécanisme que le batch (upsert de l'identité, puis résolution de `identity_id` par `key_hash`) pour une seule ligne, dont l'id est rendu par `RETURNING`. Pas d'`ON CONFLICT` : le `clear` en amont vide le document.
-        conn.execute(_UPSERT_IDENTITY_SQL, dict(item))
-        return scalar_int(conn.execute(_INSERT_AUTHORSHIP_SQL, dict(item)))
-
-    def fetch_source_authorship_ids_by_position(
-        self, conn: Connection, *, source: str, source_publication_id: int, positions: list[int]
-    ) -> dict[int, int]:
-        if not positions:
-            return {}
-        rows = conn.execute(
-            text("""
-                SELECT author_position, id FROM source_authorships
-                WHERE source = :source
-                  AND source_publication_id = :spid
-                  AND author_position = ANY(:positions)
-            """),
-            {"source": source, "spid": source_publication_id, "positions": positions},
-        ).all()
-        return {r.author_position: r.id for r in rows}
 
     def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None:
         if not values:

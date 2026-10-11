@@ -14,8 +14,10 @@ from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
-    signature_name_fields,
-    write_addresses,
+    AuthorBlock,
+    AuthorRecord,
+    SignatureSyncSettings,
+    sync_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
@@ -26,6 +28,7 @@ from application.ports.pipeline.normalize.source_publications import (
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from domain.dates import french_date_to_iso
+from domain.publications.authorship_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.theses import (
@@ -169,48 +172,54 @@ def insert_source_document(
 # =============================================================
 
 
+# Champs du payload dont dépendent les signatures : les personnes, par rôle, et les adresses du document.
+_AUTHOR_BLOCK_FIELDS = (*THESES_FIELD_ROLES, "partenairesDeRecherche", "etabSoutenanceN")
+
+
+def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'une thèse : les personnes de chaque rôle, et les adresses du document."""
+    return {field: these.get(field) for field in _AUTHOR_BLOCK_FIELDS}
+
+
+def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
+    """Une signature par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
+
+    Toutes les signatures reçoivent les adresses du document : laboratoires partenaires et établissement de soutenance. Ce dernier rattache la thèse au périmètre — theses.fr ne donne pas d'adresses par personne, et les laboratoires partenaires ne sont pas toujours des structures du périmètre.
+    """
+    partenaires = as_sequence(block.get("partenairesDeRecherche"))
+    addr_parts = [nom for p in partenaires if (nom := as_str(as_mapping(p).get("nom")))]
+    if etablissement := as_str(block.get("etabSoutenanceN")):
+        addr_parts.append(etablissement)
+    return [
+        AuthorRecord(
+            position=a.author_position,
+            name=a.name,
+            roles=a.roles,
+            person_identifiers=dict(a.person_identifiers) if a.person_identifiers else None,
+            addresses=[AddressRecord(text=t) for t in addr_parts],
+        )
+        for a in aggregate_thesis_persons(block)
+    ]
+
+
 def process_authorships(
     conn: Connection,
     these: Mapping[str, JsonValue],
     source_publication_id: int,
     *,
     batch_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> None:
-    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant `aggregate_thesis_persons` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
-    batch_queries.clear_source_authorships_for_publication(conn, source_publication_id)
-
-    authorships = aggregate_thesis_persons(these)
-
-    # Adresses partagées par toutes les personnes du document : laboratoires partenaires + établissement de soutenance.
-    # Ce dernier rattache la thèse au périmètre — theses.fr ne porte pas d'adresses, et les laboratoires partenaires ne sont pas toujours des structures du périmètre.
-    partenaires = as_sequence(these.get("partenairesDeRecherche"))
-    addr_parts = [nom for p in partenaires if (nom := as_str(as_mapping(p).get("nom")))]
-    if etablissement := as_str(these.get("etabSoutenanceN")):
-        addr_parts.append(etablissement)
-    shared_addresses = [AddressRecord(text=t) for t in addr_parts]
-
-    # Signatures insérées une par une (`RETURNING`) : les non-auteurs ont `author_position` NULL, que le remap par position du writer batch ne saurait porter.
-    # Les `sa_id` récoltés portent tous les mêmes adresses document, écrites en un seul `write_addresses`.
-    sa_addresses: list[tuple[int | None, list[AddressRecord]]] = []
-    for a in authorships:
-        sa_id = batch_queries.upsert_source_authorship(
-            conn,
-            {
-                "source": "theses",
-                "source_publication_id": source_publication_id,
-                "author_position": a.author_position,
-                **signature_name_fields(a.name),
-                "is_corresponding": False,
-                "roles": a.roles,
-                "person_identifiers": a.person_identifiers if a.person_identifiers else None,
-                "neutralized_identifiers": None,
-                "content_hash": None,
-            },
-        )
-        sa_addresses.append((sa_id, shared_addresses))
-
-    if addr_parts:
-        write_addresses(conn, batch_queries, sa_addresses)
+    """Synchronise les signatures de la thèse depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        batch_queries,
+        sync_settings,
+        "theses",
+        source_publication_id,
+        extract_theses_author_block(these),
+        build_theses_author_records,
+    )
 
 
 # =============================================================
@@ -226,6 +235,7 @@ def process_work(
     *,
     staging_queries: StagingQueries,
     batch_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = staging_row.id
@@ -237,7 +247,9 @@ def process_work(
     source_publication_id = insert_source_document(
         conn, queries, these, staging_id, theses_id, pub_meta
     )
-    process_authorships(conn, these, source_publication_id, batch_queries=batch_queries)
+    process_authorships(
+        conn, these, source_publication_id, batch_queries=batch_queries, sync_settings=sync_settings
+    )
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -254,10 +266,12 @@ class ThesesNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
         batch_queries: AuthorshipsBatchQueries,
+        sync_settings: SignatureSyncSettings,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._batch_queries = batch_queries
+        self._sync_settings = sync_settings
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         pub_meta = extract_pub_metadata(row.raw_data)
@@ -271,4 +285,5 @@ class ThesesNormalizer(SourceNormalizer):
             row,
             staging_queries=self._staging,
             batch_queries=self._batch_queries,
+            sync_settings=self._sync_settings,
         )

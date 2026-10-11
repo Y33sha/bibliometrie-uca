@@ -9,12 +9,13 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from domain.persons.signature_name import SignatureName
 from infrastructure.fingerprint import fingerprint
+from tests.unit.application.pipeline.normalize.doubles import FakeAuthorshipsBatchQueries
 
 
 def _items_written(records: list[AuthorRecord]) -> list[dict]:
-    queries = MagicMock()
+    queries = FakeAuthorshipsBatchQueries()
     write_source_authorships(MagicMock(), queries, fingerprint, "crossref", 1, records)
-    return queries.upsert_source_authorships_batch.call_args.args[1]
+    return queries.upserted_batches[0]
 
 
 def _record(position: int, raw: str, orcid: str) -> AuthorRecord:

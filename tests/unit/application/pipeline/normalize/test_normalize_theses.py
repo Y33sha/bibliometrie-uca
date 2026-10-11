@@ -1,12 +1,13 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_theses`.
 
-Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_authorships` (aggregate_thesis_persons, partenaires + établissement → adresses partagées), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
+Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_authorships` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
 Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 from unittest.mock import MagicMock
@@ -14,39 +15,24 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.normalize import normalize_theses
+from application.pipeline.normalize._authorships_batch import SignatureSyncSettings
 from application.pipeline.normalize.normalize_theses import (
     ThesesNormalizer,
     _build_source_meta,
+    build_theses_author_records,
     extract_pub_metadata,
+    extract_theses_author_block,
     insert_source_document,
     process_authorships,
     process_work,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
-from domain.persons.signature_name import SignatureName
 from tests.unit.application.pipeline.normalize.doubles import (
+    FakeAuthorshipsBatchQueries,
     FakeSourcePublicationQueries,
     FakeStagingQueries,
     staging_row,
 )
-
-# ── Stubs ────────────────────────────────────────────────────────
-
-
-class _FakeBatchQueries:
-    """Stub du port partagé des authorships — theses y écrit ses signatures une par une."""
-
-    def __init__(self) -> None:
-        self.cleared_for: list[int] = []
-        self.upserted_authorships: list[dict[str, Any]] = []
-
-    def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
-        self.cleared_for.append(source_publication_id)
-
-    def upsert_source_authorship(self, conn, item) -> int:
-        self.upserted_authorships.append(item)
-        return 100 + len(self.upserted_authorships)
-
 
 # ── extract_pub_metadata ─────────────────────────────────────────
 
@@ -238,93 +224,57 @@ class TestInsertSourceDocument:
 # ── process_authorships ──────────────────────────────────────────────
 
 
-def _spy_write_addresses(monkeypatch):
-    """Espion sur `write_addresses` capturant les `sa_addresses` de chaque appel."""
-    calls: list[list[tuple[int | None, list]]] = []
-    monkeypatch.setattr(
-        normalize_theses,
-        "write_addresses",
-        lambda conn, batch_queries, sa_addresses: calls.append(sa_addresses),
-    )
-    return calls
+_SYNC = SignatureSyncSettings(fingerprint=lambda content: json.dumps(content, sort_keys=True))
 
 
-def _addr_texts(sa_addresses):
-    """Aplati les `sa_addresses` capturés en `(sa_id, [texte, ...])` pour les assertions."""
-    return [(sa_id, [a.text for a in addrs]) for sa_id, addrs in sa_addresses]
+def _these(**fields):
+    """Thèse avec un auteur (IdRef connu) et un directeur."""
+    return {
+        "auteurs": [{"nom": "Dupont", "prenom": "Marie", "ppn": "123"}],
+        "directeurs": [{"nom": "Martin", "prenom": "Jean"}],
+        **fields,
+    }
 
 
-class _Author:
-    def __init__(self, name="X", pos=0, roles=None, ids=None):
-        self.name = SignatureName(raw=name)
-        self.author_position = pos
-        self.roles = roles or ["author"]
-        self.person_identifiers = ids
-
-
-class TestProcessPersons:
-    def test_no_authors_no_upsert(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
-        calls = _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
-        assert batch.cleared_for == [10]
-        assert batch.upserted_authorships == []
-        assert calls == []
-
-    def test_with_authors(self, monkeypatch):
-        monkeypatch.setattr(
-            normalize_theses,
-            "aggregate_thesis_persons",
-            lambda these: [
-                _Author("DUPONT Marie", 0, ["author"], {"idref": "123"}),
-                _Author("MARTIN Jean", 1, ["director"]),
-            ],
-        )
-        _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
-        assert len(batch.upserted_authorships) == 2
-        assert batch.upserted_authorships[0]["person_identifiers"] == {"idref": "123"}
-        # `None` quand l'aggregate n'a pas d'identifiants.
-        assert batch.upserted_authorships[1]["person_identifiers"] is None
-
-    def test_partenaires_become_addr_parts(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
-        calls = _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        these = {"partenairesDeRecherche": [{"nom": "LIMOS"}, {"nom": "LRL"}, {}]}
-        process_authorships(MagicMock(), these, 10, batch_queries=batch)
-        assert _addr_texts(calls[0]) == [(101, ["LIMOS", "LRL"])]
-
-    def test_etablissement_appended_to_addr_parts(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
-        calls = _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        these = {
-            "partenairesDeRecherche": [{"nom": "LIMOS"}],
-            "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
-        }
-        process_authorships(MagicMock(), these, 10, batch_queries=batch)
-        assert _addr_texts(calls[0]) == [
-            (101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])
+class TestBuildThesesAuthorRecords:
+    def test_seuls_les_auteurs_ont_une_position(self):
+        records = build_theses_author_records(extract_theses_author_block(_these()))
+        assert [(r.position, r.roles, r.person_identifiers) for r in records] == [
+            (0, ["author"], {"idref": "123"}),
+            (None, ["thesis_director"], None),
         ]
 
-    def test_etablissement_alone_creates_link(self, monkeypatch):
-        """Sans partenaire, l'établissement de soutenance suffit à poser une adresse (→ rattachement périmètre des thèses)."""
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
-        calls = _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        these = {"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"}
-        process_authorships(MagicMock(), these, 10, batch_queries=batch)
-        assert _addr_texts(calls[0]) == [(101, ["Université Clermont Auvergne (2021-...)"])]
+    def test_adresses_du_document_pour_chaque_signature(self):
+        """Partenaires et établissement de soutenance : l'établissement rattache la thèse au périmètre."""
+        these = _these(
+            partenairesDeRecherche=[{"nom": "LIMOS"}, {}],
+            etabSoutenanceN="Université Clermont Auvergne (2021-...)",
+        )
+        records = build_theses_author_records(extract_theses_author_block(these))
+        assert {tuple(a.text for a in r.addresses) for r in records} == {
+            ("LIMOS", "Université Clermont Auvergne (2021-...)")
+        }
 
-    def test_no_partenaires_no_link(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
-        calls = _spy_write_addresses(monkeypatch)
-        batch = _FakeBatchQueries()
-        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
-        assert calls == []
+    def test_sans_partenaire_ni_etablissement_aucune_adresse(self):
+        records = build_theses_author_records(extract_theses_author_block(_these()))
+        assert all(r.addresses == [] for r in records)
+
+
+class TestProcessAuthorships:
+    def test_signatures_ecrites_par_le_writer_partage(self):
+        batch = FakeAuthorshipsBatchQueries()
+        process_authorships(MagicMock(), _these(), 10, batch_queries=batch, sync_settings=_SYNC)
+        assert batch.synced_for == [10]
+        assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
+
+    def test_renormalisation_garde_les_signatures(self):
+        """Une thèse modifiée garde l'identifiant des signatures dont l'identité ne change pas, directeur compris."""
+        batch = FakeAuthorshipsBatchQueries()
+        process_authorships(MagicMock(), _these(), 10, batch_queries=batch, sync_settings=_SYNC)
+        modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
+        process_authorships(MagicMock(), modified, 10, batch_queries=batch, sync_settings=_SYNC)
+        assert [len(b) for b in batch.upserted_batches] == [2, 1]
+        assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
 
 
 # ── process_work ─────────────────────────────────────────────────
@@ -337,6 +287,7 @@ class TestProcessWork:
             "logger": logging.getLogger("test"),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "batch_queries": MagicMock(),
+            "sync_settings": _SYNC,
         }
 
     def test_happy_path(self, monkeypatch):
@@ -369,6 +320,7 @@ def _make_normalizer():
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
         batch_queries=MagicMock(),
+        sync_settings=_SYNC,
     )
 
 

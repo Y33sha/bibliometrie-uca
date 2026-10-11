@@ -96,16 +96,10 @@ class AuthorshipRorItem(TypedDict):
 class AuthorshipsBatchQueries(Protocol):
     """Opérations SQL batch partagées pour l'écriture des authorships."""
 
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None:
-        """Supprime toutes les `source_authorships` d'une `source_publication` (pré-normalisation, avant réécriture du document)."""
-        ...
-
     def fetch_stored_source_authorships(
         self, conn: Connection, source_publication_id: int
     ) -> list[StoredSourceAuthorship]:
-        """Les signatures en base d'une notice, avec leur identité."""
+        """Les signatures en base d'une notice, avec leur identité. Le writer les relit après insertion pour obtenir les identifiants des signatures insérées."""
         ...
 
     def delete_source_authorships(self, conn: Connection, ids: list[int]) -> None:
@@ -140,19 +134,6 @@ class AuthorshipsBatchQueries(Protocol):
 
     def delete_source_authorship_rors(self, conn: Connection, ids: list[int]) -> None:
         """Supprime les ROR de signatures réécrites, avant leur réécriture."""
-        ...
-
-    def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
-        """Écrit une signature seule et retourne son id.
-
-        Sert les sources dont les signatures n'ont pas toutes un rang d'auteur : le writer batch remappe les ids par `author_position`, ce que des positions nulles ne permettent pas.
-        """
-        ...
-
-    def fetch_source_authorship_ids_by_position(
-        self, conn: Connection, *, source: str, source_publication_id: int, positions: list[int]
-    ) -> dict[int, int]:
-        """`{author_position: source_authorship_id}` pour un document `(source, source_publication_id)`."""
         ...
 
     def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None:
