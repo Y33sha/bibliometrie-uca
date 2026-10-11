@@ -33,7 +33,7 @@ from application.ports.pipeline.journals import (
 )
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
-from domain.journals.journal import JournalType, OaModel
+from domain.journals.journal import JournalType, ManualField, OaModel
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.types import JsonValue
@@ -189,6 +189,9 @@ _JOURNAL_SUMMARIES = text(f"""
 """)
 
 # Revues sans enregistrement, sans publication, sans monographie et sans paiement APC.
+# Le type n'est pas saisi à la main : le pipeline peut l'écrire.
+_TYPE_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.JOURNAL_TYPE.value)
+
 _EMPTY_JOURNALS = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
     FROM journals j LEFT JOIN publishers p ON p.id = j.publisher_id
@@ -217,7 +220,7 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
                AS raw_types
     FROM journals j
     JOIN source_publications s ON s.journal_id = j.id
-    WHERE j.journal_type = 'unknown'
+    WHERE j.journal_type = 'unknown' AND NOT 'journal_type' = ANY(j.manual_fields)
     GROUP BY j.id
     ORDER BY j.id
 """)
@@ -523,7 +526,7 @@ class PgJournalGatewayQueries(
                 )
                 .label("has_issn"),
             )
-            .where(journals.c.journal_type != JournalType.PROCEEDINGS)
+            .where(journals.c.journal_type != JournalType.PROCEEDINGS, _TYPE_NOT_MANUAL)
             .order_by(journals.c.id)
         )
         return [JournalTitleIssnRow(r.id, r.title, r.has_issn) for r in rows]
@@ -630,13 +633,19 @@ class PgJournalGatewayQueries(
     def set_journal_type_if_unknown(self, journal_id: int, journal_type: JournalType) -> None:
         self._conn.execute(
             update(journals)
-            .where(journals.c.id == journal_id, journals.c.journal_type == JournalType.UNKNOWN)
+            .where(
+                journals.c.id == journal_id,
+                journals.c.journal_type == JournalType.UNKNOWN,
+                _TYPE_NOT_MANUAL,
+            )
             .values(journal_type=journal_type)
         )
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
         self._conn.execute(
-            update(journals).where(journals.c.id == journal_id).values(journal_type=journal_type)
+            update(journals)
+            .where(journals.c.id == journal_id, _TYPE_NOT_MANUAL)
+            .values(journal_type=journal_type)
         )
 
     # ── Espaces de noms DOI ────────────────────────────────────────

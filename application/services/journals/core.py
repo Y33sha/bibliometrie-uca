@@ -34,7 +34,7 @@ from domain.journals.issns import (
     received_issns,
     validate_journal_issns,
 )
-from domain.journals.journal import OaModel
+from domain.journals.journal import ManualField, OaModel
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import issn_rejection_reason
 
@@ -145,7 +145,7 @@ def update_journal(
 
     L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
 
-    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise.
+    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un type fourni devient un champ saisi à la main (`ManualField`) : le pipeline ne l'écrit plus.
 
     Lève `ValidationError` si aucun champ n'est fourni ou si les ISSN sont invalides, `NotFoundError` si la revue n'existe pas.
     """
@@ -166,6 +166,8 @@ def update_journal(
             )
         else:
             setattr(journal, field_name, getattr(update, field_name))
+    if "journal_type" in update.model_fields_set:
+        journal.manual_fields |= {ManualField.JOURNAL_TYPE}
     repo.save(journal)
     emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)
     return journal.journal_type != old_type

@@ -3665,8 +3665,6 @@ export interface components {
             journal_type?: components["schemas"]["JournalType"] | null;
             /** Is Academic */
             is_academic?: boolean | null;
-            /** Is In Doaj */
-            is_in_doaj?: boolean | null;
             /** Apc Amount */
             apc_amount?: number | null;
         };

@@ -32,6 +32,7 @@ from domain.errors import (
     ValidationError,
 )
 from domain.journals.issns import IssnSupport, JournalIssn, source_issns
+from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -489,6 +490,20 @@ class TestUpdateJournal:
         row = _columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
 
+    def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
+        """Un type saisi devient un champ saisi à la main : le typage des recueils d'actes ne le voit plus, et les écritures du pipeline s'abstiennent."""
+        j = _journal(sa_sync_conn, title="2024 IEEE SENSORS")
+        update_journal(j, update=JournalUpdate(journal_type=JournalType.JOURNAL), repo=repo)
+
+        assert j not in {r.id for r in gateway.find_titles_of_non_proceedings_journals()}
+        gateway.set_journal_type(j, JournalType.PROCEEDINGS)
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT journal_type::text AS journal_type, manual_fields FROM journals WHERE id = :id",
+            id=j,
+        )
+        assert (row.journal_type, row.manual_fields) == ("journal", ["journal_type"])
+
     def test_rejects_invalid_issn(self, sa_sync_conn, repo):
         j = _journal(sa_sync_conn, issn="0028-0836")
         with pytest.raises(ValidationError):
@@ -917,6 +932,23 @@ class TestMergeJournals:
             ).journal_id
             == target
         )
+
+    def test_type_repris_garde_son_marqueur(self, sa_sync_conn, repo, publication_repo):
+        target = _journal(sa_sync_conn, title="Target")
+        source = _journal(sa_sync_conn, title="Source", journal_type="media")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET manual_fields = '{journal_type}' WHERE id = :id"),
+            {"id": source},
+        )
+
+        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT journal_type::text AS journal_type, manual_fields FROM journals WHERE id = :id",
+            id=target,
+        )
+        assert (row.journal_type, row.manual_fields) == ("media", ["journal_type"])
 
     def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, repo, publication_repo):
         """Sans APC, la cible prend le montant et la devise de la source."""

@@ -54,7 +54,6 @@ class JournalUpdate(BaseModel):
     oa_model: OaModel | None = None
     journal_type: JournalType | None = None
     is_academic: bool | None = None
-    is_in_doaj: bool | None = None
     apc_amount: float | None = None
 
 
