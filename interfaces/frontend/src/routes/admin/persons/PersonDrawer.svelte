@@ -221,11 +221,13 @@
         <div class="sharing-list">
           {#each sharing as sp (sp.person_id)}
             <div class="sharing-row">
-              <button
-                class="btn btn-sm"
-                title="Fusionner cette personne dans celle-ci"
-                onclick={() => absorb(sp.person_id)}>Absorber</button
-              >
+              {#if !sp.has_rh}
+                <button
+                  class="btn btn-sm"
+                  title="Fusionner cette personne dans celle-ci"
+                  onclick={() => absorb(sp.person_id)}>Absorber</button
+                >
+              {/if}
               <button class="sharing-name" onclick={() => onopenPerson(sp.person_id)}>
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}

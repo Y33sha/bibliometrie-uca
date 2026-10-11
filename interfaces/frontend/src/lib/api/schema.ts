@@ -1321,7 +1321,7 @@ export interface paths {
          * Merge Persons
          * @description Fusionne une autre personne (source) dans celle-ci (target).
          *
-         *     Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
+         *     Si seule la source a une fiche RH, les rôles s'inversent : la réponse donne les rôles appliqués. Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si les deux ont une fiche RH (`merge_person`).
          */
         post: operations["merge_persons_api_persons__person_id__merge_post"];
         delete?: never;
@@ -1467,7 +1467,7 @@ export interface paths {
          * Batch Assign Orphan Authorships
          * @description Attribue plusieurs signatures orphelines à une personne existante.
          *
-         *     Les signatures déjà rattachées sont ignorées, là où l'attribution unitaire les refuse : le décompte rendu ne compte que celles qui étaient orphelines. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les signatures absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les signatures rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post"];
         delete?: never;

@@ -122,10 +122,8 @@
   const mergeSearch = useDebouncedSearch<PersonSearchResult>({
     search: (q, request) =>
       request<PersonSearchResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`),
-    transform: (results) =>
-      activeMergePersonId === null
-        ? results
-        : results.filter((r) => r.id !== activeMergePersonId),
+    // Une personne RH est toujours conservée : elle ne figure pas parmi les personnes à absorber.
+    transform: (results) => results.filter((r) => r.id !== activeMergePersonId && !r.has_rh),
   });
 
   /* ── Data loading ── */

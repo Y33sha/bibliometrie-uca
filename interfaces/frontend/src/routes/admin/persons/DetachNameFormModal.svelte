@@ -44,9 +44,11 @@
                     >{/if}
                   {#if op.has_rh}<span class="tag tag-rh">RH</span>{/if}
                 </span>
-                <button class="btn btn-sm btn-merge-modal" onclick={() => onmerge(op.person_id)}>
-                  ← Fusionner
-                </button>
+                {#if !op.has_rh}
+                  <button class="btn btn-sm btn-merge-modal" onclick={() => onmerge(op.person_id)}>
+                    ← Fusionner
+                  </button>
+                {/if}
               </div>
             {/each}
           </div>

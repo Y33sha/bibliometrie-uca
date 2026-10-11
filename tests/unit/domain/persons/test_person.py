@@ -6,7 +6,7 @@ from domain.errors import ConflictError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import PersonNameForm
-from domain.persons.person import Person
+from domain.persons.person import Person, merge_roles
 
 
 def _make_person(person_id: int | None = 1) -> Person:
@@ -49,20 +49,16 @@ class TestPersonConstruction:
         assert p.name_forms == (nf,)
 
 
-class TestCanMergeWith:
-    def test_ok_when_no_distinct_rh(self):
-        a = _make_person(person_id=1)
-        b = _make_person(person_id=2)
-        a.can_merge_with(b, has_distinct_rh=False)  # ne lève pas
+class TestMergeRoles:
+    def test_keeps_requested_roles_without_rh(self):
+        assert merge_roles(1, 2, with_rh=set()) == (1, 2)
 
-    def test_raises_when_distinct_rh(self):
-        a = _make_person(person_id=1)
-        b = _make_person(person_id=2)
-        with pytest.raises(ConflictError, match="fiche RH"):
-            a.can_merge_with(b, has_distinct_rh=True)
+    def test_keeps_requested_roles_when_target_has_rh(self):
+        assert merge_roles(1, 2, with_rh={1}) == (1, 2)
 
-    def test_error_message_contains_both_ids(self):
-        a = _make_person(person_id=42)
-        b = _make_person(person_id=17)
-        with pytest.raises(ConflictError, match="#42.*#17"):
-            a.can_merge_with(b, has_distinct_rh=True)
+    def test_swaps_roles_when_only_source_has_rh(self):
+        assert merge_roles(1, 2, with_rh={2}) == (2, 1)
+
+    def test_raises_when_both_have_rh(self):
+        with pytest.raises(ConflictError, match="#42.*#17.*fiche RH"):
+            merge_roles(42, 17, with_rh={42, 17})

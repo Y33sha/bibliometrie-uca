@@ -451,10 +451,12 @@ def merge_persons(
 ) -> MergeResponse:
     """Fusionne une autre personne (source) dans celle-ci (target).
 
-    Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
+    Si seule la source a une fiche RH, les rôles s'inversent : la réponse donne les rôles appliqués. Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si les deux ont une fiche RH (`merge_person`).
     """
-    person_commands.merge_person(conn, person_id, body.source_id, repo=repo, audit_repo=audit)
-    return MergeResponse(merged=True, source_id=body.source_id, target_id=person_id)
+    target_id, source_id = person_commands.merge_person(
+        conn, person_id, body.source_id, repo=repo, audit_repo=audit
+    )
+    return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
 
 
 @router.post("/{person_id}/detach-authorships", response_model=DetachAuthorshipsResponse)
