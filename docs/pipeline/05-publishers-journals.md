@@ -4,11 +4,19 @@
 
 La phase `publishers_journals` complète les référentiels d'éditeurs, de revues et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, va chercher auprès de sources externes le type des revues et leurs frais de publication, fusionne les doublons, et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [authorships](09-authorships.md), après les dernières suppressions de publications. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
-Les sous-étapes forment quatre groupes, chacun sous son titre dans le journal : éditeurs, revues, monographies, nettoyage. Chaque sous-étape y tient une ligne de bilan.
+Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : éditeurs, revues, monographies. Chaque sous-étape y tient une ligne de bilan.
+
+## Agences d'enregistrement DOI (`resolve_ra`)
+
+Phase à part, juste avant `publishers_journals`. Résout l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) des préfixes de tous les DOI connus : DOI des notices, DOI liés, cibles des relations, DOI arXiv. Le nombre de préfixes reste petit : aucun filtre de périmètre. Elle suit la normalisation, donc les DOI moissonnés dans le run sont résolus dans le run.
+
+Interroge `doi.org/ra` sur les préfixes absents de la table `doi_prefixes`, par lots de 100 préfixes, et enregistre leur agence. Un préfixe que doi.org ne connaît pas reçoit l'agence `unknown`. Un préfixe d'une requête en échec reste à résoudre.
+
+Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; `resolve_publishers` la complète ensuite (nom et `publisher_id` via les API `/prefixes`). La recherche des documents manquants ([fetch_missing](02-extract.md#documents-absents-dune-source-fetch_missing)), au run suivant, adresse chaque DOI à l'API de son agence.
 
 ## Éditeurs
 
-1. **`resolve_publishers`** — interroge `/prefixes/{prefix}` chez Crossref ou DataCite pour connaître le détenteur d'un préfixe DOI, puis rattache le `publisher_id` correspondant à ce préfixe. Le routage vers l'une ou l'autre API suit l'agence d'enregistrement posée par la phase [resolve_ra](02-extract.md#agences-denregistrement-doi-resolve_ra) ; un préfixe dont l'agence est `unknown` est présenté aux deux, et celle qui répond la corrige. Crossref rend l'éditeur ; DataCite rend le provider, avec l'entrepôt (Zenodo, NAKALA…) qui a déposé les DOI. Sont repris les préfixes sans éditeur et jamais interrogés (`publisher_id` et `publisher_checked_at` nuls) : un préfixe est marqué interrogé quand l'API a répondu, qu'elle le connaisse ou non, et n'est pas retenté. Un préfixe dont l'API est indisponible est repris au run suivant.
+1. **`resolve_publishers`** — interroge `/prefixes/{prefix}` chez Crossref ou DataCite pour connaître le détenteur d'un préfixe DOI, puis rattache le `publisher_id` correspondant à ce préfixe. Le routage vers l'une ou l'autre API suit l'agence d'enregistrement posée par la phase [resolve_ra](#agences-denregistrement-doi-resolve_ra) ; un préfixe dont l'agence est `unknown` est présenté aux deux, et celle qui répond la corrige. Crossref rend l'éditeur ; DataCite rend le provider, avec l'entrepôt (Zenodo, NAKALA…) qui a déposé les DOI. Sont repris les préfixes sans éditeur et jamais interrogés (`publisher_id` et `publisher_checked_at` nuls) : un préfixe est marqué interrogé quand l'API a répondu, qu'elle le connaisse ou non, et n'est pas retenté. Un préfixe dont l'API est indisponible est repris au run suivant.
 
 ## Revues
 

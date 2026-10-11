@@ -7,9 +7,9 @@ from interfaces.cli.phases.execution import UnderCircuitBreaker
 
 
 def build() -> Phase:
-    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant `fetch_missing`.
+    """Résout la Registration Agency des préfixes de tous les DOI connus (`doi.org/ra`), après la normalisation du run.
 
-    La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite : `fetch_missing` adresse ensuite chaque DOI à la bonne. La phase `publishers_journals` reprend les préfixes restants via les API `/prefixes`.
+    La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals`, qui suit, rattache les préfixes à leur éditeur via les API `/prefixes` ; `fetch_missing`, au run suivant, adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe n'est pas encore résolu.
 
     Séquence, transaction et métriques dans `application/pipeline/resolve_ra/phase.py` ; ici, le câblage : circuit-breaker, user-agent.
     """

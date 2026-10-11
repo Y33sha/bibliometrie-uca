@@ -23,7 +23,7 @@ class DoiPrefixesQueries(Protocol):
     """Contrat d'accès à la table `doi_prefixes`."""
 
     def get_prefixes_to_resolve(self) -> list[str]:
-        """Préfixes du pool `candidate_dois` absents de `doi_prefixes`, triés. Sert à `resolve_ra`."""
+        """Préfixes de tous les DOI connus (notices, DOI liés, cibles des relations, DOI arXiv) absents de `doi_prefixes`, triés. Sert à `resolve_ra`."""
         ...
 
     def insert_ra(self, *, prefix: str, ra: str) -> bool:
@@ -31,7 +31,7 @@ class DoiPrefixesQueries(Protocol):
         ...
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """Pour chaque Registration Agency présente dans le pool `candidate_dois` (`Crossref` / `DataCite` / `unknown`), le couple `(ra, nombre de DOI candidats distincts, nombre de préfixes distincts)`, trié par nombre de DOI décroissant. Un DOI (ou préfixe) non encore résolu compte comme `unknown`. Sert l'observabilité de la phase `resolve_ra`."""
+        """Pour chaque Registration Agency présente parmi tous les DOI connus (`Crossref` / `DataCite` / `unknown`), le couple `(ra, nombre de DOI distincts, nombre de préfixes distincts)`, trié par nombre de DOI décroissant. Un DOI (ou préfixe) non encore résolu compte comme `unknown`. Sert l'observabilité de la phase `resolve_ra`."""
         ...
 
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:

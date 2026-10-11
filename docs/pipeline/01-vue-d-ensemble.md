@@ -7,7 +7,6 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 ## Moissonnage
 
 - [Moissonnage](02-extract.md#moissonnage-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
-- [Identification des agences d'enregistrement des DOI](02-extract.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
 - [Documents absents d'une source](02-extract.md#documents-absents-dune-source-fetch_missing) : cherche dans chaque source les documents que le moissonnage initial n'y a pas trouvés.
 - [Documents périmés et disparus](02-extract.md#documents-périmés-et-disparus-fetch_stale) : réinterroge les documents non revus depuis un délai réglable (90 jours par défaut), rafraîchit leurs métadonnées et marque (`disappeared_at`) ceux qui ont disparu.
 - [Listes d'auteurs tronquées](02-extract.md#listes-dauteurs-tronquées-fetch_truncated) : retélécharge un par un les documents OpenAlex de 100 auteurs, que le plafond de l'API a tronqués.
@@ -22,6 +21,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des publications
 
+- [Identification des agences d'enregistrement des DOI](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
 - [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ).
 - [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera la résolution. Les métadonnées brutes sont conservées, avec l'identifiant de la règle qui les a corrigées.
 - [Publications](07-publications.md) : peuple et maintient le référentiel `publications` à partir des `source_publications`. Regroupe celles qui désignent le même document, crée une publication pour chaque document du périmètre, et fusionne ou scinde les publications existantes selon ce regroupement.

@@ -196,7 +196,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal") == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
-        """target='crossref' : DOIs DataCite/mEDRA filtrés via doi_prefixes."""
+        """target='crossref' : seuls les DOI dont le préfixe est résolu vers Crossref ; un préfixe pas encore résolu attend `resolve_ra`."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         insert_doi_prefix(sa_sync_conn, "10.1038", ra="Crossref")
         # Trois DOIs non-crossref in-périmètre : DataCite, Crossref, préfixe inconnu.
@@ -206,10 +206,10 @@ class TestGetMissingDois:
 
         result = get_missing_dois(sa_sync_conn, "crossref")
 
-        # DataCite éliminé, Crossref gardé, NULL gardé (best-effort).
+        # DataCite éliminé, Crossref gardé, préfixe non résolu en attente.
         assert "10.5281/zenodo.1" not in result
         assert "10.1038/nature.1" in result
-        assert "10.99999/x.1" in result
+        assert "10.99999/x.1" not in result
 
     def test_includes_related_dois_from_source_publications(self, sa_sync_conn):
         """Les related_dois d'un source_publication in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""

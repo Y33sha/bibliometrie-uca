@@ -9,6 +9,21 @@ from application.ports.pipeline.doi_prefixes import (
     DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
+from domain.source_publications.external_ids import ExternalIdType
+
+# Tous les DOI connus : DOI des notices, DOI liés, cibles des relations, DOI DataCite déduits des identifiants arXiv. Le nombre de préfixes reste petit : aucun filtre de périmètre.
+_KNOWN_DOIS = f"""
+    SELECT doi FROM source_publications WHERE doi IS NOT NULL
+    UNION
+    SELECT d.value FROM source_publications sp
+    CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') d(value)
+    WHERE jsonb_typeof(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') = 'array'
+    UNION
+    SELECT target_doi FROM publication_relations WHERE target_doi IS NOT NULL
+    UNION
+    SELECT '10.48550/arxiv.' || lower(external_ids ->> 'arxiv_id') FROM source_publications
+    WHERE external_ids ->> 'arxiv_id' IS NOT NULL
+"""
 
 
 class PgDoiPrefixesQueries(DoiPrefixesQueries):
@@ -18,12 +33,12 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
         self._conn = conn
 
     def get_prefixes_to_resolve(self) -> list[str]:
-        """Les DOI proviennent de la vue `candidate_dois` — la même liste que la recherche par DOI de la phase `fetch_missing` (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cette recherche soit résolu ici."""
+        """Préfixes de tous les DOI connus (`_KNOWN_DOIS`), qui couvrent les DOI que cherche la phase `fetch_missing`."""
         result = self._conn.execute(
             text(
-                """
+                f"""
                 SELECT DISTINCT split_part(c.doi, '/', 1) AS prefix
-                FROM candidate_dois c
+                FROM ({_KNOWN_DOIS}) c(doi)
                 LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)
                 WHERE c.doi <> '' AND dp.prefix IS NULL
                 ORDER BY prefix
@@ -45,11 +60,11 @@ class PgDoiPrefixesQueries(DoiPrefixesQueries):
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
         result = self._conn.execute(
             text(
-                """
+                f"""
                 SELECT COALESCE(dp.ra, 'unknown') AS ra,
                        count(DISTINCT c.doi) AS dois,
                        count(DISTINCT split_part(c.doi, '/', 1)) AS prefixes
-                FROM candidate_dois c
+                FROM ({_KNOWN_DOIS}) c(doi)
                 LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)
                 WHERE c.doi <> ''
                 GROUP BY COALESCE(dp.ra, 'unknown')

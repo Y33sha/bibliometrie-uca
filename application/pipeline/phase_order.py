@@ -7,12 +7,12 @@ from __future__ import annotations
 
 PHASE_ORDER: tuple[str, ...] = (
     "extract",
-    "resolve_ra",
     "fetch_missing",
     "fetch_stale",
     "fetch_truncated",
     "normalize",
     "affiliations",
+    "resolve_ra",
     "publishers_journals",
     "metadata_correction",
     "publications",

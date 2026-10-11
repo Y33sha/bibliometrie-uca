@@ -122,26 +122,6 @@ NODES: tuple[Node, ...] = (
         )
         for source in _SOURCES
     ),
-    _node(
-        "resolve_ra.resolve_prefixes",
-        "resolve_ra",
-        reads=(
-            "doi_prefixes.id",
-            "source_publications.doi",
-            "source_publications.external_ids",
-            "source_publications.publication_id",
-            "publications.in_perimeter",
-            "publication_relations",
-        ),
-        writes=("doi_prefixes.id", "doi_prefixes.ra"),
-        previous_run=(
-            "doi_prefixes.id",
-            "source_publications",
-            "publications",
-            "publication_relations",
-        ),
-        network="doi.org",
-    ),
     *(
         _node(
             f"fetch_missing.{channel}",
@@ -284,6 +264,19 @@ NODES: tuple[Node, ...] = (
             "source_publications.keys_dirty",
         ),
         previous_run=("source_publications.publication_id",),
+    ),
+    _node(
+        "resolve_ra.resolve_prefixes",
+        "resolve_ra",
+        reads=(
+            "doi_prefixes.id",
+            "source_publications.doi",
+            "source_publications.external_ids",
+            "publication_relations",
+        ),
+        writes=("doi_prefixes.id", "doi_prefixes.ra"),
+        previous_run=("source_publications", "publication_relations"),
+        network="doi.org",
     ),
     _node(
         "publishers_journals.resolve_publishers",

@@ -1,6 +1,6 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `fetch_missing`.
+"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, après `affiliations` et avant `publishers_journals`.
 
-Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) du pool `candidate_dois` absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
+Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
 Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
