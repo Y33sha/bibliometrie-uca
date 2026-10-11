@@ -33,8 +33,6 @@ def lancer(monkeypatch):
         )
         monkeypatch.setattr(module, "publisher_repository", lambda c: object())
         monkeypatch.setattr(module, "run_enrich_publishers_from_openalex", _enrichir)
-        monkeypatch.setattr(module, "get_openalex_api_key", lambda: "clé")
-        monkeypatch.setattr(module, "get_polite_pool_email", lambda: "contact@uca.fr")
         monkeypatch.setattr(sys, "argv", ["enrich_publishers", *arguments])
 
         code = main()
