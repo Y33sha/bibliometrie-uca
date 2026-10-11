@@ -147,17 +147,19 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def assign_orphan_source_authorships_to_person(
         self, conn: Connection, person_id: int, source_authorship_ids: list[int]
-    ) -> int:
+    ) -> list[int]:
         if not source_authorship_ids:
-            return 0
-        return conn.execute(
-            text("""
-                UPDATE source_authorships SET person_id = :pid
-                WHERE id = ANY(:ids) AND person_id IS NULL
-                RETURNING id
-            """),
-            {"pid": person_id, "ids": source_authorship_ids},
-        ).rowcount
+            return []
+        return list(
+            conn.execute(
+                text("""
+                    UPDATE source_authorships SET person_id = :pid
+                    WHERE id = ANY(:ids) AND person_id IS NULL
+                    RETURNING id
+                """),
+                {"pid": person_id, "ids": source_authorship_ids},
+            ).scalars()
+        )
 
     def create_authorships_from_sources(
         self,

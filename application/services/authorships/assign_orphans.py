@@ -7,6 +7,8 @@ Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations
 Les deux opérations vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
 """
 
+import logging
+
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
@@ -20,6 +22,8 @@ from domain.errors import (
     RejectedPairError,
 )
 from domain.sources.registry import SOURCE_PRIORITY
+
+logger = logging.getLogger(__name__)
 
 
 def _require_person(person_id: int, *, repo: PersonRepository) -> None:
@@ -155,8 +159,9 @@ def batch_assign_orphan_authorships(
     `_resolve_rejection`) : sans `force`, une seule paire rejetée bloque tout
     le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord levés.
 
-    Retourne le nombre de source_authorships effectivement rattachées
-    (celles qui étaient orphelines). Lève `NotFoundError` si la personne n'existe pas.
+    Une signature absente ou déjà rattachée est une anomalie : elle est écartée du lot et journalisée, le reste du lot est rattaché.
+
+    Retourne le nombre de signatures rattachées. Lève `NotFoundError` si la personne n'existe pas.
     """
     if not sa_ids:
         return 0
@@ -173,25 +178,30 @@ def batch_assign_orphan_authorships(
     )
 
     assigned = build_queries.assign_orphan_source_authorships_to_person(conn, person_id, sa_ids)
-    authorship_repo.pin_authorships(sa_ids, person_id)
-    build_queries.create_authorships_from_sources(conn, person_id, sa_ids, SOURCE_PRIORITY)
-
-    for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(sa_ids):
-        repo.add_name_form(person_id, name_form)
+    skipped = sorted(set(sa_ids) - set(assigned))
+    if skipped:
+        logger.warning(
+            "Rattachement à la personne %d : signatures absentes ou déjà rattachées, écartées : %s",
+            person_id,
+            skipped,
+        )
+    if assigned:
+        authorship_repo.pin_authorships(assigned, person_id)
+        build_queries.create_authorships_from_sources(conn, person_id, assigned, SOURCE_PRIORITY)
+        for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(assigned):
+            repo.add_name_form(person_id, name_form)
 
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
-    # Un lot est une décision unique : la charge utile porte les signatures visées et le
-    # nombre effectivement rattaché, celles qui portaient déjà une personne étant ignorées.
     emit_event(
         audit_repo,
         "authorship.batch_assigned",
         "person",
         person_id,
-        {"source_authorship_ids": sa_ids, "assigned": assigned},
+        {"source_authorship_ids": assigned, "skipped": skipped},
     )
-    return assigned
+    return len(assigned)
 
 
 def _refresh_authorship_from_sources(

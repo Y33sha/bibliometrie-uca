@@ -582,27 +582,41 @@ class TestBatchAssignOrphanAuthorships:
         assert all(r.person_id == person_id for r in rows)
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
+        """Une signature déjà rattachée est écartée : ni confirmation, ni authorship, ni forme de nom pour la personne visée ; l'orpheline du lot est rattachée."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        pub_id = insert_publication(sa_sync_conn)
-        sp_id = _notice(sa_sync_conn, pub_id)
-        sa1 = _jean_dupont_signature(sa_sync_conn, sp_id, person_id=p1)
+        owned_pub = insert_publication(sa_sync_conn)
+        owned = _jean_dupont_signature(sa_sync_conn, _notice(sa_sync_conn, owned_pub), person_id=p1)
+        orphan_pub = insert_publication(sa_sync_conn)
+        orphan = _jean_dupont_signature(
+            sa_sync_conn, _notice(sa_sync_conn, orphan_pub, source_id="h-2")
+        )
 
         assigned = batch_assign_orphan_authorships(
             p2,
-            [sa1],
+            [owned, orphan],
             repo=repo,
             authorship_repo=authorship_repo,
             conn=sa_sync_conn,
             build_queries=_BUILD_QUERIES,
         )
 
-        assert assigned == 0
+        assert assigned == 1
         assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa1)
+            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=owned)
             == p1
         )
+        assert _scalar(
+            sa_sync_conn,
+            "SELECT array_agg(source_authorship_id) FROM confirmed_authorships WHERE person_id = :p",
+            p=p2,
+        ) == [orphan]
+        assert _scalar(
+            sa_sync_conn,
+            "SELECT array_agg(publication_id) FROM authorships WHERE person_id = :p",
+            p=p2,
+        ) == [orphan_pub]
 
 
 # ── detach_authorships ─────────────────────────────────────────────

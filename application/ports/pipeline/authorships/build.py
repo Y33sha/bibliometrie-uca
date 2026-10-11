@@ -80,8 +80,8 @@ class AuthorshipsBuildQueries(Protocol):
 
     def assign_orphan_source_authorships_to_person(
         self, conn: Connection, person_id: int, source_authorship_ids: list[int]
-    ) -> int:
-        """Pose `person_id` sur les signatures orphelines du lot et retourne le nombre rattaché ; les signatures déjà liées restent intactes."""
+    ) -> list[int]:
+        """Pose `person_id` sur les signatures orphelines du lot et retourne leurs ids ; les signatures déjà liées restent intactes."""
         ...
 
     def create_authorships_from_sources(
