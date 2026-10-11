@@ -127,7 +127,7 @@ def batch_assign_orphan_authorships(
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs signatures orphelines à une personne existante.
 
-    Les signatures déjà rattachées sont ignorées, là où l'attribution unitaire les refuse : le décompte rendu ne compte que celles qui étaient orphelines. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+    Les signatures absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les signatures rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
     if not body.source_authorship_ids:
         return OrphanBatchAssignResponse(assigned=0)
