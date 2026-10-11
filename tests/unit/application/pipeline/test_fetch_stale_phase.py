@@ -3,7 +3,7 @@
 import logging
 
 from application.pipeline.fetch_stale.phase import FetchStalePhase
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.metrics import PhaseMetrics
 
 
 def _run(contexte, mode: str, refreshed: list[str]) -> PhaseMetrics:

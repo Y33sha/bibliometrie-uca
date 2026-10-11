@@ -13,13 +13,13 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import accord, forme
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
 from domain.publications.identifiers import DoiPrefix
+from pipeline.context import PhaseContext
+from pipeline.libelles import accord, forme
+from pipeline.metrics import PhaseMetrics
+from pipeline.signals import signal_source_unavailable
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 """Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""

@@ -17,9 +17,9 @@ from collections.abc import Mapping
 from unittest.mock import MagicMock
 
 from application.pipeline.extract.extract_hal import extract_union
-from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractConfig
+from pipeline.progression import Progression
 
 _LOGGER = logging.getLogger("test")
 

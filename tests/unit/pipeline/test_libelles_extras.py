@@ -8,8 +8,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from application.pipeline.metrics import LIBELLES_EXTRAS
 from infrastructure import PROJECT_ROOT
+from pipeline.metrics import LIBELLES_EXTRAS
 
 COUCHES = ("application", "domain", "infrastructure", "interfaces")
 

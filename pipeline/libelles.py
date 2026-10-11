@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from application.pipeline.logging_scope import ScopedOrPlainLogger
 from domain.sources.registry import SOURCE_LABELS, source_label
+from pipeline.logging_scope import ScopedOrPlainLogger
 
 ETAPE = "▶ "
 """Ouvre une sous-étape d'une phase."""

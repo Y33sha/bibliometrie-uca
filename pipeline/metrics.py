@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from application.pipeline.libelles import forme
-from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
+from domain.pipeline_runs import PhaseMetricsPayload, Signal
+from pipeline.libelles import forme
 
 LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "already_complete": "déjà complet",
@@ -145,7 +145,7 @@ class PhaseMetrics:
 
     def to_payload(self, duration_s: float) -> PhaseMetricsPayload:
         """Sérialise les compteurs et la durée d'exécution vers le payload de transport
-        (`application.ports.pipeline.phase_executions`), persisté par l'observabilité."""
+        (`domain.pipeline_runs`), persisté par l'observabilité."""
         return {
             "new": self.new,
             "updated": self.updated,

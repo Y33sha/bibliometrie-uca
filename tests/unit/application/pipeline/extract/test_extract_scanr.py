@@ -12,9 +12,9 @@ import pytest
 
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_scanr import ScanrExtractor, extract_year
-from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractConfig
+from pipeline.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur
 
 _LOGGER = logging.getLogger("test")

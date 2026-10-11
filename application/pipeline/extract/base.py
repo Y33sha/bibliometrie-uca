@@ -15,16 +15,16 @@ from typing import ClassVar
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
-from application.pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import Progression, progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
+from pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
+from pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression, progression
 
 __all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
 
 
-# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `application.pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
+# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
 ExtractLogger = ScopedOrPlainLogger
 
 

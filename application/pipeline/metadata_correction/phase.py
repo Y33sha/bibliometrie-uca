@@ -12,13 +12,12 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.context import PhaseContext
 from application.pipeline.metadata_correction.correct_by_cluster import run as run_cluster
 from application.pipeline.metadata_correction.correct_unary import run as run_unary
 from application.pipeline.metadata_correction.journal_by_doi import run as run_journal_by_doi
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
-from application.ports.pipeline.transaction import OpenTransaction
+from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.metrics import PhaseMetrics
 
 
 def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:

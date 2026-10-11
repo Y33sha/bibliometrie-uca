@@ -13,7 +13,6 @@ Usage :
 import argparse
 import os
 
-from application.pipeline.libelles import accord
 from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
@@ -21,6 +20,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.sources.doaj.client import read_doaj_dump_rows
+from pipeline.libelles import accord
 
 log = setup_logger("import_doaj_csv", os.path.dirname(__file__))
 

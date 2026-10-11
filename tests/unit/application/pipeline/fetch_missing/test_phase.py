@@ -8,8 +8,8 @@ exécution synchrone déterministe.
 import logging
 
 from application.pipeline.fetch_missing.phase import FetchMissingPhase
-from application.pipeline.libelles import DERNIERE_BRANCHE
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.libelles import DERNIERE_BRANCHE
+from pipeline.metrics import PhaseMetrics
 
 
 def _sync_run_parallel(thunks):

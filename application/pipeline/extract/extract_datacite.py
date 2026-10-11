@@ -14,13 +14,13 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import Progression
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract.datacite import (
     DataciteExtractAdapter,
     DataciteExtractConfig,
 )
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression
 
 
 class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteExtractAdapter]):

@@ -15,15 +15,14 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publications.reconcile_components import run as reconcile_run
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
 )
-from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.publication_repository import PublicationRepository
+from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.metrics import PhaseMetrics
 
 
 @dataclass(frozen=True)

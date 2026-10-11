@@ -17,13 +17,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.modes import MODES
 from application.pipeline.normalize.base import NormalizeStats
-from application.pipeline.progression import attente
 from domain.sources.registry import ALL_SOURCES_SET
+from pipeline.context import PhaseContext
+from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
+from pipeline.metrics import PhaseMetrics
+from pipeline.modes import MODES
+from pipeline.progression import attente
 
 NormalizeOne = Callable[[str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""

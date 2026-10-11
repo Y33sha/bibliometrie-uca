@@ -8,11 +8,11 @@ la phase `oa_status` s'en sert comme garde d'entrée.
 import logging
 from unittest.mock import AsyncMock, patch
 
-from application.pipeline.context import RunOptions
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import filter_configured
 from interfaces.cli.phases import oa_status
 from interfaces.cli.phases.execution import phase_context
+from pipeline.context import RunOptions
+from pipeline.metrics import PhaseMetrics
+from pipeline.signals import filter_configured
 
 _RUN_ENRICH = "application.pipeline.oa_status.phase._verifier"
 _LOG = logging.getLogger("test")

@@ -6,11 +6,17 @@ Une phase est un objet construit avec ses ports, qui s'exécute sur le contexte 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Protocol
 
-from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.transaction import OpenTransaction
+from sqlalchemy import Connection
+
+from pipeline.metrics import PhaseMetrics
+
+# Ouvreur de transaction : un appelable qui rend une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
+OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 
 
 @dataclass(frozen=True, slots=True)

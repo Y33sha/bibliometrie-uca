@@ -9,14 +9,14 @@ from typing import NamedTuple
 import ahocorasick
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, forme
-from application.pipeline.progression import progression
 from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
     DetectedStructure,
     KeptPair,
     StructureNameForm,
 )
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, forme
+from pipeline.progression import progression
 
 # Taille des tranches (pagination keyset) : borne la mémoire et les allers-retours SQL par batch.
 CHUNK_SIZE = 10000

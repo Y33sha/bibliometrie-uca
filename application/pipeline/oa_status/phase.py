@@ -14,8 +14,11 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import (
+from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
+from application.ports.pipeline.oa_status import OaStatusQueries
+from domain.publications.metadata import decide_oa_status
+from pipeline.context import PhaseContext
+from pipeline.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
     accord,
@@ -23,12 +26,9 @@ from application.pipeline.libelles import (
     forme,
     rien_a_faire,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
-from application.pipeline.signals import filter_configured
-from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
-from application.ports.pipeline.oa_status import OaStatusQueries
-from domain.publications.metadata import decide_oa_status
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
+from pipeline.signals import filter_configured
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""

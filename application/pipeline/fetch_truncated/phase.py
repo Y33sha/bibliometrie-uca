@@ -18,10 +18,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
@@ -30,6 +26,10 @@ from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailab
 from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
+from pipeline.context import PhaseContext
+from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 COMMIT_EVERY = 50
 

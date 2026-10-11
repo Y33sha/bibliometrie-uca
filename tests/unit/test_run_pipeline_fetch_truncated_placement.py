@@ -10,11 +10,11 @@ transformation.
 
 from unittest.mock import AsyncMock, patch
 
-from application.pipeline.context import RunOptions
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.normalize.base import NormalizeStats
 from interfaces.cli.phases import extract, fetch_truncated, normalize
 from interfaces.cli.phases.execution import phase_context
+from pipeline.context import RunOptions
+from pipeline.metrics import PhaseMetrics
 
 # L'orchestrateur applicatif du refetch, câblé par la phase `fetch_truncated` via `asyncio.run`.
 _REFETCH = "application.pipeline.fetch_truncated.phase.refetch"

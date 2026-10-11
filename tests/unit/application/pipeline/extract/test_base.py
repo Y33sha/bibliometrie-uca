@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.extract.base import SourceExtractor
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.metrics import PhaseMetrics
 
 
 class _FakeExtractor(SourceExtractor):

@@ -5,10 +5,10 @@ La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, en
 
 from unittest.mock import patch
 
-from application.pipeline.context import RunOptions
-from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases import publishers_journals
 from interfaces.cli.phases.execution import phase_context
+from pipeline.context import RunOptions
+from pipeline.metrics import PhaseMetrics
 
 
 def _patch_credentials_present():

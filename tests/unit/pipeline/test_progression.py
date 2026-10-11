@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from application.pipeline import progression as module
+from pipeline import progression as module
 
 
 @pytest.fixture

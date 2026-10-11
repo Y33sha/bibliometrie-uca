@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     JournalCorrectionRow,
@@ -24,6 +23,7 @@ from domain.source_publications.metadata_correction.journal_by_doi import (
     JOURNAL_BY_DOI_NAMESPACE,
 )
 from domain.source_publications.raw_metadata import raw_value, stash_entry
+from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 
 
 def _compute_update(

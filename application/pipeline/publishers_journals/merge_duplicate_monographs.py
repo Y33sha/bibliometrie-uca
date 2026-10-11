@@ -5,10 +5,10 @@ Deux monographies de même titre naissent quand l'éditeur ou l'ISBN manque à l
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.monographs import MonographMergeQueries
 from domain.monographs.matching import duplicate_monographs
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Fusion des monographies en double"
 """Libellé de la sous-étape dans le journal de la phase."""

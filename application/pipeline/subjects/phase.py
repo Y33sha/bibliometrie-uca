@@ -10,11 +10,11 @@ Aucun filtre périmètre : la phase `authorships` a purgé en amont les publicat
 
 from dataclasses import dataclass
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects.cooccurrences import run as run_cooccurrences
 from application.pipeline.subjects.ingestion import run as run_ingest
 from application.ports.pipeline.subjects import SubjectsIngestionQueries
+from pipeline.context import PhaseContext
+from pipeline.metrics import PhaseMetrics
 
 
 @dataclass(frozen=True)

@@ -15,7 +15,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
@@ -28,6 +27,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
     resolve_cluster_doi_corrections,
 )
 from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 
 
 def _compute_update(

@@ -14,9 +14,6 @@ L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent 
 import logging
 from collections.abc import Callable, Sequence
 
-from application.pipeline.libelles import BRANCHE, accord
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.pipeline.publishers_journals._journal_label import journal_label
 from application.ports.pipeline.journals import (
     JournalMergeCandidate,
@@ -25,6 +22,9 @@ from application.ports.pipeline.journals import (
     JournalTitleRow,
 )
 from domain.journals.titles import compatible_titles, nested_titles
+from pipeline.libelles import BRANCHE, accord
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 LIBELLE = "Fusion des revues en double"
 """Libellé de la sous-étape dans le journal de la phase."""

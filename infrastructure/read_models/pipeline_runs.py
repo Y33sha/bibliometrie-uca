@@ -12,17 +12,17 @@ from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.phase_executions import (
-    PhaseMetricsPayload,
-    PhaseStatus,
-    Signal,
-)
 from application.ports.read_models.pipeline_runs_queries import (
     PhaseBrief,
     PhaseExecutionDetail,
     PipelineRunsQueries,
     RunDetail,
     RunSummary,
+)
+from domain.pipeline_runs import (
+    PhaseMetricsPayload,
+    PhaseStatus,
+    Signal,
 )
 
 

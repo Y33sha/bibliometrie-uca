@@ -23,11 +23,11 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from application.pipeline.context import PhaseContext, RunOptions
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.oa_status.phase import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
 from application.ports.pipeline.lookup import LookupOutcome
 from infrastructure.sources.unpaywall.client import fetch_oa_status
+from pipeline.context import PhaseContext, RunOptions
+from pipeline.metrics import PhaseMetrics
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"

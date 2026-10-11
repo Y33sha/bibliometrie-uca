@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from application.pipeline.context import Phase
-from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.context import Phase
+from pipeline.metrics import PhaseMetrics
 
 if TYPE_CHECKING:
     from application.ports.pipeline.fetch_missing.doi import (

@@ -5,11 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from application.pipeline.context import Phase, PhaseContext
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from interfaces.cli.phases.execution import log, open_tx
+from pipeline.context import Phase, PhaseContext
+from pipeline.metrics import PhaseMetrics
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection

@@ -26,7 +26,7 @@ class Signal(TypedDict):
 
 
 class PhaseMetricsPayload(TypedDict):
-    """Sérialisation JSON de `application.pipeline.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise."""
+    """Sérialisation JSON de `pipeline.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise."""
 
     new: int
     updated: int

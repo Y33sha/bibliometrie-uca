@@ -5,10 +5,10 @@ Une revue vide n'a ni enregistrement, ni publication, ni monographie, ni paiemen
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals._journal_label import journal_label
 from application.ports.pipeline.journals import JournalCleanupQueries
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Revues vides"
 """Libellé de la sous-étape dans le journal de la phase."""
