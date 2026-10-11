@@ -10,9 +10,7 @@ from pipeline.context import Phase
 from pipeline.metrics import PhaseMetrics
 
 if TYPE_CHECKING:
-    from application.ports.pipeline.fetch_missing.doi import (
-        AsyncFetchMissingDoiAdapter,
-    )
+    from pipeline.sources.fetch_missing import DoiSearch
 
 
 def build() -> Phase:
@@ -22,10 +20,10 @@ def build() -> Phase:
 
     Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
 
-    Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
+    Séquence, parallélisme et métriques dans `pipeline/sources/fetch_missing.py`.
     """
-    from application.pipeline.fetch_missing.phase import FetchMissingPhase
     from infrastructure.parallel import run_parallel
+    from pipeline.sources.fetch_missing import FetchMissingPhase
 
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
@@ -38,18 +36,15 @@ def build() -> Phase:
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
-    from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_id
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
-    from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
+    from pipeline.sources.hal.fetch_missing import fetch_missing_hal_by_id
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         return under_circuit_breaker(
             "hal",
             lambda _breaker: asyncio.run(
-                fetch_missing_hal_by_id(
-                    conn, PgHalFetchMissingAdapter(), log, retry_after_days=retry_after_days
-                )
+                fetch_missing_hal_by_id(conn, log, retry_after_days=retry_after_days)
             ),
             phase="fetch_missing",
             logger=log,
@@ -58,76 +53,59 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
-    from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_nnt
     from infrastructure.sources.config import get_fetch_missing_retry_after_days
-    from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
+    from pipeline.sources.hal.fetch_missing import fetch_missing_hal_by_nnt
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         return under_circuit_breaker(
             "hal",
             lambda _breaker: asyncio.run(
-                fetch_missing_hal_by_nnt(
-                    conn, PgHalFetchMissingAdapter(), log, retry_after_days=retry_after_days
-                )
+                fetch_missing_hal_by_nnt(conn, log, retry_after_days=retry_after_days)
             ),
             phase="fetch_missing",
             logger=log,
         )
 
 
-def _make_fetch_missing_doi_adapter(target: str) -> AsyncFetchMissingDoiAdapter:
-    """Construit l'adapter `fetch_missing_doi` d'une source cible.
+def _make_doi_search(target: str) -> DoiSearch:
+    """Construit la recherche par DOI d'une source cible."""
+    from pipeline.sources.crossref.fetch_missing import CrossrefDoiSearch
+    from pipeline.sources.datacite.fetch_missing import DataciteDoiSearch
+    from pipeline.sources.hal.fetch_missing import HalDoiSearch
+    from pipeline.sources.openalex.fetch_missing import OpenalexDoiSearch
+    from pipeline.sources.scanr.fetch_missing import ScanrDoiSearch
+    from pipeline.sources.wos.fetch_missing import WosDoiSearch
 
-    Consommé par la recherche par DOI (`_run_fetch_missing_doi`).
-    """
-    from typing import cast
-
-    from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
-    from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
-    from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
-    from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
-    from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
-    from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
-
-    # Cast : mypy ne reconnaît pas qu'une classe concrète se conforme à un Protocol quand elle
-    # est passée comme `type[Protocol]`.
-    adapter_classes: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
-        "dict[str, type[AsyncFetchMissingDoiAdapter]]",
-        {
-            "hal": HalFetchMissingDoiAdapter,
-            "openalex": OpenalexFetchMissingDoiAdapter,
-            "wos": WosFetchMissingDoiAdapter,
-            "scanr": ScanrFetchMissingDoiAdapter,
-            "crossref": CrossrefFetchMissingDoiAdapter,
-            "datacite": DataciteFetchMissingDoiAdapter,
-        },
-    )
-    return adapter_classes[target]()
+    searches: dict[str, type[DoiSearch]] = {
+        "hal": HalDoiSearch,
+        "openalex": OpenalexDoiSearch,
+        "wos": WosDoiSearch,
+        "scanr": ScanrDoiSearch,
+        "crossref": CrossrefDoiSearch,
+        "datacite": DataciteDoiSearch,
+    }
+    return searches[target]()
 
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
-    from application.pipeline.fetch_missing.doi import run_async
-    from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
-    from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_doi_lookup
     from infrastructure.sources.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
     )
+    from pipeline.sources.fetch_missing import fetch_missing_doi
 
-    adapter = _make_fetch_missing_doi_adapter(target)
+    search = _make_doi_search(target)
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         limit = get_fetch_missing_max_per_source(conn)
         return under_circuit_breaker(
             target,
             lambda breaker: asyncio.run(
-                run_async(
+                fetch_missing_doi(
                     conn,
-                    adapter,
+                    search,
                     log,
-                    missing_dois_reader=get_missing_dois,
-                    record_not_found=record_failed_doi_lookup,
                     retry_after_days=retry_after_days,
                     limit=limit,
                     breaker=breaker,

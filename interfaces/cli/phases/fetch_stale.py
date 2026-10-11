@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.context import Phase
 from pipeline.metrics import PhaseMetrics
 
 if TYPE_CHECKING:
-    from application.ports.pipeline.fetch_stale import FetchStaleAdapter
+    from pipeline.sources.fetch_stale import StaleRefetch
 
 
 def build() -> Phase:
@@ -20,9 +20,9 @@ def build() -> Phase:
 
     Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 
-    Séquence et métriques dans `application/pipeline/fetch_stale/phase.py::FetchStalePhase`.
+    Séquence et métriques dans `pipeline/sources/fetch_stale.py`.
     """
-    from application.pipeline.fetch_stale.phase import FetchStalePhase
+    from pipeline.sources.fetch_stale import FetchStalePhase
 
     return FetchStalePhase(
         refresh_one=_run_fetch_stale,
@@ -39,31 +39,26 @@ def _get_years_for_window(start_year: int | None) -> list[int] | None:
         return get_years(conn, start_year)
 
 
-def _make_fetch_stale_adapter(source: str) -> FetchStaleAdapter:
-    """Construit l'adapter `fetch_stale` d'une source (refetch par id natif)."""
-    from infrastructure.sources.crossref.fetch_stale import CrossrefFetchStaleAdapter
-    from infrastructure.sources.datacite.fetch_stale import DataciteFetchStaleAdapter
-    from infrastructure.sources.hal.fetch_stale import HalFetchStaleAdapter
-    from infrastructure.sources.openalex.fetch_stale import OpenalexFetchStaleAdapter
-    from infrastructure.sources.scanr.fetch_stale import ScanrFetchStaleAdapter
-    from infrastructure.sources.theses.fetch_stale import ThesesFetchStaleAdapter
-    from infrastructure.sources.wos.fetch_stale import WosFetchStaleAdapter
+def _make_refetch(source: str) -> StaleRefetch:
+    """Construit la nouvelle lecture par identifiant natif d'une source."""
+    from pipeline.sources.crossref.fetch_stale import CrossrefStaleRefetch
+    from pipeline.sources.datacite.fetch_stale import DataciteStaleRefetch
+    from pipeline.sources.hal.fetch_stale import HalStaleRefetch
+    from pipeline.sources.openalex.fetch_stale import OpenalexStaleRefetch
+    from pipeline.sources.scanr.fetch_stale import ScanrStaleRefetch
+    from pipeline.sources.theses.fetch_stale import ThesesStaleRefetch
+    from pipeline.sources.wos.fetch_stale import WosStaleRefetch
 
-    # Cast : mypy ne reconnaît pas qu'une classe concrète se conforme à un Protocol quand elle
-    # est passée comme `type[Protocol]`.
-    adapter_classes: dict[str, type[FetchStaleAdapter]] = cast(
-        "dict[str, type[FetchStaleAdapter]]",
-        {
-            "hal": HalFetchStaleAdapter,
-            "openalex": OpenalexFetchStaleAdapter,
-            "wos": WosFetchStaleAdapter,
-            "scanr": ScanrFetchStaleAdapter,
-            "theses": ThesesFetchStaleAdapter,
-            "crossref": CrossrefFetchStaleAdapter,
-            "datacite": DataciteFetchStaleAdapter,
-        },
-    )
-    return adapter_classes[source]()
+    refetches: dict[str, type[StaleRefetch]] = {
+        "hal": HalStaleRefetch,
+        "openalex": OpenalexStaleRefetch,
+        "wos": WosStaleRefetch,
+        "scanr": ScanrStaleRefetch,
+        "theses": ThesesStaleRefetch,
+        "crossref": CrossrefStaleRefetch,
+        "datacite": DataciteStaleRefetch,
+    }
+    return refetches[source]()
 
 
 def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
@@ -71,16 +66,16 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from application.pipeline.fetch_stale.phase import refresh
     from infrastructure.sources.config import get_fetch_stale_after_days
+    from pipeline.sources.fetch_stale import refresh
 
-    adapter = _make_fetch_stale_adapter(target)
+    refetch = _make_refetch(target)
     with open_tx() as conn:
         after_days = get_fetch_stale_after_days(conn)
         return under_circuit_breaker(
             target,
             lambda breaker: asyncio.run(
-                refresh(conn, adapter, log, after_days=after_days, years=years, breaker=breaker)
+                refresh(conn, refetch, log, after_days=after_days, years=years, breaker=breaker)
             ),
             phase="fetch_stale",
             logger=log,

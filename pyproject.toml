@@ -85,11 +85,12 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # peut en importer les dataclasses de transport pour typer ses
 # signatures. Les Protocols restent implémentés via duck typing.
 #
-# Exception transitoire : le code du pipeline encore dans `application/` importe ce qui est déjà
-# migré dans `pipeline/`, qui importe `infrastructure/`, jusqu'à sa propre migration.
+# Exception transitoire : le code du pipeline encore dans `application/` et `infrastructure/`
+# importe ce qui est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
     "application.pipeline.** -> pipeline.**",
+    "infrastructure.sources.** -> pipeline.**",
 ]
 
 [[tool.importlinter.contracts]]
@@ -363,6 +364,7 @@ combine-as-imports = true
 # à la main dans `interfaces/api` ou `application` doit se signaler.
 "infrastructure/read_models/*" = ["S608"]
 "infrastructure/pipeline/*" = ["S608"]
+"pipeline/*" = ["S101", "S608"]
 "infrastructure/repositories/*" = ["S608"]
 "infrastructure/db/sql_fragments.py" = ["S608"]
 "alembic/versions/*" = ["S608"]
@@ -383,7 +385,6 @@ combine-as-imports = true
 # composé à partir de fragments écrits en dur.
 "interfaces/cli/*" = ["E402", "S608"]
 "application/pipeline/*" = ["S101"]
-"pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------
@@ -411,21 +412,6 @@ omit = [
     # de fichiers, maintenance, outils de développement — restent mesurés : ils écrivent
     # en base et se rejouent.
     "interfaces/cli/oneshot/*",
-    # Wiring HTTP des adapters sources : les règles de lecture des formats sources vivent
-    # dans `domain/sources/<source>.py`, mesurées ; ce qui reste ici = httpx2 + pagination
-    # + sleep + implémentation du port de rattrapage.
-    "infrastructure/sources/hal/fetch_missing_hal.py",
-    "infrastructure/sources/hal/fetch_missing_doi.py",
-    "infrastructure/sources/openalex/fetch_missing_doi.py",
-    "infrastructure/sources/openalex/fetch_truncated.py",
-    "infrastructure/sources/scanr/fetch_missing_doi.py",
-    "infrastructure/sources/wos/fetch_missing_doi.py",
-    "infrastructure/sources/crossref/fetch_missing_doi.py",
-    # Refetch des documents stale par source : même nature d'adapter HTTP
-    # (httpx2 + pagination + impl du port fetch_stale) que l'extraction
-    # ci-dessus ; la logique utile de sélection vit côté queries/domain.
-    "infrastructure/sources/fetch_stale_base.py",
-    "infrastructure/sources/*/fetch_stale.py",
 ]
 
 [tool.coverage.report]

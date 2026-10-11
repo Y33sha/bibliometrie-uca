@@ -1,38 +1,47 @@
-"""Tests pour `application.pipeline.fetch_missing.doi.run_async`.
+"""Recherche par DOI de la phase `fetch_missing` (`pipeline.sources.fetch_missing.fetch_missing_doi`).
 
 Deux angles :
-1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation (pool de workers), le lock DB, l'inscription des DOI absents et la remontée des stats.
-2. **Adapters** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (happy path, absence de résultat, erreurs réseau et HTTP).
+1. **Boucle** : via une fausse recherche, vérifie le pool de workers, l'inscription des DOI absents et les métriques.
+2. **Recherches par source** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (notice trouvée, absence, erreurs réseau et HTTP).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx2
 import pytest
 
-from application.pipeline.fetch_missing.doi import run_async
-from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
-from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
-from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
-from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
-from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
-from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
-from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources import fetch_missing
+from pipeline.sources.crossref.fetch_missing import CrossrefDoiSearch
+from pipeline.sources.datacite.fetch_missing import DataciteDoiSearch
+from pipeline.sources.fetch_missing import DoiBatchResult, fetch_missing_doi
+from pipeline.sources.hal.fetch_missing import HalDoiSearch
+from pipeline.sources.openalex.fetch_missing import OpenalexDoiSearch
+from pipeline.sources.scanr.fetch_missing import ScanrDoiSearch
+from pipeline.sources.wos.fetch_missing import WosDoiSearch
 
 # ── helpers ──────────────────────────────────────────────────────
 
 
+def _sans_config[S](cls: type[S], **attributs: object) -> S:
+    """Recherche `cls` construite sans lire la configuration, avec les attributs donnés."""
+    search = cls.__new__(cls)
+    for nom, valeur in attributs.items():
+        setattr(search, nom, valeur)
+    return search
+
+
 class _FakeAdapter:
-    """Adapter de test : rend une notice par DOI, sauf les DOI de `absents` ; insert qui compte."""
+    """Recherche de test : rend une notice par DOI, sauf les DOI de `absents` ; insert qui compte."""
 
     source_key = "fake"
     batch_size = 1
     max_concurrent = 3
+    request_delay_s = 0.0
 
     def __init__(
         self,
@@ -44,9 +53,6 @@ class _FakeAdapter:
         self._in_flight = 0
         self.record_in_flight = record_in_flight if record_in_flight is not None else []
         self.inserted_records: list[dict] = []
-
-    def configure(self, conn):  # noqa: ARG002
-        pass
 
     async def fetch_async(self, client, dois):  # noqa: ARG002
         self._in_flight += 1
@@ -63,31 +69,20 @@ class _FakeAdapter:
         return True
 
 
-def _reader(dois: list[str]):
-    """Fabrique un `missing_dois_reader` qui retourne une liste fixe."""
-
-    def _read(conn, target):  # noqa: ARG001
-        return dois
-
-    return _read
-
-
 async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) -> PhaseMetrics:
-    """`run_async` sur une connexion simulée ; les DOI inscrits absents s'ajoutent à `recorded`."""
+    """`fetch_missing_doi` sur une connexion simulée et la sélection `dois` ; les DOI inscrits absents s'ajoutent à `recorded`."""
 
-    def _record(conn, source, doi, retry_after_days):  # noqa: ARG001
+    def _record(conn, source, id_type, doi, *, retry_after_days):  # noqa: ARG001
         if recorded is not None:
             recorded.append((source, doi, retry_after_days))
 
-    return await run_async(
-        MagicMock(),
-        adapter,
-        logging.getLogger("test"),
-        missing_dois_reader=_reader(dois),
-        record_not_found=_record,
-        retry_after_days=30,
-        **kw,
-    )
+    with (
+        patch.object(fetch_missing, "get_missing_dois", lambda conn, target: dois),
+        patch.object(fetch_missing, "record_failed_lookup", _record),
+    ):
+        return await fetch_missing_doi(
+            MagicMock(), adapter, logging.getLogger("test"), retry_after_days=30, **kw
+        )
 
 
 # ── orchestrateur : parallélisme + sémaphore + stats ─────────────
@@ -103,7 +98,7 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_absent_dois_are_recorded(self):
-        """Un DOI dont la source confirme l'absence est inscrit par `record_not_found`, sans insertion."""
+        """Un DOI dont la source confirme l'absence est inscrit dans `failed_lookups`, sans insertion."""
         recorded: list = []
         adapter = _FakeAdapter(absents=frozenset({"10.1/b"}))
         result = await _run(adapter, ["10.1/a", "10.1/b"], recorded=recorded)
@@ -148,15 +143,13 @@ class TestRunAsyncOrchestrator:
         assert result.new == 2
 
 
-# ── adapter OpenAlex : fetch_async via http_mock ─────────────────
+# ── recherche OpenAlex : fetch_async via http_mock ─────────────────
 
 
 class TestOpenalexFetchAsync:
     @staticmethod
-    def _adapter() -> OpenalexFetchMissingDoiAdapter:
-        adapter = OpenalexFetchMissingDoiAdapter()
-        adapter.base_url = "https://api.openalex.org/works"
-        return adapter
+    def _adapter() -> OpenalexDoiSearch:
+        return _sans_config(OpenalexDoiSearch, base_url="https://api.openalex.org/works")
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_first_result(self, http_mock):
@@ -205,15 +198,13 @@ class TestOpenalexFetchAsync:
         assert result == DoiBatchResult()
 
 
-# ── adapter HAL : fetch_async via http_mock ──────────────────────
+# ── recherche HAL : fetch_async via http_mock ──────────────────────
 
 
 class TestHalFetchAsync:
     @staticmethod
-    def _adapter() -> HalFetchMissingDoiAdapter:
-        adapter = HalFetchMissingDoiAdapter()
-        adapter.base_url = "https://api.archives-ouvertes.fr/search/"
-        return adapter
+    def _adapter() -> HalDoiSearch:
+        return HalDoiSearch()
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_first_doc(self, http_mock):
@@ -238,16 +229,13 @@ class TestHalFetchAsync:
         assert result == DoiBatchResult(not_found=["10.1/missing"])
 
 
-# ── adapter Crossref : fetch_async via http_mock ─────────────────
+# ── recherche Crossref : fetch_async via http_mock ─────────────────
 
 
 class TestCrossrefFetchAsync:
     @staticmethod
-    def _adapter() -> CrossrefFetchMissingDoiAdapter:
-        adapter = CrossrefFetchMissingDoiAdapter()
-        adapter.base_url = "https://api.crossref.org"
-        adapter.headers = {}
-        return adapter
+    def _adapter() -> CrossrefDoiSearch:
+        return _sans_config(CrossrefDoiSearch, base_url="https://api.crossref.org", headers={})
 
     @pytest.mark.asyncio
     async def test_un_doi_principal_rend_son_document(self, http_mock):
@@ -283,7 +271,7 @@ class TestCrossrefFetchAsync:
         )
 
 
-# ── adapter ScanR : fetch_async via http_mock ────────────────────
+# ── recherche ScanR : fetch_async via http_mock ────────────────────
 
 
 def _scanr_hit(scanr_id: str, doi: str) -> dict:
@@ -292,11 +280,8 @@ def _scanr_hit(scanr_id: str, doi: str) -> dict:
 
 class TestScanrFetchAsync:
     @staticmethod
-    def _adapter() -> ScanrFetchMissingDoiAdapter:
-        adapter = ScanrFetchMissingDoiAdapter()
-        adapter.url = "https://scanr.example/_search"
-        adapter.auth = ("u", "p")
-        return adapter
+    def _adapter() -> ScanrDoiSearch:
+        return _sans_config(ScanrDoiSearch, url="https://scanr.example/_search", auth=("u", "p"))
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_hits_sources(self, http_mock):
@@ -332,16 +317,17 @@ class TestScanrFetchAsync:
         assert result == DoiBatchResult()
 
 
-# ── adapter DataCite : fetch_async (batch query) via http_mock ───
+# ── recherche DataCite : fetch_async (batch query) via http_mock ───
 
 
 class TestDataciteFetchAsync:
     @staticmethod
-    def _adapter() -> DataciteFetchMissingDoiAdapter:
-        adapter = DataciteFetchMissingDoiAdapter()
-        adapter.base_url = "https://api.datacite.org"
-        adapter.headers = {"Accept": "application/vnd.api+json"}
-        return adapter
+    def _adapter() -> DataciteDoiSearch:
+        return _sans_config(
+            DataciteDoiSearch,
+            base_url="https://api.datacite.org",
+            headers={"Accept": "application/vnd.api+json"},
+        )
 
     @pytest.mark.asyncio
     async def test_fetch_async_batch_returns_records(self, http_mock):
@@ -386,16 +372,17 @@ class TestDataciteFetchAsync:
         assert result == DoiBatchResult()
 
 
-# ── adapter WoS : fetch_async via http_mock ──────────────────────
+# ── recherche WoS : fetch_async via http_mock ──────────────────────
 
 
 class TestWosFetchAsync:
     @staticmethod
-    def _adapter() -> WosFetchMissingDoiAdapter:
-        adapter = WosFetchMissingDoiAdapter()
-        adapter.base_url = "https://api.clarivate.com/api/wos"
-        adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
-        return adapter
+    def _adapter() -> WosDoiSearch:
+        return _sans_config(
+            WosDoiSearch,
+            base_url="https://api.clarivate.com/api/wos",
+            headers={"X-ApiKey": "k", "Accept": "application/json"},
+        )
 
     @pytest.mark.asyncio
     async def test_fetch_async_single_page(self, http_mock):

@@ -15,7 +15,6 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from application.pipeline._fetch_pool import run_fetch_pool
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import (
     DoiPrefixesQueries,
@@ -25,6 +24,7 @@ from application.ports.pipeline.lookup import UNAVAILABLE, LookupOutcome, NotFou
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
+from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression

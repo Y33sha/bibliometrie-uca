@@ -29,7 +29,7 @@ from pipeline.sources.harvest import (
     scoped_logger,
     stage_document,
 )
-from pipeline.sources.openalex.credentials import auth_params
+from pipeline.sources.openalex.api import auth_params
 from pipeline.sources.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
 from pipeline.sources.throttle import Throttle
 
