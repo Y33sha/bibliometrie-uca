@@ -46,7 +46,7 @@ from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -530,6 +530,73 @@ class TestMergePerson:
         _hal_name_form(sa_sync_conn, source, name_form="forme commune", status="rejected")
         merge_person(target, source, repo=repo)
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "rejected"
+
+    def test_confirmed_signature_transferred(self, sa_sync_conn, repo):
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        sa_id = _jean_dupont_signature(
+            sa_sync_conn, _notice(sa_sync_conn, insert_publication(sa_sync_conn)), person_id=source
+        )
+        insert_confirmed_authorship(sa_sync_conn, sa_id, person_id=source)
+
+        merge_person(target, source, repo=repo)
+
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT person_id FROM confirmed_authorships WHERE source_authorship_id = :i",
+                i=sa_id,
+            )
+            == target
+        )
+
+    def test_distinct_persons_transferred(self, sa_sync_conn, repo):
+        """Les non-doublons de l'absorbée passent à la conservée ; celui qui oppose les deux personnes fusionnées disparaît."""
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        other = _person(sa_sync_conn, last_name="Durand")
+        shared = _person(sa_sync_conn, last_name="Duval")
+        for a, b in ((source, other), (source, shared), (target, shared), (source, target)):
+            mark_distinct(a, b, repo=repo)
+
+        merge_person(target, source, repo=repo)
+
+        pairs = sa_sync_conn.execute(
+            text(
+                "SELECT person_id_a, person_id_b FROM distinct_persons WHERE :t IN (person_id_a, person_id_b)"
+            ),
+            {"t": target},
+        ).all()
+        assert sorted(pairs) == sorted(
+            [(min(target, other), max(target, other)), (min(target, shared), max(target, shared))]
+        )
+
+    @pytest.mark.parametrize(
+        ("target_exclusion", "source_exclusion", "expected"),
+        [
+            (None, PersonExclusion.OUT_OF_PERIMETER, PersonExclusion.OUT_OF_PERIMETER),
+            (
+                PersonExclusion.OUT_OF_PERIMETER,
+                PersonExclusion.NOT_A_PERSON,
+                PersonExclusion.NOT_A_PERSON,
+            ),
+            (PersonExclusion.NOT_A_PERSON, None, PersonExclusion.NOT_A_PERSON),
+        ],
+    )
+    def test_strongest_exclusion_kept(
+        self, sa_sync_conn, repo, target_exclusion, source_exclusion, expected
+    ):
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        repo.set_exclusion(target, target_exclusion)
+        repo.set_exclusion(source, source_exclusion)
+
+        merge_person(target, source, repo=repo)
+
+        assert (
+            _scalar(sa_sync_conn, "SELECT exclusion FROM persons WHERE id = :p", p=target)
+            == expected
+        )
 
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────

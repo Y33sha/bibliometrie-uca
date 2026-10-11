@@ -6,15 +6,10 @@ from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
-from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
+from domain.persons.name_forms import PersonNameForm
 from domain.persons.person import Person, PersonExclusion
 from infrastructure.db.scalars import scalar_int
 from infrastructure.pipeline.authorships.build import refresh_publications_in_perimeter
-from infrastructure.repositories.authorship_repository import (
-    delete_orphan_authorships,
-    detach_rejected_signatures,
-)
-from infrastructure.repositories.person_repository import _name_forms
 
 
 def find_by_id(conn: Connection, person_id: int) -> Person | None:
@@ -191,89 +186,6 @@ def ids_with_rh(conn: Connection, person_ids: list[int]) -> set[int]:
             {"ids": person_ids},
         ).scalars()
     )
-
-
-def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Séquence, dans la transaction du caller :
-    1. Transfert source_authorships
-    2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
-    3. Sur une publication où la cible est rejetée, le rejet l'emporte : signatures détachées, authorship supprimée
-    4. Transfert des identifiants
-    5. person_name_forms : bascule source_id → target_id
-    6. Recalcul des formes source 'persons' pour la cible
-    7. Suppression de la personne source
-
-    La source n'a pas de fiche RH : le service conserve toujours la personne qui en a une.
-    """
-    conn.execute(
-        text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
-    conn.execute(
-        text("""
-            DELETE FROM authorships
-            WHERE person_id = :s
-              AND publication_id IN (
-                  SELECT publication_id FROM authorships WHERE person_id = :t
-              )
-        """),
-        {"s": source_id, "t": target_id},
-    )
-    conn.execute(
-        text("UPDATE authorships SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
-    # rejected_authorships : même motif dédup-puis-transfert. L'identité étant la même après fusion, un rejet sur l'absorbée vaut pour l'absorbante.
-    conn.execute(
-        text("""
-            DELETE FROM rejected_authorships
-            WHERE person_id = :s
-              AND publication_id IN (
-                  SELECT publication_id FROM rejected_authorships WHERE person_id = :t
-              )
-        """),
-        {"s": source_id, "t": target_id},
-    )
-    conn.execute(
-        text("UPDATE rejected_authorships SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
-    # La fusion peut réunir sur la cible une contribution de l'une et le rejet de l'autre, pour la même publication : le rejet l'emporte, comme au rejet d'une paire.
-    detach_rejected_signatures(conn, target_id)
-    delete_orphan_authorships(conn, target_id)
-    conn.execute(
-        text("UPDATE person_identifiers SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
-    # Formes de la personne absorbée transférées avec leur statut ; sur une forme commune, le verdict de la cible prime sur une attente.
-    conn.execute(
-        text(f"""
-            INSERT INTO person_name_forms (name_form, person_id, sources, status)
-            SELECT name_form, :t, sources, status FROM person_name_forms WHERE person_id = :s
-            ON CONFLICT (name_form, person_id) DO UPDATE SET
-                sources = (
-                    SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{{}}'::text[])
-                    FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
-                ),
-                status = CASE
-                    WHEN person_name_forms.status = '{AttributionStatus.PENDING.value}'
-                    THEN EXCLUDED.status
-                    ELSE person_name_forms.status
-                END
-        """),
-        {"t": target_id, "s": source_id},
-    )
-    conn.execute(
-        text("DELETE FROM person_name_forms WHERE person_id = :s"),
-        {"s": source_id},
-    )
-    target = conn.execute(
-        text("SELECT last_name, first_name FROM persons WHERE id = :id"),
-        {"id": target_id},
-    ).one()
-    forms = compute_person_name_forms(target.last_name, target.first_name or "")
-    _name_forms.refresh_name_forms(conn, target_id, forms)
-    conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
 
 
 def mark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:

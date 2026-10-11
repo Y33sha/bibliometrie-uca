@@ -11,11 +11,10 @@ Composition / associations :
 La logique métier touchant à une personne (fusion, matching cross-source, création contrôlée, normalisation des noms) vit ici.
 """
 
-from collections.abc import Collection
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from domain.errors import ConflictError, ValidationError
+from domain.errors import ValidationError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.name_forms import PersonNameForm
 
@@ -26,23 +25,6 @@ def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
     if not last_name:
         raise ValidationError("Le nom est requis")
     return last_name, first_name
-
-
-def merge_roles(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
-    """Rôles (conservée, absorbée) d'une fusion demandée `target ← source`.
-
-    Une personne qui a une fiche RH est toujours conservée : si seule la source en a une, les rôles s'inversent. `with_rh` contient les ids des personnes qui ont une fiche RH.
-
-    Lève `ConflictError` si les deux personnes ont chacune une fiche RH.
-    """
-    if target_id in with_rh and source_id in with_rh:
-        raise ConflictError(
-            f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
-            "ont chacune une fiche RH distincte.",
-        )
-    if source_id in with_rh:
-        return source_id, target_id
-    return target_id, source_id
 
 
 class PersonExclusion(StrEnum):

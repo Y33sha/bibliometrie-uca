@@ -86,7 +86,7 @@ class PersonRepository(Protocol):
         ...
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la personne `source_id` dans `target_id` : transfère contributions, identifiants et formes de nom vers la cible, recalcule ses formes canoniques, puis supprime la source. Le service garantit en amont que la source n'a pas de fiche RH (`merge_roles`)."""
+        """Fusionne la personne `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de la personne (`domain.persons.merge.PERSON_DATA`), puis supprime la source. Le service garantit en amont que la source n'a pas de fiche RH (`merge_roles`)."""
         ...
 
     # ── distinct_persons ───────────────────────────────────────────
