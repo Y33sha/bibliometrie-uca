@@ -11,7 +11,7 @@ class AuthorshipPersonRow(TypedDict):
     """Ligne renvoyée par `get_authorship_person` : identité d'une ligne consolidée `authorships`."""
 
     id: int
-    person_id: int | None
+    person_id: int
     publication_id: int
 
 
@@ -95,8 +95,6 @@ class AuthorshipRepository(Protocol):
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
         """Détache toutes les signatures de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de signatures détachées."""
         ...
-
-    def delete_authorship(self, authorship_id: int) -> None: ...
 
     def delete_orphan_authorships_for_person(self, person_id: int) -> int:
         """Supprime les lignes consolidées de la personne dépourvues de toute signature source active. Retourne le nombre supprimé."""

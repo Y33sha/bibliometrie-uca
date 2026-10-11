@@ -16,7 +16,6 @@ from sqlalchemy import Connection, text
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.rows import insert_row
 from tests.integration.helpers.sources import (
     insert_signature,
@@ -158,17 +157,11 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
     (via une signature qui atteste l'authorship + appartenance au périmètre d'affiliation),
     puis rafraîchit `source_authorship_structures` et `authorship_structures`.
 
-    La signature atteste l'authorship par sa publication et sa personne : une authorship sans personne en reçoit une."""
+    La signature atteste l'authorship par sa publication et sa personne."""
     publication_id, person_id = conn.execute(
         text("SELECT publication_id, person_id FROM authorships WHERE id = :id"),
         {"id": authorship_id},
     ).one()
-    if person_id is None:
-        person_id = insert_person(conn)
-        conn.execute(
-            text("UPDATE authorships SET person_id = :pid WHERE id = :id"),
-            {"pid": person_id, "id": authorship_id},
-        )
     sp_id = insert_source_publication(
         conn, source_id=f"as-test-{next(_seq)}", pub_year=2024, publication_id=publication_id
     )

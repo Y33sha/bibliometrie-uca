@@ -568,7 +568,7 @@ authorships = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
-    Column("person_id", Integer),
+    Column("person_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),

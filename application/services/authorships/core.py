@@ -59,8 +59,6 @@ def exclude_authorship(
 
     Retrouve la paire (publication, personne) à partir de l'`authorship_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Si la ligne n'a pas de `person_id`, il n'y a pas de paire à rejeter : on se contente de supprimer la ligne.
-
     Lève NotFoundError si la ligne n'existe pas.
     """
     row = repo.get_authorship_person(authorship_id)
@@ -69,10 +67,6 @@ def exclude_authorship(
 
     person_id = row["person_id"]
     publication_id = row["publication_id"]
-    if person_id is None:
-        repo.delete_authorship(authorship_id)
-        return {"id": authorship_id, "person_id": None, "publication_id": publication_id}
-
     reject_pair(publication_id, person_id, repo=repo, audit_repo=audit_repo)
     if person_repo is not None:
         person_repo.delete_orphan_name_forms_for_person(person_id)

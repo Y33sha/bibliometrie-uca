@@ -65,7 +65,7 @@ def insert_authorship(
     conn: Connection,
     publication_id: int,
     *,
-    person_id: int | None = None,
+    person_id: int,
     author_position: int | None = None,
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,

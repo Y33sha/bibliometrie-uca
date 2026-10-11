@@ -251,12 +251,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
         return detach_rejected_signatures(self._conn, person_id, publication_id)
 
-    def delete_authorship(self, authorship_id: int) -> None:
-        self._conn.execute(
-            text("DELETE FROM authorships WHERE id = :id"),
-            {"id": authorship_id},
-        )
-
     def delete_orphan_authorships_for_person(self, person_id: int) -> int:
         return delete_orphan_authorships(self._conn, person_id)
 

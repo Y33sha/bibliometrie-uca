@@ -28,7 +28,9 @@ _notice = partial(insert_source_publication, title="T")
 def _attach(conn, pub_id, lab_id):
     """Authorship reliant la publi à un labo via la matview authorship_structures
     (semée par la chaîne source minimale)."""
-    aid = insert_authorship(conn, pub_id, in_perimeter=True, roles=["author"])
+    aid = insert_authorship(
+        conn, pub_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
+    )
     add_authorship_structure(conn, aid, lab_id)
 
 
