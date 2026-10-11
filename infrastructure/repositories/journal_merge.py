@@ -37,6 +37,16 @@ def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
         """),
         {"t": target_id, "s": source_id},
     )
+    # Des ISSN saisis à la main sur l'absorbée gardent leur autorité sur la liste réunie.
+    conn.execute(
+        text("""
+            UPDATE journals t SET manual_fields = t.manual_fields || CAST(:field AS text)
+            FROM journals s
+            WHERE t.id = :t AND s.id = :s
+              AND :field = ANY(s.manual_fields) AND NOT :field = ANY(t.manual_fields)
+        """),
+        {"t": target_id, "s": source_id, "field": ManualField.ISSNS.value},
+    )
 
 
 def _fill_empty_with_marker(

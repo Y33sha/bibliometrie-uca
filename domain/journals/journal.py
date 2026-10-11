@@ -62,9 +62,12 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
 class ManualField(StrEnum):
     """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Un champ saisi à la main n'est plus écrit par le pipeline."""
 
+    TITLE = "title"
     JOURNAL_TYPE = "journal_type"
     # Montant et devise.
     APC = "apc"
+    # La liste des ISSN, avec leur support, leur statut et l'ISSN de liaison.
+    ISSNS = "issns"
 
 
 @dataclass(slots=True)

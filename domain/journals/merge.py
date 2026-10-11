@@ -10,7 +10,7 @@ JOURNAL_DATA: dict[str, MergedData] = {
     "issns": MergedData(
         MergeRule.COMBINE,
         DataNature.MIXED,
-        "ISSN. Un ISSN que la conservée a déjà reste le sien ; les autres passent à la conservée, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte.",
+        "ISSN. Un ISSN que la conservée a déjà reste le sien ; les autres passent à la conservée, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte. Des ISSN saisis à la main sur l'absorbée gardent leur marqueur.",
     ),
     "name_forms": MergedData(
         MergeRule.TRANSFER_UNIQUE, DataNature.DERIVED, "Formes de nom, une par éditeur."
