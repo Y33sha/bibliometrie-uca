@@ -35,7 +35,7 @@ Quelles entités gardent leur identifiant d'un run à l'autre, et que devient l'
 
 ### 2. Décisions humaines et données de référence
 
-Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité par le chantier [Décisions humaines durables](DATA_decisions-humaines-durables.md).
+Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité par le chantier [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md).
 
 **Acquis**
 - Recensement des décisions, de leur rattachement et des chemins qui les détruisent.

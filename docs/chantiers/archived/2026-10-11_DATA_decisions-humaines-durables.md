@@ -28,9 +28,8 @@ La docstring de `delete_empty_persons` pose qu'une personne vide n'a pas de déc
 - **Une entité visée par une décision humaine est conservée par défaut**, même vide ou hors périmètre. Elle peut être masquée dans l'interface et l'API publiques.
 - **Fusion de personnes : les décisions sont reportées sur la personne conservée.** Les personnes n'ont pas d'identifiant naturel général. La fusion applique déjà les rejets des deux personnes.
 - **Une décision sur un lien est une entrée de la résolution**, rattachée autant que possible à des identifiants stables : notice (source et identifiant dans la source), identifiant naturel (DOI, ISSN, ROR, ORCID, IdRef). La résolution en tient compte au lieu de la subir.
-- **Une correction de valeur est stockée à part et l'emporte sur la valeur calculée.** La valeur d'un champ est la valeur humaine si elle existe, sinon la valeur calculée. Ce qu'un humain a décidé se lit en un seul endroit, avec son auteur et sa date.
+- **Une correction de valeur est marquée dans la ligne** (`manual_fields`) : un champ saisi à la main n'est plus écrit par le pipeline. Le journal d'audit garde l'auteur et la date.
 - **Une fusion d'entités laisse des alias** : formes de nom et identifiants transférés à l'entité conservée, qui la font retrouver aux runs suivants. C'est déjà le cas pour les revues et les éditeurs.
-- **Les décisions vivent dans un schéma PostgreSQL dédié.** L'API y écrit, le pipeline y lit seulement. C'est la catégorie « décision » de la fiche [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md).
 - **Les décisions sur des liens restent dans des tables typées**, avec leurs clés : la résolution les lit par jointure. Pas de journal générique rejoué après coup.
 
 ## Recensement
@@ -187,20 +186,12 @@ Référentiels que seule l'administration écrit (`structures`, `structure_name_
 Ce qui reste à risque après la phase 2.
 
 - [x] Rejets d'une paire : rattachés aux notices de la publication. Une publication est rejetée pour une personne dès qu'une de ses notices l'est ; une signature confirmée l'emporte sur le rejet.
-- [ ] File d'administration des décisions contradictoires (notice rejetée et signature confirmée pour la même personne dans une publication).
-- [ ] Autres cas relevés par la phase 1.
-
-### Phase 5 — Schéma dédié
-
-- [ ] Créer le schéma des décisions, avec ses droits : l'API écrit, le pipeline lit.
-- [ ] Y faire atterrir les tables créées par les phases 3 et 4.
-- [ ] Y déplacer les tables de décisions sans perte, si le gain le justifie.
 
 ## Questions ouvertes
 
-- Valeurs dédiées dans une colonne partagée (statuts) : les laisser en place, ou les sortir vers le schéma des décisions ?
+Aucune.
 
 ## Reporté
 
-- Mesure sur la base de prod, avec un script qui confronte chaque type de décision journalisé à l'état de la base. Ne bloque pas les phases 1 à 3.
-- Correction de valeur face à une source jugée plus fiable : la valeur humaine l'emporte-t-elle toujours ?
+- File d'administration des décisions contradictoires : notice rejetée et signature confirmée pour la même personne dans une publication.
+- Mesure sur la base de prod, avec un script qui confronte chaque type de décision journalisé à l'état de la base.
