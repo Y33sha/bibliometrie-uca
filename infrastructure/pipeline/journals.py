@@ -6,7 +6,19 @@ Sert les contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-o
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 
-from sqlalchemy import Connection, case, delete, exists, func, literal, or_, select, text, update
+from sqlalchemy import (
+    Connection,
+    any_,
+    case,
+    delete,
+    exists,
+    func,
+    literal,
+    or_,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.journals import (
@@ -190,11 +202,11 @@ _JOURNAL_SUMMARIES = text(f"""
 
 # Revues sans enregistrement, sans publication, sans monographie et sans paiement APC.
 # Le type n'est pas saisi à la main : le pipeline peut l'écrire.
-_TYPE_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.JOURNAL_TYPE.value)
+_TYPE_NOT_MANUAL = ~(literal(ManualField.JOURNAL_TYPE.value) == any_(journals.c.manual_fields))
 # L'APC n'est pas saisi à la main : le pipeline peut l'écrire.
-_APC_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.APC.value)
+_APC_NOT_MANUAL = ~(literal(ManualField.APC.value) == any_(journals.c.manual_fields))
 # Le modèle OA n'est pas saisi à la main : le pipeline peut l'écrire.
-_OA_MODEL_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.OA_MODEL.value)
+_OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(journals.c.manual_fields))
 
 _EMPTY_JOURNALS = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
@@ -393,7 +405,7 @@ class PgJournalGatewayQueries(
         """Les ISSN de la revue sont saisis à la main : ils font autorité, le pipeline ne les écrit pas."""
         return bool(
             self._conn.execute(
-                select(journals.c.manual_fields.any(ManualField.ISSNS.value)).where(
+                select(literal(ManualField.ISSNS.value) == any_(journals.c.manual_fields)).where(
                     journals.c.id == journal_id
                 )
             ).scalar()
@@ -470,7 +482,7 @@ class PgJournalGatewayQueries(
             select(journals.c.id, journals.c.title, journals.c.journal_type)
             .where(
                 journals.c.id.in_(ids),
-                ~journals.c.manual_fields.any(ManualField.ISSNS.value),
+                ~(literal(ManualField.ISSNS.value) == any_(journals.c.manual_fields)),
             )
             .order_by(journals.c.id)
         ).all()
@@ -521,7 +533,7 @@ class PgJournalGatewayQueries(
                 update(journals)
                 .where(
                     journals.c.id == journal_id,
-                    ~journals.c.manual_fields.any(ManualField.TITLE.value),
+                    ~(literal(ManualField.TITLE.value) == any_(journals.c.manual_fields)),
                 )
                 .values(title=title, title_normalized=normalize_text(title))
             ).rowcount
