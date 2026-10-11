@@ -161,7 +161,7 @@ class PersonsMatchingQueries(Protocol):
         ...
 
     def delete_empty_persons(self, conn: Connection) -> int:
-        """Supprime les personnes vidées de toute signature, hors référentiel RH ; leurs formes de nom partent en cascade. Retourne le nombre supprimé."""
+        """Supprime les personnes vidées de toute signature, sauf celles qui ont une notice RH ou une décision humaine ; leurs formes de nom partent en cascade. Retourne le nombre supprimé."""
         ...
 
     def delete_unsupported_identifier_attributions(self, conn: Connection) -> int:

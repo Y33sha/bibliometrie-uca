@@ -10,6 +10,7 @@ _Q = PgPersonsMatchingQueries()
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
+    insert_person_identifier,
     insert_person_name_form,
     insert_person_rh,
     insert_rejected_authorship,
@@ -156,3 +157,30 @@ def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     assert _person_exists(conn, empty) is False
     assert _person_exists(conn, signed) is True
     assert _person_exists(conn, rh) is True
+
+
+def test_delete_empty_persons_spares_persons_with_a_decision(sa_sync_conn):
+    """Rejet, non-doublon ou exclusion conservent une personne vide ; une confirmation d'identifiant non."""
+    conn = sa_sync_conn
+    rejected = insert_person(conn, "Rejet", first_name="R")
+    insert_rejected_authorship(conn, insert_publication(conn), person_id=rejected)
+    distinct_a = insert_person(conn, "Distinct", first_name="A")
+    distinct_b = insert_person(conn, "Distinct", first_name="B")
+    conn.execute(
+        text("INSERT INTO distinct_persons (person_id_a, person_id_b) VALUES (:a, :b)"),
+        {"a": min(distinct_a, distinct_b), "b": max(distinct_a, distinct_b)},
+    )
+    excluded = insert_person(conn, "Exclue", first_name="E")
+    conn.execute(
+        text("UPDATE persons SET exclusion = 'not_a_person' WHERE id = :p"), {"p": excluded}
+    )
+    confirmed_orcid = insert_person(conn, "Orcid", first_name="O")
+    insert_person_identifier(
+        conn, confirmed_orcid, id_type="orcid", id_value="0000-0002-1825-0097", status="confirmed"
+    )
+
+    _Q.delete_empty_persons(conn)
+
+    for kept in (rejected, distinct_a, distinct_b, excluded):
+        assert _person_exists(conn, kept) is True
+    assert _person_exists(conn, confirmed_orcid) is False
