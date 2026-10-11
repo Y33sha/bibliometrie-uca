@@ -52,6 +52,7 @@ from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
+    UNDECIDABLE_NAME_FORM_REASONS,
     NameFormDecision,
     Namesake,
     PersonMatchDecision,
@@ -167,9 +168,12 @@ class _Cascade:
             compatible_person_ids=compatible,
         )
 
-    def name_form_ambiguous(self, a: EnrichedAuthorship) -> bool:
-        """Vrai quand la forme du nom ne désigne aucune personne unique parmi celles qui la portent : la signature ne peut ni se rattacher par son nom, ni créer de personne."""
-        return self._name_form_outcome(a, self._rejected_for(a)).reason == "ambiguous_name_form"
+    def name_form_undecidable(self, a: EnrichedAuthorship) -> bool:
+        """Vrai quand la forme du nom est connue mais ne désigne aucune personne unique, par homonymie ou parce que toutes ses personnes sont rejetées pour la publication : la signature ne peut ni se rattacher par son nom, ni créer de personne."""
+        return (
+            self._name_form_outcome(a, self._rejected_for(a)).reason
+            in UNDECIDABLE_NAME_FORM_REASONS
+        )
 
     def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
@@ -410,8 +414,8 @@ def run_cascade(
     # rejuge contre l'état ferme complet.
     sans_personne = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
     non_identifiees = [a for a in sans_personne if a.allow_create]
-    # Une création ajoute des personnes aux formes de nom sans en retirer : une forme ambiguë le reste.
-    indecidables = [a for a in non_identifiees if c.name_form_ambiguous(a)]
+    # Une création ajoute des personnes aux formes de nom sans en retirer : une forme indécidable le reste.
+    indecidables = [a for a in non_identifiees if c.name_form_undecidable(a)]
     indecidables_ids = {a.source_authorship_id for a in indecidables}
     # Les signatures au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
     a_creer = sorted(
@@ -426,7 +430,11 @@ def run_cascade(
         accord(len(non_identifiees), "signature"),
         forme(len(non_identifiees), "non identifiée"),
     )
-    logger.info("%s%s (forme de nom ambiguë)", BRANCHE, accord(len(indecidables), "indécidable"))
+    logger.info(
+        "%s%s (forme de nom ambiguë, ou candidats tous rejetés)",
+        BRANCHE,
+        accord(len(indecidables), "indécidable"),
+    )
     creees_avant = c.created
     with progression(len(a_creer), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
         for a in a_creer:

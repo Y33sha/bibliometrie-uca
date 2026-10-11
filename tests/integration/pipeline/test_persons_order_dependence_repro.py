@@ -293,7 +293,7 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
         _run_create(conn)
 
     assert "  ├─ 2 signatures non identifiées" in caplog.messages
-    assert "  ├─ 1 indécidable (forme de nom ambiguë)" in caplog.messages
+    assert "  ├─ 1 indécidable (forme de nom ambiguë, ou candidats tous rejetés)" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
 
 

@@ -178,6 +178,10 @@ def decide_cross_source_match(
     return matched_pid
 
 
+# Motifs d'un `skip` par forme de nom connue : la signature ne peut ni se rattacher par son nom, ni créer de personne.
+UNDECIDABLE_NAME_FORM_REASONS = frozenset({"ambiguous_name_form", "all_candidates_rejected"})
+
+
 @dataclass(frozen=True)
 class NameFormDecision:
     """Décision résultant du lookup d'une authorship dans `person_name_forms`.
@@ -206,7 +210,7 @@ def decide_name_form_outcome(
 
     - Forme connue, 1 candidat → `match`.
     - Forme connue, N candidats → `skip` avec `reason="ambiguous_name_form"` (homonymes en BDD, on laisse le traitement manuel trancher).
-    - Forme connue, 0 candidat (tous rejetés) → `skip` `ambiguous_name_form` : on laisse orphelin, on ne crée pas.
+    - Forme connue, 0 candidat (tous rejetés) → `skip` avec `reason="all_candidates_rejected"` : la signature reste orpheline, sans création.
     - Forme inconnue, personnes compatibles : mêmes règles sur elles, le `match` portant `reason="compatible_name"`.
     - Forme inconnue, aucune personne compatible, `allow_create` → `create`.
     - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
@@ -222,6 +226,8 @@ def decide_name_form_outcome(
     candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
     if len(candidates) == 1:
         return NameFormDecision(action="match", person_id=candidates[0], reason=match_reason)
+    if not candidates:
+        return NameFormDecision(action="skip", reason="all_candidates_rejected")
     return NameFormDecision(action="skip", reason="ambiguous_name_form")
 
 
@@ -322,7 +328,7 @@ def identifier_misplaced(signature_form: str, consensus: str | None) -> bool:
 class PersonMatchDecision:
     """Décision de la cascade de matching unifiée.
 
-    `reason` identifie le signal qui a tranché (`"orcid"` / `"hal_person_id"` / `"idref"` / `"cross_source"` / `"single_name"` / `"compatible_name"` pour les `match` ; `"new"` pour `create` ; `"ambiguous_name_form"` / `"creation_not_allowed"` pour `skip`). Utilisable côté logs et stats par le caller.
+    `reason` identifie le signal qui a tranché (`"orcid"` / `"hal_person_id"` / `"idref"` / `"cross_source"` / `"single_name"` / `"compatible_name"` pour les `match` ; `"new"` pour `create` ; `"ambiguous_name_form"` / `"all_candidates_rejected"` / `"creation_not_allowed"` pour `skip`). Utilisable côté logs et stats par le caller.
     """
 
     action: Literal["match", "create", "skip"]
