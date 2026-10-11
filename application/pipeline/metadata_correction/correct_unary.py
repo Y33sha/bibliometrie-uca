@@ -16,7 +16,6 @@ from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
@@ -40,6 +39,7 @@ from domain.source_publications.raw_metadata import (
     stash_entry,
 )
 from domain.sources.scanr import extract_hal_id_from_scanr_id
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.

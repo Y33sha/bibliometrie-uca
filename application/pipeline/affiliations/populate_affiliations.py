@@ -8,9 +8,9 @@ import time
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import DERNIERE_BRANCHE
-from application.pipeline.progression import attente
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
+from pipeline.libelles import DERNIERE_BRANCHE
+from pipeline.progression import attente
 
 
 def run_populate(

@@ -5,10 +5,10 @@ Les couples (DOI, revue) des enregistrements de toutes les sources désignent le
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.journals import JournalDoiNamespaceQueries
 from domain.journals.doi_namespaces import designated_by_namespace, learn_namespaces
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Espaces de noms DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

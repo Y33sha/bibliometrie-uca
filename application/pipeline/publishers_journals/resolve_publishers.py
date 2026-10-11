@@ -16,9 +16,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import BRANCHE, accord
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.doi_prefixes import (
     DoiPrefixesQueries,
@@ -28,6 +25,9 @@ from application.ports.pipeline.lookup import UNAVAILABLE, LookupOutcome, NotFou
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
+from pipeline.libelles import BRANCHE, accord
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 LIBELLE = "Éditeurs des préfixes DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

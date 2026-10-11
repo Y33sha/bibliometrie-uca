@@ -1,6 +1,6 @@
-"""Les cinq outils qui doivent connaître les couches du projet en reçoivent la même liste.
+"""Les cinq outils qui doivent connaître les paquets racine du projet en reçoivent la même liste.
 
-`pyproject.toml` déclare `application`, `domain`, `infrastructure` et `interfaces` dans cinq sections : chaque outil lit la sienne et TOML n'offre aucun mécanisme de référence entre elles. Une couche ajoutée ou renommée dans une seule section produit un classement d'imports, un périmètre de couverture ou un contrat d'architecture silencieusement partiels ; ce test attrape l'écart.
+`pyproject.toml` déclare `application`, `domain`, `infrastructure`, `interfaces` et `pipeline` dans cinq sections : chaque outil lit la sienne et TOML n'offre aucun mécanisme de référence entre elles. Une couche ajoutée ou renommée dans une seule section produit un classement d'imports, un périmètre de couverture ou un contrat d'architecture silencieusement partiels ; ce test attrape l'écart.
 """
 
 import tomllib
@@ -18,7 +18,7 @@ DECLARATIONS = {
     "coverage": ("tool", "coverage", "run", "source"),
 }
 
-LAYERS = {"application", "domain", "infrastructure", "interfaces"}
+LAYERS = {"application", "domain", "infrastructure", "interfaces", "pipeline"}
 
 
 def _declared(chemin: tuple[str, ...]) -> set[str]:

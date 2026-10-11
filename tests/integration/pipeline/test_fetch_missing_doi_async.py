@@ -15,7 +15,6 @@ import httpx2
 import pytest
 
 from application.pipeline.fetch_missing.doi import run_async
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
 from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
 from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
@@ -23,6 +22,7 @@ from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapt
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
 from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
+from pipeline.metrics import PhaseMetrics
 
 # ── helpers ──────────────────────────────────────────────────────
 

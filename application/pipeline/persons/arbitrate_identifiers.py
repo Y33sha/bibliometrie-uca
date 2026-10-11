@@ -7,7 +7,6 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, accord, etape
 from application.pipeline.persons.requalify_identifiers import (
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
@@ -16,9 +15,10 @@ from application.pipeline.persons.resolve_identifier_transfers import (
     detect_identifier_conflicts,
     resolve_identifier_transfers,
 )
-from application.pipeline.progression import attente
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
+from pipeline.libelles import BRANCHE, accord, etape
+from pipeline.progression import attente
 
 
 def arbitrate_identifier_conflicts(

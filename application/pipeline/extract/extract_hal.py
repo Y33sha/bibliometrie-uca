@@ -18,11 +18,11 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.types import as_mapping, as_sequence, as_str, at_path
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression
 
 
 def extract_union(

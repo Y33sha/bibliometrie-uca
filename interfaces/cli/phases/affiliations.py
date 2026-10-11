@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from application.pipeline.context import Phase
-from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases.execution import log, open_tx
+from pipeline.context import Phase
+from pipeline.metrics import PhaseMetrics
 
 
 def build() -> Phase:

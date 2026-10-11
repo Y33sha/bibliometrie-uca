@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from application.pipeline.context import Phase
 from interfaces.cli.phases.execution import UnderCircuitBreaker, credentials_missing
+from pipeline.context import Phase
 
 
 def build() -> Phase:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from application.pipeline.context import Phase
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
+from pipeline.context import Phase
 
 
 def build() -> Phase:

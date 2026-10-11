@@ -16,9 +16,6 @@ Reconstruction complète à chaque run (table dérivée) : la table est purgée 
 import logging
 from dataclasses import dataclass
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
     DoiPublication,
@@ -38,6 +35,9 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
+from pipeline.context import PhaseContext
+from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.metrics import PhaseMetrics
 
 
 def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:

@@ -2,8 +2,8 @@
 
 import logging
 
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals.phase import PublishersJournalsPhase
+from pipeline.metrics import PhaseMetrics
 
 _CHAMPS = (
     "resolve_publishers",

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from application.pipeline.context import Phase
-from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli.phases.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.context import Phase
+from pipeline.metrics import PhaseMetrics
 
 
 def build() -> Phase:

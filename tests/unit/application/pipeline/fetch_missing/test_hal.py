@@ -11,9 +11,9 @@ from application.pipeline.fetch_missing.hal import (
     fetch_missing_hal_by_id,
     fetch_missing_hal_by_nnt,
 )
-from application.pipeline.libelles import DERNIERE_BRANCHE
 from application.ports.pipeline.fetch_missing.hal import NntInsertResult
 from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.libelles import DERNIERE_BRANCHE
 
 _LOG = logging.getLogger("test")
 

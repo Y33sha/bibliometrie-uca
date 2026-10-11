@@ -7,12 +7,12 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
 
-from application.pipeline.context import Phase
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from interfaces.cli.phases.execution import circuit_breaker, open_tx, signal_if_tripped
+from pipeline.context import Phase
+from pipeline.metrics import PhaseMetrics
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -39,7 +39,7 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 def build() -> Phase:
     """Extraction des sources vers staging.
 
-    `application/pipeline/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le câblage : registre des adaptateurs, primitif de parallélisme, lecture de la date de dernière extraction.
+    `pipeline/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le câblage : registre des adaptateurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from application.pipeline.extract.phase import ExtractPhase
     from infrastructure.observability.phase_executions import get_last_daily_extract_date

@@ -16,10 +16,10 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import Progression
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
 _BREATHER_EVERY = 10  # pause longue toutes les N pages

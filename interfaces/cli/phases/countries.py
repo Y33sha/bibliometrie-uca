@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from application.pipeline.context import Phase
+from pipeline.context import Phase
 
 
 def build() -> Phase:

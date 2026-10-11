@@ -15,11 +15,11 @@ from application.pipeline.extract.base import (
     SourceExtractor,
     scoped_logger,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import Progression
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression
 
 
 def extract_year(

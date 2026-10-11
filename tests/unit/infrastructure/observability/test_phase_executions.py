@@ -2,8 +2,8 @@
 
 import datetime
 
-from application.pipeline.metrics import PhaseMetrics
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
+from pipeline.metrics import PhaseMetrics
 
 
 def test_recorder_desactive_est_noop():

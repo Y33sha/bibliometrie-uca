@@ -23,13 +23,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.context import PhaseContext
 from application.pipeline.extract.base import scoped_logger
-from application.pipeline.libelles import DERNIERE_BRANCHE, branche_de_source
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.modes import MODES
-from application.pipeline.progression import progression
-from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_stale import (
     FetchedRecord,
@@ -39,6 +33,12 @@ from application.ports.pipeline.fetch_stale import (
 )
 from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from domain.sources.registry import ALL_SOURCES
+from pipeline.context import PhaseContext
+from pipeline.libelles import DERNIERE_BRANCHE, branche_de_source
+from pipeline.metrics import PhaseMetrics
+from pipeline.modes import MODES
+from pipeline.progression import progression
+from pipeline.signals import filter_configured, select_targets, timed_metrics
 
 __all__ = ["FetchStalePhase", "refresh"]
 

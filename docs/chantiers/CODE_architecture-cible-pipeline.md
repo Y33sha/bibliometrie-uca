@@ -95,7 +95,7 @@ Les tables mixtes sont les entités centrales : un schéma par catégorie les ra
 
 ### 4. Graphe
 
-Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md) ; la déclaration est `application/pipeline/graph.py`.
+Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md) ; la déclaration est `pipeline/graph.py`.
 
 **Acquis**
 - Les nœuds, avec les données qu'ils lisent et écrivent et leurs lectures du run précédent ; un test vérifie que l'ordre d'exécution les respecte.
@@ -110,25 +110,31 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 
 ### 5. Organisation du code
 
+**Constat (2026-10-11)**
+- Le pipeline tient sur quatre couches : `application/pipeline` (106 modules), `application/ports/pipeline` (50), `infrastructure/pipeline` (37), `interfaces/cli/phases` (18 câblages). Les clients HTTP des sources sont dans `infrastructure/sources` (59).
+- Les opérations « trouver ou créer » (éditeur, revue, monographie), la création de publication et le rattachement d'une signature vivent dans `application/services`, mais seul le pipeline les appelle.
+- Partages réels avec l'API : création et nom d'une personne ; recalcul d'une publication ; propagation du périmètre et des pays d'une adresse ; fermeture des périmètres ; reconstruction d'une authorship.
+
+**Décisions**
+- **Un paquet racine `pipeline/`, hors des couches hexagonales.** L'architecture hexagonale ne convient pas au pipeline : pas de ports, chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
+- **Le pipeline possède ses opérations.** L'API passe par une interface publique du pipeline, limitée aux recalculs ciblés ; les partages se réduisent au strict nécessaire, et chaque recalcul ciblé se justifie par un effet immédiat attendu dans l'interface.
+- **Découpage par domaine**, aligné sur les schémas : `pipeline/sources/<source>` (acquisition, normalisation et client HTTP de chaque source), `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons`, `pipeline/enrichments` ; `graph.py` et l'orchestrateur à la racine.
+- **Migration une phase à la fois**, sous contrats d'import, en commençant par une phase petite et autonome (`countries` ou `relations`).
+- **Le câblage `interfaces/cli/phases` disparaît** avec les ports. Le point d'entrée `run_pipeline` passe dans `pipeline/`.
+
 **Hypothèses**
-- Un paquet de premier niveau `pipeline/`, hors des couches hexagonales. Les règles pures restent dans `domain/`.
-- Acquisition : un module par source, qui regroupe tous ses nœuds (moissonnage, recherche des documents manquants, rafraîchissement).
-- Transformation : un module par nœud, qui contient son SQL.
 - Fusion des métadonnées d'une publication : un fichier par champ consolidé, qui liste ses règles par ordre de priorité des sources.
-- Le graphe dans un seul fichier, lisible de haut en bas : chaque nœud y est un appel de fonction.
-- Tests en miroir de l'arborescence, avec un jeu de notices d'exemple.
+- Tests en miroir de l'arborescence, sur le [jeu de données commun](CODE_jeu-de-donnees-commun.md).
 - Règles d'import vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques neutres (connexion, réglages, journalisation), jamais `application/` ; seul un adaptateur de l'API importe l'interface publique du pipeline.
-- Effet immédiat d'une décision : l'API appelle un recalcul ciblé exposé par le pipeline, par un port de `application/ports/`.
 
 **Ouvert**
-- Quelles décisions exigent un effet immédiat ? Les autres attendent le run suivant.
-- Point d'entrée en ligne de commande : `interfaces/cli/` ou `pipeline/` ?
-- SQL dans le module Python, ou en fichiers `.sql` nommés par ce qu'ils font ?
+- Recalculs ciblés : lesquels garder, lesquels laisser au run suivant ?
+- Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
 - Priorités entre sources et seuils : dans le domaine, testés avec le code (`SOURCE_PRIORITY`), ou dans un fichier de configuration modifiable sans toucher au code ?
 
-### 6. Épreuve sur papier
+### 6. Épreuves
 
-La cible est confrontée à des situations concrètes. Chaque élément de la cible cite les pièges de l'inventaire qu'il supprime. Ce qui ne passe pas l'épreuve sort de la cible.
+La cible est confrontée à des situations concrètes pendant la migration ([Le pipeline en paquet racine](CODE_pipeline-package-racine.md)) : chaque phase migrée éprouve les situations qui la concernent. Ce qui ne tient pas sort de la cible.
 
 Situations :
 - fusion de revues, faite par l'admin ou par le pipeline ;

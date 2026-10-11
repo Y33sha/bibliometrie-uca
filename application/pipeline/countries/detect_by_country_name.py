@@ -9,9 +9,9 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.countries import CountryQueries
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.metrics import PhaseMetrics
 
 
 def _match_trailing_country(

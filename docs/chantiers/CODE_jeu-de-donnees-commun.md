@@ -4,7 +4,7 @@
 
 Les tests d'idempotence préparent leurs données phase par phase : chacun fabrique à la main les tables que sa phase lit (notices, signatures, publications). Ces données peuvent différer de ce que les phases précédentes produisent réellement, sans que rien le signale.
 
-Aucun test n'enchaîne toutes les phases. Le graphe de dépendances (`application/pipeline/graph.py`) déclare ce que chaque nœud lit et écrit ; rien ne vérifie ces déclarations contre le code, faute d'un banc où exécuter chaque nœud sur des données réalistes.
+Aucun test n'enchaîne toutes les phases. Le graphe de dépendances (`pipeline/graph.py`) déclare ce que chaque nœud lit et écrit ; rien ne vérifie ces déclarations contre le code, faute d'un banc où exécuter chaque nœud sur des données réalistes.
 
 ## Décisions
 

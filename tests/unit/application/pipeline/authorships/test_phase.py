@@ -7,7 +7,7 @@ import logging
 from unittest.mock import patch
 
 from application.pipeline.authorships import phase
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.metrics import PhaseMetrics
 
 
 class _FakePurgeQueries:

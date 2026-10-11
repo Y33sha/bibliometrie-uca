@@ -11,12 +11,12 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from application.pipeline.context import Phase, PhaseContext, RunOptions
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from pipeline.context import Phase, PhaseContext, RunOptions
+from pipeline.metrics import PhaseMetrics
+from pipeline.signals import signal_source_unavailable
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection

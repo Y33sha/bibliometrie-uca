@@ -13,15 +13,15 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, accord
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import attente
-from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.dump import DumpUnavailableError
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
+from pipeline.libelles import BRANCHE, accord
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import attente
+from pipeline.signals import signal_source_unavailable
 
 LIBELLE = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""

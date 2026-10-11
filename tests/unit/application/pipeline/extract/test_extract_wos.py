@@ -15,10 +15,10 @@ import pytest
 from application.pipeline.extract import extract_wos
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.extract_wos import WosExtractor, extract_year
-from application.pipeline.progression import Progression
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractConfig
+from pipeline.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur
 
 _LOGGER = logging.getLogger("test")

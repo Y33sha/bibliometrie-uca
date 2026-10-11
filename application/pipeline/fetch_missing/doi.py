@@ -18,10 +18,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import branche_de_source
-from application.pipeline.logging_scope import scoped_logger
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_missing.doi import (
     AsyncFetchMissingDoiAdapter,
@@ -29,6 +25,10 @@ from application.ports.pipeline.fetch_missing.doi import (
     FailedDoiRecorder,
     MissingDoisReader,
 )
+from pipeline.libelles import branche_de_source
+from pipeline.logging_scope import scoped_logger
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "MissingDoisReader", "run_async"]
 

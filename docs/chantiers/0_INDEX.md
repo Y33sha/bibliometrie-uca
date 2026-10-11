@@ -5,6 +5,7 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
+- [Le pipeline en paquet racine](CODE_pipeline-package-racine.md)
 
 ### En pause
 

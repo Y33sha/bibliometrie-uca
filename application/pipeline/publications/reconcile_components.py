@@ -20,15 +20,6 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.pipeline.libelles import (
-    BRANCHE,
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
-)
-from application.pipeline.progression import attente, progression
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
@@ -37,6 +28,15 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.services.publications.core import create_publication, refresh_from_sources
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
 from domain.source_publications.keys import project_confirmation_keys
+from pipeline.libelles import (
+    BRANCHE,
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
+from pipeline.progression import attente, progression
 
 
 def _member(row: ReconcileRow) -> ReconcileMember:

@@ -13,15 +13,15 @@ from dataclasses import dataclass
 
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import etape
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 from application.ports.pipeline.perimeter_structures import (
     EmptyExtractionPerimeterError,
     PerimeterStructuresQueries,
 )
+from pipeline.context import PhaseContext
+from pipeline.libelles import etape
+from pipeline.metrics import PhaseMetrics
 
 
 @dataclass(frozen=True)

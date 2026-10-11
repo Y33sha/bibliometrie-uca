@@ -4352,7 +4352,7 @@ export interface components {
         };
         /**
          * PhaseMetricsPayload
-         * @description Sérialisation JSON de `application.pipeline.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise.
+         * @description Sérialisation JSON de `pipeline.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise.
          */
         PhaseMetricsPayload: {
             /** New */

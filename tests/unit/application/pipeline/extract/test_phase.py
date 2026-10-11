@@ -11,9 +11,9 @@ import pytest
 
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.extract.phase import ExtractOne, ExtractPhase
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
+from pipeline.metrics import PhaseMetrics
 
 
 def _sync_run_parallel(thunks):

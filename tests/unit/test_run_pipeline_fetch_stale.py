@@ -10,14 +10,14 @@
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from application.pipeline.context import RunOptions
-from application.pipeline.metrics import PhaseMetrics
 from infrastructure.sources.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
 )
 from interfaces.cli.phases import fetch_stale
 from interfaces.cli.phases.execution import phase_context
+from pipeline.context import RunOptions
+from pipeline.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:

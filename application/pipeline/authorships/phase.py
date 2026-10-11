@@ -15,17 +15,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from application.pipeline.authorships.build_authorships import build
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import attente
 from application.ports.pipeline.authorships.address_pub_count import AddressPubCountQueries
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
 from application.ports.pipeline.authorships.purge_orphan_publications import (
     PurgeOrphanPublicationsQueries,
 )
-from application.ports.pipeline.transaction import OpenTransaction
+from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import attente
 
 # Taille des lots du DELETE de purge (un commit par lot).
 _PURGE_BATCH_SIZE = 5000

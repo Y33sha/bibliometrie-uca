@@ -5,10 +5,10 @@ La nature se recalcule à chaque run d'après les enregistrements, la collection
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.monographs import MonographProceedingsQueries
 from domain.monographs.proceedings import is_proceedings_volume
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Nature des monographies"
 """Libellé de la sous-étape dans le journal de la phase."""

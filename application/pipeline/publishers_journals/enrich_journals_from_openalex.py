@@ -13,12 +13,12 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import forme
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
 from application.services.journals.core import update_journal_apc
 from domain.journals.journal import JournalType
+from pipeline.libelles import forme
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Type des revues sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""

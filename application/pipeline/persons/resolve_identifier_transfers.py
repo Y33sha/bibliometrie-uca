@@ -10,13 +10,13 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme, rien_a_faire
 from application.pipeline.persons.requalify_identifiers import IdentifierConsensus
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
 from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme, rien_a_faire
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.
 _CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")

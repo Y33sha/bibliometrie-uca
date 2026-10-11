@@ -8,12 +8,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import etape, rien_a_faire
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.parallel import RunParallel
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES
+from pipeline.context import PhaseContext
+from pipeline.libelles import etape, rien_a_faire
+from pipeline.metrics import PhaseMetrics
+from pipeline.signals import filter_configured, select_targets, timed_metrics
 
 FetchChannel = Callable[[], PhaseMetrics]
 """Runner d'un canal HAL (hal-id ou NNT) : rend les métriques du canal."""

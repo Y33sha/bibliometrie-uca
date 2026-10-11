@@ -9,8 +9,6 @@ Trois règles de `domain/journals/containers.py` désignent un recueil d'actes :
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals._journal_label import journal_label
 from application.ports.pipeline.journals import JournalProceedingsTypingQueries
 from domain.journals.containers import (
@@ -19,6 +17,8 @@ from domain.journals.containers import (
     is_proceedings_title_without_issn,
 )
 from domain.journals.journal import JournalType
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Typage des recueils d'actes"
 """Libellé de la sous-étape dans le journal de la phase."""

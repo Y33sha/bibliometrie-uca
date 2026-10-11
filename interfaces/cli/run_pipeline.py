@@ -23,14 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-from application.pipeline.context import Phase, RunOptions
 from application.pipeline.exception_chain import failure_message, is_user_interruption
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.modes import MODE_NAMES
-from application.pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
-from application.pipeline.progression import ecrire_hors_barre, set_flux_barres
-from application.pipeline.signals import select_targets
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -63,6 +56,13 @@ from interfaces.cli.phases import (
     subjects,
 )
 from interfaces.cli.phases.execution import log, open_tx, phase_context
+from pipeline.context import Phase, RunOptions
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
+from pipeline.modes import MODE_NAMES
+from pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
+from pipeline.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.signals import select_targets
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())

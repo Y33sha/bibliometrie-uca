@@ -20,9 +20,6 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from application.pipeline.context import PhaseContext
-from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, etape
-from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals import (
     check_journals_in_sudoc,
     enrich_journals_from_openalex,
@@ -35,7 +32,10 @@ from application.pipeline.publishers_journals import (
     type_proceedings_journals,
     type_proceedings_volumes,
 )
-from application.pipeline.signals import filter_configured
+from pipeline.context import PhaseContext
+from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, etape
+from pipeline.metrics import PhaseMetrics
+from pipeline.signals import filter_configured
 
 RunSubstep = Callable[[], PhaseMetrics]
 CredentialsMissing = Callable[[str], str | None]

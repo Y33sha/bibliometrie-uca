@@ -5,14 +5,14 @@ Les monographies sans collection à ISSN se regroupent en séries (`group_series
 
 import logging
 
-from application.pipeline.libelles import accord
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.containers import MonographSeriesQueries
 from application.ports.pipeline.monographs import MonographJournalCandidates
 from application.services.journals.core import find_or_create_journal
 from domain.journals.journal import JournalType
 from domain.journals.series import VolumeTitle, group_series
 from domain.monographs.collection import MonographJournalChoice, choose_monograph_journal
+from pipeline.libelles import accord
+from pipeline.metrics import PhaseMetrics
 
 LIBELLE = "Rattachement aux collections"
 """Libellé de la sous-étape dans le journal de la phase."""

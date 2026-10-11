@@ -2,7 +2,7 @@
 
 import pytest
 
-from application.pipeline.libelles import accord, branche_de_source, forme
+from pipeline.libelles import accord, branche_de_source, forme
 
 
 @pytest.mark.parametrize(

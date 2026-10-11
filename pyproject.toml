@@ -43,21 +43,21 @@ dev = [
     "pre-commit-hooks==6.0.0", # check-yaml/toml/… lancés en local via `python -m`
     "import-linter==2.15",
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
-    "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. application/pipeline/progression.py)
+    "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/progression.py)
 ]
 
 [tool.setuptools]
 py-modules = []
 
 [tool.setuptools.packages.find]
-include = ["application*", "domain*", "infrastructure*", "interfaces*"]
+include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipeline*"]
 
 # ----------------------------------------------------------------------
 # deptry : détection de dépendances manquantes / inutiles / transitives
 # Lit [project.dependencies] (PEP 621) et [dependency-groups] (PEP 735).
 # ----------------------------------------------------------------------
 [tool.deptry]
-known_first_party = ["application", "domain", "infrastructure", "interfaces"]
+known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 # `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
 # développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
 # hors du dépôt.
@@ -68,7 +68,7 @@ extend_exclude = ["frontend", ".venv", "venv", "scripts", "data"]
 # Lancement : `lint-imports`
 # ----------------------------------------------------------------------
 [tool.importlinter]
-root_packages = ["domain", "application", "infrastructure", "interfaces"]
+root_packages = ["domain", "application", "infrastructure", "interfaces", "pipeline"]
 # Nécessaire aux contrats qui ciblent des modules externes.
 include_external_packages = true
 # Type de contrat maison, défini dans `scripts/contrats_import.py`.
@@ -86,6 +86,24 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # signatures. Les Protocols restent implémentés via duck typing.
 #
 ignore_imports = ["infrastructure.** -> application.ports.**"]
+
+[[tool.importlinter.contracts]]
+name = "Pipeline : hors des couches hexagonales"
+type = "forbidden"
+source_modules = ["pipeline"]
+forbidden_modules = ["application", "interfaces"]
+# Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
+# réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
+
+[[tool.importlinter.contracts]]
+name = "Pipeline : importé par interfaces seulement"
+type = "forbidden"
+source_modules = ["domain", "application", "infrastructure"]
+forbidden_modules = ["pipeline"]
+# L'API et l'orchestrateur (`interfaces/`) sont les seuls clients du pipeline.
+# Exception transitoire : les phases encore dans `application/pipeline` importent le socle
+# déjà migré dans `pipeline/`, jusqu'à leur propre migration.
+ignore_imports = ["application.pipeline.** -> pipeline.**"]
 
 [[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"
@@ -308,7 +326,7 @@ max-complexity = 15
 [tool.ruff.lint.isort]
 # Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
 # pas de l'inférence de ruff, qui varie d'une version à l'autre.
-known-first-party = ["application", "domain", "infrastructure", "interfaces"]
+known-first-party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 # Regroupe les imports d'un même module en un seul bloc, alias inclus
 # (sinon chaque `from x import (a as b)` aliasé occupe son propre bloc).
 combine-as-imports = true
@@ -368,7 +386,7 @@ asyncio_mode = "auto"
 
 [tool.coverage.run]
 branch = true
-source = ["application", "domain", "infrastructure", "interfaces"]
+source = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 omit = [
     "tests/*",
     "*/__init__.py",

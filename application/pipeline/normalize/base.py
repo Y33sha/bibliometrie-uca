@@ -19,15 +19,15 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import rollback_unless_invalidated, savepoint
-from application.pipeline.libelles import (
+from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
+from domain.publications.metadata import has_minimal_publication_metadata
+from pipeline.libelles import (
     SUITE_DE_BRANCHE,
     accord,
     branche_de_source,
 )
-from application.pipeline.logging_scope import scoped_logger
-from application.pipeline.progression import progression
-from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from domain.publications.metadata import has_minimal_publication_metadata
+from pipeline.logging_scope import scoped_logger
+from pipeline.progression import progression
 
 
 class NormalizeStats(NamedTuple):

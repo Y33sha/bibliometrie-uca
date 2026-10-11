@@ -9,8 +9,8 @@ import pytest
 
 from application.pipeline.affiliations import phase
 from application.pipeline.affiliations.resolve_addresses import ResolutionStats
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
+from pipeline.metrics import PhaseMetrics
 
 PERIMETRE = [10, 20]
 

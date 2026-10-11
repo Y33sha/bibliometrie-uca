@@ -18,12 +18,12 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.ports.pipeline.fetch_missing.hal import HalFetchMissingAdapter
 from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.types import JsonValue
+from pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
 

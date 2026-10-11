@@ -1,6 +1,6 @@
 """Métriques de phase : `total` dérivé (≥ ventilation) et sérialisation."""
 
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.metrics import PhaseMetrics
 
 
 def test_total_derives_from_breakdown_without_explicit_denominator():

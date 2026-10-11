@@ -12,17 +12,16 @@ L'état pays des adresses est relevé avant et après le passage : l'entonnoir q
 
 from dataclasses import dataclass
 
-from application.pipeline.context import PhaseContext
 from application.pipeline.countries import (
     detect_by_country_name,
     detect_by_place_name,
     refresh_publication_countries,
     suggest_countries,
 )
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.modes import MODES
 from application.ports.pipeline.countries import AddressCountryStatus, CountryQueries
-from application.ports.pipeline.transaction import OpenTransaction
+from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.metrics import PhaseMetrics
+from pipeline.modes import MODES
 
 
 def _etat_des_adresses(open_tx: OpenTransaction, queries: CountryQueries) -> AddressCountryStatus:

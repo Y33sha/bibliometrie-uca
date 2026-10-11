@@ -6,8 +6,8 @@
 import logging
 from typing import NamedTuple
 
-from application.pipeline.libelles import DERNIERE_BRANCHE, accord
-from application.pipeline.metrics import PhaseMetrics
+from pipeline.libelles import DERNIERE_BRANCHE, accord
+from pipeline.metrics import PhaseMetrics
 
 # Méthodes de rattachement, par fiabilité décroissante de la cascade, et ce qu'elles disent.
 _MATCHING_METHODS: dict[str, str] = {

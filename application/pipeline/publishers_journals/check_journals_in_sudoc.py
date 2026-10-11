@@ -13,9 +13,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import RequestPace, run_fetch_pool
-from application.pipeline.libelles import BRANCHE, accord, forme
-from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.progression import progression
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 from application.ports.pipeline.journals import JournalSudocQueries, JournalSudocRow
 from domain.journals.issn_check import (
@@ -27,6 +24,9 @@ from domain.journals.issn_check import (
 from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord
+from pipeline.libelles import BRANCHE, accord, forme
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import progression
 
 LIBELLE = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
