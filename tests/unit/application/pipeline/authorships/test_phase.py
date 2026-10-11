@@ -1,8 +1,9 @@
-"""Orchestrateur de la phase `authorships` : build, purge des orphelines, refresh des compteurs.
+"""Orchestrateur de la phase `authorships` : build, purge des orphelines, référentiels vides, refresh des compteurs.
 
 Le propos testé ici est l'enchaînement et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
 """
 
+import logging
 from unittest.mock import patch
 
 from application.pipeline.authorships import phase
@@ -107,3 +108,42 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
 
     # build, purge, puis un décompte par famille : adresses, revues, éditeurs
     assert open_tx.transactions == 5
+
+
+def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
+    """Monographies, revues puis éditeurs vides : chaque suppression écrit sa ligne et remonte ses compteurs."""
+    appels: list[str] = []
+
+    def suppression(nom: str, n: int):
+        def run() -> PhaseMetrics:
+            appels.append(nom)
+            m = PhaseMetrics()
+            if n:
+                m.add(journals_deleted=n)
+                m.resume = f"{n} supprimées"
+            return m
+
+        return run
+
+    metrics = PhaseMetrics(new=1)
+    metrics.details["summary"] = {}
+    with (
+        patch.object(phase, "build", return_value=metrics),
+        caplog.at_level(logging.INFO, logger="test"),
+    ):
+        rendu = phase.AuthorshipsPhase(
+            object(),
+            _FakePurgeQueries([]),
+            _FakePubCountsQueries(),
+            _FakeAddressPubCountQueries(),
+            empty_containers=(
+                ("Monographies vides", suppression("monographies", 0)),
+                ("Revues vides", suppression("revues", 2)),
+                ("Éditeurs vides", suppression("éditeurs", 0)),
+            ),
+        ).run(contexte())
+
+    assert appels == ["monographies", "revues", "éditeurs"]
+    assert rendu.extras["journals_deleted"] == 2
+    assert "  ├─ Revues vides : 2 supprimées" in caplog.messages
+    assert "  └─ Éditeurs vides : rien à faire" in caplog.messages

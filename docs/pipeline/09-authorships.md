@@ -26,4 +26,10 @@ La phase `authorships` consolide en une table les signatures que rapportent tout
 ## Opérations finales
 
 - **Purge des publications orphelines** : une publication qui ne porte plus aucune authorship, par exemple sortie du périmètre, est supprimée.
+- **Suppression des référentiels vides**, dans cet ordre, car une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur :
+  - les monographies sans enregistrement ni publication ;
+  - les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, avec leurs formes de nom. Le journal d'exécution garde le titre, l'éditeur et les ISSN de chaque revue supprimée ;
+  - les éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
+
+  Elle suit les dernières suppressions de publications : un référentiel vidé dans le run est supprimé dans le même run.
 - **Recalcul des `pub_count`** des revues et des éditeurs, qui dérivent du nombre de publications du périmètre.

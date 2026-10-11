@@ -1,11 +1,10 @@
 """Orchestrateur de la phase `publishers_journals` : enrichissement des référentiels d'éditeurs, de revues et de monographies.
 
-Quatre groupes de sous-étapes, dans l'ordre :
+Trois groupes de sous-étapes, dans l'ordre :
 
 - **Éditeurs** — `resolve_publishers` : éditeur Crossref ou repository DataCite de chaque préfixe DOI en attente.
 - **Revues** — `enrich_journals_from_openalex` (type et frais de publication), `check_journals_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_journals`, `type_proceedings_journals`, `learn_journal_doi_namespaces`, `enrich_journals_from_doaj`.
 - **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
-- **Nettoyage** — suppression des monographies, des revues puis des éditeurs vides.
 
 Contraintes d'ordre :
 
@@ -13,7 +12,6 @@ Contraintes d'ordre :
 - La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN.
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
-- Les suppressions viennent en dernier : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur.
 
 Chaque sous-étape tient une ligne du journal, sous le titre de son groupe. Un accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de configuration sont injectés par le câblage ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
 """
@@ -27,9 +25,6 @@ from application.pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publishers_journals import (
     check_journals_in_sudoc,
-    delete_empty_journals,
-    delete_empty_monographs,
-    delete_empty_publishers,
     enrich_journals_from_openalex,
     import_journals_from_doaj_dump,
     learn_journal_doi_namespaces,
@@ -83,14 +78,6 @@ _GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
             _SousEtape("type_proceedings_volumes", type_proceedings_volumes.LIBELLE),
         ),
     ),
-    (
-        "Nettoyage",
-        (
-            _SousEtape("delete_empty_monographs", delete_empty_monographs.LIBELLE),
-            _SousEtape("delete_empty_journals", delete_empty_journals.LIBELLE),
-            _SousEtape("delete_empty_publishers", delete_empty_publishers.LIBELLE),
-        ),
-    ),
 )
 
 
@@ -106,9 +93,6 @@ class PublishersJournalsPhase:
     merge_duplicate_monographs: RunSubstep
     link_monographs_to_collections: RunSubstep
     type_proceedings_volumes: RunSubstep
-    delete_empty_monographs: RunSubstep
-    delete_empty_journals: RunSubstep
-    delete_empty_publishers: RunSubstep
     credentials_missing: CredentialsMissing
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -190,21 +174,6 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         "type_proceedings_volumes",
         "monographies retypées (actes ou livre)",
         lambda m: m.extras.get("monographs_to_proceedings", 0),
-    ),
-    (
-        "delete_empty_monographs",
-        "monographies vides supprimées",
-        lambda m: m.extras.get("monographs_deleted", 0),
-    ),
-    (
-        "delete_empty_journals",
-        "revues vides supprimées",
-        lambda m: m.extras.get("journals_deleted", 0),
-    ),
-    (
-        "delete_empty_publishers",
-        "éditeurs vides supprimés",
-        lambda m: m.extras.get("publishers_deleted", 0),
     ),
 )
 
