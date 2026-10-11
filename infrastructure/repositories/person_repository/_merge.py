@@ -1,10 +1,4 @@
-"""SQL de la fusion de deux personnes : une étape par donnée de `domain.persons.merge.PERSON_DATA`.
-
-Chaque étape déclare les colonnes qui rattachent sa donnée à la personne. Un test confronte ces colonnes aux clés étrangères vers `persons` et aux colonnes de `persons`.
-"""
-
-from collections.abc import Callable
-from dataclasses import dataclass
+"""SQL de la fusion de deux personnes : une étape par donnée de `domain.persons.merge.PERSON_DATA`."""
 
 from sqlalchemy import Connection, text
 
@@ -16,50 +10,13 @@ from infrastructure.repositories.authorship_repository import (
     delete_orphan_authorships,
     detach_rejected_signatures,
 )
+from infrastructure.repositories.merge_steps import (
+    MergeStep,
+    transfer,
+    transfer_unique,
+    untouched,
+)
 from infrastructure.repositories.person_repository import _name_forms
-
-type _Apply = Callable[[Connection, int, int], None]
-
-
-@dataclass(frozen=True, slots=True)
-class MergeStep:
-    # (table, colonne) qui rattachent la donnée à la personne.
-    columns: tuple[tuple[str, str], ...]
-    apply: _Apply
-
-
-def _noop(conn: Connection, target_id: int, source_id: int) -> None:
-    return None
-
-
-def _transfer(table: str, column: str) -> MergeStep:
-    def apply(conn: Connection, target_id: int, source_id: int) -> None:
-        conn.execute(
-            text(f"UPDATE {table} SET {column} = :t WHERE {column} = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-    return MergeStep(((table, column),), apply)
-
-
-def _transfer_unique(table: str, column: str, key: str) -> MergeStep:
-    """Les lignes de l'absorbée dont la conservée a déjà la clé `key` sont supprimées, les autres transférées."""
-
-    def apply(conn: Connection, target_id: int, source_id: int) -> None:
-        conn.execute(
-            text(f"""
-                DELETE FROM {table}
-                WHERE {column} = :s
-                  AND {key} IN (SELECT {key} FROM {table} WHERE {column} = :t)
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        conn.execute(
-            text(f"UPDATE {table} SET {column} = :t WHERE {column} = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-    return MergeStep(((table, column),), apply)
 
 
 def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) -> None:
@@ -125,29 +82,21 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 
 # Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
-    "signatures": _transfer("source_authorships", "person_id"),
-    "authorships": _transfer_unique("authorships", "person_id", key="publication_id"),
-    "rejected_authorships": _transfer_unique(
-        "rejected_authorships", "person_id", key="publication_id"
-    ),
-    "confirmed_signatures": _transfer("confirmed_authorships", "person_id"),
+    "signatures": transfer("source_authorships", "person_id"),
+    "authorships": transfer_unique("authorships", "person_id", "publication_id"),
+    "rejected_authorships": transfer_unique("rejected_authorships", "person_id", "publication_id"),
+    "confirmed_signatures": transfer("confirmed_authorships", "person_id"),
     "distinct_persons": MergeStep(
         (("distinct_persons", "person_id_a"), ("distinct_persons", "person_id_b")),
         _merge_distinct_persons,
     ),
-    "identifiers": _transfer("person_identifiers", "person_id"),
+    "identifiers": transfer("person_identifiers", "person_id"),
     "name_forms": MergeStep((("person_name_forms", "person_id"),), _merge_name_forms),
-    "rh_record": MergeStep((("persons_rh", "person_id"),), _noop),
-    "name": MergeStep(
-        (
-            ("persons", "last_name"),
-            ("persons", "first_name"),
-            ("persons", "last_name_normalized"),
-            ("persons", "first_name_normalized"),
-        ),
-        _noop,
+    "rh_record": untouched("persons_rh", "person_id"),
+    "name": untouched(
+        "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
     ),
-    "created_at": MergeStep((("persons", "created_at"),), _noop),
+    "created_at": untouched("persons", "created_at"),
     "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion),
 }
 

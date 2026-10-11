@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import NamedTuple, cast
 
-from sqlalchemy import Connection, delete, func, select, text, update
+from sqlalchemy import Connection, delete, select, update
 
 from application.ports.repositories.journal_repository import (
     JournalRepository,
@@ -21,11 +21,8 @@ from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.db.rows import row_as
-from infrastructure.db.tables import journal_issns, journal_name_forms, journals
-from infrastructure.pipeline.authorships.pub_counts import (
-    refresh_journal_pub_count,
-    refresh_publisher_pub_count,
-)
+from infrastructure.db.tables import journal_issns, journals
+from infrastructure.repositories import journal_merge
 
 
 class _JournalRow(NamedTuple):
@@ -183,89 +180,4 @@ class PgJournalRepository(JournalRepository):
         ]
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        # publications, source_publications et apc_payments vivent hors de la MetaData de `tables.py` : accès en `text()`.
-        self._conn.execute(
-            text("UPDATE publications SET journal_id = :t WHERE journal_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("UPDATE source_publications SET journal_id = :t WHERE journal_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        # journal_name_forms (anti-doublon) : forme/publisher commun → on garde la cible.
-        self._conn.execute(
-            text("""
-                UPDATE journal_name_forms SET journal_id = :t
-                WHERE journal_id = :s
-                  AND (form_normalized, COALESCE(publisher_id, 0)) NOT IN (
-                      SELECT form_normalized, COALESCE(publisher_id, 0)
-                      FROM journal_name_forms WHERE journal_id = :t
-                  )
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            delete(journal_name_forms).where(journal_name_forms.c.journal_id == source_id)
-        )
-
-        self._conn.execute(
-            text("UPDATE apc_payments SET journal_id = :t WHERE journal_id = :s"),
-            {"t": target_id, "s": source_id},
-        )
-
-        # Les ISSN de la source rejoignent la cible avec leur support et leur statut, à vérifier dans le Sudoc ; un ISSN
-        # que la cible porte déjà reste le sien, et l'ISSN-L de la cible l'emporte.
-        self._conn.execute(
-            text("""
-                DELETE FROM journal_issns s
-                WHERE s.journal_id = :s
-                  AND EXISTS (SELECT 1 FROM journal_issns t WHERE t.journal_id = :t AND t.issn = s.issn)
-            """),
-            {"t": target_id, "s": source_id},
-        )
-        self._conn.execute(
-            text("""
-                UPDATE journal_issns
-                SET journal_id = :t, sudoc_checked_at = NULL,
-                    linking = linking AND NOT EXISTS (
-                        SELECT 1 FROM journal_issns WHERE journal_id = :t AND linking
-                    )
-                WHERE journal_id = :s
-            """),
-            {"t": target_id, "s": source_id},
-        )
-
-        # Capture des métadonnées de la source, puis suppression de la source avant l'enrichissement : la cible reprend ensuite ses valeurs (COALESCE) sans conflit sur `UNIQUE(openalex_id)`.
-        src = self._conn.execute(
-            select(
-                journals.c.publisher_id,
-                journals.c.openalex_id,
-                journals.c.is_in_doaj,
-                journals.c.apc_amount,
-                journals.c.apc_currency,
-                journals.c.oa_model,
-            ).where(journals.c.id == source_id)
-        ).one()
-        self._conn.execute(delete(journals).where(journals.c.id == source_id))
-        self._conn.execute(
-            update(journals)
-            .where(journals.c.id == target_id)
-            .values(
-                publisher_id=func.coalesce(journals.c.publisher_id, src.publisher_id),
-                openalex_id=func.coalesce(journals.c.openalex_id, src.openalex_id),
-                is_in_doaj=journals.c.is_in_doaj | src.is_in_doaj,
-                apc_amount=func.coalesce(journals.c.apc_amount, src.apc_amount),
-                apc_currency=func.coalesce(journals.c.apc_currency, src.apc_currency),
-                oa_model=func.coalesce(journals.c.oa_model, src.oa_model),
-            )
-        )
-
-        # pub_count : la cible a absorbé les publications de la source. Recalcule la revue cible, puis les éditeurs concernés (cible + éditeur de la source).
-        refresh_journal_pub_count(self._conn, target_id)
-        target_publisher = self._conn.execute(
-            select(journals.c.publisher_id).where(journals.c.id == target_id)
-        ).scalar()
-        for publisher_id in {target_publisher, src.publisher_id}:
-            if publisher_id is not None:
-                refresh_publisher_pub_count(self._conn, publisher_id)
+        journal_merge.merge_journal_into(self._conn, target_id, source_id)

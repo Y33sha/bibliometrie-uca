@@ -862,6 +862,61 @@ class TestMergeJournals:
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
 
+    def _merge(self, conn, repo, publication_repo, target, source):
+        merge_journals(
+            target,
+            source,
+            conn=conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            publication_repo=publication_repo,
+        )
+
+    def test_transfers_monographs(self, sa_sync_conn, repo, publication_repo):
+        target = _journal(sa_sync_conn, title="Target")
+        source = _journal(sa_sync_conn, title="Source")
+        monograph = insert_monograph(sa_sync_conn, journal_id=source)
+
+        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+
+        assert (
+            _fetch_one(
+                sa_sync_conn, "SELECT journal_id FROM monographs WHERE id = :id", id=monograph
+            ).journal_id
+            == target
+        )
+
+    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, repo, publication_repo):
+        """Sans APC, la cible prend le montant et la devise de la source."""
+        target = _journal(sa_sync_conn, title="Target", apc_currency="EUR")
+        source = _journal(sa_sync_conn, title="Source", apc_amount=100, apc_currency="USD")
+
+        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT apc_amount, apc_currency FROM journals WHERE id = :id", id=target
+        )
+        assert (row.apc_amount, row.apc_currency) == (100, "USD")
+
+    @pytest.mark.parametrize(
+        ("target_type", "source_type", "expected"),
+        [("unknown", "media", "media"), ("journal", "media", "journal")],
+    )
+    def test_unknown_type_takes_source_type(
+        self, sa_sync_conn, repo, publication_repo, target_type, source_type, expected
+    ):
+        target = _journal(sa_sync_conn, title="Target", journal_type=target_type)
+        source = _journal(sa_sync_conn, title="Source", journal_type=source_type)
+
+        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT journal_type::text AS journal_type FROM journals WHERE id = :id",
+            id=target,
+        )
+        assert row.journal_type == expected
+
     def test_unites_malformed_issns_and_resets_sudoc_check(
         self, sa_sync_conn, repo, publication_repo
     ):
