@@ -30,7 +30,12 @@ from domain.persons.matching import (
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.signature_name import SignatureName
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.db.sql_fragments import identifier_neutralized, usable_identifier
+from infrastructure.db.sql_fragments import (
+    REJECTED_PAIRS,
+    identifier_neutralized,
+    publication_rejected_for,
+    usable_identifier,
+)
 from infrastructure.repositories.person_repository import person_without_decision_sql
 
 # Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
@@ -284,11 +289,12 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         return {(r.name_form, r.person_id): r.status for r in rows}
 
     def fetch_rejected_person_ids_by_pub(self, conn: Connection) -> dict[int, frozenset[int]]:
-        """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
+        """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'une de ses notices l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
         rows = conn.execute(
-            text("""
-                SELECT publication_id, array_agg(person_id) AS person_ids
-                FROM rejected_authorships
+            text(f"""
+                SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids
+                FROM ({REJECTED_PAIRS}) rp
+                WHERE publication_id IS NOT NULL
                 GROUP BY publication_id
             """)
         ).all()
@@ -563,11 +569,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
                       WHERE pnf.name_form = c.name_form
                         AND (pnf.status <> '{AttributionStatus.REJECTED.value}'
                              OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
-                        AND NOT EXISTS (
-                            SELECT 1 FROM rejected_authorships r
-                            WHERE r.publication_id = sp.publication_id
-                              AND r.person_id = pnf.person_id
-                        )
+                        AND NOT {publication_rejected_for("sp.publication_id", "pnf.person_id")}
                   ) >= 2
             """)
         ).rowcount

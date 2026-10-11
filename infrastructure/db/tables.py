@@ -594,10 +594,10 @@ authorships = Table(
 rejected_authorships = Table(
     "rejected_authorships",
     metadata,
-    Column("publication_id", Integer, nullable=False),
+    Column("source_publication_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    PrimaryKeyConstraint("publication_id", "person_id", name="rejected_authorships_pkey"),
+    PrimaryKeyConstraint("source_publication_id", "person_id", name="rejected_authorships_pkey"),
 )
 
 

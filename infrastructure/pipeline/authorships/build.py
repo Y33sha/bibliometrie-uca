@@ -8,7 +8,7 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.sql_fragments import case_priority
+from infrastructure.db.sql_fragments import case_priority, publication_rejected_for
 
 
 def refresh_publications_in_perimeter(conn: Connection, person_id: int | None = None) -> int:
@@ -46,14 +46,19 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
         return n
 
     def insert_missing_authorships(self, conn: Connection) -> int:
+        # Une paire rejetée n'est pas recréée, sauf si une signature confirmée l'atteste : la confirmation vise la signature elle-même, le rejet la publication.
         return conn.execute(
-            text("""
+            text(f"""
                 WITH all_pairs AS (
-                    SELECT DISTINCT sd.publication_id, sa.person_id
+                    SELECT sd.publication_id, sa.person_id,
+                           bool_or(ca.source_authorship_id IS NOT NULL) AS confirmed
                     FROM source_authorships sa
                     JOIN source_publications sd ON sd.id = sa.source_publication_id
                     JOIN publications pub ON pub.id = sd.publication_id
+                    LEFT JOIN confirmed_authorships ca
+                      ON ca.source_authorship_id = sa.id AND ca.person_id = sa.person_id
                     WHERE sa.person_id IS NOT NULL
+                    GROUP BY sd.publication_id, sa.person_id
                 )
                 INSERT INTO authorships (publication_id, person_id)
                 SELECT ap.publication_id, ap.person_id
@@ -63,11 +68,8 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
                     WHERE a.publication_id = ap.publication_id
                       AND a.person_id = ap.person_id
                 )
-                  AND NOT EXISTS (
-                    SELECT 1 FROM rejected_authorships rj
-                    WHERE rj.publication_id = ap.publication_id
-                      AND rj.person_id = ap.person_id
-                )
+                  AND (ap.confirmed
+                       OR NOT {publication_rejected_for("ap.publication_id", "ap.person_id")})
             """)
         ).rowcount
 
@@ -185,16 +187,13 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
             {"ids": source_authorship_ids},
         )
         conn.execute(
-            text("""
+            text(f"""
                 INSERT INTO authorships (publication_id, person_id,
                     author_position, in_perimeter, is_corresponding)
                 SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter,
                        cs.is_corresponding
                 FROM _chosen_sa cs
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM rejected_authorships rj
-                    WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
-                )
+                WHERE NOT {publication_rejected_for("cs.publication_id", ":pid")}
                 ON CONFLICT (publication_id, person_id) DO NOTHING
             """),
             {"pid": person_id},

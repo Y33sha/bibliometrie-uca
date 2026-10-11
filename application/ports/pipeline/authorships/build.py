@@ -21,7 +21,7 @@ class AuthorshipsBuildQueries(Protocol):
     def insert_missing_authorships(self, conn: Connection) -> int:
         """Crée les `authorships` manquantes : les paires `(publication_id, person_id)` qu'atteste une `source_authorship` rattachée à une publication active. Retourne le rowcount.
 
-        Une paire inscrite dans `rejected_authorships` est écartée par un anti-join : le rejet admin survit aux runs suivants.
+        Une paire rejetée est écartée : une publication est rejetée pour une personne dès qu'une de ses notices l'est. Une signature confirmée à la personne l'emporte sur le rejet : la confirmation vise la signature elle-même.
         """
         ...
 

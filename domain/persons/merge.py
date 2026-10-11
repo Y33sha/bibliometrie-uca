@@ -18,7 +18,7 @@ PERSON_DATA: dict[str, MergedData] = {
     "rejected_authorships": MergedData(
         MergeRule.TRANSFER_UNIQUE,
         DataNature.DECISION,
-        "Rejets d'une paire publication-personne, un par publication.",
+        "Rejets d'une paire publication-personne, un par notice de la publication.",
     ),
     "confirmed_signatures": MergedData(
         MergeRule.TRANSFER,

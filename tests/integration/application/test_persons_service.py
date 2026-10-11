@@ -41,6 +41,7 @@ from domain.errors import (
     ValidationError,
 )
 from domain.persons.person import PersonExclusion
+from infrastructure.db.sql_fragments import REJECTED_PAIRS
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.repositories import (
     authorship_repository,
@@ -749,7 +750,7 @@ class TestDetachAuthorships:
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                f"SELECT DISTINCT 1 FROM ({REJECTED_PAIRS}) rp WHERE publication_id = :p AND person_id = :pid",
                 p=pub_id,
                 pid=person_id,
             )
@@ -1175,7 +1176,7 @@ class TestReassignRejectedPairUnit:
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                f"SELECT DISTINCT 1 FROM ({REJECTED_PAIRS}) rp WHERE publication_id = :p AND person_id = :pid",
                 p=pub_id,
                 pid=person_id,
             )
@@ -1248,7 +1249,7 @@ class TestReassignRejectedPairUnit:
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                f"SELECT DISTINCT 1 FROM ({REJECTED_PAIRS}) rp WHERE publication_id = :p AND person_id = :pid",
                 p=pub1,
                 pid=person_id,
             )
@@ -1288,9 +1289,7 @@ class TestMergePersonRejectedAuthorships:
         merge_person(target, source, repo=repo)
 
         rows = sa_sync_conn.execute(
-            text(
-                "SELECT publication_id, person_id FROM rejected_authorships ORDER BY publication_id"
-            )
+            text(f"SELECT DISTINCT publication_id, person_id FROM ({REJECTED_PAIRS}) rp")
         ).all()
         assert {(r.publication_id, r.person_id) for r in rows} == {
             (pub_shared, target),

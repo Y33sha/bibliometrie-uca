@@ -55,6 +55,22 @@ def authorship_has_signature_from(source: str, authorship: str = "a") -> str:
     )
 
 
+# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est.
+REJECTED_PAIRS = (
+    "SELECT sp_rej.publication_id, rej.person_id FROM rejected_authorships rej"
+    " JOIN source_publications sp_rej ON sp_rej.id = rej.source_publication_id"
+)
+
+
+def publication_rejected_for(publication_id: str, person_id: str) -> str:
+    """Condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : une de ses notices l'est."""
+    return (
+        "EXISTS (SELECT 1 FROM rejected_authorships rej"
+        " JOIN source_publications sp_rej ON sp_rej.id = rej.source_publication_id"
+        f" WHERE sp_rej.publication_id = {publication_id} AND rej.person_id = {person_id})"
+    )
+
+
 def has_author_role(signature: str = "sa") -> str:
     """Condition vraie quand la signature aliasée `signature` tient le rôle d'auteur."""
     return f"{signature}.roles && ARRAY['author']::text[]"
