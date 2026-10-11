@@ -9,11 +9,6 @@ import argparse
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import (
-    ExtractionConfigError,
-    SourceExtractor,
-    scoped_logger,
-)
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.extract.datacite import (
     DataciteExtractAdapter,
@@ -21,6 +16,11 @@ from application.ports.pipeline.extract.datacite import (
 )
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.harvest import (
+    ExtractionConfigError,
+    SourceExtractor,
+    scoped_logger,
+)
 
 
 class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteExtractAdapter]):

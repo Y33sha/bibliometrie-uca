@@ -37,11 +37,11 @@ from infrastructure.pipeline.normalize.staging import (
     rehydrate_staging_row,
 )
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from infrastructure.sources.hal.extract_hal import extract_doi as hal_extract_doi
 from infrastructure.sources.openalex.parsing import extract_doi as openalex_extract_doi
 from infrastructure.sources.scanr.extract_scanr import extract_doi as scanr_extract_doi
 from infrastructure.sources.theses.extract_theses import extract_doi as theses_extract_doi
 from infrastructure.sources.wos.parsing import extract_doi as wos_extract_doi
+from pipeline.sources.hal.fields import extract_doi as hal_extract_doi
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
 

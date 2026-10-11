@@ -18,13 +18,12 @@ from application.ports.pipeline.fetch_missing.hal import (
 )
 from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import record_failed_lookup
 from infrastructure.pipeline.fetch_missing.hal import get_missing_hal_ids, get_missing_nnts
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
-from infrastructure.sources.hal.extract_hal import extract_doi
-from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import lookup_json_async
+from pipeline.sources.hal.fields import HAL_FIELDS_STR, extract_doi
+from pipeline.sources.staging import upsert_staging
 
 # HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.

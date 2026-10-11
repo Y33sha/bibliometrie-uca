@@ -23,7 +23,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
-from application.pipeline.extract.base import scoped_logger
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.fetch_stale import (
     FetchedRecord,
@@ -39,6 +38,7 @@ from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODES
 from pipeline.progression import progression
 from pipeline.signals import filter_configured, select_targets, timed_metrics
+from pipeline.sources.harvest import scoped_logger
 
 __all__ = ["FetchStalePhase", "refresh"]
 

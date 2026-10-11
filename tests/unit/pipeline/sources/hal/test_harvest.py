@@ -1,0 +1,129 @@
+"""Moissonnage HAL (`pipeline.sources.hal.harvest`).
+
+Requêtes Solr et champs des notices : fonctions pures. Pilotage par `HalExtractor` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
+"""
+
+from __future__ import annotations
+
+import logging
+from unittest.mock import MagicMock
+
+import pytest
+
+from pipeline.sources.hal import harvest
+from pipeline.sources.hal.fields import extract_doi, extract_id
+from pipeline.sources.hal.harvest import HalExtractor, build_collections_fq, build_query
+from pipeline.sources.harvest import ExtractionConfigError
+from tests.helpers.extractors import arguments_du_run
+
+_LOGGER = logging.getLogger("test")
+
+# Page Solr close : aucun document, marqueur inchangé — la pagination s'arrête au premier tour.
+_PAGE_VIDE = {"response": {"numFound": 0, "docs": []}, "nextCursorMark": "*"}
+
+
+class TestBuildQuery:
+    def test_combines_years_and_since(self):
+        assert build_query(years=[2024, 2026], since="2026-05-01") == (
+            "producedDateY_i:[2024 TO 2026] AND modifiedDate_tdate:[2026-05-01T00:00:00Z TO *]"
+        )
+
+    def test_since_alone(self):
+        assert build_query(years=None, since="2025-12-31") == (
+            "modifiedDate_tdate:[2025-12-31T00:00:00Z TO *]"
+        )
+
+    def test_years_range_uses_min_and_max(self):
+        assert build_query(years=[2023, 2026, 2024]) == "producedDateY_i:[2023 TO 2026]"
+
+    def test_raises_when_no_filter(self):
+        with pytest.raises(ValueError):
+            build_query(years=None)
+        with pytest.raises(ValueError):
+            build_query(years=[])
+
+
+class TestBuildCollectionsFq:
+    def test_union_joined_with_or_and_quoted(self):
+        # Les codes sont entre guillemets : un tiret serait sinon lu comme un opérateur Solr.
+        assert build_collections_fq(["LIMOS", "CHU-CLERMONTFERRAND"]) == (
+            'collCode_s:("LIMOS" OR "CHU-CLERMONTFERRAND")'
+        )
+
+
+class TestFields:
+    def test_extract_id(self):
+        assert extract_id({"halId_s": "hal-12345"}) == "hal-12345"
+        assert extract_id({}) == ""
+
+    def test_extract_doi(self):
+        assert extract_doi({"doiId_s": "https://doi.org/10.1000/abc"}) == "10.1000/abc"
+        assert extract_doi({"doiId_s": ["10.1000/abc"]}) == "10.1000/abc"
+        assert extract_doi({}) is None
+        assert extract_doi({"doiId_s": ""}) is None
+
+
+@pytest.fixture
+def configuration(monkeypatch):
+    """Remplace la lecture des collections et des années en base."""
+
+    def _poser(collections: dict[str, str], annees: list[int]) -> None:
+        monkeypatch.setattr(harvest, "get_hal_collections", lambda conn: collections)
+        monkeypatch.setattr(harvest, "get_years", lambda conn, start_year=None: annees)
+
+    return _poser
+
+
+def _client() -> MagicMock:
+    client = MagicMock()
+    client.count.return_value = 0
+    client.fetch_page_cursor.return_value = _PAGE_VIDE
+    return client
+
+
+def test_une_passe_par_annee_de_la_configuration(configuration):
+    configuration({"C": "Coll"}, [2023, 2024])
+    client = _client()
+    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run())
+    requetes = [appel.args[0] for appel in client.fetch_page_cursor.call_args_list]
+    assert requetes == [build_query(years=[2023]), build_query(years=[2024])]
+
+
+def test_chaque_annee_est_comptee_avant_l_extraction(configuration):
+    configuration({"C": "Coll"}, [2023, 2024])
+    client = _client()
+    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run())
+    fq = build_collections_fq(["C"])
+    comptees = [appel.args for appel in client.count.call_args_list]
+    assert comptees == [(build_query(years=[2023]), fq), (build_query(years=[2024]), fq)]
+
+
+def test_une_annee_demandee_ignore_la_configuration(configuration):
+    configuration({"C": "Coll"}, [2020, 2021])
+    client = _client()
+    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(year=2024))
+    assert client.fetch_page_cursor.call_args.args[0] == build_query(years=[2024])
+
+
+def test_mode_incremental_fait_une_seule_passe_sur_la_date(configuration):
+    configuration({"C": "Coll"}, [2020, 2021, 2022])
+    client = _client()
+    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
+    assert client.fetch_page_cursor.call_count == 1
+    assert client.count.call_args.args[0] == build_query(years=None, since="2026-01-01")
+
+
+def test_sans_collection_refuse(configuration):
+    configuration({}, [2024])
+    with pytest.raises(ExtractionConfigError, match="aucune collection HAL"):
+        HalExtractor(MagicMock(), _LOGGER, _client()).run(arguments_du_run())
+
+
+def test_s_arrete_quand_la_source_est_a_bout(configuration):
+    configuration({"C": "Coll"}, [2023, 2024])
+    client = _client()
+    breaker = MagicMock()
+    breaker.tripped = True
+    metrics = HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(), breaker=breaker)
+    assert metrics.total == 0
+    client.fetch_page_cursor.assert_not_called()

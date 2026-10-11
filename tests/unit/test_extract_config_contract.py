@@ -2,7 +2,7 @@
 
 Chaque orchestrateur lève `ExtractionConfigError` quand la source n'est pas
 extractible : périmètre d'interrogation absent (contrôle propre à l'extraction :
-collections HAL, institution_ids, affiliations, PPN) ou credentials absents
+institution_ids, affiliations, PPN) ou credentials absents
 (motif porté par `*ExtractConfig.credentials_missing`, renseigné par l'adapter via
 le détecteur central `source_credentials_missing`). La règle de présence des
 credentials elle-même est testée dans `test_source_credentials_missing`.
@@ -13,15 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from application.pipeline.extract.base import ExtractionConfigError
-from application.pipeline.extract.extract_hal import HalExtractor
 from application.pipeline.extract.extract_openalex import OpenalexExtractor
 from application.pipeline.extract.extract_scanr import ScanrExtractor
 from application.pipeline.extract.extract_wos import WosExtractor
-from application.ports.pipeline.extract.hal import HalExtractConfig
 from application.ports.pipeline.extract.openalex import OpenalexExtractConfig
 from application.ports.pipeline.extract.scanr import ScanrExtractConfig
 from application.ports.pipeline.extract.wos import WosExtractConfig
+from pipeline.sources.harvest import ExtractionConfigError
 
 _LOG = logging.getLogger("test.extract.contract")
 _MISSING = "credentials absents (motif)"
@@ -113,26 +111,3 @@ def test_scanr_raises_on_missing_credentials():
 def test_scanr_ok():
     config = _scanr(affiliation_ids=["A"], credentials_missing=None).load_config(None)
     assert config.affiliation_ids == ["A"]
-
-
-# ── HAL (API publique : périmètre seul) ─────────────────────────────────────
-
-
-def _hal(all_collections):
-    return _extractor(
-        HalExtractor,
-        HalExtractConfig(
-            base_url="u",
-            all_collections=all_collections,
-            n_collections=len(all_collections),
-        ),
-    )
-
-
-def test_hal_requires_collections():
-    with pytest.raises(ExtractionConfigError):
-        _hal({}).load_config(None)
-
-
-def test_hal_ok_with_collections():
-    assert _hal({"C": "lab"}).load_config(None).all_collections == {"C": "lab"}

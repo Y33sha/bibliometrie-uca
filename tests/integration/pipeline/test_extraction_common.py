@@ -7,10 +7,10 @@ from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
 from infrastructure.fingerprint import fingerprint
-from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.pipeline.fetch_missing.doi import get_missing_dois
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
-from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
+from pipeline.sources.change_detection import change_detection_hash
+from pipeline.sources.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication

@@ -15,8 +15,8 @@ from application.ports.pipeline.fetch_stale import (
     FetchOutcome,
     StaleRow,
 )
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_stale import get_stale_rows, set_disappeared_by_source_id
+from pipeline.sources.staging import upsert_staging
 
 
 class BaseFetchStaleAdapter(ABC):

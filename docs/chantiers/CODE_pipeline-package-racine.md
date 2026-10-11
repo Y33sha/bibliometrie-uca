@@ -11,9 +11,10 @@ La cible est posée par la question 5 de la fiche [Architecture cible du pipelin
 - **Un paquet racine `pipeline/`**, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
 - **Découpage par domaine** : `pipeline/sources/<source>`, `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons`, `pipeline/enrichments` ; `graph.py` et l'orchestrateur à la racine.
 - **Règles d'import** vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques d'`infrastructure/` (connexion, réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`. `application/` et `infrastructure/` n'importent pas `pipeline/`. Seule l'API (`interfaces/api/deps.py`) importe l'interface publique du pipeline : recalculs ciblés, ordre des phases.
+- **Régime de transition** : pendant la migration, `pipeline/` et le code du pipeline encore dans les couches (`application/pipeline`, `application/ports/pipeline`, `infrastructure/pipeline`, `infrastructure/sources`) s'importent dans les deux sens. Les exceptions sont listées dans `pyproject.toml` et disparaissent avec la dernière phase.
 - **Une phase à la fois, dans l'ordre du pipeline.** Chaque phase migrée confronte la cible aux situations concrètes qui la concernent ; ce qui ne tient pas sort de la cible.
 - **Le câblage `interfaces/cli/phases` disparaît** avec les ports. Le point d'entrée `run_pipeline` passe dans `pipeline/`.
-- **Une fonction par nœud du graphe**, qui porte son nom. Une phase est la liste de ses nœuds, appelés dans l'ordre. Un exécuteur piloté par le graphe pourra les appeler directement.
+- **Une fonction par nœud du graphe**, nommée comme lui. Une phase est la liste de ses nœuds, appelés dans l'ordre. Un exécuteur piloté par le graphe pourra les appeler directement.
 - **SQL dans le module Python**, en constantes à côté du code qui l'exécute : les requêtes y composent les constantes du domaine et les fragments SQL partagés.
 - **Journalisation** : la configuration et les sorties restent dans `infrastructure/observability/log.py`, module technique que le pipeline importe. La mise en forme du journal d'un run (`libelles`, `logging_scope`) appartient au pipeline.
 

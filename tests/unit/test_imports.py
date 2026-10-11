@@ -9,8 +9,7 @@ import importlib
 import pytest
 
 MODULES = [
-    "infrastructure.sources.hal.extract_hal",
-    "application.pipeline.extract.extract_hal",
+    "pipeline.sources.hal.harvest",
     "infrastructure.sources.hal.fetch_missing_hal",
     "infrastructure.sources.hal.fetch_missing_doi",
     "infrastructure.sources.openalex.extract_openalex",

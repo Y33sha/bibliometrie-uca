@@ -7,7 +7,7 @@ Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture es
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.extract.staging import upsert_staging
+from pipeline.sources.staging import upsert_staging
 from tests.integration.helpers.staging import insert_staging
 
 

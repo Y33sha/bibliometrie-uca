@@ -86,11 +86,9 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
     from infrastructure.sources.api_params import API_BASE_URLS
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
-        from application.pipeline.extract.extract_hal import HalExtractor
-        from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
+        from pipeline.sources.hal.harvest import HalClient, HalExtractor
 
-        adapter = PgHalExtractAdapter(base_url=API_BASE_URLS["hal"])
-        return HalExtractor(conn, source_log, adapter)
+        return HalExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
     def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
         from application.pipeline.extract.extract_openalex import OpenalexExtractor

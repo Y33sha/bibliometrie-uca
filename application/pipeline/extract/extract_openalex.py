@@ -9,12 +9,6 @@ import argparse
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
-    scoped_logger,
-)
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
@@ -22,6 +16,12 @@ from application.ports.pipeline.extract.openalex import (
 from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.harvest import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
 
 
 def extract_year(

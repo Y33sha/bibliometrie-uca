@@ -11,10 +11,8 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 from domain.types import JsonValue, as_mapping
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import (
     get_extraction_api_ids,
@@ -23,6 +21,7 @@ from infrastructure.sources.config import (
 )
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.wos import parsing
+from pipeline.sources.staging import BatchInsertCounts, upsert_staging
 
 
 class PgWosExtractAdapter(WosExtractAdapter):

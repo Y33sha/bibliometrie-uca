@@ -9,17 +9,17 @@ import argparse
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import (
+from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
+from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from pipeline.metrics import PhaseMetrics
+from pipeline.progression import Progression
+from pipeline.sources.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
     scoped_logger,
 )
-from application.ports.pipeline.extract._common import UpsertOutcome
-from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
-from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import Progression
+from pipeline.sources.staging import UpsertOutcome
 
 
 def extract_year(

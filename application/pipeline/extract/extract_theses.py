@@ -12,13 +12,6 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
-    scoped_logger,
-)
-from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
@@ -26,6 +19,13 @@ from application.ports.pipeline.extract.theses import (
 from domain.types import as_int, as_mapping, as_sequence
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression, progression
+from pipeline.sources.harvest import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
+from pipeline.sources.staging import UpsertOutcome
 
 
 def extract_theses(

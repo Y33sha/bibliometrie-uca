@@ -20,13 +20,13 @@ from application.ports.pipeline.fetch_missing.doi import DoiBatchResult
 from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping
-from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.fetch_missing.failed_lookups import (
     forget_failed_doi_lookups,
 )
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.datacite.nodes import RECORD_PARAMS, api_headers, record_doi
 from infrastructure.sources.http_retry import lookup_json_async
+from pipeline.sources.staging import upsert_staging
 
 
 class DataciteFetchMissingDoiAdapter:

@@ -17,8 +17,8 @@ from application.ports.pipeline.normalize.staging import (
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.fingerprint import stable_json_bytes
-from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.raw_store import RawStore, get_raw_store
+from pipeline.sources.change_detection import change_detection_hash
 
 logger = logging.getLogger(__name__)
 
