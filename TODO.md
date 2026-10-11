@@ -1,3 +1,8 @@
+# Oneshots à lancer
+backfill_mark_truncated_fetch_missing_openalex.py
+set -a; . ./.env; set +a
+psql -U "$DB_OWNER_USER" -h "$DB_HOST" -p "$DB_PORT" -d bibliometrie -f infrastructure/db/roles.sql
+
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * plafond d'interrogations sudoc
