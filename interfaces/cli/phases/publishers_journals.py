@@ -31,9 +31,6 @@ def build() -> Phase:
         merge_duplicate_monographs=_run_merge_duplicate_monographs,
         link_monographs_to_collections=_run_link_monographs_to_collections,
         type_proceedings_volumes=_run_type_proceedings_volumes,
-        delete_empty_monographs=_run_delete_empty_monographs,
-        delete_empty_journals=_run_delete_empty_journals,
-        delete_empty_publishers=_run_delete_empty_publishers,
         credentials_missing=credentials_missing,
     )
 
@@ -168,16 +165,6 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
         )
 
 
-def _run_delete_empty_journals() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_journals import (
-        run_delete_empty_journals,
-    )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
-
-    with open_tx() as conn:
-        return run_delete_empty_journals(log, journal_repo=PgJournalGatewayQueries(conn))
-
-
 def _run_merge_duplicate_monographs() -> PhaseMetrics:
     from application.pipeline.publishers_journals.merge_duplicate_monographs import (
         run_merge_duplicate_monographs,
@@ -198,26 +185,6 @@ def _run_link_monographs_to_collections() -> PhaseMetrics:
         return run_link_monographs_to_collections(
             log, monograph_repo=PgContainerGatewayQueries(conn)
         )
-
-
-def _run_delete_empty_monographs() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_monographs import (
-        run_delete_empty_monographs,
-    )
-    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
-
-    with open_tx() as conn:
-        return run_delete_empty_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
-
-
-def _run_delete_empty_publishers() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_publishers import (
-        run_delete_empty_publishers,
-    )
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
-
-    with open_tx() as conn:
-        return run_delete_empty_publishers(log, publisher_repo=PgPublisherGatewayQueries(conn))
 
 
 def _run_type_proceedings_volumes() -> PhaseMetrics:

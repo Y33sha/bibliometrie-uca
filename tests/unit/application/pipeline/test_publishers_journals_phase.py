@@ -16,9 +16,6 @@ _CHAMPS = (
     "merge_duplicate_monographs",
     "link_monographs_to_collections",
     "type_proceedings_volumes",
-    "delete_empty_monographs",
-    "delete_empty_journals",
-    "delete_empty_publishers",
 )
 
 
@@ -53,7 +50,7 @@ def test_chaque_sous_etape_ecrit_sa_ligne_sous_son_groupe(contexte, caplog):
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
     assert lignes[:2] == ["▶ Éditeurs", "  └─ Éditeurs des préfixes DOI : rien à faire"]
     assert "  ├─ Fusion des revues en double : 2 revues fusionnées" in lignes
-    assert lignes[-1] == "  └─ Éditeurs vides : rien à faire"
+    assert lignes[-1] == "  └─ Nature des monographies : rien à faire"
 
 
 def test_les_compteurs_des_sous_etapes_remontent_a_la_phase(contexte):

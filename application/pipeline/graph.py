@@ -462,29 +462,6 @@ NODES: tuple[Node, ...] = (
         ),
     ),
     _node(
-        "publishers_journals.delete_empty_containers",
-        "publishers_journals",
-        reads=(
-            "monographs.id",
-            "monographs.journal_id",
-            "journals.id",
-            "publishers.id",
-            "source_publications.journal_id",
-            "source_publications.monograph_id",
-            "publications.journal_id",
-            "publications.monograph_id",
-            "apc_payments",
-            "doi_prefixes.publisher_id",
-            "journal_name_forms",
-        ),
-        writes=("monographs.id", "journals.id", "publishers.id", "journal_issns"),
-        previous_run=(
-            "publications",
-            "source_publications.journal_id",
-            "apc_payments",
-        ),
-    ),
-    _node(
         "metadata_correction.journal_by_doi",
         "metadata_correction",
         reads=(
@@ -540,7 +517,14 @@ NODES: tuple[Node, ...] = (
             "source_publications.raw_metadata",
             "source_publications.keys_dirty",
         ),
-        previous_run=("source_publications",),
+        # Les référentiels vides, supprimés plus loin, ne sont référencés par aucune notice : la correction ne les atteint pas.
+        previous_run=(
+            "source_publications",
+            "journals.journal_type",
+            "journals.oa_model",
+            "monographs.proceedings",
+            "publishers.publisher_type",
+        ),
     ),
     _node(
         "metadata_correction.cluster",
@@ -675,6 +659,24 @@ NODES: tuple[Node, ...] = (
         reads=("publications.id", "authorships"),
         writes=("publications.id",),
         previous_run=("publications",),
+    ),
+    _node(
+        "authorships.delete_empty_containers",
+        "authorships",
+        reads=(
+            "monographs.id",
+            "monographs.journal_id",
+            "journals.id",
+            "publishers.id",
+            "source_publications.journal_id",
+            "source_publications.monograph_id",
+            "publications.journal_id",
+            "publications.monograph_id",
+            "apc_payments",
+            "doi_prefixes.publisher_id",
+            "journal_name_forms",
+        ),
+        writes=("monographs.id", "journals.id", "publishers.id", "journal_issns"),
     ),
     _node(
         "authorships.pub_counts",

@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-09.*
 
-La phase `publishers_journals` complète les référentiels d'éditeurs, de revues et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, va chercher auprès de sources externes le type des revues et leurs frais de publication, fusionne les doublons, rattache les monographies à leur collection et supprime les entrées vides. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
+La phase `publishers_journals` complète les référentiels d'éditeurs, de revues et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents : elle rattache chaque préfixe DOI à son éditeur, vérifie les ISSN des revues, va chercher auprès de sources externes le type des revues et leurs frais de publication, fusionne les doublons, et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [authorships](09-authorships.md), après les dernières suppressions de publications. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
 Les sous-étapes forment quatre groupes, chacun sous son titre dans le journal : éditeurs, revues, monographies, nettoyage. Chaque sous-étape y tient une ligne de bilan.
 
@@ -41,14 +41,6 @@ Les sous-étapes forment quatre groupes, chacun sous son titre dans le journal :
 9. **`link_monographs_to_collections`** — choisit l'entrée de `journals` de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut l'entrée sans ISSN qui décrit le volume lui-même, à défaut aucune. Les monographies sans collection à ISSN se regroupent en séries : titres de volume (année, ordinal d'édition, numéro de volume) de même titre de série, chez le même éditeur, à partir de deux volumes. Une série reçoit son entrée dans `journals`, sans ISSN, typée recueil d'actes si tous ses volumes sont des actes, collection de livres sinon. Une monographie dont les enregistrements portent plusieurs entrées au même niveau reste en l'état, signalée. Les règles sont dans `domain/journals/series.py` et `domain/monographs/collection.py`.
 
 10. **`type_proceedings_volumes`** — recalcule la nature de chaque monographie, volume d'actes ou livre. Trois signaux suffisent chacun : un enregistrement issu d'un congrès, une collection typée recueil d'actes, un titre anglais qui annonce des actes. Les règles sont dans `domain/monographs/proceedings.py`.
-
-## Nettoyage
-
-11. **`delete_empty_monographs`** — supprime les monographies sans enregistrement ni publication.
-
-12. **`delete_empty_journals`** — supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, avec leurs formes de nom. Le journal d'exécution garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
-
-13. **`delete_empty_publishers`** — supprime les éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue.
 
 ## Import manuel d'un export DOAJ
 

@@ -1,15 +1,17 @@
 """Orchestrateur de la phase `authorships` : construction de la table `authorships`.
 
-Trois sous-étapes :
+Quatre sous-étapes :
 
 1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé.
 2. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
-3. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
+3. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
+4. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
 
 Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from application.pipeline.authorships.build_authorships import build
@@ -35,9 +37,11 @@ class AuthorshipsPhase:
     purge_queries: PurgeOrphanPublicationsQueries
     pub_counts_queries: PubCountsQueries
     address_pub_count_queries: AddressPubCountQueries
+    # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
+    empty_containers: tuple[tuple[str, Callable[[], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne build → purge → recalcul des décomptes et retourne les métriques du build."""
+        """Enchaîne build → purge → référentiels vides → recalcul des décomptes et retourne les métriques du build."""
         open_tx, logger = ctx.open_tx, ctx.logger
         with open_tx() as conn:
             metrics = build(
@@ -51,6 +55,7 @@ class AuthorshipsPhase:
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
             summary["publications_purged"] = n_purged
+        _delete_empty_containers(self.empty_containers, metrics, logger)
         _refresh_pub_counts(
             open_tx, self.pub_counts_queries, self.address_pub_count_queries, logger
         )
@@ -73,6 +78,22 @@ def _purge_orphan_publications(
             conn.commit()
             n += deleted
     return n
+
+
+def _delete_empty_containers(
+    steps: tuple[tuple[str, Callable[[], PhaseMetrics]], ...],
+    metrics: PhaseMetrics,
+    logger: logging.Logger,
+) -> None:
+    """Supprime les référentiels vides ; chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
+    if not steps:
+        return
+    etape(logger, "Référentiels vides")
+    for indice, (libelle, run) in enumerate(steps):
+        sub = run()
+        metrics.merge(sub)
+        branche = DERNIERE_BRANCHE if indice == len(steps) - 1 else BRANCHE
+        logger.info("%s%s : %s", branche, libelle, sub.resume or "rien à faire")
 
 
 def _refresh_pub_counts(
