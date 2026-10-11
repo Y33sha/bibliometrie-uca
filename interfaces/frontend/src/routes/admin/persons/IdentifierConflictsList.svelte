@@ -91,15 +91,19 @@
         <div class="pair-body">
           {@render personCol(pair.person_a)}
           <div class="actions">
-            <button class="act keep" disabled={acting} title="Garder la personne de gauche, absorber celle de droite" onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
-              >&larr; Fusionner</button
-            >
+            {#if !pair.person_b.has_rh}
+              <button class="act keep" disabled={acting} title="Garder la personne de gauche, absorber celle de droite" onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
+                >&larr; Fusionner</button
+              >
+            {/if}
             <button class="act distinct" disabled={acting} title="Personnes distinctes (identifiant mal attribué)" onclick={() => markDistinct(pair.person_a.person_id, pair.person_b.person_id)}
               >Distinctes</button
             >
-            <button class="act keep" disabled={acting} title="Garder la personne de droite, absorber celle de gauche" onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
-              >Fusionner &rarr;</button
-            >
+            {#if !pair.person_a.has_rh}
+              <button class="act keep" disabled={acting} title="Garder la personne de droite, absorber celle de gauche" onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
+                >Fusionner &rarr;</button
+              >
+            {/if}
           </div>
           {@render personCol(pair.person_b)}
         </div>

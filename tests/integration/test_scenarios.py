@@ -217,3 +217,26 @@ class TestMergePersons:
             ).first()
             is None
         )
+
+    def test_person_with_rh_absorbs_when_requested_as_source(self, sa_sync_conn, person_repo):
+        """La personne qui a une fiche RH est conservée, même demandée comme absorbée."""
+        requested_target = _person(sa_sync_conn, "Dupont", first_name="J.")
+        with_rh = _person(sa_sync_conn, "Dupont", first_name="Jean")
+        _rh(sa_sync_conn, with_rh)
+
+        assert merge_person(requested_target, with_rh, repo=person_repo) == (
+            with_rh,
+            requested_target,
+        )
+
+        remaining = sa_sync_conn.execute(
+            text("SELECT id FROM persons WHERE id = ANY(:ids)"),
+            {"ids": [requested_target, with_rh]},
+        ).scalars()
+        assert list(remaining) == [with_rh]
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT person_id FROM persons_rh WHERE person_id = :id"), {"id": with_rh}
+            ).scalar()
+            == with_rh
+        )

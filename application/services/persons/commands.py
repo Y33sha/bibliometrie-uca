@@ -110,10 +110,11 @@ def merge_person(
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository,
-) -> None:
-    """Fusionne la personne source dans la cible (refus si RH distinctes des deux côtés)."""
-    persons_service.merge_person(target_id, source_id, repo=repo, audit_repo=audit_repo)
+) -> tuple[int, int]:
+    """Fusionne deux personnes et retourne (id conservé, id absorbé) ; la personne qui a une fiche RH est conservée."""
+    merged = persons_service.merge_person(target_id, source_id, repo=repo, audit_repo=audit_repo)
     conn.commit()
+    return merged
 
 
 def mark_distinct(

@@ -82,8 +82,8 @@ class PgPersonRepository(PersonRepository):
 
     # ── Fusion ─────────────────────────────────────────────────────
 
-    def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
-        return _core.has_distinct_rh(self._conn, id_a, id_b)
+    def ids_with_rh(self, person_ids: list[int]) -> set[int]:
+        return _core.ids_with_rh(self._conn, person_ids)
 
     def merge_into(self, target_id: int, source_id: int) -> None:
         _core.merge_into(self._conn, target_id, source_id)

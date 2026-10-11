@@ -184,15 +184,12 @@ def map_rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
     }
 
 
-def has_distinct_rh(conn: Connection, id_a: int, id_b: int) -> bool:
-    return (
-        scalar_int(
-            conn.execute(
-                text("SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (:a, :b)"),
-                {"a": id_a, "b": id_b},
-            )
-        )
-        >= 2
+def ids_with_rh(conn: Connection, person_ids: list[int]) -> set[int]:
+    return set(
+        conn.execute(
+            text("SELECT DISTINCT person_id FROM persons_rh WHERE person_id = ANY(:ids)"),
+            {"ids": person_ids},
+        ).scalars()
     )
 
 
@@ -201,11 +198,12 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     1. Transfert source_authorships
     2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
     3. Sur une publication où la cible est rejetée, le rejet l'emporte : signatures détachées, authorship supprimée
-    4. Dédoublonnage + transfert identifiants
-    5. Transfert conditionnel fiche RH
-    6. person_name_forms : bascule source_id → target_id
-    7. Recalcul des formes source 'persons' pour la cible
-    8. Suppression de la personne source
+    4. Transfert des identifiants
+    5. person_name_forms : bascule source_id → target_id
+    6. Recalcul des formes source 'persons' pour la cible
+    7. Suppression de la personne source
+
+    La source n'a pas de fiche RH : le service conserve toujours la personne qui en a une.
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
@@ -245,14 +243,6 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     delete_orphan_authorships(conn, target_id)
     conn.execute(
         text("UPDATE person_identifiers SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
-    conn.execute(
-        text("""
-            UPDATE persons_rh SET person_id = :t
-            WHERE person_id = :s
-              AND NOT EXISTS (SELECT 1 FROM persons_rh WHERE person_id = :t)
-        """),
         {"t": target_id, "s": source_id},
     )
     # Formes de la personne absorbée transférées avec leur statut ; sur une forme commune, le verdict de la cible prime sur une attente.

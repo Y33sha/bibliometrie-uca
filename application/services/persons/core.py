@@ -31,7 +31,7 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person import PersonExclusion, validated_name
+from domain.persons.person import PersonExclusion, merge_roles, validated_name
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
@@ -548,14 +548,17 @@ def merge_person(
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
-) -> None:
-    """Fusionne la personne `source_id` dans `target_id`.
+) -> tuple[int, int]:
+    """Fusionne les personnes `target_id` et `source_id`, et retourne (id conservé, id absorbé).
 
-    Charge target et source via le repo, délègue l'invariant métier à `Person.can_merge_with` (refus si les deux personnes ont chacune une fiche RH distincte), puis reprend les clés étrangères via `repo.merge_into`.
+    Les rôles demandés sont inversés si seule `source_id` a une fiche RH (`merge_roles`). Le repo reprend ensuite les clés étrangères (`repo.merge_into`).
 
-    Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si l'invariant RH est violé. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
+    Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si les deux ont une fiche RH. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
     """
-    target, source = load_merge_pair(target_id, source_id, repo.find_by_id, label="Personne")
-    target.can_merge_with(source, has_distinct_rh=repo.has_distinct_rh(target_id, source_id))
+    load_merge_pair(target_id, source_id, repo.find_by_id, label="Personne")
+    target_id, source_id = merge_roles(
+        target_id, source_id, with_rh=repo.ids_with_rh([target_id, source_id])
+    )
     repo.merge_into(target_id, source_id)
     emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})
+    return target_id, source_id

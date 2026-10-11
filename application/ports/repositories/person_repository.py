@@ -81,12 +81,12 @@ class PersonRepository(Protocol):
 
     # ── Fusion ─────────────────────────────────────────────────────
 
-    def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
-        """Vrai si les deux personnes portent chacune une fiche RH distincte (`persons_rh`) : au moins deux fiches sur la paire."""
+    def ids_with_rh(self, person_ids: list[int]) -> set[int]:
+        """Ids, parmi `person_ids`, des personnes qui ont une fiche RH (`persons_rh`)."""
         ...
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la personne `source_id` dans `target_id` : transfère contributions, identifiants, fiche RH et formes de nom vers la cible, recalcule ses formes canoniques, puis supprime la source. Le service garantit en amont l'invariant « au plus une fiche RH sur la paire » via `has_distinct_rh`."""
+        """Fusionne la personne `source_id` dans `target_id` : transfère contributions, identifiants et formes de nom vers la cible, recalcule ses formes canoniques, puis supprime la source. Le service garantit en amont que la source n'a pas de fiche RH (`merge_roles`)."""
         ...
 
     # ── distinct_persons ───────────────────────────────────────────
