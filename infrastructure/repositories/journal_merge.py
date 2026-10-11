@@ -39,27 +39,29 @@ def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
     )
 
 
-def _merge_journal_type(conn: Connection, target_id: int, source_id: int) -> None:
-    """Remplir si vide, le type inconnu comptant comme vide. Un type repris de l'absorbée garde son marqueur de saisie à la main."""
-    conn.execute(
-        text("""
-            UPDATE journals t
-            SET journal_type = s.journal_type,
-                manual_fields = CASE
-                    WHEN :field = ANY(s.manual_fields) AND NOT :field = ANY(t.manual_fields)
-                    THEN t.manual_fields || CAST(:field AS text)
-                    ELSE t.manual_fields
-                END
-            FROM journals s
-            WHERE t.id = :t AND s.id = :s AND t.journal_type = CAST(:unknown AS journal_type)
-        """),
-        {
-            "t": target_id,
-            "s": source_id,
-            "field": ManualField.JOURNAL_TYPE.value,
-            "unknown": JournalType.UNKNOWN.value,
-        },
-    )
+def _fill_empty_with_marker(
+    field: ManualField, columns: tuple[str, ...], is_empty: str
+) -> MergeStep:
+    """Remplir si vide, les colonnes prises ensemble ; `is_empty` est la condition SQL de vide sur la revue conservée `t`. Une valeur reprise de l'absorbée garde son marqueur de saisie à la main."""
+    assignments = ", ".join(f"{c} = s.{c}" for c in columns)
+
+    def apply(conn: Connection, target_id: int, source_id: int) -> None:
+        conn.execute(
+            text(f"""
+                UPDATE journals t
+                SET {assignments},
+                    manual_fields = CASE
+                        WHEN :field = ANY(s.manual_fields) AND NOT :field = ANY(t.manual_fields)
+                        THEN t.manual_fields || CAST(:field AS text)
+                        ELSE t.manual_fields
+                    END
+                FROM journals s
+                WHERE t.id = :t AND s.id = :s AND {is_empty}
+            """),
+            {"t": target_id, "s": source_id, "field": field.value},
+        )
+
+    return MergeStep(tuple(("journals", c) for c in columns), apply)
 
 
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
@@ -88,13 +90,19 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "publisher": fill_empty("journals", "publisher_id"),
     "openalex_id": fill_empty_unique("journals", "openalex_id"),
     "oa_model": fill_empty("journals", "oa_model"),
-    "apc": fill_empty("journals", "apc_amount", "apc_currency"),
-    "journal_type": MergeStep((("journals", "journal_type"),), _merge_journal_type),
+    "apc": _fill_empty_with_marker(
+        ManualField.APC, ("apc_amount", "apc_currency"), "t.apc_amount IS NULL"
+    ),
+    "journal_type": _fill_empty_with_marker(
+        ManualField.JOURNAL_TYPE,
+        ("journal_type",),
+        f"t.journal_type = '{JournalType.UNKNOWN.value}'",
+    ),
     "is_academic": untouched("journals", "is_academic"),
     "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj),
     "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),
     "pub_count": untouched("journals", "pub_count"),
-    # Un champ repris de l'absorbée y apporte son marqueur (`_merge_journal_type`).
+    # Un champ repris de l'absorbée y apporte son marqueur (`_fill_empty_with_marker`).
     "manual_fields": untouched("journals", "manual_fields"),
 }
 

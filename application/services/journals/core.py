@@ -9,6 +9,7 @@ Un champ éditable d'une revue commande le `doc_type` de ses publications : le `
 
 import logging
 from collections.abc import Sequence
+from decimal import Decimal
 
 from sqlalchemy import Connection
 
@@ -145,7 +146,7 @@ def update_journal(
 
     L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
 
-    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un type fourni devient un champ saisi à la main (`ManualField`) : le pipeline ne l'écrit plus.
+    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un type ou un APC modifié devient un champ saisi à la main (`ManualField`) : le pipeline ne l'écrit plus. L'APC saisi est en euros.
 
     Lève `ValidationError` si aucun champ n'est fourni ou si les ISSN sont invalides, `NotFoundError` si la revue n'existe pas.
     """
@@ -157,6 +158,7 @@ def update_journal(
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
     old_type = journal.journal_type
+    old_apc_amount = journal.apc_amount
     champs = update.model_dump(exclude_unset=True, mode="json")
     # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
     for field_name in update.model_fields_set:
@@ -164,10 +166,21 @@ def update_journal(
             journal.issns = validate_journal_issns(
                 JournalIssn(**row.model_dump()) for row in update.issns or []
             )
+        elif field_name == "apc_amount":
+            # Montant au centime, comme la colonne : la comparaison à l'ancien montant reste exacte.
+            journal.apc_amount = (
+                Decimal(str(update.apc_amount)).quantize(Decimal("0.01"))
+                if update.apc_amount is not None
+                else None
+            )
         else:
             setattr(journal, field_name, getattr(update, field_name))
-    if "journal_type" in update.model_fields_set:
+    if journal.journal_type != old_type:
         journal.manual_fields |= {ManualField.JOURNAL_TYPE}
+    if journal.apc_amount != old_apc_amount:
+        # Le formulaire saisit l'APC en euros.
+        journal.apc_currency = "EUR" if journal.apc_amount is not None else None
+        journal.manual_fields |= {ManualField.APC}
     repo.save(journal)
     emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)
     return journal.journal_type != old_type

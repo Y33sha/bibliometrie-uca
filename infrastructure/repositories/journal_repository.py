@@ -96,7 +96,7 @@ class PgJournalRepository(JournalRepository):
     # ── Persistance de l'agrégat ───────────────────────────────────
 
     def save(self, journal: Journal) -> None:
-        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API et de ses ISSN. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`, `is_in_doaj`) ne sont pas touchées. Un ISSN gardé conserve sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
+        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API et de ses ISSN. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `is_in_doaj`) ne sont pas touchées. Un ISSN gardé conserve sa date de vérification Sudoc, un ISSN ajouté attend la sienne. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(journals)
             .where(journals.c.id == journal.id)
@@ -107,6 +107,7 @@ class PgJournalRepository(JournalRepository):
                 journal_type=journal.journal_type,
                 is_academic=journal.is_academic,
                 apc_amount=journal.apc_amount,
+                apc_currency=journal.apc_currency,
                 manual_fields=sorted(journal.manual_fields),
             )
         )

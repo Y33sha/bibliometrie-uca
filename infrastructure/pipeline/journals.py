@@ -191,6 +191,8 @@ _JOURNAL_SUMMARIES = text(f"""
 # Revues sans enregistrement, sans publication, sans monographie et sans paiement APC.
 # Le type n'est pas saisi à la main : le pipeline peut l'écrire.
 _TYPE_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.JOURNAL_TYPE.value)
+# L'APC n'est pas saisi à la main : le pipeline peut l'écrire.
+_APC_NOT_MANUAL = ~journals.c.manual_fields.any(ManualField.APC.value)
 
 _EMPTY_JOURNALS = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
@@ -622,7 +624,7 @@ class PgJournalGatewayQueries(
     ) -> None:
         stmt = (
             update(journals)
-            .where(journals.c.id == journal_id)
+            .where(journals.c.id == journal_id, _APC_NOT_MANUAL)
             .values(
                 apc_amount=func.coalesce(apc_amount, journals.c.apc_amount),
                 apc_currency=func.coalesce(apc_currency, journals.c.apc_currency),
