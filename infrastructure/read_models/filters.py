@@ -535,6 +535,14 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
+def person_active_clause(value: bool | None) -> WhereClause | None:
+    """Filtre : la personne a (ou n'a pas) une authorship ou une fiche RH."""
+    if value is None:
+        return None
+    active = "(prh.id IS NOT NULL OR EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id))"
+    return WhereClause(active if value else f"NOT {active}", {})
+
+
 def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereClause | None:
     """Filtre : le motif d'exclusion de la personne figure dans `exclusions`, `None` désignant une personne retenue."""
     if not exclusions:

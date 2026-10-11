@@ -12,6 +12,7 @@ from infrastructure.read_models.filters import (
     PERSON_HAS_PENDING_NAME_FORMS_SQL,
     WhereClause,
     assemble_where,
+    person_active_clause,
     person_department_clause,
     person_exclusion_clause,
     person_has_identifier_clause,
@@ -39,9 +40,10 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo, recherche nom et exclusion délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
+        # Scope labo, recherche nom, exclusion et activité délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
         out: list[WhereClause | None] = [
             person_exclusion_clause(filters.exclusions),
+            person_active_clause(filters.active),
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]
