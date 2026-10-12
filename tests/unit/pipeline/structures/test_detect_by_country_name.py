@@ -1,6 +1,6 @@
 """Tests unitaires du matching d'un nom de pays en fin d'adresse normalisée."""
 
-from application.pipeline.countries.detect_by_country_name import _match_trailing_country
+from pipeline.structures.detect_by_country_name import _match_trailing_country
 
 FORMS = {
     "france": "fr",

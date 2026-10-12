@@ -8,9 +8,9 @@ from pipeline.context import Phase
 def build() -> Phase:
     """Détection des pays des adresses et recalcul sur les publications.
 
-    Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
+    Séquence, transactions et métriques dans `pipeline/structures/countries.py`.
     """
-    from application.pipeline.countries.phase import CountriesPhase
-    from infrastructure.pipeline.countries import PgCountryQueries
+    from pipeline.structures.countries import CountriesPhase
+    from pipeline.structures.countries_queries import CountryQueries
 
-    return CountriesPhase(PgCountryQueries())
+    return CountriesPhase(CountryQueries())

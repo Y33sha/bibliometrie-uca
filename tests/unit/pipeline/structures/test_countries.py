@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from application.pipeline.countries import phase
-from application.ports.pipeline.countries import AddressCountryStatus
 from pipeline.metrics import PhaseMetrics
+from pipeline.structures import countries as phase
+from pipeline.structures.countries_queries import AddressCountryStatus
 
 
 class _FakeCountryQueries:

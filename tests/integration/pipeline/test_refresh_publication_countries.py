@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `application.pipeline.countries.refresh_publication_countries`.
+"""Tests d'intégration pour `pipeline.structures.refresh_publication_countries`.
 
 Recalcul des caches pays depuis `addresses.countries` :
 1. `source_publications.countries` — union des pays des adresses des source_authorships du document.
@@ -13,8 +13,8 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from application.pipeline.countries.refresh_publication_countries import refresh
-from infrastructure.pipeline.countries import PgCountryQueries
+from pipeline.structures.countries_queries import CountryQueries
+from pipeline.structures.refresh_publication_countries import refresh
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -61,8 +61,8 @@ def _get_sp_countries(conn, sp_id: int) -> list[str] | None:
 
 
 @pytest.fixture
-def queries() -> PgCountryQueries:
-    return PgCountryQueries()
+def queries() -> CountryQueries:
+    return CountryQueries()
 
 
 @pytest.fixture

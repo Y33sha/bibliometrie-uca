@@ -1,6 +1,6 @@
 """Tests unitaires de `PlaceNameDetector` (détection d'institutions, Aho-Corasick)."""
 
-from application.pipeline.countries.place_name_detector import PlaceNameDetector
+from pipeline.structures.place_name_detector import PlaceNameDetector
 
 
 class TestPlaceNameDetector:

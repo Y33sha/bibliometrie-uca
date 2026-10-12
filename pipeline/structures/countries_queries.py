@@ -1,28 +1,38 @@
-"""Query service SQL de la phase `countries` : résoudre les pays d'une adresse, puis les propager aux caches dénormalisés.
+"""SQL de la phase `countries` : résoudre les pays d'une adresse, puis les recopier dans les caches dénormalisés.
 
 **Résolution** — pose `addresses.countries` (seule source de vérité) par détection et suggestion. Détection : les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) confrontées aux adresses sans pays (`fetch_addresses_missing_country_normalized`), écriture via `write_countries`. Suggestion : les adresses déjà résolues forment un pool (`load_country_pool`) rapproché des cibles restantes (`fetch_suggest_targets_chunk`) pour alimenter `addresses.suggested_countries`. `count_address_country_status` et `count_suggest_eligible` en donnent le bilan.
 
-**Propagation** — recalcule deux caches depuis `addresses.countries` :
+**Recopie** — recalcule deux caches depuis `addresses.countries` :
 
 1. `source_publications.countries` ← union des pays des adresses des `source_authorships` du document.
 2. `publications.countries` ← union des `source_publications.countries` de même `publication_id`.
 
-Deux portées partagent l'agrégation (tails `_SP_COUNTRIES_FROM_SCOPE` / `_PUB_COUNTRIES_FROM_SCOPE`) : bornée aux `countries_dirty` (`refresh_address_source_countries` / `refresh_publication_countries`, cf. `_DIRTY_SA` — refresh global du pipeline), ou bornée à des adresses (`refresh_source_publications_countries_for_addresses` / `refresh_publications_countries_for_addresses` — refresh ciblé après une modification manuelle, via `application/services/addresses/countries.py:propagate_countries_to_publications`).
-
-`PgCountryQueries` implémente `application.ports.pipeline.countries.CountryQueries` ; le contrat de chaque opération vit au port.
+Deux portées partagent l'agrégation (`_SP_COUNTRIES_FROM_SCOPE` / `_PUB_COUNTRIES_FROM_SCOPE`) : bornée aux `countries_dirty` (`refresh_address_source_countries` / `refresh_publication_countries`, cf. `_DIRTY_SA`), ou bornée à des adresses (`refresh_source_publications_countries_for_addresses` / `refresh_publications_countries_for_addresses`). La seconde sert l'API après une modification manuelle (port `CountryRecompute`).
 """
 
 import json
+from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.countries import (
-    AddressCountryFilter,
-    AddressCountryStatus,
-    CountryQueries,
-    SuggestEligibleCounts,
-)
 from domain.countries import PlaceNameKind
+
+
+class SuggestEligibleCounts(NamedTuple):
+    """Compteurs des adresses sans pays qui bornent la passe de suggestion."""
+
+    eligible: int  # aucune suggestion tentée
+    empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
+
+
+class AddressCountryStatus(NamedTuple):
+    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
+
+    total: int
+    with_country: int
+    with_suggestion: int
+    none: int
+
 
 # CTE des signatures à recalculer : celles marquées `countries_dirty` (posé par normalize), ou liées à une adresse dont `countries` a changé. Dérivées par JOIN, sans marquage de masse ; seules celles qui changent sont réécrites.
 _DIRTY_SA = """
@@ -81,20 +91,12 @@ _PUB_COUNTRIES_FROM_SCOPE = """,
       AND p.countries IS DISTINCT FROM agg.new_countries
 """
 
-# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
-_ADD_COUNTRY_SET_CLAUSE = """
-    SET countries = CASE
-        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
-        WHEN :cc = ANY(countries) THEN countries
-        ELSE array_append(countries, CAST(:cc AS char(2)))
-    END
-"""
 
-
-class PgCountryQueries(CountryQueries):
-    """Adapter PostgreSQL implémentant `application.ports.pipeline.countries.CountryQueries`. Contrat de chaque méthode au port."""
+class CountryQueries:
+    """Requêtes de la phase `countries`."""
 
     def count_address_country_status(self, conn: Connection) -> AddressCountryStatus:
+        """Bilan de la résolution des pays sur les adresses utiles (`pub_count > 0`)."""
         row = conn.execute(
             text("""
                 SELECT
@@ -114,6 +116,7 @@ class PgCountryQueries(CountryQueries):
         return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
 
     def refresh_address_source_countries(self, conn: Connection) -> int:
+        """Recalcule `source_publications.countries` — union des pays des adresses des `source_authorships` du document — sur les documents qu'un flag `countries_dirty` signale. Retourne le nombre de lignes modifiées."""
         return conn.execute(
             text(
                 _DIRTY_SA
@@ -130,6 +133,7 @@ class PgCountryQueries(CountryQueries):
         ).rowcount
 
     def refresh_publication_countries(self, conn: Connection) -> int:
+        """Recalcule `publications.countries` — union des `source_publications.countries` de la publication — sur les publications qu'un flag `countries_dirty` signale. Retourne le nombre de lignes modifiées."""
         return conn.execute(
             text(
                 _DIRTY_SA
@@ -147,12 +151,14 @@ class PgCountryQueries(CountryQueries):
         ).rowcount
 
     def clear_countries_dirty(self, conn: Connection) -> None:
+        """Purge les flags `countries_dirty` (`source_authorships` et `addresses`) en fin de cascade."""
         conn.execute(
             text("UPDATE source_authorships SET countries_dirty = false WHERE countries_dirty")
         )
         conn.execute(text("UPDATE addresses SET countries_dirty = false WHERE countries_dirty"))
 
     def load_country_forms(self, conn: Connection) -> dict[str, str]:
+        """Formes normalisées des noms de pays, chacune avec le code ISO du pays qu'elle désigne : `{forme: code ISO}`."""
         rows = conn.execute(
             text(
                 f"SELECT form_normalized, iso_code FROM place_name_forms "
@@ -162,6 +168,7 @@ class PgCountryQueries(CountryQueries):
         return {r.form_normalized: r.iso_code for r in rows}
 
     def load_place_forms(self, conn: Connection) -> dict[str, str]:
+        """Formes normalisées des noms d'institutions et de villes, chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
         rows = conn.execute(
             text(
                 f"SELECT form_normalized, iso_code FROM place_name_forms "
@@ -171,12 +178,14 @@ class PgCountryQueries(CountryQueries):
         return {r.form_normalized: r.iso_code for r in rows}
 
     def fetch_addresses_missing_country_normalized(self, conn: Connection) -> list[tuple[int, str]]:
+        """`(id, normalized_text)` des adresses sans pays, pour les détections par nom (pays en fin d'adresse, ou lieu)."""
         rows = conn.execute(
             text("SELECT id, normalized_text FROM addresses WHERE countries IS NULL")
         ).all()
         return [(r.id, r.normalized_text) for r in rows]
 
     def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
+        """Compte les adresses sans pays selon ce que la passe de suggestion en fait : à traiter, déjà suggérées, déjà tentées sans match. Les trois ensembles partitionnent les adresses sans pays."""
         row = conn.execute(
             text("""
                 SELECT
@@ -193,6 +202,7 @@ class PgCountryQueries(CountryQueries):
     def fetch_suggest_targets_chunk(
         self, conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
     ) -> list[tuple[int, str]]:
+        """Tranche `(id, normalized_text)` des adresses à suggérer, paginée par keyset sur `after_id`. `retry_empty` y joint les adresses tentées sans match, au cas où le pool aurait grossi entre deux runs. Liste vide = parcours terminé."""
         # `retry_empty` (mode full) réessaie aussi les échecs (`= []`), sans toucher aux suggestions positives (rares à changer, coûteuses à recalculer).
         suggested_filter = (
             "AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)"
@@ -214,6 +224,7 @@ class PgCountryQueries(CountryQueries):
         return [(r.id, r.normalized_text) for r in rows]
 
     def load_country_pool(self, conn: Connection) -> list[tuple[str, list[str]]]:
+        """Pool de référence de la suggestion : `(normalized_text, countries)` des adresses ayant un pays. Tenu en mémoire, rescanné à chaque batch de cibles."""
         rows = conn.execute(
             text("SELECT normalized_text, countries FROM addresses WHERE countries IS NOT NULL")
         ).all()
@@ -226,6 +237,10 @@ class PgCountryQueries(CountryQueries):
         *,
         target_column: str = "suggested_countries",
     ) -> None:
+        """Écrit en bloc les `(address_id, codes ISO)` de `rows` dans la colonne `target_column` d'`addresses` : `countries` (pays retenus) ou `suggested_countries` (suggestions, `[]` = tentée sans match). Idempotent.
+
+        Écrire `countries` pose aussi `countries_dirty` sur les lignes touchées : le refresh des caches en dérive les documents à recalculer.
+        """
         # Bulk via `jsonb_array_elements`, idempotent (`IS DISTINCT FROM`). Écrire `countries` pose aussi `countries_dirty` sur les lignes touchées (déjà réécrites → gratuit) ; `suggested_countries` ne touche pas la cascade.
         if target_column not in ("suggested_countries", "countries"):
             raise ValueError(f"target_column invalide : {target_column!r}")
@@ -248,80 +263,10 @@ class PgCountryQueries(CountryQueries):
             {"payload": payload},
         )
 
-    def batch_add_country_by_ids(
-        self, conn: Connection, country_code: str, address_ids: list[int]
-    ) -> list[int]:
-        if not address_ids:
-            return []
-        result = conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE id = ANY(:ids)
-                RETURNING id
-            """),
-            {"cc": country_code, "ids": address_ids},
-        )
-        return [row.id for row in result]
-
-    def batch_add_country_by_filter(
-        self, conn: Connection, country_code: str, criteria: AddressCountryFilter
-    ) -> list[int]:
-        conditions: list[str] = []
-        params: dict[str, object] = {"cc": country_code}
-        if criteria.search:
-            conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
-            params["search"] = f"%{criteria.search}%"
-        if criteria.has_country is True:
-            conditions.append("countries IS NOT NULL")
-        elif criteria.has_country is False:
-            conditions.append("countries IS NULL")
-        if criteria.country_code:
-            conditions.append(":country_code = ANY(countries)")
-            params["country_code"] = criteria.country_code
-        if criteria.suggested_country:
-            conditions.append(":suggested_country = ANY(suggested_countries)")
-            params["suggested_country"] = criteria.suggested_country
-
-        if not conditions:
-            return []
-
-        where_clause = " AND ".join(conditions)
-        result = conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE {where_clause}
-                RETURNING id
-            """),
-            params,
-        )
-        return [row.id for row in result]
-
-    def propagate_countries_across_similar_addresses(
-        self, conn: Connection, source_ids: list[int]
-    ) -> list[int]:
-        if not source_ids:
-            return []
-        result = conn.execute(
-            text("""
-                UPDATE addresses a2
-                SET countries = a1.countries
-                FROM addresses a1
-                WHERE a1.id = ANY(:source_ids)
-                  AND a1.countries IS NOT NULL
-                  AND a2.normalized_text = a1.normalized_text
-                  AND a2.countries IS DISTINCT FROM a1.countries
-                  AND a2.id <> a1.id
-                RETURNING a2.id
-            """),
-            {"source_ids": source_ids},
-        )
-        return [row.id for row in result]
-
     def refresh_source_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
+        """Recalcule `source_publications.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
         if not address_ids:
             return 0
         return conn.execute(
@@ -343,6 +288,7 @@ class PgCountryQueries(CountryQueries):
     def refresh_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
+        """Recalcule `publications.countries` (union des `source_publications.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
         if not address_ids:
             return 0
         return conn.execute(

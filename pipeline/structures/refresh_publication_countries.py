@@ -10,9 +10,9 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.countries import CountryQueries
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.progression import attente
+from pipeline.structures.countries_queries import CountryQueries
 
 
 def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> int:

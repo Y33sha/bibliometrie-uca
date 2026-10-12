@@ -9,10 +9,10 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.countries.place_name_detector import PlaceNameDetector
-from application.ports.pipeline.countries import CountryQueries
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
+from pipeline.structures.countries_queries import CountryQueries
+from pipeline.structures.place_name_detector import PlaceNameDetector
 
 
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
