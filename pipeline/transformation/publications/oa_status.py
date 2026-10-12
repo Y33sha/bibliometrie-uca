@@ -16,8 +16,8 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
+from pipeline.ingestion.http.access_source import SourcePhase
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     BRANCHE,

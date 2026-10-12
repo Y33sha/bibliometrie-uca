@@ -6,8 +6,8 @@ Sans identifiants, l'étape est sautée avec un signal `source_unconfigured`, av
 import logging
 from unittest.mock import AsyncMock, patch
 
+from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics

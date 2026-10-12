@@ -24,9 +24,9 @@ from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCH
 from domain.types import JsonValue
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.parallel import RunParallel
+from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
-from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import branche_de_source, etape, rien_a_faire

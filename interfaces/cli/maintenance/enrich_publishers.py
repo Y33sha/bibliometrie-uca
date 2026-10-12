@@ -25,10 +25,10 @@ from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.source_access import access_source
 from pipeline.ingestion.openalex.api import credential_params
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.savepoint import rollback_unless_invalidated
