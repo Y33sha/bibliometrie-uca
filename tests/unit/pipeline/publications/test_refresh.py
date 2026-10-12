@@ -1,11 +1,11 @@
-"""Tests unitaires de la couche application des publications.
+"""Tests unitaires du recalcul d'une publication (`pipeline/publications/refresh.py`).
 
-Re-correction canonique du `doc_type` (`_apply_canonical_doc_type_correction`) : découplage de l'arbitrage — `doc_type` et `journal_id` canoniques peuvent provenir de `source_publications` différentes ; une correction journal-dépendante appliquée par source ne suit pas le `journal_id` canonique. La re-correction la rejoue sur le journal réellement résolu.
+Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `journal_id` de la publication peuvent venir de `source_publications` différentes. Une correction qui dépend de la revue, appliquée à chaque source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
 """
 
-from application.services.publications.core import _apply_canonical_doc_type_correction
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
+from pipeline.publications.refresh import _apply_canonical_doc_type_correction
 
 
 class _FakeRepo:

@@ -18,7 +18,6 @@ from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.ror_repository import RorRepository
 from application.ports.repositories.structure_repository import StructureRepository
@@ -30,7 +29,6 @@ from .config_repository import PgConfigRepository
 from .journal_repository import PgJournalRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
-from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
 from .ror_repository import PgRorRepository
 from .structure_repository import PgStructureRepository
@@ -62,10 +60,6 @@ def perimeter_repository(conn: Connection) -> PerimeterRepository:
 
 def person_repository(conn: Connection) -> PersonRepository:
     return PgPersonRepository(conn)
-
-
-def publication_repository(conn: Connection) -> PublicationRepository:
-    return PgPublicationRepository(conn)
 
 
 def publisher_repository(conn: Connection) -> PublisherRepository:

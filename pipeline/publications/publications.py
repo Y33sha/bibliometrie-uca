@@ -17,7 +17,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.publication_repository import PublicationRepository
 from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
@@ -25,12 +24,13 @@ from pipeline.publications.reconcile_components import run as reconcile_run
 from pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
 )
+from pipeline.publications.refresh import PublicationStore
 
 
 @dataclass(frozen=True)
 class PublicationsPhase:
     reconciliation_queries: PublicationsReconciliationQueries
-    publication_repo_factory: Callable[[Connection], PublicationRepository]
+    publication_repo_factory: Callable[[Connection], PublicationStore]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Réconciliation, puis suppression des publications restées sans source."""
@@ -74,7 +74,7 @@ def _reconcile(
     open_tx: OpenTransaction,
     reconciliation_queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
-    publication_repo_factory: Callable[[Connection], PublicationRepository],
+    publication_repo_factory: Callable[[Connection], PublicationStore],
     *,
     rebuild: bool,
 ) -> PhaseMetrics:
@@ -114,12 +114,12 @@ def build() -> Phase:
 
     `--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
     """
-    from infrastructure.repositories import publication_repository
     from pipeline.publications.reconciliation import (
         PublicationsReconciliationQueries,
     )
+    from pipeline.publications.refresh import PublicationStore
 
     return PublicationsPhase(
         PublicationsReconciliationQueries(),
-        publication_repo_factory=publication_repository,
+        publication_repo_factory=PublicationStore,
     )

@@ -2,8 +2,8 @@
 
 from sqlalchemy import text
 
-from infrastructure.repositories import publication_repository
 from interfaces.cli.imports.import_apc import import_payments
+from pipeline.publications.refresh import PublicationStore
 from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
 
 
@@ -32,7 +32,7 @@ def _payment(
 
 
 def _publication(conn, doi: str) -> int:
-    return publication_repository(conn).create(
+    return PublicationStore(conn).create(
         title="t",
         title_normalized="t",
         doc_type="article",

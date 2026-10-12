@@ -19,8 +19,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.publications.core import create_publication, refresh_from_sources
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
 from domain.source_publications.keys import project_confirmation_keys
 from pipeline.libelles import (
@@ -36,6 +34,7 @@ from pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
+from pipeline.publications.refresh import PublicationStore, create_publication, refresh_from_sources
 from pipeline.savepoint import savepoint
 
 
@@ -57,7 +56,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 
 
 def _create_new_publication(
-    group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], publication_repo: PublicationRepository
+    group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], publication_repo: PublicationStore
 ) -> int:
     """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
 
@@ -96,7 +95,7 @@ def reconcile(
     conn: Connection,
     queries: PublicationsReconciliationQueries,
     *,
-    publication_repo: PublicationRepository,
+    publication_repo: PublicationStore,
     logger: logging.Logger | None = None,
     rebuild: bool = False,
 ) -> ReconcileStats | None:
@@ -211,7 +210,7 @@ def run(
     queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
     *,
-    publication_repo: PublicationRepository,
+    publication_repo: PublicationStore,
     rebuild: bool = False,
 ) -> ReconcileStats | None:
     try:

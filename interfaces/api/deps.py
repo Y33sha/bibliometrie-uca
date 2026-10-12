@@ -13,7 +13,7 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryRecompute
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.authorships_queries import AuthorshipsQueries
@@ -39,7 +39,6 @@ from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import countries as countries_service
@@ -70,7 +69,6 @@ from infrastructure.repositories import (
     journal_repository,
     perimeter_repository,
     person_repository,
-    publication_repository,
     publisher_repository,
     structure_repository,
 )
@@ -81,8 +79,8 @@ from pipeline.public import (
     AuthorshipsBuild,
     CountryQueries,
     InPerimeterRecompute,
+    JournalRecompute,
     PerimeterQueries,
-    PgMetadataCorrectionQueries,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,7 +98,7 @@ def get_admin_user() -> str:
 
 
 def admin_user_or_none(request: Request) -> str | None:
-    """Utilisateur porté par la session en cours, ou `None` faute de session valide — sans jamais refuser l'appel.
+    """Utilisateur de la session en cours, ou `None` faute de session valide — sans jamais refuser l'appel.
 
     Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit : la configuration, dont une part est publique et le reste réservé à une session.
     """
@@ -116,9 +114,9 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _open_connection(request: Request) -> Connection:
-    """Connexion tirée de l'engine, portant les caractéristiques valant pour la requête en cours.
+    """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction porte aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
 
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
@@ -199,10 +197,6 @@ def hal_problems_queries(
 
 def audit_repo(conn: Connection = Depends(db_conn)) -> AuditRepository:
     return audit_repository(conn)
-
-
-def publication_repo(conn: Connection = Depends(db_conn)) -> PublicationRepository:
-    return publication_repository(conn)
 
 
 def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:
@@ -296,13 +290,13 @@ def get_perimeter_queries() -> PerimeterStructuresQueries:
     return _perimeter_queries_singleton
 
 
-# `PgMetadataCorrectionQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
+# `JournalRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_journal_recompute_singleton: JournalRecomputePort = JournalRecompute()
 
 
-def metadata_correction_queries() -> MetadataCorrectionQueries:
-    """Corrections de métadonnées déclenchées par les hooks d'édition des revues."""
-    return _metadata_correction_queries_singleton
+def journal_recompute() -> JournalRecomputePort:
+    """Requalification des publications d'une revue après son édition ou sa fusion."""
+    return _journal_recompute_singleton
 
 
 # Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.

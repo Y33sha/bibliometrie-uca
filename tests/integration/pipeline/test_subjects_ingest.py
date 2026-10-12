@@ -7,7 +7,7 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from infrastructure.repositories.publication_repository import PgPublicationRepository
+from pipeline.publications.refresh import PublicationStore
 from pipeline.publications.subject_extractors import (
     hal_labels,
     openalex_labels,
@@ -147,7 +147,7 @@ class TestRunOrchestrator:
             ),
             {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
         )
-        repo = PgPublicationRepository(sa_sync_conn)
+        repo = PublicationStore(sa_sync_conn)
         repo.save(repo.find_by_id(pub))
 
         m2 = run(sa_sync_conn, queries, logger)

@@ -5,10 +5,9 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import core as journals_service
 from domain.journals.journal import JournalType
 
@@ -19,9 +18,8 @@ def update_journal(
     *,
     update: JournalUpdate,
     repo: JournalRepository,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository,
-    correction_queries: MetadataCorrectionQueries,
 ) -> None:
     """Met à jour une revue (champs sélectifs). Si `journal_type` change
     effectivement, requalifie le `doc_type` des publications rattachées dans la
@@ -32,11 +30,7 @@ def update_journal(
 
     if type_changed:
         journals_service.requalify_publications_for_journal(
-            journal_id,
-            conn=conn,
-            correction_queries=correction_queries,
-            publication_repo=publication_repo,
-            audit_repo=audit_repo,
+            journal_id, conn=conn, recompute=recompute, audit_repo=audit_repo
         )
     conn.commit()
 
@@ -47,8 +41,7 @@ def preview_type_change_impact(
     *,
     journal_type: JournalType,
     repo: JournalRepository,
-    publication_repo: PublicationRepository,
-    correction_queries: MetadataCorrectionQueries,
+    recompute: JournalRecompute,
 ) -> int:
     """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `journal_type`.
 
@@ -60,10 +53,7 @@ def preview_type_change_impact(
             journal_id, update=JournalUpdate(journal_type=journal_type), repo=repo
         )
         return journals_service.requalify_publications_for_journal(
-            journal_id,
-            conn=conn,
-            correction_queries=correction_queries,
-            publication_repo=publication_repo,
+            journal_id, conn=conn, recompute=recompute
         )
     finally:
         savepoint.rollback()
@@ -74,9 +64,8 @@ def merge_journals(
     target_id: int,
     source_id: int,
     *,
-    correction_queries: MetadataCorrectionQueries,
     repo: JournalRepository,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne la revue source dans la cible (transferts publications +
@@ -86,9 +75,8 @@ def merge_journals(
         target_id,
         source_id,
         conn=conn,
-        correction_queries=correction_queries,
         repo=repo,
-        publication_repo=publication_repo,
+        recompute=recompute,
         audit_repo=audit_repo,
     )
     conn.commit()

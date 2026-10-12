@@ -3,8 +3,7 @@
 from sqlalchemy import Connection, text
 
 from domain.publishers.publisher import PublisherType
-from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
-from infrastructure.repositories.merge_steps import (
+from infrastructure.db.merge_steps import (
     MergeStep,
     fill_empty,
     fill_empty_unique,
@@ -12,6 +11,7 @@ from infrastructure.repositories.merge_steps import (
     transfer_unique,
     untouched,
 )
+from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
 
 MERGE_STEPS: dict[str, MergeStep] = {
     "journals": transfer("journals", "publisher_id"),

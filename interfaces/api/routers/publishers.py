@@ -6,7 +6,7 @@ Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.read_models.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
@@ -19,7 +19,6 @@ from application.ports.read_models.publishers_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -29,9 +28,8 @@ from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPE
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
+    journal_recompute,
     journal_repo,
-    metadata_correction_queries,
-    publication_repo,
     publisher_queries,
     publisher_repo,
 )
@@ -176,9 +174,8 @@ def merge(
     conn: Connection = Depends(db_conn),
     publishers: PublisherRepository = Depends(publisher_repo),
     journals: JournalRepository = Depends(journal_repo),
-    publications: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
-    corrections: MetadataCorrectionQueries = Depends(metadata_correction_queries),
+    recompute: JournalRecompute = Depends(journal_recompute),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
@@ -192,10 +189,9 @@ def merge(
         conn,
         publisher_id,
         body.source_id,
-        correction_queries=corrections,
+        recompute=recompute,
         publisher_repo=publishers,
         journal_repo=journals,
-        publication_repo=publications,
         audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

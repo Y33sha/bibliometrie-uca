@@ -174,7 +174,7 @@ perimeter_structures = Table(
 )
 
 
-# Les enums Postgres portent leur type côté SA pour que les binds produisent un cast typé — un
+# Les enums Postgres déclarent leur type côté SA pour que les binds produisent un cast typé — un
 # paramètre VARCHAR ne rejoint pas une enum — et pour que la lecture reconnaisse la valeur reçue.
 # Leur vocabulaire vient du domaine, qui le déclare ; `create_type=False` laisse les migrations
 # créer le type. `TestPgEnumsMatchDb` vérifie l'accord des trois.
@@ -493,7 +493,7 @@ identifier_origin_enum = PgEnum(
 
 source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
 
-# Tout statut d'accès ouvert est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
+# Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
 oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 resolution_mode_enum = PgEnum(
@@ -532,7 +532,7 @@ place_name_forms = Table(
     "place_name_forms",
     metadata,
     Column("id", Integer, primary_key=True),
-    # `iso_code` en minuscule (canonique, cf. countries.code / addresses.countries).
+    # `iso_code` en minuscule (cf. countries.code / addresses.countries).
     Column("iso_code", Text, nullable=False),
     Column("form_normalized", Text, nullable=False),
     # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
@@ -562,7 +562,7 @@ address_structures = Table(
 )
 
 
-# ── Authorships (vérité + sources) ────────────────────────────────
+# ── Authorships (table consolidée + sources) ────────────────────────────────
 
 
 authorships = Table(
@@ -881,7 +881,7 @@ publications = Table(
 
 # Colonnes grasses detail-only sorties de `publications` (1:1, FK ON DELETE CASCADE
 # côté schéma — voir migration). Lues par la page détail et `find_by_id`, écrites
-# par `publication_repository.save` (upsert).
+# par `PublicationStore.save` (upsert).
 publications_detail = Table(
     "publications_detail",
     metadata,
