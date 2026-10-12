@@ -69,11 +69,10 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
     assert open_tx.transactions == 3
 
 
-def test_perimetre_lu_une_fois_et_partage(contexte):
+def test_les_deux_noeuds_lisent_le_perimetre_des_personnes(contexte):
     _, _, vus = _run(contexte)
 
-    assert vus["resolution"] == set(PERIMETRE)
-    assert vus["populate"] is vus["resolution"]
+    assert vus["resolution"] == vus["populate"] == set(PERIMETRE)
 
 
 def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
