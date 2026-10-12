@@ -8,7 +8,12 @@ Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une le
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from domain.sources.registry import DOI_SEARCHABLE_SOURCES, SOURCE_PRIORITY
+from domain.sources.registry import (
+    ALL_SOURCES,
+    DOI_SEARCHABLE_SOURCES,
+    HARVESTED_SOURCES,
+    SOURCE_PRIORITY,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,8 +89,6 @@ def order_violations(nodes: Sequence[Node]) -> list[tuple[str, str, str]]:
     )
 
 
-# Acquisition : les canaux écrivent la dernière observation d'un document dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
-_SOURCES = ("hal", "openalex", "scanr", "theses", "datacite", "wos")
 # Référentiels que la normalisation trouve ou crée, et que `publishers_journals` fusionne et supprime.
 _CONTAINERS = (
     "publishers",
@@ -103,6 +106,7 @@ NODES: tuple[Node, ...] = (
         reads=("perimeters", "structure_tutelles", "structures"),
         writes=("perimeter_structures",),
     ),
+    # Acquisition : les canaux écrivent la dernière observation d'un document dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
     *(
         _node(
             f"extract.{source}",
@@ -119,7 +123,7 @@ NODES: tuple[Node, ...] = (
             previous_run=("staging", "pipeline_phase_executions"),
             network=source,
         )
-        for source in _SOURCES
+        for source in HARVESTED_SOURCES
     ),
     *(
         _node(
@@ -165,7 +169,7 @@ NODES: tuple[Node, ...] = (
             previous_run=("staging", "source_publications"),
             network=source,
         )
-        for source in _SOURCES
+        for source in ALL_SOURCES
     ),
     _node(
         "fetch_truncated.refetch_openalex",

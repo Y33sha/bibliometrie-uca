@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Protocol
 
 from domain.dates import date_to_french, today
+from domain.sources.registry import HARVESTED_SOURCES
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.harvest import ExtractionConfigError
@@ -51,8 +52,6 @@ if TYPE_CHECKING:
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
 GetLastDailyExtractDate = Callable[[], date | None]
 
-# Ordre de construction des tâches parallèles (les rows de la table suivent l'ordre d'achèvement).
-_PARALLEL_SOURCES = ("openalex", "hal", "wos", "scanr", "theses", "datacite")
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
 _YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr", "datacite"})
 
@@ -178,7 +177,7 @@ def _run_parallel_sources(
         source: _extractor_args(
             start_year=start_year if source in _YEAR_BOUNDED_SOURCES else None, year=year
         )
-        for source in _PARALLEL_SOURCES
+        for source in HARVESTED_SOURCES
         if source in effective
     }
     if not args_by_source:
