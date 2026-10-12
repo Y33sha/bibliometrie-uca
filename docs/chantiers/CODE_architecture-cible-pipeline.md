@@ -134,7 +134,7 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 
 ### 6. Épreuves
 
-La cible est confrontée à des situations concrètes pendant la migration ([Le pipeline en paquet racine](CODE_pipeline-package-racine.md)) : chaque phase migrée éprouve les situations qui la concernent. Ce qui ne tient pas sort de la cible.
+La cible est confrontée à des situations concrètes pendant la migration ([Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)) : chaque phase migrée éprouve les situations qui la concernent. Ce qui ne tient pas sort de la cible.
 
 Situations :
 - fusion de revues, faite par l'admin ou par le pipeline ;

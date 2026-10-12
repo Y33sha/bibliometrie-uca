@@ -4,7 +4,7 @@
 
 Le pipeline tient sur quatre couches de l'architecture hexagonale : orchestrateurs dans `application/pipeline`, ports dans `application/ports/pipeline`, adaptateurs SQL dans `infrastructure/pipeline`, câblage dans `interfaces/cli/phases`. Pour une suite de transformations de tables en tables, la séparation entre logique et SQL est artificielle : la logique est souvent le SQL. Les opérations du pipeline (« trouver ou créer » une revue, créer une publication, rattacher une signature) vivent dans `application/services`, que seul le pipeline appelle.
 
-La cible est posée par la question 5 de la fiche [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md).
+La cible est posée par la question 5 de la fiche [Architecture cible du pipeline](../CODE_architecture-cible-pipeline.md).
 
 ## Décisions
 
@@ -69,11 +69,10 @@ Dans l'ordre du pipeline.
 
 ### Phase 8 — Organisation interne de `pipeline/`
 
-- [x] Relever comment les pipelines du [benchmark](benchmark-pipelines.md) découpent leur code (extraction, chargement, transformation).
+- [x] Relever comment les pipelines du [benchmark](../benchmark-pipelines.md) découpent leur code (extraction, chargement, transformation).
 - [x] `pipeline/ingestion/<source>` : extraction et normalisation de chaque source, et clients des enrichissements (Sudoc, DOAJ, Unpaywall, doi.org). L'outillage HTTP commun dans `pipeline/ingestion/http/`. La transformation reste rangée par entité (`structures`, `containers`, `publications`, `persons`), les modules du run à la racine.
 
 ## Questions ouvertes
 
-- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres et `in_perimeter`, la reconstruction d'une authorship et les `pub_count`, les corrections de métadonnées après l'édition d'une revue, les pays d'un lot d'adresses, la création et le nom d'une personne, le recalcul d'une publication.
-- Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
-- Code applicatif appelé seulement par des scripts en ligne de commande, comme le rapport de cohérence du ROR (service, port de lecture et implémentation) : où le ranger ?
+- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres, `in_perimeter` après la revue d'une adresse ou l'exclusion d'une personne, la construction des authorships à l'attribution d'orphelines, les pays d'un lot d'adresses, la requalification et la fusion des revues, le `pub_count` d'un éditeur fusionné.
+- Scripts `imports/` et `maintenance/` : chantier [Scripts en ligne de commande autonomes](../CODE_scripts-autonomes.md).

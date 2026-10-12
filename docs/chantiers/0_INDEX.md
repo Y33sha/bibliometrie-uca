@@ -5,7 +5,6 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
-- [Le pipeline en paquet racine](CODE_pipeline-package-racine.md)
 
 ### En pause
 
@@ -29,10 +28,12 @@
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
+- [Scripts en ligne de commande autonomes](CODE_scripts-autonomes.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
 - 2026-10-11 — [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md)
 - 2026-10-11 — [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md)
 - 2026-10-10 — [Clients HTTP des sources : gestion d'erreur commune](archived/2026-10-10_CODE_clients-http-dry.md)
