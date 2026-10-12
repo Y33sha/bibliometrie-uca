@@ -13,7 +13,7 @@ from application.ports.read_models.pipeline_runs_queries import (
     RunSummary,
 )
 from interfaces.api.deps import pipeline_runs_queries
-from pipeline.phase_order import PHASE_ORDER
+from pipeline.public import PHASE_ORDER
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
