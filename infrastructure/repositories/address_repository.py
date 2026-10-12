@@ -1,14 +1,26 @@
-"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure et pays d'une adresse.
+"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays des adresses (attribution unitaire ou par lot, recopie vers les adresses jumelles).
 
-Les propagations ensemblistes des pays (adresses jumelles, `source_publications`, `publications`) vivent dans `infrastructure/pipeline/countries.py`.
+Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/structures/countries_queries.py`).
 """
 
-from sqlalchemy import Connection, delete, select, update
+from sqlalchemy import Connection, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.address_repository import (
+    AddressCountryFilter,
+    AddressRepository,
+)
 from domain.errors import NotFoundError
 from infrastructure.db.tables import address_structures, addresses, countries
+
+# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
+_ADD_COUNTRY_SET_CLAUSE = """
+    SET countries = CASE
+        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
+        WHEN :cc = ANY(countries) THEN countries
+        ELSE array_append(countries, CAST(:cc AS char(2)))
+    END
+"""
 
 
 class PgAddressRepository(AddressRepository):
@@ -131,3 +143,70 @@ class PgAddressRepository(AddressRepository):
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Adresse {address_id} introuvable")
+
+    def batch_add_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
+        if not address_ids:
+            return []
+        result = self._conn.execute(
+            text(f"""
+                UPDATE addresses
+                {_ADD_COUNTRY_SET_CLAUSE}
+                WHERE id = ANY(:ids)
+                RETURNING id
+            """),
+            {"cc": country_code, "ids": address_ids},
+        )
+        return [row.id for row in result]
+
+    def batch_add_country_by_filter(
+        self, country_code: str, criteria: AddressCountryFilter
+    ) -> list[int]:
+        conditions: list[str] = []
+        params: dict[str, object] = {"cc": country_code}
+        if criteria.search:
+            conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
+            params["search"] = f"%{criteria.search}%"
+        if criteria.has_country is True:
+            conditions.append("countries IS NOT NULL")
+        elif criteria.has_country is False:
+            conditions.append("countries IS NULL")
+        if criteria.country_code:
+            conditions.append(":country_code = ANY(countries)")
+            params["country_code"] = criteria.country_code
+        if criteria.suggested_country:
+            conditions.append(":suggested_country = ANY(suggested_countries)")
+            params["suggested_country"] = criteria.suggested_country
+
+        if not conditions:
+            return []
+
+        where_clause = " AND ".join(conditions)
+        result = self._conn.execute(
+            text(f"""
+                UPDATE addresses
+                {_ADD_COUNTRY_SET_CLAUSE}
+                WHERE {where_clause}
+                RETURNING id
+            """),
+            params,
+        )
+        return [row.id for row in result]
+
+    def propagate_countries_across_similar_addresses(self, source_ids: list[int]) -> list[int]:
+        if not source_ids:
+            return []
+        result = self._conn.execute(
+            text("""
+                UPDATE addresses a2
+                SET countries = a1.countries
+                FROM addresses a1
+                WHERE a1.id = ANY(:source_ids)
+                  AND a1.countries IS NOT NULL
+                  AND a2.normalized_text = a1.normalized_text
+                  AND a2.countries IS DISTINCT FROM a1.countries
+                  AND a2.id <> a1.id
+                RETURNING a2.id
+            """),
+            {"source_ids": source_ids},
+        )
+        return [row.id for row in result]

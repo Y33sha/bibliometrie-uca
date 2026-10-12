@@ -85,11 +85,10 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # peut en importer les dataclasses de transport pour typer ses
 # signatures. Les Protocols restent implémentés via duck typing.
 #
-# Exception transitoire : le code du pipeline encore dans `application/` et `infrastructure/`
-# importe ce qui est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
+# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
+# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
-    "application.pipeline.** -> pipeline.**",
     "application.services.journals.core -> pipeline.publications.correct_unary",
 ]
 
@@ -126,10 +125,9 @@ type = "forbidden"
 source_modules = ["domain", "application", "infrastructure"]
 forbidden_modules = ["pipeline"]
 # L'API et l'orchestrateur (`interfaces/`) sont les seuls clients du pipeline.
-# Exception transitoire : le code du pipeline encore dans les couches hexagonales importe ce qui
-# est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
+# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
+# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
 ignore_imports = [
-    "application.pipeline.** -> pipeline.**",
     "application.services.journals.core -> pipeline.publications.correct_unary",
 ]
 

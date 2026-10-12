@@ -11,7 +11,7 @@ from pathlib import Path
 from infrastructure import PROJECT_ROOT
 from pipeline.metrics import LIBELLES_EXTRAS
 
-COUCHES = ("application", "domain", "infrastructure", "interfaces")
+COUCHES = ("application", "domain", "infrastructure", "interfaces", "pipeline")
 
 COMPTEURS_NOMMES = {"new", "updated", "unchanged", "total", "errors"}
 """Paramètres déclarés de `PhaseMetrics.add`, que `as_summary` traduit lui-même."""

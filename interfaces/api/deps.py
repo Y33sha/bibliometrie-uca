@@ -12,7 +12,7 @@ from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
-from application.ports.pipeline.countries import CountryQueries
+from application.ports.pipeline.countries import CountryRecompute
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.read_models.addresses_queries import AddressesQueries
@@ -48,7 +48,6 @@ from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
-from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
@@ -82,6 +81,7 @@ from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
 from interfaces.api.session import read_session
 from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
+from pipeline.structures.countries_queries import CountryQueries
 
 logger = logging.getLogger(__name__)
 
@@ -303,13 +303,8 @@ def metadata_correction_queries() -> MetadataCorrectionQueries:
     return _metadata_correction_queries_singleton
 
 
-# `PgCountryQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_country_queries_singleton: CountryQueries = PgCountryQueries()
-
-
-def country_gateway() -> CountryQueries:
-    """Gateway ensembliste des pays — attribution admin par lot et propagations — consommé par les écritures d'adresses."""
-    return _country_queries_singleton
+# Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_country_recompute_singleton: CountryRecompute = CountryQueries()
 
 
 # `PgAuthorshipsBuildQueries` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
@@ -343,7 +338,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
     _run_detached(
         "propagation des pays",
         lambda conn: countries_service.propagate_countries_to_publications(
-            conn, address_ids, country_queries=_country_queries_singleton
+            conn, address_ids, country_recompute=_country_recompute_singleton
         ),
     )
 

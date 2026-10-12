@@ -6,7 +6,6 @@ Les briques d'écriture agnostiques vivent dans `structures.py` et `countries.py
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.countries import CountryQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.services.addresses import (
@@ -82,14 +81,11 @@ def set_country(
     countries: list[str] | None,
     *,
     repo: AddressRepository,
-    country_queries: CountryQueries,
     audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Attribue des pays à une adresse. Retourne les adresses affectées (l'adresse
     et ses jumelles), à propager vers les publications en tâche de fond."""
-    affected = countries_service.set_country(
-        conn, address_id, countries, repo=repo, country_queries=country_queries
-    )
+    affected = countries_service.set_country(conn, address_id, countries, repo=repo)
     emit_event(
         audit_repo,
         "address.country_set",
@@ -111,7 +107,6 @@ def batch_set_country(
     country_code_filter: str,
     suggested_country: str,
     repo: AddressRepository,
-    country_queries: CountryQueries,
     audit_repo: AuditRepository | None = None,
 ) -> tuple[int, int, list[int]]:
     """Ajoute un pays à des adresses (par identifiants ou par filtre), puis le
@@ -122,7 +117,7 @@ def batch_set_country(
     """
     if address_ids:
         modified_ids = countries_service.batch_set_country_by_ids(
-            conn, country_code, address_ids, repo=repo, country_queries=country_queries
+            conn, country_code, address_ids, repo=repo
         )
     else:
         modified_ids = countries_service.batch_set_country_by_filter(
@@ -133,10 +128,9 @@ def batch_set_country(
             country_code_filter=country_code_filter,
             suggested_country=suggested_country,
             repo=repo,
-            country_queries=country_queries,
         )
     propagated_ids = countries_service.propagate_countries_to_similar(
-        conn, modified_ids=modified_ids, country_queries=country_queries
+        modified_ids=modified_ids, repo=repo
     )
     # Une sélection par filtre peut couvrir toute la table : c'est le critère qui porte la
     # décision, non la liste qu'il rend. L'appel par identifiants, lui, les consigne.

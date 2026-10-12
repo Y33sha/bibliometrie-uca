@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.pipeline.countries`."""
+"""Tests d'intégration pour `pipeline.structures.countries_queries`."""
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.countries import PgCountryQueries
+from pipeline.structures.countries_queries import CountryQueries
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -11,7 +11,7 @@ from tests.integration.helpers.sources import (
     insert_source_publication,
 )
 
-_Q = PgCountryQueries()
+_Q = CountryQueries()
 
 
 class TestRefreshAddressSourceCountries:
