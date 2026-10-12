@@ -41,6 +41,7 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 - [x] HAL, 3 545 notices en 450 s : la lecture des signatures stockées prend la moitié du temps. Le planificateur sous-estime le nombre de notices distinctes de `source_authorships` et choisit un plan parallèle, dont le lancement coûte 55 ms par requête. Une migration fixe l'estimation (`n_distinct`).
 - [x] HAL après la migration, 4 435 notices en 190 s sous profileur : 43 ms par notice au lieu de 127. L'attente de PostgreSQL ne fait plus que 49 s. Le reste est du calcul Python, grossi par le profileur. `sanitize_raw_text` y coûtait 19 s : le texte d'une adresse était assaini trois fois. `AddressRecord` l'assainit à la construction, et un texte imprimable sort de `sanitize_raw_text` sans parcours caractère par caractère (1,5 µs au lieu de 16).
 - [x] OpenAlex après la migration, 5 099 notices en 305 s sous profileur : 60 ms par notice au lieu de 97. La lecture des signatures stockées passe de 59 à 2,9 ms. L'attente de PostgreSQL fait 81 s ; `sanitize_raw_text` en faisait 70, avant ses deux corrections.
+- [x] Sans profileur, après les trois corrections : 27 ms par notice pour HAL (5 089 notices en 2 min 18 s) comme pour OpenAlex (5 348 en 2 min 26 s).
 
 ### 2. Lectures et écritures des signatures par lot
 
@@ -59,5 +60,7 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 - [ ] `docs/` : boucle de `normalize`, batch et repli.
 
 ## Questions ouvertes
+
+- Le traitement par lots vaut-il son coût ? Sans profileur, l'attente de PostgreSQL représente environ la moitié des 27 ms par notice.
 
 - Taille K du lot : compromis entre allers-retours économisés et coût du rejeu.

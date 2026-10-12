@@ -5,6 +5,7 @@
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
+- [Normalisation par lots de documents](CODE_batch-normalize.md)
 
 ### Non commencé
 
@@ -16,7 +17,6 @@
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
-- [Normalisation par lots de documents](CODE_batch-normalize.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
