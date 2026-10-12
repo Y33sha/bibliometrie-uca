@@ -2,72 +2,16 @@
 
 ## Contexte
 
-Document de référence, extérieur aux fiches chantier. Lecture du code de six projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit et se clôt sur un verdict. Le récapitulatif les liste.
+Document de référence, extérieur aux fiches chantier. Lecture du code de six projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit et se clôt sur un verdict.
 
-- **CRISalid** : le moissonneur (`svp-harvester`), le graphe (`crisalid-ikg`), et le modèle de données de l'interface (`sovisuplus`).
-- **rialto-airflow** : le pipeline de Stanford.
-- **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell. Il pose le problème par personne. Pour chaque personne de l'annuaire, il cherche des articles candidats dans PubMed, puis note chaque candidat. Il ne regroupe pas les signatures entre elles : le code de regroupement existe encore dans le dépôt, mais le moteur ne l'appelle plus.
-- **OpenAIRE** : le graphe européen de la recherche. Lu dans la documentation du graphe, et pour le dédoublonnage dans le code (`dnet-dedup`, `dnet-hadoop`), en partie : voir la liste des dépôts. La chaîne d'ensemble, dans l'ordre de la [documentation](https://graph.openaire.eu/docs/graph-production-workflow/) :
-  1. **Agrégation.** Les entrepôts conformes aux directives d'OpenAIRE sont moissonnés en OAI-PMH. Les autres sources (Crossref, ORCID, PubMed, DataCite…) ont chacune leur traitement. Crossref est repris par dump complet, chaque mois.
-  2. **Fusion par identifiant.** Les enregistrements de même identifiant sont fusionnés, sans comparaison.
-  3. **Enrichissement par identifiant.** Les ORCID sont rattachés aux auteurs.
-  4. **Enrichissement par fouille.** Affiliations, citations, classification, à partir des métadonnées et du texte intégral.
-  5. **Nettoyage.** Les valeurs sont ramenées à des vocabulaires contrôlés.
-  6. **Dédoublonnage.** Produits de recherche et organisations.
-  7. **Déduction et propagation.** Des propriétés passent d'un objet à un autre par règle.
-  8. **Indicateurs**, **finalisation**, **indexation**, **statistiques**.
-
-  Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque produit, et aucune étape ne désambiguïse les auteurs entre produits.
-- **Academic Observatory** : les workflows de l'observatoire de l'université Curtin. Un pipeline ELT au sens strict : des dumps complets de sources ouvertes chargés dans BigQuery, puis une chaîne de requêtes SQL qui produit une table par DOI et des agrégats par établissement, pays, revue, financeur. Pas d'établissement de référence, pas de personnes, pas de décisions humaines.
-- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) le dépôt de présentation (`awesome-biblioref`), le schéma de la base (`bdd`) et l'API (`backend`, 25 700 lignes de TypeScript). L'interface (`frontend`, Angular) n'a pas été lue. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
+- **CRISalid** : un moissonneur qui interroge les sources personne par personne (`svp-harvester`), un graphe Neo4j qui regroupe les notices et les rattache aux personnes (`crisalid-ikg`), et l'interface (`sovisuplus`), lue pour son modèle de données. Les étapes s'enchaînent par événements, avec RabbitMQ.
+- **rialto-airflow** : le pipeline de Stanford, en Python et PostgreSQL, orchestré par Airflow. Il moissonne les publications des chercheurs de l'université, trouvés par leur ORCID, et complète les notices par DOI. Il consolide ensuite chaque champ, puis publie une base que lit Tableau.
+- **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell. Il part de chaque personne de l'annuaire, cherche des articles candidats dans PubMed, puis note chaque candidat.
+- **OpenAIRE** : le graphe européen de la recherche. Il agrège des entrepôts moissonnés en OAI-PMH et des sources comme Crossref, ORCID ou DataCite. Il fusionne par identifiant, enrichit, nettoie, dédoublonne, puis calcule des indicateurs. Il n'a pas d'entité « personne ». Lu dans la [documentation](https://graph.openaire.eu/docs/graph-production-workflow/), et en partie dans le code du dédoublonnage (`dnet-dedup`, `dnet-hadoop`).
+- **Academic Observatory** : les workflows de l'observatoire de l'université Curtin. Des dumps complets de sources ouvertes sont chargés dans BigQuery, puis des requêtes SQL produisent une table par DOI et des agrégats par établissement, pays, revue, financeur. Ni personnes ni décisions humaines.
+- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3, développé par la société DyoNeo. Un moissonneur en Python part d'un annuaire de chercheurs et interroge un connecteur par source (HAL, OpenAlex, Sudoc). L'application est en Node.js. Lu depuis des archives, sauf l'interface.
 
 Les liens vers les dépôts sont en fin de document.
-
-## Récapitulatif
-
-| Point | Projet | Verdict |
-|---|---|---|
-| Le graphe du run dans un seul fichier | rialto | adopté |
-| Une requête par fichier, nommée par ce qu'elle fait | CRISalid | écarté |
-| Un schéma de travail et un schéma de diffusion | rialto | écarté |
-| Des notices d'exemple pour les tests | rialto | adopté |
-| Les réglages hors du code | CRISalid | écarté |
-| Un graphe qui attend ses sources | Academic Observatory | écarté |
-| Un connecteur par source : un service et une base chacun | BiblioRef | écarté |
-| Le moissonnage part de l'annuaire | BiblioRef | écarté |
-| Des versions datées plutôt que des mises à jour | Academic Observatory | écarté |
-| Le contrôle du schéma des sources | Academic Observatory | à étudier |
-| Un fichier par champ consolidé | rialto | écarté |
-| La notice la plus riche, par score | CRISalid | écarté |
-| L'origine de chaque champ consolidé | BiblioRef | en projet |
-| Des vocabulaires de synonymes, réappliqués en fin de chaîne | OpenAIRE | équivalent en place |
-| Des identifiants de rapprochement déduits | CRISalid | équivalent en place |
-| Les libellés des concepts complétés | CRISalid | en projet |
-| La fusion par identifiant, avant le dédoublonnage | OpenAIRE | équivalent en place |
-| Des identifiants de confiance et d'autres non | OpenAIRE | équivalent en place |
-| Le blocage et ses garde-fous | OpenAIRE | écarté |
-| Quatre étapes, une table entre chacune | dnet-dedup | à l'étude |
-| Un identifiant de groupe qui survit aux runs | dnet-dedup | équivalent en place |
-| Les règles déclarées dans un fichier par type d'entité | dnet-dedup | écarté |
-| Une liste de titres exclus du rapprochement | dnet-dedup | équivalent en place |
-| Les rôles des signatures | CRISalid | équivalent en place |
-| Le rapprochement des auteurs en deux temps | CRISalid | équivalent en place |
-| Un dossier par type d'indice | ReCiter | à l'étude |
-| Chaque indice laisse une trace lisible | ReCiter | à l'étude |
-| Les indices activés et pondérés en configuration | ReCiter | écarté |
-| Une classe par manière de chercher des candidats | ReCiter | équivalent en place |
-| L'origine et la confiance de chaque valeur déduite | OpenAIRE | équivalent en place |
-| Le rattachement des ORCID aux auteurs | OpenAIRE | écarté |
-| La fusion humaine, arête entre notices | CRISalid | en projet |
-| Les décisions humaines entrent entre les étapes 2 et 3 | dnet-dedup | à l'étude |
-| Les décisions humaines servent trois fois | ReCiter | en place ; à l'étude |
-| Les corrections de champs stockées à part | CRISalid | équivalent en place ; en projet pour les publications |
-| Le verrouillage | BiblioRef | écarté |
-| La trace de l'entité absorbée | CRISalid | adopté |
-| L'alignement des affiliations sur ROR | OpenAIRE | écarté |
-| Des affiliations élargies par la hiérarchie de ROR | Academic Observatory | à l'étude |
-| La manière dont une structure a été attribuée | BiblioRef | équivalent en place |
-| Un annuaire riche | BiblioRef | à étudier |
 
 ## Organisation du code et du run
 
@@ -444,7 +388,7 @@ Les liens vers les dépôts sont en fin de document.
 - **[dnet-team/dnet-dedup](https://github.com/dnet-team/dnet-dedup)** — dédoublonnage d'OpenAIRE. Java, Spark. Dernier commit sur GitHub : 2022-04-26. Lu : configuration, comparateurs, fonctions de blocage.
 - **[D-Net/dnet-hadoop](https://code-repo.d4science.org/D-Net/dnet-hadoop)** — code actuel du graphe d'OpenAIRE, module `dhp-dedup-openaire`, fichiers datés de 2023-2024. Lu par résumé : `SparkCreateMergeRels.java`, `IdGenerator.java`. Non lu : `SparkWhitelistSimRels.java` (accès refusé). Le miroir GitHub de ce dépôt date de 2019.
 - **[The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)** — université Curtin. Python, Airflow, BigQuery, SQL en gabarits Jinja. 31 000 lignes de Python, dont 7 700 de liste d'établissements. Dernier commit : 2026-10-12.
-- **[biblioref (GitLab)](https://gitlab.com/biblioref)** — université Jean Moulin Lyon 3, développé par DyoNeo. Python pour le moissonneur, Node.js et Angular pour l'application, PostgreSQL. Lus, depuis des archives : [`harvester`](https://gitlab.com/biblioref/harvester/harvester), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), [`connector-hal`](https://gitlab.com/biblioref/connectors/connector-hal), [`connector-openalex`](https://gitlab.com/biblioref/connectors/connector-openalex), [`connector-sudoc`](https://gitlab.com/biblioref/connectors/connector-sudoc), [`awesome-biblioref`](https://gitlab.com/biblioref/awesome-biblioref/awesome-biblioref). Un seul commit par dépôt, septembre 2025. Puis [`bdd`](https://gitlab.com/biblioref/saas-app/bdd) et [`backend`](https://gitlab.com/biblioref/saas-app/backend). Non lu : `frontend`. Présentation : [*Arabesques*](https://publications-prairial.fr/arabesques/index.php?id=4433).
+- **[biblioref (GitLab)](https://gitlab.com/biblioref)** — université Jean Moulin Lyon 3, développé par DyoNeo. Python pour le moissonneur (2 600 lignes) et les connecteurs (2 400 à 4 100 lignes chacun), Node.js (25 700 lignes de TypeScript) et Angular pour l'application, PostgreSQL. Lus, depuis des archives : [`harvester`](https://gitlab.com/biblioref/harvester/harvester), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), [`connector-hal`](https://gitlab.com/biblioref/connectors/connector-hal), [`connector-openalex`](https://gitlab.com/biblioref/connectors/connector-openalex), [`connector-sudoc`](https://gitlab.com/biblioref/connectors/connector-sudoc), [`awesome-biblioref`](https://gitlab.com/biblioref/awesome-biblioref/awesome-biblioref). Un seul commit par dépôt, septembre 2025. Puis [`bdd`](https://gitlab.com/biblioref/saas-app/bdd) et [`backend`](https://gitlab.com/biblioref/saas-app/backend). Non lu : `frontend`. Présentation : [*Arabesques*](https://publications-prairial.fr/arabesques/index.php?id=4433).
 
 ### Repérés, non lus
 
