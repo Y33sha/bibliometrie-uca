@@ -1,7 +1,6 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre) + `compute_updates`."""
 
-from application.ports.pipeline.metadata_correction import DoiClusterRow, DoiCorrectionUpdate
 from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
@@ -13,6 +12,7 @@ from pipeline.publications.correct_by_cluster import (
     compute_updates,
     tally_doi_corrections,
 )
+from pipeline.publications.metadata_correction_queries import DoiClusterRow, DoiCorrectionUpdate
 
 
 def test_tally_doi_corrections_par_cas():

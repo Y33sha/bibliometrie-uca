@@ -16,11 +16,6 @@ from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import (
-    CorrectionUpdate,
-    MetadataCorrectionQueries,
-    UnaryCorrectionRow,
-)
 from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.languages import language_code
 from domain.source_publications.metadata_correction.rules import (
@@ -40,6 +35,11 @@ from domain.source_publications.raw_metadata import (
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
+from pipeline.publications.metadata_correction_queries import (
+    CorrectionUpdate,
+    PgMetadataCorrectionQueries,
+    UnaryCorrectionRow,
+)
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.
@@ -200,7 +200,7 @@ def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, i
 
 def run(
     conn: Connection,
-    queries: MetadataCorrectionQueries,
+    queries: PgMetadataCorrectionQueries,
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
     """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_publications`."""

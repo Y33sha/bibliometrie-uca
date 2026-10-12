@@ -18,7 +18,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from infrastructure.db.scalars import scalar_int
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import log, open_tx
@@ -26,13 +25,13 @@ from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
 from pipeline.structures.address_resolution import AddressResolutionQueries, run_resolution
-from pipeline.structures.perimeter import EmptyExtractionPerimeterError
+from pipeline.structures.perimeter import EmptyExtractionPerimeterError, PerimeterQueries
 
 
 @dataclass(frozen=True)
 class AffiliationsPhase:
     address_queries: AddressResolutionQueries
-    perimeter_queries: PerimeterStructuresQueries
+    perimeter_queries: PerimeterQueries
     refresh_ror: Callable[[], PhaseMetrics]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:

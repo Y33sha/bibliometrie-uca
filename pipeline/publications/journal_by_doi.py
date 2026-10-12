@@ -11,11 +11,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import (
-    JournalCorrectionRow,
-    JournalCorrectionUpdate,
-    MetadataCorrectionQueries,
-)
 from domain.journals.containers import is_book_or_chapter
 from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
 from domain.source_publications.metadata_correction.journal_by_doi import (
@@ -24,6 +19,11 @@ from domain.source_publications.metadata_correction.journal_by_doi import (
 from domain.source_publications.raw_metadata import raw_value, stash_entry
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
+from pipeline.publications.metadata_correction_queries import (
+    JournalCorrectionRow,
+    JournalCorrectionUpdate,
+    PgMetadataCorrectionQueries,
+)
 
 
 def _compute_update(
@@ -62,7 +62,7 @@ class JournalByDoiStats:
 
 
 def run(
-    conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
+    conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> JournalByDoiStats:
     """Rattache leur revue aux `source_publications` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
     etape(logger, "Revues non renseignées, identifiables par le DOI du document")
