@@ -3,14 +3,14 @@
 import logging
 
 from domain.publications.relations import RelationType
-from pipeline.enrichments.relations import (
+from pipeline.publications.relations import (
     _build_distinct_work_edges,
     _build_shared_key_edges,
     _build_title_match_edges,
     _count_by_pair_label,
     _log_changes,
 )
-from pipeline.enrichments.relations_queries import (
+from pipeline.publications.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
     RelationsRebuild,

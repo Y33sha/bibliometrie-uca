@@ -60,8 +60,8 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `publications` | pipeline | `application/services/publications/core.py` (`refresh_from_sources` recalcule depuis les sources) |
 | `publications_detail` | pipeline | `application/services/publications/core.py` |
 | `publication_relations` | pipeline | phase `relations` |
-| `subjects`, `publication_subjects` | pipeline | `application/pipeline/subjects/ingestion.py` |
-| `subject_cooccurrences` | pipeline | `application/pipeline/subjects/cooccurrences.py` (matview) |
+| `subjects`, `publication_subjects` | pipeline | `pipeline/publications/subject_ingestion.py` |
+| `subject_cooccurrences` | pipeline | `pipeline/publications/subject_cooccurrences.py` (matview) |
 | `doi_prefixes` | pipeline | phases `resolve_ra` et `publishers_journals` |
 | `languages`, `language_forms` | seed | `seed.sql` |
 | `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |

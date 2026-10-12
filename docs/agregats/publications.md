@@ -26,7 +26,7 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 **Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail. Une publication qu'aucune source n'atteste plus, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent.
 
-**Relations (`pipeline/enrichments/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
+**Relations (`pipeline/publications/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
 
 - les relations déclarées par DataCite et Crossref ;
 - les clés de confirmation partagées entre deux DOI distincts, dont le type se déduit du couple de types de document ;

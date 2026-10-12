@@ -7,16 +7,16 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from application.pipeline.subjects.extractors import (
+from infrastructure.repositories.publication_repository import PgPublicationRepository
+from pipeline.publications.subject_extractors import (
     hal_labels,
     openalex_labels,
     scanr_labels,
     theses_labels,
     wos_labels,
 )
-from application.pipeline.subjects.ingestion import run
-from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
-from infrastructure.repositories.publication_repository import PgPublicationRepository
+from pipeline.publications.subject_ingestion import run
+from pipeline.publications.subjects_queries import SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.subjects import insert_subject
@@ -89,7 +89,7 @@ class TestExtractors:
 
 @pytest.fixture
 def queries():
-    return PgSubjectsIngestionQueries()
+    return SubjectsIngestionQueries()
 
 
 def _subjects_of(conn, pub_id):

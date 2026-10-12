@@ -1,18 +1,29 @@
-"""Query service : écritures du référentiel des sujets et de la liaison `publication_subjects`.
+"""Écritures du référentiel des sujets et de la liaison `publication_subjects` (phase `subjects`)."""
 
-Sert les phases `subjects` et `cooccurrences`. Les lectures des routes `/api/subjects/*` vivent dans `infrastructure.read_models.subjects`.
-"""
+from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.subjects import (
-    PublicationSubjectLink,
-    SourcePublicationTopics,
-    SubjectsIngestionQueries,
-)
 from domain.normalize import normalize_label
+from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
+
+
+class SourcePublicationTopics(NamedTuple):
+    """Le champ `topics` d'une `source_publication`, avec sa publication et sa source — matière première par-source de la ré-ingestion des concepts."""
+
+    publication_id: int
+    source: str
+    topics: JsonValue
+
+
+class PublicationSubjectLink(NamedTuple):
+    """Lien à créer entre une publication et un sujet du référentiel."""
+
+    publication_id: int
+    subject_id: int
+
 
 _UPSERT_SUBJECT_SQL = text(
     """
@@ -25,8 +36,8 @@ _UPSERT_SUBJECT_SQL = text(
 )
 
 
-class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
-    """Adapter PostgreSQL implémentant `application.ports.pipeline.subjects.SubjectsIngestionQueries`."""
+class SubjectsIngestionQueries:
+    """Requêtes de la phase `subjects`."""
 
     def upsert_subject(
         self,
@@ -35,6 +46,9 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         label: str,
         language: str | None = None,
     ) -> int:
+        """UPSERT d'un sujet (clé d'unicité = lower(label)). Retourne l'id.
+
+        Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
         return scalar_int(
             conn.execute(
                 _UPSERT_SUBJECT_SQL,
@@ -49,6 +63,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         source: str,
         rows: list[PublicationSubjectLink],
     ) -> int:
+        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(pub_id, subject_id)` côté client."""
         if not rows:
             return 0
         payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
@@ -67,6 +82,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
     def clear_publication_subjects_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> int:
+        """`DELETE` des liens (non rejetés) des publications données, toutes sources. Préserve les liens rejetés. Retourne le rowcount."""
         if not publication_ids:
             return 0
         return conn.execute(
@@ -77,6 +93,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         ).rowcount
 
     def select_publications_to_reingest(self, conn: Connection) -> list[int]:
+        """Ids des publications dont les sujets sont à (ré)ingérer : `publications.subjects_ingested_at` vide, soit jamais ingérées, soit recalculées depuis leurs sources après leur dernière ingestion."""
         return [
             r.id
             for r in conn.execute(
@@ -85,6 +102,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         ]
 
     def mark_subjects_ingested(self, conn: Connection, *, publication_ids: list[int]) -> None:
+        """Pose `subjects_ingested_at = now()` sur les publications données : elles sortent de la sélection jusqu'à leur prochain recalcul depuis leurs sources."""
         if not publication_ids:
             return
         conn.execute(
@@ -93,11 +111,13 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         )
 
     def select_all_publication_ids(self, conn: Connection) -> list[int]:
+        """Ids de toutes les publications — pour une ré-ingestion complète (`rebuild`), indépendante du signal incrémental."""
         return [r.id for r in conn.execute(text("SELECT id FROM publications")).all()]
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> list[SourcePublicationTopics]:
+        """Le `topics` de chaque `source_publication` des publications données, avec sa source."""
         if not publication_ids:
             return []
         rows = conn.execute(
@@ -119,6 +139,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         ]
 
     def purge_orphan_subjects(self, conn: Connection) -> int:
+        """`DELETE` des sujets sans aucun lien `publication_subjects` (tous statuts). Retourne le nombre supprimé."""
         return conn.execute(
             text(
                 "DELETE FROM subjects s WHERE NOT EXISTS "
@@ -127,9 +148,11 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         ).rowcount
 
     def count_all_subjects(self, conn: Connection) -> int:
+        """Nombre total de sujets du référentiel (`COUNT(*)` sur `subjects`)."""
         return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subjects")))
 
     def recompute_usage_counts(self, conn: Connection) -> int:
+        """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
         n_reset = conn.execute(
             text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
         ).rowcount
@@ -151,5 +174,6 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         return n_reset + n_updated
 
     def refresh_cooccurrences(self, conn: Connection) -> int:
+        """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre de paires après refresh (seuil `count >= 2` figé dans la matview)."""
         conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
         return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))
