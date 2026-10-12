@@ -8,6 +8,8 @@ Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une le
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES, SOURCE_PRIORITY
+
 
 @dataclass(frozen=True, slots=True)
 class Node:
@@ -84,9 +86,6 @@ def order_violations(nodes: Sequence[Node]) -> list[tuple[str, str, str]]:
 
 # Acquisition : les canaux écrivent la dernière observation d'un document dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
 _SOURCES = ("hal", "openalex", "scanr", "theses", "datacite", "wos")
-_DOI_CHANNELS = ("crossref", "datacite", "openalex", "scanr", "wos")
-# Ordre de normalisation : la source qui fait le plus autorité d'abord.
-_NORMALIZE_ORDER = ("theses", "crossref", "datacite", "scanr", "hal", "openalex", "wos")
 # Référentiels que la normalisation trouve ou crée, et que `publishers_journals` fusionne et supprime.
 _CONTAINERS = (
     "publishers",
@@ -154,7 +153,7 @@ NODES: tuple[Node, ...] = (
         for channel, network in (
             ("hal_by_id", "hal"),
             ("hal_by_nnt", "hal"),
-            *((f"doi.{source}", source) for source in _DOI_CHANNELS),
+            *((f"doi.{source}", source) for source in DOI_SEARCHABLE_SOURCES),
         )
     ),
     *(
@@ -218,7 +217,7 @@ NODES: tuple[Node, ...] = (
                 *_CONTAINERS,
             ),
         )
-        for source in _NORMALIZE_ORDER
+        for source in SOURCE_PRIORITY
     ),
     _node(
         "normalize.prune_disappeared",
