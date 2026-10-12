@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_publications`.
 
-Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
+Trois nœuds (`pipeline.graph`), chacun dans sa propre transaction, dans l'ordre du graphe :
 
 1. **journal_by_doi** — rattache la revue manquante que désigne l'espace de noms du DOI. En premier : le `journal_id` qu'il commit est consommé par l'étape suivante (`journal_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
 2. **unaire** (per-record) — mapping `doc_type` source→canonique puis règles de correction `effective_metadata`.
@@ -9,12 +9,10 @@ Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import Connection
-
-from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
+from pipeline.node_runner import NodeStep, run_nodes
+from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correct_by_cluster import run as run_cluster
 from pipeline.transformation.publications.correction.correct_unary import run as run_unary
@@ -23,11 +21,7 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
     PgMetadataCorrectionQueries,
 )
 
-
-def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:
-    """Exécute une sous-étape dans sa propre transaction."""
-    with open_tx() as conn:
-        return step(conn)
+_GROUP = "metadata_correction"
 
 
 @dataclass(frozen=True)
@@ -35,32 +29,59 @@ class MetadataCorrectionPhase:
     queries: PgMetadataCorrectionQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""
-        open_tx, queries, logger = ctx.open_tx, self.queries, ctx.logger
-        journal_by_doi = _step(open_tx, lambda conn: run_journal_by_doi(conn, queries, logger))
-        unary = _step(open_tx, lambda conn: run_unary(conn, queries, logger))
-        cluster = _step(open_tx, lambda conn: run_cluster(conn, queries, logger))
+        """Exécute les trois nœuds, chacun dans sa transaction, et assemble les métriques de la phase."""
+        by_node = run_nodes(_GROUP, self._steps(), ctx)
+        journal_by_doi, unary, cluster = (
+            by_node[f"{_GROUP}.{name}"] for name in ("journal_by_doi", "unary", "cluster")
+        )
 
         metrics = PhaseMetrics()
-        metrics.add(
-            total=journal_by_doi.examined + unary.examined + cluster.examined,
-            updated=journal_by_doi.attached + unary.corrected + cluster.corrected,
-        )
+        for node_metrics in (journal_by_doi, unary, cluster):
+            metrics.add(total=node_metrics.total, updated=node_metrics.updated)
         # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
         metrics.details["summary"] = {
-            "journal_by_doi_examined": journal_by_doi.examined,
-            "journal_by_doi_corrected": journal_by_doi.attached,
-            "unary_examined": unary.examined,
-            "unary_corrected": unary.corrected,
-            "cluster_examined": cluster.examined,
-            "cluster_corrected": cluster.corrected,
+            "journal_by_doi_examined": journal_by_doi.total,
+            "journal_by_doi_corrected": journal_by_doi.updated,
+            "unary_examined": unary.total,
+            "unary_corrected": unary.updated,
+            "cluster_examined": cluster.total,
+            "cluster_corrected": cluster.updated,
         }
-        counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
+        counts = list(unary.extras.items()) + list(cluster.extras.items())
         counts.sort(key=lambda kc: kc[1], reverse=True)
         metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
-        # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
+        # Chaque nœud conclut sa section ; la table d'observabilité garde le détail.
         metrics.resume = ""
         return metrics
+
+    def _steps(self) -> dict[str, NodeStep]:
+        """Étape de chaque nœud. Chacun écrit sa section du journal et rend examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
+        queries = self.queries
+
+        def journal_by_doi(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                stats = run_journal_by_doi(conn, queries, ctx.logger)
+            return PhaseMetrics(seen=stats.examined, updated=stats.attached)
+
+        def unary(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                stats = run_unary(conn, queries, ctx.logger)
+            return PhaseMetrics(
+                seen=stats.examined, updated=stats.corrected, extras=dict(stats.rule_counts)
+            )
+
+        def cluster(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                stats = run_cluster(conn, queries, ctx.logger)
+            return PhaseMetrics(
+                seen=stats.examined, updated=stats.corrected, extras=dict(stats.case_counts)
+            )
+
+        return {
+            f"{_GROUP}.journal_by_doi": NodeStep(journal_by_doi),
+            f"{_GROUP}.unary": NodeStep(unary),
+            f"{_GROUP}.cluster": NodeStep(cluster),
+        }
 
 
 # ── Câblage ───────────────────────────────────────────────────

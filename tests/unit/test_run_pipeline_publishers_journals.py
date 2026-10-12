@@ -93,6 +93,6 @@ def test_enrichissement_openalex_au_debit_d_openalex():
             return_value=PhaseMetrics(),
         ) as run,
     ):
-        publishers_journals._run_enrich_journals_from_openalex(MagicMock())
+        publishers_journals._run_enrich_journals_from_openalex(MagicMock(), MagicMock())
 
     assert run.call_args.kwargs["rate_delay"] == OPENALEX_DELAY
