@@ -4,18 +4,16 @@ import logging
 
 import pytest
 
-from application.pipeline.affiliations.resolve_addresses import (
+from domain.structures.name_forms import is_short_form
+from domain.structures.structure import StructureType
+from pipeline.structures.address_resolution import (
     AddressMatcher,
-    process_addresses,
-    run_resolution,
-)
-from application.ports.pipeline.affiliations.address_resolution import (
     DetectedStructure,
     KeptPair,
     StructureNameForm,
+    process_addresses,
+    run_resolution,
 )
-from domain.structures.name_forms import is_short_form
-from domain.structures.structure import StructureType
 
 # ── Helpers pour construire des formes de test ───────────────────
 

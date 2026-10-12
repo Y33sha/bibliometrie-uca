@@ -32,7 +32,7 @@ MODULES = [
     "application.pipeline.persons.purge",
     "application.pipeline.persons.phase",
     "application.pipeline.authorships.build_authorships",
-    "application.pipeline.affiliations.populate_affiliations",
+    "pipeline.structures.affiliations",
     "application.pipeline.persons.populate_person_name_forms",
     "application.pipeline.countries.detect_by_country_name",
     "application.pipeline.countries.detect_by_place_name",

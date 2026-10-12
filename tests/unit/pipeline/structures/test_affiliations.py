@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from application.pipeline.affiliations import phase
-from application.pipeline.affiliations.resolve_addresses import ResolutionStats
-from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 from pipeline.metrics import PhaseMetrics
+from pipeline.structures import affiliations as phase
+from pipeline.structures.address_resolution import ResolutionStats
+from pipeline.structures.perimeter import EmptyExtractionPerimeterError
 
 PERIMETRE = [10, 20]
 
@@ -44,13 +44,13 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         ),
         patch.object(
             phase,
-            "run_populate",
-            side_effect=lambda conn, queries, logger, ids: vus.__setitem__("populate", ids),
+            "populate",
+            side_effect=lambda conn, logger, ids: vus.__setitem__("populate", ids),
         ),
     ):
-        metrics = phase.AffiliationsPhase(
-            object(), object(), perimeter, refresh_ror=PhaseMetrics
-        ).run(contexte())
+        metrics = phase.AffiliationsPhase(object(), perimeter, refresh_ror=PhaseMetrics).run(
+            contexte()
+        )
     return metrics, perimeter, vus
 
 
@@ -83,7 +83,6 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
     ):
         phase.AffiliationsPhase(
             object(),
-            object(),
             _FakePerimeterQueries(extraction_structures=0),
             refresh_ror=PhaseMetrics,
         ).run(contexte())
@@ -100,10 +99,10 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
             "run_resolution",
             return_value=ResolutionStats(processed=0, in_perimeter=0, affiliations=0),
         ),
-        patch.object(phase, "run_populate"),
+        patch.object(phase, "populate"),
     ):
         metrics = phase.AffiliationsPhase(
-            object(), object(), _FakePerimeterQueries(), refresh_ror=lambda: ror
+            object(), _FakePerimeterQueries(), refresh_ror=lambda: ror
         ).run(contexte())
 
     assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

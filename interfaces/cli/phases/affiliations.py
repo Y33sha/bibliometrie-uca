@@ -10,18 +10,16 @@ from pipeline.metrics import PhaseMetrics
 def build() -> Phase:
     """Rattachement des signatures aux structures du périmètre, par leurs adresses.
 
-    Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
+    Séquence, transactions et métriques dans `pipeline/structures/affiliations.py`.
     """
-    from application.pipeline.affiliations.phase import AffiliationsPhase
-    from infrastructure.pipeline.affiliations.address_resolution import (
-        PgAddressResolutionQueries,
-    )
-    from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
     from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
+    from pipeline.structures.address_resolution import (
+        AddressResolutionQueries,
+    )
+    from pipeline.structures.affiliations import AffiliationsPhase
 
     return AffiliationsPhase(
-        PgAddressResolutionQueries(),
-        PgAffiliationsQueries(),
+        AddressResolutionQueries(),
         PgPerimeterStructuresQueries(),
         refresh_ror=_run_refresh_ror,
     )
@@ -29,11 +27,11 @@ def build() -> Phase:
 
 def _run_refresh_ror() -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-    from application.pipeline.affiliations.refresh_ror import run_refresh_ror
     from infrastructure.repositories import ror_repository
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.polite_pool import build_user_agent
     from infrastructure.sources.ror.dump import ZenodoRorDumpSource
+    from pipeline.structures.ror import run_refresh_ror
 
     # Le dump est public : l'adresse du polite pool y est facultative.
     source = ZenodoRorDumpSource(

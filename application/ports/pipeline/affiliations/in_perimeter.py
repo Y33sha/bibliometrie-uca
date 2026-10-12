@@ -3,36 +3,13 @@
 Implémenté par `infrastructure.pipeline.affiliations.in_perimeter.PgAffiliationsQueries`.
 """
 
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 
-class InPerimeterSyncCounts(NamedTuple):
-    """Nombre de `source_authorships` dont `in_perimeter` a changé lors d'un alignement."""
-
-    added: int  # passées à TRUE (entrées dans le périmètre)
-    removed: int  # passées à FALSE (sorties du périmètre)
-
-
 class AffiliationsQueries(Protocol):
-    """Pose `in_perimeter` sur les `source_authorships` depuis leurs adresses résolues (alignement de phase via la matview, ou recompute admin ciblé par ids), rafraîchit la matview qui l'alimente, et propage `in_perimeter` vers les `authorships` consolidées."""
-
-    def sync_in_perimeter(
-        self, conn: Connection, *, perimeter_ids: list[int]
-    ) -> InPerimeterSyncCounts:
-        """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, en n'écrivant que les changements.
-
-        Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty`.
-        """
-        ...
-
-    def refresh_source_authorship_structures(self, conn: Connection) -> None:
-        """Rafraîchit la matview `source_authorship_structures`, qui alimente `sync_in_perimeter`.
-
-        À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le refresh de `authorship_structures`, qui en dérive.
-        """
-        ...
+    """Recalcul ciblé de `in_perimeter` après une édition d'adresse : sur les `source_authorships`, puis sur les `authorships` consolidées."""
 
     def recompute_in_perimeter_on_source_authorships(
         self,

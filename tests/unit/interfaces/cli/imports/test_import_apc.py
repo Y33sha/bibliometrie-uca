@@ -5,7 +5,6 @@ Les tests portent sur ce que la lecture tire de chaque format â€” montants, annÃ
 
 import pytest
 
-from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
 from domain.structures.structure import StructureType
 from interfaces.cli.imports.import_apc import (
     LAB_TYPES,
@@ -19,6 +18,7 @@ from interfaces.cli.imports.import_apc import (
     parse_year,
     read_payments,
 )
+from pipeline.structures.address_resolution import StructureNameForm
 
 
 class TestParseAmount:

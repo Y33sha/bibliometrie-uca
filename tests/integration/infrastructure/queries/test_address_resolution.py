@@ -1,21 +1,21 @@
-"""Tests d'intégration pour `infrastructure.pipeline.affiliations.address_resolution`."""
+"""Tests d'intégration pour `pipeline.structures.address_resolution`."""
 
 from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.pipeline.affiliations.address_resolution import (
+from pipeline.structures.address_resolution import (
+    AddressResolutionQueries,
     DetectedStructure,
     KeptPair,
 )
-from infrastructure.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
 
 # Forme de nom « uca ».
 _uca_form = partial(insert_structure_name_form, form_text="uca")
 
-_Q = PgAddressResolutionQueries()
+_Q = AddressResolutionQueries()
 
 
 class TestLoadNameForms:
