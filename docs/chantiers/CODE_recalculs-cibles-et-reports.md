@@ -19,6 +19,12 @@ Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` d�
 - Un recalcul ciblé se garde seulement s'il produit un effet immédiat attendu dans l'interface.
 - Les sept recalculs ciblés sont gardés : chacun produit un effet immédiat attendu dans l'interface.
 - Une écriture de pays par l'administration marque l'adresse `countries_dirty` : le run suivant reprend une propagation échouée en tâche de fond.
+- `fetch_missing` garde son report : un jour par rebond. Supprimer ce retard demanderait une seconde passe de transformation, ou une boucle jusqu'à épuisement des recherches. L'appartenance au périmètre, que `fetch_missing` lit, s'obtient au bout d'étapes qui travaillent sur l'ensemble du corpus (affiliations, réconciliation, authorships) : un traitement notice par notice ne suffirait pas.
+- `fetch_stale` garde son report : l'année d'un document se lit dans sa notice du run précédent. Seul un document dont l'année a changé dans sa source est filtré à tort, une fois.
+- `resolve_ra` garde son report : la cible d'une relation dont le préfixe est inconnu est cherchée dans Crossref ou DataCite un run plus tard. Le cas est rare, et un second passage de `resolve_ra` ne se justifie pas pour si peu.
+- La fusion des revues que relie une même publication garde son report : une revue reste en double un jour, quand une publication nouvelle est seule à relier deux entrées. Rejouer la fusion après la réconciliation obligerait à refaire les corrections et les métadonnées des publications touchées.
+- La vérification Sudoc et le rattachement des monographies à leur collection gardent leur report : ils voient au run suivant les revues que `journal_by_doi` rattache. Les notices ainsi rattachées ne donnent aucun ISSN à vérifier ; seule la collection d'un volume d'actes peut être posée un jour plus tard.
+- Le typage en actes des revues et des volumes garde son report. Il lit le type brut de la source, que la correction ne change pas. Seul le `journal_id` posé par `journal_by_doi` arrive un run plus tard, comme pour la vérification Sudoc.
 
 ## Phasage
 
@@ -57,7 +63,7 @@ Restent les lectures d'une donnée qu'un nœud placé plus loin écrit :
 | `resolve_ra.resolve_prefixes` | `publication_relations.target_doi` | `relations.rebuild` | le préfixe d'une cible de relation est résolu un run plus tard ; la cible est cherchée par `fetch_missing` un run après |
 | `publishers_journals.merge_duplicate_journals` | `source_publications.publication_id` (revues des notices d'une même publication) | `publications.reconcile` | deux revues réunies par une publication nouvelle fusionnent un run plus tard |
 | `publishers_journals.check_journals_in_sudoc`, `publishers_journals.link_monographs_to_collections` | `source_publications.journal_id` | `metadata_correction.journal_by_doi` | une revue rattachée par l'espace de noms de son DOI est vérifiée un run plus tard |
-| `publishers_journals.type_proceedings_journals`, `publishers_journals.type_proceedings_volumes` | `source_publications.doc_type` corrigé, `raw_metadata` | `metadata_correction.unary` | le typage en actes lit le type corrigé au run précédent |
+| `publishers_journals.type_proceedings_journals`, `publishers_journals.type_proceedings_volumes` | `source_publications.journal_id`, type brut de la notice | `metadata_correction.journal_by_doi` | une revue rattachée par l'espace de noms de son DOI est typée un run plus tard ; le type brut est à jour |
 | `publications.reconcile` | `source_publications.countries` | `countries.refresh_publication_countries` | aucun : `countries` réécrit `publications.countries` dans le même run |
 
 Restent à classer, colonne par colonne : les lectures de `publications` déclarées à la table entière par `authorships.*`, `relations.rebuild`, `subjects.ingest` et `countries.refresh_publication_countries`. Les nœuds suivants écrivent d'autres colonnes de `publications` (`in_perimeter`, `subjects_ingested_at`, `countries`, `oa_status`) et suppriment des lignes (`authorships.purge_orphan_publications`).
