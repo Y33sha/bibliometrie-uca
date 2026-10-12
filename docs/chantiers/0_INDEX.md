@@ -5,7 +5,6 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
-- [Un schéma PostgreSQL par domaine](CODE_schemas-par-domaine.md)
 
 ### En pause
 
@@ -34,6 +33,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)
 - 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
 - 2026-10-11 — [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md)
 - 2026-10-11 — [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md)

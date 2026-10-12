@@ -57,12 +57,13 @@ Chaque table relève d'une catégorie :
 - **dérivé recalculable** : tout le reste ;
 - **diffusion** : ce que lisent les consommateurs en lecture seule, construit à partir du dérivé et des référentiels. L'API publique d'abord ; d'autres consommateurs ensuite, si la trajectoire se confirme.
 
-**Décision : un schéma PostgreSQL par domaine.** Les tables centrales (personnes, revues, publications, signatures) sont mixtes : un découpage par catégorie les rangerait toutes dans le dérivé, sans dire qui écrit quoi. Le découpage par domaine suit la lecture du modèle. La catégorie de chaque table reste documentée ; les droits la vérifient là où elle est nette (décisions, référentiels).
+**Décision : un schéma PostgreSQL par domaine.** Les tables centrales (personnes, revues, publications, signatures) sont mixtes : un découpage par catégorie les rangerait toutes dans le dérivé, sans dire qui écrit quoi. Le découpage par domaine suit la lecture du modèle. La catégorie de chaque table est documentée ci-dessous.
 
-**Décision : la diffusion est un schéma de vues.** Les consommateurs en lecture seule lisent un schéma `diffusion` fait de vues sur les tables des domaines, et n'ont aucun droit ailleurs. Les vues fixent le contrat (noms, colonnes, filtres) : les tables internes changent sans toucher les consommateurs. Reporté : ce n'est pas urgent.
+**Piste : la diffusion est un schéma de vues.** Les consommateurs en lecture seule, l'API comprise, lisent un schéma `diffusion` fait de vues sur les tables des domaines, et n'ont aucun droit ailleurs. Les vues fixent le contrat (noms, colonnes, filtres) : les tables internes changent sans toucher les consommateurs.
 
 **Acquis**
 - L'inventaire des lectures et écritures de chaque table : [inventaire](archived/2026-10-11_CODE_pipeline-dag_inventaire.md).
+- Les schémas de domaine et le rattachement de chaque table : chantier [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md).
 
 **Classement proposé** (51 tables et vues matérialisées)
 - **brut** : `staging`, `ror_organizations`, `ror_relations`, `ror_dump_imports`, `persons_rh`, `apc_payments`.
@@ -72,10 +73,6 @@ Chaque table relève d'une catégorie :
 - **dérivé, sans décision** : `source_publications`, `author_identifying_keys`, `source_authorship_addresses`, `source_authorship_rors`, `publications_detail`, `authorships`, `publication_relations`, `publication_subjects`, `subjects`, `journal_doi_namespaces`, `journal_name_forms`, `publisher_name_forms`, `doi_prefixes`, `monographs`, `perimeter_structures`.
 - **dérivé, avec des décisions dans la ligne** : `persons` (exclusion, nom), `person_identifiers` et `person_name_forms` (statuts), `address_structures` (lien confirmé ou rejeté), `addresses` (pays), `journals` (`manual_fields`), `journal_issns`, `publishers`, `source_authorships` (personne d'une signature confirmée), `publications`.
 - **vues matérialisées, lues par l'API** : `source_authorship_structures`, `authorship_structures`, `publication_structures`, `subject_cooccurrences`.
-
-Les tables mixtes sont les entités centrales : un schéma par catégorie les range dans le dérivé, et les droits ne disent plus qui écrit quoi. Seules les tables de décision et les référentiels tenus à la main relèvent de l'API seule.
-
-**En cours** : les schémas de domaine et le rattachement de chaque table, chantier [Un schéma PostgreSQL par domaine](CODE_schemas-par-domaine.md).
 
 ### 4. Graphe
 
