@@ -12,7 +12,7 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.repositories import publication_repository
-from pipeline.enrichments.relations_queries import (
+from pipeline.publications.relations_queries import (
     DoiPublication,
     PublicationRelationsQueries,
     RelationEdge,

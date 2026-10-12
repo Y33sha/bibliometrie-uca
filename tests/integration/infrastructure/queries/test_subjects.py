@@ -1,12 +1,11 @@
-"""Tests d'intégration pour `infrastructure.pipeline.subjects`."""
+"""Tests d'intégration pour `pipeline.publications.subjects_queries`."""
 
 from sqlalchemy import text
 
-from application.ports.pipeline.subjects import PublicationSubjectLink
-from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+from pipeline.publications.subjects_queries import PublicationSubjectLink, SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
 
-_Q = PgSubjectsIngestionQueries()
+_Q = SubjectsIngestionQueries()
 
 
 def _link(conn, publication_id, subject_id, source):

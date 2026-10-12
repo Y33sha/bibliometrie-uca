@@ -118,7 +118,7 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 **Décisions**
 - **Un paquet racine `pipeline/`, hors des couches hexagonales.** L'architecture hexagonale ne convient pas au pipeline : pas de ports, chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
 - **Le pipeline possède ses opérations.** L'API passe par une interface publique du pipeline, limitée aux recalculs ciblés ; les partages se réduisent au strict nécessaire, et chaque recalcul ciblé se justifie par un effet immédiat attendu dans l'interface.
-- **Découpage par domaine**, aligné sur les schémas : `pipeline/sources/<source>` (acquisition, normalisation et client HTTP de chaque source), `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons`, `pipeline/enrichments` ; `graph.py` et l'orchestrateur à la racine.
+- **Découpage par domaine**, aligné sur les schémas : `pipeline/sources/<source>` (acquisition, normalisation et client HTTP de chaque source), `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons` ; `graph.py` et l'orchestrateur à la racine.
 - **Migration une phase à la fois**, sous contrats d'import, en commençant par une phase petite et autonome (`countries` ou `relations`).
 - **Le câblage `interfaces/cli/phases` disparaît** avec les ports. Le point d'entrée `run_pipeline` passe dans `pipeline/`.
 

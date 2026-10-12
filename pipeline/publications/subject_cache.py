@@ -1,8 +1,8 @@
-"""Helpers partagés entre les ingestors par source."""
+"""Outils partagés par les lecteurs de sujets des sources : dédoublonnage des libellés, cache des identifiants de sujets."""
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsIngestionQueries
+from pipeline.publications.subjects_queries import PublicationSubjectLink, SubjectsIngestionQueries
 
 
 def dedup_strs(values: object) -> list[str]:

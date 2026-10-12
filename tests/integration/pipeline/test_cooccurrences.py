@@ -5,12 +5,12 @@ import logging
 
 from sqlalchemy import text
 
-from application.pipeline.subjects.cooccurrences import run
-from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+from pipeline.publications.subject_cooccurrences import run
+from pipeline.publications.subjects_queries import SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
-_Q = PgSubjectsIngestionQueries()
+_Q = SubjectsIngestionQueries()
 
 
 class TestRecomputeUsageCounts:
@@ -105,7 +105,7 @@ class TestRunOrchestrator:
             insert_publication_subject(sa_sync_conn, p1, subject_id=s)
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
-        stats = run(sa_sync_conn, PgSubjectsIngestionQueries(), logging.getLogger("test"))
+        stats = run(sa_sync_conn, SubjectsIngestionQueries(), logging.getLogger("test"))
         assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
         # usage_count des deux sujets = 2.
         rows = sa_sync_conn.execute(

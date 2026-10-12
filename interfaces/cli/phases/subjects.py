@@ -14,9 +14,9 @@ def build() -> Phase:
 
     `--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
 
-    Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
+    Séquence, transactions et métriques dans `pipeline/publications/subjects.py`.
     """
-    from application.pipeline.subjects.phase import SubjectsPhase
-    from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+    from pipeline.publications.subjects import SubjectsPhase
+    from pipeline.publications.subjects_queries import SubjectsIngestionQueries
 
-    return SubjectsPhase(PgSubjectsIngestionQueries())
+    return SubjectsPhase(SubjectsIngestionQueries())

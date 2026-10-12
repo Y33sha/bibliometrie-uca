@@ -5,9 +5,9 @@ Chaque source expose ses concepts dans un format `topics` distinct ; ces fonctio
 
 from collections.abc import Callable
 
-from application.pipeline.subjects._common import dedup_strs
 from domain.sources.hal import hal_domain_labels
 from domain.types import JsonValue, as_mapping, as_str
+from pipeline.publications.subject_cache import dedup_strs
 
 # Niveaux OpenAlex, liés à plat : domain, field, subfield, topic.
 _OPENALEX_LEVELS = ("domain", "field", "subfield", "topic")

@@ -9,7 +9,7 @@ La cible est posée par la question 5 de la fiche [Architecture cible du pipelin
 ## Décisions
 
 - **Un paquet racine `pipeline/`**, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
-- **Découpage par domaine** : `pipeline/sources/<source>`, `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons`, `pipeline/enrichments` ; `graph.py` et l'orchestrateur à la racine.
+- **Découpage par domaine** : `pipeline/sources/<source>`, `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons` ; `graph.py` et l'orchestrateur à la racine. Chaque nœud rejoint le domaine des tables qu'il écrit : les relations, les sujets et le statut d'accès ouvert vont dans `pipeline/publications`, les pays dans `pipeline/structures`.
 - **Règles d'import** vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques d'`infrastructure/` (connexion, réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`. `application/` et `infrastructure/` n'importent pas `pipeline/`. Seule l'API (`interfaces/api/deps.py`) importe l'interface publique du pipeline : recalculs ciblés, ordre des phases.
 - **Régime de transition** : pendant la migration, `pipeline/` et le code du pipeline encore dans les couches (`application/pipeline`, `application/ports/pipeline`, `infrastructure/pipeline`, `infrastructure/sources`) s'importent dans les deux sens. Les exceptions sont listées dans `pyproject.toml` et disparaissent avec la dernière phase.
 - **Une phase à la fois, dans l'ordre du pipeline.** Chaque phase migrée confronte la cible aux situations concrètes qui la concernent ; ce qui ne tient pas sort de la cible.
@@ -29,20 +29,20 @@ Dans l'ordre du pipeline.
 
 ### Phase 2 — Acquisition
 
-- [ ] `extract`, une source à la fois, en commençant par HAL, avec le client HTTP de chaque source.
-- [ ] `fetch_missing`, `fetch_stale`, `fetch_truncated`.
+- [x] `extract`, une source à la fois, en commençant par HAL, avec le client HTTP de chaque source. 5f65bcee2, fb71aebab
+- [x] `fetch_missing`, `fetch_stale`, `fetch_truncated`. 697691729
 
 ### Phase 3 — Normalisation et structures
 
-- [ ] `normalize`, `affiliations`.
+- [x] `normalize`, `affiliations`. a11d8eab5, efde18c6c
 
 ### Phase 4 — Référentiels
 
-- [ ] `resolve_ra`, `publishers_journals`, `metadata_correction`.
+- [x] `resolve_ra`, `publishers_journals`, `metadata_correction`. a207d4730, 844aef4cd, d9d542139
 
 ### Phase 5 — Résolution
 
-- [ ] `publications`, `persons`, `authorships`.
+- [x] `publications`, `persons`, `authorships`. 9a96b677c, 3efd34841, e7ce48f68
 
 ### Phase 6 — Enrichissements
 
