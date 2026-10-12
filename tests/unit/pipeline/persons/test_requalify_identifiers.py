@@ -2,13 +2,13 @@
 
 from unittest.mock import ANY, MagicMock
 
-from application.pipeline.persons.requalify_identifiers import (
-    compute_identifier_consensus,
-    requalify_misplaced_identifiers,
-)
-from application.ports.pipeline.persons.matching import (
+from pipeline.persons.matching import (
     IdentityIdentifier,
     MisplacedNeutralizations,
+)
+from pipeline.persons.requalify_identifiers import (
+    compute_identifier_consensus,
+    requalify_misplaced_identifiers,
 )
 
 

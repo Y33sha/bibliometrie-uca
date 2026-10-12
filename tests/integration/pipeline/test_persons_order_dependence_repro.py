@@ -11,13 +11,13 @@ import logging
 
 from sqlalchemy import text
 
-from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
-from application.pipeline.persons.cascade import run_cascade
-from application.pipeline.persons.purge import purge
 from application.services.persons.core import create_person
 from domain.persons.name_forms import compute_person_name_forms
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
+from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
+from pipeline.persons.cascade import run_cascade
+from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.purge import purge
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -81,7 +81,7 @@ def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, 
 
 def _run_create(conn):
     """Arbitrage des conflits d'identifiant (no-op ici, pas d'identifiant) puis la cascade."""
-    q, repo = PgPersonsMatchingQueries(), person_repository(conn)
+    q, repo = PersonsMatchingQueries(), person_repository(conn)
     arbitrate_identifier_conflicts(conn, q, _LOG, person_repo=repo)
     run_cascade(conn, q, _LOG, person_repo=repo, authorship_repo=authorship_repository(conn))
 
@@ -104,7 +104,7 @@ def _run_phase(conn):
     la purge appelée directement — l'ordre reproduit `PersonsPhase`."""
     _run_create(conn)
     _populate_canonical_forms(conn)
-    purge(conn, PgPersonsMatchingQueries(), _LOG)
+    purge(conn, PersonsMatchingQueries(), _LOG)
 
 
 def _martin_count(conn) -> int:

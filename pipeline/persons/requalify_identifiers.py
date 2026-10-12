@@ -7,9 +7,9 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
 from domain.persons.matching import consensus_name, identifier_misplaced
+from pipeline.persons.matching import PersonsMatchingQueries
 
 IdentifierConsensus = dict[tuple[str, str], str]
 """`{(id_type, id_value): nom du consensus}` pour les valeurs dont le consensus désigne un nom."""

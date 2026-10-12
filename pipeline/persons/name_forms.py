@@ -1,25 +1,40 @@
-"""Query service : SQL du peuplement de `person_name_forms`.
+"""Requêtes du peuplement de `person_name_forms`."""
 
-Appelé par `application/pipeline/persons/populate_person_name_forms.py`. Collecte les formes brutes (table `persons` + `source_authorships`), passe par une table temporaire pour la normalisation SQL via `normalize_name_form()`, puis synchronise `person_name_forms` par agrégation `GROUP BY (name_form, person_id)` + diff INSERT/UPDATE/DELETE.
-
-Modèle de table cible : `(name_form, person_id, sources text[])` avec PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple est faite en SQL (`array_agg DISTINCT`), pas en Python.
-"""
+from typing import NamedTuple, TypedDict
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.persons.name_forms import (
-    PersonNameFormsQueries,
-    PersonNameRow,
-    RawFormBatchItem,
-    SyncCounts,
-)
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from infrastructure.db.jsonb import Jsonb
 
 
-class PgPersonNameFormsQueries(PersonNameFormsQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.persons.name_forms.PersonNameFormsQueries`."""
+class PersonNameRow(NamedTuple):
+    """Projection `persons` consommée par `populate_person_name_forms` : id + parts du nom (trimmées en SQL)."""
+
+    id: int
+    first_name: str | None
+    last_name: str
+
+
+class RawFormBatchItem(TypedDict):
+    """Ligne du batch executemany vers la table temp `_raw_forms`."""
+
+    raw_text: str
+    person_id: int
+    source: str
+
+
+class SyncCounts(NamedTuple):
+    """Bilan d'une synchronisation de `person_name_forms`."""
+
+    inserted: int
+    updated: int
+    deleted: int
+
+
+class PersonNameFormsQueries:
+    """Requêtes de la régénération des formes de nom des personnes."""
 
     def fetch_persons_names(self, conn: Connection) -> list[PersonNameRow]:
         """Inclut les personnes exclues : leurs name_forms restent dans `person_name_forms` comme ancres du matching, donc le pipeline ne les recrée pas à chaque run."""
@@ -43,6 +58,7 @@ class PgPersonNameFormsQueries(PersonNameFormsQueries):
         )
 
     def insert_raw_forms_batch(self, conn: Connection, rows: list[RawFormBatchItem]) -> None:
+        """Insert massif de formes brutes dans la table temporaire `_raw_forms`."""
         if not rows:
             return
         conn.execute(
@@ -55,6 +71,7 @@ class PgPersonNameFormsQueries(PersonNameFormsQueries):
         )
 
     def drop_temp_raw_forms_table(self, conn: Connection) -> None:
+        """Supprime la table temporaire `_raw_forms`."""
         conn.execute(text("DROP TABLE _raw_forms"))
 
     def sync_from_raw_forms(self, conn: Connection) -> SyncCounts:

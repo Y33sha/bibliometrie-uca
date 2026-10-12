@@ -11,7 +11,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.matching import PersonsMatchingQueries
 
 
 def purge(

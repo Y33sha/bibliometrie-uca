@@ -4,7 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+from pipeline.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -42,7 +42,7 @@ def _attribution_remaining(conn, person_id):
 def test_attribution_automatique_sans_signature_supprimee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
-    assert PgPersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn) >= 1
+    assert PersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn) >= 1
     assert not _attribution_remaining(sa_sync_conn, person)
 
 
@@ -50,7 +50,7 @@ def test_signature_qui_neutralise_l_identifiant_ne_le_porte_pas(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
     _signature(sa_sync_conn, person, "monteil jean", neutralized={"orcid": "misplaced"})
-    PgPersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
+    PersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
     assert not _attribution_remaining(sa_sync_conn, person)
 
 
@@ -58,19 +58,19 @@ def test_attribution_portee_par_une_signature_conservee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
     _signature(sa_sync_conn, person, "monteil jean")
-    PgPersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
+    PersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
     assert _attribution_remaining(sa_sync_conn, person)
 
 
 def test_attribution_confirmee_conservee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person, status="confirmed")
-    PgPersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
+    PersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
     assert _attribution_remaining(sa_sync_conn, person)
 
 
 def test_attribution_manuelle_conservee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person, source="manual")
-    PgPersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
+    PersonsMatchingQueries().delete_unsupported_identifier_attributions(sa_sync_conn)
     assert _attribution_remaining(sa_sync_conn, person)

@@ -7,11 +7,11 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import update_name
 from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
+from pipeline.persons.matching import PersonsMatchingQueries
 
 
 class FirstNameCompletion(NamedTuple):

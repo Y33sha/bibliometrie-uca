@@ -4,9 +4,9 @@ forme de nom devenue ambiguë, puis GC des personnes vidées.
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+from pipeline.persons.matching import PersonsMatchingQueries
 
-_Q = PgPersonsMatchingQueries()
+_Q = PersonsMatchingQueries()
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,

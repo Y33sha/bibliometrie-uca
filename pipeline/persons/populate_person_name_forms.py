@@ -15,8 +15,8 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries, RawFormBatchItem
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
+from pipeline.persons.name_forms import PersonNameFormsQueries, RawFormBatchItem
 
 BATCH_SIZE = 5000
 

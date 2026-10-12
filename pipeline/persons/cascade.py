@@ -29,16 +29,6 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.pipeline.persons.first_names import complete_reduced_first_names
-from application.pipeline.persons.loading import (
-    EnrichedAuthorship,
-    get_all_unlinked_authorships,
-    get_cross_source_candidates,
-    get_out_of_perimeter_candidates,
-    load_linked_authorships_by_pub,
-)
-from application.pipeline.persons.metrics import CascadeResult, log_matching_breakdown
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
@@ -64,6 +54,16 @@ from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, initials_extend
 from domain.persons.person import validated_name
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.persons.first_names import complete_reduced_first_names
+from pipeline.persons.loading import (
+    EnrichedAuthorship,
+    get_all_unlinked_authorships,
+    get_cross_source_candidates,
+    get_out_of_perimeter_candidates,
+    load_linked_authorships_by_pub,
+)
+from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.metrics import CascadeResult, log_matching_breakdown
 from pipeline.progression import attente, progression
 
 # ---------------------------------------------------------------------------
