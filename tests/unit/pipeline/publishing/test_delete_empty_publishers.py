@@ -1,8 +1,8 @@
-"""Tests de la suppression des éditeurs vides (`pipeline.publishing.delete_empty_publishers`)."""
+"""Tests de la suppression des éditeurs vides (`pipeline.publishing.publishers.delete_empty_publishers`)."""
 
 import logging
 
-from pipeline.publishing.delete_empty_publishers import (
+from pipeline.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
 )
 

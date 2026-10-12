@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.publishing import enrich_journals_from_openalex as journals_mod
+from pipeline.publishing.journals import enrich_journals_from_openalex as journals_mod
 
 
 @pytest.fixture(autouse=True)

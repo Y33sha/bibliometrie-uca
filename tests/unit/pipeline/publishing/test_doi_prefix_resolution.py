@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.publishing.doi_prefixes import PendingPublisherPrefix
-from pipeline.publishing.resolve_publishers import run_resolve_publishers
+from pipeline.publishing.publishers.resolve_publishers import run_resolve_publishers
 from pipeline.publishing.resolve_ra import ResolveRaPhase
 
 

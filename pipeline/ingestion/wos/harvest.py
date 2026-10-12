@@ -14,7 +14,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping
-from pipeline.ingestion.harvest import (
+from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,

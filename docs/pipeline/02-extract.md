@@ -28,7 +28,7 @@ Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, Sca
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
 
-Boucle et sélection des DOI dans `pipeline/ingestion/fetch_missing.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`.
+Boucle et sélection des DOI dans `pipeline/ingestion/common/fetch_missing.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`.
 
 **Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
 

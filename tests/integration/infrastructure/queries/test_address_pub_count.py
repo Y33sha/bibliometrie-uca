@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.publications.address_pub_count import AddressPubCountQueries
+from pipeline.publications.authorships.address_pub_count import AddressPubCountQueries
 
 _Q = AddressPubCountQueries()
 from tests.integration.helpers.addresses import insert_address

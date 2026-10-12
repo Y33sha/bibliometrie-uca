@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.harvest import ExtractionConfigError
-from pipeline.ingestion.staging import UpsertOutcome
+from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.theses import harvest
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.ingestion.theses.harvest import ThesesExtractor, build_query, extract_theses

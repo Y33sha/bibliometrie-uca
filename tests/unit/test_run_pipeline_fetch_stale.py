@@ -10,7 +10,7 @@
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pipeline.ingestion import fetch_stale
+from pipeline.ingestion.common import fetch_stale
 from pipeline.ingestion.http.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
@@ -96,7 +96,7 @@ def test_run_fetch_stale_installs_circuit_breaker():
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
-                "pipeline.ingestion.fetch_stale.refresh",
+                "pipeline.ingestion.common.fetch_stale.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )

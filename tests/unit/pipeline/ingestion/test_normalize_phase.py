@@ -5,7 +5,7 @@ Le retrait des documents disparus précède le nettoyage des identités : il en 
 
 import logging
 
-from pipeline.ingestion.normalize import NormalizePhase, NormalizeStats
+from pipeline.ingestion.common.normalize import NormalizePhase, NormalizeStats
 
 
 def _run(

@@ -1,12 +1,12 @@
-"""Tests du calcul des espaces de noms DOI des revues (`pipeline.publishing.learn_journal_doi_namespaces`)."""
+"""Tests du calcul des espaces de noms DOI des revues (`pipeline.publishing.journals.learn_journal_doi_namespaces`)."""
 
 import logging
 from collections.abc import Sequence
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType
-from pipeline.publishing.journals import DoiJournalRow
-from pipeline.publishing.learn_journal_doi_namespaces import (
+from pipeline.publishing.journals.journals import DoiJournalRow
+from pipeline.publishing.journals.learn_journal_doi_namespaces import (
     run_learn_journal_doi_namespaces,
 )
 

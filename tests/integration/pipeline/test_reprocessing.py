@@ -11,7 +11,7 @@ import copy
 
 from sqlalchemy import text
 
-from pipeline.publications.refresh import PublicationStore
+from pipeline.publications.reconciliation.refresh import PublicationStore
 from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
@@ -50,14 +50,14 @@ def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
     import logging
 
-    from pipeline.ingestion.hal.normalize import process_work
-    from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.source_publications import (
+    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+    from pipeline.ingestion.common.source_publications import (
         SourcePublicationQueries,
     )
-    from pipeline.ingestion.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.hal.normalize import process_work
     from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.publishers import PublisherGatewayQueries
+    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()
@@ -117,8 +117,8 @@ def _fetch_stale_publications(conn):
 
     Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
-    from pipeline.publications.reconcile_components import reconcile
-    from pipeline.publications.reconciliation import (
+    from pipeline.publications.reconciliation.reconcile_components import reconcile
+    from pipeline.publications.reconciliation.reconciliation import (
         PublicationsReconciliationQueries,
     )
 

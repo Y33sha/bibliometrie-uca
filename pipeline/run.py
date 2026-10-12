@@ -35,17 +35,14 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
-from pipeline.ingestion import extract, fetch_missing, fetch_stale, normalize
+from pipeline.ingestion.common import extract, fetch_missing, fetch_stale, normalize
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.persons import persons
-from pipeline.publications import (
-    authorships,
-    metadata_correction,
-    oa_status,
-    publications,
-    relations,
-    subjects,
-)
+from pipeline.publications import oa_status, relations
+from pipeline.publications.authorships import authorships
+from pipeline.publications.correction import metadata_correction
+from pipeline.publications.reconciliation import publications
+from pipeline.publications.subjects import subjects
 from pipeline.publishing import publishers_journals, resolve_ra
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.exception_chain import failure_message, is_user_interruption
@@ -57,7 +54,8 @@ from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.runtime.progression import ecrire_hors_barre, set_flux_barres
 from pipeline.runtime.signals import select_targets
-from pipeline.structures import affiliations, countries
+from pipeline.structures import affiliations
+from pipeline.structures.countries import countries
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())

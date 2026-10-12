@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pipeline.publications.reconciliation import PublicationsReconciliationQueries
+from pipeline.publications.reconciliation.reconciliation import PublicationsReconciliationQueries
 
 _Q = PublicationsReconciliationQueries()
 

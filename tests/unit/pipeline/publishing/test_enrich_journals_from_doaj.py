@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 from pipeline.ingestion.http.dump_download import DumpUnavailableError
-from pipeline.publishing.import_journals_from_doaj_dump import (
+from pipeline.publishing.journals.import_journals_from_doaj_dump import (
     run_enrich_journals_from_doaj,
 )
 

@@ -4,9 +4,9 @@ from sqlalchemy import text
 
 from domain.persons.signature_name import SignatureName
 from interfaces.cli.oneshot.backfill_initials_split import backfill
-from pipeline.ingestion.fingerprint import fingerprint
-from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.signatures import AuthorRecord, write_source_authorships
+from pipeline.ingestion.common.fingerprint import fingerprint
+from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signatures import AuthorRecord, write_source_authorships
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 

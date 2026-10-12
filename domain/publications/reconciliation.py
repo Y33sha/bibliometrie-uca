@@ -1,6 +1,6 @@
 """Décision pure de réconciliation des composantes — assignation, merge et split unifiés.
 
-À partir des `source_publications` d'un voisinage (les SP *dirty* et leurs voisins directs, cf. `pipeline/publications/reconcile_components.py`), calcule **où chaque SP doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
+À partir des `source_publications` d'un voisinage (les SP *dirty* et leurs voisins directs, cf. `pipeline/publications/reconciliation/reconcile_components.py`), calcule **où chaque SP doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
 
 **Opération unique.** On assigne chaque SP au **pub-ancre** de sa partition. Une SP est soit **matérialisée** (`publication_id` posé), soit **orpheline** (`publication_id = None`) — la passe ne fait aucune différence, c'est le clustering qui décide. Les quatre cas du matcher en sont des facettes :
 

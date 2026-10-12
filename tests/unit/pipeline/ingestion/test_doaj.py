@@ -8,7 +8,7 @@ import logging
 import httpx2
 import pytest
 
-from pipeline.ingestion.doaj import DOAJ_CSV_DUMP_URL, fetch_doaj_dump
+from pipeline.ingestion.complements.doaj import DOAJ_CSV_DUMP_URL, fetch_doaj_dump
 from pipeline.ingestion.http.dump_download import DumpDownloadError
 
 _S3 = "https://doaj-live-journal-csv.s3.amazonaws.com/dump.csv"

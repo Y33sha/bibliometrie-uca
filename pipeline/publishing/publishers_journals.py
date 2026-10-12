@@ -23,18 +23,20 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from pipeline.publishing import (
+from pipeline.publishing.journals import (
     check_journals_in_sudoc,
     enrich_journals_from_openalex,
     import_journals_from_doaj_dump,
     learn_journal_doi_namespaces,
-    link_monographs_to_collections,
     merge_duplicate_journals,
-    merge_duplicate_monographs,
-    resolve_publishers,
     type_proceedings_journals,
+)
+from pipeline.publishing.monographs import (
+    link_monographs_to_collections,
+    merge_duplicate_monographs,
     type_proceedings_volumes,
 )
+from pipeline.publishing.publishers import resolve_publishers
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, etape
@@ -241,8 +243,8 @@ def _run_resolve_publishers() -> PhaseMetrics:
     from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
     from pipeline.ingestion.http.polite_pool import build_user_agent
     from pipeline.publishing.doi_prefixes import DoiPrefixesQueries
-    from pipeline.publishing.publishers import PublisherGatewayQueries
-    from pipeline.publishing.resolve_publishers import (
+    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.publishing.publishers.resolve_publishers import (
         run_resolve_publishers,
     )
     from pipeline.runtime.config import get_polite_pool_email_optional
@@ -272,10 +274,10 @@ def _run_resolve_publishers() -> PhaseMetrics:
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from pipeline.ingestion.http.api_params import API_BASE_URLS, DOAJ_DELAY
     from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
-    from pipeline.publishing.enrich_journals_from_openalex import (
+    from pipeline.publishing.journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
     )
-    from pipeline.publishing.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
 
     sources_api = API_BASE_URLS["openalex_sources"]
     with open_tx() as conn:
@@ -300,16 +302,16 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
 
 
 def _run_check_journals_in_sudoc() -> PhaseMetrics:
+    from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
     from pipeline.ingestion.http.api_params import (
         API_BASE_URLS,
         SUDOC_MAX_CONCURRENT,
         SUDOC_MAX_PER_SECOND,
     )
-    from pipeline.ingestion.sudoc import fetch_ppns, fetch_serial_record
-    from pipeline.publishing.check_journals_in_sudoc import (
+    from pipeline.publishing.journals.check_journals_in_sudoc import (
         run_check_journals_in_sudoc,
     )
-    from pipeline.publishing.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
 
     base_url = API_BASE_URLS["sudoc"]
     with open_tx() as conn:
@@ -337,9 +339,9 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
 
 
 def _run_merge_duplicate_journals() -> PhaseMetrics:
-    from pipeline.publishing.journal_merge import merge_journals
-    from pipeline.publishing.journals import JournalGatewayQueries
-    from pipeline.publishing.merge_duplicate_journals import (
+    from pipeline.publishing.journals.journal_merge import merge_journals
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.merge_duplicate_journals import (
         run_merge_duplicate_journals,
     )
 
@@ -355,10 +357,10 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
 
 
 def _run_merge_duplicate_monographs() -> PhaseMetrics:
-    from pipeline.publishing.merge_duplicate_monographs import (
+    from pipeline.publishing.monographs.merge_duplicate_monographs import (
         run_merge_duplicate_monographs,
     )
-    from pipeline.publishing.monographs import MonographGatewayQueries
+    from pipeline.publishing.monographs.monographs import MonographGatewayQueries
 
     with open_tx() as conn:
         return run_merge_duplicate_monographs(log, monograph_repo=MonographGatewayQueries(conn))
@@ -366,7 +368,7 @@ def _run_merge_duplicate_monographs() -> PhaseMetrics:
 
 def _run_link_monographs_to_collections() -> PhaseMetrics:
     from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.link_monographs_to_collections import (
+    from pipeline.publishing.monographs.link_monographs_to_collections import (
         run_link_monographs_to_collections,
     )
 
@@ -375,8 +377,8 @@ def _run_link_monographs_to_collections() -> PhaseMetrics:
 
 
 def _run_type_proceedings_volumes() -> PhaseMetrics:
-    from pipeline.publishing.monographs import MonographGatewayQueries
-    from pipeline.publishing.type_proceedings_volumes import (
+    from pipeline.publishing.monographs.monographs import MonographGatewayQueries
+    from pipeline.publishing.monographs.type_proceedings_volumes import (
         run_type_proceedings_volumes,
     )
 
@@ -385,8 +387,8 @@ def _run_type_proceedings_volumes() -> PhaseMetrics:
 
 
 def _run_type_proceedings_journals() -> PhaseMetrics:
-    from pipeline.publishing.journals import JournalGatewayQueries
-    from pipeline.publishing.type_proceedings_journals import (
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.type_proceedings_journals import (
         run_type_proceedings_journals,
     )
 
@@ -395,8 +397,8 @@ def _run_type_proceedings_journals() -> PhaseMetrics:
 
 
 def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
-    from pipeline.publishing.journals import JournalGatewayQueries
-    from pipeline.publishing.learn_journal_doi_namespaces import (
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.learn_journal_doi_namespaces import (
         run_learn_journal_doi_namespaces,
     )
 
@@ -405,12 +407,12 @@ def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
-    from pipeline.ingestion.doaj import downloaded_doaj_dump
+    from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
     from pipeline.ingestion.http.polite_pool import build_user_agent
-    from pipeline.publishing.import_journals_from_doaj_dump import (
+    from pipeline.publishing.journals.import_journals_from_doaj_dump import (
         run_enrich_journals_from_doaj,
     )
-    from pipeline.publishing.journals import JournalGatewayQueries
+    from pipeline.publishing.journals.journals import JournalGatewayQueries
     from pipeline.runtime.config import (
         get_doaj_refresh_after_days,
         get_polite_pool_email_optional,

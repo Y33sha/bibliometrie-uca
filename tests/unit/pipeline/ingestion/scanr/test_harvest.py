@@ -9,12 +9,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.http.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.scanr import harvest
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.ingestion.scanr.harvest import ScanrExtractor, build_query, extract_year
-from pipeline.ingestion.staging import UpsertOutcome
 from pipeline.runtime.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
 

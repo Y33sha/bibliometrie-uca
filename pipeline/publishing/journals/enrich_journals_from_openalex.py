@@ -1,0 +1,117 @@
+"""Sous-étape de la phase `publishers_journals` — enrichit les revues à partir de l'API OpenAlex Sources.
+
+Champs mis à jour :
+- `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
+- `journal_type` (via le mapping local du `type` OpenAlex), uniquement quand le mapping renvoie une valeur exploitable
+
+Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
+"""
+
+import logging
+import time
+from collections.abc import Callable
+
+from sqlalchemy import Connection
+
+from domain.journals.journal import JournalType
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.publishing.journals.journals import JournalGatewayQueries
+from pipeline.runtime.libelles import forme
+from pipeline.runtime.metrics import PhaseMetrics
+
+LIBELLE = "Type des revues sur OpenAlex"
+"""Libellé de la sous-étape dans le journal de la phase."""
+
+BATCH_SIZE = 50
+COMMIT_EVERY = 500  # commit DB tous les N journals traités
+
+_OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
+    "journal": JournalType.JOURNAL,
+    "repository": JournalType.REPOSITORY,
+    "conference": JournalType.PROCEEDINGS,
+    "book series": JournalType.BOOK_SERIES,
+    "ebook platform": JournalType.EBOOK_PLATFORM,
+}
+
+
+def map_openalex_source_type(raw: str | None) -> JournalType | None:
+    """Mappe le champ `type` d'une source OpenAlex vers l'enum `journal_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus.
+
+    `preprint_server` et `media` sont absents de la table (sans équivalent dans la taxonomie OpenAlex) et restent posés à la main.
+    """
+    if not raw:
+        return None
+    return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
+
+
+FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str | None, str | None]]]
+"""Signature du fetch injecté : `(openalex_ids) -> {short_id: (apc_amount, apc_currency, raw_type)}`."""
+
+
+def run_enrich_journals_from_openalex(
+    conn: Connection,
+    logger: logging.Logger,
+    *,
+    journal_repo: JournalGatewayQueries,
+    fetch_batch: FetchSourcesBatch,
+    breaker: SourceCircuitBreaker,
+    rate_delay: float = 0.1,
+) -> PhaseMetrics:
+    journals = journal_repo.find_journals_of_unknown_type()
+    total = len(journals)
+    if total == 0:
+        return PhaseMetrics()
+
+    updated = 0
+    with_apc = 0
+    processed = 0
+    type_written = 0
+
+    for i in range(0, total, BATCH_SIZE):
+        if breaker.tripped:
+            conn.commit()
+            logger.warning(
+                "⚡ Coupe-circuit OpenAlex : enrichissement revues interrompu à %d/%d, reste retenté au prochain run.",
+                processed,
+                total,
+            )
+            return _bilan(total, updated)
+
+        id_map = {row[1]: row[0] for row in journals[i : i + BATCH_SIZE]}
+        sources = fetch_batch(list(id_map))
+        time.sleep(rate_delay)
+
+        for oa_id, journal_id in id_map.items():
+            data = sources.get(oa_id)
+            if data is None:
+                processed += 1
+                continue
+            apc_amount, apc_currency, raw_type = data
+
+            # Sans APC dans OpenAlex, montant et devise de la revue restent tels quels.
+            if apc_amount is not None:
+                journal_repo.update_journal_apc(
+                    journal_id, apc_amount=apc_amount, apc_currency=apc_currency
+                )
+            # journal_type : seules les revues `unknown` sont traitées (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
+            mapped_type = map_openalex_source_type(raw_type)
+            if mapped_type is not None:
+                journal_repo.set_journal_type(journal_id, mapped_type)
+                type_written += 1
+
+            updated += 1
+            if apc_amount is not None:
+                with_apc += 1
+            processed += 1
+
+        if processed % COMMIT_EVERY < BATCH_SIZE:
+            conn.commit()
+
+    conn.commit()
+    return _bilan(total, updated)
+
+
+def _bilan(total: int, updated: int) -> PhaseMetrics:
+    metrics = PhaseMetrics(seen=total, updated=updated)
+    metrics.resume = f"{updated}/{total} {forme(total, 'revue mise à jour', 'revues mises à jour')}"
+    return metrics

@@ -1,6 +1,6 @@
 """Port : lectures sur les sujets (consommé par le router subjects).
 
-Implémenté par `infrastructure.read_models.subjects.PgSubjectsQueries`. Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/publications/subjects_queries.py`).
+Implémenté par `infrastructure.read_models.subjects.PgSubjectsQueries`. Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/publications/subjects/subjects_queries.py`).
 
 `SubjectFrequency` vit ici et sert les quatre nuages de sujets des ports voisins : personnes, laboratoires, revues et éditeurs.
 """

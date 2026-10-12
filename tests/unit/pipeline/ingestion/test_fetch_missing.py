@@ -7,7 +7,7 @@ exécution synchrone déterministe.
 
 import logging
 
-from pipeline.ingestion.fetch_missing import FetchMissingPhase
+from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
 from pipeline.runtime.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.metrics import PhaseMetrics
 

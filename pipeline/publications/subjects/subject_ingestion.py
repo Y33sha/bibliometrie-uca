@@ -1,0 +1,110 @@
+"""Ingestion des sujets d'une publication — première étape de la phase `subjects` (avant les co-occurrences).
+
+Incrémental et publication-centré :
+  1. Sélectionne les publications à ingérer : `publications.subjects_ingested_at` vide. L'enregistrement d'une publication recalculée depuis ses sources vide cette date ; les autres écritures sur la publication (statut OA…) la laissent en place.
+  2. Dégage leurs liens `publication_subjects` (non rejetés).
+  3. Ré-ingère, par `source_publication`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
+  4. Date l'ingestion de chaque publication traitée, qu'elle ait des sujets ou non.
+  5. Purge les `subjects` devenus orphelins (plus aucun lien).
+
+Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_publications` et affichés via `publications_detail.keywords`, hors de `subjects`.
+
+On lit les `source_publications` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
+"""
+
+import logging
+
+from sqlalchemy import Connection
+
+from pipeline.publications.subjects.subject_cache import SubjectCache
+from pipeline.publications.subjects.subject_extractors import SUBJECT_EXTRACTORS
+from pipeline.publications.subjects.subjects_queries import (
+    PublicationSubjectLink,
+    SubjectsIngestionQueries,
+)
+from pipeline.runtime.libelles import (
+    BRANCHE,
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
+
+
+def run(
+    conn: Connection,
+    queries: SubjectsIngestionQueries,
+    logger: logging.Logger,
+    *,
+    rebuild: bool = False,
+) -> PhaseMetrics:
+    """Ré-ingère les sujets des publications à ingérer (ou de toutes si `rebuild`).
+
+    `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
+
+    `rebuild` repasse toutes les publications, indépendamment du signal incrémental : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
+    """
+    subjects_before = queries.count_all_subjects(conn)
+    etape(logger, "Liens publications-sujets")
+
+    if rebuild:
+        pub_ids = queries.select_all_publication_ids(conn)
+    else:
+        pub_ids = queries.select_publications_to_reingest(conn)
+    if not pub_ids:
+        queries.purge_orphan_subjects(conn)
+        rien_a_faire(logger)
+        subjects_after = queries.count_all_subjects(conn)
+        metrics = PhaseMetrics()
+        metrics.details["summary"] = {
+            "subjects_added": subjects_after - subjects_before,
+            "subjects_total": subjects_after,
+            "publications_updated": 0,
+        }
+        return metrics
+
+    queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
+    rows = queries.select_source_publications_for_pubs(conn, publication_ids=pub_ids)
+    logger.info(
+        "%s%s à traiter (%s), soit %s",
+        BRANCHE,
+        accord(len(pub_ids), "publication"),
+        "reconstruction complète"
+        if rebuild
+        else f"{forme(len(pub_ids), 'nouvelle')} ou {forme(len(pub_ids), 'modifiée')}",
+        accord(len(rows), "document source", "documents sources"),
+    )
+
+    cache = SubjectCache(queries)
+    n_links = 0
+    with progression(len(rows), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
+        for r in rows:
+            avancement.avance()
+            extractor_lang = SUBJECT_EXTRACTORS.get(r.source)
+            if extractor_lang is None:
+                continue
+            extractor, language = extractor_lang
+            links = [
+                PublicationSubjectLink(
+                    r.publication_id,
+                    cache.get_or_upsert(conn, label=label, language=language),
+                )
+                for label in extractor(r.topics)
+            ]
+            n_links += cache.link_bulk(conn, source=r.source, rows=links)
+
+    queries.mark_subjects_ingested(conn, publication_ids=pub_ids)
+    queries.purge_orphan_subjects(conn)
+    subjects_after = queries.count_all_subjects(conn)
+
+    metrics = PhaseMetrics()
+    metrics.add(new=n_links, total=len(rows))
+    metrics.details["summary"] = {
+        "subjects_added": subjects_after - subjects_before,
+        "subjects_total": subjects_after,
+        "publications_updated": len(pub_ids),
+    }
+    return metrics

@@ -3,7 +3,10 @@
 from sqlalchemy import text
 
 from domain.publications.metadata import normalized_title
-from pipeline.ingestion.source_publications import SourcePublicationQueries, SourcePublicationUpsert
+from pipeline.ingestion.common.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationUpsert,
+)
 from tests.integration.helpers.staging import insert_staging
 
 _Q = SourcePublicationQueries()

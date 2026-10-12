@@ -14,14 +14,14 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from pipeline.ingestion.hal.fields import HAL_FIELDS, extract_doi, extract_id
-from pipeline.ingestion.harvest import (
+from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
     scoped_logger,
     stage_document,
 )
+from pipeline.ingestion.hal.fields import HAL_FIELDS, extract_doi, extract_id
 from pipeline.ingestion.http.api_params import HAL_DELAY, HAL_PER_PAGE
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle

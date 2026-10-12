@@ -1,7 +1,7 @@
 """Tests pour `pipeline.publications.oa_status.OaStatusPhase` (async).
 
 Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
-end-to-end avec le `fetcher` concret depuis `pipeline.ingestion.unpaywall` :
+end-to-end avec le `fetcher` concret depuis `pipeline.ingestion.complements.unpaywall` :
 - happy path (3 publis, statuts mappés, update DB)
 - 404 Unpaywall → `not_found`
 - Unpaywall indisponible → publication laissée dans la file
@@ -23,8 +23,8 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
+from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.ingestion.http.lookup import LookupOutcome
-from pipeline.ingestion.unpaywall import fetch_oa_status
 from pipeline.publications.oa_status import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.metrics import PhaseMetrics

@@ -231,8 +231,8 @@ def build() -> Phase:
     Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée. La phase tourne sous le circuit-breaker d'Unpaywall.
     """
 
+    from pipeline.ingestion.complements.unpaywall import fetch_oa_status
     from pipeline.ingestion.http.api_params import API_BASE_URLS
-    from pipeline.ingestion.unpaywall import fetch_oa_status
     from pipeline.publications.oa_status_queries import OaStatusQueries
     from pipeline.runtime.config import (
         get_polite_pool_email_optional,

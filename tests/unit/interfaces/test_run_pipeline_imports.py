@@ -20,7 +20,7 @@ _SCRIPT = """
 import sys
 
 import pipeline.run
-from pipeline.ingestion import extract
+from pipeline.ingestion.common import extract
 
 registry = extract._extractors()
 print(",".join(sorted(m for m in sys.modules if "{marqueur}" in m)))

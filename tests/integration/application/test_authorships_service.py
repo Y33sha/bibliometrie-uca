@@ -18,7 +18,7 @@ from application.services.authorships.core import (
 from domain.errors import NotFoundError
 from infrastructure.repositories import authorship_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.publications.authorships_queries import AuthorshipsBuild
+from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
 from pipeline.structures.in_perimeter import InPerimeterRecompute
 from pipeline.structures.perimeter import PerimeterQueries
 from tests.integration.helpers.addresses import insert_address, insert_address_structure

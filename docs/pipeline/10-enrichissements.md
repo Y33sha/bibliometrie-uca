@@ -46,7 +46,7 @@ Associe des pays aux adresses pour permettre l'analyse des collaborations intern
 
 4. **Report sur les publications.** Recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication.
 
-Code : `pipeline/structures/countries.py`, et un module par étape dans `pipeline/structures/`.
+Code : `pipeline/structures/countries/countries.py`, et un module par étape dans `pipeline/structures/`.
 
 ## Statut open access (`oa_status`)
 

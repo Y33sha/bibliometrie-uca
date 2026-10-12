@@ -4,7 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 from domain.source_publications.raw_metadata import stash_entry
-from pipeline.publications.correct_unary import (
+from pipeline.publications.correction.correct_unary import (
     DOC_TYPE_MAP_MARKER,
     LANGUAGE_MAP_MARKER,
     compute_update,
@@ -13,7 +13,10 @@ from pipeline.publications.correct_unary import (
     run,
     tally_corrections,
 )
-from pipeline.publications.metadata_correction_queries import CorrectionUpdate, UnaryCorrectionRow
+from pipeline.publications.correction.metadata_correction_queries import (
+    CorrectionUpdate,
+    UnaryCorrectionRow,
+)
 
 # Formes du référentiel des langues, chacune associée au code de sa langue.
 _FORMS = {"en": "en", "eng": "en", "english": "en", "fr": "fr", "fra": "fr"}

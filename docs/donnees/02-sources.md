@@ -19,9 +19,9 @@ Tables sources : les *records* non dédupliqués, normalisés à partir des payl
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `staging` | pipeline | phases `extract`, `fetch_missing` et `fetch_stale` (`pipeline/ingestion/staging.py`) |
+| `staging` | pipeline | phases `extract`, `fetch_missing` et `fetch_stale` (`pipeline/ingestion/common/staging.py`) |
 | `failed_lookups` | pipeline | phase `fetch_missing` (`pipeline/ingestion/<source>/fetch_missing.py`) |
 | `source_publications` | pipeline | `pipeline/ingestion/<source>/normalize.py` |
-| `author_identifying_keys` | pipeline | `pipeline/ingestion/<source>/normalize.py` (via `pipeline/ingestion/signatures.py`) |
+| `author_identifying_keys` | pipeline | `pipeline/ingestion/<source>/normalize.py` (via `pipeline/ingestion/common/signatures.py`) |
 | `source_authorships` | mixte | `pipeline/ingestion/<source>/normalize.py` ; `in_perimeter` par la phase `affiliations` ; `person_id` par le pipeline ou en admin (orphan-assign) |
-| `source_authorship_addresses` | pipeline | `pipeline/ingestion/<source>/normalize.py` (via `pipeline/ingestion/signatures.py`) |
+| `source_authorship_addresses` | pipeline | `pipeline/ingestion/<source>/normalize.py` (via `pipeline/ingestion/common/signatures.py`) |

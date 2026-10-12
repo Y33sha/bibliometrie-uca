@@ -17,7 +17,7 @@ from application.services.addresses.structure_links import (
 )
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories import address_repository, authorship_repository
-from pipeline.structures.countries_queries import CountryQueries
+from pipeline.structures.countries.countries_queries import CountryQueries
 from pipeline.structures.perimeter import PerimeterQueries
 from tests.integration.helpers.addresses import (
     ensure_country,

@@ -9,8 +9,8 @@ from datetime import date
 
 import pytest
 
-from pipeline.ingestion.extract import ExtractOne, ExtractPhase
-from pipeline.ingestion.harvest import ExtractionConfigError
+from pipeline.ingestion.common.extract import ExtractOne, ExtractPhase
+from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.structures.perimeter import EmptyExtractionPerimeterError
