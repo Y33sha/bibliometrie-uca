@@ -1,11 +1,12 @@
 """Phase `authorships` : construction de la table `authorships`.
 
-Quatre sous-étapes :
+Nœuds (`pipeline.graph`), chacun dans sa transaction :
 
-1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé.
-2. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
-3. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
-4. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
+1. **build** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne). Sa maintenance `ANALYZE authorships` précède la propagation.
+2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des authorships (`in_perimeter` consolidé compris), le périmètre des publications et les matviews `authorship_structures`, `publication_structures`.
+3. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
+4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
+5. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
 
 Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
 """
@@ -13,9 +14,11 @@ Le build est incrémental et convergent (add + prune + recompute en une passe) ;
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
@@ -46,28 +49,96 @@ class AuthorshipsPhase:
     empty_containers: tuple[tuple[str, Callable[[], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne build → purge → référentiels vides → recalcul des décomptes et retourne les métriques du build."""
-        open_tx, logger = ctx.open_tx, ctx.logger
-        with open_tx() as conn:
-            metrics = build_authorships(
-                conn,
-                self.build_queries,
-                logger,
-                rebuild_full=ctx.options.rebuild_authorships,
-            )
+        """Exécute les nœuds de la phase et retourne les métriques du build."""
+        queries = self.build_queries
 
-        n_purged = _purge_orphan_publications(open_tx, self.purge_queries, logger)
+        def build(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                return build_authorships(
+                    conn, queries, ctx.logger, rebuild_full=ctx.options.rebuild_authorships
+                )
+
+        def propagate(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            t0 = time.perf_counter()
+            with ctx.open_tx() as conn:
+                queries.propagate_authorship_attributes(conn)
+                in_perimeter = queries.count_authorships_in_perimeter(conn)
+            metrics = _chronometre(t0)
+            metrics.details["in_perimeter"] = in_perimeter
+            return metrics
+
+        def publications_in_perimeter(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            t0 = time.perf_counter()
+            with ctx.open_tx() as conn:
+                queries.refresh_publications_in_perimeter(conn)
+            return _chronometre(t0)
+
+        def structures(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            t0 = time.perf_counter()
+            with ctx.open_tx() as conn:
+                queries.refresh_authorship_structures(conn)
+                queries.refresh_publication_structures(conn)
+            return _chronometre(t0)
+
+        def purge(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            metrics = PhaseMetrics()
+            metrics.details["purged"] = _purge_orphan_publications(
+                ctx.open_tx, self.purge_queries, ctx.logger
+            )
+            return metrics
+
+        def empty_containers(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            metrics = PhaseMetrics()
+            _delete_empty_containers(self.empty_containers, metrics, ctx.logger)
+            return metrics
+
+        def pub_counts(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            _refresh_pub_counts(
+                ctx.open_tx, self.pub_counts_queries, self.address_pub_count_queries, ctx.logger
+            )
+            return PhaseMetrics()
+
+        synchronisation = "Synchronisation des tables"
+        by_node = run_nodes(
+            "authorships",
+            {
+                "authorships.build": NodeStep(build),
+                "authorships.propagate": NodeStep(
+                    propagate, section=synchronisation, libelle="Attributs des liens"
+                ),
+                "authorships.publications_in_perimeter": NodeStep(
+                    publications_in_perimeter,
+                    section=synchronisation,
+                    libelle="Périmètre des publications",
+                ),
+                "authorships.structures": NodeStep(
+                    structures, section=synchronisation, libelle="Structures des liens"
+                ),
+                "authorships.purge_orphan_publications": NodeStep(purge),
+                "authorships.delete_empty_containers": NodeStep(empty_containers),
+                "authorships.pub_counts": NodeStep(pub_counts),
+            },
+            ctx,
+        )
+        metrics = by_node["authorships.build"]
+        metrics.merge(by_node["authorships.delete_empty_containers"])
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
-            summary["publications_purged"] = n_purged
-        _delete_empty_containers(self.empty_containers, metrics, logger)
-        _refresh_pub_counts(
-            open_tx, self.pub_counts_queries, self.address_pub_count_queries, logger
-        )
-        # Les sous-étapes affichées journalisent déjà leur décompte : une ligne de clôture les répéterait.
+            summary["total_in_perimeter"] = by_node["authorships.propagate"].details["in_perimeter"]
+            summary["publications_purged"] = by_node[
+                "authorships.purge_orphan_publications"
+            ].details["purged"]
+        # Les nœuds affichés journalisent déjà leur décompte : une ligne de clôture les répéterait.
         # La purge reste muette, son décompte va aux métriques.
         metrics.resume = ""
         return metrics
+
+
+def _chronometre(t0: float) -> PhaseMetrics:
+    """Métriques d'un nœud de synchronisation, dont le bilan est sa durée."""
+    metrics = PhaseMetrics()
+    metrics.resume = f"{time.perf_counter() - t0:.1f}s"
+    return metrics
 
 
 def _purge_orphan_publications(

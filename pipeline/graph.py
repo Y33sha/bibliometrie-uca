@@ -755,20 +755,36 @@ NODES: tuple[Node, ...] = (
         reads=(
             "source_authorships.person_id",
             "source_authorships.source_publication_id",
+            "source_publications.publication_id",
+            "publications.id",
+            "rejected_authorships",
+            "confirmed_authorships",
+            "authorships.id",
+        ),
+        writes=("authorships.id",),
+        previous_run=("publications",),
+        # Le planificateur estime la propagation des attributs sur les liens qui viennent d'être créés.
+        maintenance=("ANALYZE authorships",),
+    ),
+    _node(
+        "authorships.propagate",
+        "authorships",
+        reads=(
+            "source_authorships.person_id",
+            "source_authorships.source_publication_id",
             "source_authorships.author_position",
             "source_authorships.is_corresponding",
             "source_authorships.roles",
             "source_authorships.in_perimeter",
             "source_publications.publication_id",
-            "publications.id",
-            "rejected_authorships",
-            "confirmed_authorships",
             "authorships",
         ),
-        writes=("authorships",),
-        previous_run=("publications",),
-        # Entre la création des paires et la propagation de leurs attributs, à l'intérieur du nœud.
-        maintenance=("ANALYZE authorships",),
+        writes=(
+            "authorships.author_position",
+            "authorships.is_corresponding",
+            "authorships.in_perimeter",
+            "authorships.roles",
+        ),
     ),
     _node(
         "authorships.publications_in_perimeter",

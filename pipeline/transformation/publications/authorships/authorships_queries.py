@@ -65,9 +65,6 @@ class AuthorshipsBuild:
             """)
         ).rowcount
 
-    def analyze_authorships(self, conn: Connection) -> None:
-        conn.execute(text("ANALYZE authorships"))
-
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         return conn.execute(
             text(f"""

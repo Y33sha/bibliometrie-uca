@@ -1,13 +1,9 @@
-"""Construit la table consolidée `authorships` à partir des `source_authorships`.
+"""Nœud `authorships.build` : liens de la table consolidée `authorships`, à partir des `source_authorships`.
 
-Étape 1 : insérer les authorships manquantes puis supprimer les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste).
-Étape 2 : recomposer les attributs en une passe convergente (`author_position`, `is_corresponding`, `in_perimeter`, `roles`), depuis les signatures qui attestent chaque authorship.
-Étape 3 : matérialiser `publications.in_perimeter` (rollup depuis authorships).
-Étape 4 : rafraîchir les matviews `authorship_structures` + `publication_structures`.
+Insère les authorships manquantes puis supprime les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste). Les nœuds suivants de la phase recomposent les attributs, le périmètre des publications et les matviews.
 """
 
 import logging
-import time
 
 from sqlalchemy import Connection
 
@@ -24,9 +20,9 @@ def build(
     *,
     rebuild_full: bool = False,
 ) -> PhaseMetrics:
-    """Reconstruit la table `authorships` depuis les `source_authorships`.
+    """Ajoute les liens attestés et retire ceux que plus aucune source n'atteste.
 
-    Le build est idempotent et convergent : un appel répété sans `rebuild_full` converge vers le même résultat (l'étape 2 réécrit tout attribut divergent, l'étape 1 supprime les orphelines). `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
+    Idempotent. `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
     """
     # Reset optionnel : repart d'une table vide.
     if rebuild_full:
@@ -49,30 +45,7 @@ def build(
             f"{DERNIERE_BRANCHE}{accord(pruned, 'lien')} {forme(pruned, 'obsolète')} {forme(pruned, 'supprimé')}"
         )
 
-    etape(logger, "Synchronisation des tables")
-    t0 = time.perf_counter()
-    with attente(f"{DERNIERE_BRANCHE}synchronisation en cours", logger) as ligne:
-        # Stats fraîches avant l'UPDATE de l'étape 2 (sinon Nested Loop sur rows=1).
-        queries.analyze_authorships(conn)
-
-        # Étape 2 : Recompose les attributs dérivés, convergent (n'écrit que les valeurs changées).
-        queries.propagate_authorship_attributes(conn)
-        total_in_perimeter = queries.count_authorships_in_perimeter(conn)
-
-        # Étape 3 : Rollup vers publications.in_perimeter.
-        queries.refresh_publications_in_perimeter(conn)
-
-        # Étape 4 : Rafraîchit les matviews dérivées d'authorships.
-        queries.refresh_authorship_structures(conn)
-        queries.refresh_publication_structures(conn)
-
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
-
     metrics = PhaseMetrics()
     metrics.add(new=inserted)
-    metrics.details["summary"] = {
-        "created": inserted,
-        "pruned": pruned,
-        "total_in_perimeter": total_in_perimeter,
-    }
+    metrics.details["summary"] = {"created": inserted, "pruned": pruned}
     return metrics
