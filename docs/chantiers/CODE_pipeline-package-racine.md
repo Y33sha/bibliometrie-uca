@@ -10,7 +10,8 @@ La cible est posée par la question 5 de la fiche [Architecture cible du pipelin
 
 - **Un paquet racine `pipeline/`**, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
 - **Découpage par domaine** : `pipeline/sources/<source>`, `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons` ; `graph.py` et l'orchestrateur à la racine. Chaque nœud rejoint le domaine des tables qu'il écrit : les relations, les sujets et le statut open access vont dans `pipeline/publications`, les pays dans `pipeline/structures`.
-- **Règles d'import** vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques d'`infrastructure/` (connexion, réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`. `application/` et `infrastructure/` n'importent pas `pipeline/`. Le pipeline possède les fonctions qu'il partage avec l'API.
+- **Règles d'import** vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques d'`infrastructure/` (connexion, réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`. `application/` et `infrastructure/` n'importent pas `pipeline/`.
+- **Partage avec l'API** : les recalculs de données dérivées appartiennent au pipeline, et l'API les appelle par `public.py`. Les écritures directes d'une entité (créer une personne, la renommer, lui attribuer un identifiant) existent de chaque côté, avec leur propre SQL ; leurs règles sont dans `domain/`.
 - **Interface publique `pipeline/public.py`** : seul module du pipeline que l'API importe. Il exporte l'ordre des phases et les recalculs ciblés. `application/` les déclare comme ports, et `deps.py` les remplit depuis `public.py`.
 - **Régime de transition** : pendant la migration, des exceptions aux règles d'import couvrent le code du pipeline encore dans les couches. Elles sont listées dans `pyproject.toml`, module par module, et disparaissent avec la phase 7.
 - **Une phase à la fois, dans l'ordre du pipeline.** Chaque phase migrée confronte la cible aux situations concrètes qui la concernent ; ce qui ne tient pas sort de la cible.
@@ -58,7 +59,8 @@ Dans l'ordre du pipeline.
 - [x] La création et le recalcul d'une publication, la requalification des publications d'une revue et la fusion de deux revues passent dans `pipeline/`. `public.py` les exporte. Le service des revues garde le contrôle de la paire et l'audit.
 - [x] Les types des corrections de métadonnées, de la construction des authorships et des périmètres passent dans `pipeline/`.
 - [x] Import du dump ROR dans `pipeline/structures`, sans le port `RorRepository`.
-- [ ] Opérations du pipeline sur les personnes (création, nom, identifiants, rattachement d'une signature) dans `pipeline/persons`, sans `PersonRepository` ni `AuthorshipRepository`.
+- [x] Rattachement d'une signature, promotion des identifiants observés et `IdentifierConflict` dans `pipeline/persons`, avec leur SQL.
+- [x] Décision d'attribution d'un identifiant dans `domain/`. Le pipeline crée, renomme et attribue avec son propre SQL, sans `PersonRepository` ni `AuthorshipRepository`.
 - [ ] Suppression des exceptions aux règles d'import dans `pyproject.toml`.
 - [ ] `infrastructure/pipeline/authorships` : recalculs de `publications.in_perimeter` et des `pub_count`. Des repositories de l'API les appellent directement : celui des personnes, et la fusion d'éditeurs. À réexaminer avec la question des recalculs ciblés.
 

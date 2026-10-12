@@ -32,7 +32,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import commands as person_commands
-from application.services.persons.core import AddIdentifierOutcome
+from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
     audit_repo,
@@ -396,13 +396,13 @@ def add_person_identifier(
         repo=repo,
         audit_repo=audit,
     )
-    if result.outcome is AddIdentifierOutcome.ALREADY_EXISTS:
+    if result.outcome is AttributionOutcome.ALREADY_EXISTS:
         return AddIdentifierResponse(added=False, reason="already_exists")
     return AddIdentifierResponse(
         added=True,
         id_type=data.id_type,
         id_value=result.id_value,
-        reassigned=result.outcome is AddIdentifierOutcome.REASSIGNED or None,
+        reassigned=result.outcome is AttributionOutcome.REASSIGNED or None,
     )
 
 

@@ -8,9 +8,18 @@ La logique métier touchant aux attributions d'identifiants (transitions de stat
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from domain.errors import CannotAttributeConflict
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
+
+
+class AttributionOutcome(StrEnum):
+    """Issue de l'attribution d'un identifiant à une personne (`attribution_outcome`)."""
+
+    ADDED = "added"  # identifiant absent : inséré en `pending`
+    ALREADY_EXISTS = "already_exists"  # déjà attribué à cette personne
+    REASSIGNED = "reassigned"  # repris d'une autre personne, chez qui il était `rejected`
 
 
 @dataclass(slots=True)
@@ -59,3 +68,27 @@ class IdentifierAttribution:
             )
         self.person_id = new_person_id
         self.source = source
+
+
+def attribution_outcome(
+    existing: IdentifierAttribution | None, person_id: int
+) -> AttributionOutcome:
+    """Issue de l'attribution à `person_id` d'un identifiant dont `existing` est l'attribution en base.
+
+    Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`. Pour le lui reprendre, son statut doit d'abord passer à `rejected`.
+    """
+    if existing is None:
+        return AttributionOutcome.ADDED
+    if existing.person_id == person_id:
+        return AttributionOutcome.ALREADY_EXISTS
+    if existing.status is AttributionStatus.REJECTED:
+        return AttributionOutcome.REASSIGNED
+    raise CannotAttributeConflict(
+        f"Identifiant {existing.id_type}={existing.id_value!r} déjà attribué à "
+        f"person_id={existing.person_id} avec statut {existing.status.value!r} ; impossible "
+        f"d'attribuer à person_id={person_id}.",
+        id_type=existing.id_type,
+        id_value=existing.id_value,
+        existing_person_id=existing.person_id,
+        existing_status=existing.status.value,
+    )

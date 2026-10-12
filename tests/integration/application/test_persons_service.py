@@ -1,11 +1,4 @@
-"""Tests de caractérisation pour application/persons/core.py et
-application/authorships/assign_orphans.py.
-
-Couvre link/unlink_authorship (branches source invalide), add_identifier,
-update_name_form_status, assign_orphan_authorship (qui couvre la
-re-synchronisation de l'authorship canonique depuis ses sources),
-merge_person, etc.
-"""
+"""Tests de caractérisation du service des personnes et de l'attribution des signatures orphelines : identifiants, formes de nom, détachement, fusion."""
 
 from functools import partial
 
@@ -17,14 +10,11 @@ from application.services.authorships.assign_orphans import (
     batch_assign_orphan_authorships,
 )
 from application.services.persons.core import (
-    AddIdentifierOutcome,
     RhImportOutcome,
     add_identifier,
-    add_identifiers_from_authorships,
     create_person,
     detach_authorships,
     import_rh_person,
-    link_authorship,
     mark_distinct,
     merge_person,
     reassign_identifier,
@@ -40,6 +30,7 @@ from domain.errors import (
     RejectedPairError,
     ValidationError,
 )
+from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from infrastructure.db.sql_fragments import REJECTED_PAIRS
 from infrastructure.repositories import (
@@ -90,37 +81,6 @@ def _scalar(conn, sql_text: str, **params):
     return conn.execute(text(sql_text), params).scalar_one_or_none()
 
 
-# ── link_authorship ────────────────────────────────────────────────
-
-
-class TestLinkAuthorship:
-    def test_rejects_unknown_source(self, sa_sync_conn, authorship_repo):
-        """Source hors registre → `ValidationError` (mappée en 400 côté API)."""
-        with pytest.raises(ValidationError):
-            link_authorship(1, "invalid", 1, repo=authorship_repo, resolution_mode="name")
-
-    def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _person(sa_sync_conn)
-        pub_id = insert_publication(sa_sync_conn)
-        sp_id = _notice(sa_sync_conn, pub_id)
-        sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
-
-        link_authorship(person_id, "hal", sa_id, repo=authorship_repo, resolution_mode="name")
-
-        assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
-            == person_id
-        )
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT resolution_mode FROM source_authorships WHERE id = :i",
-                i=sa_id,
-            )
-            == "name"
-        )
-
-
 # ── add_identifier ─────────────────────────────────────────────────
 
 
@@ -135,7 +95,7 @@ class TestAddIdentifier:
         """La promotion depuis les signatures reste libre de le poser."""
         person_id = _person(sa_sync_conn)
         result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
-        assert result.outcome is AddIdentifierOutcome.ADDED
+        assert result.outcome is AttributionOutcome.ADDED
 
     def test_manual_source_raises_on_unknown_person(self, repo):
         """Sans cette garde, l'identifiant venu d'un formulaire heurterait la clé étrangère."""
@@ -145,7 +105,7 @@ class TestAddIdentifier:
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _person(sa_sync_conn)
         result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
-        assert result.outcome is AddIdentifierOutcome.ADDED
+        assert result.outcome is AttributionOutcome.ADDED
         assert result.id_value == "0000-0001-2345-6789"
         status = _scalar(
             sa_sync_conn,
@@ -165,7 +125,7 @@ class TestAddIdentifier:
             )
         )
         result = add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
-        assert result.outcome is AddIdentifierOutcome.REASSIGNED
+        assert result.outcome is AttributionOutcome.REASSIGNED
 
         row = sa_sync_conn.execute(
             text(
@@ -205,7 +165,7 @@ class TestAddIdentifier:
         p = _person(sa_sync_conn)
         add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)
         result = add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
-        assert result.outcome is AddIdentifierOutcome.ALREADY_EXISTS
+        assert result.outcome is AttributionOutcome.ALREADY_EXISTS
 
         row = sa_sync_conn.execute(
             text(
@@ -956,41 +916,6 @@ class TestMarkDistinctPersons:
             {"a": min(p1, p2), "b": max(p1, p2)},
         ).scalar_one()
         assert n == 1
-
-
-class TestAddIdentifiersFromAuthorships:
-    def test_adds_orcid_idhal_idref_once(self, sa_sync_conn, repo):
-        person_id = _person(sa_sync_conn)
-        authorships = [
-            {"source": "hal", "orcid": "0000-0001-2345-6789", "idhal": "jdupont"},
-            {"source": "scanr", "orcid": "0000-0001-2345-6789", "idref": "252404955"},
-        ]
-        add_identifiers_from_authorships(person_id, authorships, repo=repo)
-
-        rows = sa_sync_conn.execute(
-            text(
-                "SELECT id_type, id_value, source FROM person_identifiers "
-                "WHERE person_id = :pid ORDER BY id_type"
-            ),
-            {"pid": person_id},
-        ).all()
-        id_types = [r.id_type for r in rows]
-        assert id_types == ["idhal", "idref", "orcid"]
-
-    def test_skips_malformed_and_keeps_valid(self, sa_sync_conn, repo):
-        """Un identifiant source mal formé est ignoré (log, pas d'exception) ; la
-        promotion continue pour les identifiants valides du même lot."""
-        person_id = _person(sa_sync_conn)
-        authorships = [
-            {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},
-        ]
-        add_identifiers_from_authorships(person_id, authorships, repo=repo)
-
-        rows = sa_sync_conn.execute(
-            text("SELECT id_type FROM person_identifiers WHERE person_id = :pid ORDER BY id_type"),
-            {"pid": person_id},
-        ).all()
-        assert [r.id_type for r in rows] == ["idhal"]
 
 
 # ── update_name_form_status ────────────────────────────────────────
