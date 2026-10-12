@@ -5,7 +5,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
+from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
