@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Orchestrateur du pipeline bibliométrique : sélection et séquence d'exécution des phases.
 
-Le module `interfaces/cli/phases/<phase>.py` de chaque phase expose `build`, qui câble ses adaptateurs et rend la phase prête à s'exécuter ; `run(ctx)` délègue la séquence à `application/pipeline/<phase>/`. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_BUILDERS` associe chaque nom à sa fonction `build`.
+Le module de chaque phase expose `build`, qui câble ses dépendances et rend la phase prête à s'exécuter. `PHASE_ORDER` fixe l'ordre d'exécution et `_PHASE_BUILDERS` associe chaque nom à sa fonction `build`.
 
 `run_pipeline --help` donne les options et la liste des phases.
 """
@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-from application.pipeline.exception_chain import failure_message, is_user_interruption
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -37,32 +36,28 @@ from infrastructure.observability.log import (
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
-from interfaces.cli.phases import (
-    affiliations,
-    authorships,
-    countries,
-    extract,
-    fetch_missing,
-    fetch_stale,
-    fetch_truncated,
-    metadata_correction,
-    normalize,
-    oa_status,
-    persons,
-    publications,
-    publishers_journals,
-    relations,
-    resolve_ra,
-    subjects,
-)
-from interfaces.cli.phases.execution import log, open_tx, phase_context
+from pipeline.containers import publishers_journals, resolve_ra
 from pipeline.context import Phase, RunOptions
+from pipeline.exception_chain import failure_message, is_user_interruption
+from pipeline.execution import log, open_tx, phase_context
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODE_NAMES
+from pipeline.persons import persons
 from pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.publications import (
+    authorships,
+    metadata_correction,
+    oa_status,
+    publications,
+    relations,
+    subjects,
+)
 from pipeline.signals import select_targets
+from pipeline.sources import extract, fetch_missing, fetch_stale, normalize
+from pipeline.sources.openalex import fetch_truncated
+from pipeline.structures import affiliations, countries
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())

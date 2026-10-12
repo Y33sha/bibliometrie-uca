@@ -14,10 +14,10 @@ from infrastructure.sources.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
 )
-from interfaces.cli.phases import fetch_stale
-from interfaces.cli.phases.execution import phase_context
 from pipeline.context import RunOptions
+from pipeline.execution import phase_context
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources import fetch_stale
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:

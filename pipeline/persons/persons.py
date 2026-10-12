@@ -11,8 +11,10 @@ Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) :
 
 Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
-`open_tx` gère le commit : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `interfaces/cli/phases/persons.py` s'y réduit au câblage.
+`open_tx` gère le commit : `managed_transaction` commite en sortie de bloc si succès, rollback sinon.
 """
+
+from __future__ import annotations
 
 import logging
 import time
@@ -23,7 +25,9 @@ from sqlalchemy import Connection
 
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
-from pipeline.context import PhaseContext
+from infrastructure import PROJECT_ROOT
+from infrastructure.observability.log import setup_file_logger
+from pipeline.context import Phase, PhaseContext
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
 from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
@@ -92,3 +96,24 @@ class PersonsPhase:
             )
             metrics.resume = ""
         return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Rattachement des signatures aux personnes, et création des personnes inconnues.
+
+    Une seule transaction enchaîne : la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues, la création des personnes pour les signatures restantes, la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées. Les publications hors scope sont écartées (`domain/publications/scope`).
+    """
+    from infrastructure.repositories import authorship_repository, person_repository
+    from pipeline.persons.matching import PersonsMatchingQueries
+    from pipeline.persons.name_forms import PersonNameFormsQueries
+
+    return PersonsPhase(
+        PersonsMatchingQueries(),
+        PersonNameFormsQueries(),
+        person_repo_factory=person_repository,
+        authorship_repo_factory=authorship_repository,
+        orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
+    )

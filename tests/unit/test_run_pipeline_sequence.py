@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
-from interfaces.cli import run_pipeline
+from pipeline import run as run_pipeline
 from pipeline.metrics import PhaseMetrics
 from pipeline.phase_order import EXTRA_PHASES
 

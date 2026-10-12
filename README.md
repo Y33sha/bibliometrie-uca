@@ -8,7 +8,7 @@ Le pipeline collecte auprès de sources en ligne les métadonnées de publicatio
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
 - **Backend** : FastAPI + PostgreSQL 18 (SQLAlchemy) — `interfaces/api/`
-- **Pipeline** : Python — `application/pipeline/` (orchestrateur `run_pipeline`), extracteurs dans `infrastructure/sources/`
+- **Pipeline** : Python — paquet `pipeline/` (orchestrateur `pipeline/run.py`, commande `run_pipeline`)
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`, `infrastructure/`, `interfaces/`)
 
 ## Démarrer

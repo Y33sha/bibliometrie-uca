@@ -27,7 +27,7 @@ dependencies = [
 
 [project.scripts]
 # Orchestrateur du pipeline, installé comme commande : `run_pipeline --mode daily`.
-run_pipeline = "interfaces.cli.run_pipeline:main"
+run_pipeline = "pipeline.run:main"
 
 # Outils de développement et de test. `uv sync` les installe par défaut ; `--no-dev` les écarte.
 [dependency-groups]
@@ -110,6 +110,7 @@ ignore_imports = [
     "pipeline.structures.ror -> application.ports.repositories.ror_repository",
     "pipeline.structures.ror -> application.services.structures.ror",
     "pipeline.containers.* -> application.services.journals.core",
+    "pipeline.containers.publishers_journals -> application.services.journals.commands",
     "pipeline.containers.* -> application.services.publishers.core",
     "pipeline.containers.enrich_publishers -> application.ports.repositories.publisher_repository",
     "pipeline.publications.* -> application.ports.repositories.publication_repository",

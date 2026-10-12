@@ -20,7 +20,8 @@ from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.context import PhaseContext
+from pipeline.context import Phase, PhaseContext
+from pipeline.execution import UnderCircuitBreaker
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
@@ -129,3 +130,12 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
         )
 
     return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Relit les works OpenAlex tronqués à 100 auteurs, sous le circuit-breaker d'OpenAlex."""
+
+    return UnderCircuitBreaker("openalex", FetchTruncatedPhase())

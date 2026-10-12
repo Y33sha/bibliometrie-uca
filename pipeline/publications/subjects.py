@@ -8,9 +8,11 @@ Deux sous-étapes enchaînées, indissociables, chacune dans sa propre transacti
 Aucun filtre périmètre : la phase `authorships` a purgé en amont les publications orphelines, donc `publication_subjects` ne porte que du périmètre et les deux caches en héritent. Idempotente.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
-from pipeline.context import PhaseContext
+from pipeline.context import Phase, PhaseContext
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.subject_cooccurrences import run as run_cooccurrences
 from pipeline.publications.subject_ingestion import run as run_ingest
@@ -32,3 +34,20 @@ class SubjectsPhase:
         # Chaque sous-étape journalise son résultat : une ligne de clôture le répéterait.
         metrics.resume = ""
         return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Sujets et mots-clés : ingestion, puis recalcul des décomptes.
+
+    L'ingestion reprend les publications dont le contenu a changé depuis leur dernier passage, lit les sujets de leurs documents sources, et purge les sujets restés sans lien. Le recalcul qui suit compte les publications de chaque sujet et rafraîchit la matview des paires de sujets présents sur une même publication.
+
+    La phase `authorships` ayant supprimé les publications sans auteur, `publication_subjects` contient seulement le périmètre, dont les deux décomptes héritent.
+
+    `--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
+    """
+    from pipeline.publications.subjects_queries import SubjectsIngestionQueries
+
+    return SubjectsPhase(SubjectsIngestionQueries())

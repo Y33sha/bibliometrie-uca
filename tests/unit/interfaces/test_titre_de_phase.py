@@ -8,13 +8,13 @@ import sys
 
 import pytest
 
-from interfaces.cli.run_pipeline import (
+from pipeline.phase_order import PHASE_LIBELLES, PHASE_ORDER
+from pipeline.run import (
     LARGEUR_TITRE_PHASE,
     _libelle_de_phase,
     _titre_de_phase,
     _titre_du_run,
 )
-from pipeline.phase_order import PHASE_LIBELLES, PHASE_ORDER
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def sortie_capturee(monkeypatch):
 def delai_de_rafraichissement(monkeypatch):
     """Configuration lue par les libellés de phase, sans base : les documents se rafraîchissent après 7 jours."""
     delai = {"jours": 7}
-    monkeypatch.setattr("interfaces.cli.run_pipeline.open_tx", contextlib.nullcontext)
+    monkeypatch.setattr("pipeline.run.open_tx", contextlib.nullcontext)
     monkeypatch.setattr(
         "infrastructure.sources.config.get_fetch_stale_after_days", lambda conn: delai["jours"]
     )

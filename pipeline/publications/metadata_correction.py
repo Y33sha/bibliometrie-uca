@@ -7,13 +7,15 @@ Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
 3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
-from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.correct_by_cluster import run as run_cluster
 from pipeline.publications.correct_unary import run as run_unary
@@ -57,3 +59,13 @@ class MetadataCorrectionPhase:
         # Chaque sous-étape conclut la sienne ; la table d'observabilité garde le détail.
         metrics.resume = ""
         return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Correction des métadonnées des documents sources."""
+    from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
+
+    return MetadataCorrectionPhase(PgMetadataCorrectionQueries())
