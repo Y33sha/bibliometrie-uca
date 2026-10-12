@@ -58,7 +58,12 @@ _GROUP_IO: dict[str, _GroupIo] = {
             "publications.in_perimeter",
         ),
         writes=("staging", "failed_lookups"),
-        previous_run=("staging", "failed_lookups", "source_publications", "publications"),
+        previous_run=(
+            "staging",
+            "failed_lookups",
+            "source_publications",
+            "publications.in_perimeter",
+        ),
     ),
 }
 
@@ -181,6 +186,7 @@ NODES: tuple[Node, ...] = (
         "fetch_missing.hal_by_nnt",
         "fetch_missing",
         reads=("publications.doc_type",),
+        previous_run=("publications.doc_type",),
         network="hal",
     ),
     *(
@@ -672,15 +678,23 @@ NODES: tuple[Node, ...] = (
             "source_publications.keys_dirty",
             "apc_payments.publication_id",
         ),
-        # Revues et monographies vides supprimées par `authorships.delete_empty_containers`.
-        previous_run=("source_publications.countries", "publications", "journals", "monographs"),
+        # Statut confirmé par Unpaywall ; publications que `authorships.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `authorships.delete_empty_containers`.
+        previous_run=(
+            "source_publications.countries",
+            "publications.id",
+            "publications.oa_status",
+            "publications.unpaywall_checked_at",
+            "journals",
+            "monographs",
+        ),
     ),
     _node(
         "publications.delete_without_sources",
         "publications",
         reads=("publications.id", "source_publications.publication_id"),
         writes=("publications.id",),
-        previous_run=("publications",),
+        # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
+        previous_run=("publications.id",),
     ),
     _node(
         "persons.resolve",
@@ -774,7 +788,8 @@ NODES: tuple[Node, ...] = (
             "authorships.id",
         ),
         writes=("authorships.id",),
-        previous_run=("publications",),
+        # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
+        previous_run=("publications.id",),
         # Le planificateur estime la propagation des attributs sur les liens qui viennent d'être créés.
         maintenance=("ANALYZE authorships",),
     ),
@@ -803,7 +818,8 @@ NODES: tuple[Node, ...] = (
         "authorships",
         reads=("authorships", "persons.exclusion", "publications.id"),
         writes=("publications.in_perimeter",),
-        previous_run=("publications",),
+        # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
+        previous_run=("publications.id",),
     ),
     _node(
         "authorships.structures",
@@ -822,7 +838,6 @@ NODES: tuple[Node, ...] = (
         "authorships",
         reads=("publications.id", "authorships"),
         writes=("publications.id",),
-        previous_run=("publications",),
     ),
     _node(
         "authorships.delete_empty_containers",
@@ -859,7 +874,7 @@ NODES: tuple[Node, ...] = (
             "publications.journal_id",
         ),
         writes=("addresses.pub_count", "journals.pub_count", "publishers.pub_count"),
-        previous_run=("publications", "addresses"),
+        previous_run=("addresses",),
     ),
     _node(
         "relations.rebuild",
@@ -884,7 +899,6 @@ NODES: tuple[Node, ...] = (
             "publication_relations",
         ),
         writes=("publication_relations",),
-        previous_run=("publications",),
     ),
     _node(
         "subjects.ingest",
@@ -897,7 +911,7 @@ NODES: tuple[Node, ...] = (
             "publication_subjects",
         ),
         writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
-        previous_run=("publications", "subjects"),
+        previous_run=("publications.subjects_ingested_at", "subjects"),
     ),
     _node(
         "subjects.usage",
@@ -951,7 +965,6 @@ NODES: tuple[Node, ...] = (
             "source_authorships.countries_dirty",
             "addresses.countries_dirty",
         ),
-        previous_run=("publications",),
     ),
     _node(
         "oa_status.verify_unpaywall",
