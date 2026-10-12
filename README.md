@@ -35,20 +35,20 @@ L'application a besoin d'une base initialisée : la marche à suivre, du `.env` 
 bibliometrie-uca/
 ├── domain/              Entités, value objects, règles pures (zéro I/O)
 ├── application/         Orchestration métier
-│   ├── pipeline/        Phases du pipeline
 │   ├── services/        Cas d'usage appelés par l'API
 │   └── ports/           Interfaces que l'infrastructure implémente
 ├── infrastructure/      Adaptateurs sortants
 │   ├── db/              Schéma SQL, MetaData SA, engine
-│   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses…)
 │   ├── repositories/    Lecture et écriture des agrégats du domaine
-│   ├── pipeline/        Requêtes SQL des phases du pipeline
 │   ├── read_models/     Projections de lecture pour l'API
 │   └── raw_store/       Archivage des réponses brutes des sources
 ├── interfaces/          Adaptateurs entrants
 │   ├── api/             FastAPI (routers, models Pydantic, middlewares)
 │   ├── frontend/        SvelteKit
-│   └── cli/             Orchestrateur du pipeline, imports, maintenance
+│   └── cli/             Imports, maintenance
+├── pipeline/            Pipeline (orchestrateur run.py)
+│   ├── ingestion/       Extraction et normalisation par source (hal, openalex, wos, scanr, theses…)
+│   └── …                Transformation par entité (structures, containers, publications, persons)
 ├── alembic/             Migrations
 ├── tests/               pytest (unit + integration)
 └── docs/                Documentation

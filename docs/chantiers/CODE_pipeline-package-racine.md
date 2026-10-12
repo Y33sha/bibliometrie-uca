@@ -65,7 +65,7 @@ Dans l'ordre du pipeline.
 - [x] `infrastructure/sources` passe dans `pipeline/` : outillage HTTP des sources dans `pipeline/sources`, configuration dans `pipeline/config.py`. Le lien vers la fiche DOAJ d'une revue rejoint le read model des revues.
 - [x] Modules d'`infrastructure` que seul le pipeline utilise : le verrou d'exécution dans `pipeline/lock.py`, l'exécution parallèle dans `pipeline/parallel.py`, l'empreinte de détection de changement dans `pipeline/sources/fingerprint.py`. Le stockage des réponses brutes (`raw_store`), adaptateur sortant, reste dans l'infrastructure.
 - [x] `infrastructure/pipeline` passe dans `pipeline/` : recalcul de `publications.in_perimeter` dans `pipeline/publications`, des `pub_count` dans `pipeline/containers`. L'exclusion d'une personne et la fusion d'éditeurs les appellent depuis les services de l'API, par `public.py`.
-- [ ] Mise à jour de la documentation : `docs/pipeline`, `docs/architecture`, chemins périmés dans `docs/donnees`.
+- [x] Mise à jour de la documentation : `docs/pipeline`, `docs/architecture`, chemins périmés dans `docs/donnees`.
 
 ### Phase 8 — Organisation interne de `pipeline/`
 

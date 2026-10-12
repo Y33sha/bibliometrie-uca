@@ -17,7 +17,7 @@ Les tables qui référencent une revue ont des politiques de suppression différ
 
 ## Écriture par le pipeline
 
-**Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`application/services/journals/core.py`), qui essaie successivement l'`openalex_id`, puis les ISSN (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues à ISSN en ligne), et crée la revue en dernier recours avec sa forme de nom. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante, et la revue reçoit les ISSN qu'elle ne porte pas. La publication reçoit son `journal_id` par `extract_pub_metadata`. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
+**Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`pipeline/containers/find_or_create.py`), qui essaie successivement l'`openalex_id`, puis les ISSN (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues à ISSN en ligne), et crée la revue en dernier recours avec sa forme de nom. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante, et la revue reçoit les ISSN qu'elle ne porte pas. La publication reçoit son `journal_id` par `extract_pub_metadata`. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
 
 **Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`pipeline/containers/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
@@ -33,7 +33,7 @@ Routeur `interfaces/api/routers/journals.py`, commandes dans `application/servic
 
 ## Lecture par le pipeline
 
-**Compteur de publications.** `infrastructure/pipeline/authorships/pub_counts.py` recalcule `journals.pub_count`, puis celui des éditeurs. La phase `authorships` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
+**Compteur de publications.** `pipeline/containers/pub_counts.py` recalcule `journals.pub_count`, puis celui des éditeurs. La phase `authorships` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
 
 **Type de revue.** `refresh_from_sources` lit `get_journal_type` pour rejouer les règles de type de document qui en dépendent.
 

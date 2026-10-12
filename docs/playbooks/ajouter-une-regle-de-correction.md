@@ -107,9 +107,9 @@ return CorrectedFields(
 Si l'input est absent de `MetadataForCorrection` :
 
 1. champ ajouté au contrat ([`metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
-2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
+2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction_queries.py`](../../pipeline/publications/metadata_correction_queries.py)) ;
 3. colonne ajoutée au `_SELECT` de l'adaptateur ([`metadata_correction_queries.py`](../../pipeline/publications/metadata_correction_queries.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
-4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur une publication canonique, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu canonique. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)) depuis la valeur arbitrée.
+4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur la publication, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu sur la publication. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`refresh.py`](../../pipeline/publications/refresh.py)) depuis la valeur arbitrée.
 
 Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
 
@@ -127,10 +127,10 @@ Dans [`tests/unit/domain/source_publications/test_correction.py`](../../tests/un
 
 Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.journal_type`, `journal.oa_model`) :
 
-1. **Recompute des corrections** : `_correct_for_journal` (`application/services/journals/core.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
-2. **Service de requalification** dans `application/services/<table>/core.py`, modèle [`requalify_publications_for_journal`](../../application/services/journals/core.py) (mode `dry_run` pour le preview, mode apply qui recompute + refresh + audit).
-3. **Repo** : `PublicationRepository.find_ids_by_<key>` (lecture de `publications` par le repo publications — discipline ISP).
-4. **Endpoints API** : `GET /api/<table>/{id}/<field>-change-impact?new_<field>=X` → `{count: N}` (preview, `dry_run=True`) ; `PUT /api/<table>/{id}` détecte le changement et déclenche la requalification synchrone dans la même transaction.
+1. **Recompute des corrections** : `correct_journal_records` (`pipeline/publications/requalify_journal.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
+2. **Service de requalification** dans `application/services/<table>/core.py`, modèle [`requalify_publications_for_journal`](../../application/services/journals/core.py) (recompute + refresh + audit ; le preview l'exécute dans un `SAVEPOINT` annulé).
+3. **Lecture** : `PublicationStore.find_ids_by_<key>` (`pipeline/publications/refresh.py`).
+4. **Endpoints API** : `POST /api/<table>/{id}/<field>-change-impact`, avec la nouvelle valeur dans le corps → `{count: N}` (preview) ; `PUT /api/<table>/{id}` détecte le changement et déclenche la requalification synchrone dans la même transaction.
 5. **Modèles Pydantic** dédiés dans `interfaces/api/models/<table>.py` (jamais `body: dict`).
 6. **Frontend** : appel preview au save, modale de confirmation, **message générique** sur le nombre de publications recalculées (l'agrégation finale dépend de toutes les sources, pas seulement de l'input modifié).
 
@@ -174,7 +174,7 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 **`JOURNAL_TYPE_MEDIA_TO_MEDIA`** — `journal.journal_type = 'media'` ⇒ `doc_type = media`.
 
 - Input : `sp.journal_type` (joint via `SourcePublication`).
-- Hook admin : oui — service [`requalify_publications_for_journal`](../../application/services/journals/core.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
+- Hook admin : oui — service [`requalify_publications_for_journal`](../../application/services/journals/core.py), endpoint `POST /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
 - Référence : [`metadata_correction/rules.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/source_publications/metadata_correction/rules.py)
 
 ## Anti-patterns

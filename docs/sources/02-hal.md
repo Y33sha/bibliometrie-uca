@@ -13,7 +13,7 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 **Search API** (https://api.archives-ouvertes.fr/search) — moissonnage des publications.
 - Pas de credentials nécessaires.
 - Requête par [collection HAL](../glossaire.md#collection-hal) + année de publication
-- Champs Solr récupérés : voir [pipeline/sources/hal/fields.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/sources/hal/fields.py) (`HAL_FIELDS`)
+- Champs Solr récupérés : voir [pipeline/ingestion/hal/fields.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/hal/fields.py) (`HAL_FIELDS`)
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
 
 ## Données récupérées
