@@ -173,9 +173,13 @@ type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = ["pipeline"]
 # L'API importe seulement `pipeline/public.py`, qui exporte l'ordre des phases et les recalculs
-# ciblés. Les chaînes qui passent par ce module sont admises.
-ignore_imports = ["interfaces.api.** -> pipeline.public"]
-allow_indirect_imports = "true"
+# ciblés.
+# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
+# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
+ignore_imports = [
+    "interfaces.api.** -> pipeline.public",
+    "application.services.journals.core -> pipeline.publications.correct_unary",
+]
 
 [[tool.importlinter.contracts]]
 name = "Adapters : la connexion se reçoit, elle ne s'ouvre pas"
