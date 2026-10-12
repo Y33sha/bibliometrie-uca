@@ -17,8 +17,8 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import PersonIdentifierType
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.sql_fragments import identifier_neutralized
 from infrastructure.observability.log import setup_logger
+from infrastructure.sql_fragments import identifier_neutralized
 from pipeline.persons.person_writes import PersonWrites, add_identifiers_from_authorships
 
 log = setup_logger("backfill_idhal_attributions", os.path.dirname(__file__))

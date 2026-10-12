@@ -10,7 +10,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipPersonRow,
     AuthorshipRepository,
 )
-from infrastructure.db.sql_fragments import (
+from infrastructure.sql_fragments import (
     AUTHORSHIP_IN_PERIMETER_EXPR,
     REJECTED_PAIRS,
     case_priority,

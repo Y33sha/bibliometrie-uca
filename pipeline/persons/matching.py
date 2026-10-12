@@ -21,13 +21,13 @@ from domain.persons.matching import (
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.signature_name import SignatureName
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.db.sql_fragments import (
+from infrastructure.repositories.person_repository import person_without_decision_sql
+from infrastructure.sql_fragments import (
     REJECTED_PAIRS,
     identifier_neutralized,
     publication_rejected_for,
     usable_identifier,
 )
-from infrastructure.repositories.person_repository import person_without_decision_sql
 
 
 class BareUnlinkedAuthorship(NamedTuple):

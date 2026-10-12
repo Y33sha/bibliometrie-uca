@@ -21,9 +21,9 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
-from infrastructure.db.sql_fragments import has_author_role
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 

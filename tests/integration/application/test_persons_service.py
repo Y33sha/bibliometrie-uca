@@ -32,11 +32,11 @@ from domain.errors import (
 )
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
-from infrastructure.db.sql_fragments import REJECTED_PAIRS
 from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
+from infrastructure.sql_fragments import REJECTED_PAIRS
 from pipeline.publications.authorships_queries import AuthorshipsBuild
 from pipeline.publications.publication_perimeter import PublicationPerimeterRecompute
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship

@@ -27,11 +27,12 @@ from application.ports.read_models.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
-from infrastructure.db.sql_fragments import signature_display_name, usable_identifier
 from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
 )
+from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.sql_fragments import usable_identifier
 
 # Identifiants d'une signature `sa`, hors ceux qu'elle neutralise.
 _HAL_PERSON_ID = usable_identifier("'hal_person_id'")

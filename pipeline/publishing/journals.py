@@ -28,15 +28,15 @@ from domain.journals.journal import JournalType, ManualField, OaModel
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
 from domain.types import JsonValue
-from infrastructure.db.journal_issns import issn_values, issns_by_journal
 from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
-from infrastructure.db.sql_fragments import active_issns, has_active_issn
 from infrastructure.db.tables import (
     journal_doi_namespaces,
     journal_issns,
     journal_name_forms,
     journals,
 )
+from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
+from infrastructure.sql_fragments import active_issns, has_active_issn
 
 
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.

@@ -1,6 +1,6 @@
 """Tests des fragments SQL rendus depuis des tuples de valeurs."""
 
-from infrastructure.db.sql_fragments import case_priority, in_clause
+from infrastructure.sql_fragments import case_priority, in_clause
 
 
 class TestInClause:

@@ -17,7 +17,7 @@ from application.ports.read_models.addresses_queries import (
     StructureLinkState,
 )
 from domain.types import JsonValue
-from infrastructure.db.sql_fragments import signature_display_name
+from infrastructure.read_models.sql_fragments import signature_display_name
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (

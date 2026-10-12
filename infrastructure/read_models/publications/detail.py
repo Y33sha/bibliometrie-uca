@@ -20,11 +20,11 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
-from infrastructure.db.sql_fragments import (
-    active_issns,
+from infrastructure.read_models.sql_fragments import (
     authorship_has_signature_from,
     signature_display_name,
 )
+from infrastructure.sql_fragments import active_issns
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:

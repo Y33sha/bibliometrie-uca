@@ -26,8 +26,8 @@ from pathlib import Path
 from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.sql_fragments import has_active_issn
 from infrastructure.observability.log import setup_logger
+from infrastructure.sql_fragments import has_active_issn
 
 log = setup_logger("snapshot_conference_papers", os.path.dirname(__file__))
 

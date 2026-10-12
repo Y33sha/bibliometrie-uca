@@ -27,8 +27,8 @@ from sqlalchemy import text
 from domain.journals.series import ContainerLevel, container_level, series_key
 from domain.source_publications.doc_types import map_doc_type
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.sql_fragments import has_active_issn
 from infrastructure.observability.log import setup_logger
+from infrastructure.sql_fragments import has_active_issn
 
 log = setup_logger("audit_container_levels", os.path.dirname(__file__))
 

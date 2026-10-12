@@ -3,7 +3,7 @@
 from sqlalchemy import Connection, text
 
 from domain.publishers.publisher import PublisherType
-from infrastructure.db.merge_steps import (
+from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty,
     fill_empty_unique,

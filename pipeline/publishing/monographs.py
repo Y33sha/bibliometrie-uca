@@ -7,7 +7,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.monographs.matching import MonographCandidate
 from domain.monographs.proceedings import MonographRecord
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.sql_fragments import has_active_issn
+from infrastructure.sql_fragments import has_active_issn
 
 
 class MonographTitleGroup(NamedTuple):

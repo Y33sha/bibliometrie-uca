@@ -16,8 +16,8 @@ from application.services.authorships.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
-from infrastructure.db.sql_fragments import REJECTED_PAIRS
 from infrastructure.repositories import authorship_repository
+from infrastructure.sql_fragments import REJECTED_PAIRS
 from pipeline.publications.authorships_queries import AuthorshipsBuild
 from pipeline.structures.in_perimeter import InPerimeterRecompute
 from pipeline.structures.perimeter import PerimeterQueries

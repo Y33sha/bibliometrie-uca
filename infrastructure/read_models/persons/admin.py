@@ -25,13 +25,12 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
-from infrastructure.db.sql_fragments import (
+from infrastructure.read_models.sql_fragments import (
     has_author_role,
-    identifier_neutralized,
-    in_clause,
     name_form_holder,
     other_name_form_holders,
 )
+from infrastructure.sql_fragments import identifier_neutralized, in_clause
 
 # ── Name-form authorships ────────────────────────────────────────
 

@@ -40,8 +40,8 @@ from domain.journals.titles import compatible_titles
 from domain.publishers.names import publisher_name_key
 from infrastructure import PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.observability.log import setup_logger
+from infrastructure.repositories.journal_issns import issns_by_journal
 
 log = setup_logger("audit_divergent_journals", os.path.dirname(__file__))
 

@@ -19,9 +19,9 @@ from domain.errors import NotFoundError
 from domain.journals.issns import JournalIssn
 from domain.journals.journal import Journal, JournalType, ManualField, OaModel
 from domain.normalize import normalize_text
-from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.db.rows import row_as
 from infrastructure.db.tables import journal_issns, journals
+from infrastructure.repositories.journal_issns import issns_by_journal
 
 
 class _JournalRow(NamedTuple):

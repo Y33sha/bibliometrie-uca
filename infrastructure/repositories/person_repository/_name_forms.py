@@ -12,7 +12,7 @@ from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_name
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.sources.registry import AUTHOR_SOURCES
-from infrastructure.db.sql_fragments import in_clause
+from infrastructure.sql_fragments import in_clause
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
