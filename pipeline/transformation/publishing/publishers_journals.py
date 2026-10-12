@@ -23,8 +23,9 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from pipeline.ingestion.http.breaker_scope import under_circuit_breaker
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.runtime.execution import credentials_missing, log, open_tx
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import filter_configured

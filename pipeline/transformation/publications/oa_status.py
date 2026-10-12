@@ -16,9 +16,10 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
+from pipeline.ingestion.http.breaker_scope import UnderCircuitBreaker
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import UnderCircuitBreaker, credentials_missing
+from pipeline.runtime.execution import credentials_missing
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,

@@ -19,11 +19,11 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
+from pipeline.ingestion.http.breaker_scope import UnderCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import UnderCircuitBreaker
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
