@@ -18,6 +18,7 @@ Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` d�
 
 - Un recalcul ciblé se garde seulement s'il produit un effet immédiat attendu dans l'interface.
 - Les sept recalculs ciblés sont gardés : chacun produit un effet immédiat attendu dans l'interface.
+- Une écriture de pays par l'administration marque l'adresse `countries_dirty` : le run suivant reprend une propagation échouée en tâche de fond.
 
 ## Phasage
 
@@ -37,14 +38,11 @@ Code au 2026-10-12. Le mode `daily` rejoue toutes les phases de transformation. 
 | `in_perimeter` des signatures (`InPerimeterRecompute`) | confirmation ou rejet d'un lien adresse-structure | tâche de fond | appartenance au périmètre des signatures et des authorships concernées | `affiliations.populate`, puis `authorships` |
 | `in_perimeter` des publications d'une personne (`PublicationPerimeterRecompute`) | exclusion d'une personne | dans la requête | publications de la personne retirées des listes du périmètre | `authorships.publications_in_perimeter` |
 | Authorships d'orphelines (`AuthorshipsBuild`) | attribution de signatures orphelines à une personne | dans la requête | les publications apparaissent sur la fiche de la personne | `authorships.build` |
-| Pays des notices et des publications (`CountryQueries`) | attribution manuelle de pays à des adresses | tâche de fond | pays des publications (facettes, collaborations) | **rien** : voir ci-dessous |
+| Pays des notices et des publications (`CountryQueries`) | attribution manuelle de pays à des adresses | tâche de fond | pays des publications (facettes, collaborations) | `countries.refresh_publication_countries`, par le marqueur `countries_dirty` que pose chaque écriture de pays |
 | Requalification d'une revue (`JournalRecompute.requalify_publications`) | changement de `journal_type` d'une revue | dans la requête | `doc_type` des publications de la revue | `metadata_correction.unary`, qui relit toutes les notices |
 | `pub_count` d'un éditeur (`PubCountRecompute`) | fusion d'éditeurs | dans la requête | nombre de publications de l'éditeur conservé | `authorships.pub_counts` |
 
-Constats :
-
-- **Pays** : les éditions de l'administration écrivent `addresses.countries` sans poser `countries_dirty`. Or `countries.refresh_publication_countries` recalcule seulement les lignes marquées. Sans le recalcul ciblé, une édition de pays n'atteint jamais les publications.
-- **Fusion de revues** (`JournalRecompute.merge_journals`) : c'est l'opération elle-même, partagée avec `publishers_journals.merge_duplicate_journals`, pas un recalcul.
+La fusion de revues (`JournalRecompute.merge_journals`) est l'opération elle-même, partagée avec `publishers_journals.merge_duplicate_journals`.
 
 #### Reports au run suivant
 
@@ -75,4 +73,3 @@ Restent à classer, colonne par colonne : les lectures de `publications` déclar
 
 ## Questions ouvertes
 
-- Pays : les éditions de l'administration marquent-elles aussi `countries_dirty`, pour que le run suivant reprenne une propagation échouée en tâche de fond ?

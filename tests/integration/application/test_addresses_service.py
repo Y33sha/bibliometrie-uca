@@ -375,6 +375,49 @@ class TestPropagateCountriesToSimilar:
         assert propagate_countries_to_similar(modified_ids=[], repo=repo) == []
 
 
+def _countries_dirty(conn, address_id):
+    return conn.execute(
+        text("SELECT countries_dirty FROM addresses WHERE id = :id"), {"id": address_id}
+    ).scalar_one()
+
+
+class TestCountriesDirty:
+    """Une écriture de pays marque l'adresse : le run suivant reprend la propagation vers les publications si le recalcul ciblé a échoué."""
+
+    def test_set_country_marks_the_address_and_its_twins(self, sa_sync_conn, repo):
+        ensure_country(sa_sync_conn, "FR")
+        a1 = insert_address(sa_sync_conn, "UCA EE")
+        a2 = insert_address(sa_sync_conn, "UCA FF")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
+                "WHERE id = ANY(:ids)"
+            ),
+            {"ids": [a1, a2]},
+        )
+
+        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
+
+        assert _countries_dirty(sa_sync_conn, a1) is True
+        assert _countries_dirty(sa_sync_conn, a2) is True
+
+    def test_batch_by_ids_marks_the_addresses(self, sa_sync_conn, repo):
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
+
+        batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo)
+
+        assert _countries_dirty(sa_sync_conn, addr) is True
+
+    def test_batch_by_filter_marks_the_addresses(self, sa_sync_conn, repo):
+        ensure_country(sa_sync_conn, "FR")
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
+
+        batch_set_country_by_filter(sa_sync_conn, "FR", search="Clermont", repo=repo)
+
+        assert _countries_dirty(sa_sync_conn, addr) is True
+
+
 # ── propagate_countries_to_publications ─────────────────────────────
 
 
