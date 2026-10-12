@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 
-from application.services.structures.ror import import_ror_dump
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
+from pipeline.structures.ror import import_ror_dump
 
 UNIV, LABO = RorId("01a8ajp46"), RorId("03vgfxd91")
 

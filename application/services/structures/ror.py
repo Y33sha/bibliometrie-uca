@@ -1,36 +1,10 @@
-"""Référentiel ROR : chargement depuis son dump, cohérence avec `structure_tutelles`."""
+"""Référentiel ROR : cohérence avec `structure_tutelles`."""
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 
-from sqlalchemy import Connection
-
 from application.ports.read_models.ror_queries import RorCoherenceQueries
-from application.ports.repositories.ror_repository import RorRepository
 from domain.structures.identifiers import RorId
-from domain.structures.ror import RorOrganization, ror_relations
 from domain.structures.ror_coherence import TutelleCoherence, tutelle_coherence
-
-
-@dataclass(frozen=True, slots=True)
-class RorImportStats:
-    organizations: int
-    relations: int
-
-
-def import_ror_dump(
-    conn: Connection,
-    organizations: Iterable[RorOrganization],
-    *,
-    version: str,
-    repo: RorRepository,
-) -> RorImportStats:
-    """Remplit le référentiel ROR avec les organisations du dump `version` et leurs relations parent/enfant, en une transaction."""
-    orgs = list(organizations)
-    relations = ror_relations(orgs)
-    repo.replace_all(orgs, relations, version=version)
-    conn.commit()
-    return RorImportStats(organizations=len(orgs), relations=len(relations))
 
 
 @dataclass(frozen=True, slots=True)
