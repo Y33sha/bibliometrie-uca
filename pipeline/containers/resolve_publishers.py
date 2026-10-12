@@ -22,12 +22,12 @@ from pipeline.containers.doi_prefixes import (
 )
 from pipeline.containers.find_or_create import match_or_create_publisher
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.fetch_pool import run_fetch_pool
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.ingestion.http.fetch_pool import run_fetch_pool
+from pipeline.ingestion.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
-from pipeline.sources.circuit_breaker import SourceCircuitBreaker
-from pipeline.sources.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 
 LIBELLE = "Éditeurs des préfixes DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

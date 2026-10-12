@@ -52,7 +52,7 @@ Dans l'ordre du pipeline.
 
 ### Phase 7 — Fin
 
-- [x] `run_pipeline` dans `pipeline/run.py` ; le câblage de chaque phase (`build`) rejoint le module de la phase ; suppression de `interfaces/cli/phases` et des ports techniques (issues de requête, circuit-breaker, dumps, empreinte, parallélisme), repliés dans l'infrastructure. 01d7da467, 6fbbccdab
+- [x] `run_pipeline` dans `pipeline/run.py` ; le câblage de chaque phase (`build`) rejoint le module de la phase ; suppression de `interfaces/cli/phases` et des ports techniques (issues de requête, circuit-breaker, dumps, empreinte, parallélisme). 01d7da467, 6fbbccdab
 - [x] Les implémentations des ports que l'API appelle (clôture des périmètres, `in_perimeter` ciblé, construction des authorships) rejoignent `pipeline/` ; `deps.py` les injecte. 028c1cc33
 - [x] `pipeline/public.py`, seul module du pipeline que l'API importe.
 - [x] Les opérations « trouver ou créer » (revues, monographies, éditeurs) passent dans `pipeline/containers`, sans les ports `containers`, `journals`, `monographs`, `publishers`.
@@ -65,10 +65,15 @@ Dans l'ordre du pipeline.
 - [x] `infrastructure/sources` passe dans `pipeline/` : outillage HTTP des sources dans `pipeline/sources`, configuration dans `pipeline/config.py`. Le lien vers la fiche DOAJ d'une revue rejoint le read model des revues.
 - [x] Modules d'`infrastructure` que seul le pipeline utilise : le verrou d'exécution dans `pipeline/lock.py`, l'exécution parallèle dans `pipeline/parallel.py`, l'empreinte de détection de changement dans `pipeline/sources/fingerprint.py`. Le stockage des réponses brutes (`raw_store`), adaptateur sortant, reste dans l'infrastructure.
 - [x] `infrastructure/pipeline` passe dans `pipeline/` : recalcul de `publications.in_perimeter` dans `pipeline/publications`, des `pub_count` dans `pipeline/containers`. L'exclusion d'une personne et la fusion d'éditeurs les appellent depuis les services de l'API, par `public.py`.
+- [ ] Mise à jour de la documentation : `docs/pipeline`, `docs/architecture`, chemins périmés dans `docs/donnees`.
+
+### Phase 8 — Organisation interne de `pipeline/`
+
+- [x] Relever comment les pipelines du [benchmark](benchmark-pipelines.md) découpent leur code (extraction, chargement, transformation).
+- [x] `pipeline/ingestion/<source>` : extraction et normalisation de chaque source, et clients des enrichissements (Sudoc, DOAJ, Unpaywall, doi.org). L'outillage HTTP commun dans `pipeline/ingestion/http/`. La transformation reste rangée par entité (`structures`, `containers`, `publications`, `persons`), les modules du run à la racine.
 
 ## Questions ouvertes
 
 - Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres et `in_perimeter`, la reconstruction d'une authorship et les `pub_count`, les corrections de métadonnées après l'édition d'une revue, les pays d'un lot d'adresses, la création et le nom d'une personne, le recalcul d'une publication.
 - Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
-- Contenu d'`infrastructure/db/` : modules techniques et modules qui n'y ont pas leur place, comme `merge_steps.py` (helpers des fusions de personnes, d'éditeurs et de revues).
 - Code applicatif appelé seulement par des scripts en ligne de commande, comme le rapport de cohérence du ROR (service, port de lecture et implémentation) : où le ranger ?

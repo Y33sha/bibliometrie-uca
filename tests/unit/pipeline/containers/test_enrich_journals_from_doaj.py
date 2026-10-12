@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from pipeline.containers.import_journals_from_doaj_dump import (
     run_enrich_journals_from_doaj,
 )
-from pipeline.sources.dump_download import DumpUnavailableError
+from pipeline.ingestion.http.dump_download import DumpUnavailableError
 
 
 class _FakeJournalRepo:

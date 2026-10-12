@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.sources.staging import upsert_staging
+from pipeline.ingestion.staging import upsert_staging
 
 
 def test_ligne_d_export_wos(sa_sync_conn):

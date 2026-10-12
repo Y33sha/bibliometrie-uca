@@ -97,7 +97,7 @@ def _clear_caches():
     yield
     # HAL author cache
     try:
-        from pipeline.sources.hal.normalize import _hal_author_cache
+        from pipeline.ingestion.hal.normalize import _hal_author_cache
 
         _hal_author_cache.clear()
     except ImportError:

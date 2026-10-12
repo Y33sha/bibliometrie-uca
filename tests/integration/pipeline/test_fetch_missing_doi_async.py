@@ -1,4 +1,4 @@
-"""Recherche par DOI de la phase `fetch_missing` (`pipeline.sources.fetch_missing.fetch_missing_doi`).
+"""Recherche par DOI de la phase `fetch_missing` (`pipeline.ingestion.fetch_missing.fetch_missing_doi`).
 
 Deux angles :
 1. **Boucle** : via une fausse recherche, vérifie le pool de workers, l'inscription des DOI absents et les métriques.
@@ -14,15 +14,15 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
+from pipeline.ingestion import fetch_missing
+from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
+from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
+from pipeline.ingestion.fetch_missing import DoiBatchResult, fetch_missing_doi
+from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
+from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
+from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
+from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
 from pipeline.metrics import PhaseMetrics
-from pipeline.sources import fetch_missing
-from pipeline.sources.crossref.fetch_missing import CrossrefDoiSearch
-from pipeline.sources.datacite.fetch_missing import DataciteDoiSearch
-from pipeline.sources.fetch_missing import DoiBatchResult, fetch_missing_doi
-from pipeline.sources.hal.fetch_missing import HalDoiSearch
-from pipeline.sources.openalex.fetch_missing import OpenalexDoiSearch
-from pipeline.sources.scanr.fetch_missing import ScanrDoiSearch
-from pipeline.sources.wos.fetch_missing import WosDoiSearch
 
 # ── helpers ──────────────────────────────────────────────────────
 

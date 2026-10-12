@@ -12,12 +12,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from pipeline.context import RunOptions
 from pipeline.execution import phase_context
-from pipeline.metrics import PhaseMetrics
-from pipeline.sources import fetch_stale
-from pipeline.sources.circuit_breaker import (
+from pipeline.ingestion import fetch_stale
+from pipeline.ingestion.http.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
 )
+from pipeline.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
@@ -96,7 +96,7 @@ def test_run_fetch_stale_installs_circuit_breaker():
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
-                "pipeline.sources.fetch_stale.refresh",
+                "pipeline.ingestion.fetch_stale.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )

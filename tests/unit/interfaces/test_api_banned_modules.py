@@ -97,7 +97,7 @@ def test_les_contrats_suivent_les_chaines_d_imports() -> None:
 
 def test_le_pipeline_garde_son_client_reseau() -> None:
     """La fermeture vise la couche qui sert les requêtes HTTP, non le projet : le trafic sortant appartient au pipeline."""
-    sortie = _analyser("import httpx2\n", "pipeline/sources/sonde.py")
+    sortie = _analyser("import httpx2\n", "pipeline/ingestion/sonde.py")
     assert "is banned" not in sortie
 
 

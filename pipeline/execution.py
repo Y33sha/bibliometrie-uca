@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.context import Phase, PhaseContext, RunOptions
+from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.metrics import PhaseMetrics
 from pipeline.signals import signal_source_unavailable
-from pipeline.sources.circuit_breaker import SourceUnavailableError
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-    from pipeline.sources.circuit_breaker import SourceCircuitBreaker
+    from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 
 # `setup_logger` attache un FileHandler sur `logs/pipeline.log` quand `LOG_TO_FILE=true`.
 log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
@@ -50,7 +50,7 @@ def credentials_missing(source: str) -> str | None:
 @contextmanager
 def circuit_breaker(source: str, *, threshold: int | None = None) -> Iterator[SourceCircuitBreaker]:
     """Pose le circuit-breaker de `source` dans la ContextVar que lisent les clients HTTP, le temps du bloc."""
-    from pipeline.sources.circuit_breaker import (
+    from pipeline.ingestion.http.circuit_breaker import (
         DEFAULT_THRESHOLD,
         SourceCircuitBreaker,
         reset_current_breaker,

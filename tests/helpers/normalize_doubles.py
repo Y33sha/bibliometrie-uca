@@ -3,9 +3,9 @@
 Un normalizer verse ses documents dans `source_publications`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
-from pipeline.sources.signature_queries import StoredSourceAuthorship
-from pipeline.sources.source_publications import SourcePublicationUpsert
-from pipeline.sources.staging import StagingRow
+from pipeline.ingestion.signature_queries import StoredSourceAuthorship
+from pipeline.ingestion.source_publications import SourcePublicationUpsert
+from pipeline.ingestion.staging import StagingRow
 
 
 def staging_row(
