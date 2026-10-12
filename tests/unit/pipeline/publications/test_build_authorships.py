@@ -1,9 +1,5 @@
 """Construction de la table `authorships` : les stats de `source_authorships` sont fraîches avant chaque requête qui filtre sur une colonne réécrite en masse."""
 
-import logging
-
-from pipeline.transformation.publications.authorships.build_authorships import build
-
 
 class _QueriesEnregistrees:
     """Enregistre le nom de chaque requête appelée et rend zéro."""
@@ -17,14 +13,3 @@ class _QueriesEnregistrees:
             return 0
 
         return requete
-
-
-def test_stats_de_source_authorships_fraiches_avant_la_creation_des_liens():
-    """Les phases normalize et persons réécrivent `person_id` juste avant : l'insertion des liens filtre sur cette colonne."""
-    queries = _QueriesEnregistrees()
-
-    build(object(), queries, logging.getLogger("test"))
-
-    assert queries.appels.index("analyze_source_authorships") < queries.appels.index(
-        "insert_missing_authorships"
-    )

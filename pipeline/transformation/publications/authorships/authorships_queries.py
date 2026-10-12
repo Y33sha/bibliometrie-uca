@@ -68,9 +68,6 @@ class AuthorshipsBuild:
     def analyze_authorships(self, conn: Connection) -> None:
         conn.execute(text("ANALYZE authorships"))
 
-    def analyze_source_authorships(self, conn: Connection) -> None:
-        conn.execute(text("ANALYZE source_authorships"))
-
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         return conn.execute(
             text(f"""

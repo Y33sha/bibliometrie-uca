@@ -105,3 +105,9 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     assert all("failed_lookups" in r for r in reads.values())
     lisent_l_agence = {name for name, r in reads.items() if "doi_prefixes.ra" in r}
     assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}
+
+
+def test_les_statistiques_des_signatures_sont_rafraichies_apres_persons():
+    """`normalize` et `persons` réécrivent en masse `source_authorships.person_id`, que la construction des authorships filtre ensuite."""
+    purge = next(n for n in NODES if n.name == "persons.purge")
+    assert "ANALYZE source_authorships" in purge.maintenance

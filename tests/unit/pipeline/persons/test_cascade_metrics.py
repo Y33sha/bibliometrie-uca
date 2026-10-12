@@ -33,8 +33,6 @@ class TestCorroborationCounts:
             _result(rejected=22555, distinct=798),
             transferred=0,
             cross_source_detached=0,
-            reorphaned=0,
-            deleted_persons=0,
         ).details["summary"]
         assert summary["corroboration_rejected"] == 22555
         assert summary["corroboration_rejected_distinct"] == 798

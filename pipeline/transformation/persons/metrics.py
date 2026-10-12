@@ -55,10 +55,8 @@ def build_metrics(
     *,
     transferred: int,
     cross_source_detached: int,
-    reorphaned: int,
-    deleted_persons: int,
 ) -> PhaseMetrics:
-    """Assemble les métriques de la phase personnes depuis les compteurs de la cascade."""
+    """Assemble les métriques du nœud `persons.resolve` depuis les compteurs de la cascade. La phase y ajoute ceux de la purge."""
     matched = result.matched_counts
     skipped = result.skipped_counts
     linked_total = sum(matched.values())
@@ -79,7 +77,5 @@ def build_metrics(
         "corroboration_rejected_distinct": result.corroboration_rejected_distinct,
         "identifiers_transferred": transferred,
         "cross_source_detached": cross_source_detached,
-        "reorphaned_nominal": reorphaned,
-        "deleted_empty_persons": deleted_persons,
     }
     return metrics
