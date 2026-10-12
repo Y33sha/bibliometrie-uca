@@ -21,10 +21,10 @@ from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.config import get_polite_pool_email
 from pipeline.ingestion.crossref.prefixes import member_profile
 from pipeline.ingestion.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.http.polite_pool import build_user_agent
+from pipeline.runtime.config import get_polite_pool_email
 
 log = setup_logger("reset_idle_crossref_prefixes", os.path.dirname(__file__))
 

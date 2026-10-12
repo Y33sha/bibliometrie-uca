@@ -7,8 +7,8 @@ import logging
 
 from pipeline.containers.journal_label import journal_label
 from pipeline.containers.journals import JournalGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Revues vides"
 """Libellé de la sous-étape dans le journal de la phase."""

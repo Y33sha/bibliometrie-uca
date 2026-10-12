@@ -10,8 +10,8 @@ import time
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import DERNIERE_BRANCHE, etape
-from pipeline.progression import attente
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.progression import attente
 from pipeline.structures.countries_queries import CountryQueries
 
 

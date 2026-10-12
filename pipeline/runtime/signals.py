@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Callable, Sequence
 
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.metrics import PhaseMetrics
 
 
 def timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:

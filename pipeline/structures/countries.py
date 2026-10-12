@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.context import OpenTransaction, Phase, PhaseContext
-from pipeline.metrics import PhaseMetrics
-from pipeline.modes import MODES
+from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.modes import MODES
 from pipeline.structures import (
     detect_by_country_name,
     detect_by_place_name,

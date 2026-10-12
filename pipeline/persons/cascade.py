@@ -47,7 +47,6 @@ from domain.persons.matching import (
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, initials_extend
 from domain.persons.person import validated_name
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.persons.first_names import complete_reduced_first_names
 from pipeline.persons.loading import (
     EnrichedAuthorship,
@@ -62,7 +61,8 @@ from pipeline.persons.person_writes import (
     PersonWrites,
     add_identifiers_from_authorships as add_identifiers,
 )
-from pipeline.progression import attente, progression
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.progression import attente, progression
 
 # ---------------------------------------------------------------------------
 # Passe de cascade

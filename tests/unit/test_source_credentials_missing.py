@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pipeline import config
+from pipeline.runtime import config
 
 
 def _detect(source: str) -> str | None:

@@ -21,13 +21,13 @@ from domain.source_publications.metadata_correction.shared_doi import (
     resolve_cluster_doi_corrections,
 )
 from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
 from pipeline.publications.metadata_correction_queries import (
     DoiClusterRow,
     DoiCorrectionUpdate,
     PgMetadataCorrectionQueries,
 )
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 
 
 def _compute_update(

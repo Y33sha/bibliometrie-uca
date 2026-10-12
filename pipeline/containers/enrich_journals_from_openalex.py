@@ -16,8 +16,8 @@ from sqlalchemy import Connection
 from domain.journals.journal import JournalType
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.libelles import forme
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import forme
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Type des revues sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""

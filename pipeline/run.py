@@ -36,18 +36,9 @@ from infrastructure.observability.log import (
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.containers import publishers_journals, resolve_ra
-from pipeline.context import Phase, RunOptions
-from pipeline.exception_chain import failure_message, is_user_interruption
-from pipeline.execution import log, open_tx, phase_context
 from pipeline.ingestion import extract, fetch_missing, fetch_stale, normalize
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.libelles import accord
-from pipeline.lock import PipelineAlreadyRunningError, pipeline_lock
-from pipeline.metrics import PhaseMetrics
-from pipeline.modes import MODE_NAMES
 from pipeline.persons import persons
-from pipeline.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
-from pipeline.progression import ecrire_hors_barre, set_flux_barres
 from pipeline.publications import (
     authorships,
     metadata_correction,
@@ -56,7 +47,16 @@ from pipeline.publications import (
     relations,
     subjects,
 )
-from pipeline.signals import select_targets
+from pipeline.runtime.context import Phase, RunOptions
+from pipeline.runtime.exception_chain import failure_message, is_user_interruption
+from pipeline.runtime.execution import log, open_tx, phase_context
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.modes import MODE_NAMES
+from pipeline.runtime.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
+from pipeline.runtime.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.runtime.signals import select_targets
 from pipeline.structures import affiliations, countries
 
 set_console_writer(ecrire_hors_barre)
@@ -249,7 +249,7 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 
 def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    from pipeline.config import get_fetch_stale_after_days
+    from pipeline.runtime.config import get_fetch_stale_after_days
 
     return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
 

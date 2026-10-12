@@ -22,9 +22,9 @@ from pipeline.containers.journals import (
     JournalPublicationPair,
     JournalTitleRow,
 )
-from pipeline.libelles import BRANCHE, accord
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
+from pipeline.runtime.libelles import BRANCHE, accord
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
 
 LIBELLE = "Fusion des revues en double"
 """Libellé de la sous-étape dans le journal de la phase."""

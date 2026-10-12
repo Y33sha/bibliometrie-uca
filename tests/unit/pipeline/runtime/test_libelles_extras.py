@@ -9,7 +9,7 @@ import ast
 from pathlib import Path
 
 from infrastructure import PROJECT_ROOT
-from pipeline.metrics import LIBELLES_EXTRAS
+from pipeline.runtime.metrics import LIBELLES_EXTRAS
 
 COUCHES = ("application", "domain", "infrastructure", "interfaces", "pipeline")
 

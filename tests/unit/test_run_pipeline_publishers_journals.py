@@ -6,14 +6,14 @@ La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, en
 from unittest.mock import patch
 
 from pipeline.containers import publishers_journals
-from pipeline.context import RunOptions
-from pipeline.execution import phase_context
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.context import RunOptions
+from pipeline.runtime.execution import phase_context
+from pipeline.runtime.metrics import PhaseMetrics
 
 
 def _patch_credentials_present():
     return patch(
-        "pipeline.config.source_credentials_missing",
+        "pipeline.runtime.config.source_credentials_missing",
         side_effect=lambda source: None,
     )
 

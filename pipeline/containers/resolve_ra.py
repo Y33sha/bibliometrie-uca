@@ -15,12 +15,12 @@ from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
 from pipeline.containers.doi_prefixes import DoiPrefixesQueries
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import UnderCircuitBreaker
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.libelles import accord, forme
-from pipeline.metrics import PhaseMetrics
-from pipeline.signals import signal_source_unavailable
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import UnderCircuitBreaker
+from pipeline.runtime.libelles import accord, forme
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.signals import signal_source_unavailable
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 """Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""
@@ -104,10 +104,10 @@ def build() -> Phase:
 
     La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals`, qui suit, rattache les préfixes à leur éditeur via les API `/prefixes` ; `fetch_missing`, au run suivant, adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe n'est pas encore résolu.
     """
-    from pipeline.config import get_polite_pool_email_optional
     from pipeline.containers.doi_prefixes import DoiPrefixesQueries
     from pipeline.ingestion.doi_org import fetch_registration_agencies
     from pipeline.ingestion.http.polite_pool import build_user_agent
+    from pipeline.runtime.config import get_polite_pool_email_optional
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")

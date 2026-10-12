@@ -1,7 +1,7 @@
 """Le graphe de dépendances du pipeline (`pipeline.graph`) est cohérent avec l'ordre d'exécution."""
 
 from pipeline.graph import NODES, Node, order_violations
-from pipeline.phase_order import PHASE_ORDER
+from pipeline.runtime.phase_order import PHASE_ORDER
 
 
 def test_noms_uniques():

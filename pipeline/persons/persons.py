@@ -25,9 +25,6 @@ from sqlalchemy import Connection
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
-from pipeline.context import Phase, PhaseContext
-from pipeline.libelles import DERNIERE_BRANCHE, etape
-from pipeline.metrics import PhaseMetrics
 from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.persons.cascade import run_cascade
 from pipeline.persons.matching import PersonsMatchingQueries
@@ -36,7 +33,10 @@ from pipeline.persons.name_forms import PersonNameFormsQueries
 from pipeline.persons.person_writes import PersonWrites
 from pipeline.persons.populate_person_name_forms import populate
 from pipeline.persons.purge import purge
-from pipeline.progression import attente
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import attente
 
 
 @dataclass(frozen=True)

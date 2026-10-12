@@ -11,8 +11,8 @@ from domain.monographs.collection import MonographJournalChoice, choose_monograp
 from pipeline.containers.containers import ContainerGatewayQueries
 from pipeline.containers.find_or_create import find_or_create_journal
 from pipeline.containers.monographs import MonographJournalCandidates
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Rattachement aux collections"
 """Libellé de la sous-étape dans le journal de la phase."""

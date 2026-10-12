@@ -11,12 +11,12 @@ import httpx2
 
 from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping, as_str
-from pipeline.config import get_polite_pool_email
 from pipeline.ingestion.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.ingestion.http.api_params import API_BASE_URLS
 from pipeline.ingestion.http.http_retry import lookup_json_async
 from pipeline.ingestion.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.http.polite_pool import build_user_agent
+from pipeline.runtime.config import get_polite_pool_email
 
 
 class CrossrefStaleRefetch(StaleRefetch):

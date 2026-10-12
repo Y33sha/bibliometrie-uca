@@ -17,8 +17,8 @@ from domain.journals.containers import (
 from domain.journals.journal import JournalType
 from pipeline.containers.journal_label import journal_label
 from pipeline.containers.journals import JournalGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Typage des recueils d'actes"
 """Libellé de la sous-étape dans le journal de la phase."""

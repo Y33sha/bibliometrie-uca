@@ -11,8 +11,8 @@ from sqlalchemy import Connection, text
 
 from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, forme
-from pipeline.progression import progression
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, forme
+from pipeline.runtime.progression import progression
 
 # Taille des tranches (pagination keyset) : borne la mémoire et les allers-retours SQL par batch.
 CHUNK_SIZE = 10000

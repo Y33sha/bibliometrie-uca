@@ -34,7 +34,7 @@ from pipeline.ingestion.http.circuit_breaker import (
 )
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.openalex.api import credential_params
-from pipeline.savepoint import rollback_unless_invalidated
+from pipeline.runtime.savepoint import rollback_unless_invalidated
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))
 

@@ -18,10 +18,10 @@ from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.ingestion.http.dump_download import DumpUnavailableError
-from pipeline.libelles import BRANCHE, accord
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import attente
-from pipeline.signals import signal_source_unavailable
+from pipeline.runtime.libelles import BRANCHE, accord
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import attente
+from pipeline.runtime.signals import signal_source_unavailable
 
 LIBELLE = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""

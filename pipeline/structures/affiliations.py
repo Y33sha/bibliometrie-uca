@@ -19,11 +19,11 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import log, open_tx
-from pipeline.libelles import DERNIERE_BRANCHE, etape
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import attente
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import log, open_tx
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import attente
 from pipeline.structures.address_resolution import AddressResolutionQueries, run_resolution
 from pipeline.structures.perimeter import EmptyExtractionPerimeterError, PerimeterQueries
 
@@ -165,9 +165,9 @@ def build() -> Phase:
 
 def _run_refresh_ror() -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-    from pipeline.config import get_polite_pool_email_optional
     from pipeline.ingestion.http.polite_pool import build_user_agent
     from pipeline.ingestion.ror.dump import ZenodoRorDumpSource
+    from pipeline.runtime.config import get_polite_pool_email_optional
     from pipeline.structures.ror import RorDumpQueries, run_refresh_ror
 
     # Le dump est public : l'adresse du polite pool y est facultative.

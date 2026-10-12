@@ -24,9 +24,9 @@ from domain.sources.sudoc import SudocSerialRecord
 from pipeline.containers.journals import JournalGatewayQueries, JournalSudocRow
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.ingestion.http.fetch_pool import RequestPace, run_fetch_pool
-from pipeline.libelles import BRANCHE, accord, forme
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
+from pipeline.runtime.libelles import BRANCHE, accord, forme
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
 
 LIBELLE = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""

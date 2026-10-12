@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from pipeline.context import Phase, PhaseContext, RunOptions
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.metrics import PhaseMetrics
-from pipeline.signals import signal_source_unavailable
+from pipeline.runtime.context import Phase, PhaseContext, RunOptions
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.signals import signal_source_unavailable
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -42,7 +42,7 @@ def phase_context(options: RunOptions) -> PhaseContext:
 
 def credentials_missing(source: str) -> str | None:
     """Motif d'absence des identifiants d'une source, ou `None` si elle est configurée. Injecté aux phases qui interrogent une API tierce."""
-    from pipeline.config import source_credentials_missing
+    from pipeline.runtime.config import source_credentials_missing
 
     return source_credentials_missing(source)
 

@@ -23,18 +23,18 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.staging import upsert_staging
-from pipeline.libelles import DERNIERE_BRANCHE, branche_de_source
-from pipeline.logging_scope import scoped_logger
-from pipeline.metrics import PhaseMetrics
-from pipeline.modes import MODES
-from pipeline.progression import progression
-from pipeline.signals import filter_configured, select_targets, timed_metrics
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, branche_de_source
+from pipeline.runtime.logging_scope import scoped_logger
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.modes import MODES
+from pipeline.runtime.progression import progression
+from pipeline.runtime.signals import filter_configured, select_targets, timed_metrics
 
 COMMIT_EVERY = 50
 
@@ -270,7 +270,7 @@ def build() -> Phase:
 
 def _get_years_for_window(start_year: int | None) -> list[int] | None:
     """Années de la fenêtre du run, de `start_year` à l'année courante."""
-    from pipeline.config import get_years
+    from pipeline.runtime.config import get_years
 
     with open_tx() as conn:
         return get_years(conn, start_year)
@@ -303,7 +303,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from pipeline.config import get_fetch_stale_after_days
+    from pipeline.runtime.config import get_fetch_stale_after_days
 
     refetch = _make_refetch(target)
     with open_tx() as conn:

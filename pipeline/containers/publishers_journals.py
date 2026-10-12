@@ -35,11 +35,11 @@ from pipeline.containers import (
     type_proceedings_journals,
     type_proceedings_volumes,
 )
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, etape
-from pipeline.metrics import PhaseMetrics
-from pipeline.signals import filter_configured
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, etape
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.signals import filter_configured
 
 RunSubstep = Callable[[], PhaseMetrics]
 CredentialsMissing = Callable[[str], str | None]
@@ -237,7 +237,6 @@ def build() -> Phase:
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
-    from pipeline.config import get_polite_pool_email_optional
     from pipeline.containers.doi_prefixes import DoiPrefixesQueries
     from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.containers.resolve_publishers import (
@@ -246,6 +245,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
     from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
     from pipeline.ingestion.http.polite_pool import build_user_agent
+    from pipeline.runtime.config import get_polite_pool_email_optional
 
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
@@ -405,16 +405,16 @@ def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
-    from pipeline.config import (
-        get_doaj_refresh_after_days,
-        get_polite_pool_email_optional,
-    )
     from pipeline.containers.import_journals_from_doaj_dump import (
         run_enrich_journals_from_doaj,
     )
     from pipeline.containers.journals import JournalGatewayQueries
     from pipeline.ingestion.doaj import downloaded_doaj_dump
     from pipeline.ingestion.http.polite_pool import build_user_agent
+    from pipeline.runtime.config import (
+        get_doaj_refresh_after_days,
+        get_polite_pool_email_optional,
+    )
 
     # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")

@@ -17,13 +17,13 @@ from domain.source_publications.metadata_correction.journal_by_doi import (
     JOURNAL_BY_DOI_NAMESPACE,
 )
 from domain.source_publications.raw_metadata import raw_value, stash_entry
-from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
 from pipeline.publications.metadata_correction_queries import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
     PgMetadataCorrectionQueries,
 )
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, accord, etape, forme
 
 
 def _compute_update(

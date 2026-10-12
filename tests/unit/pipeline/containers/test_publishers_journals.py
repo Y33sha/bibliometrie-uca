@@ -3,7 +3,7 @@
 import logging
 
 from pipeline.containers.publishers_journals import PublishersJournalsPhase
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.metrics import PhaseMetrics
 
 _CHAMPS = (
     "resolve_publishers",

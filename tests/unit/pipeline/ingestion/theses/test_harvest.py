@@ -15,7 +15,7 @@ from pipeline.ingestion.staging import UpsertOutcome
 from pipeline.ingestion.theses import harvest
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.ingestion.theses.harvest import ThesesExtractor, build_query, extract_theses
-from pipeline.progression import Progression
+from pipeline.runtime.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
 
 _LOGGER = logging.getLogger("test")

@@ -7,8 +7,8 @@ import logging
 
 from domain.monographs.proceedings import is_proceedings_volume
 from pipeline.containers.monographs import MonographGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Nature des monographies"
 """Libellé de la sous-étape dans le journal de la phase."""

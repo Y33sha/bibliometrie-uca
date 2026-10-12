@@ -33,13 +33,13 @@ from domain.source_publications.raw_metadata import (
     stash_entry,
 )
 from domain.sources.scanr import extract_hal_id_from_scanr_id
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
 from pipeline.publications.metadata_correction_queries import (
     CorrectionUpdate,
     PgMetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.

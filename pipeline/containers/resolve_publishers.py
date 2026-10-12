@@ -25,9 +25,9 @@ from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.libelles import BRANCHE, accord
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
+from pipeline.runtime.libelles import BRANCHE, accord
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
 
 LIBELLE = "Éditeurs des préfixes DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

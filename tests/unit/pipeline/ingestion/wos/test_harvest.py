@@ -17,7 +17,7 @@ from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.staging import UpsertOutcome
 from pipeline.ingestion.wos import harvest
 from pipeline.ingestion.wos.harvest import WosExtractor, extract_year
-from pipeline.progression import Progression
+from pipeline.runtime.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
