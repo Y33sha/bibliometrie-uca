@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import httpx2
 
-from infrastructure.sources.doi_org import registration_agency
-from infrastructure.sources.doi_org.registration_agency import fetch_registration_agencies
+from pipeline.sources import doi_org as registration_agency
+from pipeline.sources.doi_org import fetch_registration_agencies
 
 
 def _mock_response(status_code: int = 200, json_data=None):

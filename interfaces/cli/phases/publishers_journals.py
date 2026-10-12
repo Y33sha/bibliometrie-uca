@@ -39,12 +39,12 @@ def _run_resolve_publishers() -> PhaseMetrics:
     from application.pipeline.publishers_journals.resolve_publishers import (
         run_resolve_publishers,
     )
-    from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.crossref.prefixes import fetch_crossref_prefix
     from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
     from infrastructure.sources.polite_pool import build_user_agent
+    from pipeline.containers.doi_prefixes import DoiPrefixesQueries
 
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
@@ -53,7 +53,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
             lambda breaker: run_resolve_publishers(
                 conn,
                 log,
-                repo=PgDoiPrefixesQueries(conn),
+                repo=DoiPrefixesQueries(conn),
                 publisher_repo=PgPublisherGatewayQueries(conn),
                 fetch_crossref_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
                     client, prefix, sample_doi, user_agent=user_agent
