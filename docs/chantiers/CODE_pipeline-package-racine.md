@@ -11,7 +11,7 @@ La cible est posée par la question 5 de la fiche [Architecture cible du pipelin
 - **Un paquet racine `pipeline/`**, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
 - **Découpage par domaine** : `pipeline/sources/<source>`, `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons` ; `graph.py` et l'orchestrateur à la racine. Chaque nœud rejoint le domaine des tables qu'il écrit : les relations, les sujets et le statut d'accès ouvert vont dans `pipeline/publications`, les pays dans `pipeline/structures`.
 - **Règles d'import** vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques d'`infrastructure/` (connexion, réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`. `application/` et `infrastructure/` n'importent pas `pipeline/`. Seule l'API (`interfaces/api/deps.py`) importe l'interface publique du pipeline : recalculs ciblés, ordre des phases.
-- **Régime de transition** : pendant la migration, `pipeline/` et le code du pipeline encore dans les couches (`application/pipeline`, `application/ports/pipeline`, `infrastructure/pipeline`, `infrastructure/sources`) s'importent dans les deux sens. Les exceptions sont listées dans `pyproject.toml` et disparaissent avec la dernière phase.
+- **Régime de transition** : pendant la migration, des exceptions aux règles d'import couvrent le code du pipeline encore dans les couches. Elles sont listées dans `pyproject.toml`, module par module, et disparaissent avec la phase 7.
 - **Une phase à la fois, dans l'ordre du pipeline.** Chaque phase migrée confronte la cible aux situations concrètes qui la concernent ; ce qui ne tient pas sort de la cible.
 - **Le câblage `interfaces/cli/phases` disparaît** avec les ports. Le point d'entrée `run_pipeline` passe dans `pipeline/`.
 - **Une fonction par nœud du graphe**, nommée comme lui. Une phase est la liste de ses nœuds, appelés dans l'ordre. Un exécuteur piloté par le graphe pourra les appeler directement.
@@ -46,14 +46,15 @@ Dans l'ordre du pipeline.
 
 ### Phase 6 — Enrichissements
 
-- [ ] `relations`, `subjects`, `countries`, `oa_status`. Les écritures d'administration du port des pays (ajout par lot, recopie sur les adresses jumelles) rejoignent le dépôt des adresses ; le pipeline expose le recalcul des pays des notices et publications d'un lot d'adresses.
+- [x] `relations`, `subjects`, `countries`, `oa_status`. Les écritures d'administration du port des pays (ajout par lot, recopie sur les adresses jumelles) rejoignent le dépôt des adresses ; le pipeline expose le recalcul des pays des notices et publications d'un lot d'adresses. dca9cbcec, db4425ba5, 1038f22b0, afaa9712d
 
 ### Phase 7 — Fin
 
-- [ ] `run_pipeline` dans `pipeline/` ; suppression de `interfaces/cli/phases`, des ports et des adaptateurs du pipeline.
-- [ ] Les opérations du pipeline quittent `application/services`.
+- [x] `run_pipeline` dans `pipeline/run.py` ; le câblage de chaque phase (`build`) rejoint le module de la phase ; suppression de `interfaces/cli/phases` et des ports techniques (issues de requête, circuit-breaker, dumps, empreinte, parallélisme), repliés dans l'infrastructure. 01d7da467, 6fbbccdab
+- [ ] Les opérations « trouver ou créer » (revues, monographies, éditeurs) et la création d'une publication quittent `application/services` pour `pipeline/containers` et `pipeline/publications`, avec les ports qui ne servent qu'à elles (`containers`, `journals`, `monographs`, `publishers`).
+- [ ] Les ports partagés avec l'API restants dans `application/ports/pipeline`, et leurs adaptateurs dans `infrastructure/pipeline`, selon la réponse à la question des recalculs ciblés.
 
 ## Questions ouvertes
 
-- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ?
+- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres et `in_perimeter`, la reconstruction d'une authorship et les `pub_count`, les corrections de métadonnées après l'édition d'une revue, les pays d'un lot d'adresses, la création et le nom d'une personne, le recalcul d'une publication.
 - Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
