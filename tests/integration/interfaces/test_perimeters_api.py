@@ -24,7 +24,7 @@ def _clear_config(key: str) -> None:
         cur.execute("DELETE FROM config WHERE key = %s", (key,))
 
 
-_cleanup_after_module = truncate_after_module("perimeters", "structures", "audit_log", "config")
+_cleanup_after_module = truncate_after_module("perimeters", "structures", "audit_log")
 
 
 class TestListPerimeters:

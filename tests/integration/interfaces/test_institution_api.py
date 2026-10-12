@@ -12,7 +12,9 @@ from tests.integration.helpers.seeds import seed_config, seed_perimeter, seed_st
 def _cleanup():
     yield
     with owner_pool() as cur:
-        cur.execute("TRUNCATE TABLE perimeters, structures, config RESTART IDENTITY CASCADE")
+        cur.execute("TRUNCATE TABLE perimeters, structures RESTART IDENTITY CASCADE")
+        # Seule la clé posée par les tests part : les autres viennent de la migration.
+        cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
 
 
 def test_serves_name_and_roots_of_persons_perimeter(client):
