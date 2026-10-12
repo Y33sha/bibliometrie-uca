@@ -25,6 +25,7 @@ Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` d�
 - La fusion des revues que relie une même publication garde son report : une revue reste en double un jour, quand une publication nouvelle est seule à relier deux entrées. Rejouer la fusion après la réconciliation obligerait à refaire les corrections et les métadonnées des publications touchées.
 - La vérification Sudoc et le rattachement des monographies à leur collection gardent leur report : ils voient au run suivant les revues que `journal_by_doi` rattache. Les notices ainsi rattachées ne donnent aucun ISSN à vérifier ; seule la collection d'un volume d'actes peut être posée un jour plus tard.
 - Le typage en actes des revues et des volumes garde son report. Il lit le type brut de la source, que la correction ne change pas. Seul le `journal_id` posé par `journal_by_doi` arrive un run plus tard, comme pour la vérification Sudoc.
+- Les lectures de `publications` au run précédent sont déclarées colonne par colonne. Seules celles de `fetch_missing` introduisent un retard.
 
 ## Phasage
 
@@ -32,7 +33,7 @@ Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` d�
 
 - [x] Pour chaque recalcul ciblé : l'édition qui le déclenche, l'effet visible dans l'interface, le délai sans lui.
 - [x] Pour chaque report : la donnée concernée, le retard qu'il introduit.
-- [ ] Pour chaque report : le coût de sa suppression.
+- [x] Pour chaque report : le coût de sa suppression.
 
 Code au 2026-10-12. Le mode `daily` rejoue toutes les phases de transformation. Sans recalcul ciblé, une édition attend donc au plus un jour.
 
@@ -66,16 +67,19 @@ Restent les lectures d'une donnée qu'un nœud placé plus loin écrit :
 | `publishers_journals.type_proceedings_journals`, `publishers_journals.type_proceedings_volumes` | `source_publications.journal_id`, type brut de la notice | `metadata_correction.journal_by_doi` | une revue rattachée par l'espace de noms de son DOI est typée un run plus tard ; le type brut est à jour |
 | `publications.reconcile` | `source_publications.countries` | `countries.refresh_publication_countries` | aucun : `countries` réécrit `publications.countries` dans le même run |
 
-Restent à classer, colonne par colonne : les lectures de `publications` déclarées à la table entière par `authorships.*`, `relations.rebuild`, `subjects.ingest` et `countries.refresh_publication_countries`. Les nœuds suivants écrivent d'autres colonnes de `publications` (`in_perimeter`, `subjects_ingested_at`, `countries`, `oa_status`) et suppriment des lignes (`authorships.purge_orphan_publications`).
+Lectures de `publications` sans retard :
+
+- `authorships.build`, `authorships.publications_in_perimeter` et `publications.delete_without_sources` lisent des lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
+- `publications.reconcile` lit le statut confirmé par Unpaywall (`oa_status`, `unpaywall_checked_at`). Une publication créée dans le run est vérifiée par `oa_status` le même jour.
 
 ### Phase 2 — Décisions
 
 - [x] Garder ou retirer chaque recalcul ciblé : tous gardés.
-- [ ] Garder ou supprimer chaque report.
+- [x] Garder ou supprimer chaque report : tous gardés.
 
 ### Phase 3 — Mise en œuvre
 
-- [ ] Supprimer les reports écartés, et mettre à jour leurs déclarations dans `pipeline/graph.py`.
+- [x] Déclarer dans `pipeline/graph.py` les lectures du run précédent à la colonne près.
 
 ## Questions ouvertes
 
