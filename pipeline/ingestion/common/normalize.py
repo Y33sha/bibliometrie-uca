@@ -12,7 +12,6 @@ Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normal
 from __future__ import annotations
 
 import logging
-import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -253,6 +252,11 @@ NormalizeOne = Callable[[str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
 
 
+def _retenue(source: str) -> Callable[[PhaseContext], bool]:
+    """Condition d'exécution du nœud de `source` : le run normalise toutes les sources, ou celles de ses options."""
+    return lambda ctx: ctx.options.sources is None or source in ctx.options.sources
+
+
 @dataclass(frozen=True)
 class NormalizePhase:
     """Le run normalise les sources de ses options, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
@@ -265,7 +269,9 @@ class NormalizePhase:
         """Normalise les sources retenues, retire les documents disparus, nettoie les identités orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
-            f"normalize.{source}": NodeStep(self._normalize_node(source), section="Normalisation")
+            f"normalize.{source}": NodeStep(
+                self._normalize_node(source), section="Normalisation", when=_retenue(source)
+            )
             for source in sources
         }
         steps["normalize.prune_disappeared"] = NodeStep(self._prune, section="Normalisation")
@@ -275,9 +281,12 @@ class NormalizePhase:
         by_node = run_nodes("normalize", steps, ctx)
 
         rows = [
-            cast("dict[str, object]", by_node[f"normalize.{source}"].details["row"])
+            {
+                **cast("dict[str, object]", node.details["row"]),
+                "duration_s": node.duration_s,
+            }
             for source in sources
-            if "row" in by_node[f"normalize.{source}"].details
+            if "row" in (node := by_node[f"normalize.{source}"]).details
         ]
         metrics = PhaseMetrics()
         normalises = sum(cast("int", row["processed"]) for row in rows)
@@ -290,20 +299,16 @@ class NormalizePhase:
         return metrics
 
     def _normalize_node(self, source: str) -> NodeRun:
-        """Nœud `normalize.<source>` : normalise la source si le run la retient, et garde sa ligne de la table d'observabilité."""
+        """Nœud `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
 
-        def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            metrics = PhaseMetrics()
-            if ctx.options.sources is not None and source not in ctx.options.sources:
-                return metrics
-            t0 = time.perf_counter()
+        def run(_ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             stats = self.normalize_one(source)
+            metrics = PhaseMetrics()
             metrics.details["row"] = {
                 "key": source,
                 "processed": stats.processed,
                 "skipped": stats.skipped,
                 "errors": stats.errors,
-                "duration_s": round(time.perf_counter() - t0, 1),
             }
             return metrics
 

@@ -1,23 +1,12 @@
-"""Chronométrage et signaux partagés des phases qui ventilent par source / canal.
+"""Signaux partagés des phases qui ventilent par source ou par canal.
 
-Utilisés par les phases à interrogation externe (`extract`, `fetch_missing`, `fetch_stale`, `oa_status`) : `timed_metrics` mesure la durée d'une sous-tâche (distincte de la durée totale de la phase), `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
+Utilisés par les phases à interrogation externe (`extract`, `fetch_missing`, `fetch_stale`, `oa_status`) : `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
 """
 
 import logging
-import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
-
-
-def timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
-    """Exécute `fn` et renvoie ses métriques avec sa durée d'exécution (s).
-
-    Pour les phases qui ventilent leurs indicateurs par source / canal et ont besoin d'une durée par sous-tâche.
-    """
-    started = time.time()
-    result = fn()
-    return result, time.time() - started
 
 
 def signal_source_unconfigured(

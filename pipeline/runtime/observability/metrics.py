@@ -103,6 +103,8 @@ class PhaseMetrics:
 
     Hors comparaison : deux relevés portant les mêmes compteurs sont égaux, quels que soient les mots qui les présentent.
     """
+    duration_s: float | None = field(default=None, compare=False)
+    """Durée d'un nœud en secondes, mesurée par l'exécuteur. Hors fusion : une phase en remplit sa table d'observabilité."""
 
     @property
     def total(self) -> int:

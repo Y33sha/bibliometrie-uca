@@ -1,16 +1,22 @@
-"""Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels + DOI parallèle, skip config.
+"""Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels, puis lot parallèle de la recherche par DOI.
 
-Dépendances techniques injectées (runners par canal / par source, parallélisme), donc
-l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une
-exécution synchrone déterministe.
+Les dépendances techniques sont injectées (runners par canal et par source, parallélisme). L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est remplacé par une exécution synchrone déterministe.
 """
 
 import logging
+
+import pytest
 
 from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
+
+
+@pytest.fixture(autouse=True)
+def _identifiants_presents(monkeypatch):
+    """Toutes les sources ont leurs identifiants : les tests choisissent eux-mêmes les sources non configurées."""
+    monkeypatch.setattr("pipeline.runtime.config.source_credentials_missing", lambda _source: None)
 
 
 def _sync_run_parallel(thunks):
@@ -31,7 +37,7 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
     metrics = FetchMissingPhase(
         fetch_hal_by_id=lambda: PhaseMetrics(new=2),
         fetch_hal_by_nnt=lambda: PhaseMetrics(new=1),
-        fetch_doi_one=lambda source: (
+        fetch_doi_one=lambda source, _breaker: (
             PhaseMetrics(new=5) if source == "openalex" else _non_configuree(source)
         ),
         run_parallel=_sync_run_parallel,
@@ -50,7 +56,7 @@ def test_nnt_channel_only_in_full_mode(contexte):
     FetchMissingPhase(
         fetch_hal_by_id=lambda: calls.append("id") or PhaseMetrics(),
         fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
-        fetch_doi_one=lambda source: PhaseMetrics(),
+        fetch_doi_one=lambda source, _breaker: PhaseMetrics(),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="daily"))
 
@@ -70,14 +76,14 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
 
 
 def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(contexte, caplog):
-    journal = _run_doi_only(contexte, lambda source: PhaseMetrics(), caplog)
+    journal = _run_doi_only(contexte, lambda source, _breaker: PhaseMetrics(), caplog)
     assert f"{DERNIERE_BRANCHE}Rien à faire" in journal
 
 
 def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(contexte, caplog):
     journal = _run_doi_only(
         contexte,
-        lambda source: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(),
+        lambda source, _breaker: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(),
         caplog,
     )
     assert "Rien à faire" not in journal
@@ -88,7 +94,9 @@ def test_une_source_indisponible_n_est_pas_un_rien_a_faire(contexte, caplog):
         signals=[{"level": "warning", "code": "source_unavailable", "message": "openalex"}]
     )
     journal = _run_doi_only(
-        contexte, lambda source: indisponible if source == "openalex" else PhaseMetrics(), caplog
+        contexte,
+        lambda source, _breaker: indisponible if source == "openalex" else PhaseMetrics(),
+        caplog,
     )
     assert "Rien à faire" not in journal
 
@@ -99,7 +107,7 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
     FetchMissingPhase(
         fetch_hal_by_id=lambda: calls.append("id") or PhaseMetrics(),
         fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
-        fetch_doi_one=lambda source: PhaseMetrics(new=3),
+        fetch_doi_one=lambda source, _breaker: PhaseMetrics(new=3),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
 

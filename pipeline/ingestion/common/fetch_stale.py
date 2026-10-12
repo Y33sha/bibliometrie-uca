@@ -16,8 +16,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from functools import partial
-from typing import cast
 
 import httpx2
 from sqlalchemy import Connection, text
@@ -36,7 +34,7 @@ from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.runtime.observability.signals import select_targets, skipped, timed_metrics
+from pipeline.runtime.observability.signals import select_targets, skipped
 
 COMMIT_EVERY = 50
 
@@ -75,11 +73,7 @@ class FetchStalePhase:
             def run(_ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
                 row_years = years_theses if source == "theses" else years_default
-                source_metrics, duration = timed_metrics(
-                    partial(self.refresh_one, source, row_years, breaker)
-                )
-                source_metrics.details["duration_s"] = round(duration, 1)
-                return source_metrics
+                return self.refresh_one(source, row_years, breaker)
 
             return run
 
@@ -95,7 +89,7 @@ class FetchStalePhase:
             ctx,
         )
 
-        by_source: dict[str, dict[str, float]] = {}
+        by_source: dict[str, dict[str, float | None]] = {}
         for source in ALL_SOURCES:
             source_metrics = by_node[f"fetch_stale.{source}"]
             metrics.merge(source_metrics)
@@ -106,7 +100,7 @@ class FetchStalePhase:
                 "refreshed": source_metrics.updated,
                 "unchanged": source_metrics.unchanged,
                 "disappeared": source_metrics.extras.get("disappeared", 0),
-                "duration_s": cast("float", source_metrics.details["duration_s"]),
+                "duration_s": source_metrics.duration_s,
             }
 
         if by_source:
