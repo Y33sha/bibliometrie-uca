@@ -75,4 +75,4 @@ Dans l'ordre du pipeline.
 ## Questions ouvertes
 
 - Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres, `in_perimeter` après la revue d'une adresse ou l'exclusion d'une personne, la construction des authorships à l'attribution d'orphelines, les pays d'un lot d'adresses, la requalification et la fusion des revues, le `pub_count` d'un éditeur fusionné.
-- Scripts `imports/` et `maintenance/` : chantier [Scripts en ligne de commande autonomes](../CODE_scripts-autonomes.md).
+- Scripts `imports/` et `maintenance/` : chantier [Scripts en ligne de commande autonomes](2026-10-12_CODE_scripts-autonomes.md).

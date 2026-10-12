@@ -9,6 +9,7 @@ Une partie de leur code est dispersée dans les couches : des services, des port
 ## Décisions
 
 - **Un script est autonome au maximum** : ses requêtes et sa logique sont dans son module. Il importe le domaine, les modules techniques de l'infrastructure et le pipeline, pas un service ou un port créé pour lui seul. Modèle : `maintenance/enrich_publishers.py`.
+- **Les scripts `imports/` et `maintenance/` restent hors du pipeline.** En production, le pipeline ne dépend d'aucun script. Les imports se répètent chaque année.
 
 ## Phasage
 
@@ -28,8 +29,4 @@ Une partie de leur code est dispersée dans les couches : des services, des port
 
 ### Phase 3 — Oneshot
 
-- [x] Trier les scripts `oneshot/` déjà joués : suppression de ceux qui ont un journal d'exécution et plus de 7 jours, sauf `snapshot_record_containers`, dont la comparaison sert à l'audit avant/après du chantier des monographies.
-
-## Questions ouvertes
-
-- Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ?
+- [x] Trier les scripts `oneshot/` déjà joués : suppression de ceux qui ont un journal d'exécution et plus de 7 jours, et de ceux sans journal de plus de 2 semaines. Seul `snapshot_record_containers` reste, car sa comparaison sert à l'audit avant/après du chantier des monographies.

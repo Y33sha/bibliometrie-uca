@@ -27,11 +27,11 @@
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
-- [Scripts en ligne de commande autonomes](CODE_scripts-autonomes.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Scripts en ligne de commande autonomes](archived/2026-10-12_CODE_scripts-autonomes.md)
 - 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)
 - 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)
 - 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
