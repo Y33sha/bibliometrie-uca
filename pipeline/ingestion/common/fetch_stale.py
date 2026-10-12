@@ -24,11 +24,12 @@ from sqlalchemy import Connection, text
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.http.breaker_scope import under_circuit_breaker
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.runtime.execution import credentials_missing, log, open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
 from pipeline.runtime.observability.logging_scope import scoped_logger

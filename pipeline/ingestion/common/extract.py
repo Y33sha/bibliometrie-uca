@@ -30,9 +30,10 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.common.parallel import RunParallel
+from pipeline.ingestion.http.breaker_scope import circuit_breaker, signal_if_tripped
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import circuit_breaker, open_tx, signal_if_tripped
+from pipeline.runtime.execution import open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
