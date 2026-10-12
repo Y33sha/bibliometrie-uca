@@ -1,6 +1,6 @@
 """Ports d'accès pipeline à la table `journals`.
 
-Des contrats étroits, un par consommateur du pipeline, tous servis par un même adapter `PgJournalGatewayQueries` (la table est mono-adapter, cf. `infrastructure/pipeline/journals.py`) :
+Des contrats étroits, un par consommateur du pipeline, tous servis par un même adapter `JournalGatewayQueries` (la table est mono-adapter, cf. `pipeline/containers/journals.py`) :
 
 - `JournalFindOrCreateQueries` : lookup + création + enrichissement à la création, pour `find_or_create_journal` (appelé par les normaliseurs de sources) ;
 - `JournalOpenAlexEnrichmentQueries` : file des revues à typer + écriture APC / journal_type, pour l'enrichissement OpenAlex ;

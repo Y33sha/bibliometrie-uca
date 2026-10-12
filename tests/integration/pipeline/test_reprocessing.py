@@ -50,8 +50,8 @@ def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
     import logging
 
-    from infrastructure.pipeline.containers import PgContainerGatewayQueries
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from pipeline.containers.containers import ContainerGatewayQueries
+    from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.sources.hal.normalize import process_work
     from pipeline.sources.signature_queries import AuthorshipsBatchQueries
     from pipeline.sources.source_publications import (
@@ -63,8 +63,8 @@ def _run_normalize_hal(conn):
     staging_queries = StagingQueries()
     authorship_queries = AuthorshipsBatchQueries()
     logger = logging.getLogger("test")
-    container_repo = PgContainerGatewayQueries(conn)
-    publisher_repo = PgPublisherGatewayQueries(conn)
+    container_repo = ContainerGatewayQueries(conn)
+    publisher_repo = PublisherGatewayQueries(conn)
 
     rows = conn.execute(
         text("""

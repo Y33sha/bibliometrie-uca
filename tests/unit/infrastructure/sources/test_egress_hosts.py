@@ -12,7 +12,7 @@ import pytest
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.doaj.client import ALLOWED_DUMP_HOSTS, DOAJ_CSV_DUMP_URL
+from pipeline.sources.doaj import ALLOWED_DUMP_HOSTS, DOAJ_CSV_DUMP_URL
 
 HOTES_DECLARES = frozenset(
     {

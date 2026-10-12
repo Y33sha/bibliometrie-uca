@@ -5,17 +5,17 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from application.pipeline.publishers_journals.link_monographs_to_collections import (
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
-from infrastructure.pipeline.containers import PgContainerGatewayQueries
 from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.sources import insert_source_publication
 
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return PgContainerGatewayQueries(sa_sync_conn)
+    return ContainerGatewayQueries(sa_sync_conn)
 
 
 def _volume(conn, repo, title: str, source_id: str) -> int:

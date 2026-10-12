@@ -81,9 +81,9 @@ def _normalize_builders(
 ) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from infrastructure.fingerprint import fingerprint
-    from infrastructure.pipeline.containers import PgContainerGatewayQueries
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.raw_store import NullRawStore, get_raw_store
+    from pipeline.containers.containers import ContainerGatewayQueries
+    from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.sources.crossref.normalize import CrossrefNormalizer
     from pipeline.sources.datacite.normalize import DataciteNormalizer
     from pipeline.sources.hal.normalize import HalNormalizer
@@ -107,8 +107,8 @@ def _normalize_builders(
             log,
             StagingQueries(raw_store),
             SourcePublicationQueries(),
-            container_repo_factory=PgContainerGatewayQueries,
-            publisher_repo_factory=PgPublisherGatewayQueries,
+            container_repo_factory=ContainerGatewayQueries,
+            publisher_repo_factory=PublisherGatewayQueries,
             authorship_queries=AuthorshipsBatchQueries(),
             sync_settings=sync_settings,
         )

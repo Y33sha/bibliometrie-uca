@@ -1,4 +1,4 @@
-"""Port des conteneurs d'un document, revue et monographie, consommé par les normaliseurs. Servi par `PgContainerGatewayQueries` (`infrastructure/pipeline/containers.py`)."""
+"""Port des conteneurs d'un document, revue et monographie, consommé par les normaliseurs. Servi par `ContainerGatewayQueries` (`pipeline/containers/containers.py`)."""
 
 from typing import Protocol
 

@@ -4,10 +4,10 @@ import logging
 
 from sqlalchemy import text
 
-from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
+from pipeline.containers.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from infrastructure.pipeline.journals import PgJournalGatewayQueries
+from pipeline.containers.journals import JournalGatewayQueries
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn
 
 
@@ -33,7 +33,7 @@ def _run(conn, rows, *, dry_run=False):
     return run_import_doaj_dump(
         conn,
         logging.getLogger("test"),
-        journal_repo=PgJournalGatewayQueries(conn),
+        journal_repo=JournalGatewayQueries(conn),
         rows=rows,
         dry_run=dry_run,
         commit=False,

@@ -1,6 +1,6 @@
 """Port d'accès pipeline à la table `publishers` : trouve-ou-crée d'un éditeur.
 
-Contrat étroit consommé par le trouve-ou-crée d'éditeur (`services/publishers/core.py:find_or_create_publisher`, appelé par les normaliseurs) et par le volet publisher de la phase `publishers_journals`. Servi par l'adapter `PgPublisherGatewayQueries`.
+Contrat étroit consommé par le trouve-ou-crée d'éditeur (`services/publishers/core.py:find_or_create_publisher`, appelé par les normaliseurs) et par le volet publisher de la phase `publishers_journals`. Servi par l'adapter `PublisherGatewayQueries`.
 
 L'édition curée, la fusion et l'enrichissement pays (maintenance) vivent à part, dans `application/ports/repositories/publisher_repository.py`.
 """

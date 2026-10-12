@@ -90,7 +90,6 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
     "application.pipeline.** -> pipeline.**",
-    "infrastructure.sources.** -> pipeline.**",
 ]
 
 [[tool.importlinter.contracts]]
@@ -110,6 +109,9 @@ ignore_imports = [
     "pipeline.sources.*.normalize -> application.services.publishers.core",
     "pipeline.structures.ror -> application.ports.repositories.ror_repository",
     "pipeline.structures.ror -> application.services.structures.ror",
+    "pipeline.containers.* -> application.services.journals.core",
+    "pipeline.containers.* -> application.services.publishers.core",
+    "pipeline.containers.enrich_publishers -> application.ports.repositories.publisher_repository",
 ]
 
 [[tool.importlinter.contracts]]
@@ -122,8 +124,6 @@ forbidden_modules = ["pipeline"]
 # est déjà migré dans `pipeline/`, jusqu'à sa propre migration.
 ignore_imports = [
     "application.pipeline.** -> pipeline.**",
-    "application.services.publishers.enrich_country -> pipeline.**",
-    "infrastructure.sources.** -> pipeline.**",
 ]
 
 [[tool.importlinter.contracts]]

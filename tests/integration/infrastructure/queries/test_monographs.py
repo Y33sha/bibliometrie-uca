@@ -1,4 +1,4 @@
-"""Tests d'intégration de `PgMonographGatewayQueries`."""
+"""Tests d'intégration de `MonographGatewayQueries`."""
 
 import logging
 from functools import partial
@@ -6,10 +6,10 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from application.pipeline.publishers_journals.type_proceedings_volumes import (
+from pipeline.containers.monographs import MonographGatewayQueries
+from pipeline.containers.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
-from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher
 from tests.integration.helpers.sources import insert_source_publication
 
@@ -22,7 +22,7 @@ _ELECTRONIC = "9783030580810"
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return PgMonographGatewayQueries(sa_sync_conn)
+    return MonographGatewayQueries(sa_sync_conn)
 
 
 def _create(repo, title="Livre", **fields):
