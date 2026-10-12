@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md) décide un schéma par domaine (question 3) : le découpage suit la lecture du modèle, et les droits pourront vérifier la catégorie d'une table là où elle est nette.
+Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md) décide un schéma par domaine (question 3) : le découpage suit la lecture du modèle.
 
 ## Décisions
 
@@ -35,7 +35,3 @@ Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du
 ### Phase 3 — Documentation
 
 - [x] `docs/donnees` : une page par schéma.
-
-## Questions ouvertes
-
-- Droits par catégorie : décisions et référentiels tenus à la main réservés à l'API.
