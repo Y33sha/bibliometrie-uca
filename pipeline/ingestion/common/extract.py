@@ -23,7 +23,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES
@@ -38,11 +38,7 @@ from pipeline.runtime.execution import open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import (
-    signal_source_unconfigured,
-    skipped,
-    timed_metrics,
-)
+from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 if TYPE_CHECKING:
@@ -63,7 +59,7 @@ def _extractor_args(
     return argparse.Namespace(start_year=start_year, year=year, since=since)
 
 
-def _source_summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
+def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
     """Ligne « par source » de la table d'observabilité de la phase."""
     return {
         "found": metrics.total,
@@ -71,7 +67,7 @@ def _source_summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float
         "updated": metrics.updated,
         "unchanged": metrics.unchanged,
         "errors": metrics.errors,
-        "duration_s": round(duration_s, 1),
+        "duration_s": metrics.duration_s,
     }
 
 
@@ -112,17 +108,13 @@ class ExtractPhase:
                     since=since,
                 )
                 try:
-                    metrics, duration = timed_metrics(
-                        lambda: self.extract_one(source, args, breaker)
-                    )
+                    return self.extract_one(source, args, breaker)
                 except ExtractionConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
                         metrics, source, str(exc), logger=ctx.logger, phase="extract"
                     )
                     return metrics
-                metrics.details["duration_s"] = duration
-                return metrics
 
             return run
 
@@ -145,13 +137,12 @@ class ExtractPhase:
         )
 
         metrics = PhaseMetrics()
-        by_source: dict[str, dict[str, float]] = {}
+        by_source: dict[str, dict[str, float | None]] = {}
         for source in HARVESTED_SOURCES:
             source_metrics = by_node[f"extract.{source}"]
             metrics.merge(source_metrics)
             if source in effective and not skipped(source_metrics):
-                duration = cast("float", source_metrics.details["duration_s"])
-                by_source[source] = _source_summary(source_metrics, duration)
+                by_source[source] = _source_summary(source_metrics)
         if by_source:
             metrics.details["table"] = {
                 "rows": [{"key": source, **summary} for source, summary in by_source.items()]

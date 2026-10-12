@@ -1,6 +1,6 @@
 """Exécution des nœuds d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacun de ses nœuds, un `NodeStep` : la fonction qui l'exécute, et pour un nœud qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute le nœud par l'accès à sa source s'il en déclare une (`network`), écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Un nœud sans section écrit lui-même ses lignes.
+Une phase fournit, pour chacun de ses nœuds, un `NodeStep` : la fonction qui l'exécute, et pour un nœud qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute le nœud par l'accès à sa source s'il en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Un nœud sans section écrit lui-même ses lignes.
 """
 
 from __future__ import annotations
@@ -120,15 +120,20 @@ def _retenu(step: NodeStep, ctx: PhaseContext) -> bool:
 
 
 def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> PhaseMetrics:
+    """Exécute le nœud et range sa durée dans `duration_s`."""
+    t0 = time.perf_counter()
     if node.network is None:
-        return step.run(ctx, None)
-    return access_source(
-        node.network,
-        lambda breaker: step.run(ctx, breaker),
-        phase=group,
-        logger=ctx.logger,
-        threshold=step.threshold,
-    )
+        metrics = step.run(ctx, None)
+    else:
+        metrics = access_source(
+            node.network,
+            lambda breaker: step.run(ctx, breaker),
+            phase=group,
+            logger=ctx.logger,
+            threshold=step.threshold,
+        )
+    metrics.duration_s = round(time.perf_counter() - t0, 1)
+    return metrics
 
 
 def _bilan(metrics: PhaseMetrics) -> str:
