@@ -54,33 +54,6 @@ class PgPersonRepository(PersonRepository):
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────
 
-    def find_rh_person_duplicate(
-        self, last_name: str, first_name: str, department: str | None, role: str | None
-    ) -> int | None:
-        return _core.find_rh_person_duplicate(self._conn, last_name, first_name, department, role)
-
-    def insert_rh_record(
-        self,
-        person_id: int,
-        *,
-        email: str | None,
-        role: str | None,
-        department: str | None,
-        start_date: str | None,
-        end_date: str | None,
-        export_date: str | None,
-    ) -> None:
-        _core.insert_rh_record(
-            self._conn,
-            person_id,
-            email=email,
-            role=role,
-            department=department,
-            start_date=start_date,
-            end_date=end_date,
-            export_date=export_date,
-        )
-
     def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
         return _core.map_rh_emails_to_person_ids(self._conn)
 

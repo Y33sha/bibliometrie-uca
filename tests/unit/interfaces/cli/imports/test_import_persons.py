@@ -129,12 +129,11 @@ class TestImportPersons:
         appels: list[dict] = []
         issues: list = []
 
-        def _import(last_name, first_name, **kw):
+        def _import(conn, last_name, first_name, **kw):
             appels.append({"last_name": last_name, "first_name": first_name, **kw})
             return issues.pop(0) if issues else module.RhImportOutcome.INSERTED
 
         monkeypatch.setattr(module, "import_rh_person", _import)
-        monkeypatch.setattr(module, "person_repository", lambda conn: object())
         return appels, issues
 
     def test_personne_versee_et_transaction_close(self, personnes_importees):

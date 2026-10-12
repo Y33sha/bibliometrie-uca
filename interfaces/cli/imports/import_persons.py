@@ -17,17 +17,84 @@ import os
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from sqlalchemy import Connection, text
 
-from application.services.persons.core import RhImportOutcome, import_rh_person
-from domain.normalize import sanitize_optional_text
+from application.services.persons.core import create_person
+from domain.normalize import normalize_name, sanitize_optional_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository
 
 log = setup_logger("import_persons", os.path.dirname(__file__))
+
+
+class RhImportOutcome(StrEnum):
+    """Issue de l'import d'une ligne de fichier RH par `import_rh_person`."""
+
+    INSERTED = "inserted"  # personne créée et fiche RH ajoutée
+    DUPLICATE = "duplicate"  # même nom et même fiche RH déjà en base (ignorée)
+
+
+_RH_DUPLICATE = text("""
+    SELECT p.id FROM persons p
+    LEFT JOIN persons_rh prh ON prh.person_id = p.id
+    WHERE p.last_name_normalized = :ln
+      AND p.first_name_normalized = :fn
+      AND prh.department_name IS NOT DISTINCT FROM :dept
+      AND prh.role_title IS NOT DISTINCT FROM :role
+""")
+
+_INSERT_RH = text("""
+    INSERT INTO persons_rh
+        (person_id, email, role_title, department_name, start_date, end_date, hr_export_date)
+    VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
+""")
+
+
+def import_rh_person(
+    conn: Connection,
+    last_name: str,
+    first_name: str,
+    *,
+    email: str | None = None,
+    department: str | None = None,
+    role: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    export_date: str | None = None,
+) -> RhImportOutcome:
+    """Crée la personne et sa fiche `persons_rh`, sauf doublon : même nom normalisé, même service et même fonction.
+
+    La création passe par `create_person`, qui dérive les formes de nom.
+    """
+    duplicate = conn.execute(
+        _RH_DUPLICATE,
+        {
+            "ln": normalize_name(last_name),
+            "fn": normalize_name(first_name),
+            "dept": department,
+            "role": role,
+        },
+    ).first()
+    if duplicate is not None:
+        return RhImportOutcome.DUPLICATE
+    person_id = create_person(last_name, first_name, repo=person_repository(conn))
+    conn.execute(
+        _INSERT_RH,
+        {
+            "pid": person_id,
+            "email": email,
+            "role": role,
+            "dept": department,
+            "start": start_date,
+            "end": end_date,
+            "exp": export_date,
+        },
+    )
+    return RhImportOutcome.INSERTED
 
 
 def parse_date(val: object) -> str | None:
@@ -179,7 +246,6 @@ def import_persons(
     duplicates = 0
 
     export_dt = parse_date(export_date) if export_date else None
-    repo = person_repository(conn)
 
     for rec in records:
         last_name = sanitize_optional_text(rec.get("last_name"))
@@ -193,6 +259,7 @@ def import_persons(
             continue
 
         outcome = import_rh_person(
+            conn,
             last_name,
             first_name,
             email=sanitize_optional_text(rec.get("email")),
@@ -201,7 +268,6 @@ def import_persons(
             start_date=parse_date(rec.get("start_date", "")),
             end_date=parse_date(rec.get("end_date", "")),
             export_date=export_dt,
-            repo=repo,
         )
         if outcome is RhImportOutcome.DUPLICATE:
             duplicates += 1

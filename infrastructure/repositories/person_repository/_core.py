@@ -111,58 +111,6 @@ def set_exclusion(conn: Connection, person_id: int, exclusion: PersonExclusion |
         raise NotFoundError(f"Personne {person_id} introuvable")
 
 
-def find_rh_person_duplicate(
-    conn: Connection, last_name: str, first_name: str, department: str | None, role: str | None
-) -> int | None:
-    row = conn.execute(
-        text("""
-            SELECT p.id FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.last_name_normalized = :ln
-              AND p.first_name_normalized = :fn
-              AND prh.department_name IS NOT DISTINCT FROM :dept
-              AND prh.role_title IS NOT DISTINCT FROM :role
-        """),
-        {
-            "ln": normalize_name(last_name),
-            "fn": normalize_name(first_name),
-            "dept": department,
-            "role": role,
-        },
-    ).first()
-    return row.id if row else None
-
-
-def insert_rh_record(
-    conn: Connection,
-    person_id: int,
-    *,
-    email: str | None,
-    role: str | None,
-    department: str | None,
-    start_date: str | None,
-    end_date: str | None,
-    export_date: str | None,
-) -> None:
-    conn.execute(
-        text("""
-            INSERT INTO persons_rh
-                (person_id, email, role_title, department_name,
-                 start_date, end_date, hr_export_date)
-            VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
-        """),
-        {
-            "pid": person_id,
-            "email": email,
-            "role": role,
-            "dept": department,
-            "start": start_date,
-            "end": end_date,
-            "exp": export_date,
-        },
-    )
-
-
 def map_rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
     """`{email minusculisé: [person_id, ...]}` depuis `persons_rh` (emails renseignés). Résout les emails de l'import des ORCID authentifiés vers les personnes qui les portent."""
     return {
