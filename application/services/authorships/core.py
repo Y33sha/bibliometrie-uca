@@ -8,7 +8,7 @@ La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
+from application.ports.pipeline.in_perimeter import AffiliationsQueries
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository

@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from fastapi import Depends, Request
 from sqlalchemy import Connection
 
-from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
+from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries

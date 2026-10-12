@@ -212,7 +212,7 @@ def _cluster_case(value: str | None) -> DoiClusterCase | None:
 
 
 class PgMetadataCorrectionQueries:
-    """Adapter PostgreSQL pour `application.ports.pipeline.metadata_correction.PgMetadataCorrectionQueries`."""
+    """Requêtes de la phase `metadata_correction`."""
 
     def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
         """Toutes les `source_publications`, avec join `journals` et `raw_metadata`.
