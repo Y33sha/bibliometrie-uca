@@ -453,8 +453,8 @@ def _execute_phases(
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
-    # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
-    # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
+    # Matérialise `perimeter_structures` avant toute phase, même avec `--only` ou `--from` :
+    # les phases qui suivent lisent le périmètre sans le recalculer.
     from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
     with open_tx() as perimeter_conn:

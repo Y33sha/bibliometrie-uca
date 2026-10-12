@@ -53,7 +53,7 @@ Accès aux sources :
 
 - [ ] Chaque nœud désigne sa fonction. `run.py` exécute les nœuds dans l'ordre du graphe. Il affiche le cadre quand le groupe change, le titre de section quand la section change, puis le bilan du nœud.
 - [ ] Un nœud qui déclare un `network` s'exécute dans la fonction d'accès à sa source, posée par l'exécuteur.
-- [ ] Mise à jour de la documentation, dont `publisher_checked_at` et `resolve_publishers` dans `docs/pipeline/05-publishers-journals.md`, `docs/agregats/publishers.md` et `docs/sources/`.
+- [ ] Mise à jour de la documentation, dont `publisher_checked_at` et `resolve_publishers` dans `docs/pipeline/05-publishers-journals.md`, `docs/agregats/publishers.md` et `docs/sources/`, et la matérialisation de `perimeter_structures` dans `docs/donnees/08-donnees-derivees.md`.
 
 ## Questions ouvertes
 

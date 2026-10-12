@@ -3,7 +3,7 @@
 Quatre sous-étapes, chacune dans sa propre transaction :
 
 0. **Référentiel ROR** : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
-1. **Périmètre** : rafraîchit la table `perimeter_structures`. La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure.
+1. **Périmètre** : la phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. `run.py` matérialise `perimeter_structures` avant toute phase.
 2. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
 3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
 """
@@ -46,13 +46,12 @@ class AffiliationsPhase:
         ror = self.refresh_ror()
 
         with open_tx() as conn:
-            perimeter_queries.refresh_perimeter_structures(conn)
             if perimeter_queries.count_extraction_structures(conn) == 0:
                 raise EmptyExtractionPerimeterError()
 
         etape(logger, "Identification des structures dans les adresses institutionnelles")
         with open_tx() as conn:
-            # Périmètre lu une fois après le rafraîchissement, réutilisé par les deux sous-étapes suivantes.
+            # Périmètre lu une fois, réutilisé par les deux sous-étapes suivantes.
             perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
             stats = run_resolution(conn, self.address_queries, perimeter_ids, logger)
 
