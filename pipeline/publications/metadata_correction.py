@@ -14,12 +14,12 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.correct_by_cluster import run as run_cluster
 from pipeline.publications.correct_unary import run as run_unary
 from pipeline.publications.journal_by_doi import run as run_journal_by_doi
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
 
 def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:
@@ -30,7 +30,7 @@ def _step[T](open_tx: OpenTransaction, step: Callable[[Connection], T]) -> T:
 
 @dataclass(frozen=True)
 class MetadataCorrectionPhase:
-    queries: MetadataCorrectionQueries
+    queries: PgMetadataCorrectionQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""

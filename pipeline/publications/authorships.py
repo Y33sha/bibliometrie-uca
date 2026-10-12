@@ -16,14 +16,14 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
-from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
+from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
 from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.execution import log, open_tx
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
 from pipeline.publications.address_pub_count import AddressPubCountQueries
+from pipeline.publications.authorships_queries import AuthorshipsBuild
 from pipeline.publications.build_authorships import build as build_authorships
 from pipeline.publications.purge_orphan_publications import (
     PurgeOrphanPublicationsQueries,
@@ -34,9 +34,9 @@ _PURGE_BATCH_SIZE = 5000
 
 @dataclass(frozen=True)
 class AuthorshipsPhase:
-    build_queries: AuthorshipsBuildQueries
+    build_queries: AuthorshipsBuild
     purge_queries: PurgeOrphanPublicationsQueries
-    pub_counts_queries: PubCountsQueries
+    pub_counts_queries: PgPubCountsQueries
     address_pub_count_queries: AddressPubCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[], PhaseMetrics]], ...] = ()
@@ -99,7 +99,7 @@ def _delete_empty_containers(
 
 def _refresh_pub_counts(
     open_tx: OpenTransaction,
-    pub_counts_queries: PubCountsQueries,
+    pub_counts_queries: PgPubCountsQueries,
     address_pub_count_queries: AddressPubCountQueries,
     logger: logging.Logger,
 ) -> None:
@@ -144,7 +144,6 @@ def build() -> Phase:
 
     Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée. `run_pipeline --rebuild-authorships` la purge et la reconstruit depuis zéro, en récupération.
     """
-    from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
     from pipeline.containers import (
         delete_empty_journals,
         delete_empty_monographs,

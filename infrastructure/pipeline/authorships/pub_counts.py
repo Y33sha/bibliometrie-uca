@@ -8,8 +8,6 @@ Les deux recalculs en masse tournent dans le pipeline après que `in_perimeter` 
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
-
 
 def refresh_journal_pub_count(conn: Connection, journal_id: int) -> None:
     """Recalcule le `pub_count` d'une seule revue (fusion admin)."""
@@ -38,10 +36,14 @@ def refresh_publisher_pub_count(conn: Connection, publisher_id: int) -> None:
     )
 
 
-class PgPubCountsQueries(PubCountsQueries):
-    """Adapter PostgreSQL pour le port `PubCountsQueries`."""
+class PgPubCountsQueries:
+    """Recalcul en masse des `pub_count` sur `journals` puis `publishers`, en fin de phase `authorships`."""
 
     def refresh_journal_pub_counts(self, conn: Connection) -> int:
+        """Recalcule le `pub_count` de chaque revue.
+
+        Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
+        """
         return conn.execute(
             text("""
                 WITH counts AS (
@@ -60,6 +62,10 @@ class PgPubCountsQueries(PubCountsQueries):
         ).rowcount
 
     def refresh_publisher_pub_counts(self, conn: Connection) -> int:
+        """Recalcule le `pub_count` de chaque éditeur, somme de celui de ses revues.
+
+        À appeler après `refresh_journal_pub_counts`, dont il lit le résultat. Rend le nombre de lignes changées.
+        """
         return conn.execute(
             text("""
                 WITH counts AS (

@@ -15,11 +15,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import (
-    DoiClusterRow,
-    DoiCorrectionUpdate,
-    MetadataCorrectionQueries,
-)
 from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterDecision,
     DoiClusterMember,
@@ -28,6 +23,11 @@ from domain.source_publications.metadata_correction.shared_doi import (
 from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.publications.correction_batches import persist_in_batches
+from pipeline.publications.metadata_correction_queries import (
+    DoiClusterRow,
+    DoiCorrectionUpdate,
+    PgMetadataCorrectionQueries,
+)
 
 
 def _compute_update(
@@ -98,7 +98,7 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 
 
 def run(
-    conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
+    conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI des chapitres portant le DOI de l'ouvrage."""
     etape(logger, "Corrections de DOI par confrontation de documents")

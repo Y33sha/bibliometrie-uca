@@ -1,30 +1,128 @@
-"""SQL de la phase `metadata_correction`, et du recalcul ciblé des corrections que l'API lance après une édition de revue.
+"""SQL de la phase `metadata_correction`, et du recalcul ciblé des corrections d'une revue.
 
-Implémente le port `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
+La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce module : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
 """
+
+from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.metadata_correction import (
-    CorrectionUpdate,
-    DoiClusterRow,
-    DoiCorrectionUpdate,
-    JournalCorrectionRow,
-    JournalCorrectionUpdate,
-    MetadataCorrectionQueries,
-    UnaryCorrectionRow,
-)
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
+from domain.source_publications.metadata_correction.rules import MetadataForCorrection
 from domain.source_publications.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
     DoiClusterCase,
 )
 from domain.sources.registry import Source
+from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
 from infrastructure.db.tables import source_publications
+
+
+class UnaryCorrectionRow(NamedTuple):
+    """Une `source_publication` candidate à la correction unaire, jointe à son journal.
+
+    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'une notice ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+
+    L'adapter construit les lignes par appariement de noms : chaque champ a le nom de la colonne qui l'alimente.
+    """
+
+    id: int
+    source: str
+    source_id: str
+    title: str
+    doc_type: str | None
+    doi: str | None
+    journal_id: int | None
+    oa_status: str | None
+    language: str | None
+    urls: list[str] | None
+    external_ids: dict[str, JsonValue]
+    journal_type: str | None
+    oa_model: str | None
+    raw_metadata: dict[str, JsonValue]
+    embargo_expired: bool
+    self_declared_preprint: bool
+    declares_conference: bool
+    registrant_publisher_type: str | None
+    in_proceedings_volume: bool
+    group_title: str | None
+
+    def for_correction(self) -> MetadataForCorrection:
+        """Projette la ligne vers le contrat d'entrée des règles."""
+        return MetadataForCorrection(
+            title=self.title,
+            doc_type=self.doc_type,
+            doi=self.doi,
+            journal_id=self.journal_id,
+            oa_status=self.oa_status,
+            urls=self.urls,
+            journal_type=self.journal_type,
+            oa_model=self.oa_model,
+            embargo_expired=self.embargo_expired,
+            self_declared_preprint=self.self_declared_preprint,
+            declares_conference=self.declares_conference,
+            registrant_publisher_type=self.registrant_publisher_type,
+            in_proceedings_volume=self.in_proceedings_volume,
+            group_title=self.group_title,
+        )
+
+
+class CorrectionUpdate(NamedTuple):
+    """Une mise à jour à persister : colonnes effectives + `external_ids` + sidecar `raw_metadata`."""
+
+    id: int
+    doc_type: str | None
+    oa_status: str | None
+    language: str | None
+    external_ids: dict[str, JsonValue]
+    raw_metadata: dict[str, JsonValue]
+
+
+class JournalCorrectionRow(NamedTuple):
+    """Une `source_publication` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
+
+    id: int
+    source: str
+    raw_doc_type: str | None
+    doi: str | None
+    journal_id: int | None
+    raw_metadata: dict[str, JsonValue]
+
+
+class JournalCorrectionUpdate(NamedTuple):
+    """Une mise à jour de rattachement : colonne `journal_id` (posée ou restaurée à NULL) + sidecar `raw_metadata`. Produite par la sous-étape `journal_by_doi`, persistée via `persist_journal_corrections`."""
+
+    id: int
+    journal_id: int | None
+    raw_metadata: dict[str, JsonValue]
+
+
+class DoiClusterRow(NamedTuple):
+    """Une `source_publication` candidate à la correction de DOI par cluster.
+
+    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre de référence quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` donne alors le cas correspondant."""
+
+    id: int
+    doc_type: str | None
+    doi: str | None
+    title_normalized: str | None
+    raw_metadata: dict[str, JsonValue]
+    raw_doi: str
+    canonical_doi: str | None
+    same_work_case: DoiClusterCase | None
+
+
+class DoiCorrectionUpdate(NamedTuple):
+    """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou substituée) + sidecar. Produite par la correction de DOI par cluster (convergence même-œuvre ou nullage de DOI partagé à tort), persistée via `persist_doi_corrections`."""
+
+    id: int
+    doi: str | None
+    raw_metadata: dict[str, JsonValue]
+
 
 # Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
 # métier `DATACITE_DIRECT_CONVERGENCE`.
@@ -113,22 +211,30 @@ def _cluster_case(value: str | None) -> DoiClusterCase | None:
     return DoiClusterCase(value) if value is not None else None
 
 
-class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`."""
+class PgMetadataCorrectionQueries:
+    """Adapter PostgreSQL pour `application.ports.pipeline.metadata_correction.PgMetadataCorrectionQueries`."""
 
     def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
+        """Toutes les `source_publications`, avec join `journals` et `raw_metadata`.
+
+        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_publication` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
+        """
         rows = conn.execute(text(_SELECT))
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
     ) -> list[UnaryCorrectionRow]:
+        """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
+
+        Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_publications` voient leur correction journal-dépendante bouger."""
         rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_for_unary_correction_by_hal_ids(
         self, conn: Connection, hal_ids: list[str]
     ) -> list[UnaryCorrectionRow]:
+        """Les `source_publications` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des notices ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         rows = conn.execute(
@@ -138,10 +244,12 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_language_forms(self, conn: Connection) -> dict[str, str]:
+        """Formes de `language_forms`, chacune associée au code de sa langue."""
         rows = conn.execute(text("SELECT form_normalized, language_code FROM language_forms"))
         return {r.form_normalized: r.language_code for r in rows}
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
+        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation ; celle-ci recalcule aussi la langue de la publication. Retourne le nombre de lignes mises à jour."""
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],
@@ -150,12 +258,14 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         )
 
     def fetch_journal_doi_namespaces(self, conn: Connection) -> list[DoiNamespace]:
+        """Le contenu de `journal_doi_namespaces`."""
         rows = conn.execute(
             text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
         )
         return rows_as(DoiNamespace, rows)
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
+        """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         rows = conn.execute(
             text("""
                 SELECT id, source::text AS source,
@@ -171,6 +281,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     def persist_journal_corrections(
         self, conn: Connection, updates: list[JournalCorrectionUpdate]
     ) -> int:
+        """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` de la publication — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],
@@ -179,6 +290,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), et `source_publications` déjà corrigées (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sp_eff AS (
@@ -265,6 +377,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         ]
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
+        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — le DOI est une clé de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],

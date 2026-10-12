@@ -56,7 +56,7 @@ Dans l'ordre du pipeline.
 - [x] `pipeline/public.py`, seul module du pipeline que l'API importe.
 - [x] Les opérations « trouver ou créer » (revues, monographies, éditeurs) passent dans `pipeline/containers`, sans les ports `containers`, `journals`, `monographs`, `publishers`.
 - [x] La création et le recalcul d'une publication, la requalification des publications d'une revue et la fusion de deux revues passent dans `pipeline/`. `public.py` les exporte. Le service des revues garde le contrôle de la paire et l'audit.
-- [ ] Les types des corrections de métadonnées, de la construction des authorships et des périmètres passent dans `pipeline/`.
+- [x] Les types des corrections de métadonnées, de la construction des authorships et des périmètres passent dans `pipeline/`.
 - [ ] Import du dump ROR dans `pipeline/structures`.
 - [ ] Opérations du pipeline sur les personnes (création, nom, identifiants, rattachement d'une signature) dans `pipeline/persons`, sans `PersonRepository` ni `AuthorshipRepository`.
 - [ ] Suppression des exceptions aux règles d'import dans `pyproject.toml`.

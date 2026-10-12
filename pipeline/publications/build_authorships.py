@@ -11,15 +11,15 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
+from pipeline.publications.authorships_queries import AuthorshipsBuild
 
 
 def build(
     conn: Connection,
-    queries: AuthorshipsBuildQueries,
+    queries: AuthorshipsBuild,
     logger: logging.Logger,
     *,
     rebuild_full: bool = False,
