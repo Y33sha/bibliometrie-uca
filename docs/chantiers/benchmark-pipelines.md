@@ -9,26 +9,11 @@ Document de référence, extérieur aux fiches chantier. Lecture du code de six 
 - **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell.
 - **dnet-dedup** : le dédoublonnage du graphe d'OpenAIRE. Lecture partielle, voir la liste des dépôts.
 - **Academic Observatory** : les workflows de l'observatoire de l'université Curtin.
-- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Moissonneur et connecteurs, lus depuis des archives ; application non lue.
+- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Tous les dépôts, lus depuis des archives.
 
 Les liens vers les dépôts sont en fin de document.
 
 ## Organisation du code
-
-### Le découpage d'ensemble : acquisition, transformation, diffusion
-
-- **rialto** : trois paquets, dans l'ordre du run. [`harvest_incremental/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/harvest_incremental) contient un module par source (`openalex.py`, `wos.py`, `crossref.py`, `pubmed.py`…), qui moissonne et charge dans la base de travail, puis `deduplicate.py` et `distill.py`. [`distiller/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/distiller) consolide, un fichier par champ. [`publish/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/publish) alimente la base de diffusion. Les graphes Airflow sont à part, dans `dags/`.
-- **Academic Observatory** : deux familles de dossiers ([`academic_observatory_workflows/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows)). Un `<source>_telescope/` par source télécharge le dump et le charge dans BigQuery : `telescope.py` pour le graphe, `tasks.py` pour les fonctions, `schema/` pour les tables. Un `<produit>_workflow/` par transformation, avec son SQL dans `sql/` : `doi_workflow/`, `oa_dashboard_workflow/`. Les deux familles n'ont aucun module commun.
-- **CRISalid** : deux applications. svp-harvester moissonne : [`app/harvesters/<source>/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/harvesters) contient le client, le constructeur de requêtes et les convertisseurs vers un modèle commun. Les résultats sont stockés dans sa base et publiés sur une file de messages. crisalid-ikg les reçoit ([`app/amqp/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/amqp)) et consolide le graphe dans [`app/services/<entité>/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/services) : documents (avec `merge_strategies/`), personnes, revues, organisations.
-- **openalex-walden** : [`notebooks/ingest/`](https://github.com/ourresearch/openalex-walden/tree/main/notebooks/ingest) contient un notebook par source (Crossref, DataCite, HAL, PubMed, dépôts…). La transformation a un dossier par entité : `authors/`, `institutions/`, `publishers/`, `sources/`, `topics/`, et `end2end/` pour l'assemblage des works. [`jobs/`](https://github.com/ourresearch/openalex-walden/tree/main/jobs) déclare un fichier YAML par chaîne.
-- **ReCiter** : un service, sans run par lots. Chaque source a son paquet de récupération (`pubmed/retriever/`, `scopus/retriever/`) ; l'attribution est à part ([`algorithm/`, `engine/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter)).
-- **dnet-dedup** : la bibliothèque de rapprochement seule ([`dnet-pace-core/`](https://github.com/dnet-team/dnet-dedup/tree/master/dnet-pace-core)), sans acquisition. Une chaîne Spark plus large l'appelle.
-
-Ce qui se dégage :
-
-- Tous séparent l'acquisition, un dossier ou un module par source, de la transformation. CRISalid en fait deux applications, l'Academic Observatory deux familles de workflows.
-- La transformation est rangée par entité produite (walden, crisalid-ikg) ou par produit (Academic Observatory), jamais par source.
-- La diffusion, quand elle existe, est un troisième temps distinct (rialto, `publish/`).
 
 ### Le graphe du run dans un seul fichier
 
@@ -350,7 +335,7 @@ Un pipeline ELT au sens strict : des dumps complets de sources ouvertes chargés
 
 ## Outil d'établissement : BiblioRef (Lyon 3)
 
-Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) et le dépôt de présentation (`awesome-biblioref`). Non lus : le schéma de la base, l'API et l'interface. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
+Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) le dépôt de présentation (`awesome-biblioref`), le schéma de la base (`bdd`) et l'API (`backend`, 25 700 lignes de TypeScript). L'interface (`frontend`, Angular) n'a pas été lue. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
 
 ### Des connecteurs en services séparés, derrière un contrat commun
 
@@ -384,6 +369,25 @@ Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), 
 - OpenAlex : par date de publication seulement. Un commentaire du code note que le filtre par date de mise à jour est payant.
 - Le Sudoc : requête SPARQL par IdRef, puis notice complète en MARCXML.
 - Aucune gestion des notices disparues d'une source.
+
+### Les corrections manuelles
+
+- Où : [`backend`](https://gitlab.com/biblioref/saas-app/backend), dossier `src/modules/`, un module par table (contrôleur, modèle, routes).
+- L'API est un CRUD par table : une modification écrit directement dans les tables que remplit le moissonneur.
+- La seule protection est le verrou posé à la main sur une publication (`locked`). Une publication corrigée mais non verrouillée peut être supprimée et recréée par la fusion suivante, et la correction est perdue.
+- Une table `trace` journalise chaque modification : utilisateur, table, identifiant de la ligne, type d'opération. C'est un journal d'audit, pas un journal de décisions rejouable.
+- Des imports par tableur pour l'annuaire, les unités de recherche et les publications ; le modèle d'import des publications a une colonne « verrouillé ».
+
+### Un annuaire riche
+
+- Où : [`bdd`](https://gitlab.com/biblioref/saas-app/bdd), fichier `1_Création/biblioref.sql`.
+- Pour chaque personne : appartenances datées aux structures, grades, diplômes, disciplines, sections, mots-clés, identifiants.
+- Pour chaque structure : tutelles typées (principale ou non), formes de nom, et un historique des créations, fusions et scissions (`structurecreation`, avec les structures d'origine).
+- Chez nous : l'historique des structures manque à `structure_tutelles` ; il sert à rattacher une publication ancienne à une unité qui a depuis fusionné.
+
+### Les collections thématiques par expression régulière
+
+- Une collection (`tag`) est définie par une expression régulière, stockée en base. Je n'ai pas trouvé où elle est appliquée aux publications.
 
 ### L'origine de chaque champ consolidé
 
@@ -424,6 +428,8 @@ Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), 
 - **Le rattachement d'auteurs par égalité de nom, sans contrôle des homonymes.**
 - **La comparaison de chaque notice à tout le stock en mémoire.**
 - **Le code commun recopié dans chaque connecteur**, au lieu d'une bibliothèque partagée.
+- **Les corrections écrites dans les tables du moissonneur**, protégées seulement par le verrou.
+- **Le script de création de la base au format MySQL**, alors que l'API se connecte à PostgreSQL : le schéma de référence n'est pas évident.
 
 ## Métadonnées
 
@@ -476,7 +482,7 @@ Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), 
 - **[dnet-team/dnet-dedup](https://github.com/dnet-team/dnet-dedup)** — dédoublonnage d'OpenAIRE. Java, Spark. Dernier commit sur GitHub : 2022-04-26. Lu : configuration, comparateurs, fonctions de blocage.
 - **[D-Net/dnet-hadoop](https://code-repo.d4science.org/D-Net/dnet-hadoop)** — code actuel du graphe d'OpenAIRE, module `dhp-dedup-openaire`, fichiers datés de 2023-2024. Lu par résumé : `SparkCreateMergeRels.java`, `IdGenerator.java`. Non lu : `SparkWhitelistSimRels.java` (accès refusé). Le miroir GitHub de ce dépôt date de 2019.
 - **[The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)** — université Curtin. Python, Airflow, BigQuery, SQL en gabarits Jinja. 31 000 lignes de Python, dont 7 700 de liste d'établissements. Dernier commit : 2026-10-12.
-- **[biblioref (GitLab)](https://gitlab.com/biblioref)** — université Jean Moulin Lyon 3, développé par DyoNeo. Python pour le moissonneur, Node.js et Angular pour l'application, PostgreSQL. Lus, depuis des archives : [`harvester`](https://gitlab.com/biblioref/harvester/harvester), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), [`connector-hal`](https://gitlab.com/biblioref/connectors/connector-hal), [`connector-openalex`](https://gitlab.com/biblioref/connectors/connector-openalex), [`connector-sudoc`](https://gitlab.com/biblioref/connectors/connector-sudoc), [`awesome-biblioref`](https://gitlab.com/biblioref/awesome-biblioref/awesome-biblioref). Un seul commit par dépôt, septembre 2025. Non lus : `bdd`, `backend`, `frontend`. Présentation : [*Arabesques*](https://publications-prairial.fr/arabesques/index.php?id=4433).
+- **[biblioref (GitLab)](https://gitlab.com/biblioref)** — université Jean Moulin Lyon 3, développé par DyoNeo. Python pour le moissonneur, Node.js et Angular pour l'application, PostgreSQL. Lus, depuis des archives : [`harvester`](https://gitlab.com/biblioref/harvester/harvester), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), [`connector-hal`](https://gitlab.com/biblioref/connectors/connector-hal), [`connector-openalex`](https://gitlab.com/biblioref/connectors/connector-openalex), [`connector-sudoc`](https://gitlab.com/biblioref/connectors/connector-sudoc), [`awesome-biblioref`](https://gitlab.com/biblioref/awesome-biblioref/awesome-biblioref). Un seul commit par dépôt, septembre 2025. Puis [`bdd`](https://gitlab.com/biblioref/saas-app/bdd) et [`backend`](https://gitlab.com/biblioref/saas-app/backend). Non lu : `frontend`. Présentation : [*Arabesques*](https://publications-prairial.fr/arabesques/index.php?id=4433).
 
 ### Repérés, non lus
 
