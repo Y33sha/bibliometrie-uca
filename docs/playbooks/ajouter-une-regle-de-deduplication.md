@@ -48,8 +48,6 @@ Le token est cette valeur sérialisée en chaîne (ex. `"<doc_type>|<title_norma
 
 SQL d'audit qui compte les blocs que le token regrouperait, et **mesure leur pureté**. Le contrôle de référence : comparer le recouvrement d'auteurs des couples que le token relierait à celui des couples reliés par DOI (vérité terrain « même œuvre »). Si le token n'est pas plus bruité que le DOI, il n'introduit pas d'excédent de collision.
 
-Outils d'audit : [`audit_dedup_author_overlap`](../../interfaces/cli/oneshot/audit_dedup_author_overlap.py) (taux de non-recouvrement, token candidat vs DOI, par paire de sources) et [`audit_dedup_overmerge_examples`](../../interfaces/cli/oneshot/audit_dedup_overmerge_examples.py) (dump des couples suspects pour qualification manuelle).
-
 ### 4. Valider
 
 Revue du résidu suspect (couples sans recouvrement d'auteurs). Trois sorties :
