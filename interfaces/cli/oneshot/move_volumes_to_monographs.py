@@ -39,10 +39,10 @@ from domain.sources.openalex import parse_primary_location, should_skip_publishe
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.containers import PgContainerGatewayQueries
-from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from infrastructure.raw_store.base import RawStore
 from infrastructure.raw_store.factory import get_raw_store
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.crossref import normalize as normalize_crossref
 from pipeline.sources.datacite import normalize as normalize_datacite
 from pipeline.sources.hal import normalize as normalize_hal
@@ -160,7 +160,7 @@ def resolve_stored(record: StoredRecord, conn: Connection) -> Containers:
     return find_or_create_containers(
         describe(record),
         publisher_id=record.monograph_publisher_id or record.journal_publisher_id,
-        repo=PgContainerGatewayQueries(conn),
+        repo=ContainerGatewayQueries(conn),
     )
 
 
@@ -172,10 +172,10 @@ def _replay_crossref(
     payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
 ) -> Containers:
     publisher_id = normalize_crossref.upsert_publisher(
-        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+        payload, publisher_repo=PublisherGatewayQueries(conn)
     )
     return normalize_crossref.upsert_containers(
-        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        payload, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 
@@ -183,10 +183,10 @@ def _replay_scanr(
     payload: Mapping[str, JsonValue], record: StoredRecord, conn: Connection
 ) -> Containers:
     publisher_id = normalize_scanr.upsert_publisher(
-        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+        payload, publisher_repo=PublisherGatewayQueries(conn)
     )
     return normalize_scanr.upsert_containers(
-        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        payload, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 
@@ -197,12 +197,12 @@ def _replay_hal(
         payload.get("publisher_s")
     )
     publisher_id = (
-        normalize_hal.upsert_publisher(name, publisher_repo=PgPublisherGatewayQueries(conn))
+        normalize_hal.upsert_publisher(name, publisher_repo=PublisherGatewayQueries(conn))
         if name
         else None
     )
     return normalize_hal.upsert_containers(
-        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        payload, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 
@@ -212,10 +212,10 @@ def _replay_openalex(
     if should_skip_publisher_journal(parse_primary_location(payload)):
         return Containers(None, None)
     publisher_id = normalize_openalex.upsert_publisher(
-        payload, publisher_repo=PgPublisherGatewayQueries(conn)
+        payload, publisher_repo=PublisherGatewayQueries(conn)
     )
     return normalize_openalex.upsert_containers(
-        payload, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        payload, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 
@@ -224,10 +224,10 @@ def _replay_datacite(
 ) -> Containers:
     attributes = as_mapping(payload.get("attributes"))
     publisher_id = normalize_datacite.upsert_publisher(
-        attributes, publisher_repo=PgPublisherGatewayQueries(conn)
+        attributes, publisher_repo=PublisherGatewayQueries(conn)
     )
     return normalize_datacite.upsert_containers(
-        attributes, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        attributes, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 
@@ -236,10 +236,10 @@ def _replay_wos(
 ) -> Containers:
     rec = normalize_wos.extract_from_api(payload, record.doi)
     publisher_id = normalize_wos.upsert_publisher(
-        as_str(rec.get("publisher_name")), publisher_repo=PgPublisherGatewayQueries(conn)
+        as_str(rec.get("publisher_name")), publisher_repo=PublisherGatewayQueries(conn)
     )
     return normalize_wos.upsert_containers(
-        rec, publisher_id, container_repo=PgContainerGatewayQueries(conn)
+        rec, publisher_id, container_repo=ContainerGatewayQueries(conn)
     )
 
 

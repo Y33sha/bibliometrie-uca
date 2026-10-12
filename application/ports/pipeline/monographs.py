@@ -1,4 +1,4 @@
-"""Port d'accès pipeline à la table `monographs`, servi par `PgMonographGatewayQueries` (`infrastructure/pipeline/monographs.py`)."""
+"""Port d'accès pipeline à la table `monographs`, servi par `MonographGatewayQueries` (`pipeline/containers/monographs.py`)."""
 
 from typing import NamedTuple, Protocol
 

@@ -34,14 +34,14 @@ from domain.errors import (
 )
 from domain.journals.issns import IssnSupport, JournalIssn, source_issns
 from domain.journals.journal import JournalType, OaModel
-from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,
     publisher_repository,
 )
+from pipeline.containers.journals import JournalGatewayQueries
+from pipeline.containers.publishers import PublisherGatewayQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal_with_issns,
@@ -71,7 +71,7 @@ def repo(sa_sync_conn):
 
 @pytest.fixture
 def gateway(sa_sync_conn):
-    return PgJournalGatewayQueries(sa_sync_conn)
+    return JournalGatewayQueries(sa_sync_conn)
 
 
 @pytest.fixture
@@ -81,7 +81,7 @@ def publisher_repo(sa_sync_conn):
 
 @pytest.fixture
 def publisher_gateway(sa_sync_conn):
-    return PgPublisherGatewayQueries(sa_sync_conn)
+    return PublisherGatewayQueries(sa_sync_conn)
 
 
 @pytest.fixture

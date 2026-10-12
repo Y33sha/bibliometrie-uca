@@ -1,4 +1,4 @@
-"""Tests d'intégration de `PgJournalGatewayQueries` : files d'enrichissement et index DOAJ."""
+"""Tests d'intégration de `JournalGatewayQueries` : files d'enrichissement et index DOAJ."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from sqlalchemy import text
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
-from infrastructure.pipeline.journals import PgJournalGatewayQueries
+from pipeline.containers.journals import JournalGatewayQueries
 from tests.integration.helpers.journals import (
     insert_journal,
     insert_journal_issn,
@@ -29,7 +29,7 @@ _article = partial(insert_source_publication, title="Article")
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return PgJournalGatewayQueries(sa_sync_conn)
+    return JournalGatewayQueries(sa_sync_conn)
 
 
 def _issns(conn, journal_id):

@@ -24,9 +24,6 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
-    clean_doaj_row,
-)
 from domain.normalize import (
     clean_raw_author_name,
     normalize_label,
@@ -37,6 +34,9 @@ from domain.normalize import (
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from pipeline.containers.import_journals_from_doaj_dump import (
+    clean_doaj_row,
+)
 
 log = setup_logger("backfill_strip_markup", os.path.dirname(__file__))
 

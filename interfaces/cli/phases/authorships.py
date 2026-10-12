@@ -19,16 +19,16 @@ def build() -> Phase:
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
     from application.pipeline.authorships.phase import AuthorshipsPhase
-    from application.pipeline.publishers_journals import (
-        delete_empty_journals,
-        delete_empty_monographs,
-        delete_empty_publishers,
-    )
     from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
     from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
     from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
     from infrastructure.pipeline.authorships.purge_orphan_publications import (
         PgPurgeOrphanPublicationsQueries,
+    )
+    from pipeline.containers import (
+        delete_empty_journals,
+        delete_empty_monographs,
+        delete_empty_publishers,
     )
 
     return AuthorshipsPhase(
@@ -45,30 +45,30 @@ def build() -> Phase:
 
 
 def _run_delete_empty_monographs() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_monographs import (
+    from pipeline.containers.delete_empty_monographs import (
         run_delete_empty_monographs,
     )
-    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+    from pipeline.containers.monographs import MonographGatewayQueries
 
     with open_tx() as conn:
-        return run_delete_empty_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
+        return run_delete_empty_monographs(log, monograph_repo=MonographGatewayQueries(conn))
 
 
 def _run_delete_empty_journals() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_journals import (
+    from pipeline.containers.delete_empty_journals import (
         run_delete_empty_journals,
     )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
+    from pipeline.containers.journals import JournalGatewayQueries
 
     with open_tx() as conn:
-        return run_delete_empty_journals(log, journal_repo=PgJournalGatewayQueries(conn))
+        return run_delete_empty_journals(log, journal_repo=JournalGatewayQueries(conn))
 
 
 def _run_delete_empty_publishers() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.delete_empty_publishers import (
+    from pipeline.containers.delete_empty_publishers import (
         run_delete_empty_publishers,
     )
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from pipeline.containers.publishers import PublisherGatewayQueries
 
     with open_tx() as conn:
-        return run_delete_empty_publishers(log, publisher_repo=PgPublisherGatewayQueries(conn))
+        return run_delete_empty_publishers(log, publisher_repo=PublisherGatewayQueries(conn))

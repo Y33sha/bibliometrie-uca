@@ -93,8 +93,8 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from infrastructure.pipeline.containers import PgContainerGatewayQueries
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from pipeline.containers.containers import ContainerGatewayQueries
+    from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.sources.crossref.normalize import CrossrefNormalizer
     from pipeline.sources.signature_queries import AuthorshipsBatchQueries
     from pipeline.sources.source_publications import (
@@ -112,8 +112,8 @@ def _run_normalize_crossref(conn):
         logger,
         staging_queries,
         queries,
-        container_repo_factory=PgContainerGatewayQueries,
-        publisher_repo_factory=PgPublisherGatewayQueries,
+        container_repo_factory=ContainerGatewayQueries,
+        publisher_repo_factory=PublisherGatewayQueries,
         authorship_queries=authorship_queries,
         sync_settings=SYNC_SETTINGS,
     )

@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'édition et la fusion curées de l'agrégat Journal.
 
-L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Le trouve-ou-crée et l'enrichissement, alimentés par le pipeline, vivent dans `infrastructure/pipeline/journals.py`.
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Le trouve-ou-crée et l'enrichissement, alimentés par le pipeline, vivent dans `pipeline/containers/journals.py`.
 
 Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """

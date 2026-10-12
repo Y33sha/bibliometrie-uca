@@ -13,7 +13,6 @@ import argparse
 import os
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.services.publishers.enrich_country import run_enrich_publishers_from_openalex
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import publisher_repository
@@ -23,7 +22,8 @@ from infrastructure.sources.circuit_breaker import (
     reset_current_breaker,
     set_current_breaker,
 )
-from infrastructure.sources.openalex.publisher_enrichment import fetch_publishers_batch
+from pipeline.containers.enrich_publishers import run_enrich_publishers_from_openalex
+from pipeline.sources.openalex.publisher_enrichment import fetch_publishers_batch
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))
 

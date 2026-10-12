@@ -23,8 +23,8 @@ from application.ports.pipeline.lookup import NotFound, Unavailable
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.config import get_polite_pool_email
-from infrastructure.sources.crossref.prefixes import member_profile
 from infrastructure.sources.polite_pool import build_user_agent
+from pipeline.sources.crossref.prefixes import member_profile
 
 log = setup_logger("reset_idle_crossref_prefixes", os.path.dirname(__file__))
 

@@ -16,9 +16,9 @@ def build() -> Phase:
 
     La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 
-    Séquence, gardes de configuration et métriques dans `application/pipeline/publishers_journals/phase.py`.
+    Séquence, gardes de configuration et métriques dans `pipeline/containers/publishers_journals.py`.
     """
-    from application.pipeline.publishers_journals.phase import PublishersJournalsPhase
+    from pipeline.containers.publishers_journals import PublishersJournalsPhase
 
     return PublishersJournalsPhase(
         resolve_publishers=_run_resolve_publishers,
@@ -36,15 +36,15 @@ def build() -> Phase:
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.resolve_publishers import (
-        run_resolve_publishers,
-    )
-    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.crossref.prefixes import fetch_crossref_prefix
-    from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
     from infrastructure.sources.polite_pool import build_user_agent
     from pipeline.containers.doi_prefixes import DoiPrefixesQueries
+    from pipeline.containers.publishers import PublisherGatewayQueries
+    from pipeline.containers.resolve_publishers import (
+        run_resolve_publishers,
+    )
+    from pipeline.sources.crossref.prefixes import fetch_crossref_prefix
+    from pipeline.sources.datacite.prefixes import fetch_datacite_prefix
 
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
@@ -54,7 +54,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
                 conn,
                 log,
                 repo=DoiPrefixesQueries(conn),
-                publisher_repo=PgPublisherGatewayQueries(conn),
+                publisher_repo=PublisherGatewayQueries(conn),
                 fetch_crossref_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
                     client, prefix, sample_doi, user_agent=user_agent
                 ),
@@ -69,12 +69,12 @@ def _run_resolve_publishers() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
+    from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
+    from pipeline.containers.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
     )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
-    from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
-    from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.sources.openalex.journal_enrichment import fetch_sources_batch
 
     sources_api = API_BASE_URLS["openalex_sources"]
     with open_tx() as conn:
@@ -85,7 +85,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
             lambda breaker: run_enrich_journals_from_openalex(
                 conn,
                 log,
-                journal_repo=PgJournalGatewayQueries(conn),
+                journal_repo=JournalGatewayQueries(conn),
                 fetch_batch=lambda oa_ids: fetch_sources_batch(
                     oa_ids, openalex_sources_api=sources_api
                 ),
@@ -99,16 +99,16 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
 
 
 def _run_check_journals_in_sudoc() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.check_journals_in_sudoc import (
-        run_check_journals_in_sudoc,
-    )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.api_params import (
         API_BASE_URLS,
         SUDOC_MAX_CONCURRENT,
         SUDOC_MAX_PER_SECOND,
     )
-    from infrastructure.sources.sudoc.client import fetch_ppns, fetch_serial_record
+    from pipeline.containers.check_journals_in_sudoc import (
+        run_check_journals_in_sudoc,
+    )
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.sources.sudoc import fetch_ppns, fetch_serial_record
 
     base_url = API_BASE_URLS["sudoc"]
     with open_tx() as conn:
@@ -119,7 +119,7 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
                 run_check_journals_in_sudoc(
                     conn,
                     log,
-                    journal_repo=PgJournalGatewayQueries(conn),
+                    journal_repo=JournalGatewayQueries(conn),
                     fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
                     fetch_record=lambda client, ppn: fetch_serial_record(
                         client, ppn, base_url=base_url
@@ -136,14 +136,14 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
 
 
 def _run_merge_duplicate_journals() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.merge_duplicate_journals import (
-        run_merge_duplicate_journals,
-    )
     from application.services.journals.commands import merge_journals
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
     from infrastructure.repositories.journal_repository import PgJournalRepository
     from infrastructure.repositories.publication_repository import PgPublicationRepository
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.containers.merge_duplicate_journals import (
+        run_merge_duplicate_journals,
+    )
 
     with open_tx() as conn:
         corrections = PgMetadataCorrectionQueries()
@@ -161,73 +161,71 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
             )
 
         return run_merge_duplicate_journals(
-            log, journal_repo=PgJournalGatewayQueries(conn), merge=merge
+            log, journal_repo=JournalGatewayQueries(conn), merge=merge
         )
 
 
 def _run_merge_duplicate_monographs() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.merge_duplicate_monographs import (
+    from pipeline.containers.merge_duplicate_monographs import (
         run_merge_duplicate_monographs,
     )
-    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
+    from pipeline.containers.monographs import MonographGatewayQueries
 
     with open_tx() as conn:
-        return run_merge_duplicate_monographs(log, monograph_repo=PgMonographGatewayQueries(conn))
+        return run_merge_duplicate_monographs(log, monograph_repo=MonographGatewayQueries(conn))
 
 
 def _run_link_monographs_to_collections() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.link_monographs_to_collections import (
+    from pipeline.containers.containers import ContainerGatewayQueries
+    from pipeline.containers.link_monographs_to_collections import (
         run_link_monographs_to_collections,
     )
-    from infrastructure.pipeline.containers import PgContainerGatewayQueries
 
     with open_tx() as conn:
-        return run_link_monographs_to_collections(
-            log, monograph_repo=PgContainerGatewayQueries(conn)
-        )
+        return run_link_monographs_to_collections(log, monograph_repo=ContainerGatewayQueries(conn))
 
 
 def _run_type_proceedings_volumes() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.type_proceedings_volumes import (
+    from pipeline.containers.monographs import MonographGatewayQueries
+    from pipeline.containers.type_proceedings_volumes import (
         run_type_proceedings_volumes,
     )
-    from infrastructure.pipeline.monographs import PgMonographGatewayQueries
 
     with open_tx() as conn:
-        return run_type_proceedings_volumes(log, monograph_repo=PgMonographGatewayQueries(conn))
+        return run_type_proceedings_volumes(log, monograph_repo=MonographGatewayQueries(conn))
 
 
 def _run_type_proceedings_journals() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.type_proceedings_journals import (
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.containers.type_proceedings_journals import (
         run_type_proceedings_journals,
     )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
     with open_tx() as conn:
-        return run_type_proceedings_journals(log, journal_repo=PgJournalGatewayQueries(conn))
+        return run_type_proceedings_journals(log, journal_repo=JournalGatewayQueries(conn))
 
 
 def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.learn_journal_doi_namespaces import (
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.containers.learn_journal_doi_namespaces import (
         run_learn_journal_doi_namespaces,
     )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
     with open_tx() as conn:
-        return run_learn_journal_doi_namespaces(log, journal_repo=PgJournalGatewayQueries(conn))
+        return run_learn_journal_doi_namespaces(log, journal_repo=JournalGatewayQueries(conn))
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
-        run_enrich_journals_from_doaj,
-    )
-    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.config import (
         get_doaj_refresh_after_days,
         get_polite_pool_email_optional,
     )
-    from infrastructure.sources.doaj.client import downloaded_doaj_dump
     from infrastructure.sources.polite_pool import build_user_agent
+    from pipeline.containers.import_journals_from_doaj_dump import (
+        run_enrich_journals_from_doaj,
+    )
+    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.sources.doaj import downloaded_doaj_dump
 
     # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
@@ -235,7 +233,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         return run_enrich_journals_from_doaj(
             conn,
             log,
-            journal_repo=PgJournalGatewayQueries(conn),
+            journal_repo=JournalGatewayQueries(conn),
             refresh_after_days=get_doaj_refresh_after_days(conn),
             download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
         )

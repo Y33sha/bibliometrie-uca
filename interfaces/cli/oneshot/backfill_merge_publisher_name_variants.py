@@ -29,10 +29,10 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
+from pipeline.containers.publishers import PublisherGatewayQueries
 
 log = setup_logger("backfill_merge_publisher_name_variants", os.path.dirname(__file__))
 
@@ -121,7 +121,7 @@ def _merge_variants(conn: Connection) -> tuple[int, int]:
 
 
 def _add_key_forms(conn: Connection) -> int:
-    gateway = PgPublisherGatewayQueries(conn)
+    gateway = PublisherGatewayQueries(conn)
     before = scalar_int(conn.execute(text("SELECT count(*) FROM publisher_name_forms")))
     for row in conn.execute(text("SELECT id, name FROM publishers ORDER BY id")).all():
         key = publisher_name_key(row.name)
@@ -132,7 +132,7 @@ def _add_key_forms(conn: Connection) -> int:
 
 
 def _reattach_orphan_prefixes(conn: Connection) -> int:
-    gateway = PgPublisherGatewayQueries(conn)
+    gateway = PublisherGatewayQueries(conn)
     rows = conn.execute(
         text("""
             SELECT prefix, publisher_name_raw FROM doi_prefixes

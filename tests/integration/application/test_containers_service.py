@@ -7,12 +7,12 @@ from application.services.journals.core import find_or_create_journal
 from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
-from infrastructure.pipeline.containers import PgContainerGatewayQueries
+from pipeline.containers.containers import ContainerGatewayQueries
 
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return PgContainerGatewayQueries(sa_sync_conn)
+    return ContainerGatewayQueries(sa_sync_conn)
 
 
 def _count(conn, table: str) -> int:
