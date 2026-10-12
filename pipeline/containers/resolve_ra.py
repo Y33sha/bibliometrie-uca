@@ -2,7 +2,7 @@
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
-Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
+La requête à `doi.org/ra` est injectée par le câblage de la phase.
 """
 
 from __future__ import annotations
@@ -13,9 +13,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
 from domain.publications.identifiers import DoiPrefix
+from infrastructure.sources.circuit_breaker import SourceUnavailableError
+from pipeline.containers.doi_prefixes import DoiPrefixesQueries
 from pipeline.context import PhaseContext
 from pipeline.libelles import accord, forme
 from pipeline.metrics import PhaseMetrics
@@ -27,7 +27,7 @@ ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 
 @dataclass(frozen=True)
 class ResolveRaPhase:
-    """`repo_factory` construit le repository des préfixes sur la connexion de la phase."""
+    """`repo_factory` construit les requêtes sur les préfixes sur la connexion de la phase."""
 
     repo_factory: Callable[[Connection], DoiPrefixesQueries]
     resolve_ras_fn: ResolveRasFn

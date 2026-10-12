@@ -376,7 +376,7 @@ class TestGetPrefixesToResolve:
     laissant leur RA jamais résolue et la recherche par DOI en best-effort sur les deux RA."""
 
     def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
-        from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
+        from pipeline.containers.doi_prefixes import DoiPrefixesQueries
 
         # Préfixe vu UNIQUEMENT via publication_relations.target_doi (parent in-périmètre).
         _publication(sa_sync_conn, "P", row_id=1, in_perimeter=True)
@@ -396,6 +396,6 @@ class TestGetPrefixesToResolve:
             external_ids={"arxiv_id": "2605.02321"},
         )
 
-        prefixes = PgDoiPrefixesQueries(sa_sync_conn).get_prefixes_to_resolve()
+        prefixes = DoiPrefixesQueries(sa_sync_conn).get_prefixes_to_resolve()
         assert "10.77777" in prefixes  # cible de relation
         assert "10.48550" in prefixes  # arxiv-dérivé

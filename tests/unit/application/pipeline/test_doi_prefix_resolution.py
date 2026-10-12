@@ -11,10 +11,10 @@ from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
 from application.pipeline.publishers_journals.resolve_publishers import run_resolve_publishers
-from application.pipeline.resolve_ra.phase import ResolveRaPhase
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.doi_prefixes import PendingPublisherPrefix
 from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.containers.doi_prefixes import PendingPublisherPrefix
+from pipeline.containers.resolve_ra import ResolveRaPhase
 
 
 @dataclass
