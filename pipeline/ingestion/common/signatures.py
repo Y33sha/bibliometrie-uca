@@ -41,6 +41,7 @@ from pipeline.ingestion.common.signature_queries import (
 class AddressRecord:
     """Une affiliation textuelle d'un auteur, avec pays optionnels.
 
+    `text` : texte de l'affiliation, assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas.
     `countries` : codes pays d'autorité (ScanR, détectés dans le texte).
     `suggested_countries` : suggestion à valider (OpenAlex, `country_code` de structure désambiguïsée — faillible). Tous deux propagés sur la row `addresses` partagée, jamais écrasés.
     """
@@ -48,6 +49,9 @@ class AddressRecord:
     text: str
     countries: list[str] | None = None
     suggested_countries: list[str] | None = None
+
+    def __post_init__(self) -> None:
+        self.text = sanitize_raw_text(self.text)
 
 
 @dataclass(slots=True)
@@ -138,8 +142,7 @@ def write_source_authorships(
                         roles=rec.roles,
                         neutralized_identifiers=neutralized,
                         addresses=[
-                            (sanitize_raw_text(a.text), a.countries, a.suggested_countries)
-                            for a in rec.addresses
+                            (a.text, a.countries, a.suggested_countries) for a in rec.addresses
                         ],
                         ror_ids=[r.value for r in rec.ror_ids],
                     )
@@ -245,24 +248,16 @@ def write_addresses(
 ) -> None:
     """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`.
 
-    `sa_addresses` : les couples `(sa_id, adresses)` du document. Les textes uniques
-    sont upsertés puis leurs ids récupérés en une passe, les pays propagés sur la row
-    `addresses`, et les liens pivot insérés en batch. Un `sa_id` None (position
-    introuvable) est ignoré.
-
-    Clé par `sa_id` : l'appelant obtient ses `sa_id` à sa façon — l'écriture batch par
-    remap de position, le normaliseur theses par `RETURNING` (ses adresses sont
-    partagées au niveau document, attachées à chaque personne).
+    `sa_addresses` : les couples `(sa_id, adresses)` du document. Les textes uniques sont upsertés puis leurs ids récupérés en une passe, les pays propagés sur la ligne `addresses`, et les liens insérés en une requête. Un `sa_id` None est ignoré.
     """
     addr_countries: dict[str, list[str] | None] = {}
     addr_suggested: dict[str, list[str] | None] = {}
     for _sa_id, addresses in sa_addresses:
         for addr in addresses:
-            cleaned = sanitize_raw_text(addr.text)
-            if not cleaned or cleaned in addr_countries:
+            if not addr.text or addr.text in addr_countries:
                 continue
-            addr_countries[cleaned] = addr.countries
-            addr_suggested[cleaned] = addr.suggested_countries
+            addr_countries[addr.text] = addr.countries
+            addr_suggested[addr.text] = addr.suggested_countries
 
     if not addr_countries:
         return
@@ -289,10 +284,7 @@ def write_addresses(
             continue
         seen: set[int] = set()
         for addr in addresses:
-            cleaned = sanitize_raw_text(addr.text)
-            if not cleaned:
-                continue
-            addr_id = addr_id_by_text.get(cleaned)
+            addr_id = addr_id_by_text.get(addr.text)
             if not addr_id or addr_id in seen:
                 continue
             seen.add(addr_id)
