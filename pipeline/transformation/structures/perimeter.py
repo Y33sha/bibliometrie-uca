@@ -1,6 +1,6 @@
 """Périmètres : clôture des tutelles matérialisée dans `perimeter_structures`, lecture des structures d'un périmètre, condition d'exécution des phases qui dépendent du périmètre d'extraction.
 
-`refresh_perimeter_structures` est rejouée en tête de pipeline, au début de la phase `affiliations`, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (port `PerimeterStructuresQueries`, injecté par l'API)."""
+`refresh_perimeter_structures` est rejouée en tête de pipeline, avant toute phase, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (port `PerimeterStructuresQueries`, injecté par l'API)."""
 
 from sqlalchemy import Connection, text
 

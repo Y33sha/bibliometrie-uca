@@ -57,7 +57,8 @@ def _run(contexte, *, processed=7, in_perimeter=3):
 def test_assemble_les_metriques_de_la_resolution(contexte):
     metrics, perimeter, _ = _run(contexte, processed=7, in_perimeter=3)
 
-    assert perimeter.refreshed == 1
+    assert perimeter.refreshed == 0  # `run.py` matérialise le périmètre avant toute phase
+
     assert metrics.total == 7
     assert metrics.details["summary"] == {"adresses": 7, "in_perimeter": 3}
 
