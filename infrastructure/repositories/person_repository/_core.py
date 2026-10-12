@@ -111,19 +111,6 @@ def set_exclusion(conn: Connection, person_id: int, exclusion: PersonExclusion |
         raise NotFoundError(f"Personne {person_id} introuvable")
 
 
-def map_rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
-    """`{email minusculisé: [person_id, ...]}` depuis `persons_rh` (emails renseignés). Résout les emails de l'import des ORCID authentifiés vers les personnes qui les portent."""
-    return {
-        r.email: list(r.pids)
-        for r in conn.execute(
-            text(
-                "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
-                "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
-            )
-        )
-    }
-
-
 def ids_with_rh(conn: Connection, person_ids: list[int]) -> set[int]:
     return set(
         conn.execute(

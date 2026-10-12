@@ -4,7 +4,6 @@ Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le 
 """
 
 import logging
-from collections import Counter
 from typing import NamedTuple, TypedDict
 
 from sqlalchemy import Connection
@@ -14,7 +13,6 @@ from application.ports.pipeline.publication_perimeter import PublicationPerimete
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
-    AuthenticateOrcidOutcome,
     NameFormStatusRow,
     PersonRepository,
 )
@@ -267,19 +265,6 @@ def reassign_identifier(
         target_person_id,
         {"ident_id": ident_id},
     )
-
-
-def authenticate_orcids(
-    entries: list[tuple[int, str]], *, repo: PersonRepository
-) -> Counter[AuthenticateOrcidOutcome]:
-    """Applique le statut `authenticated` à des paires `(person_id, orcid)` déjà résolues, et retourne le décompte des issues.
-
-    Ouvre une fois le contexte d'écriture protégé pour la transaction courante (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`. Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues : l'appelant qui lit le fichier des ORCID authentifiés porte cette préparation.
-
-    Unique chemin d'écriture autorisé pour ce statut : ailleurs, le trigger `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
-    """
-    repo.begin_authenticated_orcid_import()
-    return Counter(repo.authenticate_orcid(person_id, orcid) for person_id, orcid in entries)
 
 
 # ── Formes de noms ──
