@@ -117,7 +117,7 @@ class SourceNormalizer(ABC):
         return False
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
-        """Pré-chargement optionnel (ex: struct_cache pour HAL)."""
+        """Pré-chargement optionnel, avant la boucle sur les notices."""
 
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libération des caches in-memory."""
@@ -334,7 +334,7 @@ type ConstructeurNormalizer = Callable[[Connection], SourceNormalizer]
 def build() -> Phase:
     """Normalisation du staging vers les tables sources.
 
-    Écrit les `source_publications` avec leurs métadonnées — résumé, mots-clés, sujets, références — et leurs signatures, en laissant `publication_id` à NULL : la phase `publications` assigne le document à sa publication. Le `raw_data` du staging est vidé après traitement. Pour HAL, les structures sont enrichies et les ORCID et IdRef extraits du TEI.
+    Écrit les `source_publications` avec leurs métadonnées — résumé, mots-clés, sujets, références — et leurs signatures, en laissant `publication_id` à NULL : la phase `publications` assigne le document à sa publication. Le `raw_data` du staging est vidé après traitement. Pour HAL, les ORCID et IdRef sont extraits du TEI.
     """
     return _NormalizeSelonOptions()
 

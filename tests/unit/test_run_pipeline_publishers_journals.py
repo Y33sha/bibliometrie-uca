@@ -70,3 +70,19 @@ def test_phase_propagates_substep_signals():
         metrics = publishers_journals.build().run(phase_context(RunOptions()))
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
+
+
+def test_enrichissement_openalex_au_debit_d_openalex():
+    from pipeline.ingestion.http.api_params import OPENALEX_DELAY
+
+    with (
+        patch("pipeline.transformation.publishing.publishers_journals.open_tx"),
+        patch(
+            "pipeline.transformation.publishing.journals.enrich_journals_from_openalex"
+            ".run_enrich_journals_from_openalex",
+            return_value=PhaseMetrics(),
+        ) as run,
+    ):
+        publishers_journals._run_enrich_journals_from_openalex()
+
+    assert run.call_args.kwargs["rate_delay"] == OPENALEX_DELAY

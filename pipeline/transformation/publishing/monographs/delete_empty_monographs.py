@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — supprime les monographies vides.
+"""Sous-étape de la phase `authorships` — supprime les monographies vides.
 
 Une monographie vide n'est portée par aucun enregistrement ni aucune publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore portée par une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
 """
