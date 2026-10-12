@@ -18,12 +18,12 @@ from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NotFound, Unavailable
+from pipeline.sources.api_params import API_BASE_URLS
 from pipeline.sources.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 from pipeline.sources.failed_lookups import forget_failed_doi_lookups
 from pipeline.sources.fetch_missing import DoiBatchResult
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NotFound, Unavailable
 from pipeline.sources.staging import upsert_staging
 
 

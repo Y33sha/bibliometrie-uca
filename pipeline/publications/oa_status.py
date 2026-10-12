@@ -16,7 +16,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
-from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import UnderCircuitBreaker, credentials_missing
 from pipeline.libelles import (
@@ -31,6 +30,7 @@ from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
 from pipeline.publications.oa_status_queries import OaStatusQueries
 from pipeline.signals import filter_configured
+from pipeline.sources.lookup import LookupOutcome, NotFound, Unavailable
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""
@@ -231,13 +231,13 @@ def build() -> Phase:
     Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée. La phase tourne sous le circuit-breaker d'Unpaywall.
     """
 
-    from infrastructure.sources.api_params import API_BASE_URLS
-    from infrastructure.sources.config import (
+    from pipeline.config import (
         get_polite_pool_email_optional,
         get_unpaywall_max_per_run,
         get_unpaywall_recheck_after_days,
     )
     from pipeline.publications.oa_status_queries import OaStatusQueries
+    from pipeline.sources.api_params import API_BASE_URLS
     from pipeline.sources.unpaywall import fetch_oa_status
 
     base_url = API_BASE_URLS["unpaywall"]

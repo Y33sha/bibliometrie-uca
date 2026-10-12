@@ -23,10 +23,10 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from infrastructure.sources.lookup import LookupOutcome
 from pipeline.context import PhaseContext, RunOptions
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.oa_status import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
+from pipeline.sources.lookup import LookupOutcome
 from pipeline.sources.unpaywall import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"

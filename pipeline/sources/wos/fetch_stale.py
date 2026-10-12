@@ -8,11 +8,11 @@ from __future__ import annotations
 import httpx2
 
 from domain.types import as_mapping
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import get_wos_api_key
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE, NotFound, Unavailable
+from pipeline.config import get_wos_api_key
+from pipeline.sources.api_params import API_BASE_URLS
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE, NotFound, Unavailable
 from pipeline.sources.wos.fields import extract_doi, get_records
 
 

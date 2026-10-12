@@ -25,15 +25,15 @@ from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.api_params import API_BASE_URLS, OPENALEX_DELAY
-from infrastructure.sources.circuit_breaker import (
+from pipeline.savepoint import rollback_unless_invalidated
+from pipeline.sources.api_params import API_BASE_URLS, OPENALEX_DELAY
+from pipeline.sources.circuit_breaker import (
     SourceCircuitBreaker,
     SourceUnavailableError,
     reset_current_breaker,
     set_current_breaker,
 )
-from infrastructure.sources.http_retry import http_request_with_retry
-from pipeline.savepoint import rollback_unless_invalidated
+from pipeline.sources.http_retry import http_request_with_retry
 from pipeline.sources.openalex.api import credential_params
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))

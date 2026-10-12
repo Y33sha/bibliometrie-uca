@@ -29,7 +29,6 @@ from domain.dates import date_to_french, today
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from infrastructure.parallel import RunParallel
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import circuit_breaker, open_tx, signal_if_tripped
 from pipeline.libelles import etape
@@ -40,6 +39,7 @@ from pipeline.signals import (
     signal_source_unconfigured,
     timed_metrics,
 )
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.sources.harvest import ExtractionConfigError
 from pipeline.structures.perimeter import EmptyExtractionPerimeterError
 
@@ -291,7 +291,7 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
     `wos` et `scanr` lisent leurs identifiants d'API en configuration.
 
     Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
-    from infrastructure.sources.api_params import API_BASE_URLS
+    from pipeline.sources.api_params import API_BASE_URLS
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
         from pipeline.sources.hal.harvest import HalClient, HalExtractor
@@ -304,14 +304,14 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
         return OpenalexExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
     def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
-        from infrastructure.sources.config import get_wos_api_key
+        from pipeline.config import get_wos_api_key
         from pipeline.sources.wos.harvest import WosClient, WosExtractor
 
         client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, client)
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
-        from infrastructure.sources.config import get_scanr_credentials
+        from pipeline.config import get_scanr_credentials
         from pipeline.sources.scanr.harvest import ScanrClient, ScanrExtractor
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())

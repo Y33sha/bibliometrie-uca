@@ -15,8 +15,8 @@ from defusedxml.common import DefusedXmlException
 from domain.publications.identifiers import ISSN
 from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
 from domain.types import as_mapping, as_sequence, as_str
-from infrastructure.sources.api_params import SUDOC_ISSN2PPN_BATCH
-from infrastructure.sources.http_retry import (
+from pipeline.sources.api_params import SUDOC_ISSN2PPN_BATCH
+from pipeline.sources.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
 )

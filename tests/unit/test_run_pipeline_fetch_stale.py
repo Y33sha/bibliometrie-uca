@@ -10,14 +10,14 @@
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from infrastructure.sources.circuit_breaker import (
-    SourceCircuitBreaker,
-    get_current_breaker,
-)
 from pipeline.context import RunOptions
 from pipeline.execution import phase_context
 from pipeline.metrics import PhaseMetrics
 from pipeline.sources import fetch_stale
+from pipeline.sources.circuit_breaker import (
+    SourceCircuitBreaker,
+    get_current_breaker,
+)
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
@@ -35,7 +35,7 @@ def _called_targets(stack) -> MagicMock:
     stack.enter_context(patch.object(fetch_stale, "credentials_missing", return_value=None))
     # Fenêtre d'années : évite tout accès base (get_years lit la config).
     stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
-    stack.enter_context(patch("infrastructure.sources.config.get_years", return_value=[2024]))
+    stack.enter_context(patch("pipeline.config.get_years", return_value=[2024]))
     return run_one
 
 

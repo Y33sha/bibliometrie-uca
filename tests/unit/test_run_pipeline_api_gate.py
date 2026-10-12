@@ -57,7 +57,7 @@ def test_phase_oa_status_skips_without_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         patch(
-            "infrastructure.sources.config.source_credentials_missing",
+            "pipeline.config.source_credentials_missing",
             return_value="email polite pool absent (config.polite_pool_email)",
         ),
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
@@ -71,8 +71,8 @@ def test_phase_oa_status_skips_without_email():
 def test_phase_oa_status_runs_with_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch("infrastructure.sources.config.source_credentials_missing", return_value=None),
-        patch("infrastructure.sources.config.get_polite_pool_email_optional", return_value="e@x"),
+        patch("pipeline.config.source_credentials_missing", return_value=None),
+        patch("pipeline.config.get_polite_pool_email_optional", return_value="e@x"),
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
         metrics = oa_status.build().run(phase_context(RunOptions()))

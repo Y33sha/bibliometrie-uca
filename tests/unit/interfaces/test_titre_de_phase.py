@@ -32,9 +32,7 @@ def delai_de_rafraichissement(monkeypatch):
     """Configuration lue par les libellés de phase, sans base : les documents se rafraîchissent après 7 jours."""
     delai = {"jours": 7}
     monkeypatch.setattr("pipeline.run.open_tx", contextlib.nullcontext)
-    monkeypatch.setattr(
-        "infrastructure.sources.config.get_fetch_stale_after_days", lambda conn: delai["jours"]
-    )
+    monkeypatch.setattr("pipeline.config.get_fetch_stale_after_days", lambda conn: delai["jours"])
     return delai
 
 

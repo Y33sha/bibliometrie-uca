@@ -18,13 +18,11 @@ from sqlalchemy import Connection, text
 
 from domain.source_publications.external_ids import ExternalIdType
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
+from pipeline.sources.api_params import API_BASE_URLS, HAL_DELAY
 from pipeline.sources.failed_lookups import (
     LookupIdType,
     forget_failed_doi_lookups,
@@ -33,6 +31,8 @@ from pipeline.sources.failed_lookups import (
 )
 from pipeline.sources.fetch_missing import DoiBatchResult
 from pipeline.sources.hal.fields import HAL_FIELDS_STR, extract_doi, extract_id
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.sources.staging import upsert_staging
 
 # HAL ne publie pas de seuil officiel : 5 workers et une pause de HAL_DELAY par worker donnent ~6-7 req/s, sans rafale.

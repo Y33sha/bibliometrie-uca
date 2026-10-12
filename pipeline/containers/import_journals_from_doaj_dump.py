@@ -16,12 +16,12 @@ from sqlalchemy import Connection
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
-from infrastructure.sources.dump_download import DumpUnavailableError
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
 from pipeline.signals import signal_source_unavailable
+from pipeline.sources.dump_download import DumpUnavailableError
 
 LIBELLE = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""

@@ -8,11 +8,11 @@ from __future__ import annotations
 import httpx2
 
 from domain.types import JsonValue, as_mapping, as_sequence
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import get_scanr_credentials
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NOT_FOUND, NotFound, Unavailable
+from pipeline.config import get_scanr_credentials
+from pipeline.sources.api_params import API_BASE_URLS
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.sources.scanr.fields import extract_doi
 
 

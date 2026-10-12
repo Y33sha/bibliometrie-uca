@@ -14,11 +14,10 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
-from infrastructure.sources.config import get_extraction_api_ids, get_years
-from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.config import get_extraction_api_ids, get_years
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 from pipeline.sources.harvest import (
     ExtractionConfigError,
@@ -26,6 +25,7 @@ from pipeline.sources.harvest import (
     scoped_logger,
     stage_document,
 )
+from pipeline.sources.http_retry import http_request_with_retry
 
 # Plafond de l'API DataCite pour la taille d'une page.
 _PAGE_SIZE = 1000

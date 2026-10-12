@@ -10,9 +10,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from interfaces.cli.maintenance import enrich_publishers as module
 from interfaces.cli.maintenance.enrich_publishers import main
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.openalex import api
 
 

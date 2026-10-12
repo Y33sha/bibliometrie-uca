@@ -12,8 +12,8 @@ from collections.abc import Iterator, Sequence
 import httpx2
 
 from domain.types import as_mapping, as_sequence, as_str
-from infrastructure.sources.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
-from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.sources.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
+from pipeline.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
 

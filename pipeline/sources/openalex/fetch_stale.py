@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import httpx2
 
-from infrastructure.sources.lookup import NotFound, Unavailable
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.sources.lookup import NotFound, Unavailable
 from pipeline.sources.openalex.api import fetch_work
 from pipeline.sources.openalex.fields import extract_doi
 

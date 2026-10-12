@@ -23,8 +23,6 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
-from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.fetch_pool import run_fetch_pool
@@ -34,6 +32,8 @@ from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODES
 from pipeline.progression import progression
 from pipeline.signals import filter_configured, select_targets, timed_metrics
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker
+from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.sources.staging import upsert_staging
 
 COMMIT_EVERY = 50
@@ -270,7 +270,7 @@ def build() -> Phase:
 
 def _get_years_for_window(start_year: int | None) -> list[int] | None:
     """Années de la fenêtre du run, de `start_year` à l'année courante."""
-    from infrastructure.sources.config import get_years
+    from pipeline.config import get_years
 
     with open_tx() as conn:
         return get_years(conn, start_year)
@@ -303,7 +303,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from infrastructure.sources.config import get_fetch_stale_after_days
+    from pipeline.config import get_fetch_stale_after_days
 
     refetch = _make_refetch(target)
     with open_tx() as conn:

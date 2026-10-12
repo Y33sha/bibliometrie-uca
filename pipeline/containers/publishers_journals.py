@@ -237,8 +237,7 @@ def build() -> Phase:
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
-    from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.polite_pool import build_user_agent
+    from pipeline.config import get_polite_pool_email_optional
     from pipeline.containers.doi_prefixes import DoiPrefixesQueries
     from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.containers.resolve_publishers import (
@@ -246,6 +245,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     )
     from pipeline.sources.crossref.prefixes import fetch_crossref_prefix
     from pipeline.sources.datacite.prefixes import fetch_datacite_prefix
+    from pipeline.sources.polite_pool import build_user_agent
 
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
@@ -270,11 +270,11 @@ def _run_resolve_publishers() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
-    from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
     from pipeline.containers.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
     )
     from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.sources.api_params import API_BASE_URLS, DOAJ_DELAY
     from pipeline.sources.openalex.journal_enrichment import fetch_sources_batch
 
     sources_api = API_BASE_URLS["openalex_sources"]
@@ -300,15 +300,15 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
 
 
 def _run_check_journals_in_sudoc() -> PhaseMetrics:
-    from infrastructure.sources.api_params import (
-        API_BASE_URLS,
-        SUDOC_MAX_CONCURRENT,
-        SUDOC_MAX_PER_SECOND,
-    )
     from pipeline.containers.check_journals_in_sudoc import (
         run_check_journals_in_sudoc,
     )
     from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.sources.api_params import (
+        API_BASE_URLS,
+        SUDOC_MAX_CONCURRENT,
+        SUDOC_MAX_PER_SECOND,
+    )
     from pipeline.sources.sudoc import fetch_ppns, fetch_serial_record
 
     base_url = API_BASE_URLS["sudoc"]
@@ -405,16 +405,16 @@ def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
-    from infrastructure.sources.config import (
+    from pipeline.config import (
         get_doaj_refresh_after_days,
         get_polite_pool_email_optional,
     )
-    from infrastructure.sources.polite_pool import build_user_agent
     from pipeline.containers.import_journals_from_doaj_dump import (
         run_enrich_journals_from_doaj,
     )
     from pipeline.containers.journals import JournalGatewayQueries
     from pipeline.sources.doaj import downloaded_doaj_dump
+    from pipeline.sources.polite_pool import build_user_agent
 
     # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")

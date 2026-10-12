@@ -1,6 +1,6 @@
 """Port ConfigRepository — écritures sur la table `config` (paramètres applicatifs clé/valeur).
 
-Sert l'admin qui édite les paramètres. Les lookups par clé du pipeline et des CLI (clé d'API OpenAlex, email du polite pool, URLs de base) vivent dans `infrastructure/sources/config.py` : ils sont lus au composition root et passés en paramètres, hors de ce port.
+Sert l'admin qui édite les paramètres. Les lookups par clé du pipeline et des CLI (clé d'API OpenAlex, email du polite pool, URLs de base) vivent dans `pipeline/config.py` : ils sont lus au composition root et passés en paramètres, hors de ce port.
 """
 
 from typing import Protocol

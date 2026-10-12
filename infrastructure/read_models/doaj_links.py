@@ -1,7 +1,4 @@
-"""Composition des URL de fiche DOAJ, à partir de ce qu'un payload en porte.
-
-Purement textuel : ce module manipule des chaînes et rien d'autre. Le téléchargement du dump DOAJ vit à côté, dans `client.py`.
-"""
+"""Lien vers la fiche DOAJ d'une revue, à partir des données du dump DOAJ."""
 
 from __future__ import annotations
 
@@ -28,7 +25,7 @@ DOAJ_HOST = urlparse(DOAJ_TOC_URL).netloc
 def _est_une_fiche_doaj(url: str) -> bool:
     """Vrai si `url` désigne une page de `DOAJ_HOST` par le web.
 
-    L'URL de fiche que le dump fournit toute faite alimente l'attribut `href` d'un lien. La confronter à l'hôte et au schéma attendus donne aux liens affichés une propriété uniforme : leur adresse porte un hôte écrit dans le code.
+    L'URL de fiche que le dump fournit toute faite alimente l'attribut `href` d'un lien. La confronter à l'hôte et au schéma attendus donne aux liens affichés une propriété uniforme : l'hôte de leur adresse est écrit dans le code.
     """
     adresse = urlparse(url)
     return adresse.scheme in ("http", "https") and adresse.netloc.lower() == DOAJ_HOST

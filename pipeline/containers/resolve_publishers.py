@@ -16,8 +16,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text, to_plain_text
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
-from infrastructure.sources.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.containers.doi_prefixes import (
     DoiPrefixesQueries,
     PendingPublisherPrefix,
@@ -28,6 +26,8 @@ from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker
+from pipeline.sources.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 
 LIBELLE = "Éditeurs des préfixes DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

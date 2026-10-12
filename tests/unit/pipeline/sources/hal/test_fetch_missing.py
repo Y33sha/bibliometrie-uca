@@ -7,10 +7,10 @@ import logging
 
 import pytest
 
-from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.libelles import DERNIERE_BRANCHE
 from pipeline.sources.hal import fetch_missing
 from pipeline.sources.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
+from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE
 
 _LOG = logging.getLogger("test")
 

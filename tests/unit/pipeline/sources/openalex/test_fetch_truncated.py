@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.sources.openalex import fetch_truncated
 from pipeline.sources.openalex.fetch_truncated import FetchTruncatedPhase, refetch_openalex
 

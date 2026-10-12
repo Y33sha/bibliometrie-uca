@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.sources.api_params import SCANR_PER_PAGE
 from pipeline.progression import Progression
+from pipeline.sources.api_params import SCANR_PER_PAGE
 from pipeline.sources.harvest import ExtractionConfigError
 from pipeline.sources.scanr import harvest
 from pipeline.sources.scanr.fields import extract_doi, extract_id

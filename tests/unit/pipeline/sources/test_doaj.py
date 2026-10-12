@@ -8,8 +8,8 @@ import logging
 import httpx2
 import pytest
 
-from infrastructure.sources.dump_download import DumpDownloadError
 from pipeline.sources.doaj import DOAJ_CSV_DUMP_URL, fetch_doaj_dump
+from pipeline.sources.dump_download import DumpDownloadError
 
 _S3 = "https://doaj-live-journal-csv.s3.amazonaws.com/dump.csv"
 _CSV = b"Journal title,ISSN\nRevue,1234-5678\n"

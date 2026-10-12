@@ -2,7 +2,7 @@
 
 La liste d'hôtes déclarée est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé ne suit une redirection que vers le même hôte (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
 
-La confrontation porte sur `infrastructure/sources/`, couche d'où partent les requêtes. Les URL des autres couches désignent des pages à afficher — une fiche HAL, un profil ORCID — ou un espace de noms XML, et ne sont jamais appelées.
+La confrontation vise `pipeline/sources/`, d'où partent les requêtes. Les espaces de noms XML que les normaliseurs y lisent ne sont jamais appelés. Les URL des autres couches désignent des pages à afficher — une fiche HAL, un profil ORCID — et ne sont jamais appelées non plus.
 """
 
 import re
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from infrastructure import PROJECT_ROOT
-from infrastructure.sources.api_params import API_BASE_URLS
+from pipeline.sources.api_params import API_BASE_URLS
 from pipeline.sources.doaj import ALLOWED_DUMP_HOSTS, DOAJ_CSV_DUMP_URL
 
 HOTES_DECLARES = frozenset(
@@ -28,7 +28,7 @@ HOTES_DECLARES = frozenset(
         "cluster-production.elasticsearch.dataesr.ovh",
         "www.sudoc.fr",
         "zenodo.org",
-        # Le référentiel des revues en libre accès n'est pas servi par `doaj.org`, qui redirige
+        # Le référentiel des revues open access n'est pas servi par `doaj.org`, qui redirige
         # vers un lien signé sur son stockage objet. Seule redirection que le code suive, et
         # vers ce seul hôte (`ALLOWED_DUMP_HOSTS`).
         "doaj-live-journal-csv.s3.amazonaws.com",
@@ -36,16 +36,19 @@ HOTES_DECLARES = frozenset(
 )
 """Destinations joignables depuis la couche sortante. Y ajouter un hôte est un geste délibéré."""
 
-_COUCHE_SORTANTE = PROJECT_ROOT / "infrastructure" / "sources"
+_COUCHE_SORTANTE = PROJECT_ROOT / "pipeline" / "sources"
 _URL = re.compile(r"https?://([A-Za-z0-9._-]+)")
+
+_ESPACES_DE_NOMS_XML = frozenset({"www.tei-c.org", "www.w3.org"})
+"""Hôtes des espaces de noms XML du TEI de HAL : des identifiants, jamais appelés."""
 
 
 def _hotes_ecrits_dans(racine: Path) -> set[str]:
-    """Hôtes de toutes les URL littérales des modules Python d'une arborescence."""
+    """Hôtes de toutes les URL littérales des modules Python d'une arborescence, hors espaces de noms XML."""
     hotes: set[str] = set()
     for fichier in racine.rglob("*.py"):
         hotes |= set(_URL.findall(fichier.read_text(encoding="utf-8")))
-    return hotes
+    return hotes - _ESPACES_DE_NOMS_XML
 
 
 class TestListeDeclaree:

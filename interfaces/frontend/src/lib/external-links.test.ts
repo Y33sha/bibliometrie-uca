@@ -30,7 +30,7 @@ const HOTES_AFFICHABLES = new Set([
 	'pubmed.ncbi.nlm.nih.gov',
 	'www.ncbi.nlm.nih.gov',
 	// Fiche de revue en libre accès. Seule adresse qui vienne des données : le serveur la
-	// confronte à cet hôte avant de la servir (`infrastructure/sources/doaj/urls.py`).
+	// confronte à cet hôte avant de la servir (`infrastructure/read_models/doaj_links.py`).
 	'doaj.org',
 	// Rapport de participation d'un membre Crossref, depuis la liste des éditeurs.
 	'www.crossref.org'

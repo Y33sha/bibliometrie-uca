@@ -18,15 +18,15 @@ from domain.structures.name_forms import is_short_form
 from domain.structures.structure import StructureType
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.db import tables
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.config import get_openalex_api_key, get_polite_pool_email_optional
-from infrastructure.sources.http_retry import http_request_with_retry
 from interfaces.cli.dev.generate_seed import (
     INSTITUTION_SEED,
     SeedSection,
     exported_columns,
     write_seed,
 )
+from pipeline.config import get_openalex_api_key, get_polite_pool_email_optional
+from pipeline.sources.api_params import API_BASE_URLS
+from pipeline.sources.http_retry import http_request_with_retry
 
 ROR_API = "https://api.ror.org/v2/organizations"
 
