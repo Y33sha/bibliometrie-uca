@@ -33,7 +33,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 - [x] `normalize.prune_disappeared` ne déclare pas la suppression en cascade des signatures, de leurs adresses et ROR, des signatures confirmées et rejetées. `cleanup_orphan_identities` n'en dépend donc pas.
 - [x] `publications.reconcile` lit `journals.journal_type` et `monographs.journal_id` sans les déclarer.
 - [x] Lectures déclarées à tort : `language_forms` par `normalize.<source>`, les référentiels de publication par `normalize.theses`, `publications` par `subjects.usage`, `countries` par `countries.detect`, `source_publications.external_ids` par `oa_status.verify_unpaywall`.
-- [ ] `oa_status.verify_unpaywall` interroge Unpaywall sans déclarer de `network`.
+- [x] `oa_status.verify_unpaywall` interroge Unpaywall sans déclarer de `network`.
 - [ ] Étapes sans nœud : import du dump ROR et seconde matérialisation de `perimeter_structures` au début d'`affiliations`, `VACUUM` du staging.
 - [ ] Les canaux de `fetch_missing` partagent une même déclaration, trop large pour chacun.
 - [ ] Journal : `fetch_stale`, `resolve_ra` et `extract` en mode daily n'ont pas de titre de section. Les épinglages de `persons` et les documents disparus de `normalize` s'affichent sans branche.
