@@ -34,6 +34,7 @@ def lancer(monkeypatch):
             module, "get_sync_engine", lambda: SimpleNamespace(connect=lambda: conn)
         )
         monkeypatch.setattr(module, "run_enrich_publishers_from_openalex", _enrichir)
+        monkeypatch.setattr("pipeline.runtime.config.source_credentials_missing", lambda s: None)
         monkeypatch.setattr(sys, "argv", ["enrich_publishers", *arguments])
 
         code = main()
@@ -65,7 +66,7 @@ def test_quota_de_la_source_epuise(lancer, caplog):
         resultat = lancer(issue=SourceUnavailableError("openalex"))
 
     assert resultat.code == 0
-    assert "à relancer plus tard" in caplog.text
+    assert "openalex indisponible" in caplog.text
     assert resultat.fermetures == [True]
 
 

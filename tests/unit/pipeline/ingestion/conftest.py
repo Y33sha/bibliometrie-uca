@@ -30,7 +30,7 @@ class Ecriture:
 
 @pytest.fixture
 def configuration(monkeypatch):
-    """Remplace la lecture de la configuration d'un moissonneur : identifiants du périmètre, années, identifiants de connexion.
+    """Remplace la lecture de la configuration d'un moissonneur : identifiants du périmètre, années.
 
     Seules les fonctions que le module importe sont remplacées.
     """
@@ -40,12 +40,10 @@ def configuration(monkeypatch):
         *,
         api_ids: list[str] | None = None,
         annees: list[int] | None = None,
-        credentials_missing: str | None = None,
     ) -> None:
         lectures = {
             "get_extraction_api_ids": lambda conn, source: ["X"] if api_ids is None else api_ids,
             "get_years": lambda conn, start_year=None: [2024] if annees is None else annees,
-            "source_credentials_missing": lambda source: credentials_missing,
         }
         for nom, lecture in lectures.items():
             if hasattr(module, nom):

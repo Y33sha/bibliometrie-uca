@@ -16,10 +16,9 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
-from pipeline.ingestion.http.breaker_scope import UnderCircuitBreaker
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -30,7 +29,6 @@ from pipeline.runtime.observability.libelles import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.runtime.observability.signals import filter_configured
 from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
@@ -50,22 +48,13 @@ class OaStatusPhase:
 
     queries: OaStatusQueries
     fetcher: OaStatusFetcher
-    credentials_missing: Callable[[str], str | None]
     staleness_days: Callable[[Connection], int]
     max_per_run: Callable[[Connection], int | None]
     max_concurrent: int = MAX_CONCURRENT
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Saute la phase quand Unpaywall est sans configuration, sinon vérifie les publications dans une seule transaction."""
+        """Vérifie les publications dans une seule transaction."""
         metrics = PhaseMetrics()
-        if not filter_configured(
-            ["unpaywall"],
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=ctx.logger,
-            phase="oa_status",
-        ):
-            return metrics
         with ctx.open_tx() as conn:
             metrics.merge(
                 asyncio.run(
@@ -229,7 +218,7 @@ async def _verifier(
 def build() -> Phase:
     """Enrichissement de `publications.oa_status`, une publication à la fois, via Unpaywall.
 
-    Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée. La phase tourne sous le circuit-breaker d'Unpaywall.
+    Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
     """
 
     from pipeline.ingestion.complements.unpaywall import fetch_oa_status
@@ -247,12 +236,12 @@ def build() -> Phase:
     async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
         return await fetch_oa_status(client, doi, base_url=base_url, email=email)
 
-    return UnderCircuitBreaker(
+    return SourcePhase(
         "unpaywall",
+        "oa_status",
         OaStatusPhase(
             OaStatusQueries(),
             fetcher,
-            credentials_missing=credentials_missing,
             staleness_days=get_unpaywall_recheck_after_days,
             max_per_run=get_unpaywall_max_per_run,
         ),

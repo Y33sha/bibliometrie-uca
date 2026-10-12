@@ -211,7 +211,7 @@ def get_scanr_credentials() -> tuple[str, str]:
 def source_credentials_missing(source: str) -> str | None:
     """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
 
-    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extract, fetch_missing, fetch_stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
+    Consultée par `access_source`, par lequel passe tout appel à une API tierce : un accès dont cette fonction renvoie un motif est sauté avec un avertissement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
     """
     if source in ("hal", "theses"):
         return None

@@ -1,7 +1,7 @@
 """Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels + DOI parallèle, skip config.
 
-Dépendances techniques injectées (runners par canal / par source, parallélisme, détection de
-config), donc l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une
+Dépendances techniques injectées (runners par canal / par source, parallélisme), donc
+l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une
 exécution synchrone déterministe.
 """
 
@@ -10,10 +10,20 @@ import logging
 from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unconfigured
 
 
 def _sync_run_parallel(thunks):
     return {label: thunk() for label, thunk in thunks.items()}
+
+
+def _non_configuree(source: str) -> PhaseMetrics:
+    """Métriques que rend l'accès à une source sans identifiants."""
+    metrics = PhaseMetrics()
+    signal_source_unconfigured(
+        metrics, source, "pas de credentials", logger=logging.getLogger("test"), phase="test"
+    )
+    return metrics
 
 
 def test_hal_channels_then_parallel_doi_with_skip(contexte):
@@ -21,9 +31,10 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
     metrics = FetchMissingPhase(
         fetch_hal_by_id=lambda: PhaseMetrics(new=2),
         fetch_hal_by_nnt=lambda: PhaseMetrics(new=1),
-        fetch_doi_one=lambda source: PhaseMetrics(new=5),
+        fetch_doi_one=lambda source: (
+            PhaseMetrics(new=5) if source == "openalex" else _non_configuree(source)
+        ),
         run_parallel=_sync_run_parallel,
-        credentials_missing=lambda source: None if source == "openalex" else "pas de credentials",
     ).run(contexte(mode="full"))
 
     channels = {r["key"] for r in metrics.details["table"]["rows"]}
@@ -41,7 +52,6 @@ def test_nnt_channel_only_in_full_mode(contexte):
         fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
         fetch_doi_one=lambda source: PhaseMetrics(),
         run_parallel=_sync_run_parallel,
-        credentials_missing=lambda source: "hors sujet ici",  # neutralise le volet DOI
     ).run(contexte(mode="daily"))
 
     assert calls == ["id"]  # NNT réservé au mode full
@@ -55,7 +65,6 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
             fetch_hal_by_nnt=PhaseMetrics,
             fetch_doi_one=fetch_doi_one,
             run_parallel=_sync_run_parallel,
-            credentials_missing=lambda source: None,
         ).run(contexte(mode="daily", sources={"openalex", "scanr"}))
     return caplog.text
 
@@ -92,7 +101,6 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
         fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
         fetch_doi_one=lambda source: PhaseMetrics(new=3),
         run_parallel=_sync_run_parallel,
-        credentials_missing=lambda source: None,
     ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
 
     assert calls == []  # aucun canal HAL

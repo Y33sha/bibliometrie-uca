@@ -26,14 +26,11 @@ from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
-from pipeline.ingestion.http.circuit_breaker import (
-    SourceCircuitBreaker,
-    SourceUnavailableError,
-    reset_current_breaker,
-    set_current_breaker,
-)
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.http_retry import http_request_with_retry
+from pipeline.ingestion.http.source_access import access_source
 from pipeline.ingestion.openalex.api import credential_params
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.savepoint import rollback_unless_invalidated
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))
@@ -208,12 +205,9 @@ def main() -> int:
     args = parser.parse_args()
 
     conn = get_sync_engine().connect()
-    # Seuil 3 : trois lots consécutifs à bout de budget (429) suffisent à conclure que le
-    # quota OpenAlex du jour est épuisé et à reporter le reste à la prochaine exécution.
-    breaker = SourceCircuitBreaker("openalex publishers", threshold=3)
-    token = set_current_breaker(breaker)
     publishers_api = API_BASE_URLS["openalex_publishers"]
-    try:
+
+    def enrich(breaker: SourceCircuitBreaker) -> PhaseMetrics:
         run_enrich_publishers_from_openalex(
             conn,
             log,
@@ -225,10 +219,19 @@ def main() -> int:
             dry_run=args.dry_run,
             rate_delay=OPENALEX_DELAY,
         )
-    except SourceUnavailableError:
-        log.warning("OpenAlex indisponible : enrichissement abandonné, à relancer plus tard.")
+        return PhaseMetrics()
+
+    try:
+        # Seuil 3 : trois lots consécutifs à bout de budget (429) suffisent à conclure que le
+        # quota OpenAlex du jour est épuisé et à reporter le reste à la prochaine exécution.
+        access_source(
+            "openalex",
+            enrich,
+            phase="enrich_publishers",
+            logger=log,
+            threshold=3,
+        )
     finally:
-        reset_current_breaker(token)
         conn.close()
     return 0
 

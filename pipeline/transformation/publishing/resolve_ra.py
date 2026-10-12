@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
-from pipeline.ingestion.http.breaker_scope import UnderCircuitBreaker
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
+from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -111,8 +111,9 @@ def build() -> Phase:
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-    return UnderCircuitBreaker(
-        "doi.org/ra",
+    return SourcePhase(
+        "doi.org",
+        "resolve_ra",
         ResolveRaPhase(
             DoiPrefixesQueries,
             lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),

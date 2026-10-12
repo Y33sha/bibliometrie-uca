@@ -24,7 +24,6 @@ from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.runtime.config import (
     get_extraction_api_ids,
     get_years,
-    source_credentials_missing,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -154,8 +153,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrClient]):
             raise ExtractionConfigError(
                 "aucun affiliation_id (api_ids->'scanr' vide pour le périmètre d'extraction)"
             )
-        if missing := source_credentials_missing("scanr"):
-            raise ExtractionConfigError(missing)
         return ScanrExtractConfig(affiliation_ids=affiliation_ids)
 
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:

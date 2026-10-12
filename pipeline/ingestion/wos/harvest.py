@@ -35,7 +35,6 @@ from pipeline.ingestion.wos.fields import (
 from pipeline.runtime.config import (
     get_extraction_api_ids,
     get_years,
-    source_credentials_missing,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -210,8 +209,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
             raise ExtractionConfigError(
                 "aucune affiliation (api_ids->'wos' vide pour le périmètre d'extraction)"
             )
-        if missing := source_credentials_missing("wos"):
-            raise ExtractionConfigError(missing)
         return WosExtractConfig(affiliations=affiliations)
 
     def setup_logging(self, args: argparse.Namespace, config: WosExtractConfig) -> None:

@@ -3,6 +3,7 @@
 import logging
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
 
 _CHAMPS = (
@@ -30,10 +31,7 @@ def _run(contexte, appels: list[str] | None = None, **metrics: PhaseMetrics) -> 
 
         return run
 
-    return PublishersJournalsPhase(
-        **{champ: runner(champ) for champ in _CHAMPS},
-        credentials_missing=lambda source: None,
-    ).run(contexte())
+    return PublishersJournalsPhase(**{champ: runner(champ) for champ in _CHAMPS}).run(contexte())
 
 
 def test_les_sous_etapes_s_enchainent_par_groupe(contexte):
@@ -66,13 +64,12 @@ def test_les_compteurs_des_sous_etapes_remontent_a_la_phase(contexte):
 
 
 def test_acces_non_configure_saute_la_sous_etape(contexte, caplog):
-    appels: list[str] = []
-    phase = PublishersJournalsPhase(
-        **{champ: (lambda c=champ: appels.append(c) or PhaseMetrics()) for champ in _CHAMPS},
-        credentials_missing=lambda source: "clé absente" if source == "openalex" else None,
+    """L'accès à la source rend un signal `source_unconfigured` : la ligne de la sous-étape dit qu'elle est sautée."""
+    non_configuree = PhaseMetrics()
+    signal_source_unconfigured(
+        non_configuree, "openalex", "clé absente", logger=logging.getLogger("test"), phase="test"
     )
     with caplog.at_level(logging.INFO, logger="test"):
-        metrics = phase.run(contexte())
-    assert "enrich_journals_from_openalex" not in appels
+        metrics = _run(contexte, enrich_journals_from_openalex=non_configuree)
     assert "Type des revues sur OpenAlex : sautée, accès non configuré" in caplog.text
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

@@ -126,12 +126,6 @@ def test_run_sans_affiliation_refuse(configuration):
         extracteur(ScanrExtractor, _client([])).run(arguments_du_run())
 
 
-def test_run_sans_identifiants_de_connexion_refuse(configuration):
-    configuration(harvest, credentials_missing="mot de passe ScanR absent")
-    with pytest.raises(ExtractionConfigError, match="mot de passe"):
-        extracteur(ScanrExtractor, _client([])).run(arguments_du_run())
-
-
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     configuration(harvest, annees=[2023, 2024])
     client = _client([])

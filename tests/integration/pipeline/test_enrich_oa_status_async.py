@@ -18,13 +18,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import contextmanager
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx2
 import pytest
 
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.ingestion.http.lookup import LookupOutcome
+from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.oa_status import (
@@ -112,7 +113,6 @@ def _run(
     return OaStatusPhase(
         queries,
         fetcher,
-        credentials_missing=lambda source: None,  # noqa: ARG005
         staleness_days=lambda conn: 15,  # noqa: ARG005
         max_per_run=lambda conn: None,  # noqa: ARG005
         max_concurrent=max_concurrent,
@@ -283,17 +283,25 @@ def test_semaphore_caps_concurrent_fetches(logger):
 
 
 def test_skips_without_unpaywall_configuration(logger):
-    """Sans configuration Unpaywall, la phase signale la source et s'arrête avant toute transaction."""
+    """Sans configuration Unpaywall, l'accès à la source signale son absence et la phase s'arrête avant toute transaction."""
     queries = _FakeQueries([(1, "10.1/a", "closed", False)])
     open_tx = MagicMock()
+    phase = SourcePhase(
+        "unpaywall",
+        "oa_status",
+        OaStatusPhase(
+            queries,
+            _make_fetcher(),
+            staleness_days=lambda conn: 15,  # noqa: ARG005
+            max_per_run=lambda conn: None,  # noqa: ARG005
+        ),
+    )
 
-    metrics = OaStatusPhase(
-        queries,
-        _make_fetcher(),
-        credentials_missing=lambda source: "email polite pool absent",  # noqa: ARG005
-        staleness_days=lambda conn: 15,  # noqa: ARG005
-        max_per_run=lambda conn: None,  # noqa: ARG005
-    ).run(PhaseContext(open_tx=open_tx, logger=logger, options=RunOptions()))
+    with patch(
+        "pipeline.runtime.config.source_credentials_missing",
+        return_value="email polite pool absent",
+    ):
+        metrics = phase.run(PhaseContext(open_tx=open_tx, logger=logger, options=RunOptions()))
 
     open_tx.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

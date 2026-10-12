@@ -61,7 +61,7 @@ def select_targets(
 ) -> list[str]:
     """Sources à interroger : `base` moins WoS (opt-in via `include_wos`), restreintes au filtre `sources` s'il est fourni, dans l'ordre canonique de `base`.
 
-    Prologue commun aux phases à interrogation externe, en amont de `filter_configured`. L'ordre stable garantit des logs et un dispatch déterministes.
+    Prologue commun aux phases à interrogation externe. L'ordre stable garantit des logs et un dispatch déterministes.
     """
     eligible = set(base) - (set() if include_wos else {"wos"})
     if sources:
@@ -69,23 +69,7 @@ def select_targets(
     return [t for t in base if t in eligible]
 
 
-def filter_configured(
-    targets: list[str],
-    metrics: PhaseMetrics,
-    *,
-    credentials_missing: Callable[[str], str | None],
-    logger: logging.Logger,
-    phase: str,
-) -> list[str]:
-    """Garde les sources configurées, signale les autres (`source_unconfigured`).
-
-    `credentials_missing(source)` rend le motif d'absence de credentials, ou `None` si la source est configurée. La détection (lecture des credentials) est injectée par le composition-root ; l'assemblage des signaux vit ici, côté application.
-    """
-    configured: list[str] = []
-    for target in targets:
-        reason = credentials_missing(target)
-        if reason:
-            signal_source_unconfigured(metrics, target, reason, logger=logger, phase=phase)
-        else:
-            configured.append(target)
-    return configured
+def skipped(metrics: PhaseMetrics) -> bool:
+    """Accès sauté avant tout traitement : source non configurée, ou indisponible sans élément traité."""
+    codes = {s["code"] for s in metrics.signals}
+    return "source_unconfigured" in codes or (metrics.total == 0 and "source_unavailable" in codes)
