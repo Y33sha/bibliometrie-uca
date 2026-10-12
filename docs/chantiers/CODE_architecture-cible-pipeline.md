@@ -15,7 +15,7 @@ Le pipeline alimente la base de données. L'objectif est un pipeline clair, lisi
 
 ## Démarche
 
-Six questions, dans cet ordre. Chacune s'appuie sur les précédentes. La mise en pratique et les fiches chantier viennent après.
+Cinq questions, dans cet ordre. Chacune s'appuie sur les précédentes. La mise en pratique et les fiches chantier viennent après.
 
 ### 1. Identités stables
 
@@ -61,18 +61,6 @@ Chaque table relève d'une catégorie :
 
 **Décision : la diffusion est un schéma de vues.** Les consommateurs en lecture seule lisent un schéma `diffusion` fait de vues sur les tables des domaines, et n'ont aucun droit ailleurs. Les vues fixent le contrat (noms, colonnes, filtres) : les tables internes changent sans toucher les consommateurs. Reporté : ce n'est pas urgent.
 
-**Contrat de la résolution** : en entrée, les notices et les signatures sources, plus les décisions ; en sortie, une table de correspondance entre chaque notice ou signature et son entité. Le contrat tient quel que soit l'algorithme.
-
-Une forme possible, celle des modèles par paires (dnet-dedup, Splink). Chaque étape lit en base ce que la précédente a écrit :
-
-1. **paires candidates** : les paires de notices ou de signatures qui concordent, avec leur origine ou leur score ;
-2. **décisions** : les confirmations ajoutent des paires, les rejets et les non-doublons en retirent ;
-3. **groupes** : composantes connexes sur les paires retenues ;
-4. **identifiant** : chaque groupe reçoit un identifiant ;
-5. **entité** : construite à partir des membres du groupe.
-
-La table des paires est du dérivé recalculable. C'est la sortie d'un modèle probabiliste comme de règles déterministes.
-
 **Acquis**
 - L'inventaire des lectures et écritures de chaque table : [inventaire](archived/2026-10-11_CODE_pipeline-dag_inventaire.md).
 
@@ -87,12 +75,8 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 Les tables mixtes sont les entités centrales : un schéma par catégorie les range dans le dérivé, et les droits ne disent plus qui écrit quoi. Seules les tables de décision et les référentiels tenus à la main relèvent de l'API seule.
 
-**Ouvert**
-- Liste des schémas de domaine et rattachement de chaque table. Proposition : `sources`, `persons`, `publications`, `containers` (revues, éditeurs, monographies), `structures` (structures, adresses, périmètres), `ref` (pays, langues, ROR, configuration), `ops` (audit, exécutions, migrations).
-- Forme par paires : les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
-- Forme par paires : les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de signatures. Leur traduction en contraintes sur les signatures dépend de la question 2.
-- La cascade des personnes rattache une signature à une personne existante, sans comparer les signatures entre elles : forme de ReCiter, autre que la forme par paires.
-- Propriété des écritures : une seule phase écrit chaque colonne. Les caches dénormalisés (`publications.countries`, `source_publications.countries`) deviennent des projections : vues matérialisées, ou phase finale de projection ?
+**À mettre en œuvre**
+- Les schémas de domaine et le rattachement de chaque table. Proposition : `sources`, `persons`, `publications`, `containers` (revues, éditeurs, monographies), `structures` (structures, adresses, périmètres), `ref` (pays, langues, ROR, configuration), `ops` (audit, exécutions, migrations).
 
 ### 4. Graphe
 
@@ -102,13 +86,11 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 - Les nœuds, avec les données qu'ils lisent et écrivent et leurs lectures du run précédent ; un test vérifie que l'ordre d'exécution les respecte.
 - Une seule boucle d'acquisition ciblée, gardée : `fetch_missing` cherche les documents des publications du périmètre établi au run précédent.
 - `resolve_ra` résout les DOI du run, juste avant `publishers_journals`. Les référentiels vides sont supprimés dans le run qui les vide.
+- Le recalcul est incrémental, et documenté nœud par nœud.
+- Les appels réseau restent dans les nœuds qui en ont besoin, certains après des transformations. Leur code est regroupé dans `pipeline/ingestion`.
 
 **Ouvert**
-- Recalcul complet ou incrémental, nœud par nœud, d'après la nature de ses tables. Dépend de la durée d'un recalcul complet. Le pipeline de Stanford est passé du recalcul complet à l'incrémental.
-- `publications.reconcile`, aujourd'hui un seul nœud : le scinder selon les étapes de la forme par paires, si elle est retenue.
-- Place des appels réseau. Hypothèse : acquisition séparée de la transformation, qui se rejoue alors sur une copie de la base.
-- Phases réduites à des groupes d'affichage ; exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
-- `publishers_journals` enchaîne treize sous-étapes en quatre groupes (éditeurs, revues, monographies, nettoyage) : une phase par référentiel ?
+- À étudier : des phases réduites à des groupes d'affichage, et l'exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
 - Reports au run suivant : peser chaque lecture `previous_run` que déclare `pipeline/graph.py`, et les données différées sans lecture à rebours (`fetch_missing` n'est pas récursif), puis garder ou supprimer chaque report.
 
 ### 5. Organisation du code
@@ -129,34 +111,14 @@ Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_
 - Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres, `in_perimeter` après la revue d'une adresse ou l'exclusion d'une personne, la construction des authorships à l'attribution d'orphelines, les pays d'un lot d'adresses, la requalification et la fusion des revues, le `pub_count` d'un éditeur fusionné. Chaque recalcul gardé se justifie par un effet immédiat attendu dans l'interface.
 - Priorités entre sources et seuils : dans le domaine, testés avec le code (`SOURCE_PRIORITY`), ou dans un fichier de configuration modifiable sans toucher au code ?
 
-### 6. Épreuves
-
-La cible est confrontée à des situations concrètes. Ce qui ne tient pas sort de la cible.
-
-Situations :
-- fusion de revues, faite par l'admin ou par le pipeline ;
-- fusion de personnes, dont l'une est rejetée sur une publication de l'autre ;
-- DOI d'une notice corrigé entre deux runs ;
-- signature rejetée par l'admin, seule signature du périmètre de sa publication ;
-- notice OpenAlex de plus de 100 auteurs rapatriée par DOI ;
-- panne d'une API au milieu d'un run ;
-- nouvelle source ;
-- règle de correction modifiée ;
-- deux publications regroupées à tort par un DOI commun ;
-- cascade des personnes remplacée par Splink.
-
 ## Hors de la cible, à décider plus tard
 
-- Algorithme de résolution des personnes : cascade de règles ou modèle probabiliste, et avec lui le recalcul complet de la résolution. Le contrat de la résolution (question 3) doit tenir dans les deux cas.
-  - Pour le probabiliste : Splink plutôt qu'un modèle maison.
-  - Splink additionne les comparaisons comme si elles étaient indépendantes : revue, sujet et structure, corrélés, sont à regrouper en une seule comparaison.
-  - Splink ne prévoit pas les liens imposés ou interdits : les décisions s'appliquent à l'étape 2 du contrat.
-- Conception de la résolution, deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres signatures.
+- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des entités avec Splink](CODE_resolution-splink.md).
 - Outillage : orchestrateur par *assets* (Dagster), dbt, publication en bloc après contrôle (*Write-Audit-Publish*).
 
 ## Mise en pratique
 
-Après les six questions. La refonte avance nœud par nœud. Elle commence par un test de non-régression : sur une copie figée de la base, on compare les tables produites avant et après chaque modification.
+Après les cinq questions. La refonte avance nœud par nœud. Elle commence par un test de non-régression : sur une copie figée de la base, on compare les tables produites avant et après chaque modification.
 
 ## Documents liés
 
