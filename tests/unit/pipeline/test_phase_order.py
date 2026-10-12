@@ -1,6 +1,6 @@
 """L'ordre des phases est cohérent : noms uniques."""
 
-from pipeline.runtime.phase_order import EXTRA_PHASES, PHASE_ORDER
+from pipeline.graph import EXTRA_PHASES, PHASE_ORDER
 
 
 def test_phases_uniques():

@@ -2,11 +2,9 @@
 
 ## Contexte
 
-`run.py` exécute les phases dans l'ordre de `PHASE_ORDER` (`pipeline/runtime/phase_order.py`). Chaque phase expose `build()`, dont le code fixe l'ordre de ses étapes.
+`pipeline/graph.py` déclare les nœuds du pipeline : une étape, sa phase, ce qu'elle lit et écrit, ses lectures du run précédent. L'ordre des phases, `PHASE_ORDER`, est celui de leurs nœuds.
 
-`pipeline/graph.py` déclare les nœuds du pipeline : une étape, sa phase, ce qu'elle lit et écrit, ses lectures du run précédent. Seuls les tests lisent le graphe. Ils vérifient l'ordre déclaré, pas l'ordre exécuté. Le graphe a donc pu diverger du code : il omettait la recherche de HAL par DOI et la relecture de Crossref, et recopiait des listes de sources que le domaine déclare.
-
-L'ordre des phases est déclaré deux fois : `PHASE_ORDER`, et les groupes des nœuds de `graph.py`. Un test les accorde.
+`run.py` exécute les phases dans cet ordre. Chaque phase expose `build()`, dont le code fixe l'ordre de ses étapes. Les tests vérifient l'ordre déclaré des nœuds, pas l'ordre exécuté. Le graphe a donc pu diverger du code : il omettait la recherche de HAL par DOI et la relecture de Crossref, et recopiait des listes de sources que le domaine déclare.
 
 Le journal du terminal suit déjà la structure du graphe : un cadre par phase, des sections (« Éditeurs », « Revues »), une ligne de bilan par étape. Les lignes de bilan de `publishers_journals` correspondent presque une à une à ses dix nœuds.
 
@@ -18,7 +16,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 
 ### Phase 1 — Une seule déclaration
 
-- [ ] `PHASE_ORDER` se déduit des groupes de `graph.py`. Les libellés et la liste des enrichissements deviennent des attributs de phase dans `graph.py`. Suppression de `phase_order.py`.
+- [x] `PHASE_ORDER` se déduit des groupes de `graph.py`. Les libellés et la liste des enrichissements deviennent des attributs de phase dans `graph.py`. Suppression de `phase_order.py`.
 - [x] Les nœuds par source du graphe lisent les listes du domaine : `HARVESTED_SOURCES`, `ALL_SOURCES`, `DOI_SEARCHABLE_SOURCES`, `SOURCE_PRIORITY`.
 
 ### Phase 2 — Inventaire

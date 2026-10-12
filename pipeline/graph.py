@@ -1,4 +1,4 @@
-"""Graphe de dépendances du pipeline : les nœuds, ce qu'ils lisent et écrivent, dans l'ordre d'exécution actuel.
+"""Graphe de dépendances du pipeline : les nœuds, ce qu'ils lisent et écrivent, dans l'ordre d'exécution actuel. Chaque nœud appartient à une phase, et l'ordre des phases est celui de leurs nœuds.
 
 Une donnée se désigne par sa table (`"journals"`) ou par une colonne (`"journals.journal_type"`) ; `"journals.id"` désigne l'existence des lignes, que créent et suppriment les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
@@ -803,3 +803,49 @@ NODES: tuple[Node, ...] = (
         writes=("publications.oa_status", "publications.unpaywall_checked_at"),
     ),
 )
+
+
+# ── Phases ────────────────────────────────────────────────────
+
+_RUN_GROUP = "run"
+"""Groupe des nœuds que l'orchestrateur exécute avant toute phase."""
+
+PHASE_ORDER: tuple[str, ...] = tuple(
+    dict.fromkeys(node.group for node in NODES if node.group != _RUN_GROUP)
+)
+"""Ordre d'exécution des phases : celui de leurs nœuds dans `NODES`."""
+
+PHASE_LIBELLES: dict[str, str] = {
+    "extract": "Moissonnage des sources",
+    "resolve_ra": "Résolution des agences d'enregistrement des DOI",
+    "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
+    "fetch_stale": "Recherche des documents non revus depuis {delai}",
+    "fetch_truncated": "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
+    "normalize": "Normalisation des données brutes",
+    "affiliations": "Résolution des affiliations par signature",
+    "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
+    "metadata_correction": "Correction des métadonnées de publication",
+    "publications": "Dédoublonnage des publications",
+    "persons": "Résolution de l'identité des personnes",
+    "authorships": "Rafraîchissement des liens entre publications, personnes et structures",
+    "relations": "Relations entre publications apparentées",
+    "subjects": "Sujets des publications",
+    "countries": "Pays associés aux signatures",
+    "oa_status": "Statut open access des publications",
+}
+"""Ce que chaque phase produit, en une ligne lisible sans connaître le schéma.
+
+Les champs entre accolades reçoivent une valeur de configuration au lancement de la phase.
+"""
+
+EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
+"""Enrichissements, hors résolution d'entités : `--no-extras` les omet.
+
+Aucune ne dépend d'une autre. Des phases placées avant elles lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
+"""
+
+if not EXTRA_PHASES <= set(PHASE_ORDER):
+    raise ValueError("EXTRA_PHASES nomme une phase absente du graphe")
+
+if set(PHASE_LIBELLES) != set(PHASE_ORDER):
+    raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")
