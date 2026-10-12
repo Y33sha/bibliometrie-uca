@@ -15,16 +15,16 @@ import os
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.pipeline.normalize._authorships_batch import signature_name_fields
 from domain.persons.signature_name import SignatureName
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.normalize.authorships import (
+from pipeline.sources.signature_queries import (
     IDENTITY_KEY_COLUMNS,
     delete_orphan_identities,
     key_hash_sql,
 )
+from pipeline.sources.signatures import signature_name_fields
 
 log = setup_logger("backfill_initials_split", os.path.dirname(__file__))
 

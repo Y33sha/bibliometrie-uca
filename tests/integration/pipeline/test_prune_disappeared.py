@@ -8,11 +8,11 @@ from unittest.mock import MagicMock
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.normalize.staging import (
-    PgStagingQueries,
+from infrastructure.repositories import publication_repository
+from pipeline.sources.staging import (
+    StagingQueries,
     delete_disappeared_source_publications,
 )
-from infrastructure.repositories import publication_repository
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.staging import insert_staging
 
@@ -150,9 +150,7 @@ def test_une_notice_sans_metadonnees_minimales_perd_son_enregistrement(sa_sync_c
     autre_staging = _staging(sa_sync_conn_owner, source_id="hal-soeur")
     soeur = _notice(sa_sync_conn_owner, pub, source_id="hal-soeur", staging_id=autre_staging)
 
-    PgStagingQueries(raw_store=MagicMock()).discard_source_publication(
-        sa_sync_conn_owner, staging_id
-    )
+    StagingQueries(raw_store=MagicMock()).discard_source_publication(sa_sync_conn_owner, staging_id)
 
     restants = (
         sa_sync_conn_owner.execute(

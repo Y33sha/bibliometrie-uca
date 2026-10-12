@@ -2,11 +2,11 @@
 
 from sqlalchemy import text
 
-from application.pipeline.normalize._authorships_batch import AuthorRecord, write_source_authorships
 from domain.persons.signature_name import SignatureName
 from infrastructure.fingerprint import fingerprint
-from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 from interfaces.cli.oneshot.backfill_initials_split import backfill
+from pipeline.sources.signature_queries import AuthorshipsBatchQueries
+from pipeline.sources.signatures import AuthorRecord, write_source_authorships
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 
@@ -45,7 +45,7 @@ def test_synchronisation_apres_backfill_garde_la_signature(sa_sync_conn):
 
     write_source_authorships(
         sa_sync_conn,
-        PgAuthorshipsBatchQueries(),
+        AuthorshipsBatchQueries(),
         fingerprint,
         "openalex",
         sp,

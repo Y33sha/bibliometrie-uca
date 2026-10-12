@@ -24,14 +24,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.normalize import (
-    normalize_crossref,
-    normalize_datacite,
-    normalize_hal,
-    normalize_openalex,
-    normalize_scanr,
-    normalize_wos,
-)
 from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import (
     ContainerDescription,
@@ -51,6 +43,12 @@ from infrastructure.pipeline.containers import PgContainerGatewayQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from infrastructure.raw_store.base import RawStore
 from infrastructure.raw_store.factory import get_raw_store
+from pipeline.sources.crossref import normalize as normalize_crossref
+from pipeline.sources.datacite import normalize as normalize_datacite
+from pipeline.sources.hal import normalize as normalize_hal
+from pipeline.sources.openalex import normalize as normalize_openalex
+from pipeline.sources.scanr import normalize as normalize_scanr
+from pipeline.sources.wos import normalize as normalize_wos
 
 log = setup_logger("move_volumes_to_monographs", os.path.dirname(__file__))
 

@@ -10,11 +10,11 @@ transformation.
 
 from unittest.mock import AsyncMock, patch
 
-from application.pipeline.normalize.base import NormalizeStats
 from interfaces.cli.phases import extract, fetch_truncated, normalize
 from interfaces.cli.phases.execution import phase_context
 from pipeline.context import RunOptions
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.normalize import NormalizeStats
 
 # Le nœud de la phase `fetch_truncated`, lancé via `asyncio.run`.
 _REFETCH = "pipeline.sources.openalex.fetch_truncated.refetch_openalex"

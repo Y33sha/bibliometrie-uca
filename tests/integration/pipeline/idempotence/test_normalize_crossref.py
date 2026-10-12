@@ -93,19 +93,18 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
-    from application.ports.pipeline.normalize.staging import StagingRow
     from infrastructure.pipeline.containers import PgContainerGatewayQueries
-    from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.pipeline.normalize.source_publications import (
-        PgSourcePublicationQueries,
-    )
-    from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from pipeline.sources.crossref.normalize import CrossrefNormalizer
+    from pipeline.sources.signature_queries import AuthorshipsBatchQueries
+    from pipeline.sources.source_publications import (
+        SourcePublicationQueries,
+    )
+    from pipeline.sources.staging import StagingQueries, StagingRow
 
-    queries = PgSourcePublicationQueries()
-    staging_queries = PgStagingQueries()
-    authorship_queries = PgAuthorshipsBatchQueries()
+    queries = SourcePublicationQueries()
+    staging_queries = StagingQueries()
+    authorship_queries = AuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = CrossrefNormalizer(

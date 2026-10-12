@@ -5,7 +5,7 @@ Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data,
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.normalize.staging import (
+from pipeline.sources.staging import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )

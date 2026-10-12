@@ -2,12 +2,11 @@
 
 from sqlalchemy import text
 
-from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
 from domain.publications.metadata import normalized_title
-from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+from pipeline.sources.source_publications import SourcePublicationQueries, SourcePublicationUpsert
 from tests.integration.helpers.staging import insert_staging
 
-_Q = PgSourcePublicationQueries()
+_Q = SourcePublicationQueries()
 
 
 def test_upsert_writes_title_normalized(sa_sync_conn):

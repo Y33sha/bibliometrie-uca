@@ -30,7 +30,7 @@ Quatre phases écrivent ces tables, dans l'ordre où le pipeline les enchaîne.
 
 ### `normalize` — création des adresses
 
-Les adresses extraites des sources sont dédoublonnées, insérées, puis reliées aux signatures par `application/pipeline/normalize/_authorships_batch.py`.
+Les adresses extraites des sources sont dédoublonnées, insérées, puis reliées aux signatures par `pipeline/sources/signatures.py`.
 
 ### `affiliations` — résolution en structures
 

@@ -629,7 +629,7 @@ author_identifying_keys = Table(
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
-    # Aligné sur `key_hash_sql` (infrastructure/pipeline/normalize/authorships.py).
+    # Aligné sur `key_hash_sql` (pipeline/sources/signature_queries.py).
     Column(
         "key_hash",
         Text,

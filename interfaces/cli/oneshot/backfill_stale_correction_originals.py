@@ -18,18 +18,16 @@ from collections.abc import Mapping
 
 from sqlalchemy import text
 
-from application.pipeline.normalize import (
-    normalize_datacite,
-    normalize_hal,
-    normalize_openalex,
-    normalize_scanr,
-    normalize_wos,
-)
 from domain.sources.openalex import parse_primary_location
 from domain.types import JsonValue, as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.factory import get_raw_store
+from pipeline.sources.datacite import normalize as normalize_datacite
+from pipeline.sources.hal import normalize as normalize_hal
+from pipeline.sources.openalex import normalize as normalize_openalex
+from pipeline.sources.scanr import normalize as normalize_scanr
+from pipeline.sources.wos import normalize as normalize_wos
 
 log = setup_logger("backfill_stale_correction_originals", os.path.dirname(__file__))
 
