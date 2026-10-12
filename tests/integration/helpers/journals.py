@@ -168,10 +168,10 @@ def insert_doi_prefix(
     ra: str,
     publisher_id: int | None = None,
     crossref_member_id: int | None = None,
-    publisher_checked: bool = False,
+    checked: bool = False,
 ) -> None:
-    """Insère le préfixe DOI `prefix` de l'agence `ra`. `publisher_checked` date la vérification de l'éditeur de l'instant de la transaction."""
-    checked_at = conn.execute(text("SELECT now()")).scalar_one() if publisher_checked else None
+    """Insère le préfixe DOI `prefix` de l'agence `ra`. `checked` date la réponse de cette agence de l'instant de la transaction."""
+    checked_at = conn.execute(text("SELECT now()")).scalar_one() if checked else None
     insert_row(
         conn,
         "doi_prefixes",
@@ -180,7 +180,8 @@ def insert_doi_prefix(
             "ra": ra,
             "publisher_id": publisher_id,
             "crossref_member_id": crossref_member_id,
-            "publisher_checked_at": checked_at,
+            "crossref_checked_at": checked_at if ra == "Crossref" else None,
+            "datacite_checked_at": checked_at if ra == "DataCite" else None,
         },
         returning=False,
     )

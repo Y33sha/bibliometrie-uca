@@ -68,7 +68,8 @@ Les avertissements de source non configurée ou indisponible s'affichent après 
 
 | Nœud | Étape | Journal |
 |---|---|---|
-| `resolve_publishers` | éditeurs des préfixes DOI (Crossref, DataCite) | ▶ Éditeurs ; └─ Éditeurs des préfixes DOI : … |
+| `resolve_crossref_publishers` | éditeurs des préfixes DOI Crossref | ▶ Éditeurs ; ├─ Éditeurs des préfixes DOI Crossref : … |
+| `resolve_datacite_publishers` | éditeurs des préfixes DOI DataCite | └─ Éditeurs des préfixes DOI DataCite : … |
 | `enrich_journals_from_openalex` | type et APC des revues (OpenAlex) | ▶ Revues ; ├─ Type des revues sur OpenAlex : … |
 | `check_journals_in_sudoc` | ISSN vérifiés au Sudoc | ├─ Vérification des ISSN dans le Sudoc : … |
 | `merge_duplicate_journals` | cinq règles de fusion | ├─ Fusion des revues en double : … |
@@ -79,7 +80,7 @@ Les avertissements de source non configurée ou indisponible s'affichent après 
 | `link_monographs_to_collections` | rattachement aux collections | ├─ Rattachement aux collections : … |
 | `type_proceedings_volumes` | nature des monographies | └─ Nature des monographies : … |
 
-Les dix étapes correspondent une à une aux dix nœuds, dans le même ordre.
+Les onze étapes correspondent une à une aux onze nœuds, dans le même ordre.
 
 ## metadata_correction
 

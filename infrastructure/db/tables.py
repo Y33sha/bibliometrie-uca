@@ -486,7 +486,8 @@ doi_prefixes = Table(
     Column("client_name_normalized", Text),
     Column("datacite_client_symbol", Text),
     Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    Column("publisher_checked_at", DateTime(timezone=True)),
+    Column("crossref_checked_at", DateTime(timezone=True)),
+    Column("datacite_checked_at", DateTime(timezone=True)),
     schema="publishing",
 )
 
