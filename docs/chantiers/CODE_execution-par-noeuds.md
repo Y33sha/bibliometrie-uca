@@ -35,7 +35,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 - [x] Lectures déclarées à tort : `language_forms` par `normalize.<source>`, les référentiels de publication par `normalize.theses`, `publications` par `subjects.usage`, `countries` par `countries.detect`, `source_publications.external_ids` par `oa_status.verify_unpaywall`.
 - [x] `oa_status.verify_unpaywall` interroge Unpaywall sans déclarer de `network`.
 - [x] Étapes sans nœud. L'import du dump ROR devient le nœud `affiliations.refresh_ror`. La seconde matérialisation de `perimeter_structures` disparaît : `run.py` le matérialise avant toute phase. Le `VACUUM` du staging et les deux `ANALYZE` des signatures sont déclarés comme maintenance de leur nœud, sans dépendance.
-- [ ] Les canaux de `fetch_missing` partagent une même déclaration, trop large pour chacun.
+- [x] Les canaux de `fetch_missing` partagent une même déclaration, trop large pour chacun. Une phase peut déclarer les lectures et écritures communes à ses nœuds ; chaque canal ajoute les siennes.
 - [ ] Journal : `fetch_stale`, `resolve_ra` et `extract` en mode daily n'ont pas de titre de section. Les épinglages de `persons` et les documents disparus de `normalize` s'affichent sans branche.
 
 Constats hors du graphe :
