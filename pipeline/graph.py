@@ -13,6 +13,7 @@ from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
     HARVESTED_SOURCES,
     SOURCE_PRIORITY,
+    Source,
 )
 
 
@@ -98,6 +99,12 @@ _CONTAINERS = (
     "journal_name_forms",
     "monographs",
 )
+
+
+def _containers(source: Source) -> tuple[str, ...]:
+    """Référentiels de publication que lit et écrit la normalisation de `source` : aucun pour theses.fr."""
+    return () if source == Source.THESES else _CONTAINERS
+
 
 NODES: tuple[Node, ...] = (
     _node(
@@ -195,8 +202,7 @@ NODES: tuple[Node, ...] = (
                 "addresses.id",
                 "addresses.countries",
                 "addresses.suggested_countries",
-                "language_forms",
-                *_CONTAINERS,
+                *_containers(source),
             ),
             writes=(
                 "staging.processed",
@@ -209,7 +215,7 @@ NODES: tuple[Node, ...] = (
                 "addresses.id",
                 "addresses.countries",
                 "addresses.suggested_countries",
-                *_CONTAINERS,
+                *_containers(source),
             ),
             # Ses propres lignes de `staging`, notices et signatures, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
             previous_run=(
@@ -218,7 +224,7 @@ NODES: tuple[Node, ...] = (
                 "source_authorships",
                 "author_identifying_keys",
                 "addresses",
-                *_CONTAINERS,
+                *_containers(source),
             ),
         )
         for source in SOURCE_PRIORITY
@@ -835,18 +841,15 @@ NODES: tuple[Node, ...] = (
         reads=(
             "publication_subjects",
             "subjects.id",
-            "publications.id",
-            "publications.in_perimeter",
         ),
         writes=("subjects.usage_count", "subject_cooccurrences"),
-        previous_run=("publications", "subjects"),
+        previous_run=("subjects",),
     ),
     _node(
         "countries.detect",
         "countries",
         reads=(
             "place_name_forms",
-            "countries",
             "addresses.id",
             "addresses.normalized_text",
             "addresses.countries",
@@ -895,7 +898,8 @@ NODES: tuple[Node, ...] = (
             "publications.oa_status",
             "publications.unpaywall_checked_at",
             "source_publications.publication_id",
-            "source_publications.external_ids",
+            "source_publications.source",
+            "source_publications.oa_status",
             "config",
         ),
         writes=("publications.oa_status", "publications.unpaywall_checked_at"),
