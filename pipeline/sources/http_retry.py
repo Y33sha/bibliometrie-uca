@@ -36,6 +36,12 @@ from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 logger = logging.getLogger(__name__)
 
 
+def _describe(error: Exception) -> str:
+    """Type de l'erreur, suivi de son message quand elle en a un : un délai dépassé de httpx a un message vide."""
+    message = str(error)
+    return f"{type(error).__name__}: {message}" if message else type(error).__name__
+
+
 def _backoff_delay(initial_backoff: float, attempt: int) -> float:
     return initial_backoff * float(2**attempt)
 
@@ -124,9 +130,9 @@ def http_request_with_retry(
                     raise SourceUnavailableError(breaker.source) from e
                 raise
             logger.warning(
-                "Erreur réseau %s: %s — attente %ss (tentative %s/%s)",
+                "Erreur réseau %s : %s — attente %ss (tentative %s/%s)",
                 label,
-                e,
+                _describe(e),
                 wait,
                 attempt + 1,
                 max_retries,
@@ -334,9 +340,9 @@ async def _request_with_retry_async[T](
                     breaker.record_failure()
                 raise
             logger.warning(
-                "Erreur réseau %s: %s — attente %ss (tentative %s/%s)",
+                "Erreur réseau %s : %s — attente %ss (tentative %s/%s)",
                 label,
-                e,
+                _describe(e),
                 wait,
                 attempt + 1,
                 max_retries,
