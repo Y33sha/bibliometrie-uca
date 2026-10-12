@@ -89,7 +89,7 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 **Décisions**
 - Pas d'exécution en parallèle des nœuds sans dépendance entre eux, tant que l'orchestration est locale, sur un seul poste : le gain est faible et les journaux de progression deviennent moins lisibles. La question se rouvre avec un orchestrateur de type Airflow.
 
-**Suite** : les reports au run suivant sont traités par le chantier [Recalculs ciblés et reports au run suivant](../CODE_recalculs-cibles-et-reports.md).
+**Suite** : les reports au run suivant sont traités par le chantier [Recalculs ciblés et reports au run suivant](2026-10-12_CODE_recalculs-cibles-et-reports.md).
 
 ### 5. Organisation du code
 
@@ -106,7 +106,7 @@ Traité par le chantier [Le pipeline en paquet racine](2026-10-12_CODE_pipeline-
 - Fusion des métadonnées d'une publication : les règles complexes d'un champ vont dans `domain/`, en fonctions dédiées. La qualité des métadonnées repose d'abord sur la correction en amont de la fusion.
 - Tests sur le [jeu de données commun](../CODE_jeu-de-donnees-commun.md).
 
-**Suite** : les recalculs ciblés appelés par l'API sont traités par le chantier [Recalculs ciblés et reports au run suivant](../CODE_recalculs-cibles-et-reports.md).
+**Suite** : les recalculs ciblés appelés par l'API sont traités par le chantier [Recalculs ciblés et reports au run suivant](2026-10-12_CODE_recalculs-cibles-et-reports.md).
 
 ## Hors de la cible, à décider plus tard
 
