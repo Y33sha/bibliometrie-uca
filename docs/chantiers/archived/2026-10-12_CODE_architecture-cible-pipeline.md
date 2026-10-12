@@ -115,4 +115,4 @@ Traité par le chantier [Le pipeline en paquet racine](2026-10-12_CODE_pipeline-
 
 ## Documents liés
 
-- [benchmark-pipelines.md](../benchmark-pipelines.md) : idées relevées dans le code d'autres pipelines de publications (Stanford, CRISalid, ReCiter, OpenAIRE), avec les liens vers les fichiers.
+- [benchmark-pipelines.md](2026-10-12_benchmark-pipelines.md) : idées relevées dans le code d'autres pipelines de publications (Stanford, CRISalid, ReCiter, OpenAIRE), avec les liens vers les fichiers.

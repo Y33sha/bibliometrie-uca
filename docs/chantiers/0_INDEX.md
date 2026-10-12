@@ -28,6 +28,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Benchmark des pipelines de publications d'autres établissements](archived/2026-10-12_benchmark-pipelines.md)
 - 2026-10-12 — [Recalculs ciblés et reports au run suivant](archived/2026-10-12_CODE_recalculs-cibles-et-reports.md)
 - 2026-10-12 — [Architecture cible du pipeline](archived/2026-10-12_CODE_architecture-cible-pipeline.md)
 - 2026-10-12 — [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md)
