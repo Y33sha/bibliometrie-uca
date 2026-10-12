@@ -69,7 +69,7 @@ Dans l'ordre du pipeline.
 
 ### Phase 8 — Organisation interne de `pipeline/`
 
-- [x] Relever comment les pipelines du [benchmark](../benchmark-pipelines.md) découpent leur code (extraction, chargement, transformation).
+- [x] Relever comment les pipelines du [benchmark](2026-10-12_benchmark-pipelines.md) découpent leur code (extraction, chargement, transformation).
 - [x] `pipeline/ingestion/<source>` : extraction et normalisation de chaque source, et clients des enrichissements (Sudoc, DOAJ, Unpaywall, doi.org). L'outillage HTTP commun dans `pipeline/ingestion/http/`. La transformation reste rangée par entité (`structures`, `containers`, `publications`, `persons`), les modules du run à la racine.
 
 ## Questions ouvertes
