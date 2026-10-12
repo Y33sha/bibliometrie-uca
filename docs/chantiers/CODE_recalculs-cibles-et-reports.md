@@ -17,6 +17,7 @@ Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` d�
 ## Décisions
 
 - Un recalcul ciblé se garde seulement s'il produit un effet immédiat attendu dans l'interface.
+- Les sept recalculs ciblés sont gardés : chacun produit un effet immédiat attendu dans l'interface.
 
 ## Phasage
 
@@ -43,7 +44,7 @@ Code au 2026-10-12. Le mode `daily` rejoue toutes les phases de transformation. 
 Constats :
 
 - **Pays** : les éditions de l'administration écrivent `addresses.countries` sans poser `countries_dirty`. Or `countries.refresh_publication_countries` recalcule seulement les lignes marquées. Sans le recalcul ciblé, une édition de pays n'atteint jamais les publications.
-- **Fusion de revues** (`JournalRecompute.merge_journals`) : c'est l'opération elle-même, partagée avec `publishers_journals.merge_duplicate_journals`, pas un recalcul. Elle reste exposée quelle que soit la décision.
+- **Fusion de revues** (`JournalRecompute.merge_journals`) : c'est l'opération elle-même, partagée avec `publishers_journals.merge_duplicate_journals`, pas un recalcul.
 
 #### Reports au run suivant
 
@@ -65,14 +66,13 @@ Restent à classer, colonne par colonne : les lectures de `publications` déclar
 
 ### Phase 2 — Décisions
 
-- [ ] Garder ou retirer chaque recalcul ciblé.
+- [x] Garder ou retirer chaque recalcul ciblé : tous gardés.
 - [ ] Garder ou supprimer chaque report.
 
 ### Phase 3 — Mise en œuvre
 
-- [ ] Retirer les recalculs écartés, leur port et leur export dans `pipeline/public.py`.
 - [ ] Supprimer les reports écartés, et mettre à jour leurs déclarations dans `pipeline/graph.py`.
 
 ## Questions ouvertes
 
-- Une donnée laissée au run suivant : l'interface signale-t-elle qu'elle attend un recalcul ?
+- Pays : les éditions de l'administration marquent-elles aussi `countries_dirty`, pour que le run suivant reprenne une propagation échouée en tâche de fond ?
