@@ -1,7 +1,13 @@
 """Le graphe de dépendances du pipeline (`pipeline.graph`) est cohérent avec l'ordre d'exécution."""
 
-from domain.sources.registry import DOI_SEARCHABLE_SOURCES, SOURCE_PRIORITY
+from domain.sources.registry import (
+    ALL_SOURCES,
+    DOI_SEARCHABLE_SOURCES,
+    HARVESTED_SOURCES,
+    SOURCE_PRIORITY,
+)
 from pipeline.graph import NODES, Node, order_violations
+from pipeline.ingestion.common import extract
 from pipeline.ingestion.common.normalize import _normalize_builders
 from pipeline.runtime.phase_order import PHASE_ORDER
 
@@ -18,6 +24,18 @@ def test_groupes_dans_l_ordre_des_phases():
     assert [n.group for n in NODES] == sorted(
         (n.group for n in NODES), key=["run", *PHASE_ORDER].index
     )
+
+
+def test_un_noeud_d_extraction_par_source_moissonnee():
+    extract_nodes = [n.name for n in NODES if n.group == "extract"]
+    assert extract_nodes == [f"extract.{s}" for s in HARVESTED_SOURCES]
+    assert set(extract._extractors()) == {s.value for s in HARVESTED_SOURCES}
+
+
+def test_un_noeud_de_relecture_par_source():
+    """Crossref aussi : `fetch_stale` relit toutes les sources par identifiant natif."""
+    stale_nodes = [n.name for n in NODES if n.group == "fetch_stale"]
+    assert stale_nodes == [f"fetch_stale.{s}" for s in ALL_SOURCES]
 
 
 def test_un_noeud_de_recherche_par_doi_par_source_interrogeable():
