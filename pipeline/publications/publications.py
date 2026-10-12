@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `publications` : assignation des `source_publications` aux publications, en une seule passe.
+"""Phase `publications` : assignation des `source_publications` aux publications, en une seule passe.
 
 `reconcile_components` clusterise le voisinage des SP dirty par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation (match/create/skip d'un orphelin) et réconciliation (merge/split de publications matérialisées) sont des facettes du même primitif.
 
@@ -15,14 +15,14 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.publications.reconcile_components import run as reconcile_run
-from application.ports.pipeline.publications.reconciliation import (
-    PublicationsReconciliationQueries,
-)
 from application.ports.repositories.publication_repository import PublicationRepository
 from pipeline.context import OpenTransaction, PhaseContext
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
+from pipeline.publications.reconcile_components import run as reconcile_run
+from pipeline.publications.reconciliation import (
+    PublicationsReconciliationQueries,
+)
 
 
 @dataclass(frozen=True)

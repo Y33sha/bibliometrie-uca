@@ -1,20 +1,34 @@
-"""Query service : SQL de la passe de réconciliation des composantes.
+"""SQL de la passe de réconciliation des composantes (phase `publications`)."""
 
-Implémente `application.ports.pipeline.publications.reconciliation.PublicationsReconciliationQueries`.
-"""
+from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.publications.reconciliation import (
-    PublicationsReconciliationQueries,
-    ReconcileRow,
-)
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     SCALAR_CONFIRMATION_ID_TYPES,
 )
+from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_int
+
+
+class ReconcileRow(NamedTuple):
+    """Projection d'une `source_publication` du voisinage : clés + publication courante.
+
+    `doc_type`/`title_normalized`/`pub_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI canonique de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = la SP a ≥1 authorship in-périmètre (gate de création d'une pub neuve)."""
+
+    id: int
+    doi: str | None
+    external_ids: dict[str, JsonValue] | None
+    publication_id: int | None
+    doc_type: str | None
+    title_normalized: str | None
+    pub_year: int | None
+    publication_doi: str | None
+    in_perimeter: bool
+
 
 # Voisinage 1-hop : les `source_publications` dirty (orphelines comprises) et celles qui
 # partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
@@ -117,16 +131,25 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
     ).rowcount
 
 
-class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
-    """Adapter PostgreSQL pour `PublicationsReconciliationQueries`."""
+class PublicationsReconciliationQueries:
+    """Requêtes de la passe de réconciliation."""
 
     def mark_keys_dirty(self, conn: Connection) -> int:
+        """Pose `keys_dirty = true` sur toutes les `source_publications` (rebuild complet).
+
+        Retourne le nombre de lignes marquées. Force la réconciliation à dégénérer en cluster-then-materialize global (après une évolution des règles de clés).
+        """
         return mark_keys_dirty(conn)
 
     def mark_publication_siblings_dirty(self, conn: Connection) -> int:
+        """Propage `keys_dirty` aux `source_publications` rattachées à la même publication qu'une SP déjà dirty. Retourne le nombre de lignes marquées.
+
+        Clôt le voisinage sur l'appartenance déjà matérialisée : sans cela, une SP rattachée par une clé de confirmation qui vient de disparaître (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) ne figure dans aucun bras du voisinage 1-hop — calculé sur les clés d'après — et resterait indéfiniment sur une publication dont plus rien ne la rapproche.
+        """
         return conn.execute(_SPREAD_TO_SIBLINGS_SQL).rowcount
 
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
+        """Les `source_publications` `keys_dirty` (**orphelines comprises** : la réconciliation est aussi l'assignation). Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""
         # Orphelins **compris** : la réconciliation est aussi l'assignation (un orphelin dirty
         # se fait matcher/créer/skipper). Les source_publications traitées sont ensuite
         # nettoyées (`clear_keys_dirty`).
@@ -136,6 +159,7 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         return [row.id for row in rows]
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
+        """Le voisinage 1-hop : les SP dirty (orphelines comprises) **et** les SP qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`) avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
         rows = conn.execute(_UNIVERSE_SQL).all()
         return [
             ReconcileRow(
@@ -153,6 +177,9 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         ]
 
     def fetch_publication_ids_by_doi(self, conn: Connection) -> dict[str, int]:
+        """Map `lower(doi) → id` des publications existantes portant un DOI.
+
+        Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui porte déjà son DOI même quand **aucune** SP du voisinage n'y est rattachée — publication devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une publication neuve qui heurterait la contrainte unique sur le DOI."""
         # Map `lower(doi) → id` des publications portant un DOI. Clé sur `lower(doi)` :
         # l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de
         # partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
@@ -164,6 +191,7 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     def repoint_source_publications(
         self, conn: Connection, source_publication_ids: list[int], publication_id: int
     ) -> None:
+        """Rattache un ensemble de `source_publications` à `publication_id` (assignation d'un groupe)."""
         if not source_publication_ids:
             return
         stmt = text(
@@ -174,6 +202,7 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     def detach_source_publications(
         self, conn: Connection, source_publication_ids: list[int]
     ) -> None:
+        """Détache un ensemble de `source_publications` de leur publication : elles deviennent orphelines."""
         if not source_publication_ids:
             return
         stmt = text(
@@ -184,12 +213,14 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
+        """Re-pointe les paiements APC (`apc_payments`) d'une publication **dissoute** vers son successeur. À appeler avant la suppression de la publication dissoute, qui les détacherait (SET NULL)."""
         conn.execute(
             text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
             {"s": from_publication_id, "t": to_publication_id},
         )
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
+        """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""
         if not source_publication_ids:
             return 0
         stmt = text(
@@ -198,6 +229,7 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
 
     def delete_publications_without_sources(self, conn: Connection) -> int:
+        """Supprime les publications auxquelles plus aucune `source_publication` n'est rattachée. Retourne le nombre de publications supprimées."""
         return conn.execute(
             text("""
                 DELETE FROM publications p
@@ -208,5 +240,6 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         ).rowcount
 
     def count_publications(self, conn: Connection) -> int:
+        """Total des publications (toutes in-périmètre : la réconciliation gate leur création sur le périmètre)."""
         # Toutes les publications sont in-périmètre par construction : la réconciliation gate leur création sur le périmètre.
         return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())

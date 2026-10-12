@@ -14,15 +14,15 @@ def build() -> Phase:
 
     `--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
 
-    Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
+    Séquence, transactions et métriques dans `pipeline/publications/publications.py`.
     """
-    from application.pipeline.publications.phase import PublicationsPhase
-    from infrastructure.pipeline.publications.reconciliation import (
-        PgPublicationsReconciliationQueries,
-    )
     from infrastructure.repositories import publication_repository
+    from pipeline.publications.publications import PublicationsPhase
+    from pipeline.publications.reconciliation import (
+        PublicationsReconciliationQueries,
+    )
 
     return PublicationsPhase(
-        PgPublicationsReconciliationQueries(),
+        PublicationsReconciliationQueries(),
         publication_repo_factory=publication_repository,
     )

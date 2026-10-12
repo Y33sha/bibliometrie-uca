@@ -26,7 +26,7 @@ MODULES = [
     "pipeline.sources.wos.normalize",
     "pipeline.sources.scanr.normalize",
     "pipeline.sources.theses.normalize",
-    "application.pipeline.publications.reconcile_components",
+    "pipeline.publications.reconcile_components",
     "application.pipeline.persons.arbitrate_identifiers",
     "application.pipeline.persons.cascade",
     "application.pipeline.persons.purge",

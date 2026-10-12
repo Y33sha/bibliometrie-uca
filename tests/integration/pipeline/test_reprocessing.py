@@ -117,15 +117,15 @@ def _fetch_stale_publications(conn):
 
     Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
-    from application.pipeline.publications.reconcile_components import reconcile
-    from infrastructure.pipeline.publications.reconciliation import (
-        PgPublicationsReconciliationQueries,
+    from pipeline.publications.reconcile_components import reconcile
+    from pipeline.publications.reconciliation import (
+        PublicationsReconciliationQueries,
     )
 
     apply_metadata_corrections(conn)
 
     reconcile(
-        conn, PgPublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
+        conn, PublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
     )
 
 

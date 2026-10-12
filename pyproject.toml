@@ -113,6 +113,8 @@ ignore_imports = [
     "pipeline.containers.* -> application.services.journals.core",
     "pipeline.containers.* -> application.services.publishers.core",
     "pipeline.containers.enrich_publishers -> application.ports.repositories.publisher_repository",
+    "pipeline.publications.* -> application.ports.repositories.publication_repository",
+    "pipeline.publications.reconcile_components -> application.services.publications.core",
 ]
 
 [[tool.importlinter.contracts]]
