@@ -1,6 +1,6 @@
 # Inventaire — étapes exécutées, nœuds du graphe, journal
 
-Annexe du chantier [Exécution du pipeline par nœuds](CODE_execution-par-noeuds.md). Code au 2026-10-12.
+Annexe du chantier [Exécution du pipeline par nœuds](2026-10-12_CODE_execution-par-noeuds.md). Code au 2026-10-12.
 
 Notation du journal : ▶ titre de section ; ├─ └─ ligne d'étape ou barre de progression. Les barres s'affichent seulement dans un terminal interactif.
 

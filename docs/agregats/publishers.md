@@ -1,8 +1,8 @@
 # Éditeurs — cycle de vie
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-12.*
 
-Un éditeur porte les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
+Un éditeur publie les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
 ## Tables
 
@@ -10,7 +10,7 @@ Un éditeur porte les revues et reçoit les frais de publication. Il se reconna�
 |---|---|---|
 | `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type`, `pub_count` |
 | `publisher_name_forms` | Formes de nom permettant de reconnaître un éditeur | `publisher_id`, `form_normalized` |
-| `doi_prefixes` | Correspondance entre un préfixe de DOI et un éditeur | `publisher_id`, `crossref_member_id`, `datacite_client_symbol`, `publisher_checked_at` |
+| `doi_prefixes` | Correspondance entre un préfixe de DOI et un éditeur | `publisher_id`, `crossref_member_id`, `datacite_client_symbol`, `crossref_checked_at`, `datacite_checked_at` |
 
 Une forme de nom d'éditeur est unique dans toute la table, là où une forme de titre de revue n'est unique que pour un éditeur donné : deux éditeurs ne peuvent pas revendiquer la même forme de nom.
 
@@ -20,7 +20,7 @@ Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `
 
 **Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur.
 
-**Résolution par préfixe de DOI (`publishers_journals`).** Pour chaque préfixe non encore résolu, `resolve_publishers` détermine l'agence d'enregistrement du DOI, interroge Crossref ou DataCite, enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom — la même opération que dans `normalize` — et renseigne `doi_prefixes.publisher_id`. `publisher_checked_at` retient une réponse de l'API, préfixe connu ou non : le préfixe n'est plus interrogé. Un préfixe dont l'API est indisponible est repris au run suivant.
+**Résolution par préfixe de DOI (`publishers_journals`).** Une sous-étape par agence d'enregistrement, Crossref puis DataCite, interroge l'API de l'agence sur les préfixes qu'elle n'a pas vus. Elle enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom, comme dans `normalize`, et renseigne `doi_prefixes.publisher_id`. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Un préfixe dont l'API est indisponible est repris au run suivant.
 
 **Enrichissement du pays, hors pipeline.** `interfaces/cli/maintenance/enrich_publishers.py` renseigne le pays depuis OpenAlex, et seulement là où il est absent : une valeur saisie à la main est conservée.
 
@@ -32,7 +32,7 @@ Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepositor
 
 **Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
 
-L'opération est refusée quand deux revues de même titre, une chez chaque éditeur, portent des ISSN différents : leurs identités sont distinctes. Elle l'est aussi quand un même titre apparaît deux fois chez l'un des deux éditeurs.
+L'opération est refusée quand deux revues de même titre, une chez chaque éditeur, ont des ISSN différents : leurs identités sont distinctes. Elle l'est aussi quand un même titre apparaît deux fois chez l'un des deux éditeurs.
 
 ## Lecture par le pipeline
 

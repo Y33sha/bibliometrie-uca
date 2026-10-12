@@ -84,9 +84,9 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 - `resolve_ra` résout les DOI du run, juste avant `publishers_journals`. Les référentiels vides sont supprimés dans le run qui les vide.
 - Le recalcul est incrémental, et documenté nœud par nœud.
 - Les appels réseau restent dans les nœuds qui en ont besoin, certains après des transformations. Leur code est regroupé dans `pipeline/ingestion`.
+- Chaque phase exécute ses nœuds dans l'ordre du graphe, par l'exécuteur `pipeline/node_runner.py` : chantier [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md).
 
 **Ouvert**
-- Phases réduites à des groupes d'affichage : chantier [Exécution du pipeline par nœuds](CODE_execution-par-noeuds.md).
 - À étudier : l'exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
 - Reports au run suivant : peser chaque lecture `previous_run` que déclare `pipeline/graph.py`, et les données différées sans lecture à rebours (`fetch_missing` n'est pas récursif), puis garder ou supprimer chaque report.
 

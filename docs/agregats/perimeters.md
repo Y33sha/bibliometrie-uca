@@ -25,7 +25,7 @@ Toute édition qui peut déplacer la frontière rejoue `refresh_perimeter_struct
 
 ## Écriture par le pipeline
 
-Le pipeline ne modifie jamais un périmètre. Il recalcule `perimeter_structures` à deux moments : au démarrage, avant que l'extraction ne lise le périmètre, puis au début de la phase `affiliations`. L'ensemble est ainsi à jour chaque fois qu'il sert à décider.
+Le pipeline ne modifie jamais un périmètre. Il recalcule `perimeter_structures` au démarrage, avant la première phase.
 
 ## Lecture par le pipeline
 

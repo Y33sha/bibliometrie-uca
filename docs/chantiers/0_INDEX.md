@@ -14,7 +14,6 @@
 
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
-- [Exécution du pipeline par nœuds](CODE_execution-par-noeuds.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
@@ -32,6 +31,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md)
 - 2026-10-12 — [Scripts en ligne de commande autonomes](archived/2026-10-12_CODE_scripts-autonomes.md)
 - 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)
 - 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)

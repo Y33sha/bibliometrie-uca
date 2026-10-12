@@ -1,6 +1,6 @@
 # Résolution des affiliations
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-12.*
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
 
 La phase `affiliations` reconnaît les structures dans le texte des adresses, et marque les signatures rattachées au périmètre.
 
-1. **`refresh_perimeter_structures`** — rematérialise la table `perimeter_structures`, qui liste, pour chaque périmètre configuré, l'ensemble des structures qu'il englobe (clôture récursive des tutelles). Les deux sous-étapes suivantes s'appuient sur cette liste à jour.
+1. **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée.
 
 2. **`resolve_addresses`** — rapproche chaque adresse normalisée des structures connues, en cherchant leurs formes de nom (`structure_name_forms`) dans le texte de l'adresse. Le résultat est écrit dans `address_structures`, avec `matched_form_id` pour la traçabilité (quelle forme a déclenché la détection). Code : `pipeline/transformation/structures/address_resolution.py`.
 

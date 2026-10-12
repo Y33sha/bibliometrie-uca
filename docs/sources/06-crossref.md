@@ -17,7 +17,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 - Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adaptateur colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 
-**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishers-journals.md#agences-denregistrement-doi-resolve_ra).
+**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par la sous-étape `resolve_crossref_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishers-journals.md#agences-denregistrement-doi-resolve_ra).
 
 ## Données récupérées
 
@@ -78,7 +78,7 @@ Crossref déclare ses relations dans `meta.relation`, sous des clés comme `is-p
 
 ### Affiliations mal renseignées
 
-29 % des auteurs Crossref portent une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de résolution des personnes et dans le build des authorships. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
+29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de résolution des personnes et dans le build des authorships. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
 ### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
 
