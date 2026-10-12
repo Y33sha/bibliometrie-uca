@@ -2,14 +2,13 @@
 
 ## Contexte
 
-La phase `normalize` traite les sources l'une après l'autre, dans un ordre de priorité fixe. Pour chaque source, une connexion lit le `staging` par sous-lots de 50 lignes. Chaque document est analysé puis écrit sous un SAVEPOINT. Un commit a lieu tous les 500 documents.
+La phase `normalize` traite les sources l'une après l'autre, dans l'ordre de `SOURCE_PRIORITY`. Pour chaque source, la boucle de `SourceNormalizer.run` (`pipeline/ingestion/common/normalize.py`) lit le `staging` par sous-lots de 50 lignes. Chaque document est analysé puis écrit sous un SAVEPOINT. Un commit a lieu tous les 100 ou 500 documents selon la source (`DEFAULT_BATCH_SIZE`).
 
-Le writer partagé (`pipeline/sources/signatures.py`) écrit les signatures d'un document en une requête par opération (`jsonb_to_recordset`, `unnest`). Il fait donc un nombre constant d'allers-retours par document :
+Le writer partagé (`pipeline/ingestion/common/signatures.py`) écrit les signatures de toutes les sources, theses comprise. Ses requêtes (`AuthorshipsBatchQueries`, dans `signature_queries.py`) traitent déjà plusieurs signatures en une requête, mais toujours celles d'un seul document. Le writer fait donc un nombre constant d'allers-retours par document :
 
-- lectures : empreinte du bloc auteurs, signatures stockées ;
-- écritures : suppressions, mises à jour, insertions de signatures, adresses, liens d'adresse, ROR.
-
-L'écriture domine le temps de la phase, surtout pour les auteurs avec `--normalize-full`. Dans ce mode, la plupart des signatures ont une empreinte inchangée : le temps passe surtout dans les lectures par document.
+- lecture de l'empreinte du bloc auteurs (`fetch_authors_hash`) : un bloc inchangé s'arrête là, sauf avec `--normalize-full` ;
+- lecture des signatures stockées (`fetch_stored_source_authorships`), relue après insertion pour obtenir les identifiants des signatures insérées ;
+- écritures : suppressions, mises à jour, insertions de signatures, adresses et leurs pays, liens d'adresse, ROR, empreinte du bloc.
 
 Le SAVEPOINT par document isole un document en erreur sans perdre le lot en cours. Regrouper les écritures de plusieurs documents sous un seul SAVEPOINT perd cet isolement.
 
@@ -28,7 +27,7 @@ Le rejeu isole le document fautif. Les erreurs sont rares, donc le rejeu l'est a
 - `fetch_authors_hash` et `fetch_stored_source_authorships` lisent les K `source_publication_id` en une requête ;
 - `plan_signature_sync` reste par document ;
 - suppressions, mises à jour, insertions, adresses, liens d'adresse et ROR deviennent une requête par lot ;
-- `fetch_source_authorship_ids_by_position` rend une correspondance `(source_publication_id, position) → id`.
+- les identifiants des signatures insérées se lisent pour les K documents en une requête.
 
 L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs et conteneurs restent par document. Deux documents d'un lot peuvent désigner la même revue.
 
@@ -38,13 +37,13 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 
 ### 1. Mesure
 
-- [ ] Profil de `normalize` sur un échantillon par source, avec et sans `--normalize-full` : part de l'analyse, des lectures et des écritures.
+- [ ] Profil de `normalize` sur un échantillon par source, avec et sans `--normalize-full` : part de l'analyse, des lectures et des écritures. L'échantillon se rejoue depuis le raw store (`rehydrate_staging_from_raw_store`, puis `run_pipeline --only normalize --sources <source>`).
 
 ### 2. Lectures et écritures des signatures par lot
 
-- [ ] Port `AuthorshipsBatchQueries` : variantes multi-documents des lectures et écritures.
+- [ ] `AuthorshipsBatchQueries` : variantes multi-documents des lectures et écritures.
 - [ ] Writer : traitement de K documents, repli document par document sur erreur.
-- [ ] Boucle de `normalize/base.py` : accumulation de K documents analysés avant écriture.
+- [ ] Boucle de `SourceNormalizer.run` : accumulation de K documents analysés avant écriture.
 - [ ] Tests : résultat identique au traitement par document ; un document en erreur isolé par le repli, les autres écrits.
 - [ ] Mesure du gain.
 
@@ -59,4 +58,3 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 ## Questions ouvertes
 
 - Taille K du lot : compromis entre allers-retours économisés et coût du rejeu.
-- Theses : son upsert par signature (positions `NULL` des non-auteurs) reste hors du writer partagé.
