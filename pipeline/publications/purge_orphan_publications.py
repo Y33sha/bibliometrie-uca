@@ -7,15 +7,12 @@ Défense en profondeur. La réconciliation ne crée une publication que pour une
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.authorships.purge_orphan_publications import (
-    PurgeOrphanPublicationsQueries,
-)
 
-
-class PgPurgeOrphanPublicationsQueries(PurgeOrphanPublicationsQueries):
-    """Adapter PostgreSQL pour le port `PurgeOrphanPublicationsQueries`."""
+class PurgeOrphanPublicationsQueries:
+    """Suppression des publications sans authorship."""
 
     def purge_orphan_publications(self, conn: Connection, *, limit: int | None = None) -> int:
+        """Supprime les publications sans aucun authorship (un lot si `limit`). Retourne le nombre supprimé ; la phase pilote les lots et leurs commits."""
         limit_clause = "LIMIT :lim" if limit is not None else ""
         return conn.execute(
             text(

@@ -8,15 +8,15 @@ filtre propre.
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.authorships.purge_orphan_publications import (
-    PgPurgeOrphanPublicationsQueries,
+from pipeline.publications.purge_orphan_publications import (
+    PurgeOrphanPublicationsQueries,
 )
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
-_Q = PgPurgeOrphanPublicationsQueries()
+_Q = PurgeOrphanPublicationsQueries()
 
 
 class TestPurgeOrphanPublications:

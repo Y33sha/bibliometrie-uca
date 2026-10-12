@@ -4,10 +4,10 @@ import logging
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
-from application.pipeline.authorships import phase as authorships_phase
 from interfaces.cli import run_pipeline
 from pipeline.context import PhaseContext, RunOptions
 from pipeline.metrics import PhaseMetrics
+from pipeline.publications import authorships as authorships_phase
 
 
 @contextmanager

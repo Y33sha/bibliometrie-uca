@@ -10,8 +10,8 @@ def _run_build_authorships(conn):
     """Exécute build_authorships sur la Connection SA de test."""
     import logging
 
-    from application.pipeline.authorships.build_authorships import build
     from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+    from pipeline.publications.build_authorships import build
 
     build(conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
 
@@ -65,8 +65,8 @@ class TestBuildAuthorshipsRebuildFull:
     def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
         import logging
 
-        from application.pipeline.authorships.build_authorships import build
         from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -93,8 +93,8 @@ class TestBuildAuthorshipsRebuildFull:
 
         from sqlalchemy import text
 
-        from application.pipeline.authorships.build_authorships import build
         from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -121,8 +121,8 @@ class TestBuildAuthorshipsRebuildRollback:
 
         from sqlalchemy import text
 
-        from application.pipeline.authorships.build_authorships import build
         from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -199,8 +199,8 @@ class TestIncrementalEqualsFull:
         # Rebuild full (purge + reconstruction) sur le même état source → snapshot.
         import logging
 
-        from application.pipeline.authorships.build_authorships import build
         from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.build_authorships import build
 
         build(
             sa_sync_conn,

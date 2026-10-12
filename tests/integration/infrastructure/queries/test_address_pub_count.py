@@ -2,9 +2,9 @@
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.authorships.address_pub_count import PgAddressPubCountQueries
+from pipeline.publications.address_pub_count import AddressPubCountQueries
 
-_Q = PgAddressPubCountQueries()
+_Q = AddressPubCountQueries()
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
