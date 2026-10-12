@@ -6,8 +6,8 @@ Pilote l'UPSERT `staging` (réécriture de `raw_data` + repassage `processed`) :
 from collections.abc import Callable, Mapping
 
 from domain.types import JsonValue
-from infrastructure.fingerprint import fingerprint
 from pipeline.sources.datacite import hash_normalize as datacite_hash
+from pipeline.sources.fingerprint import fingerprint
 from pipeline.sources.hal import hash_normalize as hal_hash
 from pipeline.sources.wos import hash_normalize as wos_hash
 

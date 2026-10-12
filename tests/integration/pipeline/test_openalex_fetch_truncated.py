@@ -14,8 +14,8 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 
 from sqlalchemy import text
 
-from infrastructure.fingerprint import fingerprint
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.fingerprint import fingerprint
 from pipeline.sources.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.sources.openalex.harvest import stage_work
 from tests.integration.helpers.staging import insert_staging

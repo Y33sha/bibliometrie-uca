@@ -28,12 +28,12 @@ from typing import TYPE_CHECKING, Protocol
 from domain.dates import date_to_french, today
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from infrastructure.parallel import RunParallel
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import circuit_breaker, open_tx, signal_if_tripped
 from pipeline.libelles import etape
 from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODES
+from pipeline.parallel import RunParallel
 from pipeline.signals import (
     signal_source_unavailable,
     signal_source_unconfigured,
@@ -251,7 +251,7 @@ def build() -> Phase:
     `pipeline/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `pipeline/sources/extract.py` ; ici, le câblage : registre des extracteurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from infrastructure.observability.phase_executions import get_last_daily_extract_date
-    from infrastructure.parallel import run_parallel
+    from pipeline.parallel import run_parallel
 
     registry = _extractors()
 

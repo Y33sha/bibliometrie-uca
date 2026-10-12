@@ -25,7 +25,7 @@ from domain.source_publications.signature_sync import (
 )
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue
-from infrastructure.fingerprint import Fingerprinter
+from pipeline.sources.fingerprint import Fingerprinter
 from pipeline.sources.signature_queries import (
     AddressCountryItem,
     AuthorshipAddressItem,

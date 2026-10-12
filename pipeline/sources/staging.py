@@ -19,9 +19,9 @@ from sqlalchemy import Connection, Row, ScalarResult, bindparam, text
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.fingerprint import stable_json_bytes
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.sources.change_detection import change_detection_hash
+from pipeline.sources.fingerprint import stable_json_bytes
 
 _logger = logging.getLogger(__name__)
 

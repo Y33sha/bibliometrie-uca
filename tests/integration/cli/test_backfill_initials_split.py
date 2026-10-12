@@ -3,8 +3,8 @@
 from sqlalchemy import text
 
 from domain.persons.signature_name import SignatureName
-from infrastructure.fingerprint import fingerprint
 from interfaces.cli.oneshot.backfill_initials_split import backfill
+from pipeline.sources.fingerprint import fingerprint
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
 from pipeline.sources.signatures import AuthorRecord, write_source_authorships
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
