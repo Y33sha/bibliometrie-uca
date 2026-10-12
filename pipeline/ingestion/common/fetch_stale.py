@@ -31,7 +31,7 @@ from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source, etape
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
@@ -58,6 +58,7 @@ class FetchStalePhase:
         """
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
+        etape(logger, "Relecture des documents dans leur source")
         if not MODES[options.mode].fetch_stale:
             logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return metrics

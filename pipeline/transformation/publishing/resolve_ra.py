@@ -17,7 +17,13 @@ from domain.publications.identifiers import DoiPrefix
 from pipeline.ingestion.http.access_source import SourcePhase
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import accord, forme
+from pipeline.runtime.observability.libelles import (
+    DERNIERE_BRANCHE,
+    accord,
+    etape,
+    forme,
+    rien_a_faire,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
@@ -63,9 +69,15 @@ def _resolve(
         for prefix in repo.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
-    log.info("%s à résoudre", accord(len(prefixes), "préfixe DOI", "préfixes DOI"))
-    if prefixes:
-        log.info("")
+    etape(log, "Agences d'enregistrement des préfixes DOI")
+    if not prefixes:
+        rien_a_faire(log)
+    else:
+        log.info(
+            "%s%s à résoudre",
+            DERNIERE_BRANCHE,
+            accord(len(prefixes), "préfixe DOI", "préfixes DOI"),
+        )
 
     new_by_ra: dict[str, int] = {}
     for prefix, answer in resolve_ras_fn(prefixes):
@@ -77,7 +89,7 @@ def _resolve(
         if repo.insert_ra(prefix=prefix, ra=ra):
             metrics.add(new=1)
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
-        log.info("%s → %s", prefix, ra)
+        log.info("     %s → %s", prefix, ra)
 
     # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org ne connaît pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
     metrics.details["summary"] = {

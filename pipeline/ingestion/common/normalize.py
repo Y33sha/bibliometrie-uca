@@ -280,7 +280,8 @@ class NormalizePhase:
         disparues = self.prune_disappeared()
         if disparues:
             logger.info(
-                "%s (disparus de leur source)",
+                "%s%s (disparus de leur source)",
+                DERNIERE_BRANCHE,
                 accord(disparues, "document supprimé", "documents supprimés"),
             )
 
