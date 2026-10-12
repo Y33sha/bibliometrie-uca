@@ -116,7 +116,11 @@ def _run(
         staleness_days=lambda conn: 15,  # noqa: ARG005
         max_per_run=lambda conn: None,  # noqa: ARG005
         max_concurrent=max_concurrent,
-    ).run(PhaseContext(open_tx=_open_tx, logger=logger, options=RunOptions()))
+    ).run(
+        PhaseContext(
+            open_tx=_open_tx, logger=logger, options=RunOptions(), maintain=lambda op: None
+        )
+    )
 
 
 def test_happy_path_updates_each_pub(logger, http_mock):
@@ -300,7 +304,11 @@ def test_skips_without_unpaywall_configuration(logger):
         "pipeline.runtime.config.source_credentials_missing",
         return_value="email polite pool absent",
     ):
-        metrics = phase.run(PhaseContext(open_tx=open_tx, logger=logger, options=RunOptions()))
+        metrics = phase.run(
+            PhaseContext(
+                open_tx=open_tx, logger=logger, options=RunOptions(), maintain=lambda op: None
+            )
+        )
 
     open_tx.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

@@ -42,11 +42,12 @@ class RunOptions:
 
 @dataclass(frozen=True, slots=True)
 class PhaseContext:
-    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options."""
+    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, et l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`), hors transaction."""
 
     open_tx: OpenTransaction
     logger: logging.Logger
     options: RunOptions
+    maintain: Callable[[str], None]
 
 
 class Phase(Protocol):

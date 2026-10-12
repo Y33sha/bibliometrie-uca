@@ -1,10 +1,11 @@
 """Exécution des nœuds d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacun de ses nœuds, un `NodeStep` : la fonction qui l'exécute, et pour un nœud qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute le nœud par l'accès à sa source s'il en déclare une (`network`), puis écrit sa ligne de bilan. Un nœud sans section écrit lui-même ses lignes.
+Une phase fournit, pour chacun de ses nœuds, un `NodeStep` : la fonction qui l'exécute, et pour un nœud qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute le nœud par l'accès à sa source s'il en déclare une (`network`), écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Un nœud sans section écrit lui-même ses lignes.
 """
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -12,6 +13,7 @@ from pipeline.graph import NODES, Node
 from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -53,11 +55,31 @@ def run_nodes(
         if step.section is not None and step.section != precedente:
             etape(logger, step.section)
         metrics = _execute(node, step, group, ctx)
-        if step.libelle is not None:
-            branche = DERNIERE_BRANCHE if step.section != suivante else BRANCHE
-            logger.info("%s%s : %s", branche, step.libelle, _bilan(metrics))
+        fin_de_section = step.section != suivante
+        lignes = [
+            *([(step.libelle, _bilan(metrics))] if step.libelle is not None else []),
+            *_maintain(node, ctx),
+        ]
+        for rang, (libelle, bilan) in enumerate(lignes):
+            if step.section is None:
+                logger.info("%s : %s", libelle, bilan, extra={"detail": True})
+                continue
+            dernier = fin_de_section and rang == len(lignes) - 1
+            logger.info("%s%s : %s", DERNIERE_BRANCHE if dernier else BRANCHE, libelle, bilan)
         results[node.name] = metrics
     return results
+
+
+def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
+    """Lance la maintenance du nœud et rend une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
+    lignes = []
+    for operation in node.maintenance:
+        if operation.startswith("VACUUM ") and MODES[ctx.options.mode].vacuum_full:
+            operation = operation.replace("VACUUM", "VACUUM FULL", 1)
+        t0 = time.perf_counter()
+        ctx.maintain(operation)
+        lignes.append((operation, f"{time.perf_counter() - t0:.1f}s"))
+    return lignes
 
 
 def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> PhaseMetrics:

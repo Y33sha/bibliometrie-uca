@@ -34,9 +34,9 @@ def test_refetch_not_called_in_extract():
 def test_refetch_not_called_in_normalize():
     with (
         patch.object(normalize, "_run_normalize", return_value=NormalizeStats(0, 0, 0)),
-        patch.object(normalize, "_vacuum_staging"),
+        patch("pipeline.runtime.execution.maintain"),
         patch.object(normalize, "_run_prune_disappeared", return_value=0),
-        patch.object(normalize, "_run_cleanup_orphan_identities"),
+        patch.object(normalize, "_run_cleanup_orphan_identities", return_value=0),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
         normalize.build().run(phase_context(RunOptions(mode="full", sources={"openalex", "hal"})))

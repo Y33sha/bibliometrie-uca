@@ -34,7 +34,12 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
         authorships_phase.AuthorshipsPhase(
             build_queries, purge_queries, pub_counts, address_pub_count
         ).run(
-            PhaseContext(open_tx=_fake_tx, logger=logging.getLogger("test"), options=RunOptions())
+            PhaseContext(
+                open_tx=_fake_tx,
+                logger=logging.getLogger("test"),
+                options=RunOptions(),
+                maintain=lambda op: None,
+            )
         )
     address_pub_count.recompute_pub_count.assert_called_once()
     pub_counts.refresh_journal_pub_counts.assert_called_once()
