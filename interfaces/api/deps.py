@@ -46,9 +46,6 @@ from application.services.addresses import countries as countries_service
 from application.services.authorships.core import propagate_in_perimeter_for_addresses
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
-from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
-from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from infrastructure.read_models.config import PgConfigQueries
@@ -80,8 +77,11 @@ from infrastructure.repositories import (
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
 from interfaces.api.session import read_session
+from pipeline.publications.authorships_queries import AuthorshipsBuild
 from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 from pipeline.structures.countries_queries import CountryQueries
+from pipeline.structures.in_perimeter import InPerimeterRecompute
+from pipeline.structures.perimeter import PerimeterQueries
 
 logger = logging.getLogger(__name__)
 
@@ -286,8 +286,8 @@ def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 
-# `PgPerimeterStructuresQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_perimeter_queries_singleton: PerimeterStructuresQueries = PgPerimeterStructuresQueries()
+# `PerimeterQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_perimeter_queries_singleton: PerimeterStructuresQueries = PerimeterQueries()
 
 
 def get_perimeter_queries() -> PerimeterStructuresQueries:
@@ -307,8 +307,8 @@ def metadata_correction_queries() -> MetadataCorrectionQueries:
 _country_recompute_singleton: CountryRecompute = CountryQueries()
 
 
-# `PgAuthorshipsBuildQueries` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
-_authorships_build_queries_singleton: AuthorshipsBuildQueries = PgAuthorshipsBuildQueries()
+# `AuthorshipsBuild` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
+_authorships_build_queries_singleton: AuthorshipsBuildQueries = AuthorshipsBuild()
 
 
 def authorships_build_queries() -> AuthorshipsBuildQueries:
@@ -355,6 +355,6 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
             address_ids,
             repo=authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
-            affiliations_queries=PgAffiliationsQueries(),
+            affiliations_queries=InPerimeterRecompute(),
         ),
     )

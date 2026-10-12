@@ -2,7 +2,6 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR
 
 # Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
@@ -13,8 +12,8 @@ _MARK_ORPHANS_DIRTY = """
 """
 
 
-class PgAffiliationsQueries(AffiliationsQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
+class InPerimeterRecompute:
+    """Recalcul ciblé de `in_perimeter` (port `AffiliationsQueries`, injecté par l'API)."""
 
     def recompute_in_perimeter_on_source_authorships(
         self,

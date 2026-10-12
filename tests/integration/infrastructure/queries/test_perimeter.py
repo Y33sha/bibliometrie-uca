@@ -7,7 +7,7 @@ idempotent.
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.perimeter import refresh_perimeter_structures
+from pipeline.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.structures import insert_perimeter, insert_structure, insert_tutelle
 
 

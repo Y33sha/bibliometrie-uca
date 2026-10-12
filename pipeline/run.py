@@ -457,7 +457,7 @@ def _execute_phases(
 
     # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
     # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
-    from infrastructure.pipeline.perimeter import refresh_perimeter_structures
+    from pipeline.structures.perimeter import refresh_perimeter_structures
 
     with open_tx() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)

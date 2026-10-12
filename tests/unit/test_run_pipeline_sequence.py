@@ -243,7 +243,7 @@ class TestExecutePhases:
         """Neutralise l'ouverture de la base et le journal d'observabilité."""
         recorder = _FakeRecorder()
         import infrastructure.observability.phase_executions as observabilite
-        import infrastructure.pipeline.perimeter as perimetre
+        import pipeline.structures.perimeter as perimetre
 
         def _start_run(**kw):
             recorder.demarrage = kw

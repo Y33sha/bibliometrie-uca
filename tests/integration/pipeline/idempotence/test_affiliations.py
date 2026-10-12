@@ -75,7 +75,7 @@ def _setup_affiliations_test_data(conn):
 
     # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.
-    from infrastructure.pipeline.perimeter import refresh_perimeter_structures
+    from pipeline.structures.perimeter import refresh_perimeter_structures
 
     refresh_perimeter_structures(conn)
 
@@ -271,12 +271,12 @@ class TestEntreeDansLePerimetre:
         assert _keys_dirty(sa_sync_conn, 80002) is False
 
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
-        from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+        from pipeline.structures.in_perimeter import InPerimeterRecompute
 
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)
 
-        PgAffiliationsQueries().recompute_in_perimeter_on_source_authorships(
+        InPerimeterRecompute().recompute_in_perimeter_on_source_authorships(
             sa_sync_conn, [80002], [80000, 80001]
         )
 

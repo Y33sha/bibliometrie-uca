@@ -42,11 +42,11 @@ from domain.errors import (
 )
 from domain.persons.person import PersonExclusion
 from infrastructure.db.sql_fragments import REJECTED_PAIRS
-from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
+from pipeline.publications.authorships_queries import AuthorshipsBuild
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
@@ -70,7 +70,7 @@ _jean_dupont_signature = partial(insert_signature, author_name_normalized="jean 
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
-_BUILD_QUERIES = PgAuthorshipsBuildQueries()
+_BUILD_QUERIES = AuthorshipsBuild()
 
 
 @pytest.fixture

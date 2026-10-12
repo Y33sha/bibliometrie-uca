@@ -1,6 +1,6 @@
 """Port : construction de la table `authorships` depuis les `source_authorships`, phase `authorships`.
 
-Implémenté par `infrastructure.pipeline.authorships.build.PgAuthorshipsBuildQueries`.
+Implémenté par `pipeline.publications.authorships_queries.AuthorshipsBuild`.
 """
 
 from typing import Protocol

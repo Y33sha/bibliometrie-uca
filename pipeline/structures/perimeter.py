@@ -1,4 +1,13 @@
-"""Périmètre d'extraction : condition d'exécution des phases qui en dépendent."""
+"""Périmètres : clôture des tutelles matérialisée dans `perimeter_structures`, lecture des structures d'un périmètre, condition d'exécution des phases qui dépendent du périmètre d'extraction.
+
+`refresh_perimeter_structures` est rejouée en tête de pipeline, au début de la phase `affiliations`, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (port `PerimeterStructuresQueries`, injecté par l'API)."""
+
+from sqlalchemy import Connection, text
+
+from infrastructure.read_models.perimeters import (
+    get_extraction_structure_ids,
+    get_persons_structure_ids_list,
+)
 
 
 class EmptyExtractionPerimeterError(RuntimeError):
@@ -9,3 +18,41 @@ class EmptyExtractionPerimeterError(RuntimeError):
             "Le périmètre d'extraction est vide : la clé `perimeter_extraction` est absente de "
             "`config`, ou désigne un périmètre sans structure."
         )
+
+
+def refresh_perimeter_structures(conn: Connection) -> None:
+    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
+
+    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_tutelles`.
+    """
+    conn.execute(text("DELETE FROM perimeter_structures"))
+    conn.execute(
+        text("""
+            INSERT INTO perimeter_structures (perimeter_id, structure_id)
+            WITH RECURSIVE descendants AS (
+                SELECT p.id AS perimeter_id, s.structure_id
+                FROM perimeters p
+                CROSS JOIN LATERAL unnest(p.root_structure_ids) AS s(structure_id)
+                UNION
+                SELECT d.perimeter_id, sr.child_id
+                FROM descendants d
+                JOIN structure_tutelles sr ON sr.parent_id = d.structure_id
+            )
+            SELECT DISTINCT d.perimeter_id, d.structure_id
+            FROM descendants d
+            WHERE EXISTS (SELECT 1 FROM structures st WHERE st.id = d.structure_id)
+        """)
+    )
+
+
+class PerimeterQueries:
+    """Opérations sur les périmètres : lecture des structures, rematérialisation de la clôture."""
+
+    def count_extraction_structures(self, conn: Connection) -> int:
+        return len(get_extraction_structure_ids(conn))
+
+    def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
+        return get_persons_structure_ids_list(conn)
+
+    def refresh_perimeter_structures(self, conn: Connection) -> None:
+        refresh_perimeter_structures(conn)

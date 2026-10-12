@@ -16,9 +16,9 @@ from application.services.addresses.structure_links import (
     review_structure_link,
 )
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from pipeline.structures.countries_queries import CountryQueries
+from pipeline.structures.perimeter import PerimeterQueries
 from tests.integration.helpers.addresses import (
     ensure_country,
     insert_address,
@@ -45,7 +45,7 @@ def repo(sa_sync_conn):
 
 @pytest.fixture
 def perimeter_queries():
-    return PgPerimeterStructuresQueries()
+    return PerimeterQueries()
 
 
 @pytest.fixture

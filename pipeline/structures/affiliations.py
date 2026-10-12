@@ -152,14 +152,14 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
 
 def build() -> Phase:
     """Rattachement des signatures aux structures du périmètre, par leurs adresses."""
-    from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
     from pipeline.structures.address_resolution import (
         AddressResolutionQueries,
     )
+    from pipeline.structures.perimeter import PerimeterQueries
 
     return AffiliationsPhase(
         AddressResolutionQueries(),
-        PgPerimeterStructuresQueries(),
+        PerimeterQueries(),
         refresh_ror=_run_refresh_ror,
     )
 
