@@ -125,7 +125,7 @@ name = "Pipeline : importé par interfaces seulement"
 type = "forbidden"
 source_modules = ["domain", "application", "infrastructure"]
 forbidden_modules = ["pipeline"]
-# L'API et l'orchestrateur (`interfaces/`) sont les seuls clients du pipeline.
+# L'API et les scripts en ligne de commande (`interfaces/`) sont les seuls clients du pipeline.
 # Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
 # du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
 ignore_imports = [
