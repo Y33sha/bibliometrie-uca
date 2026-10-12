@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import partial
+from typing import cast
 
 import httpx2
 from sqlalchemy import Connection, text
@@ -24,10 +25,10 @@ from sqlalchemy import Connection, text
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
+from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
@@ -40,8 +41,8 @@ from pipeline.runtime.observability.signals import select_targets, skipped, time
 COMMIT_EVERY = 50
 
 # Dépendances techniques du phasage, injectées par le composition-root.
-RefreshOne = Callable[[str, "list[int] | None"], PhaseMetrics]
-"""Nouvelle lecture des documents d'une source, bornée à `years`, par l'accès à cette source. Rend des métriques portant déjà les signaux de source non configurée ou indisponible."""
+RefreshOne = Callable[[str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
+"""Nouvelle lecture des documents d'une source, bornée à `years`, sous le circuit-breaker de la source."""
 GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
 """`(start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
@@ -62,27 +63,50 @@ class FetchStalePhase:
         if not MODES[options.mode].fetch_stale:
             logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return metrics
-        targets = select_targets(
-            ALL_SOURCES, options.sources or None, include_wos=options.include_wos
+        targets = set(
+            select_targets(ALL_SOURCES, options.sources or None, include_wos=options.include_wos)
         )
 
         year = options.year
         years_default = [int(year)] if year else self.get_years_for_window(options.start_year)
         years_theses = [int(year)] if year else None
 
+        def node(source: str) -> NodeRun:
+            def run(_ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+                assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
+                row_years = years_theses if source == "theses" else years_default
+                source_metrics, duration = timed_metrics(
+                    partial(self.refresh_one, source, row_years, breaker)
+                )
+                source_metrics.details["duration_s"] = round(duration, 1)
+                return source_metrics
+
+            return run
+
+        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: source in targets
+
+        by_node = run_nodes(
+            "fetch_stale",
+            {
+                f"fetch_stale.{source}": NodeStep(node(source), when=retenue(source))
+                for source in ALL_SOURCES
+            },
+            ctx,
+        )
+
         by_source: dict[str, dict[str, float]] = {}
-        for target in targets:
-            row_years = years_theses if target == "theses" else years_default
-            source_metrics, duration = timed_metrics(partial(self.refresh_one, target, row_years))
+        for source in ALL_SOURCES:
+            source_metrics = by_node[f"fetch_stale.{source}"]
             metrics.merge(source_metrics)
-            if skipped(source_metrics):
+            if source not in targets or skipped(source_metrics):
                 continue
-            by_source[target] = {
+            by_source[source] = {
                 "interrogated": source_metrics.total,
                 "refreshed": source_metrics.updated,
                 "unchanged": source_metrics.unchanged,
                 "disappeared": source_metrics.extras.get("disappeared", 0),
-                "duration_s": round(duration, 1),
+                "duration_s": cast("float", source_metrics.details["duration_s"]),
             }
 
         if by_source:
@@ -291,7 +315,9 @@ def _make_refetch(source: str) -> StaleRefetch:
     return refetches[source]()
 
 
-def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
+def _run_fetch_stale(
+    target: str, years: list[int] | None, breaker: SourceCircuitBreaker
+) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
@@ -301,11 +327,6 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     refetch = _make_refetch(target)
     with open_tx() as conn:
         after_days = get_fetch_stale_after_days(conn)
-        return access_source(
-            target,
-            lambda breaker: asyncio.run(
-                refresh(conn, refetch, log, after_days=after_days, years=years, breaker=breaker)
-            ),
-            phase="fetch_stale",
-            logger=log,
+        return asyncio.run(
+            refresh(conn, refetch, log, after_days=after_days, years=years, breaker=breaker)
         )
