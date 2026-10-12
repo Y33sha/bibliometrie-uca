@@ -1,20 +1,22 @@
 """Tests de l'enchaînement de la phase `fetch_stale` selon le mode."""
 
 import logging
+from unittest.mock import patch
 
 from pipeline.ingestion.common.fetch_stale import FetchStalePhase
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run(contexte, mode: str, refreshed: list[str]) -> PhaseMetrics:
-    def refresh_one(source: str, years: list[int] | None) -> PhaseMetrics:
+    def refresh_one(source: str, years: list[int] | None, breaker) -> PhaseMetrics:
         refreshed.append(source)
         return PhaseMetrics()
 
-    return FetchStalePhase(
-        refresh_one=refresh_one,
-        get_years_for_window=lambda start_year: None,
-    ).run(contexte(mode=mode, sources={"openalex"}))
+    with patch("pipeline.runtime.config.source_credentials_missing", return_value=None):
+        return FetchStalePhase(
+            refresh_one=refresh_one,
+            get_years_for_window=lambda start_year: None,
+        ).run(contexte(mode=mode, sources={"openalex"}))
 
 
 def test_mode_daily_saute_la_phase(contexte, caplog):

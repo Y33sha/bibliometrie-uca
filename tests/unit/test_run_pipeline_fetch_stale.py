@@ -29,6 +29,9 @@ def _called_targets(stack) -> MagicMock:
     run_one = stack.enter_context(
         patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
     )
+    stack.enter_context(
+        patch("pipeline.runtime.config.source_credentials_missing", return_value=None)
+    )
     # Fenêtre d'années : évite tout accès base (get_years lit la config).
     stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
     stack.enter_context(patch("pipeline.runtime.config.get_years", return_value=[2024]))
@@ -88,7 +91,8 @@ def test_fetch_stale_respects_sources_filter():
     assert [c.args[0] for c in run_one.call_args_list] == ["hal"]
 
 
-def test_run_fetch_stale_installs_circuit_breaker():
+def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
+    """L'exécuteur pose le circuit-breaker de la source, le transmet à la relecture, puis le retire."""
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
@@ -102,10 +106,12 @@ def test_run_fetch_stale_installs_circuit_breaker():
         stack.enter_context(
             patch("pipeline.runtime.config.source_credentials_missing", return_value=None)
         )
+        stack.enter_context(patch("pipeline.runtime.config.get_years", return_value=[2024]))
         stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))
-        fetch_stale._run_fetch_stale("hal", None)
+        _run_phase(RunOptions(sources={"hal"}))
 
     breaker = refresh.call_args.kwargs["breaker"]
     assert isinstance(breaker, SourceCircuitBreaker)
+    assert breaker.source == "hal"
     # La ContextVar est restaurée en sortie (pas de fuite de breaker).
     assert get_current_breaker() is None

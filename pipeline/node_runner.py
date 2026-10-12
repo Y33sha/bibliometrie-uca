@@ -31,6 +31,8 @@ class NodeStep:
     libelle: str | None = None
     # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
     threshold: int | None = None
+    # Condition d'exécution, évaluée avant l'accès à la source. Un nœud écarté rend des métriques vides et n'écrit rien.
+    when: Callable[[PhaseContext], bool] | None = None
 
 
 def run_nodes(
@@ -47,11 +49,12 @@ def run_nodes(
             f"{set(steps) ^ {node.name for node in nodes}}"
         )
     logger = ctx.logger
-    results: dict[str, PhaseMetrics] = {}
-    for index, node in enumerate(nodes):
+    results: dict[str, PhaseMetrics] = {node.name: PhaseMetrics() for node in nodes}
+    retenus = [node for node in nodes if _retenu(steps[node.name], ctx)]
+    for index, node in enumerate(retenus):
         step = steps[node.name]
-        precedente = steps[nodes[index - 1].name].section if index else None
-        suivante = steps[nodes[index + 1].name].section if index + 1 < len(nodes) else None
+        precedente = steps[retenus[index - 1].name].section if index else None
+        suivante = steps[retenus[index + 1].name].section if index + 1 < len(retenus) else None
         if step.section is not None and step.section != precedente:
             etape(logger, step.section)
         metrics = _execute(node, step, group, ctx)
@@ -80,6 +83,10 @@ def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
         ctx.maintain(operation)
         lignes.append((operation, f"{time.perf_counter() - t0:.1f}s"))
     return lignes
+
+
+def _retenu(step: NodeStep, ctx: PhaseContext) -> bool:
+    return step.when is None or step.when(ctx)
 
 
 def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> PhaseMetrics:
