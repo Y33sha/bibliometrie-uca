@@ -61,11 +61,12 @@ Dans l'ordre du pipeline.
 - [x] Import du dump ROR dans `pipeline/structures`, sans le port `RorRepository`.
 - [x] Rattachement d'une signature, promotion des identifiants observés et `IdentifierConflict` dans `pipeline/persons`, avec leur SQL.
 - [x] Décision d'attribution d'un identifiant dans `domain/`. Le pipeline crée, renomme et attribue avec son propre SQL, sans `PersonRepository` ni `AuthorshipRepository`.
-- [ ] Suppression des exceptions aux règles d'import dans `pyproject.toml`.
+- [x] Suppression des exceptions aux règles d'import dans `pyproject.toml`. L'enrichissement du pays des éditeurs devient un script de maintenance autonome, avec ses requêtes.
 - [ ] `infrastructure/pipeline/authorships` : recalculs de `publications.in_perimeter` et des `pub_count`. Des repositories de l'API les appellent directement : celui des personnes, et la fusion d'éditeurs. À réexaminer avec la question des recalculs ciblés.
 
 ## Questions ouvertes
 
 - Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres et `in_perimeter`, la reconstruction d'une authorship et les `pub_count`, les corrections de métadonnées après l'édition d'une revue, les pays d'un lot d'adresses, la création et le nom d'une personne, le recalcul d'une publication.
 - Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
+- Contenu d'`infrastructure/db/` : modules techniques et modules qui n'y ont pas leur place, comme `merge_steps.py` (helpers des fusions de personnes, d'éditeurs et de revues).
 - Code applicatif appelé seulement par des scripts en ligne de commande, comme le rapport de cohérence du ROR (service, port de lecture et implémentation) : où le ranger ?
