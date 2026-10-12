@@ -92,6 +92,7 @@ Les tables mixtes sont les entités centrales : un schéma par catégorie les ra
 - Forme par paires : les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
 - Forme par paires : les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de signatures. Leur traduction en contraintes sur les signatures dépend de la question 2.
 - La cascade des personnes rattache une signature à une personne existante, sans comparer les signatures entre elles : forme de ReCiter, autre que la forme par paires.
+- Propriété des écritures : une seule phase écrit chaque colonne. Les caches dénormalisés (`publications.countries`, `source_publications.countries`) deviennent des projections : vues matérialisées, ou phase finale de projection ?
 
 ### 4. Graphe
 
@@ -107,34 +108,30 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 - `publications.reconcile`, aujourd'hui un seul nœud : le scinder selon les étapes de la forme par paires, si elle est retenue.
 - Place des appels réseau. Hypothèse : acquisition séparée de la transformation, qui se rejoue alors sur une copie de la base.
 - Phases réduites à des groupes d'affichage ; exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
+- `publishers_journals` enchaîne treize sous-étapes en quatre groupes (éditeurs, revues, monographies, nettoyage) : une phase par référentiel ?
+- Reports au run suivant : peser chaque lecture `previous_run` que déclare `pipeline/graph.py`, et les données différées sans lecture à rebours (`fetch_missing` n'est pas récursif), puis garder ou supprimer chaque report.
 
 ### 5. Organisation du code
 
-**Constat (2026-10-11)**
-- Le pipeline tient sur quatre couches : `application/pipeline` (106 modules), `application/ports/pipeline` (50), `infrastructure/pipeline` (37), `interfaces/cli/phases` (18 câblages). Les clients HTTP des sources sont dans `infrastructure/sources` (59).
-- Les opérations « trouver ou créer » (éditeur, revue, monographie), la création de publication et le rattachement d'une signature vivent dans `application/services`, mais seul le pipeline les appelle.
-- Partages réels avec l'API : création et nom d'une personne ; recalcul d'une publication ; propagation du périmètre et des pays d'une adresse ; fermeture des périmètres ; reconstruction d'une authorship.
+Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md).
 
-**Décisions**
-- **Un paquet racine `pipeline/`, hors des couches hexagonales.** L'architecture hexagonale ne convient pas au pipeline : pas de ports, chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
-- **Le pipeline possède ses opérations.** L'API passe par une interface publique du pipeline, limitée aux recalculs ciblés ; les partages se réduisent au strict nécessaire, et chaque recalcul ciblé se justifie par un effet immédiat attendu dans l'interface.
-- **Découpage par domaine**, aligné sur les schémas : `pipeline/sources/<source>` (acquisition, normalisation et client HTTP de chaque source), `pipeline/structures`, `pipeline/containers`, `pipeline/publications`, `pipeline/persons` ; `graph.py` et l'orchestrateur à la racine.
-- **Migration une phase à la fois**, sous contrats d'import, en commençant par une phase petite et autonome (`countries` ou `relations`).
-- **Le câblage `interfaces/cli/phases` disparaît** avec les ports. Le point d'entrée `run_pipeline` passe dans `pipeline/`.
+**Acquis**
+- Un paquet racine `pipeline/`, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
+- `pipeline/ingestion/<source>` contient l'extraction et la normalisation de chaque source, et les clients des enrichissements. La transformation est rangée par entité : `structures`, `containers`, `publications`, `persons`.
+- L'API importe seulement `pipeline/public.py`, qui exporte les recalculs ciblés. Les écritures directes d'une entité existent de chaque côté, avec leurs règles dans `domain/`.
+- `import-linter` vérifie ces règles d'import.
 
 **Hypothèses**
 - Fusion des métadonnées d'une publication : un fichier par champ consolidé, qui liste ses règles par ordre de priorité des sources.
-- Tests en miroir de l'arborescence, sur le [jeu de données commun](CODE_jeu-de-donnees-commun.md).
-- Règles d'import vérifiées par `import-linter` : `pipeline/` importe `domain/` et les modules techniques neutres (connexion, réglages, journalisation), jamais `application/` ; seul un adaptateur de l'API importe l'interface publique du pipeline.
+- Tests sur le [jeu de données commun](CODE_jeu-de-donnees-commun.md).
 
 **Ouvert**
-- Recalculs ciblés : lesquels garder, lesquels laisser au run suivant ?
-- Scripts `imports/` et `maintenance/` : nœuds manuels du pipeline, ou outils à part ? Tri des scripts `oneshot/` déjà joués.
+- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres, `in_perimeter` après la revue d'une adresse ou l'exclusion d'une personne, la construction des authorships à l'attribution d'orphelines, les pays d'un lot d'adresses, la requalification et la fusion des revues, le `pub_count` d'un éditeur fusionné. Chaque recalcul gardé se justifie par un effet immédiat attendu dans l'interface.
 - Priorités entre sources et seuils : dans le domaine, testés avec le code (`SOURCE_PRIORITY`), ou dans un fichier de configuration modifiable sans toucher au code ?
 
 ### 6. Épreuves
 
-La cible est confrontée à des situations concrètes pendant la migration ([Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)) : chaque phase migrée éprouve les situations qui la concernent. Ce qui ne tient pas sort de la cible.
+La cible est confrontée à des situations concrètes. Ce qui ne tient pas sort de la cible.
 
 Situations :
 - fusion de revues, faite par l'admin ou par le pipeline ;
