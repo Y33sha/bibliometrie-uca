@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `infrastructure.pipeline.persons.name_forms`."""
+"""Tests d'intégration pour `pipeline.persons.name_forms`."""
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
+from pipeline.persons.name_forms import PersonNameFormsQueries
 
-_Q = PgPersonNameFormsQueries()
+_Q = PersonNameFormsQueries()
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 

@@ -1,19 +1,10 @@
-"""Lectures et réinitialisations pour la phase personnes.
-
-Appelé par les orchestrateurs `application/pipeline/persons/{reset,cascade,purge}.py`. Regroupe les SELECT du rattachement (comptes HAL, cross-source, IdRef/ORCID connus, lookup `person_name_forms`) et les réinitialisations ordre-indépendantes de la phase : re-orphelinage des signatures nominales à forme devenue ambiguë, suppression des personnes vidées.
-"""
+"""Requêtes de la phase personnes : lectures du rattachement (comptes HAL, cross-source, IdRef et ORCID connus, recherche dans `person_name_forms`) et réinitialisations ordre-indépendantes (re-orphelinage des signatures nominales dont la forme est devenue ambiguë, suppression des personnes vidées)."""
 
 from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 from sqlalchemy import Connection, Row, bindparam, text
 
-from application.ports.pipeline.persons.matching import (
-    BareUnlinkedAuthorship,
-    IdentityIdentifier,
-    LinkedAuthorshipRow,
-    MisplacedNeutralizations,
-    PersonsMatchingQueries,
-)
 from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierNeutralization,
@@ -37,6 +28,56 @@ from infrastructure.db.sql_fragments import (
     usable_identifier,
 )
 from infrastructure.repositories.person_repository import person_without_decision_sql
+
+
+class BareUnlinkedAuthorship(NamedTuple):
+    """Projection SQL brute : `source_authorships` non rattaché à une personne.
+
+    `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
+
+    `in_perimeter` reflète la détection d'une structure du périmètre sur cette signature. Les candidats `in_perimeter = FALSE` ne sont rattachables que par les barreaux non-nominaux de la cascade (identifiants forts, cross-source) — le matching/création par forme de nom reste réservé au périmètre (cf. `decide_name_form_outcome` et l'orchestrateur).
+    """
+
+    source_authorship_id: int
+    source: str
+    name: SignatureName
+    author_name_normalized: str | None
+    # `{id_type: valeur}` des identifiants de l'identité, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la signature.
+    identifiers: dict[str, str]
+    roles: list[str] | None
+    publication_id: int | None
+    author_position: int
+    in_perimeter: bool
+    # `person_id` courant si la signature est déjà liée en cross-source et re-jugée ce run ; `None` pour une signature non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
+    current_person_id: int | None
+
+
+class LinkedAuthorshipRow(NamedTuple):
+    """Projection SQL : `source_authorships` déjà rattaché à une personne, toutes sources confondues. Sert au matching cross-source par `(publication_id, author_position)`."""
+
+    person_id: int
+    author_position: int
+    publication_id: int
+    name: SignatureName
+    source: str
+
+
+class IdentityIdentifier(NamedTuple):
+    """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
+
+    identity_id: int
+    name: str
+    value: str
+
+
+class MisplacedNeutralizations(NamedTuple):
+    """Résultat d'une réécriture des neutralisations `misplaced`."""
+
+    neutralized: int
+    """Signatures qui gagnent un identifiant neutralisé."""
+    to_detach: list[int]
+    """Parmi elles, les signatures résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
+
 
 # Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
 _ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
@@ -152,8 +193,8 @@ _OOP_CANDIDATES_SQL = " UNION ".join(
 )
 
 
-class PgPersonsMatchingQueries(PersonsMatchingQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.persons.matching.PersonsMatchingQueries`."""
+class PersonsMatchingQueries:
+    """Requêtes du rattachement des signatures aux personnes."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         """Colonnes de la projection des `source_authorships` in-perimeter non liés :
@@ -301,6 +342,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
     def fetch_namesakes(self, conn: Connection) -> list[Namesake]:
+        """Les personnes non exclues, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
         rows = conn.execute(
             text("""
                 SELECT id, last_name, COALESCE(first_name, '') AS first_name
@@ -314,6 +356,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
     def fetch_linked_signature_names(
         self, conn: Connection, person_ids: list[int]
     ) -> dict[int, list[SignatureName]]:
+        """`{person_id: [nom, ...]}` — les noms des signatures rattachées à chacune des personnes, tels que les sources les donnent."""
         if not person_ids:
             return {}
         rows = conn.execute(
@@ -499,6 +542,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         return [(r.id_value, r.person_id) for r in rows]
 
     def enforce_confirmed_authorships(self, conn: Connection) -> int:
+        """Réapplique les épinglages admin (`confirmed_authorships`, must-link) : pose `source_authorships.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
         return conn.execute(
             text("""
                 UPDATE source_authorships sa

@@ -7,17 +7,17 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.persons.requalify_identifiers import (
+from application.ports.repositories.person_repository import PersonRepository
+from pipeline.libelles import BRANCHE, accord, etape
+from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.requalify_identifiers import (
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
 )
-from application.pipeline.persons.resolve_identifier_transfers import (
+from pipeline.persons.resolve_identifier_transfers import (
     detect_identifier_conflicts,
     resolve_identifier_transfers,
 )
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
-from application.ports.repositories.person_repository import PersonRepository
-from pipeline.libelles import BRANCHE, accord, etape
 from pipeline.progression import attente
 
 

@@ -21,11 +21,11 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
-from application.pipeline.persons.cascade import run_cascade
 from application.services.persons.core import add_name_form, create_person
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
+from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
+from pipeline.persons.cascade import run_cascade
+from pipeline.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,
@@ -38,7 +38,7 @@ from tests.integration.helpers.sources import insert_signature, insert_source_pu
 # Notice de 2024, de titre « Test ».
 _notice = partial(insert_source_publication, title="Test", pub_year=2024)
 
-_queries = PgPersonsMatchingQueries()
+_queries = PersonsMatchingQueries()
 _logger = logging.getLogger("test")
 
 

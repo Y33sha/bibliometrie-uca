@@ -2,9 +2,8 @@
 
 from sqlalchemy import text
 
-from application.ports.pipeline.persons.matching import MisplacedNeutralizations
 from domain.persons.matching import ResolutionMode
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+from pipeline.persons.matching import MisplacedNeutralizations, PersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -49,7 +48,7 @@ def _carte(conn, signature_id):
 
 
 def _orcid_projete(conn):
-    rows = PgPersonsMatchingQueries().fetch_unlinked_authorships(conn)
+    rows = PersonsMatchingQueries().fetch_unlinked_authorships(conn)
     [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
     return row.identifiers.get("orcid")
 
@@ -69,7 +68,7 @@ def test_vote_sans_les_signatures_neutralisees_pour_partage(sa_sync_conn):
     _signature(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
     _signature(sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2")
     _signature(sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3")
-    votes = PgPersonsMatchingQueries().fetch_identifier_votes(sa_sync_conn, "orcid")
+    votes = PersonsMatchingQueries().fetch_identifier_votes(sa_sync_conn, "orcid")
     assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
 
 
@@ -83,7 +82,7 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
         person_id=insert_person(sa_sync_conn, "Dado", first_name="T"),
         resolution_mode=ResolutionMode.IDENTIFIER.value,
     )
-    queries = PgPersonsMatchingQueries()
+    queries = PersonsMatchingQueries()
 
     assert queries.write_misplaced_neutralizations(
         sa_sync_conn, {identity_id: ["orcid"]}
@@ -100,7 +99,5 @@ def test_shared_prime_sur_misplaced(sa_sync_conn):
     signature_id, identity_id = _signature(
         sa_sync_conn, {"orcid": "shared"}, source_id="c-shared-prime"
     )
-    PgPersonsMatchingQueries().write_misplaced_neutralizations(
-        sa_sync_conn, {identity_id: ["orcid"]}
-    )
+    PersonsMatchingQueries().write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "shared"}

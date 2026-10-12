@@ -8,13 +8,13 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons.matching import (
-    BareUnlinkedAuthorship,
-    PersonsMatchingQueries,
-)
 from domain.persons.creation import allow_person_creation
 from domain.persons.name_forms import signature_name_forms
 from domain.persons.signature_name import SignatureName
+from pipeline.persons.matching import (
+    BareUnlinkedAuthorship,
+    PersonsMatchingQueries,
+)
 
 
 class EnrichedAuthorship(NamedTuple):

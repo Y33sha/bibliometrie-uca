@@ -3,11 +3,11 @@
 import logging
 from unittest.mock import MagicMock
 
-from application.pipeline.persons.resolve_identifier_transfers import (
-    resolve_identifier_transfers,
-)
 from application.services.persons.core import IdentifierConflict
 from domain.persons.matching import PersonNameForms
+from pipeline.persons.resolve_identifier_transfers import (
+    resolve_identifier_transfers,
+)
 
 _ORCID = "0000-0001-2345-6789"
 _OWNER, _CANDIDATE = 1, 2

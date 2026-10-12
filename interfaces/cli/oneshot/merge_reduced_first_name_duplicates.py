@@ -25,15 +25,15 @@ from domain.persons.matching import Namesake, full_namesakes
 from domain.persons.name_matching import first_name_initials
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import person_repository
+from pipeline.persons.matching import PersonsMatchingQueries
 
 log = setup_logger("merge_reduced_first_name_duplicates", os.path.dirname(__file__))
 
 
 def _pairs_to_merge(conn: Connection) -> list[tuple[Namesake, Namesake]]:
     """Couples (personne réduite, seule personne au prénom plein compatible), hors paires marquées distinctes."""
-    namesakes = PgPersonsMatchingQueries().fetch_namesakes(conn)
+    namesakes = PersonsMatchingQueries().fetch_namesakes(conn)
     by_id = {n.person_id: n for n in namesakes}
     by_last_name: dict[str, list[Namesake]] = defaultdict(list)
     for n in namesakes:

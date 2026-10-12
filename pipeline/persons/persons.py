@@ -21,18 +21,18 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
-from application.pipeline.persons.cascade import run_cascade
-from application.pipeline.persons.metrics import build_metrics
-from application.pipeline.persons.populate_person_name_forms import populate
-from application.pipeline.persons.purge import purge
-from application.ports.pipeline.persons.matching import PersonsMatchingQueries
-from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from pipeline.context import PhaseContext
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
+from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
+from pipeline.persons.cascade import run_cascade
+from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.metrics import build_metrics
+from pipeline.persons.name_forms import PersonNameFormsQueries
+from pipeline.persons.populate_person_name_forms import populate
+from pipeline.persons.purge import purge
 from pipeline.progression import attente
 
 
