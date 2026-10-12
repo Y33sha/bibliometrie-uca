@@ -86,7 +86,8 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 - Les appels réseau restent dans les nœuds qui en ont besoin, certains après des transformations. Leur code est regroupé dans `pipeline/ingestion`.
 
 **Ouvert**
-- À étudier : des phases réduites à des groupes d'affichage, et l'exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
+- Phases réduites à des groupes d'affichage : chantier [Exécution du pipeline par nœuds](CODE_execution-par-noeuds.md).
+- À étudier : l'exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
 - Reports au run suivant : peser chaque lecture `previous_run` que déclare `pipeline/graph.py`, et les données différées sans lecture à rebours (`fetch_missing` n'est pas récursif), puis garder ou supprimer chaque report.
 
 ### 5. Organisation du code
