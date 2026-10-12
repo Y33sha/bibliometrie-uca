@@ -52,7 +52,7 @@ def pytest_configure(config):
 def _isolate_raw_store(tmp_path_factory):
     """Pointe le raw store vers un tmp de session.
 
-    `PgStagingQueries()` (donc la normalisation) écrit chaque payload au raw
+    `StagingQueries()` (donc la normalisation) écrit chaque payload au raw
     store par défaut (`data/raw_store`) via `mark_done` ; sans isolation, les
     tests pollueraient ce répertoire de travail.
     """
@@ -97,7 +97,7 @@ def _clear_caches():
     yield
     # HAL author cache
     try:
-        from application.pipeline.normalize.normalize_hal import _hal_author_cache
+        from pipeline.sources.hal.normalize import _hal_author_cache
 
         _hal_author_cache.clear()
     except ImportError:

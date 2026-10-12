@@ -5,8 +5,8 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.fingerprint import stable_json_bytes
-from infrastructure.pipeline.normalize.staging import PgStagingQueries
 from infrastructure.raw_store.local import LocalFileRawStore
+from pipeline.sources.staging import StagingQueries
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging OpenAlex « W1 ».
@@ -19,7 +19,7 @@ class TestMarkDoneArchivesRaw:
         sid = _w1_staging(sa_sync_conn, raw_data=raw)
         store = LocalFileRawStore(tmp_path)
 
-        PgStagingQueries(raw_store=store).mark_done(sa_sync_conn, sid)
+        StagingQueries(raw_store=store).mark_done(sa_sync_conn, sid)
 
         # raw_data vidé + processed posé
         rd, processed = sa_sync_conn.execute(
@@ -35,7 +35,7 @@ class TestMarkDoneArchivesRaw:
         sid = _w1_staging(sa_sync_conn, processed=True)
         store = LocalFileRawStore(tmp_path)
 
-        PgStagingQueries(raw_store=store).mark_done(sa_sync_conn, sid)
+        StagingQueries(raw_store=store).mark_done(sa_sync_conn, sid)
 
         assert store.exists("openalex", "W1") is False
 
@@ -47,7 +47,7 @@ class TestMarkDoneArchivesRaw:
                 raise OSError("disk full")
 
         # ne lève pas, et vide quand même raw_data (la BDD reste maîtresse)
-        PgStagingQueries(raw_store=_BoomStore()).mark_done(sa_sync_conn, sid)
+        StagingQueries(raw_store=_BoomStore()).mark_done(sa_sync_conn, sid)
 
         rd = sa_sync_conn.execute(
             text("SELECT raw_data FROM staging WHERE id = :i"), {"i": sid}

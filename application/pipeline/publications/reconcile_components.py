@@ -19,7 +19,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.pipeline._savepoint import savepoint
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
@@ -37,6 +36,7 @@ from pipeline.libelles import (
     rien_a_faire,
 )
 from pipeline.progression import attente, progression
+from pipeline.savepoint import savepoint
 
 
 def _member(row: ReconcileRow) -> ReconcileMember:

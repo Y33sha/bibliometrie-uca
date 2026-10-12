@@ -1,17 +1,16 @@
-"""Tests d'intégration pour `infrastructure.pipeline.normalize.source_publications`."""
+"""Tests d'intégration pour `pipeline.sources.source_publications`."""
 
 from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.pipeline.normalize.source_publications import SourcePublicationUpsert
-from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+from pipeline.sources.source_publications import SourcePublicationQueries, SourcePublicationUpsert
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».
 _thesis_staging = partial(insert_staging, source="theses", source_id="t-stg")
 
-_Q = PgSourcePublicationQueries()
+_Q = SourcePublicationQueries()
 
 
 def _row(staging_id: int, **overrides) -> SourcePublicationUpsert:

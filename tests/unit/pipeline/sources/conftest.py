@@ -1,7 +1,8 @@
-"""Fixtures des tests des moissonneurs."""
+"""Fixtures des tests des moissonneurs et des normaliseurs."""
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import pytest
@@ -67,3 +68,9 @@ def ecritures(monkeypatch) -> list[Ecriture]:
 
     monkeypatch.setattr(harvest, "upsert_staging", _upsert)
     return ecrits
+
+
+@pytest.fixture
+def logger() -> logging.Logger:
+    """Logger neutre pour les normaliseurs sous test (aucune sortie disque)."""
+    return logging.getLogger("test_normalize")

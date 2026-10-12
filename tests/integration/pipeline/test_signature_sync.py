@@ -4,17 +4,17 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.pipeline.normalize._authorships_batch import (
+from domain.persons.signature_name import SignatureName
+from domain.structures.identifiers import RorId
+from infrastructure.fingerprint import fingerprint
+from pipeline.sources.signature_queries import AuthorshipsBatchQueries
+from pipeline.sources.signatures import (
     AddressRecord,
     AuthorRecord,
     SignatureSyncSettings,
     sync_source_authorships,
     write_source_authorships,
 )
-from domain.persons.signature_name import SignatureName
-from domain.structures.identifiers import RorId
-from infrastructure.fingerprint import fingerprint
-from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_publication
@@ -22,7 +22,7 @@ from tests.integration.helpers.sources import insert_source_publication
 # Notice Crossref « 10.9999/sync », de titre « t ».
 _notice = partial(insert_source_publication, source="crossref", source_id="10.9999/sync", title="t")
 
-_Q = PgAuthorshipsBatchQueries()
+_Q = AuthorshipsBatchQueries()
 
 
 def _rec(position: int, raw: str, **fields) -> AuthorRecord:

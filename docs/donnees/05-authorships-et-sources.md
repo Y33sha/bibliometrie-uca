@@ -43,10 +43,10 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 |---|---|---|
 | `staging` | pipeline | phases `extract`, `fetch_missing` et `fetch_stale` (`pipeline/sources/staging.py`) |
 | `failed_lookups` | pipeline | phase `fetch_missing` (`infrastructure/sources/*/fetch_missing_*.py`) |
-| `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
-| `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
-| `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations` ; `person_id` par le pipeline ou en admin (orphan-assign) |
-| `source_authorship_addresses` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
+| `source_publications` | pipeline | `pipeline/sources/<source>/normalize.py` |
+| `author_identifying_keys` | pipeline | `pipeline/sources/<source>/normalize.py` (via `pipeline/sources/signatures.py`) |
+| `source_authorships` | mixte | `pipeline/sources/<source>/normalize.py` ; `in_perimeter` par la phase `affiliations` ; `person_id` par le pipeline ou en admin (orphan-assign) |
+| `source_authorship_addresses` | pipeline | `pipeline/sources/<source>/normalize.py` (via `pipeline/sources/signatures.py`) |
 | `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
 | `rejected_authorships` | admin | `application/services/authorships/core.py` |
 | `confirmed_authorships` | admin | `application/services/authorships/assign_orphans.py` |

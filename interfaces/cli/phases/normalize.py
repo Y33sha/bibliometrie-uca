@@ -5,11 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
-from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from interfaces.cli.phases.execution import log, open_tx
 from pipeline.context import Phase, PhaseContext
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.normalize import BibliographicNormalizer, NormalizeStats, SourceNormalizer
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -23,7 +22,7 @@ def build() -> Phase:
 
     Écrit les `source_publications` avec leurs métadonnées — résumé, mots-clés, sujets, références — et leurs signatures, en laissant `publication_id` à NULL : la phase `publications` assigne le document à sa publication. Le `raw_data` du staging est vidé après traitement. Pour HAL, les structures sont enrichies et les ORCID et IdRef extraits du TEI.
 
-    Séquence, nettoyage et VACUUM dans `application/pipeline/normalize/phase.py`.
+    Séquence, nettoyage et VACUUM dans `pipeline/sources/normalize.py`.
     """
     return _NormalizeSelonOptions()
 
@@ -32,7 +31,7 @@ class _NormalizeSelonOptions:
     """Construit les normaliseurs selon les options du run (`--raw-store`, `--normalize-full`), puis exécute `NormalizePhase`."""
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        from application.pipeline.normalize.phase import NormalizePhase
+        from pipeline.sources.normalize import NormalizePhase
 
         options = ctx.options
         registry = _normalize_builders(archive=options.raw_store, full=options.normalize_full)
@@ -50,14 +49,14 @@ class _NormalizeSelonOptions:
 
 
 def _run_prune_disappeared() -> int:
-    from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
+    from pipeline.sources.staging import delete_disappeared_source_publications
 
     with open_tx() as conn:
         return delete_disappeared_source_publications(conn)
 
 
 def _run_cleanup_orphan_identities() -> None:
-    from infrastructure.pipeline.normalize.authorships import delete_orphan_identities
+    from pipeline.sources.signature_queries import delete_orphan_identities
 
     with open_tx() as conn:
         delete_orphan_identities(conn)
@@ -81,23 +80,23 @@ def _normalize_builders(
     *, archive: bool = True, full: bool = False
 ) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
-    from application.pipeline.normalize._authorships_batch import SignatureSyncSettings
-    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
-    from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
-    from application.pipeline.normalize.normalize_hal import HalNormalizer
-    from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
-    from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
-    from application.pipeline.normalize.normalize_theses import ThesesNormalizer
-    from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.fingerprint import fingerprint
     from infrastructure.pipeline.containers import PgContainerGatewayQueries
-    from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.pipeline.normalize.source_publications import (
-        PgSourcePublicationQueries,
-    )
-    from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.raw_store import NullRawStore, get_raw_store
+    from pipeline.sources.crossref.normalize import CrossrefNormalizer
+    from pipeline.sources.datacite.normalize import DataciteNormalizer
+    from pipeline.sources.hal.normalize import HalNormalizer
+    from pipeline.sources.openalex.normalize import OpenalexNormalizer
+    from pipeline.sources.scanr.normalize import ScanrNormalizer
+    from pipeline.sources.signature_queries import AuthorshipsBatchQueries
+    from pipeline.sources.signatures import SignatureSyncSettings
+    from pipeline.sources.source_publications import (
+        SourcePublicationQueries,
+    )
+    from pipeline.sources.staging import StagingQueries
+    from pipeline.sources.theses.normalize import ThesesNormalizer
+    from pipeline.sources.wos.normalize import WosNormalizer
 
     raw_store = get_raw_store() if archive else NullRawStore()
     sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)
@@ -106,11 +105,11 @@ def _normalize_builders(
         return lambda conn: cls(
             conn,
             log,
-            PgStagingQueries(raw_store),
-            PgSourcePublicationQueries(),
+            StagingQueries(raw_store),
+            SourcePublicationQueries(),
             container_repo_factory=PgContainerGatewayQueries,
             publisher_repo_factory=PgPublisherGatewayQueries,
-            authorship_queries=PgAuthorshipsBatchQueries(),
+            authorship_queries=AuthorshipsBatchQueries(),
             sync_settings=sync_settings,
         )
 
@@ -118,9 +117,9 @@ def _normalize_builders(
         "theses": lambda conn: ThesesNormalizer(
             conn,
             log,
-            PgStagingQueries(raw_store),
-            PgSourcePublicationQueries(),
-            batch_queries=PgAuthorshipsBatchQueries(),
+            StagingQueries(raw_store),
+            SourcePublicationQueries(),
+            batch_queries=AuthorshipsBatchQueries(),
             sync_settings=sync_settings,
         ),
         "crossref": _biblio(CrossrefNormalizer),

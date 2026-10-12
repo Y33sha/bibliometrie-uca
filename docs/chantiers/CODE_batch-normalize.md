@@ -4,7 +4,7 @@
 
 La phase `normalize` traite les sources l'une après l'autre, dans un ordre de priorité fixe. Pour chaque source, une connexion lit le `staging` par sous-lots de 50 lignes. Chaque document est analysé puis écrit sous un SAVEPOINT. Un commit a lieu tous les 500 documents.
 
-Le writer partagé (`application/pipeline/normalize/_authorships_batch.py`) écrit les signatures d'un document en une requête par opération (`jsonb_to_recordset`, `unnest`). Il fait donc un nombre constant d'allers-retours par document :
+Le writer partagé (`pipeline/sources/signatures.py`) écrit les signatures d'un document en une requête par opération (`jsonb_to_recordset`, `unnest`). Il fait donc un nombre constant d'allers-retours par document :
 
 - lectures : empreinte du bloc auteurs, signatures stockées ;
 - écritures : suppressions, mises à jour, insertions de signatures, adresses, liens d'adresse, ROR.

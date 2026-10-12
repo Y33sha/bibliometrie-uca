@@ -13,9 +13,9 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.pipeline._savepoint import rollback_unless_invalidated
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.repositories.publisher_repository import PublisherRepository
+from pipeline.savepoint import rollback_unless_invalidated
 
 BATCH_SIZE = 50
 

@@ -1,0 +1,530 @@
+"""Normalisation des données OpenAlex : staging → tables structurées."""
+
+import logging
+from collections.abc import Mapping
+
+from sqlalchemy import Connection
+
+from application.ports.pipeline.containers import ContainerFindOrCreateQueries
+from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
+from application.services.monographs.containers import Containers, find_or_create_containers
+from application.services.publishers.core import find_or_create_publisher
+from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
+from domain.journals.journal import OaModel
+from domain.persons.identifiers import (
+    compact_identifiers,
+    normalize_orcid,
+)
+from domain.persons.signature_name import SignatureName
+from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
+from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.impact import Impact
+from domain.sources.openalex import (
+    OpenalexLocation,
+    extract_external_ids_from_urls,
+    extract_nnt_from_location,
+    is_theses_fr_location,
+    map_openalex_oa_status,
+    parse_primary_location,
+    short_openalex_id,
+    should_skip_publisher_journal,
+)
+from domain.structures.identifiers import parse_ror_ids
+from domain.types import (
+    JsonValue,
+    as_bool,
+    as_float,
+    as_int,
+    as_mapping,
+    as_sequence,
+    as_str,
+    as_strs,
+)
+from pipeline.sources.normalize import BibliographicNormalizer
+from pipeline.sources.pub_metadata import PublicationMetadata
+from pipeline.sources.signature_queries import AuthorshipsBatchQueries
+from pipeline.sources.signatures import (
+    AddressRecord,
+    AuthorBlock,
+    AuthorRecord,
+    SignatureSyncSettings,
+    sync_source_authorships,
+)
+from pipeline.sources.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationUpsert,
+)
+from pipeline.sources.staging import StagingQueries, StagingRow
+
+# =============================================================
+# UTILITAIRES
+# =============================================================
+
+
+def extract_locations_data(
+    work: Mapping[str, JsonValue],
+) -> tuple[list[str], dict[str, JsonValue]]:
+    """Extrait les URLs et identifiants depuis les locations d'un work OpenAlex.
+
+    Retourne (urls, external_ids) où :
+      - urls : liste dédupliquée de landing_page_url et pdf_url
+      - external_ids : dict d'identifiants (nnt, pmid, pmcid, arxiv_id scalaires ; hal_id et related_dois **listes**)
+
+    hal_id et related_dois sont collectés depuis les URLs **et** depuis `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`), source structurée présente même quand la landing page est une page éditeur. related_dois contient ici **tous** les DOI des locations ; l'appelant en retire le DOI primaire (top-level) de la publication.
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+    location_ids: list[str] = []
+    for entree in as_sequence(work.get("locations")):
+        loc = as_mapping(entree)
+        for key in ("landing_page_url", "pdf_url"):
+            url = as_str(loc.get(key))
+            if url and url not in seen:
+                seen.add(url)
+                urls.append(url)
+        if loc_id := as_str(loc.get("id")):
+            location_ids.append(loc_id)
+
+    external_ids: dict[str, JsonValue] = dict(extract_external_ids_from_urls(urls))
+    # hal_id et related_dois sont multivalués et apparaissent aussi dans les location.id (absents des URLs quand la landing page est une page éditeur).
+    # On balaie URLs + location.id en une passe.
+    hal_ids: list[str] = [
+        h for e in as_sequence(external_ids.get(ExternalIdType.HAL_ID)) if (h := as_str(e))
+    ]
+    related_dois: list[str] = []
+    for s in (*urls, *location_ids):
+        if (hal_id := extract_hal_id_from_url(s)) and hal_id not in hal_ids:
+            hal_ids.append(hal_id)
+        if (doi := extract_doi_from_url(s)) and doi not in related_dois:
+            related_dois.append(doi)
+    if hal_ids:
+        external_ids[ExternalIdType.HAL_ID] = hal_ids
+    if related_dois:
+        external_ids[ExternalIdType.RELATED_DOIS] = related_dois
+    return urls, external_ids
+
+
+def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:
+    """Reconstruit le texte de l'abstract depuis l'inverted index OpenAlex.
+
+    Le format est {mot: [positions]} → on reconstitue le texte en ordre.
+    """
+    if not inverted_index:
+        return None
+    positions: dict[int, str] = {}
+    for word, indices in inverted_index.items():
+        for brut in as_sequence(indices):
+            if (idx := as_int(brut)) is not None:
+                positions[idx] = word
+    if not positions:
+        return None
+    return " ".join(positions[k] for k in sorted(positions))
+
+
+def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
+    """Extrait les topics OpenAlex sous forme de liste simplifiée."""
+    topics: list[dict[str, JsonValue]] = []
+    for entree in as_sequence(work.get("topics")):
+        t = as_mapping(entree)
+        topic: dict[str, JsonValue] = {}
+        for level in ("domain", "field", "subfield", "topic"):
+            obj = as_mapping(t.get(level)) or (t if level == "topic" else {})
+            if nom := as_str(obj.get("display_name")):
+                topic[level] = nom
+        if (score := t.get("score")) is not None:
+            topic["score"] = score
+        if topic:
+            topics.append(topic)
+    return topics or None
+
+
+def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
+    """Indicateurs de citation OpenAlex : nombre de citations, FWCI et percentile de citations normalisé."""
+    percentile = as_mapping(work.get("citation_normalized_percentile"))
+    return Impact(
+        cited_by_count=as_int(work.get("cited_by_count")),
+        fwci=as_float(work.get("fwci")),
+        citation_percentile=as_float(percentile.get("value")),
+        top_10_percent=as_bool(percentile.get("is_in_top_10_percent")),
+        top_1_percent=as_bool(percentile.get("is_in_top_1_percent")),
+    )
+
+
+# =============================================================
+# PUBLISHERS & JOURNALS
+# =============================================================
+
+
+def upsert_publisher(
+    work: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+) -> int | None:
+    """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
+    source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    publisher_name = as_str(source.get("host_organization_name"))
+    if not publisher_name:
+        return None
+    openalex_id = short_openalex_id(as_str(source.get("host_organization")) or "")
+    return find_or_create_publisher(
+        publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
+    )
+
+
+def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
+    """Ce qu'OpenAlex dit du conteneur d'un document : la source de sa localisation principale.
+
+    Une source `book series` ou `journal` est la collection d'un livre, d'un chapitre ou d'un article de congrès ; une source `conference` est son volume d'actes. OpenAlex ne donne ni le titre du livre qui contient un chapitre, ni ISBN.
+    """
+    source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    title = as_str(source.get("display_name"))
+
+    openalex_id = short_openalex_id(as_str(source.get("id")) or "")
+    # OpenAlex ne donne pas le support de ses ISSN.
+    issns = source_issns(unknown=as_strs(source.get("issn")), linking=as_str(source.get("issn_l")))
+
+    source_type = as_str(source.get("type"))
+    oa_model: OaModel | None = None
+    if source_type == "journal":
+        oa_model = OaModel.FULL_OA if source.get("is_oa") else OaModel.SUBSCRIPTION
+    elif source_type == "repository":
+        oa_model = OaModel.REPOSITORY
+
+    return ContainerDescription(
+        source="openalex",
+        raw_doc_type=as_str(work.get("type")),
+        document_title=as_str(work.get("title")) or as_str(work.get("display_name")),
+        journal_title=title,
+        collection_title=title if source_type in ("book series", "journal") else None,
+        book_title=title if source_type == "conference" else None,
+        issns=issns,
+        openalex_id=openalex_id or None,
+        oa_model=oa_model,
+        year=as_int(work.get("publication_year")),
+    )
+
+
+def upsert_containers(
+    work: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    container_repo: ContainerFindOrCreateQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(work), publisher_id=publisher_id, repo=container_repo
+    )
+
+
+# =============================================================
+# PUBLICATIONS
+# =============================================================
+
+
+def extract_pub_metadata(
+    work: Mapping[str, JsonValue],
+    journal_id: int | None,
+    primary: OpenalexLocation | None = None,
+    monograph_id: int | None = None,
+) -> PublicationMetadata:
+    """Extrait les métadonnées canoniques d'un work OpenAlex.
+
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans `map_doc_type(source="openalex")`).
+    """
+    title = as_str(work.get("title")) or as_str(work.get("display_name")) or ""
+    if primary is None:
+        primary = parse_primary_location(work)
+    theses_fr = primary is not None and is_theses_fr_location(primary)
+    nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
+    oa_info = as_mapping(work.get("open_access"))
+    container_title = primary.source_display_name if (primary and not journal_id) else None
+
+    return PublicationMetadata(
+        title=title,
+        pub_year=as_int(work.get("publication_year")),
+        doc_type=as_str(work.get("type")),
+        doi=clean_doi(as_str(work.get("doi"))),
+        nnt=nnt,
+        oa_status=map_openalex_oa_status(as_str(oa_info.get("oa_status"))),
+        journal_id=journal_id,
+        monograph_id=monograph_id,
+        container_title=container_title,
+        language=as_str(work.get("language")),
+    )
+
+
+# =============================================================
+# SOURCE DOCUMENTS (OPENALEX)
+# =============================================================
+
+
+def insert_openalex_document(  # noqa: C901
+    conn: Connection,
+    queries: SourcePublicationQueries,
+    work: Mapping[str, JsonValue],
+    staging_id: int,
+    pub_meta: PublicationMetadata,
+    primary: OpenalexLocation | None = None,
+) -> int:
+    """Crée/retrouve l'entrée source_publications pour OpenAlex.
+
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
+    """
+    openalex_id = short_openalex_id(as_str(work.get("id")) or "")
+    if primary is None:
+        primary = parse_primary_location(work)
+
+    # URLs et identifiants extraits des locations
+    urls, external_ids = extract_locations_data(work)
+    if nnt := pub_meta.nnt:
+        external_ids[ExternalIdType.NNT] = nnt
+    # related_dois (collecté depuis les locations) = DOI secondaires : on retire
+    # le DOI primaire de la publication, qui vit sur la colonne `doi`.
+    if related_dois := as_sequence(external_ids.get(ExternalIdType.RELATED_DOIS)):
+        if remaining := [d for d in related_dois if d != pub_meta.doi]:
+            external_ids[ExternalIdType.RELATED_DOIS] = remaining
+        else:
+            del external_ids[ExternalIdType.RELATED_DOIS]
+
+    is_retracted = bool(work.get("is_retracted"))
+
+    # Biblio (volume, issue, pages)
+    raw_biblio = as_mapping(work.get("biblio"))
+    biblio: dict[str, JsonValue] = {
+        k: raw_biblio[k]
+        for k in ("volume", "issue", "first_page", "last_page")
+        if raw_biblio.get(k)
+    }
+
+    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex, en parallèle des publishers/journals créés via find_or_create_*).
+    # Ignoré pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
+    if not should_skip_publisher_journal(primary):
+        source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
+        if publisher_raw := as_str(source.get("host_organization_name")):
+            biblio["publisher"] = publisher_raw
+        journal_obj: dict[str, str] = {}
+        if jt := as_str(source.get("display_name")):
+            journal_obj["title"] = jt
+        issn_l = as_str(source.get("issn_l"))
+        journal_issn = None
+        journal_eissn = None
+        for entree in as_sequence(source.get("issn")):
+            i = as_str(entree)
+            if not i or i == issn_l:
+                continue
+            if not journal_issn:
+                journal_issn = i
+            elif not journal_eissn:
+                journal_eissn = i
+        if journal_issn:
+            journal_obj["issn"] = journal_issn
+        if journal_eissn:
+            journal_obj["eissn"] = journal_eissn
+        if issn_l:
+            journal_obj["issnl"] = issn_l
+        if journal_oa_id := short_openalex_id(as_str(source.get("id")) or ""):
+            journal_obj["openalex_id"] = journal_oa_id
+        if journal_obj:
+            biblio["journal"] = journal_obj
+
+    biblio_json = biblio if biblio else None
+
+    # Abstract, keywords, topics
+    abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))
+    mots = [
+        as_str(as_mapping(k).get("keyword")) or as_str(k) for k in as_sequence(work.get("keywords"))
+    ]
+    keywords = [m for m in mots if m] or None
+    topics = extract_topics(work)
+    topics_json = topics if topics else None
+
+    return queries.upsert_source_publication(
+        conn,
+        SourcePublicationUpsert(
+            source="openalex",
+            source_id=openalex_id,
+            staging_id=staging_id,
+            doi=pub_meta.doi,
+            external_ids=external_ids or None,
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
+            biblio=biblio_json,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics_json,
+            oa_status=pub_meta.oa_status,
+            urls=urls or None,
+            impact=extract_impact(work).to_json(),
+            is_retracted=is_retracted,
+        ),
+    )
+
+
+# =============================================================
+# OPENALEX AUTHORS — identifiants sur source_authorships
+# =============================================================
+# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, sur l'identité de la signature (author_identifying_keys.person_identifiers).
+
+
+def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
+    """Extrait l'ORCID déposé par l'auteur sur l'authorship (`raw_orcid`).
+
+    OpenAlex porte deux ORCID par authorship, de provenances opposées :
+
+    - `raw_orcid` (niveau authorship) : recopié tel quel de la métadonnée brute du work telle qu'ingérée par OpenAlex depuis sa source amont (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID déposé par l'auteur à la soumission — fiable au même titre qu'un ORCID Crossref.
+    - `author.orcid` (niveau entité auteur OpenAlex) : ORCID de l'entité désambiguïsée par le clustering nom × affiliation d'OpenAlex, régulièrement fautif.
+
+    On retient `raw_orcid` et on ignore `author.orcid`.
+    """
+    return normalize_orcid(as_str(authorship.get("raw_orcid")))
+
+
+# =============================================================
+# OPENALEX AUTHORSHIPS
+# =============================================================
+
+
+def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorRecord]:
+    """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
+
+    - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
+    - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
+    - `country_code` OpenAlex (rattaché à la structure désambiguïsée, algorithmique et faillible) en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
+    - ROR des institutions → `ror_ids` ;
+    - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
+    """
+    authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
+    ids_by_position = [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
+
+    records: list[AuthorRecord] = []
+    for position, authorship in enumerate(authorships):
+        name = SignatureName.from_raw(as_str(authorship.get("raw_author_name")))
+        if name is None:
+            # Sans nom, l'authorship est inexploitable pour le matching personnes.
+            continue
+
+        institutions = [as_mapping(i) for i in as_sequence(authorship.get("institutions"))]
+        suggested_countries = sorted(
+            {pays.lower() for i in institutions if (pays := as_str(i.get("country_code")))}
+        )
+        raw_strings = [
+            texte
+            for e in as_sequence(authorship.get("raw_affiliation_strings"))
+            if (texte := as_str(e))
+        ]
+        addr_parts = raw_strings or [
+            nom for i in institutions if (nom := as_str(i.get("display_name")))
+        ]
+
+        ids = ids_by_position[position]
+        records.append(
+            AuthorRecord(
+                position=position,
+                name=name,
+                is_corresponding=bool(authorship.get("is_corresponding")),
+                roles=["author"],
+                person_identifiers=ids if ids else None,
+                addresses=[
+                    AddressRecord(text=part, suggested_countries=suggested_countries or None)
+                    for part in addr_parts
+                ],
+                ror_ids=parse_ror_ids(as_str(i.get("ror")) for i in institutions),
+            )
+        )
+    return records
+
+
+def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un work OpenAlex : `authorships`."""
+    return {"authorships": work.get("authorships")}
+
+
+def process_authorships(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    work: Mapping[str, JsonValue],
+    source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
+) -> None:
+    """Synchronise les signatures OpenAlex de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "openalex",
+        source_publication_id,
+        extract_openalex_author_block(work),
+        build_openalex_author_records,
+    )
+
+
+# =============================================================
+# BOUCLE PRINCIPALE
+# =============================================================
+
+
+def process_work(
+    conn: Connection,
+    queries: SourcePublicationQueries,
+    logger: logging.Logger,
+    staging_row: StagingRow,
+    *,
+    container_repo: ContainerFindOrCreateQueries,
+    publisher_repo: PublisherFindOrCreateQueries,
+    staging_queries: StagingQueries,
+    authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
+) -> bool | None:
+    """Traite un work du staging OpenAlex."""
+    staging_id = staging_row.id
+    work = staging_row.raw_data
+
+    primary = parse_primary_location(work)
+
+    if should_skip_publisher_journal(primary):
+        containers = Containers(None, None)
+    else:
+        publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
+        containers = upsert_containers(work, publisher_id, container_repo=container_repo)
+    pub_meta = extract_pub_metadata(
+        work, containers.journal_id, primary, monograph_id=containers.monograph_id
+    )
+
+    source_publication_id = insert_openalex_document(
+        conn, queries, work, staging_id, pub_meta, primary
+    )
+    process_authorships(
+        conn, authorship_queries, work, source_publication_id, sync_settings=sync_settings
+    )
+    staging_queries.mark_done(conn, staging_id)
+    return True
+
+
+class OpenalexNormalizer(BibliographicNormalizer):
+    SOURCE = "openalex"
+    DEFAULT_BATCH_SIZE = 500
+
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        work = row.raw_data
+        title = as_str(work.get("title")) or as_str(work.get("display_name"))
+        return title, as_int(work.get("publication_year"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+        container_repo, publisher_repo = self._require_repos()
+        return process_work(
+            conn,
+            self._queries,
+            self.logger,
+            row,
+            container_repo=container_repo,
+            publisher_repo=publisher_repo,
+            staging_queries=self._staging,
+            authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
+        )

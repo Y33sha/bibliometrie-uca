@@ -8,8 +8,8 @@ Six endroits écrivent l'un ou l'autre :
 
 | Site | Moyen | Colonne écrite |
 |---|---|---|
-| `application/pipeline/normalize/normalize_scanr.py` | pays déclaré par ScanR | `countries` |
-| `application/pipeline/normalize/normalize_openalex.py` | pays de la structure désambiguïsée par OpenAlex | `suggested_countries` |
+| `pipeline/sources/scanr/normalize.py` | pays déclaré par ScanR | `countries` |
+| `pipeline/sources/openalex/normalize.py` | pays de la structure désambiguïsée par OpenAlex | `suggested_countries` |
 | `application/pipeline/countries/detect_by_country_name.py` | nom de pays en fin d'adresse | `countries` |
 | `application/pipeline/countries/detect_by_place_name.py` | nom d'institution ou de ville, via `place_name_forms` | `countries` |
 | `application/pipeline/countries/suggest_countries.py` | emprunt du pays d'une adresse qui contient celle-ci | `suggested_countries` |
