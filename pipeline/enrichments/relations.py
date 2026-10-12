@@ -16,15 +16,6 @@ Reconstruction complète à chaque run (table dérivée) : la table est purgée 
 import logging
 from dataclasses import dataclass
 
-from application.ports.pipeline.relations import (
-    DeclaredRelationSource,
-    DoiPublication,
-    PublicationRelationsQueries,
-    RelationEdge,
-    RelationsRebuild,
-    SharedKeyPair,
-    TitleMatch,
-)
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
@@ -36,6 +27,15 @@ from domain.publications.relations import (
     infer_shared_key_relation,
 )
 from pipeline.context import PhaseContext
+from pipeline.enrichments.relations_queries import (
+    DeclaredRelationSource,
+    DoiPublication,
+    PublicationRelationsQueries,
+    RelationEdge,
+    RelationsRebuild,
+    SharedKeyPair,
+    TitleMatch,
+)
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 

@@ -11,13 +11,16 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.pipeline.relations import DoiPublication, RelationEdge
-from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
+from pipeline.enrichments.relations_queries import (
+    DoiPublication,
+    PublicationRelationsQueries,
+    RelationEdge,
+)
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication
 
-_Q = PgPublicationRelationsQueries()
+_Q = PublicationRelationsQueries()
 
 # Notice de titre « t ».
 _notice = partial(insert_source_publication, title="t")
