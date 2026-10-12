@@ -72,5 +72,5 @@ Orientations à confirmer ou amender.
 
 - Convention de signature : <https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications>
 - Tables : `addresses`, `source_authorship_addresses`, `address_structures`, `structures`, `structure_name_forms`, `perimeters`, `persons_rh`.
-- Phase `affiliations` : `application/pipeline/affiliations/`.
+- Phase `affiliations` : `pipeline/structures/`.
 - Administration : `interfaces/frontend/src/routes/admin/addresses/`, `interfaces/frontend/src/routes/admin/structures/`.

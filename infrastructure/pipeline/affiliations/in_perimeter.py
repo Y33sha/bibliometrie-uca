@@ -1,28 +1,9 @@
-"""Query service : résolution des affiliations sur `source_authorships`, phase `affiliations`.
-
-Appelé par `application/pipeline/affiliations/populate_affiliations.py` : rafraîchit la matview `source_authorship_structures`, puis pose `in_perimeter` depuis celle-ci.
-"""
+"""Recalcul ciblé de `in_perimeter` après une édition d'adresse par l'administration."""
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.affiliations.in_perimeter import (
-    AffiliationsQueries,
-    InPerimeterSyncCounts,
-)
-from infrastructure.db.scalars import scalar_int
+from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR
-
-# Ensembles d'ids des deux UPDATE de `sync_in_perimeter` : `should` (authorships du périmètre restreint, via la matview) et `currently` (à TRUE, via l'index partiel). Delta par EXCEPT ; un run stable produit un delta vide.
-_DELTA_CTE = """
-    WITH should AS (
-        SELECT DISTINCT source_authorship_id AS id
-        FROM source_authorship_structures
-        WHERE structure_id = ANY(:perimeter_ids)
-    ),
-    currently AS (
-        SELECT id FROM source_authorships WHERE in_perimeter
-    )
-"""
 
 # Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
 _MARK_ORPHANS_DIRTY = """
@@ -34,48 +15,6 @@ _MARK_ORPHANS_DIRTY = """
 
 class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
-
-    def sync_in_perimeter(
-        self, conn: Connection, *, perimeter_ids: list[int]
-    ) -> InPerimeterSyncCounts:
-        params = {"perimeter_ids": perimeter_ids}
-        added = scalar_int(
-            conn.execute(
-                text(
-                    _DELTA_CTE
-                    + """
-                , entrees AS (
-                    UPDATE source_authorships
-                    SET in_perimeter = TRUE
-                    WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
-                    RETURNING source_publication_id
-                ), marquees AS (
-                    """
-                    + _MARK_ORPHANS_DIRTY.format(ids="SELECT source_publication_id FROM entrees")
-                    + """
-                    RETURNING 1
-                )
-                SELECT count(*) FROM entrees
-            """
-                ),
-                params,
-            )
-        )
-        removed = conn.execute(
-            text(
-                _DELTA_CTE
-                + """
-                UPDATE source_authorships
-                SET in_perimeter = FALSE
-                WHERE id IN (SELECT id FROM currently EXCEPT SELECT id FROM should)
-            """
-            ),
-            params,
-        ).rowcount
-        return InPerimeterSyncCounts(added=added, removed=removed)
-
-    def refresh_source_authorship_structures(self, conn: Connection) -> None:
-        conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
     def recompute_in_perimeter_on_source_authorships(
         self,

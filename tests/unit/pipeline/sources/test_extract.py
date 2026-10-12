@@ -10,10 +10,10 @@ from datetime import date
 import pytest
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.perimeter_structures import EmptyExtractionPerimeterError
 from pipeline.metrics import PhaseMetrics
 from pipeline.sources.extract import ExtractOne, ExtractPhase
 from pipeline.sources.harvest import ExtractionConfigError
+from pipeline.structures.perimeter import EmptyExtractionPerimeterError
 
 
 def _sync_run_parallel(thunks):

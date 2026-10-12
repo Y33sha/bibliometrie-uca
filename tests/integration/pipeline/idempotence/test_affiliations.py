@@ -84,13 +84,11 @@ def _run_populate_affiliations(conn):
     """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
-    from application.pipeline.affiliations.populate_affiliations import run_populate
-    from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
     from infrastructure.read_models.perimeters import get_persons_structure_ids
+    from pipeline.structures.affiliations import populate
 
-    run_populate(
+    populate(
         conn,
-        PgAffiliationsQueries(),
         logging.getLogger("test"),
         get_persons_structure_ids(conn),
     )
@@ -143,8 +141,8 @@ class TestPopulateAffiliationsIdempotence:
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
-    def test_run_populate_is_source_agnostic(self, sa_sync_conn):
-        """Régression : run_populate doit traiter toutes les sources sans filtre.
+    def test_populate_is_source_agnostic(self, sa_sync_conn):
+        """Régression : populate doit traiter toutes les sources sans filtre.
 
         Une weekly avec --sources=hal ne doit plus laisser les SAs OpenAlex
         bloquées sans structure_ids quand leur adresse a été résolue entre
@@ -156,15 +154,13 @@ class TestPopulateAffiliationsIdempotence:
 
         from sqlalchemy import text
 
-        from application.pipeline.affiliations.populate_affiliations import run_populate
-        from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
         from infrastructure.read_models.perimeters import get_persons_structure_ids
+        from pipeline.structures.affiliations import populate
 
         _setup_affiliations_test_data(sa_sync_conn)
 
-        run_populate(
+        populate(
             sa_sync_conn,
-            PgAffiliationsQueries(),
             logging.getLogger("test"),
             get_persons_structure_ids(sa_sync_conn),
         )

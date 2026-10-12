@@ -1,4 +1,4 @@
-"""Rafraîchissement du référentiel ROR depuis la dernière version publiée de son dump.
+"""Rafraîchissement du référentiel ROR depuis la dernière version publiée de son dump, en tête de la phase `affiliations`.
 
 Le dump est importé seulement si sa version diffère de celle du dernier import. Un dump inaccessible laisse le référentiel en l'état.
 """

@@ -20,15 +20,17 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.affiliations.resolve_addresses import AddressMatcher
-from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
 from domain.normalize import normalize_text, sanitize_optional_text
 from domain.publications.identifiers import clean_doi
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
+from pipeline.structures.address_resolution import (
+    AddressMatcher,
+    AddressResolutionQueries,
+    StructureNameForm,
+)
 
 log = setup_logger("import_apc", os.path.dirname(__file__))
 
@@ -265,7 +267,7 @@ def import_payments(conn: Connection, payments: list[Payment], source_file: str)
     map_publications(conn)
     map_journals(conn)
     map_publishers(conn)
-    resolver = StructureResolver(PgAddressResolutionQueries().load_name_forms(conn))
+    resolver = StructureResolver(AddressResolutionQueries().load_name_forms(conn))
     unresolved = map_structures(conn, resolver)
     return ImportStats(
         read=len(payments), in_base=len(in_base), inserted=inserted, unresolved=unresolved

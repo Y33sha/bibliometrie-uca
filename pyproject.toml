@@ -108,6 +108,8 @@ ignore_imports = [
     "pipeline.** -> application.ports.pipeline.**",
     "pipeline.sources.*.normalize -> application.services.monographs.containers",
     "pipeline.sources.*.normalize -> application.services.publishers.core",
+    "pipeline.structures.ror -> application.ports.repositories.ror_repository",
+    "pipeline.structures.ror -> application.services.structures.ror",
 ]
 
 [[tool.importlinter.contracts]]

@@ -34,7 +34,7 @@ Les adresses extraites des sources sont dédoublonnées, insérées, puis relié
 
 ### `affiliations` — résolution en structures
 
-`application/pipeline/affiliations/resolve_addresses.py` balaie les adresses et cherche dans leur texte normalisé les formes de noms déclarées par les structures, au moyen d'un automate Aho-Corasick.
+`pipeline/structures/address_resolution.py` balaie les adresses et cherche dans leur texte normalisé les formes de noms déclarées par les structures, au moyen d'un automate Aho-Corasick.
 
 La résolution compare l'état détecté à l'état enregistré et n'écrit que l'écart. Un rattachement posé ou confirmé à la main survit.
 
@@ -52,7 +52,7 @@ Toute écriture dans `countries` pose `addresses.countries_dirty`, ce qui décle
 
 Deux chaînes portent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_authorships.in_perimeter`, et `addresses.countries` → `source_publications.countries` → `publications.countries`.
 
-**Appartenance au périmètre.** Troisième étape d'`affiliations` (`populate_affiliations.py`) : la vue matérialisée est rafraîchie, puis comparée aux signatures actuellement marquées `in_perimeter`. Seul l'écart est écrit. C'est là que les rattachements décident finalement du périmètre.
+**Appartenance au périmètre.** Troisième étape d'`affiliations` (`populate`, dans `pipeline/structures/affiliations.py`) : la vue matérialisée est rafraîchie, puis comparée aux signatures actuellement marquées `in_perimeter`. Seul l'écart est écrit. C'est là que les rattachements décident finalement du périmètre.
 
 **Pays.** Étape finale de `countries` (`refresh_publication_countries.py`) : les signatures marquées sales — soit par `normalize` à leur création, soit par une adresse dont le pays vient de changer — voient leur publication source recalculée, puis la publication elle-même. Les deux marqueurs sont ensuite remis à zéro.
 

@@ -1,4 +1,4 @@
-"""Résolution des adresses : rattachement aux structures et détection du périmètre.
+"""Résolution des adresses : rattachement aux structures et détection du périmètre. Nœud `affiliations.resolve_addresses`.
 
 Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
 """
@@ -7,19 +7,165 @@ import logging
 from typing import NamedTuple
 
 import ahocorasick
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
-from application.ports.pipeline.affiliations.address_resolution import (
-    AddressResolutionQueries,
-    DetectedStructure,
-    KeptPair,
-    StructureNameForm,
-)
+from domain.structures.structure import StructureType
+from infrastructure.db.scalars import scalar_int
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, forme
 from pipeline.progression import progression
 
 # Taille des tranches (pagination keyset) : borne la mémoire et les allers-retours SQL par batch.
 CHUNK_SIZE = 10000
+
+
+class StructureNameForm(NamedTuple):
+    """Forme normalisée d'une structure consommée par le matching adresses → structures.
+
+    `requires_context_of` : liste des structure_ids dont au moins une forme doit aussi matcher pour valider cette forme (anti-faux-positifs cross-établissement : un code de laboratoire ambigu n'est retenu que si son université de tutelle matche la même adresse). `None` ou liste vide = pas de contexte requis.
+    `is_excluding` : si TRUE et que la forme matche, retire la structure des résultats même si d'autres formes la matchent.
+    `structure_type` : type de la structure portant la forme. Détermine si un appariement vaut affiliation à retenir ou seulement contexte de reconnaissance (`StructureType.is_affiliation`).
+    """
+
+    id: int
+    structure_id: int
+    form_text: str
+    is_word_boundary: bool
+    requires_context_of: list[int] | None
+    is_excluding: bool
+    structure_type: StructureType
+
+
+class KeptPair(NamedTuple):
+    """Détection `(address_id, structure_id)` encore présente, à préserver de la purge."""
+
+    address_id: int
+    structure_id: int
+
+
+class DetectedStructure(NamedTuple):
+    """Détection à écrire : structure `structure_id` reconnue dans l'adresse `address_id` par la forme `form_id`."""
+
+    address_id: int
+    structure_id: int
+    form_id: int
+
+
+# ─── SQL ─────────────────────────────────────────────────────────
+
+# Détections auto (`matched_form_id` posé) d'une adresse de `addr_ids` dont le couple
+# (address_id, structure_id) est absent de `kept_pairs` (les couples encore détectés).
+# Alias de table : `a`.
+_OBSOLETE_AUTO_WHERE = """
+    a.address_id = ANY(:addr_ids)
+    AND a.matched_form_id IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
+        WHERE k.aid = a.address_id AND k.sid = a.structure_id
+    )
+"""
+
+
+def _kept_arrays(kept_pairs: list[KeptPair]) -> tuple[list[int], list[int]]:
+    """Éclate `kept_pairs` en tableaux parallèles `(address_ids, structure_ids)` pour l'`unnest` SQL."""
+    return [p.address_id for p in kept_pairs], [p.structure_id for p in kept_pairs]
+
+
+class AddressResolutionQueries:
+    """Requêtes de la résolution des adresses.
+
+    Chaque run est un recalcul complet idempotent : toutes les adresses sont traitées par tranches (keyset par `id`), et seules les détections `address_structures` qui changent sont écrites.
+    """
+
+    def load_name_forms(self, conn: Connection) -> list[StructureNameForm]:
+        rows = conn.execute(
+            text("""
+                SELECT nf.id, nf.structure_id, nf.form_text,
+                       nf.is_word_boundary, nf.requires_context_of, nf.is_excluding,
+                       s.structure_type::text AS structure_type
+                FROM structure_name_forms nf
+                JOIN structures s ON s.id = nf.structure_id
+                ORDER BY nf.id
+            """)
+        ).all()
+        return [
+            StructureNameForm(
+                id=r.id,
+                structure_id=r.structure_id,
+                form_text=r.form_text,
+                is_word_boundary=r.is_word_boundary,
+                requires_context_of=r.requires_context_of,
+                is_excluding=r.is_excluding,
+                structure_type=StructureType(r.structure_type),
+            )
+            for r in rows
+        ]
+
+    def count_addresses(self, conn: Connection) -> int:
+        return scalar_int(conn.execute(text("SELECT count(*) FROM addresses")))
+
+    def fetch_addresses_chunk(
+        self, conn: Connection, *, after_id: int, limit: int
+    ) -> list[tuple[int, str]]:
+        rows = conn.execute(
+            text(
+                "SELECT a.id, a.normalized_text FROM addresses a "
+                "WHERE a.id > :after ORDER BY a.id LIMIT :limit"
+            ),
+            {"after": after_id, "limit": limit},
+        ).all()
+        return [(r.id, r.normalized_text) for r in rows]
+
+    def delete_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
+    ) -> int:
+        if not addr_ids:
+            return 0
+        kept_aids, kept_sids = _kept_arrays(kept_pairs)
+        return conn.execute(
+            text(
+                "DELETE FROM address_structures a WHERE "
+                + _OBSOLETE_AUTO_WHERE
+                + " AND a.is_confirmed IS NULL"
+            ),
+            {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
+        ).rowcount
+
+    def unflag_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
+    ) -> None:
+        if not addr_ids:
+            return
+        kept_aids, kept_sids = _kept_arrays(kept_pairs)
+        conn.execute(
+            text(
+                "UPDATE address_structures a SET matched_form_id = NULL WHERE "
+                + _OBSOLETE_AUTO_WHERE
+                + " AND a.is_confirmed IS NOT NULL"
+            ),
+            {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
+        )
+
+    def upsert_detected_structures_bulk(
+        self, conn: Connection, detections: list[DetectedStructure]
+    ) -> None:
+        if not detections:
+            return
+        aids = [d.address_id for d in detections]
+        sids = [d.structure_id for d in detections]
+        fids = [d.form_id for d in detections]
+        conn.execute(
+            text("""
+                INSERT INTO address_structures (address_id, structure_id, matched_form_id)
+                SELECT aid, sid, fid
+                FROM unnest(CAST(:aids AS int[]), CAST(:sids AS int[]), CAST(:fids AS int[]))
+                     AS t(aid, sid, fid)
+                ON CONFLICT (address_id, structure_id)
+                    DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
+                    WHERE address_structures.matched_form_id IS DISTINCT FROM EXCLUDED.matched_form_id
+            """),
+            {"aids": aids, "sids": sids, "fids": fids},
+        )
 
 
 # ─── Matching ────────────────────────────────────────────────────
