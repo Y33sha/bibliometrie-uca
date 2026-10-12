@@ -32,13 +32,6 @@ class AuthorshipsBuildQueries(Protocol):
         """
         ...
 
-    def analyze_authorships(self, conn: Connection) -> None:
-        """Met à jour les stats Postgres sur `authorships`.
-
-        À appeler après l'insertion (`insert_missing_authorships`) pour que le planner SQL des étapes suivantes (`propagate_authorship_attributes`) ait des estimations correctes sur les lignes fraîchement insérées. Sans ça, Postgres garde des stats périmées (`null_frac = 0`) et choisit un Nested Loop O(n×m) au lieu d'un Hash Join, ce qui peut bloquer indéfiniment.
-        """
-        ...
-
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         """Recompose les attributs dérivés de chaque authorship depuis les `source_authorships` qui l'attestent : même publication par leur notice, même personne. Retourne le nombre d'authorships modifiées.
 

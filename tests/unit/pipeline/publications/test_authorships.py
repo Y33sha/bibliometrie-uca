@@ -1,6 +1,6 @@
-"""Orchestrateur de la phase `authorships` : build, purge des orphelines, référentiels vides, refresh des compteurs.
+"""Orchestrateur de la phase `authorships` : build, synchronisation, purge des orphelines, référentiels vides, refresh des compteurs.
 
-Le propos testé ici est l'enchaînement et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
+Le propos testé ici est l'enchaînement des nœuds et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
 """
 
 import logging
@@ -8,6 +8,29 @@ from unittest.mock import patch
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.authorships import authorships as phase
+
+
+class _FakeBuildQueries:
+    """Requêtes des trois nœuds de synchronisation."""
+
+    def __init__(self) -> None:
+        self.appels: list[str] = []
+
+    def propagate_authorship_attributes(self, conn) -> int:
+        self.appels.append("propagate")
+        return 0
+
+    def count_authorships_in_perimeter(self, conn) -> int:
+        return 9
+
+    def refresh_publications_in_perimeter(self, conn) -> None:
+        self.appels.append("publications_in_perimeter")
+
+    def refresh_authorship_structures(self, conn) -> None:
+        self.appels.append("authorship_structures")
+
+    def refresh_publication_structures(self, conn) -> None:
+        self.appels.append("publication_structures")
 
 
 class _FakePurgeQueries:
@@ -58,7 +81,7 @@ def _run(contexte, lots, *, rebuild_authorships=False, build_metrics=None):
             vus.__setitem__("rebuild_full", rebuild_full) or metrics
         ),
     ):
-        rendu = phase.AuthorshipsPhase(object(), purge, pub_counts, adresses).run(
+        rendu = phase.AuthorshipsPhase(_FakeBuildQueries(), purge, pub_counts, adresses).run(
             contexte(rebuild_authorships=rebuild_authorships)
         )
     return rendu, purge, pub_counts, vus
@@ -103,11 +126,24 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
     assert purge.limites  # la purge a bien tourné
 
 
-def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
+def test_chaque_noeud_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # build, purge, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 5
+    # build, propagation, périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 8
+
+
+def test_la_synchronisation_suit_le_build(contexte, caplog):
+    with caplog.at_level(logging.INFO, logger="test"):
+        rendu, _, _, _ = _run(contexte, [])
+    assert rendu.details["summary"]["total_in_perimeter"] == 9
+    lignes = [m for m in caplog.messages if m]
+    debut = lignes.index("▶ Synchronisation des tables")
+    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 1 : debut + 4]] == [
+        "  ├─ Attributs des liens",
+        "  ├─ Périmètre des publications",
+        "  └─ Structures des liens",
+    ]
 
 
 def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
@@ -132,7 +168,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
         caplog.at_level(logging.INFO, logger="test"),
     ):
         rendu = phase.AuthorshipsPhase(
-            object(),
+            _FakeBuildQueries(),
             _FakePurgeQueries([]),
             _FakePubCountsQueries(),
             _FakeAddressPubCountQueries(),
