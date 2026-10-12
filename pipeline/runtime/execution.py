@@ -27,6 +27,16 @@ def open_tx() -> AbstractContextManager[Connection]:
     return managed_transaction(get_sync_engine())
 
 
+def maintain(operation: str) -> None:
+    """Exécute une opération de maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, en autocommit."""
+    from sqlalchemy import text
+
+    from infrastructure.db.engine import get_sync_engine
+
+    with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text(operation))
+
+
 def phase_context(options: RunOptions) -> PhaseContext:
-    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run."""
-    return PhaseContext(open_tx=open_tx, logger=log, options=options)
+    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables."""
+    return PhaseContext(open_tx=open_tx, logger=log, options=options, maintain=maintain)

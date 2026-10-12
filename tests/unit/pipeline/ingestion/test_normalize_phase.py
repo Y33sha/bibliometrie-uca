@@ -1,10 +1,12 @@
-"""Séquence de la phase `normalize`.
+"""Séquence de la phase `normalize`, exécutée nœud par nœud.
 
-Le retrait des documents disparus précède le nettoyage des identités : il en libère, que le nettoyage ramasse dans la foulée.
+Le retrait des documents disparus précède le nettoyage des identités : il en libère, que le nettoyage ramasse dans la foulée. L'exécuteur lance ensuite le `VACUUM` du staging, maintenance du nœud de nettoyage.
 """
 
+import dataclasses
 import logging
 
+from domain.sources.registry import SOURCE_PRIORITY
 from pipeline.ingestion.common.normalize import NormalizePhase, NormalizeStats
 
 
@@ -16,25 +18,31 @@ def _run(
     bilan: NormalizeStats = NormalizeStats(3, 0, 0),
     **options,
 ):
+    ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
+    ctx = dataclasses.replace(ctx, maintain=appels.append)
     return NormalizePhase(
-        ordered_sources=["hal", "openalex"],
         normalize_one=lambda source: (appels.append(f"normalize:{source}"), bilan)[1],
         prune_disappeared=lambda: (appels.append("prune"), disparues)[1],
-        cleanup_orphan_identities=lambda: appels.append("cleanup"),
-        vacuum_staging=lambda full: appels.append("vacuum"),
-    ).run(contexte(**{"mode": "daily", "sources": {"hal"}, **options}))
+        cleanup_orphan_identities=lambda: (appels.append("cleanup"), 0)[1],
+    ).run(ctx)
 
 
 def test_le_retrait_precede_le_nettoyage_des_identites(contexte):
     appels: list[str] = []
     _run(contexte, appels)
-    assert appels == ["normalize:hal", "prune", "cleanup", "vacuum"]
+    assert appels == ["normalize:hal", "prune", "cleanup", "VACUUM staging"]
 
 
-def test_sans_restriction_toutes_les_sources_sont_normalisees(contexte):
+def test_sans_restriction_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
     appels: list[str] = []
     _run(contexte, appels, sources=None)
-    assert appels[:2] == ["normalize:hal", "normalize:openalex"]
+    assert appels[: len(SOURCE_PRIORITY)] == [f"normalize:{s.value}" for s in SOURCE_PRIORITY]
+
+
+def test_le_mode_full_reecrit_le_staging(contexte):
+    appels: list[str] = []
+    _run(contexte, appels, mode="full")
+    assert appels[-1] == "VACUUM FULL staging"
 
 
 def test_le_decompte_des_retraits_part_dans_les_metriques(contexte):
@@ -47,29 +55,13 @@ def test_le_total_reste_celui_des_documents_normalises(contexte):
     assert metrics.total == 3
 
 
-_RIEN = NormalizeStats(0, 0, 0)
-
-
-def test_sans_document_la_phase_saute_la_maintenance(contexte, caplog):
+def test_sans_document_la_maintenance_tourne_quand_meme(contexte, caplog):
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
-        metrics = _run(contexte, appels, bilan=_RIEN)
-    assert appels == ["normalize:hal", "prune"]
-    assert "Rien à faire" in caplog.text
-    assert "Maintenance" not in caplog.text
-    assert metrics.resume == ""
-
-
-def test_un_retrait_suffit_a_declencher_la_maintenance(contexte):
-    appels: list[str] = []
-    _run(contexte, appels, disparues=2, bilan=_RIEN)
-    assert appels[-2:] == ["cleanup", "vacuum"]
-
-
-def test_un_document_ecarte_suffit_a_declencher_la_maintenance(contexte):
-    appels: list[str] = []
-    _run(contexte, appels, bilan=NormalizeStats(0, 1, 0))
-    assert appels[-2:] == ["cleanup", "vacuum"]
+        _run(contexte, appels, bilan=NormalizeStats(0, 0, 0))
+    assert appels == ["normalize:hal", "prune", "cleanup", "VACUUM staging"]
+    assert "aucun document disparu de sa source" in caplog.text
+    assert "▶ Maintenance des tables" in caplog.text
 
 
 def test_les_retraits_sont_annonces(contexte, caplog):

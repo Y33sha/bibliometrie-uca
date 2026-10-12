@@ -1,13 +1,10 @@
 """Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Nœuds `normalize.<source>`.
 
-La phase enchaîne :
+La phase enchaîne ses nœuds (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
-3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
-4. le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
-
-Sans document traité ni retiré, la phase s'arrête après l'étape 2.
+3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence). Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
 
 Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron porte la boucle : chargement des lignes à traiter, un SAVEPOINT par notice (une erreur isolée ne perd pas le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_publications` et les signatures sont injectées à la construction.
 """
@@ -24,25 +21,23 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
 from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.sources.registry import ALL_SOURCES_SET, SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
     SUITE_DE_BRANCHE,
     accord,
     branche_de_source,
-    etape,
-    rien_a_faire,
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente, progression
+from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -256,74 +251,83 @@ class BibliographicNormalizer(SourceNormalizer):
 
 NormalizeOne = Callable[[str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
-VacuumStaging = Callable[[bool], None]
-"""`VACUUM` du staging (maintenance physique, autocommit) ; `full=True` réécrit la table."""
 
 
 @dataclass(frozen=True)
 class NormalizePhase:
-    """`ordered_sources` liste les sources dans l'ordre de priorité ; le run normalise celles de ses options, toutes quand il n'en restreint aucune."""
+    """Le run normalise les sources de ses options, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
 
-    ordered_sources: list[str]
     normalize_one: NormalizeOne
     prune_disappeared: Callable[[], int]
-    cleanup_orphan_identities: Callable[[], None]
-    vacuum_staging: VacuumStaging
+    cleanup_orphan_identities: Callable[[], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Normalise les sources retenues (dans l'ordre de priorité), retire les documents disparus, nettoie puis VACUUM le staging."""
-        logger = ctx.logger
-        sources = ctx.options.sources if ctx.options.sources is not None else ALL_SOURCES_SET
-        etape(logger, "Normalisation")
-        rows = [self._normalize(source) for source in self.ordered_sources if source in sources]
+        """Normalise les sources retenues, retire les documents disparus, nettoie les identités orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
+        sources = [source.value for source in SOURCE_PRIORITY]
+        steps = {
+            f"normalize.{source}": NodeStep(self._normalize_node(source), section="Normalisation")
+            for source in sources
+        }
+        steps["normalize.prune_disappeared"] = NodeStep(self._prune, section="Normalisation")
+        steps["normalize.cleanup_orphan_identities"] = NodeStep(
+            self._cleanup, section="Maintenance des tables", libelle="Identités d'auteur orphelines"
+        )
+        by_node = run_nodes("normalize", steps, ctx)
 
-        disparues = self.prune_disappeared()
-        if disparues:
-            logger.info(
-                "%s%s (disparus de leur source)",
-                DERNIERE_BRANCHE,
-                accord(disparues, "document supprimé", "documents supprimés"),
-            )
-
-        if not disparues and not any(_a_traite(row) for row in rows):
-            rien_a_faire(logger)
-            metrics = PhaseMetrics()
-            metrics.resume = ""
-            metrics.details["table"] = {"rows": rows}
-            metrics.details["disappeared_pruned"] = 0
-            return metrics
-
-        etape(logger, "Maintenance des tables")
-        t0 = time.perf_counter()
-        with attente(f"{DERNIERE_BRANCHE}en cours", logger) as ligne:
-            self.cleanup_orphan_identities()
-            self.vacuum_staging(MODES[ctx.options.mode].vacuum_full)
-            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
-
+        rows = [
+            cast("dict[str, object]", by_node[f"normalize.{source}"].details["row"])
+            for source in sources
+            if "row" in by_node[f"normalize.{source}"].details
+        ]
         metrics = PhaseMetrics()
         normalises = sum(cast("int", row["processed"]) for row in rows)
         metrics.add(total=normalises)
         metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
         metrics.details["table"] = {"rows": rows}
-        metrics.details["disappeared_pruned"] = disparues
+        metrics.details["disappeared_pruned"] = by_node["normalize.prune_disappeared"].extras.get(
+            "disappeared", 0
+        )
         return metrics
 
-    def _normalize(self, source: str) -> dict[str, object]:
-        """Normalise `source` et rend sa ligne de la table d'observabilité."""
-        t0 = time.perf_counter()
-        stats = self.normalize_one(source)
-        return {
-            "key": source,
-            "processed": stats.processed,
-            "skipped": stats.skipped,
-            "errors": stats.errors,
-            "duration_s": round(time.perf_counter() - t0, 1),
-        }
+    def _normalize_node(self, source: str) -> NodeRun:
+        """Nœud `normalize.<source>` : normalise la source si le run la retient, et garde sa ligne de la table d'observabilité."""
 
+        def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            metrics = PhaseMetrics()
+            if ctx.options.sources is not None and source not in ctx.options.sources:
+                return metrics
+            t0 = time.perf_counter()
+            stats = self.normalize_one(source)
+            metrics.details["row"] = {
+                "key": source,
+                "processed": stats.processed,
+                "skipped": stats.skipped,
+                "errors": stats.errors,
+                "duration_s": round(time.perf_counter() - t0, 1),
+            }
+            return metrics
 
-def _a_traite(row: dict[str, object]) -> bool:
-    """Vrai si la source a traité au moins un document : normalisé, écarté ou en erreur."""
-    return any(cast("int", row.get(cle, 0)) for cle in ("processed", "skipped", "errors"))
+        return run
+
+    def _prune(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
+        disparues = self.prune_disappeared()
+        if disparues:
+            ctx.logger.info(
+                "%s%s (disparus de leur source)",
+                DERNIERE_BRANCHE,
+                accord(disparues, "document supprimé", "documents supprimés"),
+            )
+        else:
+            ctx.logger.info("%saucun document disparu de sa source", DERNIERE_BRANCHE)
+        return PhaseMetrics(extras={"disappeared": disparues})
+
+    def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        supprimees = self.cleanup_orphan_identities()
+        metrics = PhaseMetrics()
+        if supprimees:
+            metrics.resume = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
+        return metrics
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -352,11 +356,9 @@ class _NormalizeSelonOptions:
             return _run_normalize(registry[source])
 
         return NormalizePhase(
-            ordered_sources=[source.value for source in SOURCE_PRIORITY],
             normalize_one=normalize_one,
             prune_disappeared=_run_prune_disappeared,
             cleanup_orphan_identities=_run_cleanup_orphan_identities,
-            vacuum_staging=_vacuum_staging,
         ).run(ctx)
 
 
@@ -367,25 +369,11 @@ def _run_prune_disappeared() -> int:
         return delete_disappeared_source_publications(conn)
 
 
-def _run_cleanup_orphan_identities() -> None:
+def _run_cleanup_orphan_identities() -> int:
     from pipeline.ingestion.common.signature_queries import delete_orphan_identities
 
     with open_tx() as conn:
-        delete_orphan_identities(conn)
-
-
-def _vacuum_staging(full: bool = False) -> None:
-    """VACUUM du staging, complet en mode `full` et simple sinon.
-
-    La normalisation vide `staging.raw_data`, un JSONB volumineux. Le VACUUM simple marque l'espace réutilisable, le VACUUM complet réécrit la table et le rend au système. Ce dernier prend un verrou exclusif sur le staging, le temps de son exécution.
-    """
-    from sqlalchemy import text
-
-    from infrastructure.db.engine import get_sync_engine
-
-    sql = "VACUUM FULL staging" if full else "VACUUM staging"
-    with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        conn.execute(text(sql))
+        return delete_orphan_identities(conn)
 
 
 def _normalize_builders(

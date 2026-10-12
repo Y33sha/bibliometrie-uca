@@ -50,7 +50,10 @@ def contexte(open_tx: FakeOpenTransaction) -> Callable[..., PhaseContext]:
 
     def fabriquer(**options: Any) -> PhaseContext:
         return PhaseContext(
-            open_tx=open_tx, logger=logging.getLogger("test"), options=RunOptions(**options)
+            open_tx=open_tx,
+            logger=logging.getLogger("test"),
+            options=RunOptions(**options),
+            maintain=lambda operation: None,
         )
 
     return fabriquer
