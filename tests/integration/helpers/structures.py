@@ -13,7 +13,7 @@ import json
 
 from sqlalchemy import Connection, text
 
-from infrastructure.pipeline.perimeter import refresh_perimeter_structures
+from pipeline.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.rows import insert_row

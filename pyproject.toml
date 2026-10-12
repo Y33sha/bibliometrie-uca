@@ -158,13 +158,13 @@ forbidden_modules = [
     "infrastructure.pipeline",
 ]
 # Verrouillage d'une règle de docs/architecture/01-vue-d-ensemble.md :
-# seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les
-# routers et autres modules sous `interfaces.api/` passent par un port
-# via `Depends(...)`.
+# seul `interfaces/api/deps.py` instancie les `Pg*` concrets et les recalculs
+# que le pipeline expose ; les routers et autres modules sous `interfaces.api/`
+# passent par un port via `Depends(...)`.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
     "interfaces.api.deps -> infrastructure.read_models.**",
-    "interfaces.api.deps -> infrastructure.pipeline.**",
+    "interfaces.api.deps -> pipeline.**",
 ]
 
 [[tool.importlinter.contracts]]

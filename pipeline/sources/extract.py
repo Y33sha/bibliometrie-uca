@@ -268,10 +268,10 @@ def build() -> Phase:
 
 def _extraction_structure_count() -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
-    from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
+    from pipeline.structures.perimeter import PerimeterQueries
 
     with open_tx() as conn:
-        return PgPerimeterStructuresQueries().count_extraction_structures(conn)
+        return PerimeterQueries().count_extraction_structures(conn)
 
 
 def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:

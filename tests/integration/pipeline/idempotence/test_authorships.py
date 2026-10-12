@@ -10,10 +10,10 @@ def _run_build_authorships(conn):
     """Exécute build_authorships sur la Connection SA de test."""
     import logging
 
-    from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+    from pipeline.publications.authorships_queries import AuthorshipsBuild
     from pipeline.publications.build_authorships import build
 
-    build(conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
+    build(conn, AuthorshipsBuild(), logging.getLogger("test"))
 
 
 def _count_authorships_tables(conn) -> dict:
@@ -65,7 +65,7 @@ class TestBuildAuthorshipsRebuildFull:
     def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
         import logging
 
-        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.authorships_queries import AuthorshipsBuild
         from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
@@ -76,7 +76,7 @@ class TestBuildAuthorshipsRebuildFull:
 
         build(
             sa_sync_conn,
-            PgAuthorshipsBuildQueries(),
+            AuthorshipsBuild(),
             logging.getLogger("test"),
             rebuild_full=True,
         )
@@ -93,7 +93,7 @@ class TestBuildAuthorshipsRebuildFull:
 
         from sqlalchemy import text
 
-        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.authorships_queries import AuthorshipsBuild
         from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
@@ -104,7 +104,7 @@ class TestBuildAuthorshipsRebuildFull:
         with caplog.at_level(logging.INFO, logger="test"):
             build(
                 sa_sync_conn,
-                PgAuthorshipsBuildQueries(),
+                AuthorshipsBuild(),
                 logging.getLogger("test"),
                 rebuild_full=True,
             )
@@ -121,7 +121,7 @@ class TestBuildAuthorshipsRebuildRollback:
 
         from sqlalchemy import text
 
-        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.authorships_queries import AuthorshipsBuild
         from pipeline.publications.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
@@ -132,9 +132,7 @@ class TestBuildAuthorshipsRebuildRollback:
         _run_build_authorships(sa_sync_conn)
 
         savepoint = sa_sync_conn.begin_nested()
-        build(
-            sa_sync_conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"), rebuild_full=True
-        )
+        build(sa_sync_conn, AuthorshipsBuild(), logging.getLogger("test"), rebuild_full=True)
         savepoint.rollback()
 
         # Le lien d'id maximal, supprimé puis recréé, reçoit un id libre.
@@ -199,12 +197,12 @@ class TestIncrementalEqualsFull:
         # Rebuild full (purge + reconstruction) sur le même état source → snapshot.
         import logging
 
-        from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+        from pipeline.publications.authorships_queries import AuthorshipsBuild
         from pipeline.publications.build_authorships import build
 
         build(
             sa_sync_conn,
-            PgAuthorshipsBuildQueries(),
+            AuthorshipsBuild(),
             logging.getLogger("test"),
             rebuild_full=True,
         )

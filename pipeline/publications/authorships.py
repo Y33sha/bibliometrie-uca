@@ -144,7 +144,6 @@ def build() -> Phase:
 
     Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée. `run_pipeline --rebuild-authorships` la purge et la reconstruit depuis zéro, en récupération.
     """
-    from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
     from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
     from pipeline.containers import (
         delete_empty_journals,
@@ -152,12 +151,13 @@ def build() -> Phase:
         delete_empty_publishers,
     )
     from pipeline.publications.address_pub_count import AddressPubCountQueries
+    from pipeline.publications.authorships_queries import AuthorshipsBuild
     from pipeline.publications.purge_orphan_publications import (
         PurgeOrphanPublicationsQueries,
     )
 
     return AuthorshipsPhase(
-        PgAuthorshipsBuildQueries(),
+        AuthorshipsBuild(),
         PurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
         AddressPubCountQueries(),

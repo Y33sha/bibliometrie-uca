@@ -17,10 +17,10 @@ from application.services.authorships.core import (
 )
 from domain.errors import NotFoundError
 from infrastructure.db.sql_fragments import REJECTED_PAIRS
-from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
-from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
-from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
+from pipeline.publications.authorships_queries import AuthorshipsBuild
+from pipeline.structures.in_perimeter import InPerimeterRecompute
+from pipeline.structures.perimeter import PerimeterQueries
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.config import set_config
@@ -44,13 +44,13 @@ _publication = partial(
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
-_AFFILIATIONS = PgAffiliationsQueries()
-_BUILD = PgAuthorshipsBuildQueries()
+_AFFILIATIONS = InPerimeterRecompute()
+_BUILD = AuthorshipsBuild()
 
 
 @pytest.fixture
 def perimeter_queries():
-    return PgPerimeterStructuresQueries()
+    return PerimeterQueries()
 
 
 @pytest.fixture
@@ -457,7 +457,7 @@ class TestPropagateUcaForAddresses:
         `perimeter_extraction` + `perimeter_structures` sont requis pour que la
         matview `source_authorship_structures` rattache les structures du périmètre.
         """
-        from infrastructure.pipeline.perimeter import refresh_perimeter_structures
+        from pipeline.structures.perimeter import refresh_perimeter_structures
 
         uca_id = insert_persons_perimeter(conn)
         set_config(conn, "perimeter_extraction", "uca")

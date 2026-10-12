@@ -2,8 +2,8 @@
 
 from functools import partial
 
-from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.read_models.structures import PgStructuresQueries
+from pipeline.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import (
     ensure_country,
     insert_address,

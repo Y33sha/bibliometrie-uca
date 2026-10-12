@@ -1,6 +1,6 @@
-"""Port : résolution des affiliations sur `source_authorships`.
+"""Port : recalcul ciblé de `in_perimeter` sur des signatures, après une édition d'adresse par l'administration.
 
-Implémenté par `infrastructure.pipeline.affiliations.in_perimeter.PgAffiliationsQueries`.
+Implémenté par `pipeline.structures.in_perimeter.InPerimeterRecompute`.
 """
 
 from typing import Protocol

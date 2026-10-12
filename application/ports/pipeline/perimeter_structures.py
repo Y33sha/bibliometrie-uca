@@ -1,6 +1,6 @@
 """Port : lecture des périmètres (ensembles de structures).
 
-Implémenté par `infrastructure.pipeline.perimeter.PgPerimeterStructuresQueries`.
+Implémenté par `pipeline.structures.perimeter.PerimeterQueries`.
 """
 
 from typing import Protocol

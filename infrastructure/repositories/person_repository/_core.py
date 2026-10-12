@@ -9,7 +9,7 @@ from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm
 from domain.persons.person import Person, PersonExclusion
 from infrastructure.db.scalars import scalar_int
-from infrastructure.pipeline.authorships.build import refresh_publications_in_perimeter
+from infrastructure.pipeline.authorships.in_perimeter import refresh_publications_in_perimeter
 
 
 def find_by_id(conn: Connection, person_id: int) -> Person | None:
