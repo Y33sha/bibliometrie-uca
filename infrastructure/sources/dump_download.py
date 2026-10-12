@@ -8,6 +8,10 @@ from __future__ import annotations
 import httpx2
 
 
+class DumpUnavailableError(Exception):
+    """Un dump de référentiel (ROR, DOAJ) est inaccessible : échec du réseau, du serveur, ou réponse inattendue."""
+
+
 class DumpDownloadError(Exception):
     """Le téléchargement d'un dump sort de ce qu'on en attend : destination imprévue ou réponse qui dépasse le plafond d'octets."""
 

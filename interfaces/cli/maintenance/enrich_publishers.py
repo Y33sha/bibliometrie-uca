@@ -12,13 +12,13 @@ from __future__ import annotations
 import argparse
 import os
 
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import publisher_repository
 from infrastructure.sources.api_params import API_BASE_URLS, OPENALEX_DELAY
 from infrastructure.sources.circuit_breaker import (
     SourceCircuitBreaker,
+    SourceUnavailableError,
     reset_current_breaker,
     set_current_breaker,
 )

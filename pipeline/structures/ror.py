@@ -7,10 +7,10 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.dump import DumpUnavailableError
-from application.ports.pipeline.ror_dump import RorDumpSource
 from application.ports.repositories.ror_repository import RorRepository
 from application.services.structures.ror import import_ror_dump
+from infrastructure.sources.dump_download import DumpUnavailableError
+from infrastructure.sources.ror.dump import ZenodoRorDumpSource
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
 
@@ -18,7 +18,7 @@ from pipeline.metrics import PhaseMetrics
 def run_refresh_ror(
     conn: Connection,
     *,
-    source: RorDumpSource,
+    source: ZenodoRorDumpSource,
     repo: RorRepository,
     logger: logging.Logger,
 ) -> PhaseMetrics:

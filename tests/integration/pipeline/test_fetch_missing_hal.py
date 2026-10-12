@@ -2,8 +2,8 @@
 
 import httpx2
 
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.sources.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication

@@ -15,11 +15,11 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
+from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
+from infrastructure.sources.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.containers.doi_prefixes import (
     DoiPrefixesQueries,
     PendingPublisherPrefix,
@@ -65,7 +65,7 @@ def run_resolve_publishers(
     publisher_repo: PublisherFindOrCreateQueries,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
-    breaker: CircuitBreaker | None = None,
+    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Détermine et attache le publisher des préfixes en attente via `/prefixes`.
 

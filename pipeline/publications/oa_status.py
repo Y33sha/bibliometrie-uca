@@ -13,8 +13,8 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.publications.metadata import decide_oa_status
+from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.context import PhaseContext
 from pipeline.libelles import (
     BRANCHE,

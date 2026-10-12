@@ -15,12 +15,12 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import NotFound, Unavailable
 from infrastructure.sources.polite_pool import build_user_agent
 from pipeline.sources.failed_lookups import forget_failed_doi_lookups
 from pipeline.sources.fetch_missing import DoiBatchResult

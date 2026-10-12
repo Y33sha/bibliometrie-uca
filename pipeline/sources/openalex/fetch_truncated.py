@@ -15,11 +15,11 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
 from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.context import PhaseContext
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme

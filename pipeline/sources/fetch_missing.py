@@ -18,11 +18,11 @@ from typing import Protocol
 import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
-from application.ports.pipeline.parallel import RunParallel
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCHABLE_SOURCES
 from domain.types import JsonValue
+from infrastructure.parallel import RunParallel
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from pipeline.context import PhaseContext
 from pipeline.fetch_pool import run_fetch_pool

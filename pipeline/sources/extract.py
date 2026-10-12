@@ -22,8 +22,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from application.ports.pipeline.parallel import RunParallel
 from domain.dates import date_to_french, today
+from infrastructure.parallel import RunParallel
 from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from pipeline.context import PhaseContext
 from pipeline.libelles import etape

@@ -13,8 +13,8 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.repositories.publisher_repository import PublisherRepository
+from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from pipeline.savepoint import rollback_unless_invalidated
 
 BATCH_SIZE = 50
@@ -70,7 +70,7 @@ def run_enrich_publishers_from_openalex(
     *,
     publisher_repo: PublisherRepository,
     fetch_batch: FetchPublishersBatch,
-    breaker: CircuitBreaker,
+    breaker: SourceCircuitBreaker,
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import httpx2
 
-from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping
 from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {

@@ -21,10 +21,10 @@ from functools import partial
 import httpx2
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
+from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.context import PhaseContext
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, branche_de_source

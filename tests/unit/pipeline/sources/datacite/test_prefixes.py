@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx2
 import pytest
 
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
+from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.sources.datacite.prefixes import (
     _parse_datacite_prefix_payload,
     fetch_datacite_prefix,

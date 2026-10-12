@@ -16,14 +16,17 @@ from pathlib import Path
 
 import httpx2
 
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
-from application.ports.pipeline.dump import DumpUnavailableError
 from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
 from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.dump_download import DumpDownloadError, write_capped
+from infrastructure.sources.circuit_breaker import SourceUnavailableError
+from infrastructure.sources.dump_download import (
+    DumpDownloadError,
+    DumpUnavailableError,
+    write_capped,
+)
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.http_status import raise_for_status
 
@@ -150,7 +153,7 @@ def _parse_relationships(cell: str) -> dict[str, frozenset[RorId]]:
 
 
 class ZenodoRorDumpSource:
-    """Implémentation de `application.ports.pipeline.ror_dump.RorDumpSource` : versions du dump publiées sur Zenodo."""
+    """Versions du dump ROR publiées sur Zenodo, et lecture de leurs organisations."""
 
     def __init__(self, *, user_agent: str, logger: logging.Logger) -> None:
         self._user_agent = user_agent
@@ -158,6 +161,7 @@ class ZenodoRorDumpSource:
         self._latest: RorDumpFile | None = None
 
     def latest_version(self) -> str:
+        """Nom de l'archive de la version la plus récente. Lève `DumpUnavailableError`."""
         try:
             self._latest = find_latest_ror_dump(user_agent=self._user_agent)
         except _UNAVAILABLE as e:
@@ -165,6 +169,7 @@ class ZenodoRorDumpSource:
         return self._latest.name
 
     def organizations(self, version: str) -> Iterator[RorOrganization]:
+        """Organisations de l'archive `version`, téléchargée le temps de la lecture. Lève `DumpUnavailableError`."""
         if self._latest is None or self._latest.name != version:
             raise DumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
         with tempfile.TemporaryDirectory() as tmp:

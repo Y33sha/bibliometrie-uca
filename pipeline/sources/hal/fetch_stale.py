@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import httpx2
 
-from application.ports.pipeline.lookup import NotFound, Unavailable
+from infrastructure.sources.lookup import NotFound, Unavailable
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.sources.hal.fetch_missing import search_one
 from pipeline.sources.hal.fields import extract_doi

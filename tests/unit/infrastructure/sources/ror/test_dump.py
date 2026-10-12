@@ -8,11 +8,10 @@ import zipfile
 import httpx2
 import pytest
 
-from application.ports.pipeline.dump import DumpUnavailableError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.dump_download import DumpDownloadError
+from infrastructure.sources.dump_download import DumpDownloadError, DumpUnavailableError
 from infrastructure.sources.ror.dump import (
     ZenodoRorDumpSource,
     fetch_ror_dump,

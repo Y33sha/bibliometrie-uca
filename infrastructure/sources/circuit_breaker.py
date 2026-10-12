@@ -2,7 +2,7 @@
 
 Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
 
-Le helper HTTP infra le manipule (check / record) ; les orchestrateurs `application/` ne consultent que l'état `tripped` via le protocole `application.ports.pipeline.circuit_breaker.CircuitBreaker` (implémenté ici). Le câblage (création, pose de la ContextVar) est fait par la composition root `run_pipeline`.
+Le client HTTP le manipule (check / record) ; les boucles du pipeline consultent seulement l'état `tripped`. Le câblage des phases le crée et le pose dans la ContextVar.
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
@@ -13,11 +13,8 @@ from __future__ import annotations
 
 from contextvars import ContextVar, Token
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
-
 DEFAULT_THRESHOLD = 10
 
-# `SourceUnavailableError` est définie au port (attrapable par `application/`) et re-exportée ici, où le helper HTTP la manipule.
 __all__ = [
     "DEFAULT_THRESHOLD",
     "SourceCircuitBreaker",
@@ -28,10 +25,21 @@ __all__ = [
 ]
 
 
-class SourceCircuitBreaker(CircuitBreaker):
-    """Compteur d'échecs consécutifs d'une source. `tripped` à `threshold`.
+class SourceUnavailableError(Exception):
+    """Une source est indisponible pour le run en cours : budget API épuisé (429) ou panne (5xx / réseau).
 
-    Implémente le port `application.ports.pipeline.circuit_breaker.CircuitBreaker`."""
+    Levée par le helper HTTP quand une requête a épuisé ses retries sur une erreur retryable, ou par le circuit-breaker quand la source cumule trop d'échecs. Les orchestrateurs l'attrapent pour sauter la source sans interrompre le run ; les items non traités repartent au run suivant (phases de rattrapage idempotentes).
+    """
+
+    def __init__(self, source: str) -> None:
+        super().__init__(
+            f"source {source} indisponible (retries épuisés ou circuit-breaker déclenché)"
+        )
+        self.source = source
+
+
+class SourceCircuitBreaker:
+    """Compteur d'échecs consécutifs d'une source. `tripped` à `threshold`."""
 
     def __init__(self, source: str, *, threshold: int = DEFAULT_THRESHOLD) -> None:
         self.source = source

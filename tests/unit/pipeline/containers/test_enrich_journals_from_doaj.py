@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
-from application.ports.pipeline.dump import DumpUnavailableError
+from infrastructure.sources.dump_download import DumpUnavailableError
 from pipeline.containers.import_journals_from_doaj_dump import (
     run_enrich_journals_from_doaj,
 )

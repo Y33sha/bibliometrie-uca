@@ -13,17 +13,17 @@ from collections.abc import Mapping
 
 import httpx2
 
-from application.ports.pipeline.lookup import (
+from domain.publications.identifiers import DoiPrefix
+from domain.types import JsonValue, as_mapping
+from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import (
     NOT_FOUND,
     UNAVAILABLE,
     LookupOutcome,
     NotFound,
     Unavailable,
 )
-from domain.publications.identifiers import DoiPrefix
-from domain.types import JsonValue, as_mapping
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.http_retry import lookup_json_async
 
 logger = logging.getLogger(__name__)
 

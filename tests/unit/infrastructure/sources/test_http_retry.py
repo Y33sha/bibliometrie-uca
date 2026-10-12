@@ -8,13 +8,13 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
-from application.ports.pipeline.lookup import NOT_FOUND, UNAVAILABLE
 from infrastructure.sources import http_retry
 from infrastructure.sources.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
     lookup_json_async,
 )
+from infrastructure.sources.lookup import NOT_FOUND, UNAVAILABLE
 
 _API_KEY = "cle-secrete-de-test"
 
