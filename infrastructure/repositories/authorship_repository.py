@@ -122,22 +122,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
 
     # ── source_authorships : lien personne ↔ signature
 
-    def link_authorship(
-        self,
-        person_id: int,
-        source: str,
-        source_authorship_id: int,
-        resolution_mode: str,
-    ) -> None:
-        self._conn.execute(
-            text(
-                "UPDATE source_authorships SET person_id = :pid, "
-                "resolution_mode = CAST(:mode AS resolution_mode) "
-                "WHERE id = :aid AND source = :src"
-            ),
-            {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
-        )
-
     def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
         return self._conn.execute(
             text("SELECT person_id FROM source_authorships WHERE id = :aid"),

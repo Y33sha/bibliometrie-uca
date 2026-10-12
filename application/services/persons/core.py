@@ -1,13 +1,10 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, plus le rattachement des authorships sources (`source_authorships`), dont le `person_id` porte le lien vers la personne. Les appelants sont la phase `persons` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
-
-Toute écriture éditoriale passe par ce service, pipeline compris (`create_person` dans la cascade). Les formes de nom dérivées, que la phase `persons` resynchronise sur tout le stock, s'écrivent en SQL ensembliste (`infrastructure/pipeline/persons/name_forms.py`), hors de ce service qui traite une personne à la fois.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même. La phase `persons` du pipeline a ses propres écritures (`pipeline/persons/person_writes.py`), sur les mêmes règles du domaine.
 """
 
 import logging
 from collections import Counter
-from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
@@ -21,10 +18,13 @@ from application.ports.repositories.person_repository import (
 )
 from application.services._merge import load_merge_pair
 from application.services.authorships.core import reject_pair
-from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
-from domain.persons.identifier_attribution import IdentifierAttribution
+from domain.errors import NotFoundError, ValidationError
+from domain.persons.identifier_attribution import (
+    AttributionOutcome,
+    IdentifierAttribution,
+    attribution_outcome,
+)
 from domain.persons.identifiers import (
-    PERSON_IDENTIFIER_TYPES,
     PUBLIC_PERSON_IDENTIFIER_TYPES,
     AttributionStatus,
     IdentifierOrigin,
@@ -34,7 +34,6 @@ from domain.persons.merge import merge_roles
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion, validated_name
 from domain.sources.registry import require_known_source
-from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -160,40 +159,13 @@ def import_rh_person(
     return RhImportOutcome.INSERTED
 
 
-# ── Rattachement / détachement authorships ──
-
-
-def link_authorship(
-    person_id: int,
-    source: str,
-    source_authorship_id: int,
-    *,
-    repo: AuthorshipRepository,
-    resolution_mode: str,
-) -> None:
-    """Rattache une signature source à une personne (pipeline), en marquant le canal. Lève `ValidationError` sur une source hors registre."""
-    require_known_source(source)
-    repo.link_authorship(person_id, source, source_authorship_id, resolution_mode)
-
-
 # ── Identifiants ──
 
 
-class AddIdentifierOutcome(StrEnum):
-    """Issue de la cascade de décision d'`add_identifier`.
-
-    L'appelant (API) traduit l'issue en réponse ; un conflit lève `CannotAttributeConflict` (hors énumération).
-    """
-
-    ADDED = "added"  # insertion en `pending`
-    ALREADY_EXISTS = "already_exists"  # déjà porté par cette personne (no-op)
-    REASSIGNED = "reassigned"  # repris d'une autre personne (était `rejected`)
-
-
 class AddIdentifierResult(NamedTuple):
-    """Retour d'`add_identifier` : l'issue de la cascade et la valeur canonique normalisée, que l'appelant ré-affiche sans re-normaliser."""
+    """Retour d'`add_identifier` : l'issue de l'attribution et la valeur normalisée, que l'appelant affiche sans la normaliser de nouveau."""
 
-    outcome: AddIdentifierOutcome
+    outcome: AttributionOutcome
     id_value: str
 
 
@@ -202,7 +174,7 @@ def _identifiant_ajoute(
     person_id: int,
     id_type: str,
     id_value: str,
-    outcome: AddIdentifierOutcome,
+    outcome: AttributionOutcome,
 ) -> AddIdentifierResult:
     """Consigne l'attribution d'un identifiant, et rend l'issue à l'appelant."""
     emit_event(
@@ -226,17 +198,7 @@ def add_identifier(
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
-    Charge l'éventuel `IdentifierAttribution` existant pour `(id_type, id_value)`
-    et dispatche, en renvoyant l'issue (`AddIdentifierResult`) :
-
-    - **absent** → insertion en `pending` (`ADDED`)
-    - **existant sur cette personne** → idempotent, no-op (`ALREADY_EXISTS`)
-    - **existant sur autre personne en `rejected`** → réattribution
-      (statut → `pending`, via `IdentifierAttribution.reattribute_to` ; `REASSIGNED`)
-    - **existant sur autre personne en `pending` ou `confirmed`** →
-      lève `CannotAttributeConflict`. Pour réattribuer, le statut
-      existant doit d'abord être passé à `rejected` (via
-      `update_identifier_status` ou `reassign_identifier`).
+    L'issue suit la règle du domaine (`attribution_outcome`) : insertion en `pending`, rien à faire, ou reprise d'un identifiant rejeté chez une autre personne. Elle lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
 
     La valeur est validée et normalisée via le value object du type
     (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
@@ -260,40 +222,26 @@ def add_identifier(
             raise NotFoundError(f"Personne {person_id} introuvable")
     id_value = normalized_identifier_value(id_type, id_value)
     existing = repo.find_identifier(id_type, id_value)
+    outcome = attribution_outcome(existing, person_id)
 
-    if existing is None:
-        ident = IdentifierAttribution(
-            id=None,
-            person_id=person_id,
-            id_type=id_type,
-            id_value=id_value,
-            status=AttributionStatus.PENDING,
-            source=source,
-        )
-        repo.insert_identifier(ident)
-        return _identifiant_ajoute(
-            audit_repo, person_id, id_type, id_value, AddIdentifierOutcome.ADDED
-        )
-
-    if existing.person_id == person_id:
+    if outcome is AttributionOutcome.ALREADY_EXISTS:
         # Rien n'a changé : l'appel est idempotent, aucune décision n'a été prise.
-        return AddIdentifierResult(AddIdentifierOutcome.ALREADY_EXISTS, id_value)
-
-    if existing.status is AttributionStatus.REJECTED:
+        return AddIdentifierResult(outcome, id_value)
+    if existing is None:
+        repo.insert_identifier(
+            IdentifierAttribution(
+                id=None,
+                person_id=person_id,
+                id_type=id_type,
+                id_value=id_value,
+                status=AttributionStatus.PENDING,
+                source=source,
+            )
+        )
+    else:
         existing.reattribute_to(person_id, source=source)
         repo.update_identifier(existing)
-        return _identifiant_ajoute(
-            audit_repo, person_id, id_type, id_value, AddIdentifierOutcome.REASSIGNED
-        )
-
-    raise CannotAttributeConflict(
-        f"Identifiant {id_type}={id_value!r} déjà attribué à person_id={existing.person_id} "
-        f"avec statut {existing.status.value!r} ; impossible d'attribuer à person_id={person_id}.",
-        id_type=id_type,
-        id_value=id_value,
-        existing_person_id=existing.person_id,
-        existing_status=existing.status.value,
-    )
+    return _identifiant_ajoute(audit_repo, person_id, id_type, id_value, outcome)
 
 
 class IdentifierStatusResult(NamedTuple):
@@ -372,53 +320,6 @@ def authenticate_orcids(
     """
     repo.begin_authenticated_orcid_import()
     return Counter(repo.authenticate_orcid(person_id, orcid) for person_id, orcid in entries)
-
-
-class IdentifierConflict(NamedTuple):
-    """Conflit d'attribution détecté sur le snapshot (`detect_identifier_conflicts`) : une valeur d'identifiant portée par une signature du candidat est déjà attribuée à un autre propriétaire.
-
-    Arbitré avant la cascade par le consensus des porteurs (canal identifiant ordre-indépendant) : la valeur est transférée au candidat si le consensus le désigne face au propriétaire. `owner_status` distingue le `pending` (transférable) du `confirmed` (verrou admin, jamais transféré)."""
-
-    id_type: str
-    id_value: str
-    candidate_person_id: int
-    owner_person_id: int
-    owner_status: str
-
-
-def add_identifiers_from_authorships(
-    person_id: int,
-    authorships: Sequence[Mapping[str, JsonValue]],
-    *,
-    repo: PersonRepository,
-) -> None:
-    """Promotion en batch : pour chaque authorship source, donnée par ses identifiants observés `{id_type: valeur}`, extrait les identifiants et délègue à `add_identifier` qui dispatche selon l'état existant en base.
-
-    Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
-
-    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`. La `source` enregistrée garde sa valeur par défaut (`IdentifierOrigin.AUTO`).
-    """
-    seen: set[tuple[str, str]] = set()
-    for a in authorships:
-        for id_type in PERSON_IDENTIFIER_TYPES:
-            raw = a.get(id_type)
-            if not raw:
-                continue
-            # Cible `person_identifiers` = text ; `hal_person_id` arrive en int,
-            # les autres en str — `str()` couvre les deux.
-            value = str(raw)
-            if (id_type, value) in seen:
-                continue
-            seen.add((id_type, value))
-            try:
-                add_identifier(person_id, id_type, value, repo=repo)
-            except CannotAttributeConflict as exc:
-                # Valeur déjà prise par une autre personne : on n'écrase pas. Le conflit est
-                # tranché par le balayage frontal de la phase (arbitrage par consensus) au run
-                # suivant — inutile de le collecter ici, et de le porter au journal.
-                logger.debug("%s", exc)
-            except ValidationError:
-                logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
 
 # ── Formes de noms ──

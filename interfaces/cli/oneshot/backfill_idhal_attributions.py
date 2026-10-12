@@ -15,12 +15,11 @@ import os
 
 from sqlalchemy import Connection, text
 
-from application.services.persons.core import add_identifiers_from_authorships
 from domain.persons.identifiers import PersonIdentifierType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.sql_fragments import identifier_neutralized
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import person_repository
+from pipeline.persons.person_writes import PersonWrites, add_identifiers_from_authorships
 
 log = setup_logger("backfill_idhal_attributions", os.path.dirname(__file__))
 
@@ -79,9 +78,9 @@ def main() -> int:
             log.info("DRY-RUN terminé — aucune écriture")
             return 0
         before = _count_idhal(conn)
-        repo = person_repository(conn)
+        writes = PersonWrites(conn)
         for person_id, value in pairs:
-            add_identifiers_from_authorships(person_id, [{_IDHAL: value}], repo=repo)
+            add_identifiers_from_authorships(person_id, [{_IDHAL: value}], writes=writes)
         conn.commit()
         log.info("✓ %d idHAL attribués", _count_idhal(conn) - before)
     return 0

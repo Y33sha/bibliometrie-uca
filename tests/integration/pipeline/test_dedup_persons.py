@@ -22,10 +22,11 @@ from functools import partial
 from sqlalchemy import text
 
 from application.services.persons.core import add_name_form, create_person
-from infrastructure.repositories import authorship_repository, person_repository
+from infrastructure.repositories import person_repository
 from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.persons.cascade import run_cascade
 from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.person_writes import PersonWrites
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,
@@ -105,11 +106,8 @@ def _get_person_identifiers(conn, person_id):
 
 
 def _run_cascade(conn):
-    repo = person_repository(conn)
-    arbitrate_identifier_conflicts(conn, _queries, _logger, person_repo=repo)
-    run_cascade(
-        conn, _queries, _logger, person_repo=repo, authorship_repo=authorship_repository(conn)
-    )
+    arbitrate_identifier_conflicts(conn, _queries, _logger, writes=PersonWrites(conn))
+    run_cascade(conn, _queries, _logger, writes=PersonWrites(conn))
 
 
 # ── Scénarios ────────────────────────────────────────────────────
@@ -517,14 +515,12 @@ class TestCascadeRun:
         sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
         orphan = _insert_authorship(sa_sync_conn, "openalex", sd, "J Dupont")
 
-        repo = person_repository(sa_sync_conn)
         with caplog.at_level(logging.INFO, logger="test_orphelines"):
             run_cascade(
                 sa_sync_conn,
                 _queries,
                 _logger,
-                person_repo=repo,
-                authorship_repo=authorship_repository(sa_sync_conn),
+                writes=PersonWrites(sa_sync_conn),
                 orphans_log=logging.getLogger("test_orphelines"),
             )
 

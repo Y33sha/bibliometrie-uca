@@ -14,10 +14,10 @@ import logging
 
 from sqlalchemy import text
 
-from infrastructure.repositories import authorship_repository, person_repository
 from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.persons.cascade import run_cascade
 from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.person_writes import PersonWrites
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -51,9 +51,9 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
 
 def _run(conn):
     """Arbitrage des conflits d'identifiant (transfert par consensus) puis la cascade."""
-    q, repo = PersonsMatchingQueries(), person_repository(conn)
-    arbitrate_identifier_conflicts(conn, q, _LOG, person_repo=repo)
-    run_cascade(conn, q, _LOG, person_repo=repo, authorship_repo=authorship_repository(conn))
+    q = PersonsMatchingQueries()
+    arbitrate_identifier_conflicts(conn, q, _LOG, writes=PersonWrites(conn))
+    run_cascade(conn, q, _LOG, writes=PersonWrites(conn))
 
 
 def _idref_owner_name(conn, idref):

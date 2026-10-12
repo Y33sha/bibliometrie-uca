@@ -23,8 +23,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.authorship_repository import AuthorshipRepository
-from application.ports.repositories.person_repository import PersonRepository
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
 from pipeline.context import Phase, PhaseContext
@@ -35,6 +33,7 @@ from pipeline.persons.cascade import run_cascade
 from pipeline.persons.matching import PersonsMatchingQueries
 from pipeline.persons.metrics import build_metrics
 from pipeline.persons.name_forms import PersonNameFormsQueries
+from pipeline.persons.person_writes import PersonWrites
 from pipeline.persons.populate_person_name_forms import populate
 from pipeline.persons.purge import purge
 from pipeline.progression import attente
@@ -44,8 +43,7 @@ from pipeline.progression import attente
 class PersonsPhase:
     persons_queries: PersonsMatchingQueries
     name_forms_queries: PersonNameFormsQueries
-    person_repo_factory: Callable[[Connection], PersonRepository]
-    authorship_repo_factory: Callable[[Connection], AuthorshipRepository]
+    writes_factory: Callable[[Connection], PersonWrites]
     orphans_log: logging.Logger | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -55,22 +53,20 @@ class PersonsPhase:
         """
         persons_queries, logger = self.persons_queries, ctx.logger
         with ctx.open_tx() as conn:
-            person_repo = self.person_repo_factory(conn)
-            authorship_repo = self.authorship_repo_factory(conn)
+            writes = self.writes_factory(conn)
 
             n_enforced = persons_queries.enforce_confirmed_authorships(conn)
             if n_enforced:
                 logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
             arbitration = arbitrate_identifier_conflicts(
-                conn, persons_queries, logger, person_repo=person_repo
+                conn, persons_queries, logger, writes=writes
             )
             cascade_result = run_cascade(
                 conn,
                 persons_queries,
                 logger,
-                person_repo=person_repo,
-                authorship_repo=authorship_repo,
+                writes=writes,
                 orphans_log=self.orphans_log,
             )
 
@@ -106,14 +102,12 @@ def build() -> Phase:
 
     Une seule transaction enchaîne : la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues, la création des personnes pour les signatures restantes, la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées. Les publications hors scope sont écartées (`domain/publications/scope`).
     """
-    from infrastructure.repositories import authorship_repository, person_repository
     from pipeline.persons.matching import PersonsMatchingQueries
     from pipeline.persons.name_forms import PersonNameFormsQueries
 
     return PersonsPhase(
         PersonsMatchingQueries(),
         PersonNameFormsQueries(),
-        person_repo_factory=person_repository,
-        authorship_repo_factory=authorship_repository,
+        writes_factory=PersonWrites,
         orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
     )

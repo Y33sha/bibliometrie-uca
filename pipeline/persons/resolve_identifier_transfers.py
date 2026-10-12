@@ -10,12 +10,11 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.person_repository import PersonRepository
-from application.services.persons.core import IdentifierConflict
 from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, forme, rien_a_faire
 from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.persons.person_writes import IdentifierConflict, PersonWrites
 from pipeline.persons.requalify_identifiers import IdentifierConsensus
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.
@@ -53,7 +52,7 @@ def resolve_identifier_transfers(
     *,
     consensus: IdentifierConsensus,
     queries: PersonsMatchingQueries,
-    repo: PersonRepository,
+    writes: PersonWrites,
     logger: logging.Logger,
 ) -> dict[str, int]:
     """Arbitre les conflits d'attribution collectés et transfère les identifiants captés, d'après le `consensus` des valeurs d'identifiant (`compute_identifier_consensus`).
@@ -95,11 +94,11 @@ def resolve_identifier_transfers(
             continue  # aucun candidat du consensus, ou ambiguïté → triage manuel
         target = matching[0]
         id_type, id_value = key
-        ident = repo.find_identifier(id_type, id_value)
+        ident = writes.find_identifier(id_type, id_value)
         if ident is None or ident.person_id != owner_id:
             continue  # l'état a changé entre la collecte et la résolution
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
-        repo.update_identifier(ident)
+        writes.update_identifier(ident)
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
         logger.info(

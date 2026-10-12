@@ -3,7 +3,11 @@
 import pytest
 
 from domain.errors import CannotAttributeConflict
-from domain.persons.identifier_attribution import IdentifierAttribution
+from domain.persons.identifier_attribution import (
+    AttributionOutcome,
+    IdentifierAttribution,
+    attribution_outcome,
+)
 from domain.persons.identifiers import AttributionStatus
 
 
@@ -73,3 +77,22 @@ class TestTransferTo:
             ident.transfer_to(99, source="auto")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.REJECTED
+
+
+class TestAttributionOutcome:
+    def test_absent_identifier_is_added(self):
+        assert attribution_outcome(None, 10) is AttributionOutcome.ADDED
+
+    def test_identifier_of_the_same_person_already_exists(self):
+        assert attribution_outcome(_make(), 10) is AttributionOutcome.ALREADY_EXISTS
+
+    def test_identifier_rejected_elsewhere_is_reassigned(self):
+        rejected = _make(status=AttributionStatus.REJECTED)
+        assert attribution_outcome(rejected, 99) is AttributionOutcome.REASSIGNED
+
+    @pytest.mark.parametrize("status", [AttributionStatus.PENDING, AttributionStatus.CONFIRMED])
+    def test_identifier_held_elsewhere_is_a_conflict(self, status):
+        with pytest.raises(CannotAttributeConflict) as exc:
+            attribution_outcome(_make(status=status), 99)
+        assert exc.value.existing_person_id == 10
+        assert exc.value.existing_status == status.value

@@ -29,12 +29,6 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.authorship_repository import AuthorshipRepository
-from application.ports.repositories.person_repository import PersonRepository
-from application.services.persons.core import (
-    add_identifiers_from_authorships as add_identifiers,
-    link_authorship,
-)
 from domain.normalize import normalize_name
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import (
@@ -64,6 +58,10 @@ from pipeline.persons.loading import (
 )
 from pipeline.persons.matching import PersonsMatchingQueries
 from pipeline.persons.metrics import CascadeResult, log_matching_breakdown
+from pipeline.persons.person_writes import (
+    PersonWrites,
+    add_identifiers_from_authorships as add_identifiers,
+)
 from pipeline.progression import attente, progression
 
 # ---------------------------------------------------------------------------
@@ -82,12 +80,10 @@ class _Cascade:
         conn: Connection,
         queries: PersonsMatchingQueries,
         *,
-        person_repo: PersonRepository,
-        authorship_repo: AuthorshipRepository,
+        writes: PersonWrites,
         conflicting: frozenset[int] = frozenset(),
     ) -> None:
-        self._person_repo = person_repo
-        self._authorship_repo = authorship_repo
+        self._writes = writes
 
         in_perimeter = get_all_unlinked_authorships(conn, queries)
         out_of_perimeter = get_out_of_perimeter_candidates(conn, queries)
@@ -263,15 +259,14 @@ class _Cascade:
             self.resolved_cross_source_ids.add(a.source_authorship_id)
             if reason == "cross_source" and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
-        link_authorship(
+        self._writes.link_authorship(
             pid,
             a.source,
             a.source_authorship_id,
-            repo=self._authorship_repo,
-            resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
+            RESOLUTION_MODE_BY_REASON[reason],
         )
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
-        add_identifiers(pid, [a.identifiers], repo=self._person_repo)
+        add_identifiers(pid, [a.identifiers], writes=self._writes)
         self._complete_first_name(pid, a)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
@@ -288,15 +283,14 @@ class _Cascade:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.source_authorship_id)
         last, first = validated_name(a.last_name or a.name.display(), a.first_name or "")
-        marker = self._person_repo.create(last, first)
-        link_authorship(
+        marker = self._writes.create(last, first)
+        self._writes.link_authorship(
             marker,
             a.source,
             a.source_authorship_id,
-            repo=self._authorship_repo,
-            resolution_mode="name",
+            "name",
         )
-        add_identifiers(marker, [a.identifiers], repo=self._person_repo)
+        add_identifiers(marker, [a.identifiers], writes=self._writes)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
         if a.publication_id is not None:
@@ -335,7 +329,7 @@ class _Cascade:
             or not initials_extend(initials, first_name)
         ):
             return
-        self._person_repo.update_name(pid, *validated_name(namesake.last_name, first_name))
+        self._writes.update_name(pid, *validated_name(namesake.last_name, first_name))
         self._index_namesake(namesake._replace(first_name=first_name))
         self.first_names_completed += 1
 
@@ -360,8 +354,7 @@ def run_cascade(
     queries: PersonsMatchingQueries,
     logger: logging.Logger,
     *,
-    person_repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
+    writes: PersonWrites,
     orphans_log: logging.Logger | None = None,
 ) -> CascadeResult:
     """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
@@ -373,7 +366,7 @@ def run_cascade(
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
     etape(logger, "Identification des personnes")
-    completion = complete_reduced_first_names(conn, queries, person_repo=person_repo)
+    completion = complete_reduced_first_names(conn, queries, writes=writes)
     logger.info(
         "%s%s d'après les signatures",
         BRANCHE,
@@ -385,8 +378,7 @@ def run_cascade(
         c = _Cascade(
             conn,
             queries,
-            person_repo=person_repo,
-            authorship_repo=authorship_repo,
+            writes=writes,
             conflicting=completion.conflicting,
         )
         c.first_names_completed = completion.completed
