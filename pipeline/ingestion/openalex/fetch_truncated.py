@@ -19,10 +19,10 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
-from pipeline.ingestion.http.access_source import SourcePhase
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
+from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -138,4 +138,4 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 def build() -> Phase:
     """Relit les works OpenAlex tronqués à 100 auteurs, par l'accès à OpenAlex."""
 
-    return SourcePhase("openalex", "fetch_truncated", FetchTruncatedPhase())
+    return NodePhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase())
