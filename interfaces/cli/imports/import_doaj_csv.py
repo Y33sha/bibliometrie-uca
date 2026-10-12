@@ -19,8 +19,8 @@ from pipeline.containers.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
 from pipeline.containers.journals import JournalGatewayQueries
+from pipeline.ingestion.doaj import read_doaj_dump_rows
 from pipeline.libelles import accord
-from pipeline.sources.doaj import read_doaj_dump_rows
 
 log = setup_logger("import_doaj_csv", os.path.dirname(__file__))
 

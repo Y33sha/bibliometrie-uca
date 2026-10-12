@@ -39,6 +39,8 @@ from pipeline.containers import publishers_journals, resolve_ra
 from pipeline.context import Phase, RunOptions
 from pipeline.exception_chain import failure_message, is_user_interruption
 from pipeline.execution import log, open_tx, phase_context
+from pipeline.ingestion import extract, fetch_missing, fetch_stale, normalize
+from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.libelles import accord
 from pipeline.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.metrics import PhaseMetrics
@@ -55,8 +57,6 @@ from pipeline.publications import (
     subjects,
 )
 from pipeline.signals import select_targets
-from pipeline.sources import extract, fetch_missing, fetch_stale, normalize
-from pipeline.sources.openalex import fetch_truncated
 from pipeline.structures import affiliations, countries
 
 set_console_writer(ecrire_hors_barre)

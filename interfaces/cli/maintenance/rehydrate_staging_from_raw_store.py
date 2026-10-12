@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Réhydrate `staging.raw_data` depuis le raw store, pour renormaliser une source.
 
-Opération inverse de `mark_done` (`pipeline/sources/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
+Opération inverse de `mark_done` (`pipeline/ingestion/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
 
 Pour chaque source demandée, parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash` recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant), `processed = FALSE`.
 
@@ -33,15 +33,15 @@ from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from pipeline.sources.hal.fields import extract_doi as hal_extract_doi
-from pipeline.sources.openalex.fields import extract_doi as openalex_extract_doi
-from pipeline.sources.scanr.fields import extract_doi as scanr_extract_doi
-from pipeline.sources.staging import (
+from pipeline.ingestion.hal.fields import extract_doi as hal_extract_doi
+from pipeline.ingestion.openalex.fields import extract_doi as openalex_extract_doi
+from pipeline.ingestion.scanr.fields import extract_doi as scanr_extract_doi
+from pipeline.ingestion.staging import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )
-from pipeline.sources.theses.fields import extract_doi as theses_extract_doi
-from pipeline.sources.wos.fields import extract_doi as wos_extract_doi
+from pipeline.ingestion.theses.fields import extract_doi as theses_extract_doi
+from pipeline.ingestion.wos.fields import extract_doi as wos_extract_doi
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
 

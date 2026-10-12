@@ -11,9 +11,9 @@ from unittest.mock import patch
 
 from pipeline.context import RunOptions
 from pipeline.execution import phase_context
+from pipeline.ingestion import extract
+from pipeline.ingestion.harvest import ExtractionConfigError
 from pipeline.metrics import PhaseMetrics
-from pipeline.sources import extract
-from pipeline.sources.harvest import ExtractionConfigError
 
 
 def _table_keys(metrics: PhaseMetrics) -> set[str]:

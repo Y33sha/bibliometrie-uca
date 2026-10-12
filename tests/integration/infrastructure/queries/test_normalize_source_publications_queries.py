@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `pipeline.sources.source_publications`."""
+"""Tests d'intégration pour `pipeline.ingestion.source_publications`."""
 
 from functools import partial
 
 from sqlalchemy import text
 
-from pipeline.sources.source_publications import SourcePublicationQueries, SourcePublicationUpsert
+from pipeline.ingestion.source_publications import SourcePublicationQueries, SourcePublicationUpsert
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».

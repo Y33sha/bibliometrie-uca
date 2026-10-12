@@ -1,6 +1,6 @@
 """Empreinte de changement d'une ligne d'export WoS : indifférente à la date d'export et aux compteurs d'usage, sensible à la notice."""
 
-from pipeline.sources.change_detection import change_detection_hash
+from pipeline.ingestion.change_detection import change_detection_hash
 
 _ROW = {"UT": "WOS:1", "TI": "Un titre", "TC": "3", "DA": "2026-10-07", "U1": "2", "U2": "5"}
 

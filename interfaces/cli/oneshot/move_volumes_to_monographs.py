@@ -43,12 +43,12 @@ from infrastructure.raw_store.factory import get_raw_store
 from pipeline.containers.containers import ContainerGatewayQueries
 from pipeline.containers.find_or_create import Containers, find_or_create_containers
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.sources.crossref import normalize as normalize_crossref
-from pipeline.sources.datacite import normalize as normalize_datacite
-from pipeline.sources.hal import normalize as normalize_hal
-from pipeline.sources.openalex import normalize as normalize_openalex
-from pipeline.sources.scanr import normalize as normalize_scanr
-from pipeline.sources.wos import normalize as normalize_wos
+from pipeline.ingestion.crossref import normalize as normalize_crossref
+from pipeline.ingestion.datacite import normalize as normalize_datacite
+from pipeline.ingestion.hal import normalize as normalize_hal
+from pipeline.ingestion.openalex import normalize as normalize_openalex
+from pipeline.ingestion.scanr import normalize as normalize_scanr
+from pipeline.ingestion.wos import normalize as normalize_wos
 
 log = setup_logger("move_volumes_to_monographs", os.path.dirname(__file__))
 

@@ -1,10 +1,10 @@
-"""Recherches dans HAL de la phase `fetch_missing` : sélection des identifiants, requête Solr (`pipeline.sources.hal.fetch_missing`)."""
+"""Recherches dans HAL de la phase `fetch_missing` : sélection des identifiants, requête Solr (`pipeline.ingestion.hal.fetch_missing`)."""
 
 import httpx2
 
-from pipeline.sources.api_params import API_BASE_URLS
-from pipeline.sources.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
-from pipeline.sources.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.ingestion.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
+from pipeline.ingestion.http.api_params import API_BASE_URLS
+from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging

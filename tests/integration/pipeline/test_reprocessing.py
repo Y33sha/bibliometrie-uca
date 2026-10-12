@@ -52,12 +52,12 @@ def _run_normalize_hal(conn):
 
     from pipeline.containers.containers import ContainerGatewayQueries
     from pipeline.containers.publishers import PublisherGatewayQueries
-    from pipeline.sources.hal.normalize import process_work
-    from pipeline.sources.signature_queries import AuthorshipsBatchQueries
-    from pipeline.sources.source_publications import (
+    from pipeline.ingestion.hal.normalize import process_work
+    from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
+    from pipeline.ingestion.source_publications import (
         SourcePublicationQueries,
     )
-    from pipeline.sources.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.staging import StagingQueries, StagingRow
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()

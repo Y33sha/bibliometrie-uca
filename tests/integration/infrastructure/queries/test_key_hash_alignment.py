@@ -5,7 +5,7 @@ Un désalignement ferait échouer silencieusement la résolution d'identité par
 
 from sqlalchemy import text
 
-from pipeline.sources.signature_queries import IDENTITY_KEY_COLUMNS, key_hash_sql
+from pipeline.ingestion.signature_queries import IDENTITY_KEY_COLUMNS, key_hash_sql
 
 
 def test_key_hash_sql_matches_generated_column(sa_sync_conn):

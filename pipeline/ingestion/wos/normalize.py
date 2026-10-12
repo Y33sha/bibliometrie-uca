@@ -1,0 +1,723 @@
+"""Normalisation des données WoS : staging → tables normalisées."""
+
+import logging
+from collections.abc import Mapping, Sequence
+from functools import partial
+
+from sqlalchemy import Connection
+
+from domain.journals.containers import ContainerDescription
+from domain.journals.issns import source_issns
+from domain.normalize import normalize_text
+from domain.persons.identifiers import compact_identifiers
+from domain.persons.signature_name import SignatureName
+from domain.publications.authorship_roles import map_role
+from domain.publications.identifiers import clean_doi, find_isbns
+from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.impact import Impact
+from domain.sources.wos import (
+    derive_wos_api_oa_status,
+    is_wos_author_exploitable,
+    parse_export_addresses,
+    parse_export_corresponding,
+    parse_export_researcher_ids,
+    split_export_list,
+)
+from domain.structures.identifiers import parse_ror_ids
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
+from pipeline.ingestion.normalize import BibliographicNormalizer
+from pipeline.ingestion.pub_metadata import PublicationMetadata
+from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.signatures import (
+    AddressRecord,
+    AuthorBlock,
+    AuthorRecord,
+    SignatureSyncSettings,
+    sync_source_authorships,
+)
+from pipeline.ingestion.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationUpsert,
+)
+from pipeline.ingestion.staging import StagingQueries, StagingRow
+
+# =============================================================
+# UTILITAIRES
+# =============================================================
+
+
+def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
+    """Suite de valeurs portée par `obj` : l'API rend un objet seul là où elle annonce une liste."""
+    if obj is None:
+        return []
+    if isinstance(obj, str | Mapping):
+        return [obj]
+    if isinstance(obj, Sequence):
+        return obj
+    return [obj]
+
+
+def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | None:
+    """Extrait un titre depuis la structure API."""
+    titles = at_path(static, "summary", "titles")
+    title_list = _safe_list(titles.get("title"))
+    for entree in title_list:
+        t = as_mapping(entree)
+        if as_str(t.get("type")) == title_type:
+            return as_str(t.get("content"))
+    return None
+
+
+def _parse_api_authors(
+    static: Mapping[str, JsonValue], dynamic: Mapping[str, JsonValue]
+) -> list[dict[str, JsonValue]]:
+    """Extrait les auteurs depuis le format API."""
+    names_data = at_path(static, "summary", "names")
+    name_list = _safe_list(names_data.get("name"))
+
+    # Adresses pour le matching
+    addresses_data = at_path(static, "fullrecord_metadata", "addresses")
+    addr_list = _safe_list(addresses_data.get("address_name"))
+    addr_map: dict[str, str] = {}  # addr_no -> full_address
+    addr_orgs_map: dict[str, list[dict[str, JsonValue]]] = {}  # addr_no -> [{name, ror_id, pref}]
+    for addr_entry in addr_list:
+        spec = at_path(addr_entry, "address_spec")
+        addr_no = spec.get("addr_no")
+        if addr_no is not None:
+            addr_map[str(addr_no)] = as_str(spec.get("full_address")) or ""
+            # Organizations structurées
+            org_list = _safe_list(at_path(spec, "organizations").get("organization"))
+            orgs: list[dict[str, JsonValue]] = []
+            for entree in org_list:
+                o = as_mapping(entree)
+                if nom := as_str(o.get("content")):
+                    orgs.append({"name": nom, "ror_id": o.get("ror_id"), "pref": o.get("pref")})
+            if orgs:
+                addr_orgs_map[str(addr_no)] = orgs
+
+    authors: list[dict[str, JsonValue]] = []
+    for entree in name_list:
+        name_obj = as_mapping(entree)
+        wos_role = as_str(name_obj.get("role"))
+        if not wos_role:
+            continue
+
+        full_name = as_str(name_obj.get("display_name")) or as_str(name_obj.get("full_name")) or ""
+        last_name = as_str(name_obj.get("last_name"))
+        first_name = as_str(name_obj.get("first_name"))
+        seq_no = as_int(name_obj.get("seq_no")) or as_str(name_obj.get("seq_no"))
+        position = int(seq_no) - 1 if seq_no else 0
+
+        daisng = name_obj.get("daisng_id")
+        daisng_id = str(daisng) if daisng else None
+        researcher_id = as_str(name_obj.get("r_id"))
+
+        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un faux signal de matching).
+        # Les ORCID fiables viennent des sources à dépôt auteur (`ORCID_MATCH_SOURCES`).
+
+        is_corresponding = as_str(name_obj.get("reprint")) == "Y"
+
+        # Affiliations via addr_no
+        addr_nos = name_obj.get("addr_no")
+        raw_affiliation = None
+        individual_addresses: list[str] = []
+        author_orgs: list[dict[str, JsonValue]] = []
+        if addr_nos:
+            addr_no_list = str(addr_nos).split()
+            affils = [addr_map[a] for a in addr_no_list if a in addr_map]
+            individual_addresses = [a.strip() for a in affils if a.strip()]
+            if affils:
+                raw_affiliation = " | ".join(affils)
+            # Collecter les organizations de cet auteur
+            seen_org_names = set()
+            for a_no in addr_no_list:
+                for org in addr_orgs_map.get(a_no, []):
+                    nom = as_str(org["name"])
+                    if nom and nom not in seen_org_names:
+                        author_orgs.append(org)
+                        seen_org_names.add(nom)
+
+        roles, is_corresponding_from_role = map_role("wos", wos_role)
+        is_corresponding = is_corresponding or is_corresponding_from_role
+
+        authors.append(
+            {
+                "position": position,
+                "full_name": full_name.strip(),
+                "last_name": last_name,
+                "first_name": first_name,
+                "researcher_id": researcher_id,
+                "daisng_id": daisng_id,
+                "is_corresponding": is_corresponding,
+                "raw_affiliation": raw_affiliation,
+                "addresses": individual_addresses,
+                "organizations": author_orgs,
+                "roles": roles,
+            }
+        )
+
+    return authors
+
+
+def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
+    """Extrait le DOI depuis la structure API."""
+    try:
+        identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
+        for ident in _safe_list(identifiers):
+            if isinstance(ident, dict) and ident.get("type") == "doi":
+                return clean_doi(str(ident.get("value", "")))
+    except (KeyError, TypeError):
+        pass
+    return None
+
+
+def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> str | None:
+    """Extrait l'ISSN ou eISSN depuis la structure API."""
+    try:
+        identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
+        for ident in _safe_list(identifiers):
+            if isinstance(ident, dict) and ident.get("type") == issn_type:
+                return str(ident.get("value", "")).strip() or None
+    except (KeyError, TypeError):
+        pass
+    return None
+
+
+def _get_api_isbns(dynamic: Mapping[str, JsonValue], isbn_type: str) -> list[str]:
+    """ISBN d'un support (`isbn` papier, `eisbn` électronique), que WoS distingue par le type de l'identifiant."""
+    identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
+    isbns: list[str] = []
+    for entree in _safe_list(identifiers):
+        ident = as_mapping(entree)
+        if as_str(ident.get("type")) == isbn_type:
+            isbns += find_isbns(as_str(ident.get("value")))
+    return list(dict.fromkeys(isbns))
+
+
+def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:  # noqa: C901
+    """Extrait un record structuré depuis le format API."""
+    static = at_path(raw, "static_data")
+    dynamic = at_path(raw, "dynamic_data")
+    summary = at_path(static, "summary")
+    pub_info = at_path(summary, "pub_info")
+
+    doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
+    title = _get_api_title(static, "item") or "(sans titre)"
+
+    pub_year = as_int(pub_info.get("pubyear"))
+    if pub_year is None and (py := as_str(pub_info.get("pubyear"))):
+        try:
+            pub_year = int(py)
+        except ValueError:
+            pass
+
+    # Doc type
+    doctypes = at_path(summary, "doctypes")
+    doctype_list = _safe_list(doctypes.get("doctype"))
+    raw_doc_type = None
+    if doctype_list:
+        premier = doctype_list[0]
+        raw_doc_type = as_str(as_mapping(premier).get("content")) or as_str(premier)
+
+    # Publisher
+    publishers = at_path(summary, "publishers")
+    pub_data = at_path(publishers, "publisher")
+    pub_names = at_path(pub_data, "names")
+    noms = _safe_list(pub_names.get("name"))
+    pub_name_obj = as_mapping(noms[0]) if noms else {}
+    publisher_name = as_str(pub_name_obj.get("unified_name")) or as_str(
+        pub_name_obj.get("full_name")
+    )
+
+    # Journal
+    journal_title = _get_api_title(static, "source")
+
+    oa_status = derive_wos_api_oa_status(as_str(pub_info.get("journal_oas_gold")))
+
+    # Language
+    lang_data = at_path(static, "fullrecord_metadata", "languages")
+    lang_list = _safe_list(lang_data.get("language"))
+    language = None
+    if lang_list:
+        language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
+
+    # Biblio
+    page = at_path(pub_info, "page")
+    if isinstance(page, str):
+        page = {}
+    biblio: dict[str, JsonValue] = {}
+    vol = pub_info.get("vol")
+    if vol:
+        biblio["volume"] = str(vol)
+    issue_val = pub_info.get("issue")
+    if issue_val:
+        biblio["issue"] = str(issue_val)
+    if isinstance(page, dict):
+        if page.get("begin"):
+            biblio["first_page"] = str(page["begin"])
+        if page.get("end"):
+            biblio["last_page"] = str(page["end"])
+
+    # Publisher + journal bruts (traçabilité du nom tel que vu par WoS, en parallèle des publishers/journals créés via find_or_create_*).
+    issn_val = _get_api_issn(dynamic, "issn")
+    eissn_val = _get_api_issn(dynamic, "eissn")
+    if publisher_name:
+        biblio["publisher"] = publisher_name
+    journal_obj: dict[str, str] = {}
+    if journal_title:
+        journal_obj["title"] = journal_title
+    if issn_val:
+        journal_obj["issn"] = issn_val
+    if eissn_val:
+        journal_obj["eissn"] = eissn_val
+    if journal_obj:
+        biblio["journal"] = journal_obj
+
+    # Abstract
+    frm = at_path(static, "fullrecord_metadata")
+    abstract = None
+    abstracts = at_path(frm, "abstracts")
+    if abstracts:
+        ab = at_path(abstracts, "abstract")
+        p = at_path(ab, "abstract_text").get("p", "")
+        if isinstance(p, list):
+            p = " ".join(str(x) for x in p)
+        if p:
+            abstract = str(p)
+
+    # Keywords
+    # Web of Science rend un mot-clé unique en chaîne, plusieurs en liste.
+    kw_raw = at_path(frm, "keywords").get("keyword", [])
+    mot_seul = as_str(kw_raw)
+    keywords = ([mot_seul] if mot_seul else as_strs(kw_raw)) or None
+
+    # Topics : categories
+    cat = at_path(frm, "category_info")
+    topics = {}
+    subj_names = [
+        nom
+        for s in _safe_list(at_path(cat, "subjects").get("subject"))
+        if (nom := as_str(as_mapping(s).get("content")))
+    ]
+    if subj_names:
+        topics["subjects"] = subj_names
+    if headings := [
+        h for e in _safe_list(at_path(cat, "headings").get("heading")) if (h := as_str(e))
+    ]:
+        topics["headings"] = headings
+
+    # Citations
+    cited_by_count = None
+    for entree in _safe_list(at_path(dynamic, "citation_related", "tc_list").get("silo_tc")):
+        tc = as_mapping(entree)
+        if as_str(tc.get("coll_id")) == "WOK":
+            # Compte absent : zéro citation. Compte illisible : le décompte reste inconnu.
+            brut = tc.get("local_count")
+            cited_by_count = 0 if brut is None else as_int(brut)
+
+    authors = _parse_api_authors(static, dynamic)
+    return {
+        "ut": raw.get("UID", ""),
+        "doi": doi,
+        "title": title,
+        "pub_year": pub_year,
+        "doc_type": raw_doc_type or "other",
+        "language": language,
+        "oa_status": oa_status,
+        "journal_title": journal_title,
+        "issn": issn_val,
+        "eissn": eissn_val,
+        "publisher_name": publisher_name,
+        "authors": [a for a in authors if is_wos_author_exploitable(a)],
+        "authors_found": len(authors),
+        "abstract": abstract,
+        "cited_by_count": cited_by_count,
+        "biblio": biblio or None,
+        "keywords": keywords,
+        "topics": topics or None,
+        "urls": None,
+        "external_ids": {
+            key: isbns
+            for key, isbns in (
+                (ExternalIdType.ISBN, _get_api_isbns(dynamic, "isbn")),
+                (ExternalIdType.EISBN, _get_api_isbns(dynamic, "eisbn")),
+            )
+            if isbns
+        }
+        or None,
+    }
+
+
+def _export_authors(raw: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]]:
+    """Auteurs d'une ligne d'export, dans l'ordre de `AF` (noms complets) et `AU` (noms abrégés)."""
+    full_names = split_export_list(as_str(raw.get("AF")))
+    short_names = split_export_list(as_str(raw.get("AU")))
+    addresses = parse_export_addresses(as_str(raw.get("C1")))
+    corresponding = parse_export_corresponding(as_str(raw.get("RP")))
+    researcher_ids = parse_export_researcher_ids(as_str(raw.get("RI")))
+    roles, _ = map_role("wos", "author")
+    authors: list[dict[str, JsonValue]] = []
+    for position, full_name in enumerate(full_names):
+        key = normalize_text(full_name)
+        short_name = short_names[position] if position < len(short_names) else ""
+        author_addresses = addresses.get(key, [])
+        last_name, _, first_name = full_name.partition(", ")
+        authors.append(
+            {
+                "position": position,
+                "full_name": full_name,
+                "last_name": last_name.strip() or None,
+                "first_name": first_name.strip() or None,
+                "researcher_id": researcher_ids.get(key),
+                "is_corresponding": normalize_text(short_name) in corresponding,
+                "raw_affiliation": " | ".join(author_addresses) or None,
+                "addresses": author_addresses,
+                "roles": roles,
+            }
+        )
+    return authors
+
+
+def extract_from_export(
+    raw: Mapping[str, JsonValue], staging_doi: str | None
+) -> dict[str, JsonValue]:
+    """Extrait un record structuré d'une ligne d'export tabulé de l'interface WoS, sous la même forme qu'`extract_from_api`. Le statut open access reste inconnu."""
+
+    def field(tag: str) -> str | None:
+        return as_str(raw.get(tag))
+
+    biblio: dict[str, JsonValue] = {
+        key: value
+        for key, tag in (
+            ("volume", "VL"),
+            ("issue", "IS"),
+            ("first_page", "BP"),
+            ("last_page", "EP"),
+            ("publisher", "PU"),
+        )
+        if (value := field(tag))
+    }
+    journal_obj = {
+        key: value
+        for key, tag in (("title", "SO"), ("issn", "SN"), ("eissn", "EI"))
+        if (value := field(tag))
+    }
+    if journal_obj:
+        biblio["journal"] = journal_obj
+    subjects = list(dict.fromkeys(split_export_list(field("WC")) + split_export_list(field("SC"))))
+    doc_types = split_export_list(field("DT"))
+    languages = split_export_list(field("LA"))
+    isbns = [isbn for value in split_export_list(field("BN")) for isbn in find_isbns(value)]
+    authors = _export_authors(raw)
+    return {
+        "ut": field("UT") or "",
+        "doi": clean_doi(field("DI")) or clean_doi(staging_doi),
+        "title": field("TI") or "(sans titre)",
+        "pub_year": int(py) if (py := field("PY")) and py.isdigit() else None,
+        "doc_type": doc_types[0] if doc_types else "other",
+        "language": languages[0] if languages else None,
+        "oa_status": None,
+        "journal_title": field("SO"),
+        "issn": field("SN"),
+        "eissn": field("EI"),
+        "publisher_name": field("PU"),
+        "authors": authors,
+        "authors_found": len(authors),
+        "abstract": field("AB"),
+        "cited_by_count": int(tc) if (tc := field("TC")) and tc.isdigit() else None,
+        "biblio": biblio or None,
+        "keywords": split_export_list(field("DE")) or None,
+        "topics": {"subjects": subjects} if subjects else None,
+        "urls": None,
+        "external_ids": {ExternalIdType.ISBN: list(dict.fromkeys(isbns))} if isbns else None,
+    }
+
+
+def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:
+    """Extrait un record structuré d'un payload WoS : JSON de l'API, ou ligne d'export tabulé de l'interface (balise `UT`)."""
+    if "UT" in raw:
+        return extract_from_export(raw, staging_doi)
+    return extract_from_api(raw, staging_doi)
+
+
+# =============================================================
+# PUBLISHERS & JOURNALS
+# =============================================================
+
+
+def upsert_publisher(
+    publisher_name: str | None, *, publisher_repo: PublisherGatewayQueries
+) -> int | None:
+    """Trouve ou crée un éditeur. Délègue au service journals."""
+    return find_or_create_publisher(publisher_name, repo=publisher_repo)
+
+
+def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
+    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
+    title = as_str(rec.get("journal_title"))
+    issn, eissn = as_str(rec.get("issn")), as_str(rec.get("eissn"))
+    external_ids = as_mapping(rec.get("external_ids"))
+    return ContainerDescription(
+        source="wos",
+        raw_doc_type=as_str(rec.get("doc_type")),
+        document_title=as_str(rec.get("title")),
+        journal_title=title,
+        collection_title=title if issn or eissn else None,
+        book_title=title,
+        issns=source_issns(print_issn=issn, electronic_issn=eissn),
+        isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
+        eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
+        year=as_int(rec.get("pub_year")),
+    )
+
+
+def upsert_containers(
+    rec: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    container_repo: ContainerGatewayQueries,
+) -> Containers:
+    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
+    return find_or_create_containers(
+        get_container_facts(rec), publisher_id=publisher_id, repo=container_repo
+    )
+
+
+# =============================================================
+# PUBLICATIONS
+# =============================================================
+
+
+def extract_pub_metadata(
+    rec: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
+) -> PublicationMetadata:
+    """Extrait les métadonnées canoniques d'un record WoS.
+
+    Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses.
+    """
+    return PublicationMetadata(
+        title=as_str(rec.get("title")),
+        pub_year=as_int(rec.get("pub_year")),
+        doc_type=as_str(rec.get("doc_type")),
+        doi=as_str(rec.get("doi")),
+        nnt=None,
+        oa_status=as_str(rec.get("oa_status")),
+        journal_id=journal_id,
+        monograph_id=monograph_id,
+        container_title=as_str(rec.get("journal_title")) if not journal_id else None,
+        language=as_str(rec.get("language")),
+    )
+
+
+# =============================================================
+# SOURCE DOCUMENTS (WOS)
+# =============================================================
+
+
+def insert_wos_document(
+    conn: Connection,
+    queries: SourcePublicationQueries,
+    rec: Mapping[str, JsonValue],
+    staging_id: int,
+    pub_meta: PublicationMetadata,
+) -> int:
+    """Crée/retrouve l'entrée source_publications pour WoS.
+
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, journal_id,
+    oa_status, language, container_title) viennent toutes de `pub_meta`,
+    construit en amont par `extract_pub_metadata`. `rec` ne sert ici
+    que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
+    keywords, topics, urls, external_ids non canoniques).
+    """
+    return queries.upsert_source_publication(
+        conn,
+        SourcePublicationUpsert(
+            source="wos",
+            source_id=as_str(rec.get("ut")) or "",
+            staging_id=staging_id,
+            doi=pub_meta.doi,
+            external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            monograph_id=pub_meta.monograph_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
+            biblio=dict(as_mapping(rec.get("biblio"))) or None,
+            abstract=as_str(rec.get("abstract")),
+            keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
+            topics=dict(as_mapping(rec.get("topics"))) or None,
+            oa_status=pub_meta.oa_status,
+            urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
+            impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
+        ),
+    )
+
+
+# =============================================================
+# WOS AUTHORSHIPS — identifiants sur source_authorships
+# =============================================================
+# Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas conservé.
+# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (author_identifying_keys.person_identifiers).
+
+
+def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
+    """`last_name` et `first_name` du payload, sinon `full_name`."""
+    if as_str(author.get("last_name")):
+        return SignatureName.from_parts(
+            as_str(author.get("last_name")), as_str(author.get("first_name"))
+        )
+    return SignatureName.from_raw(as_str(author.get("full_name")))
+
+
+def build_wos_author_records(
+    rec: Mapping[str, JsonValue], logger: logging.Logger
+) -> list[AuthorRecord]:
+    """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
+
+    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes et les ROR des organisations de ses adresses. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
+    """
+    authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
+    if not authors_kept:
+        if found := as_int(rec.get("authors_found")):
+            logger.warning(
+                "WoS record %s : %d auteurs présents mais aucun exploitable "
+                "(filtre is_wos_author_exploitable) — authorships ignorés",
+                as_str(rec.get("ut")) or "?",
+                found,
+            )
+        return []
+
+    ids_by_position = [
+        compact_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept
+    ]
+
+    records: list[AuthorRecord] = []
+    for idx, author in enumerate(authors_kept):
+        name = _author_name(author)
+        if name is None:
+            continue
+        ids = ids_by_position[idx]
+        records.append(
+            AuthorRecord(
+                position=as_int(author.get("position")) or 0,
+                name=name,
+                is_corresponding=bool(author.get("is_corresponding")),
+                roles=[role for e in as_sequence(author.get("roles")) if (role := as_str(e))]
+                or None,
+                person_identifiers=ids if ids else None,
+                addresses=[
+                    AddressRecord(text=adresse)
+                    for e in as_sequence(author.get("addresses"))
+                    if (adresse := as_str(e))
+                ],
+                ror_ids=parse_ror_ids(
+                    as_str(as_mapping(o).get("ror_id"))
+                    for o in as_sequence(author.get("organizations"))
+                ),
+            )
+        )
+    # `author_position` lue du payload WoS : dédup (première occurrence gagne).
+    by_position: dict[int | None, AuthorRecord] = {}
+    for r in records:
+        by_position.setdefault(r.position, r)
+    return list(by_position.values())
+
+
+def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
+    """Bloc auteurs d'un record WoS : `authors`, et `ut` pour le signalement d'auteurs inexploitables."""
+    return {"ut": rec.get("ut"), "authors": rec.get("authors")}
+
+
+def process_authorships(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    logger: logging.Logger,
+    rec: Mapping[str, JsonValue],
+    source_publication_id: int,
+    *,
+    sync_settings: SignatureSyncSettings,
+) -> None:
+    """Synchronise les signatures WoS de la notice depuis son bloc auteurs."""
+    sync_source_authorships(
+        conn,
+        authorship_queries,
+        sync_settings,
+        "wos",
+        source_publication_id,
+        extract_wos_author_block(rec),
+        partial(build_wos_author_records, logger=logger),
+    )
+
+
+# =============================================================
+# BOUCLE PRINCIPALE
+# =============================================================
+
+
+def process_record(
+    conn: Connection,
+    queries: SourcePublicationQueries,
+    logger: logging.Logger,
+    staging_row: StagingRow,
+    *,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
+    staging_queries: StagingQueries,
+    authorship_queries: AuthorshipsBatchQueries,
+    sync_settings: SignatureSyncSettings,
+) -> bool:
+    """Traite un record du staging WoS. Retourne True si succès."""
+    staging_id = staging_row.id
+    ut = staging_row.source_id
+    staging_doi = staging_row.doi
+    raw_data = staging_row.raw_data
+
+    rec = extract_record(raw_data, staging_doi)
+
+    if not rec["ut"]:
+        rec["ut"] = ut
+
+    publisher_id = upsert_publisher(
+        as_str(rec.get("publisher_name")), publisher_repo=publisher_repo
+    )
+    containers = upsert_containers(rec, publisher_id, container_repo=container_repo)
+    pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
+
+    source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
+    process_authorships(
+        conn, authorship_queries, logger, rec, source_publication_id, sync_settings=sync_settings
+    )
+    staging_queries.mark_done(conn, staging_id)
+    return True
+
+
+class WosNormalizer(BibliographicNormalizer):
+    SOURCE = "wos"
+    DEFAULT_BATCH_SIZE = 500
+
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        rec = extract_record(row.raw_data, row.doi)
+        return as_str(rec.get("title")), as_int(rec.get("pub_year"))
+
+    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+        container_repo, publisher_repo = self._require_repos()
+        return process_record(
+            conn,
+            self._queries,
+            self.logger,
+            row,
+            container_repo=container_repo,
+            publisher_repo=publisher_repo,
+            staging_queries=self._staging,
+            authorship_queries=self._authorship_queries,
+            sync_settings=self._sync_settings,
+        )

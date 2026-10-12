@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock, patch
 
 from pipeline.context import RunOptions
 from pipeline.execution import phase_context
+from pipeline.ingestion import extract, normalize
+from pipeline.ingestion.normalize import NormalizeStats
+from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.metrics import PhaseMetrics
-from pipeline.sources import extract, normalize
-from pipeline.sources.normalize import NormalizeStats
-from pipeline.sources.openalex import fetch_truncated
 
 # Le nœud de la phase `fetch_truncated`, lancé via `asyncio.run`.
-_REFETCH = "pipeline.sources.openalex.fetch_truncated.refetch_openalex"
+_REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"
 
 
 def test_refetch_not_called_in_extract():

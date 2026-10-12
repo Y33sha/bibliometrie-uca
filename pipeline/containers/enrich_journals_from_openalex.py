@@ -4,7 +4,7 @@ Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
 - `journal_type` (via le mapping local du `type` OpenAlex), uniquement quand le mapping renvoie une valeur exploitable
 
-Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/sources/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
+Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
 """
 
 import logging
@@ -15,9 +15,9 @@ from sqlalchemy import Connection
 
 from domain.journals.journal import JournalType
 from pipeline.containers.journals import JournalGatewayQueries
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.libelles import forme
 from pipeline.metrics import PhaseMetrics
-from pipeline.sources.circuit_breaker import SourceCircuitBreaker
 
 LIBELLE = "Type des revues sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""

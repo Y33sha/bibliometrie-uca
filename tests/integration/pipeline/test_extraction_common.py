@@ -6,11 +6,11 @@ import pytest
 from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
-from pipeline.sources.change_detection import change_detection_hash
-from pipeline.sources.fetch_missing import get_missing_dois
-from pipeline.sources.fetch_stale import get_stale_source_ids, set_disappeared
-from pipeline.sources.fingerprint import fingerprint
-from pipeline.sources.hal.hash_normalize import strip_volatile_for_hash
+from pipeline.ingestion.change_detection import change_detection_hash
+from pipeline.ingestion.fetch_missing import get_missing_dois
+from pipeline.ingestion.fetch_stale import get_stale_source_ids, set_disappeared
+from pipeline.ingestion.fingerprint import fingerprint
+from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication

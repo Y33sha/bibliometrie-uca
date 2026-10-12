@@ -15,6 +15,22 @@ Les liens vers les dépôts sont en fin de document.
 
 ## Organisation du code
 
+### Le découpage d'ensemble : acquisition, transformation, diffusion
+
+- **rialto** : trois paquets, dans l'ordre du run. [`harvest_incremental/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/harvest_incremental) contient un module par source (`openalex.py`, `wos.py`, `crossref.py`, `pubmed.py`…), qui moissonne et charge dans la base de travail, puis `deduplicate.py` et `distill.py`. [`distiller/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/distiller) consolide, un fichier par champ. [`publish/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/publish) alimente la base de diffusion. Les graphes Airflow sont à part, dans `dags/`.
+- **Academic Observatory** : deux familles de dossiers ([`academic_observatory_workflows/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows)). Un `<source>_telescope/` par source télécharge le dump et le charge dans BigQuery : `telescope.py` pour le graphe, `tasks.py` pour les fonctions, `schema/` pour les tables. Un `<produit>_workflow/` par transformation, avec son SQL dans `sql/` : `doi_workflow/`, `oa_dashboard_workflow/`. Les deux familles n'ont aucun module commun.
+- **CRISalid** : deux applications. svp-harvester moissonne : [`app/harvesters/<source>/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/harvesters) contient le client, le constructeur de requêtes et les convertisseurs vers un modèle commun. Les résultats sont stockés dans sa base et publiés sur une file de messages. crisalid-ikg les reçoit ([`app/amqp/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/amqp)) et consolide le graphe dans [`app/services/<entité>/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/services) : documents (avec `merge_strategies/`), personnes, revues, organisations.
+- **openalex-walden** : [`notebooks/ingest/`](https://github.com/ourresearch/openalex-walden/tree/main/notebooks/ingest) contient un notebook par source (Crossref, DataCite, HAL, PubMed, dépôts…). La transformation a un dossier par entité : `authors/`, `institutions/`, `publishers/`, `sources/`, `topics/`, et `end2end/` pour l'assemblage des works. [`jobs/`](https://github.com/ourresearch/openalex-walden/tree/main/jobs) déclare un fichier YAML par chaîne.
+- **ReCiter** : un service, sans run par lots. Chaque source a son paquet de récupération (`pubmed/retriever/`, `scopus/retriever/`) ; l'attribution est à part ([`algorithm/`, `engine/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter)).
+- **dnet-dedup** : la bibliothèque de rapprochement seule ([`dnet-pace-core/`](https://github.com/dnet-team/dnet-dedup/tree/master/dnet-pace-core)), sans acquisition. Une chaîne Spark plus large l'appelle.
+
+Ce qui se dégage :
+
+- Tous séparent l'acquisition, un dossier ou un module par source, de la transformation. CRISalid en fait deux applications, l'Academic Observatory deux familles de workflows.
+- La transformation est rangée par entité produite (walden, crisalid-ikg) ou par produit (Academic Observatory), jamais par source.
+- La diffusion, quand elle existe, est un troisième temps distinct (rialto, `publish/`).
+- Chez nous, `pipeline/sources/<source>` contient à la fois l'acquisition (`harvest`, `fetch_missing`, `fetch_stale`) et la normalisation (`normalize`). Les dossiers de domaine (`structures`, `containers`, `publications`, `persons`) contiennent la transformation et des appels réseau : Sudoc, DOAJ, OpenAlex Sources, Unpaywall.
+
 ### Le graphe du run dans un seul fichier
 
 - Où : rialto, [`dags/harvest_incremental.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/dags/harvest_incremental.py), 227 lignes.

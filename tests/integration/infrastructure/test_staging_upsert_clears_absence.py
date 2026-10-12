@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.sources.staging import upsert_staging
+from pipeline.ingestion.staging import upsert_staging
 
 
 def test_bulk_upsert_clears_disappeared_marker(sa_sync_conn):
