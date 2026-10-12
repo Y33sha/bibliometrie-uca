@@ -3654,7 +3654,7 @@ export interface components {
          *
          *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
          *
-         *     `journal_type` et `oa_model` portent les types du domaine : leurs jeux de valeurs, que les enums SQL des mêmes noms reprennent, se vérifient ici plutôt que chez chaque appelant.
+         *     `journal_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
          */
         JournalUpdate: {
             /** Title */
