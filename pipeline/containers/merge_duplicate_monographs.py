@@ -5,8 +5,8 @@ Deux monographies de même titre naissent quand l'éditeur ou l'ISBN manque à l
 
 import logging
 
-from application.ports.pipeline.monographs import MonographMergeQueries
 from domain.monographs.matching import duplicate_monographs
+from pipeline.containers.monographs import MonographGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -15,7 +15,7 @@ LIBELLE = "Fusion des monographies en double"
 
 
 def run_merge_duplicate_monographs(
-    logger: logging.Logger, *, monograph_repo: MonographMergeQueries
+    logger: logging.Logger, *, monograph_repo: MonographGatewayQueries
 ) -> PhaseMetrics:
     """Fusionne les monographies en double et journalise chaque fusion."""
     merges = [

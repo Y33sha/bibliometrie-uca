@@ -15,10 +15,6 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.monographs.containers import Containers, find_or_create_containers
-from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
@@ -49,6 +45,13 @@ from domain.sources.datacite import (
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.normalize import BibliographicNormalizer
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
 from pipeline.sources.signatures import (
@@ -70,7 +73,7 @@ from pipeline.sources.staging import StagingQueries, StagingRow
 
 
 def upsert_publisher(
-    attributes: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+    attributes: Mapping[str, JsonValue], *, publisher_repo: PublisherGatewayQueries
 ) -> int | None:
     name = get_publisher_name(attributes)
     if not name:
@@ -104,7 +107,7 @@ def upsert_containers(
     attributes: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
 ) -> Containers:
     """Trouve ou crée l'entrée de `journals` et la monographie qui contiennent le document."""
     return find_or_create_containers(
@@ -265,8 +268,8 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerFindOrCreateQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,

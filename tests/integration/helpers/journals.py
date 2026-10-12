@@ -1,6 +1,7 @@
 """Semis des revues, de leurs ISSN et formes de nom, des éditeurs et des monographies, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
 from collections.abc import Iterable
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -194,4 +195,36 @@ def insert_journal_doi_namespace(
         "journal_doi_namespaces",
         {"namespace": namespace, "journal_id": journal_id, "dois": dois, "share": share},
         returning=False,
+    )
+
+
+def mark_checked_in_sudoc(conn, journal_id: int) -> None:
+    conn.execute(
+        text("UPDATE journal_issns SET sudoc_checked_at = now() WHERE journal_id = :id"),
+        {"id": journal_id},
+    )
+
+
+def issn_columns(conn, journal_id: int) -> SimpleNamespace:
+    """Premier ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
+    rows = conn.execute(
+        text(
+            "SELECT issn, support::text AS support, linking, status::text AS status, "
+            "sudoc_checked_at FROM journal_issns WHERE journal_id = :id ORDER BY id"
+        ),
+        {"id": journal_id},
+    ).all()
+
+    def first(support):
+        return next((r.issn for r in rows if r.status == "active" and r.support == support), None)
+
+    issn, eissn = first("print"), first("electronic")
+    issnl = next((r.issn for r in rows if r.linking), None)
+    checked = [r.sudoc_checked_at for r in rows]
+    return SimpleNamespace(
+        issn=issn,
+        eissn=eissn,
+        issnl=issnl,
+        rejected_issns=sorted(r.issn for r in rows if r.issn not in (issn, eissn, issnl)),
+        sudoc_checked_at=min(checked) if checked and all(checked) else None,
     )

@@ -5,8 +5,8 @@ La nature se recalcule à chaque run d'après les enregistrements, la collection
 
 import logging
 
-from application.ports.pipeline.monographs import MonographProceedingsQueries
 from domain.monographs.proceedings import is_proceedings_volume
+from pipeline.containers.monographs import MonographGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -15,7 +15,7 @@ LIBELLE = "Nature des monographies"
 
 
 def run_type_proceedings_volumes(
-    logger: logging.Logger, *, monograph_repo: MonographProceedingsQueries
+    logger: logging.Logger, *, monograph_repo: MonographGatewayQueries
 ) -> PhaseMetrics:
     """Pose la nature recalculée des monographies qui en changent, et journalise chacune."""
     to_proceedings: list[int] = []

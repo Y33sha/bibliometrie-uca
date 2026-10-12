@@ -13,10 +13,9 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
-from application.services.journals.core import update_journal_apc
 from domain.journals.journal import JournalType
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
+from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.libelles import forme
 from pipeline.metrics import PhaseMetrics
 
@@ -53,7 +52,7 @@ def run_enrich_journals_from_openalex(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalOpenAlexEnrichmentQueries,
+    journal_repo: JournalGatewayQueries,
     fetch_batch: FetchSourcesBatch,
     breaker: SourceCircuitBreaker,
     rate_delay: float = 0.1,
@@ -91,8 +90,8 @@ def run_enrich_journals_from_openalex(
 
             # Sans APC dans OpenAlex, montant et devise de la revue restent tels quels.
             if apc_amount is not None:
-                update_journal_apc(
-                    journal_id, apc_amount=apc_amount, apc_currency=apc_currency, repo=journal_repo
+                journal_repo.update_journal_apc(
+                    journal_id, apc_amount=apc_amount, apc_currency=apc_currency
                 )
             # journal_type : seules les revues `unknown` sont traitées (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
             mapped_type = map_openalex_source_type(raw_type)

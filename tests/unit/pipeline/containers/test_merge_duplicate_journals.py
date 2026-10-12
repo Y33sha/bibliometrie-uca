@@ -2,7 +2,7 @@
 
 import logging
 
-from application.ports.pipeline.journals import (
+from pipeline.containers.journals import (
     JournalIssnGroup,
     JournalMergeCandidate,
     JournalMergeGroup,

@@ -5,12 +5,12 @@ Les monographies sans collection à ISSN se regroupent en séries (`group_series
 
 import logging
 
-from application.ports.pipeline.containers import MonographSeriesQueries
-from application.ports.pipeline.monographs import MonographJournalCandidates
-from application.services.journals.core import find_or_create_journal
 from domain.journals.journal import JournalType
 from domain.journals.series import VolumeTitle, group_series
 from domain.monographs.collection import MonographJournalChoice, choose_monograph_journal
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import find_or_create_journal
+from pipeline.containers.monographs import MonographJournalCandidates
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -19,7 +19,7 @@ LIBELLE = "Rattachement aux collections"
 
 
 def _series_by_monograph(
-    candidates: list[MonographJournalCandidates], repo: MonographSeriesQueries
+    candidates: list[MonographJournalCandidates], repo: ContainerGatewayQueries
 ) -> dict[int, int]:
     """Série sans ISSN de chaque monographie qui en a une, trouvée ou créée dans `journals`."""
     proceedings = {m.monograph_id: m.proceedings for m in candidates}
@@ -45,7 +45,7 @@ def _series_by_monograph(
 
 
 def run_link_monographs_to_collections(
-    logger: logging.Logger, *, monograph_repo: MonographSeriesQueries
+    logger: logging.Logger, *, monograph_repo: ContainerGatewayQueries
 ) -> PhaseMetrics:
     """Rattache les monographies à leur entrée de `journals`, et journalise chaque changement et chaque conflit."""
     candidates = monograph_repo.find_monograph_journal_candidates()

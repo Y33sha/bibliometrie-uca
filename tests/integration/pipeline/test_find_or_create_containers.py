@@ -3,11 +3,14 @@
 import pytest
 from sqlalchemy import text
 
-from application.services.journals.core import find_or_create_journal
-from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_journal,
+)
 
 
 @pytest.fixture

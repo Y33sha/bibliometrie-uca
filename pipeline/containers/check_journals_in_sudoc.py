@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.journals import JournalSudocQueries, JournalSudocRow
 from domain.journals.issn_check import (
     JournalIssns,
     SudocCheck,
@@ -23,6 +22,7 @@ from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.containers.journals import JournalGatewayQueries, JournalSudocRow
 from pipeline.fetch_pool import RequestPace, run_fetch_pool
 from pipeline.libelles import BRANCHE, accord, forme
 from pipeline.metrics import PhaseMetrics
@@ -79,7 +79,7 @@ async def run_check_journals_in_sudoc(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalSudocQueries,
+    journal_repo: JournalGatewayQueries,
     fetch_ppns: FetchPpns,
     fetch_record: FetchRecord,
     breaker: SourceCircuitBreaker,

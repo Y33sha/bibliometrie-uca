@@ -2,8 +2,6 @@
 
 Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un appelant limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
 
-Le trouve-ou-crée, alimenté par le pipeline, vit à part dans `application/ports/pipeline/publishers.py`.
-
 La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`journals.publisher_id`, `publisher_name_forms`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`, `doi_prefixes.publisher_id`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
 """
 
@@ -27,7 +25,7 @@ class PublisherUpdate(BaseModel):
     @field_validator("country")
     @classmethod
     def _country_lowercase(cls, v: str | None) -> str | None:
-        # Code pays canonique en minuscule (cf. countries.code / addresses.countries).
+        # Code pays en minuscule (cf. countries.code / addresses.countries).
         return v.lower() if v else v
 
 

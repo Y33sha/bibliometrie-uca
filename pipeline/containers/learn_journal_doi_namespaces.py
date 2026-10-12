@@ -5,8 +5,8 @@ Les couples (DOI, revue) des enregistrements de toutes les sources désignent le
 
 import logging
 
-from application.ports.pipeline.journals import JournalDoiNamespaceQueries
 from domain.journals.doi_namespaces import designated_by_namespace, learn_namespaces
+from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -15,7 +15,7 @@ LIBELLE = "Espaces de noms DOI"
 
 
 def run_learn_journal_doi_namespaces(
-    logger: logging.Logger, *, journal_repo: JournalDoiNamespaceQueries
+    logger: logging.Logger, *, journal_repo: JournalGatewayQueries
 ) -> PhaseMetrics:
     """Calcule les espaces de noms DOI des revues et les enregistre."""
     pairs = journal_repo.find_doi_journal_pairs()

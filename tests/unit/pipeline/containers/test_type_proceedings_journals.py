@@ -3,12 +3,8 @@
 import logging
 from collections.abc import Sequence
 
-from application.ports.pipeline.journals import (
-    JournalRecordTypes,
-    JournalSummary,
-    JournalTitleIssnRow,
-)
 from domain.journals.journal import JournalType
+from pipeline.containers.journals import JournalRecordTypes, JournalSummary, JournalTitleIssnRow
 from pipeline.containers.type_proceedings_journals import (
     run_type_proceedings_journals,
 )

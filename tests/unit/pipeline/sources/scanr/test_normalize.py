@@ -15,9 +15,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.services.monographs.containers import Containers
 from domain.journals.issns import JournalIssn
 from domain.persons.signature_name import SignatureName
+from pipeline.containers.find_or_create import Containers
 from pipeline.sources.pub_metadata import PublicationMetadata
 from pipeline.sources.scanr import normalize as normalize_scanr
 from pipeline.sources.scanr.normalize import (

@@ -6,10 +6,6 @@ from functools import partial
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.monographs.containers import Containers, find_or_create_containers
-from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
@@ -29,6 +25,13 @@ from domain.sources.wos import (
 )
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.normalize import BibliographicNormalizer
 from pipeline.sources.pub_metadata import PublicationMetadata
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
@@ -450,7 +453,7 @@ def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dic
 
 
 def upsert_publisher(
-    publisher_name: str | None, *, publisher_repo: PublisherFindOrCreateQueries
+    publisher_name: str | None, *, publisher_repo: PublisherGatewayQueries
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
@@ -479,7 +482,7 @@ def upsert_containers(
     rec: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
@@ -666,8 +669,8 @@ def process_record(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerFindOrCreateQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,

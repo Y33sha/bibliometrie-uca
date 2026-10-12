@@ -12,10 +12,6 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.monographs.containers import Containers, find_or_create_containers
-from application.services.publishers.core import find_or_create_publisher
 from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.journals.series import split_collection_and_volume
@@ -38,6 +34,13 @@ from domain.sources.crossref import (
 )
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.normalize import BibliographicNormalizer
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
 from pipeline.sources.signatures import (
@@ -188,7 +191,7 @@ def get_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
 
 
 def upsert_publisher(
-    msg: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+    msg: Mapping[str, JsonValue], *, publisher_repo: PublisherGatewayQueries
 ) -> int | None:
     name = get_publisher_name(msg)
     if not name:
@@ -243,7 +246,7 @@ def upsert_containers(
     msg: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
@@ -358,8 +361,8 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerFindOrCreateQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,

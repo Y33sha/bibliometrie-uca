@@ -6,11 +6,11 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from application.ports.pipeline.journals import JournalSudocRow, JournalTitleTypeRow
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord
 from pipeline.containers import check_journals_in_sudoc as mod
+from pipeline.containers.journals import JournalSudocRow, JournalTitleTypeRow
 from tests.journal_issns import issns_from_columns
 
 
