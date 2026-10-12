@@ -28,7 +28,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 
 ### Phase 3 — Corrections du graphe
 
-- [ ] `persons` : la purge tourne après `populate_person_name_forms`, mais ses lectures et écritures sont déclarées dans `persons.resolve`, placé avant. Un nœud `persons.purge` après `populate_person_name_forms`.
+- [x] `persons` : la purge tourne après `populate_person_name_forms`, mais ses lectures et écritures sont déclarées dans `persons.resolve`, placé avant. Un nœud `persons.purge` après `populate_person_name_forms`.
 - [ ] `merge_duplicate_journals` lit `journal_type`, l'APC, `oa_model`, `manual_fields` et `title` des revues sans les déclarer. Le graphe ignore donc qu'il dépend d'`enrich_journals_from_openalex`.
 - [ ] `normalize.prune_disappeared` ne déclare pas la suppression en cascade des signatures, de leurs adresses et ROR, des signatures confirmées et rejetées. `cleanup_orphan_identities` n'en dépend donc pas.
 - [ ] `publications.reconcile` lit `journals.journal_type` et `monographs.journal_id` sans les déclarer.
