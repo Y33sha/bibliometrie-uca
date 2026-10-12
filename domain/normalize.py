@@ -138,6 +138,9 @@ def sanitize_raw_text(text: str) -> str:
     if not text:
         return ""
     text = to_plain_text(text)
+    # `to_plain_text` réduit déjà l'espacement : un texte imprimable n'a plus rien à retirer.
+    if text.isprintable():
+        return text
     out: list[str] = []
     for ch in text:
         if ch.isspace():
