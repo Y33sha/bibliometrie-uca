@@ -273,7 +273,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
 
 
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
-    from pipeline.ingestion.http.api_params import API_BASE_URLS, DOAJ_DELAY
+    from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
     from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
     from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
@@ -294,7 +294,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
                     oa_ids, openalex_sources_api=sources_api
                 ),
                 breaker=breaker,
-                rate_delay=DOAJ_DELAY,
+                rate_delay=OPENALEX_DELAY,
             ),
             phase="publishers_journals",
             logger=log,
