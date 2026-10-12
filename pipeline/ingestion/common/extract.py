@@ -36,7 +36,7 @@ from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
-from pipeline.runtime.observability.libelles import etape
+from pipeline.runtime.observability.libelles import BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
     signal_source_unconfigured,
@@ -140,8 +140,10 @@ def _run_since_last(
         depuis = today() - timedelta(days=30)
         origine = "aucune extraction quotidienne réussie, repli sur 30 jours"
     since = depuis.isoformat()
+    etape(logger, "Extraction des sources")
     logger.info(
-        "Mode incrémental : notices HAL modifiées depuis le %s (%s)",
+        "%sMode incrémental : notices HAL modifiées depuis le %s (%s)",
+        BRANCHE,
         date_to_french(depuis),
         origine,
     )

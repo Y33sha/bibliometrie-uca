@@ -26,7 +26,7 @@ from sqlalchemy import Connection
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
 from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
@@ -57,7 +57,12 @@ class PersonsPhase:
 
             n_enforced = persons_queries.enforce_confirmed_authorships(conn)
             if n_enforced:
-                logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
+                etape(logger, "Épinglages réappliqués")
+                logger.info(
+                    "%s%s",
+                    DERNIERE_BRANCHE,
+                    accord(n_enforced, "signature recalée", "signatures recalées"),
+                )
 
             arbitration = arbitrate_identifier_conflicts(
                 conn, persons_queries, logger, writes=writes
