@@ -166,12 +166,6 @@ def test_run_sans_institution_refuse(configuration):
         extracteur(OpenalexExtractor, _client([])).run(arguments_du_run())
 
 
-def test_run_sans_identifiants_de_connexion_refuse(configuration):
-    configuration(harvest, credentials_missing="clé API OpenAlex absente")
-    with pytest.raises(ExtractionConfigError, match="clé API"):
-        extracteur(OpenalexExtractor, _client([])).run(arguments_du_run())
-
-
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     configuration(harvest, annees=[2023, 2024])
     client = _client([])

@@ -11,7 +11,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 Les dépendances techniques sont injectées par le composition-root :
 
 - `count_extraction_structures()` : le nombre de structures du périmètre d'extraction ;
-- `extract_one(source, args)` : ouvre la connexion, câble l'extracteur, exécute l'extraction sous circuit-breaker (les métriques rendues portent déjà l'éventuel signal `source_unavailable`), et lève `ExtractionConfigError` si la source n'est pas configurée ;
+- `extract_one(source, args)` : ouvre la connexion, câble l'extracteur, exécute l'extraction par l'accès à la source (les métriques rendues portent déjà les signaux de source non configurée ou indisponible), et lève `ExtractionConfigError` si le périmètre d'interrogation de la source manque ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_extract_date` : la date de la dernière extraction quotidienne réussie (branche incrémentale).
 """
@@ -31,16 +31,16 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.common.parallel import RunParallel
-from pipeline.ingestion.http.breaker_scope import circuit_breaker, signal_if_tripped
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import open_tx
+from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
-    signal_source_unavailable,
     signal_source_unconfigured,
+    skipped,
     timed_metrics,
 )
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
@@ -77,12 +77,11 @@ def _source_summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float
 
 @dataclass
 class _SourceOutcome:
-    """Issue d'une extraction de source : métriques + durée, ou motif de non-configuration / d'indisponibilité."""
+    """Issue d'une extraction de source : métriques + durée, ou motif d'absence du périmètre d'interrogation."""
 
     metrics: PhaseMetrics | None
     duration: float
     unconfigured: str | None = None
-    unavailable: str | None = None
 
 
 @dataclass(frozen=True)
@@ -156,11 +155,8 @@ def _run_since_last(
     except ExtractionConfigError as exc:
         signal_source_unconfigured(metrics, "hal", str(exc), logger=logger, phase="extract")
         return {}
-    except SourceUnavailableError:
-        signal_source_unavailable(metrics, "hal", logger=logger, phase="extract")
-        return {}
     metrics.merge(hal_metrics)
-    return {"hal": _source_summary(hal_metrics, hal_duration)}
+    return {} if skipped(hal_metrics) else {"hal": _source_summary(hal_metrics, hal_duration)}
 
 
 def _run_parallel_sources(
@@ -198,27 +194,23 @@ def _run_parallel_sources(
                 metrics, source, outcome.unconfigured, logger=logger, phase="extract"
             )
             continue
-        if outcome.unavailable is not None:
-            signal_source_unavailable(metrics, source, logger=logger, phase="extract")
-            continue
         assert outcome.metrics is not None
         metrics.merge(outcome.metrics)
-        by_source[source] = _source_summary(outcome.metrics, outcome.duration)
+        if not skipped(outcome.metrics):
+            by_source[source] = _source_summary(outcome.metrics, outcome.duration)
     return by_source
 
 
 def _extraction_thunk(
     extract_one: ExtractOne, source: str, args: argparse.Namespace
 ) -> Callable[[], _SourceOutcome]:
-    """Enveloppe une extraction en thunk : chronométrée, la non-configuration rendue en valeur (jamais levée hors du thread) pour que le primitif de parallélisme n'ait pas à la connaître."""
+    """Enveloppe une extraction en thunk : chronométrée, l'absence de périmètre d'interrogation rendue en valeur (jamais levée hors du thread) pour que le primitif de parallélisme n'ait pas à la connaître."""
 
     def thunk() -> _SourceOutcome:
         try:
             source_metrics, duration = timed_metrics(lambda: extract_one(source, args))
         except ExtractionConfigError as exc:
             return _SourceOutcome(None, 0.0, unconfigured=str(exc))
-        except SourceUnavailableError as exc:
-            return _SourceOutcome(None, 0.0, unavailable=str(exc))
         return _SourceOutcome(source_metrics, duration)
 
     return thunk
@@ -275,14 +267,17 @@ def _extraction_structure_count() -> int:
 
 
 def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
-    """Exécute un extracteur sous circuit-breaker, qui coupe la source après cinq échecs.
+    """Exécute un extracteur par l'accès à sa source, dont le circuit-breaker coupe après cinq échecs.
 
-    Le circuit-breaker est posé dans la ContextVar que lit le client HTTP synchrone, et passé à `run`, dont les boucles le consultent pour arrêter une source à bout de budget. Le seuil est plus bas qu'à la phase `fetch_missing`, les extracteurs travaillant sans lots concurrents.
+    Le seuil est plus bas qu'à la phase `fetch_missing`, les extracteurs travaillant sans lots concurrents.
     """
-    with circuit_breaker(source, threshold=5) as breaker:
-        metrics = extractor.run(args, breaker=breaker)
-    signal_if_tripped(metrics, breaker)
-    return metrics
+    return access_source(
+        source,
+        lambda breaker: extractor.run(args, breaker=breaker),
+        phase="extract",
+        logger=log,
+        threshold=5,
+    )
 
 
 def _extractors() -> dict[str, ConstructeurExtracteur]:

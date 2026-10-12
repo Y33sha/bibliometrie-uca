@@ -46,7 +46,7 @@ Constats hors du graphe :
 
 Accès aux sources :
 
-- [ ] Fonction d'accès à une source dans `pipeline/ingestion/http/`, à partir de `breaker_scope.py`. Elle remplace `filter_configured`, les contrôles des moissonneurs OpenAlex, WoS et ScanR, et les trois formes du circuit-breaker. L'extraction de DataCite et `fetch_truncated` contrôlent ainsi leurs identifiants.
+- [x] Fonction d'accès à une source, `access_source`, dans `pipeline/ingestion/http/source_access.py`. Elle remplace `filter_configured`, les contrôles des moissonneurs OpenAlex, WoS et ScanR, et les trois formes du circuit-breaker. L'extraction de DataCite et `fetch_truncated` contrôlent ainsi leurs identifiants.
 - [x] `resolve_publishers` se découpe en deux nœuds, Crossref et DataCite, qui choisissent leurs préfixes par agence d'enregistrement. `crossref_checked_at` et `datacite_checked_at` remplacent `publisher_checked_at`. Les préfixes d'agence inconnue passent par Crossref, puis par DataCite quand Crossref les a interrogés sans les trouver.
 
 ### Phase 4 — Exécution par nœuds

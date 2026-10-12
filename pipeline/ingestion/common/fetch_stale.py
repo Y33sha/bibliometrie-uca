@@ -24,26 +24,24 @@ from sqlalchemy import Connection, text
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.http.breaker_scope import under_circuit_breaker
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
+from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing, log, open_tx
+from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.runtime.observability.signals import filter_configured, select_targets, timed_metrics
+from pipeline.runtime.observability.signals import select_targets, skipped, timed_metrics
 
 COMMIT_EVERY = 50
 
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[str, "list[int] | None"], PhaseMetrics]
-"""Nouvelle lecture des documents d'une source, bornée à `years`. Rend des métriques portant déjà l'éventuel signal `source_unavailable`."""
-CredentialsMissing = Callable[[str], "str | None"]
-"""`(source) -> motif d'absence de credentials | None si configurée`."""
+"""Nouvelle lecture des documents d'une source, bornée à `years`, par l'accès à cette source. Rend des métriques portant déjà les signaux de source non configurée ou indisponible."""
 GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
 """`(start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
@@ -51,13 +49,12 @@ GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
 @dataclass(frozen=True)
 class FetchStalePhase:
     refresh_one: RefreshOne
-    credentials_missing: CredentialsMissing
     get_years_for_window: GetYearsForWindow
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Relit les documents anciens de chaque source configurée, dans la fenêtre d'années du run.
+        """Relit les documents anciens de chaque source, dans la fenêtre d'années du run.
 
-        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
+        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`.
         """
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
@@ -67,23 +64,18 @@ class FetchStalePhase:
         targets = select_targets(
             ALL_SOURCES, options.sources or None, include_wos=options.include_wos
         )
-        configured = filter_configured(
-            targets,
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=logger,
-            phase="fetch_stale",
-        )
 
         year = options.year
         years_default = [int(year)] if year else self.get_years_for_window(options.start_year)
         years_theses = [int(year)] if year else None
 
         by_source: dict[str, dict[str, float]] = {}
-        for target in configured:
+        for target in targets:
             row_years = years_theses if target == "theses" else years_default
             source_metrics, duration = timed_metrics(partial(self.refresh_one, target, row_years))
             metrics.merge(source_metrics)
+            if skipped(source_metrics):
+                continue
             by_source[target] = {
                 "interrogated": source_metrics.total,
                 "refreshed": source_metrics.updated,
@@ -264,7 +256,6 @@ def build() -> Phase:
 
     return FetchStalePhase(
         refresh_one=_run_fetch_stale,
-        credentials_missing=credentials_missing,
         get_years_for_window=_get_years_for_window,
     )
 
@@ -309,7 +300,7 @@ def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     refetch = _make_refetch(target)
     with open_tx() as conn:
         after_days = get_fetch_stale_after_days(conn)
-        return under_circuit_breaker(
+        return access_source(
             target,
             lambda breaker: asyncio.run(
                 refresh(conn, refetch, log, after_days=after_days, years=years, breaker=breaker)

@@ -5,14 +5,15 @@ donc l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé
 synchrone déterministe.
 """
 
+import logging
 from datetime import date
 
 import pytest
 
 from pipeline.ingestion.common.extract import ExtractOne, ExtractPhase
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unavailable
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 
@@ -73,12 +74,19 @@ def test_theses_ignores_year_range_bound(contexte):
     assert seen["theses"] == (None, None)  # theses ramène tout l'historique des PPN
 
 
+def _indisponible(source: str) -> PhaseMetrics:
+    """Métriques que rend l'accès à une source indisponible."""
+    metrics = PhaseMetrics()
+    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="extract")
+    return metrics
+
+
 def test_parallel_skips_unavailable_source(contexte):
-    """Une source qui lève `SourceUnavailableError` (500 répétés sous circuit-breaker) est sautée : la phase se termine en ambre et les autres sources aboutissent."""
+    """Une source indisponible (500 répétés sous circuit-breaker) est sautée : la phase se termine en ambre et les autres sources aboutissent."""
 
     def extract_one(source, _args):
         if source == "hal":
-            raise SourceUnavailableError("hal")
+            return _indisponible("hal")
         return PhaseMetrics(new=3)
 
     metrics = _phase(extract_one).run(contexte(mode="full", sources={"hal", "theses"}))
@@ -89,10 +97,10 @@ def test_parallel_skips_unavailable_source(contexte):
 
 
 def test_since_last_marks_hal_unavailable(contexte):
-    """En quotidien, une source HAL qui lève `SourceUnavailableError` termine la phase en ambre."""
+    """En quotidien, une source HAL indisponible termine la phase en ambre."""
 
     def extract_one(_source, _args):
-        raise SourceUnavailableError("hal")
+        return _indisponible("hal")
 
     metrics = _phase(extract_one).run(contexte(mode="daily"))
 

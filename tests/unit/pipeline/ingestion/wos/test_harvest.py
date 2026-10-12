@@ -130,12 +130,6 @@ def test_run_sans_affiliation_refuse(configuration):
         extracteur(WosExtractor, _client([])).run(arguments_du_run())
 
 
-def test_run_sans_cle_api_refuse(configuration):
-    configuration(harvest, credentials_missing="clé API WoS absente")
-    with pytest.raises(ExtractionConfigError, match="clé API"):
-        extracteur(WosExtractor, _client([])).run(arguments_du_run())
-
-
 def test_run_s_arrete_quand_la_source_devient_indisponible(configuration, ecritures, pauses):
     """Retries épuisés pendant une année : les années suivantes sont sautées sans pause, les métriques déjà acquises sont gardées."""
     configuration(harvest, annees=[2023, 2024, 2025])

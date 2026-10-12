@@ -28,7 +28,6 @@ from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extra
 from pipeline.runtime.config import (
     get_extraction_api_ids,
     get_years,
-    source_credentials_missing,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -175,8 +174,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexClient]):
             raise ExtractionConfigError(
                 "aucun institution_id (api_ids->'openalex' vide pour le périmètre d'extraction)"
             )
-        if missing := source_credentials_missing("openalex"):
-            raise ExtractionConfigError(missing)
         return OpenalexExtractConfig(institution_ids=institution_ids)
 
     def setup_logging(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> None:

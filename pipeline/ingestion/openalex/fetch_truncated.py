@@ -19,9 +19,9 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
-from pipeline.ingestion.http.breaker_scope import UnderCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
@@ -136,6 +136,6 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 
 
 def build() -> Phase:
-    """Relit les works OpenAlex tronqués à 100 auteurs, sous le circuit-breaker d'OpenAlex."""
+    """Relit les works OpenAlex tronqués à 100 auteurs, par l'accès à OpenAlex."""
 
-    return UnderCircuitBreaker("openalex", FetchTruncatedPhase())
+    return SourcePhase("openalex", "fetch_truncated", FetchTruncatedPhase())

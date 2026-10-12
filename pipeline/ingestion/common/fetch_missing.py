@@ -24,23 +24,21 @@ from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCH
 from domain.types import JsonValue
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.parallel import RunParallel
-from pipeline.ingestion.http.breaker_scope import under_circuit_breaker
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
+from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing, log, open_tx
+from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import branche_de_source, etape, rien_a_faire
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.runtime.observability.signals import filter_configured, select_targets, timed_metrics
+from pipeline.runtime.observability.signals import select_targets, skipped, timed_metrics
 
 FetchChannel = Callable[[], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
 FetchDoiOne = Callable[[str], PhaseMetrics]
-"""Recherche par DOI dans une source cible, sous circuit-breaker."""
-CredentialsMissing = Callable[[str], "str | None"]
-"""`(source) -> motif d'absence de credentials | None si configurée`."""
+"""Recherche par DOI dans une source cible, par l'accès à cette source."""
 
 
 def _summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
@@ -59,7 +57,6 @@ class FetchMissingPhase:
     fetch_hal_by_nnt: FetchChannel
     fetch_doi_one: FetchDoiOne
     run_parallel: RunParallel
-    credentials_missing: CredentialsMissing
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Enchaîne les canaux HAL puis la recherche par DOI parallèle, et assemble les métriques."""
@@ -85,25 +82,18 @@ class FetchMissingPhase:
         doi_targets = select_targets(
             DOI_SEARCHABLE_SOURCES, sources, include_wos=options.include_wos
         )
-        configured = filter_configured(
-            doi_targets,
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=logger,
-            phase="fetch_missing",
-        )
-
-        if configured:
+        if doi_targets:
             etape(logger, "Recherche par DOI des documents manquants dans chaque source")
             outcomes = self.run_parallel(
                 {
                     target: partial(timed_metrics, partial(self.fetch_doi_one, target))
-                    for target in configured
+                    for target in doi_targets
                 }
             )
             for target, (channel_metrics, duration) in outcomes.items():
                 metrics.merge(channel_metrics)
-                by_channel[target] = _summary(channel_metrics, duration)
+                if not skipped(channel_metrics):
+                    by_channel[target] = _summary(channel_metrics, duration)
             # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
             if all(m.total == 0 and not m.signals for m, _ in outcomes.values()):
                 rien_a_faire(logger)
@@ -325,7 +315,6 @@ def build() -> Phase:
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
         fetch_doi_one=_run_fetch_missing_doi,
         run_parallel=run_parallel,
-        credentials_missing=credentials_missing,
     )
 
 
@@ -336,7 +325,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
-        return under_circuit_breaker(
+        return access_source(
             "hal",
             lambda _breaker: asyncio.run(
                 fetch_missing_hal_by_id(conn, log, retry_after_days=retry_after_days)
@@ -353,7 +342,7 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
-        return under_circuit_breaker(
+        return access_source(
             "hal",
             lambda _breaker: asyncio.run(
                 fetch_missing_hal_by_nnt(conn, log, retry_after_days=retry_after_days)
@@ -393,7 +382,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         limit = get_fetch_missing_max_per_source(conn)
-        return under_circuit_breaker(
+        return access_source(
             target,
             lambda breaker: asyncio.run(
                 fetch_missing_doi(

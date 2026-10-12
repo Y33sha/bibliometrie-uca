@@ -1,4 +1,4 @@
-"""Contexte d'exécution commun aux phases : journal du pipeline, transaction gérée, identifiants des sources.
+"""Contexte d'exécution commun aux phases : journal du pipeline, transaction gérée.
 
 Les imports d'infrastructure restent locaux aux fonctions : charger ce module ne charge aucun client de source.
 """
@@ -30,10 +30,3 @@ def open_tx() -> AbstractContextManager[Connection]:
 def phase_context(options: RunOptions) -> PhaseContext:
     """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run."""
     return PhaseContext(open_tx=open_tx, logger=log, options=options)
-
-
-def credentials_missing(source: str) -> str | None:
-    """Motif d'absence des identifiants d'une source, ou `None` si elle est configurée. Injecté aux phases qui interrogent une API tierce."""
-    from pipeline.runtime.config import source_credentials_missing
-
-    return source_credentials_missing(source)

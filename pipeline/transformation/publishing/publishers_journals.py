@@ -13,7 +13,7 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
-Chaque sous-étape tient une ligne du journal, sous le titre de son groupe. Un accès non configuré est sauté avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, circuit-breaker, adapters) et la détection de configuration sont injectés par le câblage ; ici, la séquence, les gardes de configuration et l'assemblage des métriques.
+Chaque sous-étape tient une ligne du journal, sous le titre de son groupe. Une sous-étape qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, accès à la source, adapters) sont injectés par le câblage ; ici, la séquence et l'assemblage des métriques.
 """
 
 from __future__ import annotations
@@ -23,12 +23,11 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from pipeline.ingestion.http.breaker_scope import under_circuit_breaker
+from pipeline.ingestion.http.source_access import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import credentials_missing, log, open_tx
+from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import filter_configured
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
     enrich_journals_from_openalex,
@@ -45,42 +44,28 @@ from pipeline.transformation.publishing.monographs import (
 from pipeline.transformation.publishing.publishers import resolve_publishers
 
 RunSubstep = Callable[[], PhaseMetrics]
-CredentialsMissing = Callable[[str], str | None]
 
 
 @dataclass(frozen=True)
 class _SousEtape:
-    """Sous-étape de la phase : le champ de `PublishersJournalsPhase` qui l'exécute, son libellé, et les accès à configurer avant de la lancer."""
+    """Sous-étape de la phase : le champ de `PublishersJournalsPhase` qui l'exécute, et son libellé."""
 
     champ: str
     libelle: str
-    acces: tuple[str, ...] = ()
 
 
 _GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
     (
         "Éditeurs",
         (
-            _SousEtape(
-                "resolve_crossref_publishers",
-                resolve_publishers.LIBELLES["Crossref"],
-                ("crossref",),
-            ),
-            _SousEtape(
-                "resolve_datacite_publishers",
-                resolve_publishers.LIBELLES["DataCite"],
-                ("datacite",),
-            ),
+            _SousEtape("resolve_crossref_publishers", resolve_publishers.LIBELLES["Crossref"]),
+            _SousEtape("resolve_datacite_publishers", resolve_publishers.LIBELLES["DataCite"]),
         ),
     ),
     (
         "Revues",
         (
-            _SousEtape(
-                "enrich_journals_from_openalex",
-                enrich_journals_from_openalex.LIBELLE,
-                ("openalex",),
-            ),
+            _SousEtape("enrich_journals_from_openalex", enrich_journals_from_openalex.LIBELLE),
             _SousEtape("check_journals_in_sudoc", check_journals_in_sudoc.LIBELLE),
             _SousEtape("merge_duplicate_journals", merge_duplicate_journals.LIBELLE),
             _SousEtape("type_proceedings_journals", type_proceedings_journals.LIBELLE),
@@ -112,7 +97,6 @@ class PublishersJournalsPhase:
     merge_duplicate_monographs: RunSubstep
     link_monographs_to_collections: RunSubstep
     type_proceedings_volumes: RunSubstep
-    credentials_missing: CredentialsMissing
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Enchaîne les groupes de sous-étapes, écrit une ligne par sous-étape et assemble les métriques de la phase."""
@@ -123,26 +107,19 @@ class PublishersJournalsPhase:
             etape(logger, titre)
             for indice, sous_etape in enumerate(sous_etapes):
                 branche = DERNIERE_BRANCHE if indice == len(sous_etapes) - 1 else BRANCHE
-                by_step[sous_etape.champ] = self._run_one(sous_etape, branche, metrics, logger)
+                by_step[sous_etape.champ] = self._run_one(sous_etape, branche, logger)
         _assemble(metrics, by_step)
         return metrics
 
     def _run_one(
-        self, sous_etape: _SousEtape, branche: str, metrics: PhaseMetrics, logger: logging.Logger
+        self, sous_etape: _SousEtape, branche: str, logger: logging.Logger
     ) -> PhaseMetrics:
-        """Exécute une sous-étape, sauf si aucun de ses accès n'est configuré, et écrit sa ligne de bilan."""
-        if sous_etape.acces and not filter_configured(
-            list(sous_etape.acces),
-            metrics,
-            credentials_missing=self.credentials_missing,
-            logger=logger,
-            phase="publishers_journals",
-        ):
-            logger.info("%s%s : sautée, accès non configuré", branche, sous_etape.libelle)
-            return PhaseMetrics()
+        """Exécute une sous-étape et écrit sa ligne de bilan."""
         sub: PhaseMetrics = getattr(self, sous_etape.champ)()
         if sub.resume is not None:
             bilan = sub.resume
+        elif any(s["code"] == "source_unconfigured" for s in sub.signals):
+            bilan = "sautée, accès non configuré"
         elif sub.signals:
             bilan = "interrompue"
         else:
@@ -250,7 +227,6 @@ def build() -> Phase:
         merge_duplicate_monographs=_run_merge_duplicate_monographs,
         link_monographs_to_collections=_run_link_monographs_to_collections,
         type_proceedings_volumes=_run_type_proceedings_volumes,
-        credentials_missing=credentials_missing,
     )
 
 
@@ -264,7 +240,7 @@ def _run_resolve_crossref_publishers() -> PhaseMetrics:
 
     user_agent = _prefixes_user_agent()
     with open_tx() as conn:
-        return under_circuit_breaker(
+        return access_source(
             "crossref",
             lambda breaker: run_resolve_crossref_publishers(
                 conn,
@@ -291,7 +267,7 @@ def _run_resolve_datacite_publishers() -> PhaseMetrics:
 
     user_agent = _prefixes_user_agent()
     with open_tx() as conn:
-        return under_circuit_breaker(
+        return access_source(
             "datacite",
             lambda breaker: run_resolve_datacite_publishers(
                 conn,
@@ -327,8 +303,8 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     with open_tx() as conn:
         # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
         # le run suivant.
-        return under_circuit_breaker(
-            "openalex sources",
+        return access_source(
+            "openalex",
             lambda breaker: run_enrich_journals_from_openalex(
                 conn,
                 log,
@@ -360,7 +336,7 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
     base_url = API_BASE_URLS["sudoc"]
     with open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
-        return under_circuit_breaker(
+        return access_source(
             "sudoc",
             lambda breaker: asyncio.run(
                 run_check_journals_in_sudoc(
@@ -465,10 +441,15 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
-        return run_enrich_journals_from_doaj(
-            conn,
-            log,
-            journal_repo=JournalGatewayQueries(conn),
-            refresh_after_days=get_doaj_refresh_after_days(conn),
-            download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
+        return access_source(
+            "doaj",
+            lambda _breaker: run_enrich_journals_from_doaj(
+                conn,
+                log,
+                journal_repo=JournalGatewayQueries(conn),
+                refresh_after_days=get_doaj_refresh_after_days(conn),
+                download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
+            ),
+            phase="publishers_journals",
+            logger=log,
         )
