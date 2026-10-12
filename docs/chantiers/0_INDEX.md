@@ -20,7 +20,6 @@
 - [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Le SQL métier partagé hors d'`infrastructure/db`](CODE_infrastructure-db.md)
 - [Licences des publications](DATA_licences.md)
-- [Modularité du pipeline](CODE_pipeline.md)
 - [Monographies](DATA_monographies.md)
 - [Normalisation par lots de documents](CODE_batch-normalize.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
