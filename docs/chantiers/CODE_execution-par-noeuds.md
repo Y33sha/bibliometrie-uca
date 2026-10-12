@@ -34,7 +34,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 - [x] `publications.reconcile` lit `journals.journal_type` et `monographs.journal_id` sans les déclarer.
 - [x] Lectures déclarées à tort : `language_forms` par `normalize.<source>`, les référentiels de publication par `normalize.theses`, `publications` par `subjects.usage`, `countries` par `countries.detect`, `source_publications.external_ids` par `oa_status.verify_unpaywall`.
 - [x] `oa_status.verify_unpaywall` interroge Unpaywall sans déclarer de `network`.
-- [ ] Étapes sans nœud : import du dump ROR et seconde matérialisation de `perimeter_structures` au début d'`affiliations`, `VACUUM` du staging.
+- [x] Étapes sans nœud. L'import du dump ROR devient le nœud `affiliations.refresh_ror`. La seconde matérialisation de `perimeter_structures` disparaît : `run.py` le matérialise avant toute phase. Le `VACUUM` du staging et les deux `ANALYZE` des signatures sont déclarés comme maintenance de leur nœud, sans dépendance.
 - [ ] Les canaux de `fetch_missing` partagent une même déclaration, trop large pour chacun.
 - [ ] Journal : `fetch_stale`, `resolve_ra` et `extract` en mode daily n'ont pas de titre de section. Les épinglages de `persons` et les documents disparus de `normalize` s'affichent sans branche.
 
@@ -53,6 +53,7 @@ Accès aux sources :
 
 - [ ] Chaque nœud désigne sa fonction. `run.py` exécute les nœuds dans l'ordre du graphe. Il affiche le cadre quand le groupe change, le titre de section quand la section change, puis le bilan du nœud.
 - [ ] Un nœud qui déclare un `network` s'exécute dans la fonction d'accès à sa source, posée par l'exécuteur.
+- [ ] L'exécuteur lance la maintenance déclarée d'un nœud à la fin du nœud. `authorships.build` se découpe en deux nœuds, pour que `ANALYZE authorships` tombe entre la création des paires et la propagation de leurs attributs.
 - [ ] Mise à jour de la documentation, dont `publisher_checked_at` et `resolve_publishers` dans `docs/pipeline/05-publishers-journals.md`, `docs/agregats/publishers.md` et `docs/sources/`, et la matérialisation de `perimeter_structures` dans `docs/donnees/08-donnees-derivees.md`.
 
 ## Questions ouvertes

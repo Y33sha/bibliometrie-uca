@@ -3,6 +3,8 @@
 Une donnée se désigne par sa table (`"journals"`) ou par une colonne (`"journals.journal_type"`) ; `"journals.id"` désigne l'existence des lignes, que créent et suppriment les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
 Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une lecture déclarée `previous_run` lit aussi ce qu'un nœud placé après lui, ou lui-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucun nœud une donnée écrite après lui, sauf lecture du run précédent déclarée.
+
+La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance.
 """
 
 from collections.abc import Iterable, Sequence
@@ -28,6 +30,8 @@ class Node:
     previous_run: frozenset[str] = frozenset()
     # API interrogée, si le nœud sort sur le réseau.
     network: str | None = None
+    # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE authorships`.
+    maintenance: tuple[str, ...] = ()
 
 
 def _node(
@@ -38,6 +42,7 @@ def _node(
     writes: Iterable[str] = (),
     previous_run: Iterable[str] = (),
     network: str | None = None,
+    maintenance: tuple[str, ...] = (),
 ) -> Node:
     return Node(
         name,
@@ -46,6 +51,7 @@ def _node(
         frozenset(writes),
         frozenset(previous_run),
         network,
+        maintenance,
     )
 
 
@@ -256,6 +262,8 @@ NODES: tuple[Node, ...] = (
         reads=("source_authorships.identity_id", "author_identifying_keys.id"),
         writes=("author_identifying_keys.id",),
         previous_run=("source_authorships",),
+        # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
+        maintenance=("VACUUM staging",),
     ),
     _node(
         "affiliations.refresh_ror",
@@ -722,6 +730,8 @@ NODES: tuple[Node, ...] = (
             "persons.id",
             "person_name_forms.id",
         ),
+        # `normalize` et `persons` réécrivent en masse `source_authorships.person_id`.
+        maintenance=("ANALYZE source_authorships",),
     ),
     _node(
         "authorships.build",
@@ -741,6 +751,8 @@ NODES: tuple[Node, ...] = (
         ),
         writes=("authorships",),
         previous_run=("publications",),
+        # Entre la création des paires et la propagation de leurs attributs, à l'intérieur du nœud.
+        maintenance=("ANALYZE authorships",),
     ),
     _node(
         "authorships.publications_in_perimeter",
