@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
 
 from pipeline.ingestion.http.circuit_breaker import (
     DEFAULT_THRESHOLD,
@@ -18,7 +17,6 @@ from pipeline.ingestion.http.circuit_breaker import (
     set_current_breaker,
 )
 from pipeline.runtime import config
-from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
     signal_source_unavailable,
@@ -50,23 +48,6 @@ def access_source(
             signal_source_unavailable(metrics, source, logger=logger, phase=phase)
     _signal_if_tripped(metrics, breaker)
     return metrics
-
-
-@dataclass(frozen=True)
-class SourcePhase:
-    """Phase qui interroge une seule source, exécutée par `access_source`."""
-
-    source: str
-    name: str
-    phase: Phase
-
-    def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        return access_source(
-            self.source,
-            lambda breaker: self.phase.run(ctx),  # noqa: ARG005
-            phase=self.name,
-            logger=ctx.logger,
-        )
 
 
 @contextmanager

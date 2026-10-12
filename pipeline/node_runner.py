@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pipeline.graph import NODES, Node
 from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.runtime.context import PhaseContext
+from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -81,3 +81,16 @@ def _bilan(metrics: PhaseMetrics) -> str:
     if metrics.signals:
         return "interrompue"
     return "rien à faire"
+
+
+@dataclass(frozen=True)
+class NodePhase:
+    """Phase d'un seul nœud, `node`, dont `phase` fait le travail."""
+
+    node: str
+    phase: Phase
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        group = self.node.partition(".")[0]
+        step = NodeStep(lambda ctx, _breaker: self.phase.run(ctx))
+        return run_nodes(group, {self.node: step}, ctx)[self.node]
