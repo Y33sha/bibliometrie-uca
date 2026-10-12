@@ -39,7 +39,7 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 
 - [ ] Profil de `normalize` sur HAL et OpenAlex, avec `--normalize-full` : part de l'analyse, des lectures et des écritures. L'échantillon se rejoue depuis le raw store (`rehydrate_staging_from_raw_store`, puis `run_pipeline --only normalize --sources <source>`).
 - [x] HAL, 3 545 notices en 450 s : la lecture des signatures stockées prend la moitié du temps. Le planificateur sous-estime le nombre de notices distinctes de `source_authorships` et choisit un plan parallèle, dont le lancement coûte 55 ms par requête. Une migration fixe l'estimation (`n_distinct`).
-- [x] HAL après la migration, 4 435 notices en 190 s sous profileur : 43 ms par notice au lieu de 127. L'attente de PostgreSQL ne fait plus que 49 s. Le reste est du calcul Python, grossi par le profileur : le TEI est analysé deux fois par notice pour les ISBN (`get_container_facts`, `build_hal_external_ids`), et `sanitize_raw_text` coûte 19 s.
+- [x] HAL après la migration, 4 435 notices en 190 s sous profileur : 43 ms par notice au lieu de 127. L'attente de PostgreSQL ne fait plus que 49 s. Le reste est du calcul Python, grossi par le profileur. `sanitize_raw_text` y coûtait 19 s : le texte d'une adresse était assaini trois fois. `AddressRecord` l'assainit à la construction.
 
 ### 2. Lectures et écritures des signatures par lot
 

@@ -1,10 +1,11 @@
-"""Tests du writer partagé des signatures : neutralisation des identifiants partagés dans un document, colonnes de nom."""
+"""Tests du writer partagé des signatures : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
 
 from unittest.mock import MagicMock
 
 from domain.persons.signature_name import SignatureName
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signatures import (
+    AddressRecord,
     AuthorRecord,
     signature_name_fields,
     write_source_authorships,
@@ -62,3 +63,7 @@ class TestSignatureNameFields:
     def test_sans_prenom(self):
         fields = signature_name_fields(SignatureName(last_name="Dupont"))
         assert (fields["last_name_normalized"], fields["first_name_normalized"]) == ("dupont", None)
+
+
+def test_texte_d_adresse_assaini_a_la_construction():
+    assert AddressRecord("  Labo A​ ").text == "Labo A"
