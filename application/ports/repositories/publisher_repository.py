@@ -40,10 +40,6 @@ class PublisherRepository(Protocol):
 
     # ── Enrichissement pays (maintenance) ──────────────────────────
 
-    def find_needing_country_enrichment(self, *, limit: int | None = None) -> list[tuple[int, str]]:
-        """`(id, openalex_id)` des éditeurs à `openalex_id` connu et `country` absent, triés par id (batching stable). `limit=None` les rend tous."""
-        ...
-
     # ── Persistance de l'agrégat ───────────────────────────────────
 
     def save(self, publisher: Publisher) -> None:

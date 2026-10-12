@@ -1,7 +1,9 @@
 # STATUS: maintenance
 """Enrichissement (cosmétique) du `country` des éditeurs depuis OpenAlex Publishers.
 
-Hors pipeline (champs d'affichage), lancé à la demande. Politique « NULL only » : les valeurs saisies par un administrateur sont préservées ; idempotent.
+Hors pipeline, lancé à la demande. Seuls les éditeurs sans pays reçoivent celui d'OpenAlex : une valeur saisie par un administrateur est préservée, et deux exécutions successives donnent le même résultat.
+
+Le circuit-breaker de source arrête la boucle quand OpenAlex est à bout de budget (429). Le reste est repris à l'exécution suivante.
 
 Usage :
     python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]
@@ -10,11 +12,19 @@ Usage :
 from __future__ import annotations
 
 import argparse
+import logging
 import os
+import time
+from collections import Counter
+from collections.abc import Callable
+from typing import NamedTuple, NotRequired, TypedDict, cast
 
+from sqlalchemy import Connection, text
+
+from domain.sources.openalex import full_openalex_id, short_openalex_id
+from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import publisher_repository
 from infrastructure.sources.api_params import API_BASE_URLS, OPENALEX_DELAY
 from infrastructure.sources.circuit_breaker import (
     SourceCircuitBreaker,
@@ -22,10 +32,168 @@ from infrastructure.sources.circuit_breaker import (
     reset_current_breaker,
     set_current_breaker,
 )
-from pipeline.containers.enrich_publishers import run_enrich_publishers_from_openalex
-from pipeline.sources.openalex.publisher_enrichment import fetch_publishers_batch
+from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.savepoint import rollback_unless_invalidated
+from pipeline.sources.openalex.api import credential_params
 
 log = setup_logger("enrich_publishers", os.path.dirname(__file__))
+
+BATCH_SIZE = 50
+
+_COUNTRYLESS = text("""
+    SELECT id, openalex_id FROM publishers
+    WHERE openalex_id IS NOT NULL AND country IS NULL
+    ORDER BY id
+    LIMIT :limit
+""")
+
+_SET_COUNTRY = text("UPDATE publishers SET country = :country WHERE id = :id AND country IS NULL")
+
+FetchPublishersBatch = Callable[[list[str]], dict[str, str | None]]
+"""`(openalex_ids) -> {short_id: pays}`. Le pays vaut `None` quand la source n'en donne pas ; un éditeur sur lequel elle ne répond rien est absent du dictionnaire."""
+
+
+def find_countryless(conn: Connection, limit: int | None = None) -> list[tuple[int, str]]:
+    """`(id, openalex_id)` des éditeurs qui ont un `openalex_id` et pas de pays, par id. `limit=None` les rend tous."""
+    return [(r.id, r.openalex_id) for r in conn.execute(_COUNTRYLESS, {"limit": limit}).all()]
+
+
+class _OpenAlexPublisher(TypedDict):
+    """Sous-ensemble de la payload OpenAlex Publishers lu ici."""
+
+    id: str
+    country_codes: NotRequired[list[str]]
+
+
+def extract_country(source: _OpenAlexPublisher) -> str | None:
+    """Pays d'un éditeur dans la payload OpenAlex Publishers.
+
+    Premier code de `country_codes`, en minuscule. Le premier pays correspond généralement au siège. Liste vide ou absente : `None`.
+    """
+    country_codes = source.get("country_codes") or []
+    return country_codes[0].lower() if country_codes else None
+
+
+def fetch_publishers_batch(
+    openalex_ids: list[str], *, openalex_publishers_api: str
+) -> dict[str, str | None]:
+    """Interroge OpenAlex Publishers pour un lot d'identifiants (filtre à `|`, 50 au plus).
+
+    Rend `{}` en cas d'échec : `http_request_with_retry` a déjà compté l'échec au circuit-breaker, que la boucle consulte.
+    """
+    params: dict[str, str] = {
+        "filter": f"ids.openalex:{'|'.join(full_openalex_id(oid) for oid in openalex_ids)}",
+        "per_page": str(len(openalex_ids)),
+        "select": "id,country_codes",
+        **credential_params(),
+    }
+    try:
+        data = as_mapping(
+            http_request_with_retry(
+                "GET", openalex_publishers_api, params=params, timeout=30, label="publishers batch"
+            )
+        )
+    except Exception as exc:
+        log.warning("OpenAlex publishers batch : %r", exc)
+        return {}
+    results = cast("list[_OpenAlexPublisher]", data.get("results", []))
+    return {short_openalex_id(source["id"]): extract_country(source) for source in results}
+
+
+class _BatchOutcome(NamedTuple):
+    """Compteurs du traitement d'un lot d'éditeurs."""
+
+    updated: int
+    no_response: int
+    countries: Counter[str]
+
+
+def _enrich_batch(
+    conn: Connection,
+    id_map: dict[str, int],
+    countries_by_id: dict[str, str | None],
+    *,
+    dry_run: bool,
+) -> _BatchOutcome:
+    """Écrit le pays OpenAlex des éditeurs d'un lot. `id_map` associe `openalex_id` et id de l'éditeur."""
+    updated = no_response = 0
+    countries: Counter[str] = Counter()
+    for oa_id, publisher_id in id_map.items():
+        if oa_id not in countries_by_id:
+            no_response += 1
+            continue
+        country = countries_by_id[oa_id]
+        if not country:
+            continue
+        if (
+            not dry_run
+            and not conn.execute(_SET_COUNTRY, {"id": publisher_id, "country": country}).rowcount
+        ):
+            continue
+        countries[country] += 1
+        updated += 1
+    return _BatchOutcome(updated, no_response, countries)
+
+
+def run_enrich_publishers_from_openalex(
+    conn: Connection,
+    logger: logging.Logger,
+    *,
+    fetch_batch: FetchPublishersBatch,
+    breaker: SourceCircuitBreaker,
+    limit: int = 0,
+    dry_run: bool = False,
+    rate_delay: float = 0.1,
+) -> None:
+    """Pose le pays OpenAlex des éditeurs qui n'en ont pas, par lots de `BATCH_SIZE`, avec un commit par lot."""
+    try:
+        publishers = find_countryless(conn, limit or None)
+        total = len(publishers)
+        logger.info("%s éditeurs à enrichir (avec openalex_id, sans pays).", total)
+        if total == 0:
+            return
+
+        updated = no_response = processed = 0
+        country_counter: Counter[str] = Counter()
+        for i in range(0, total, BATCH_SIZE):
+            if breaker.tripped:
+                if not dry_run:
+                    conn.commit()
+                logger.warning(
+                    "⚡ Coupe-circuit OpenAlex : enrichissement éditeurs interrompu à %d/%d. "
+                    "Reste retenté à la prochaine exécution.",
+                    processed,
+                    total,
+                )
+                return
+            id_map = {oa_id: publisher_id for publisher_id, oa_id in publishers[i : i + BATCH_SIZE]}
+            countries_by_id = fetch_batch(list(id_map))
+            time.sleep(rate_delay)
+            outcome = _enrich_batch(conn, id_map, countries_by_id, dry_run=dry_run)
+            updated += outcome.updated
+            no_response += outcome.no_response
+            country_counter += outcome.countries
+            processed += len(id_map)
+            if not dry_run:
+                conn.commit()
+            logger.info("  %s/%s — %s pays écrits", min(i + BATCH_SIZE, total), total, updated)
+
+        logger.info(
+            "Terminé : %s/%s éditeurs mis à jour, %s sans réponse.", updated, total, no_response
+        )
+        if country_counter:
+            distrib = ", ".join(f"{c}={n}" for c, n in country_counter.most_common(10))
+            logger.info("Pays les plus posés : %s", distrib)
+    except KeyboardInterrupt:
+        # Un Ctrl+C en plein execute avorte la transaction : le lot en cours est annulé, les lots
+        # déjà committés restent.
+        rollback_unless_invalidated(conn)
+        logger.warning("Interruption — lots déjà committés conservés.")
+        raise
+    except Exception as e:
+        rollback_unless_invalidated(conn)
+        logger.error("Erreur fatale : %s", e)
+        raise
 
 
 def main() -> int:
@@ -49,10 +217,8 @@ def main() -> int:
         run_enrich_publishers_from_openalex(
             conn,
             log,
-            publisher_repo=publisher_repository(conn),
             fetch_batch=lambda oa_ids: fetch_publishers_batch(
-                oa_ids,
-                openalex_publishers_api=publishers_api,
+                oa_ids, openalex_publishers_api=publishers_api
             ),
             breaker=breaker,
             limit=args.limit,
