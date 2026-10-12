@@ -53,7 +53,7 @@ Les avertissements de source non configurée ou indisponible s'affichent après 
 
 | Nœud | Étape | Journal |
 |---|---|---|
-| — | import du dump ROR, si une version plus récente existe (réseau : Zenodo) | ▶ Référentiel ROR ; └─ version déjà importée, importée, ou dump inaccessible |
+| `affiliations.refresh_ror` | import du dump ROR, si une version plus récente existe (réseau : Zenodo) | ▶ Référentiel ROR ; └─ version déjà importée, importée, ou dump inaccessible |
 | — | seconde matérialisation de `perimeter_structures`, garde du périmètre vide | aucun |
 | `affiliations.resolve_addresses` | structures reconnues dans les adresses | ▶ Identification des structures dans les adresses institutionnelles ; ├─ barre ; └─ bilan |
 | `affiliations.populate` | vue `source_authorship_structures`, `in_perimeter` des signatures | ▶ Rattachement des structures aux auteurs des documents ; └─ Terminé en… |

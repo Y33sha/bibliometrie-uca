@@ -258,6 +258,14 @@ NODES: tuple[Node, ...] = (
         previous_run=("source_authorships",),
     ),
     _node(
+        "affiliations.refresh_ror",
+        "affiliations",
+        reads=("ror_dump_imports",),
+        writes=("ror_organizations", "ror_relations", "ror_dump_imports"),
+        previous_run=("ror_dump_imports",),
+        network="zenodo",
+    ),
+    _node(
         "affiliations.resolve_addresses",
         "affiliations",
         reads=(
