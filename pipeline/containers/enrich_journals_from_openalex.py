@@ -13,10 +13,10 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.journals import JournalOpenAlexEnrichmentQueries
 from application.services.journals.core import update_journal_apc
 from domain.journals.journal import JournalType
+from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from pipeline.libelles import forme
 from pipeline.metrics import PhaseMetrics
 
@@ -55,7 +55,7 @@ def run_enrich_journals_from_openalex(
     *,
     journal_repo: JournalOpenAlexEnrichmentQueries,
     fetch_batch: FetchSourcesBatch,
-    breaker: CircuitBreaker,
+    breaker: SourceCircuitBreaker,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
     journals = journal_repo.find_journals_of_unknown_type()

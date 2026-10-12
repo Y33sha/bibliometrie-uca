@@ -10,11 +10,11 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.lookup import NotFound, Unavailable
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_mapping, as_sequence
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import NotFound, Unavailable
 from pipeline.sources.failed_lookups import forget_failed_doi_lookups
 from pipeline.sources.fetch_missing import DoiBatchResult
 from pipeline.sources.openalex.api import auth_params

@@ -13,11 +13,11 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.dump import DumpUnavailableError
 from application.ports.pipeline.journals import JournalDoajQueries
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
+from infrastructure.sources.dump_download import DumpUnavailableError
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente

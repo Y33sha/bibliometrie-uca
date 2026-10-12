@@ -15,13 +15,13 @@ def build() -> Phase:
     """
     import httpx2
 
-    from application.ports.pipeline.lookup import LookupOutcome
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import (
         get_polite_pool_email_optional,
         get_unpaywall_max_per_run,
         get_unpaywall_recheck_after_days,
     )
+    from infrastructure.sources.lookup import LookupOutcome
     from pipeline.publications.oa_status import OaStatusPhase
     from pipeline.publications.oa_status_queries import OaStatusQueries
     from pipeline.sources.unpaywall import fetch_oa_status

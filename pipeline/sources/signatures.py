@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.fingerprint import Fingerprinter
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
@@ -26,6 +25,7 @@ from domain.source_publications.signature_sync import (
 )
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue
+from infrastructure.fingerprint import Fingerprinter
 from pipeline.sources.signature_queries import (
     AddressCountryItem,
     AuthorshipAddressItem,

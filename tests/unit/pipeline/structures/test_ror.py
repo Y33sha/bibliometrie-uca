@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from application.ports.pipeline.dump import DumpUnavailableError
+from infrastructure.sources.dump_download import DumpUnavailableError
 from pipeline.structures.ror import run_refresh_ror
 
 _LOG = logging.getLogger("test")

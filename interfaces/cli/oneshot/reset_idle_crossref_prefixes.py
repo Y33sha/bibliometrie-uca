@@ -19,10 +19,10 @@ import os
 import httpx2
 from sqlalchemy import text
 
-from application.ports.pipeline.lookup import NotFound, Unavailable
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.config import get_polite_pool_email
+from infrastructure.sources.lookup import NotFound, Unavailable
 from infrastructure.sources.polite_pool import build_user_agent
 from pipeline.sources.crossref.prefixes import member_profile
 

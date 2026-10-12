@@ -11,9 +11,9 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from pipeline.context import Phase, PhaseContext, RunOptions
 from pipeline.metrics import PhaseMetrics
 from pipeline.signals import signal_source_unavailable

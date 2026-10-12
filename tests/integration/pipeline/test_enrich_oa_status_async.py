@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from application.ports.pipeline.lookup import LookupOutcome
+from infrastructure.sources.lookup import LookupOutcome
 from pipeline.context import PhaseContext, RunOptions
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.oa_status import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase

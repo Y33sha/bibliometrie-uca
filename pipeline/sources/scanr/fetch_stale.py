@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import httpx2
 
-from application.ports.pipeline.lookup import NOT_FOUND, NotFound, Unavailable
 from domain.types import JsonValue, as_mapping, as_sequence
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.sources.scanr.fields import extract_doi
 

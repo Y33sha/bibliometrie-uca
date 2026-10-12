@@ -16,11 +16,11 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 import httpx2
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from domain.source_publications.external_ids import ExternalIdType
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
 from infrastructure.sources.http_retry import lookup_json_async
+from infrastructure.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.metrics import PhaseMetrics

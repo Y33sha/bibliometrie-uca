@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from interfaces.cli.maintenance import enrich_publishers as module
 from interfaces.cli.maintenance.enrich_publishers import main
 
