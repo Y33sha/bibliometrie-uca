@@ -612,6 +612,8 @@ NODES: tuple[Node, ...] = (
             "source_authorships.in_perimeter",
             "publications",
             "apc_payments",
+            "journals.journal_type",
+            "monographs.journal_id",
         ),
         writes=(
             "publications",
@@ -620,7 +622,8 @@ NODES: tuple[Node, ...] = (
             "source_publications.keys_dirty",
             "apc_payments.publication_id",
         ),
-        previous_run=("source_publications.countries", "publications"),
+        # Revues et monographies vides supprimées par `authorships.delete_empty_containers`.
+        previous_run=("source_publications.countries", "publications", "journals", "monographs"),
     ),
     _node(
         "publications.delete_without_sources",
