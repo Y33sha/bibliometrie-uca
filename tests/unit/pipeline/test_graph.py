@@ -97,3 +97,11 @@ def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publicatio
     assert not any(
         item.startswith(("journals", "publishers", "monographs")) for item in theses.writes
     )
+
+
+def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
+    """Les lectures communes viennent du groupe ; seuls les canaux Crossref et DataCite lisent l'agence des préfixes."""
+    reads = {n.name: n.reads for n in NODES if n.group == "fetch_missing"}
+    assert all("failed_lookups" in r for r in reads.values())
+    lisent_l_agence = {name for name, r in reads.items() if "doi_prefixes.ra" in r}
+    assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}

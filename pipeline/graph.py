@@ -34,6 +34,33 @@ class Node:
     maintenance: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class _GroupIo:
+    """Lectures et écritures communes à tous les nœuds d'une phase."""
+
+    reads: tuple[str, ...] = ()
+    writes: tuple[str, ...] = ()
+    previous_run: tuple[str, ...] = ()
+
+
+_GROUP_IO: dict[str, _GroupIo] = {
+    # Identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`.
+    "fetch_missing": _GroupIo(
+        reads=(
+            "config",
+            "staging",
+            "failed_lookups",
+            "source_publications.source",
+            "source_publications.external_ids",
+            "source_publications.publication_id",
+            "publications.in_perimeter",
+        ),
+        writes=("staging", "failed_lookups"),
+        previous_run=("staging", "failed_lookups", "source_publications", "publications"),
+    ),
+}
+
+
 def _node(
     name: str,
     group: str,
@@ -44,12 +71,14 @@ def _node(
     network: str | None = None,
     maintenance: tuple[str, ...] = (),
 ) -> Node:
+    """Nœud de `group`, avec les lectures et écritures communes à la phase (`_GROUP_IO`)."""
+    shared = _GROUP_IO.get(group, _GroupIo())
     return Node(
         name,
         group,
-        frozenset(reads),
-        frozenset(writes),
-        frozenset(previous_run),
+        frozenset((*shared.reads, *reads)),
+        frozenset((*shared.writes, *writes)),
+        frozenset((*shared.previous_run, *previous_run)),
         network,
         maintenance,
     )
@@ -138,40 +167,27 @@ NODES: tuple[Node, ...] = (
         )
         for source in HARVESTED_SOURCES
     ),
+    _node("fetch_missing.hal_by_id", "fetch_missing", network="hal"),
+    _node(
+        "fetch_missing.hal_by_nnt",
+        "fetch_missing",
+        reads=("publications.doc_type",),
+        network="hal",
+    ),
     *(
         _node(
-            f"fetch_missing.{channel}",
+            f"fetch_missing.doi.{source}",
             "fetch_missing",
+            # DOI candidats de la vue `candidate_dois`, et agence d'enregistrement pour Crossref et DataCite.
             reads=(
-                "config",
-                "staging",
-                "failed_lookups",
-                "source_publications.id",
-                "source_publications.source",
                 "source_publications.doi",
-                "source_publications.external_ids",
-                "source_publications.publication_id",
-                "publications.in_perimeter",
-                "publications.doc_type",
-                "doi_prefixes.ra",
                 "publication_relations",
+                *(("doi_prefixes.ra",) if source in (Source.CROSSREF, Source.DATACITE) else ()),
             ),
-            writes=("staging", "failed_lookups"),
-            previous_run=(
-                "staging",
-                "failed_lookups",
-                "source_publications",
-                "publications",
-                "doi_prefixes",
-                "publication_relations",
-            ),
-            network=network,
+            previous_run=("doi_prefixes", "publication_relations"),
+            network=source,
         )
-        for channel, network in (
-            ("hal_by_id", "hal"),
-            ("hal_by_nnt", "hal"),
-            *((f"doi.{source}", source) for source in DOI_SEARCHABLE_SOURCES),
-        )
+        for source in DOI_SEARCHABLE_SOURCES
     ),
     *(
         _node(
