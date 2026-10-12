@@ -34,7 +34,7 @@ Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du
 
 ### Phase 3 — Documentation
 
-- [ ] `docs/donnees` : une page par schéma.
+- [x] `docs/donnees` : une page par schéma.
 
 ## Questions ouvertes
 

@@ -1,8 +1,8 @@
-# Publications
+# Schéma `publications`
 
-*À jour le 2026-09-05.*
+*À jour le 2026-10-12.*
 
-Référentiel consolidé des productions de recherche. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de résolution d'entités.
+Référentiel consolidé des productions de recherche et de leurs contributions. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de résolution d'entités.
 
 ```mermaid
 flowchart LR
@@ -34,16 +34,25 @@ Légende :
 
 ## Tables associées
 
-- **`journals`** : référentiel des revues.
-- **`journal_name_forms`** : formes de noms normalisées pour reconnaître une revue (parallèle à `person_name_forms` et `structure_name_forms`).
-- **`publishers`** : référentiel des éditeurs.
-- **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
-- **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
-- **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
+- **`publications_detail`** : satellite 1:1 de `publications` qui contient les métadonnées volumineuses. Cf. [données dérivées](08-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
-- **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.
-- **`languages`** : référentiel des langues, avec leur code ISO 639-1, ou ISO 639-3 à défaut, et leur nom français.
-- **`language_forms`** : formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux et trois lettres, nom anglais.
+
+## `authorships` — table consolidée des contributions
+
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `pipeline/publications/build_authorships.py` à partir des *authorships* sources.
+
+**Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_authorships`.
+
+Colonnes notables :
+
+- `in_perimeter` : TRUE si l'auteur signe cette publication depuis une structure du périmètre
+- `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
+
+`authorship_structures (authorship_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures qui attestent l'authorship (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `authorships`.
+
+**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une signature orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
+
+**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships`. `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
 
 ## Sujets / mots-clés
 
@@ -60,10 +69,6 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `publications` | pipeline | `pipeline/publications/refresh.py` (`refresh_from_sources` recalcule depuis les sources) |
 | `publications_detail` | pipeline | `pipeline/publications/refresh.py` |
 | `publication_relations` | pipeline | phase `relations` |
+| `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
 | `subjects`, `publication_subjects` | pipeline | `pipeline/publications/subject_ingestion.py` |
 | `subject_cooccurrences` | pipeline | `pipeline/publications/subject_cooccurrences.py` (matview) |
-| `doi_prefixes` | pipeline | phases `resolve_ra` et `publishers_journals` |
-| `languages`, `language_forms` | seed | `seed.sql` |
-| `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |
-| `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
-| `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
