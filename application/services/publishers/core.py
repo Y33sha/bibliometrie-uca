@@ -10,10 +10,9 @@ from collections import Counter
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -64,10 +63,9 @@ def merge_publishers(
     source_id: int,
     *,
     conn: Connection,
-    correction_queries: MetadataCorrectionQueries,
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
@@ -128,9 +126,8 @@ def merge_publishers(
             pair["target_journal_id"],
             pair["source_journal_id"],
             conn=conn,
-            correction_queries=correction_queries,
             repo=journal_repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
             audit_repo=audit_repo,
         )
 

@@ -11,7 +11,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from infrastructure.repositories import publication_repository
+from pipeline.publications.refresh import PublicationStore
 from pipeline.publications.relations_queries import (
     DoiPublication,
     PublicationRelationsQueries,
@@ -202,7 +202,7 @@ class TestRelationTargetDeletionCascades:
         )
 
         # Le chemin qui plantait : refresh_from_sources → repo.delete sur la cible orpheline.
-        publication_repository(sa_sync_conn).delete(parent)
+        PublicationStore(sa_sync_conn).delete(parent)
 
         remaining = sa_sync_conn.execute(
             text("SELECT count(*) FROM publication_relations WHERE from_publication_id = :c"),

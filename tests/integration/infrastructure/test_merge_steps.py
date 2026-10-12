@@ -9,8 +9,9 @@ from sqlalchemy import text
 from domain.journals.merge import JOURNAL_DATA
 from domain.persons.merge import PERSON_DATA
 from domain.publishers.merge import PUBLISHER_DATA
-from infrastructure.repositories import journal_merge, publisher_merge
+from infrastructure.repositories import publisher_merge
 from infrastructure.repositories.person_repository import _merge as person_merge
+from pipeline.containers import journal_merge
 
 _ENTITIES = [
     pytest.param("persons", PERSON_DATA, person_merge.MERGE_STEPS, id="persons"),

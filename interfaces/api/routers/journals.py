@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.journals_queries import (
     DoiNamespaceConflictsResponse,
@@ -25,7 +25,6 @@ from application.ports.read_models.journals_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import commands as journal_commands
 from domain.journals.journal import (
     JOURNAL_TYPE_LABELS_FR,
@@ -37,9 +36,8 @@ from interfaces.api.deps import (
     audit_repo,
     db_conn,
     journal_queries,
+    journal_recompute,
     journal_repo,
-    metadata_correction_queries,
-    publication_repo,
 )
 from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
@@ -263,8 +261,7 @@ def get_type_change_impact(
     body: JournalTypeChange,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publications: PublicationRepository = Depends(publication_repo),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
+    recompute: JournalRecompute = Depends(journal_recompute),
 ) -> JournalTypeChangeImpact:
     """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à la valeur demandée.
 
@@ -277,8 +274,7 @@ def get_type_change_impact(
         journal_id,
         journal_type=body.journal_type,
         repo=repo,
-        publication_repo=publications,
-        correction_queries=correction_queries,
+        recompute=recompute,
     )
     return JournalTypeChangeImpact(count=count)
 
@@ -289,9 +285,8 @@ def update_journal(
     body: JournalUpdate,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publications: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
+    recompute: JournalRecompute = Depends(journal_recompute),
 ) -> OkResponse:
     """Met à jour une revue, champ par champ.
 
@@ -304,9 +299,8 @@ def update_journal(
         journal_id,
         update=body,
         repo=repo,
-        publication_repo=publications,
         audit_repo=audit,
-        correction_queries=correction_queries,
+        recompute=recompute,
     )
     return OkResponse()
 
@@ -317,9 +311,8 @@ def merge(
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publications: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
+    recompute: JournalRecompute = Depends(journal_recompute),
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
@@ -329,9 +322,8 @@ def merge(
         conn,
         journal_id,
         body.source_id,
-        correction_queries=correction_queries,
+        recompute=recompute,
         repo=repo,
-        publication_repo=publications,
         audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=journal_id)

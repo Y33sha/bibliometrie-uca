@@ -1,6 +1,6 @@
-"""Adapter PostgreSQL pour l'édition et la fusion curées de l'agrégat Journal.
+"""Adapter PostgreSQL pour l'édition de l'agrégat Journal dans l'administration.
 
-L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Le trouve-ou-crée et l'enrichissement, alimentés par le pipeline, vivent dans `pipeline/containers/journals.py`.
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). La fusion de deux revues appartient au pipeline (`pipeline/containers/journal_merge.py`).
 
 Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """
@@ -22,7 +22,6 @@ from domain.normalize import normalize_text
 from infrastructure.db.journal_issns import issns_by_journal
 from infrastructure.db.rows import row_as
 from infrastructure.db.tables import journal_issns, journals
-from infrastructure.repositories import journal_merge
 
 
 class _JournalRow(NamedTuple):
@@ -182,6 +181,3 @@ class PgJournalRepository(JournalRepository):
             )
             for r in rows
         ]
-
-    def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        journal_merge.merge_journal_into(self._conn, target_id, source_id)

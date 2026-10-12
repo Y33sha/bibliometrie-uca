@@ -5,10 +5,9 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -36,10 +35,9 @@ def merge_publishers(
     target_id: int,
     source_id: int,
     *,
-    correction_queries: MetadataCorrectionQueries,
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible (transferts revues +
@@ -48,10 +46,9 @@ def merge_publishers(
         target_id,
         source_id,
         conn=conn,
-        correction_queries=correction_queries,
         publisher_repo=publisher_repo,
         journal_repo=journal_repo,
-        publication_repo=publication_repo,
+        recompute=recompute,
         audit_repo=audit_repo,
     )
     conn.commit()

@@ -8,10 +8,10 @@ from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
 from application.services.persons.core import merge_person
-from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
-from infrastructure.repositories import person_repository, publication_repository
+from infrastructure.repositories import person_repository
+from pipeline.publications.refresh import PublicationStore, refresh_from_sources
 from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.persons import (
     insert_person,
@@ -38,7 +38,7 @@ def person_repo(sa_sync_conn):
 
 @pytest.fixture
 def publication_repo(sa_sync_conn):
-    return publication_repository(sa_sync_conn)
+    return PublicationStore(sa_sync_conn)
 
 
 # ── Helpers ──

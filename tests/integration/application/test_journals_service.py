@@ -26,12 +26,11 @@ from domain.journals.issns import IssnSupport, JournalIssn
 from domain.journals.journal import JournalType, OaModel
 from infrastructure.repositories import (
     journal_repository,
-    publication_repository,
     publisher_repository,
 )
+from pipeline.containers.journal_merge import JournalRecompute
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal_with_issns,
@@ -45,9 +44,6 @@ from tests.integration.helpers.sources import insert_source_publication
 
 # Revue « Nature » par défaut, sans devise d'APC.
 _journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
-
-# Stateless (connexion passée aux méthodes) → une instance module suffit.
-_CORRECTION_QUERIES = PgMetadataCorrectionQueries()
 
 # Date de vérification Sudoc des tests.
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -77,8 +73,8 @@ def publisher_gateway(sa_sync_conn):
 
 
 @pytest.fixture
-def publication_repo(sa_sync_conn):
-    return publication_repository(sa_sync_conn)
+def recompute():
+    return JournalRecompute()
 
 
 def _fetch_one(conn, sql_text: str, **params):
@@ -324,7 +320,7 @@ class TestMergePublishers:
         sa_sync_conn,
         repo,
         publisher_repo,
-        publication_repo,
+        recompute,
         target_type,
         source_type,
         expected,
@@ -335,10 +331,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
         row = _fetch_one(
             sa_sync_conn,
@@ -347,47 +342,44 @@ class TestMergePublishers:
         )
         assert row.publisher_type == expected
 
-    def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, recompute):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError, match="identiques"):
             merge_publishers(
                 p_id,
                 p_id,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
-    def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, recompute):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_publishers(
                 999999,
                 p_id,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
-    def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, recompute):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_publishers(
                 p_id,
                 999999,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
     def test_transfers_journals_and_deletes_source(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -397,10 +389,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         assert (
@@ -409,7 +400,7 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=j1)
         assert row.publisher_id == target
 
-    def test_transfers_monographs(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_transfers_monographs(self, sa_sync_conn, repo, publisher_repo, recompute):
         """La monographie garde un éditeur, qui la retrouve par son titre."""
         target = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
         source = insert_publisher(sa_sync_conn, "PUR")
@@ -419,10 +410,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = _fetch_one(
@@ -430,7 +420,7 @@ class TestMergePublishers:
         )
         assert row.publisher_id == target
 
-    def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, recompute):
         """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
@@ -442,10 +432,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = _fetch_one(
@@ -453,7 +442,7 @@ class TestMergePublishers:
         )
         assert row.publisher_id == target
 
-    def test_merges_same_title_journals(self, sa_sync_conn, repo, publisher_repo, publication_repo):
+    def test_merges_same_title_journals(self, sa_sync_conn, repo, publisher_repo, recompute):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -465,10 +454,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -477,7 +465,7 @@ class TestMergePublishers:
         assert row.eissn == "1476-4687"
 
     def test_merges_same_title_journals_with_only_source_openalex_id(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         """Cible sans openalex_id, source avec : la fusion doit déplacer
         l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
@@ -490,10 +478,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -501,7 +488,7 @@ class TestMergePublishers:
         assert row.openalex_id == "S4210225546"
 
     def test_raises_blocked_error_on_issn_conflict(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -513,10 +500,9 @@ class TestMergePublishers:
                 target,
                 source,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
         blockers = exc_info.value.blocking_journals
@@ -530,7 +516,7 @@ class TestMergePublishers:
         assert "0028-0836" in b["reason"] and "9999-9999" in b["reason"]
 
     def test_blocks_when_target_has_internal_duplicate_titles(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
         N→1 casserait. On flagge ces paires comme blockers."""
@@ -545,10 +531,9 @@ class TestMergePublishers:
                 target,
                 source,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
         blockers = exc_info.value.blocking_journals
@@ -556,9 +541,7 @@ class TestMergePublishers:
         for b in blockers:
             assert "doublon interne" in b["reason"]
 
-    def test_collects_all_blockers_in_one_pass(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
-    ):
+    def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, repo, publisher_repo, recompute):
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -572,16 +555,15 @@ class TestMergePublishers:
                 target,
                 source,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
         assert len(exc_info.value.blocking_journals) == 2
 
     def test_transfers_openalex_id_when_target_has_none(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
         target = insert_publisher(sa_sync_conn, "Target")
@@ -590,10 +572,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -601,7 +582,7 @@ class TestMergePublishers:
         assert row.openalex_id == "P999"
 
     def test_keeps_target_openalex_id_when_both_set(
-        self, sa_sync_conn, repo, publisher_repo, publication_repo
+        self, sa_sync_conn, repo, publisher_repo, recompute
     ):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
         target = insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
@@ -610,10 +591,9 @@ class TestMergePublishers:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             publisher_repo=publisher_repo,
             journal_repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -625,43 +605,40 @@ class TestMergePublishers:
 
 
 class TestMergeJournals:
-    def test_raises_on_self_merge(self, sa_sync_conn, repo, publication_repo):
+    def test_raises_on_self_merge(self, sa_sync_conn, repo, recompute):
         j_id = _journal(sa_sync_conn)
         with pytest.raises(ValidationError, match="identiques"):
             merge_journals(
                 j_id,
                 j_id,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
-    def test_raises_on_missing_target(self, sa_sync_conn, repo, publication_repo):
+    def test_raises_on_missing_target(self, sa_sync_conn, repo, recompute):
         j_id = _journal(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_journals(
                 999999,
                 j_id,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
-    def test_raises_on_missing_source(self, sa_sync_conn, repo, publication_repo):
+    def test_raises_on_missing_source(self, sa_sync_conn, repo, recompute):
         j_id = _journal(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
             merge_journals(
                 j_id,
                 999999,
                 conn=sa_sync_conn,
-                correction_queries=_CORRECTION_QUERIES,
                 repo=repo,
-                publication_repo=publication_repo,
+                recompute=recompute,
             )
 
-    def test_transfers_publications(self, sa_sync_conn, repo, publication_repo):
+    def test_transfers_publications(self, sa_sync_conn, repo, recompute):
         target = _journal(sa_sync_conn, title="Target")
         source = _journal(sa_sync_conn, title="Source")
         pub_id = insert_publication(sa_sync_conn, journal_id=source)
@@ -673,9 +650,8 @@ class TestMergeJournals:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = _fetch_one(
@@ -686,22 +662,21 @@ class TestMergeJournals:
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
 
-    def _merge(self, conn, repo, publication_repo, target, source):
+    def _merge(self, conn, repo, recompute, target, source):
         merge_journals(
             target,
             source,
             conn=conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
-    def test_transfers_monographs(self, sa_sync_conn, repo, publication_repo):
+    def test_transfers_monographs(self, sa_sync_conn, repo, recompute):
         target = _journal(sa_sync_conn, title="Target")
         source = _journal(sa_sync_conn, title="Source")
         monograph = insert_monograph(sa_sync_conn, journal_id=source)
 
-        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+        self._merge(sa_sync_conn, repo, recompute, target, source)
 
         assert (
             _fetch_one(
@@ -710,7 +685,7 @@ class TestMergeJournals:
             == target
         )
 
-    def test_type_repris_garde_son_marqueur(self, sa_sync_conn, repo, publication_repo):
+    def test_type_repris_garde_son_marqueur(self, sa_sync_conn, repo, recompute):
         target = _journal(sa_sync_conn, title="Target")
         source = _journal(sa_sync_conn, title="Source", journal_type="media")
         sa_sync_conn.execute(
@@ -718,7 +693,7 @@ class TestMergeJournals:
             {"id": source},
         )
 
-        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+        self._merge(sa_sync_conn, repo, recompute, target, source)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -727,12 +702,12 @@ class TestMergeJournals:
         )
         assert (row.journal_type, row.manual_fields) == ("media", ["journal_type"])
 
-    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, repo, publication_repo):
+    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, repo, recompute):
         """Sans APC, la cible prend le montant et la devise de la source."""
         target = _journal(sa_sync_conn, title="Target", apc_currency="EUR")
         source = _journal(sa_sync_conn, title="Source", apc_amount=100, apc_currency="USD")
 
-        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+        self._merge(sa_sync_conn, repo, recompute, target, source)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT apc_amount, apc_currency FROM journals WHERE id = :id", id=target
@@ -744,12 +719,12 @@ class TestMergeJournals:
         [("unknown", "media", "media"), ("journal", "media", "journal")],
     )
     def test_unknown_type_takes_source_type(
-        self, sa_sync_conn, repo, publication_repo, target_type, source_type, expected
+        self, sa_sync_conn, repo, recompute, target_type, source_type, expected
     ):
         target = _journal(sa_sync_conn, title="Target", journal_type=target_type)
         source = _journal(sa_sync_conn, title="Source", journal_type=source_type)
 
-        self._merge(sa_sync_conn, repo, publication_repo, target, source)
+        self._merge(sa_sync_conn, repo, recompute, target, source)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -758,9 +733,7 @@ class TestMergeJournals:
         )
         assert row.journal_type == expected
 
-    def test_unites_malformed_issns_and_resets_sudoc_check(
-        self, sa_sync_conn, repo, publication_repo
-    ):
+    def test_unites_malformed_issns_and_resets_sudoc_check(self, sa_sync_conn, repo, recompute):
         """La cible reçoit les valeurs mal formées de la source et redevient à vérifier dans le Sudoc."""
         target = _journal(
             sa_sync_conn, title="Target", rejected=("1234-5678",), rejected_status="malformed"
@@ -777,16 +750,15 @@ class TestMergeJournals:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = issn_columns(sa_sync_conn, target)
         assert row.rejected_issns == ["(Internet)", "1234-5678"]
         assert row.sudoc_checked_at is None
 
-    def test_source_issns_join_the_target(self, sa_sync_conn, repo, publication_repo):
+    def test_source_issns_join_the_target(self, sa_sync_conn, repo, recompute):
         """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint la cible, qui garde son propre ISSN."""
         target = _journal(sa_sync_conn, title="BMC Primary Care", eissn="2731-4553")
         source = _journal(
@@ -801,16 +773,15 @@ class TestMergeJournals:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = issn_columns(sa_sync_conn, target)
         assert row.eissn == "2731-4553"
         assert row.rejected_issns == ["1471-2296"]
 
-    def test_enriches_target_metadata(self, sa_sync_conn, repo, publication_repo):
+    def test_enriches_target_metadata(self, sa_sync_conn, repo, recompute):
         target = _journal(sa_sync_conn, title="Target")
         source = _journal(
             sa_sync_conn, title="Source", is_in_doaj=True, issn="1234-5678", eissn="9999-0000"
@@ -820,9 +791,8 @@ class TestMergeJournals:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = issn_columns(sa_sync_conn, target)
@@ -833,7 +803,7 @@ class TestMergeJournals:
         assert row.eissn == "9999-0000"
         assert row.is_in_doaj is True
 
-    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo, publication_repo):
+    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo, recompute):
         """COALESCE : les champs renseignés dans la cible sont préservés."""
         target = _journal(sa_sync_conn, title="Target", issn="0028-0836")
         source = _journal(sa_sync_conn, title="Source", issn="1234-5678")
@@ -842,16 +812,15 @@ class TestMergeJournals:
             target,
             source,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = issn_columns(sa_sync_conn, target)
         assert row.issn == "0028-0836"
 
     def test_requalifies_absorbed_publications_against_target_type(
-        self, sa_sync_conn, repo, publication_repo
+        self, sa_sync_conn, repo, recompute
     ):
         """Fusionner une revue dans un média retype ses publications en `media`.
 
@@ -878,9 +847,8 @@ class TestMergeJournals:
             media,
             revue,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
             repo=repo,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         row = _fetch_one(
@@ -909,7 +877,7 @@ class TestRequalifyPublicationsForJournal:
         )
         return journal, pub, sp
 
-    def test_persists_sp_correction_and_retypes_publication(self, sa_sync_conn, publication_repo):
+    def test_persists_sp_correction_and_retypes_publication(self, sa_sync_conn, recompute):
         journal, pub, sp = self._seed(sa_sync_conn)
         # Le caller a déjà basculé le type (comme update_journal).
         sa_sync_conn.execute(
@@ -919,8 +887,7 @@ class TestRequalifyPublicationsForJournal:
         count = requalify_publications_for_journal(
             journal,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
         assert count == 1
 
@@ -939,7 +906,7 @@ class TestRequalifyPublicationsForJournal:
         )
         assert pub_row.doc_type == "media"
 
-    def test_self_heals_when_type_reverts(self, sa_sync_conn, publication_repo):
+    def test_self_heals_when_type_reverts(self, sa_sync_conn, recompute):
         journal, pub, sp = self._seed(sa_sync_conn)
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": journal}
@@ -947,8 +914,7 @@ class TestRequalifyPublicationsForJournal:
         requalify_publications_for_journal(
             journal,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
 
         # Le type revient à 'journal' : la correction doit être défaite, le brut restauré.
@@ -958,8 +924,7 @@ class TestRequalifyPublicationsForJournal:
         count = requalify_publications_for_journal(
             journal,
             conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
-            publication_repo=publication_repo,
+            recompute=recompute,
         )
         assert count == 1
 

@@ -29,11 +29,10 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories.journal_repository import PgJournalRepository
-from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from pipeline.containers.find_or_create import match_or_create_publisher
+from pipeline.containers.journal_merge import JournalRecompute
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
 log = setup_logger("backfill_merge_publisher_name_variants", os.path.dirname(__file__))
 
@@ -66,10 +65,9 @@ def _merge_variants(conn: Connection) -> tuple[int, int]:
         key = publisher_name_key(row.name)
         if key:
             groups[key].append(row)
-    corrections = PgMetadataCorrectionQueries()
     publishers = PgPublisherRepository(conn)
     journals = PgJournalRepository(conn)
-    publications = PgPublicationRepository(conn)
+    recompute = JournalRecompute()
     merged = blocked = 0
     for key, rows in sorted(groups.items()):
         if len(rows) < 2:
@@ -90,10 +88,9 @@ def _merge_variants(conn: Connection) -> tuple[int, int]:
                     target.id,
                     source.id,
                     conn=conn,
-                    correction_queries=corrections,
                     publisher_repo=publishers,
                     journal_repo=journals,
-                    publication_repo=publications,
+                    recompute=recompute,
                 )
             except PublisherMergeBlockedError as e:
                 savepoint.rollback()

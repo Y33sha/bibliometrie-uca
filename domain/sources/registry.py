@@ -1,6 +1,6 @@
 """Registre des sources bibliographiques : liste et ordres de priorité.
 
-Source unique de vérité côté Python pour la liste des sources et les ordres de priorité entre sources.
+Référentiel Python de la liste des sources et les ordres de priorité entre sources.
 
 Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestSourcesEnum` vérifie la cohérence.
 """
@@ -11,7 +11,7 @@ from domain.errors import ValidationError
 
 
 class Source(StrEnum):
-    """Source bibliographique — les membres portent les libellés de l'enum PostgreSQL `source_type`."""
+    """Source bibliographique — les membres ont les libellés de l'enum PostgreSQL `source_type`."""
 
     HAL = "hal"
     OPENALEX = "openalex"
@@ -22,8 +22,8 @@ class Source(StrEnum):
     DATACITE = "datacite"
 
 
-# Nom sous lequel une source se donne à lire, dans le journal comme à l'écran. L'interface porte
-# les mêmes dans `interfaces/frontend/src/lib/sources.ts`, que TypeScript lit sans passer par ici.
+# Nom sous lequel une source se donne à lire, dans le journal comme à l'écran. L'interface en garde
+# une copie dans `interfaces/frontend/src/lib/sources.ts`, que TypeScript lit sans passer par ici.
 SOURCE_LABELS: dict[str, str] = {
     Source.HAL: "HAL",
     Source.OPENALEX: "OpenAlex",
@@ -47,7 +47,7 @@ ALL_SOURCES: tuple[Source, ...] = tuple(Source)
 ALL_SOURCES_SET: frozenset[str] = frozenset(Source)
 
 # Préfixe sous lequel une source se désigne dans une requête de lecture. Court, parce qu'il
-# voyage dans une URL ; distinct du libellé de l'enum SQL, que `Source` porte.
+# voyage dans une URL ; distinct du libellé de l'enum SQL, que `Source` contient.
 SOURCE_FILTER_PREFIXES: dict[str, Source] = {
     "hal": Source.HAL,
     "oa": Source.OPENALEX,
@@ -57,7 +57,7 @@ SOURCE_FILTER_PREFIXES: dict[str, Source] = {
 }
 
 # Vocabulaire du filtre par source : un préfixe suffixé de la présence attendue. `hal_yes`
-# retient les publications que HAL porte, `hal_no` les autres ; les deux ensemble ne
+# retient les publications présentes dans HAL, `hal_no` les autres ; les deux ensemble ne
 # contraignent rien. Valide le filtre `source_filter` des lectures ; une valeur hors
 # vocabulaire est refusée.
 SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
@@ -97,7 +97,7 @@ AUTHOR_SOURCES = ALL_SOURCES
 # question est « quelle source gagne ? ». Couvre :
 #
 # - l'agrégation multi-sources des métadonnées publication
-#   (`refresh_from_sources` dans `application/services/publications/core.py`)
+#   (`refresh_from_sources` dans `pipeline/publications/refresh.py`)
 # - la résolution de `author_position` quand plusieurs sources
 #   attestent une même authorship
 # - l'ordre d'exécution des normalizers dans le pipeline
@@ -105,8 +105,8 @@ AUTHOR_SOURCES = ALL_SOURCES
 #   avant tout enrichissement)
 #
 # theses.fr fait autorité sur les métadonnées de thèse ; CrossRef et DataCite
-# sont les autorités officielles de l'enregistrement DOI (métadonnées
-# canoniques) pour leurs périmètres respectifs et passent juste après theses ;
+# sont les autorités officielles de l'enregistrement DOI
+# pour leurs périmètres respectifs et passent juste après theses ;
 # pour les documents hors-thèse la clé `theses` n'apparaît simplement pas dans
 # les rows et l'ordre se réduit aux sources restantes. Crossref et DataCite ne
 # se concurrencent pas : chaque RA fait autorité sur ses propres DOI.

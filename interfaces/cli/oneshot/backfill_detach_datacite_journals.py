@@ -18,12 +18,11 @@ from collections import Counter
 
 from sqlalchemy import Connection, Row, text
 
-from application.services.publications.core import refresh_from_sources
 from domain.source_publications.raw_metadata import raw_value
 from domain.sources.datacite import container_names_a_journal
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories.publication_repository import PgPublicationRepository
+from pipeline.publications.refresh import PublicationStore, refresh_from_sources
 
 log = setup_logger("backfill_detach_datacite_journals", os.path.dirname(__file__))
 
@@ -82,7 +81,7 @@ def main() -> int:
 
         conn.execute(_DETACH, {"ids": [r.id for r in rows]})
         publication_ids = sorted({r.publication_id for r in rows if r.publication_id})
-        repo = PgPublicationRepository(conn)
+        repo = PublicationStore(conn)
         for publication_id in publication_ids:
             refresh_from_sources(publication_id, repo=repo)
 

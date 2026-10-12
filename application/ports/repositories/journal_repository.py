@@ -1,4 +1,4 @@
-"""Port JournalRepository — édition dans l'administration et fusion de l'agrégat Journal.
+"""Port JournalRepository — édition de l'agrégat Journal dans l'administration.
 
 L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Les deux agrégats sont liés par `journals.publisher_id` (FK) mais manipulés par des opérations distinctes — séparer les ports réduit la surface sur laquelle chaque call site s'engage.
 
@@ -56,7 +56,7 @@ class JournalUpdate(BaseModel):
 
 
 class JournalRepository(Protocol):
-    """Contrat d'édition dans l'administration et de fusion de l'agrégat Journal."""
+    """Contrat d'édition de l'agrégat Journal dans l'administration."""
 
     def find_by_id(self, journal_id: int) -> Journal | None:
         """Hydrate l'aggregate `Journal` complet. Retourne None si le journal n'existe pas. Les `journal_name_forms` restent une projection séparée, hors de l'aggregate."""
@@ -72,8 +72,4 @@ class JournalRepository(Protocol):
         source_publisher_id: int,
     ) -> list[SharedTitleJournalPair]:
         """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`. Chaque ligne contient `target_journal_id`, `source_journal_id` et les six valeurs ISSN/eISSN/ISSN-L des deux côtés. Le service détecte ainsi les conflits d'ISSN en une seule requête."""
-        ...
-
-    def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la revue `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de la revue (`domain.journals.merge.JOURNAL_DATA`), supprime la source, puis recalcule les compteurs de publications."""
         ...

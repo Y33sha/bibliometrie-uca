@@ -1,19 +1,24 @@
-"""SQL de la fusion de deux revues : une étape par donnée de `domain.journals.merge.JOURNAL_DATA`."""
+"""Fusion de deux revues : une étape SQL par donnée de `domain.journals.merge.JOURNAL_DATA`, puis la requalification des publications absorbées."""
 
 from sqlalchemy import Connection, text
 
 from domain.journals.journal import JournalType, ManualField
-from infrastructure.pipeline.authorships.pub_counts import (
-    refresh_journal_pub_count,
-    refresh_publisher_pub_count,
-)
-from infrastructure.repositories.merge_steps import (
+from infrastructure.db.merge_steps import (
     MergeStep,
     fill_empty,
     fill_empty_unique,
     transfer,
     transfer_unique,
     untouched,
+)
+from infrastructure.pipeline.authorships.pub_counts import (
+    refresh_journal_pub_count,
+    refresh_publisher_pub_count,
+)
+from pipeline.publications.refresh import PublicationStore, refresh_from_sources
+from pipeline.publications.requalify_journal import (
+    correct_journal_records,
+    requalify_journal_publications,
 )
 
 
@@ -133,3 +138,28 @@ def merge_journal_into(conn: Connection, target_id: int, source_id: int) -> None
     for publisher_id in {target_publisher_id, source_publisher_id}:
         if publisher_id is not None:
             refresh_publisher_pub_count(conn, publisher_id)
+
+
+def merge_journals(conn: Connection, target_id: int, source_id: int) -> None:
+    """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées contre le `journal_type` de la cible.
+
+    Les corrections des `source_publications` de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
+    """
+    store = PublicationStore(conn)
+    absorbed_pub_ids = store.find_ids_by_journal_id(source_id)
+    merge_journal_into(conn, target_id, source_id)
+    correct_journal_records(conn, target_id)
+    for pub_id in absorbed_pub_ids:
+        refresh_from_sources(pub_id, repo=store)
+
+
+class JournalRecompute:
+    """Recalculs ciblés d'une revue, exposés à l'API par `pipeline/public.py`."""
+
+    def requalify_publications(self, conn: Connection, journal_id: int) -> int:
+        """Requalifie les publications de la revue. Retourne le nombre de publications dont le `doc_type` change."""
+        return requalify_journal_publications(conn, journal_id)
+
+    def merge_journals(self, conn: Connection, target_id: int, source_id: int) -> None:
+        """Fusionne la revue `source_id` dans `target_id` et requalifie les publications absorbées."""
+        merge_journals(conn, target_id, source_id)

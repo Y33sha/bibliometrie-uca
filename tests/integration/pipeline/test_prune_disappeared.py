@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 from sqlalchemy import text
 
-from infrastructure.repositories import publication_repository
+from pipeline.publications.refresh import PublicationStore
 from pipeline.sources.staging import (
     StagingQueries,
     delete_disappeared_source_publications,
@@ -24,7 +24,7 @@ _notice = partial(insert_source_publication, title="Titre", keys_dirty=False)
 
 
 def _publication(conn) -> int:
-    return publication_repository(conn).create(
+    return PublicationStore(conn).create(
         title="T",
         title_normalized="t",
         doc_type="article",

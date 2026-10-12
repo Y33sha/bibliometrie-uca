@@ -84,12 +84,8 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # Exception : `application.ports.*` est zone neutre. `infrastructure`
 # peut en importer les dataclasses de transport pour typer ses
 # signatures. Les Protocols restent implémentés via duck typing.
-#
-# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
-# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
-    "application.services.journals.core -> pipeline.publications.correct_unary",
 ]
 
 [[tool.importlinter.contracts]]
@@ -106,10 +102,7 @@ ignore_imports = [
     "pipeline.** -> application.ports.pipeline.**",
     "pipeline.structures.ror -> application.ports.repositories.ror_repository",
     "pipeline.structures.ror -> application.services.structures.ror",
-    "pipeline.containers.publishers_journals -> application.services.journals.commands",
     "pipeline.containers.enrich_publishers -> application.ports.repositories.publisher_repository",
-    "pipeline.publications.* -> application.ports.repositories.publication_repository",
-    "pipeline.publications.reconcile_components -> application.services.publications.core",
     "pipeline.persons.* -> application.ports.repositories.authorship_repository",
     "pipeline.persons.* -> application.ports.repositories.person_repository",
     "pipeline.persons.* -> application.services.persons.core",
@@ -121,11 +114,6 @@ type = "forbidden"
 source_modules = ["domain", "application", "infrastructure"]
 forbidden_modules = ["pipeline"]
 # L'API et les scripts en ligne de commande (`interfaces/`) sont les seuls clients du pipeline.
-# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
-# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
-ignore_imports = [
-    "application.services.journals.core -> pipeline.publications.correct_unary",
-]
 
 [[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"
@@ -169,12 +157,7 @@ source_modules = ["interfaces.api"]
 forbidden_modules = ["pipeline"]
 # L'API importe seulement `pipeline/public.py`, qui exporte l'ordre des phases et les recalculs
 # ciblés.
-# Exception transitoire : `application/services/journals/core.py` appelle la correction unaire
-# du pipeline, jusqu'au départ des opérations du pipeline hors d'`application/services`.
-ignore_imports = [
-    "interfaces.api.** -> pipeline.public",
-    "application.services.journals.core -> pipeline.publications.correct_unary",
-]
+ignore_imports = ["interfaces.api.** -> pipeline.public"]
 
 [[tool.importlinter.contracts]]
 name = "Adapters : la connexion se reçoit, elle ne s'ouvre pas"
@@ -387,6 +370,7 @@ combine-as-imports = true
 "pipeline/*" = ["S101", "S608"]
 "infrastructure/repositories/*" = ["S608"]
 "infrastructure/db/sql_fragments.py" = ["S608"]
+"infrastructure/db/merge_steps.py" = ["S608"]
 "alembic/versions/*" = ["S608"]
 # Scripts de développement : `dump_schema` lance `pg_dump`, dont il compose lui-même les
 # arguments.

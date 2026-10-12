@@ -55,7 +55,7 @@ Dans l'ordre du pipeline.
 - [x] Les implémentations des ports que l'API appelle (clôture des périmètres, `in_perimeter` ciblé, construction des authorships) rejoignent `pipeline/` ; `deps.py` les injecte. 028c1cc33
 - [x] `pipeline/public.py`, seul module du pipeline que l'API importe.
 - [x] Les opérations « trouver ou créer » (revues, monographies, éditeurs) passent dans `pipeline/containers`, sans les ports `containers`, `journals`, `monographs`, `publishers`.
-- [ ] La création et le recalcul d'une publication, la requalification des publications d'une revue et la fusion de deux revues passent dans `pipeline/`. `public.py` les exporte. Le service des revues garde le contrôle de la paire et l'audit.
+- [x] La création et le recalcul d'une publication, la requalification des publications d'une revue et la fusion de deux revues passent dans `pipeline/`. `public.py` les exporte. Le service des revues garde le contrôle de la paire et l'audit.
 - [ ] Les types des corrections de métadonnées, de la construction des authorships et des périmètres passent dans `pipeline/`.
 - [ ] Import du dump ROR dans `pipeline/structures`.
 - [ ] Opérations du pipeline sur les personnes (création, nom, identifiants, rattachement d'une signature) dans `pipeline/persons`, sans `PersonRepository` ni `AuthorshipRepository`.

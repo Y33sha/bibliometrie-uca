@@ -2,7 +2,7 @@
 
 Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `journals.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
-Un champ éditable d'une revue commande le `doc_type` de ses publications : le `journal_type` alimente des règles de correction. D'où `requalify_publications_for_journal` et le volet requalification de `merge_journals`, qui rejouent ces corrections sur le stock après une édition.
+Le `journal_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`JournalRecompute`).
 """
 
 from decimal import Decimal
@@ -10,22 +10,16 @@ from decimal import Decimal
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
-from application.ports.repositories.publication_repository import PublicationRepository
 from application.services._merge import load_merge_pair
-from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.issns import (
     JournalIssn,
     validate_journal_issns,
 )
 from domain.journals.journal import ManualField
-from pipeline.publications.correct_unary import (
-    compute_updates,
-    hal_origin_ids,
-)
 
 
 def update_journal(
@@ -88,53 +82,21 @@ def update_journal(
     return journal.journal_type != old_type
 
 
-def _correct_for_journal(
-    conn: Connection, queries: MetadataCorrectionQueries, journal_id: int
-) -> int:
-    """Recalcule et persiste les corrections unaires des `source_publications` d'un journal, après un changement de son `journal_type`. Retourne le nombre de `source_publications` corrigées.
-
-    À enchaîner avec `refresh_from_sources` des publications du journal, qui repart de la colonne `source_publication` rafraîchie ici.
-    """
-    rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
-    hal_rows = {
-        row.source_id: row
-        for row in queries.fetch_for_unary_correction_by_hal_ids(conn, hal_origin_ids(rows))
-    }
-    language_forms = queries.fetch_language_forms(conn)
-    updates = compute_updates(rows, hal_rows, language_forms)
-    return queries.persist_corrections(conn, updates)
-
-
 def merge_journals(
     target_id: int,
     source_id: int,
     *,
     conn: Connection,
-    correction_queries: MetadataCorrectionQueries,
     repo: JournalRepository,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Fusionne le journal source dans le journal cible.
-
-    Les `source_publications` et publications du journal absorbé sont repointées vers la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de la cible : on recalcule en place les corrections des `source_publications` de la cible (`_correct_for_journal`, qui voit alors les enregistrements absorbés via le `journal_id` repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans un média retype ses publications en `media`.
+    """Fusionne la revue source dans la revue cible, par le pipeline, qui requalifie les publications absorbées.
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur une revue introuvable.
     """
     load_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
-
-    # Capturer les publications du source avant le repoint, pour les rafraîchir.
-    absorbed_pub_ids = publication_repo.find_ids_by_journal_id(source_id)
-
-    repo.merge_journal_into(target_id, source_id)
-
-    # Les enregistrements absorbés ont alors `journal_id = target` : recalcule en
-    # place leurs corrections (le `journal_type` lu est celui de la cible), puis refresh des
-    # publications absorbées (qui lisent les colonnes `source_publication` fraîchement corrigées).
-    _correct_for_journal(conn, correction_queries, target_id)
-    for pub_id in absorbed_pub_ids:
-        refresh_from_sources(pub_id, repo=publication_repo)
-
+    recompute.merge_journals(conn, target_id, source_id)
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
 
 
@@ -145,37 +107,16 @@ def requalify_publications_for_journal(
     journal_id: int,
     *,
     conn: Connection,
-    correction_queries: MetadataCorrectionQueries,
-    publication_repo: PublicationRepository,
+    recompute: JournalRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> int:
-    """Requalifie le `doc_type` des publications d'un journal après changement de son `journal_type`.
+    """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `journal_type`.
 
-    Précondition : le `journal.journal_type` a déjà été mis à jour par l'appelant (dans la même transaction qu'un `update_journal`). Deux temps :
+    Précondition : l'appelant a déjà écrit le `journal_type`, dans la même transaction. Retourne le nombre de publications dont le `doc_type` change, et émet l'audit `journal.type_requalified` si ce nombre est positif.
 
-    1. `_correct_for_journal` recalcule **en place** les corrections des `source_publications` du journal. `refresh_from_sources` repart de la colonne corrigée (pas du brut) ; ce recalcul préalable garantit qu'elle reflète le `journal_type` mis à jour.
-    2. `refresh_from_sources` sur chaque publication du journal ré-agrège les colonnes `source_publication` fraîchement corrigées (garde-fous habituels : conflits DOI, audit `doi_changed`, orphelins).
-
-    Retourne le nombre de publications dont le `doc_type` a effectivement changé, par comparaison de deux relevés encadrant la boucle ; émet l'audit `journal.type_requalified` si > 0.
-
-    Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel dans un `SAVEPOINT` que l'appelant annule : preview et apply partagent alors exactement la même logique.
+    Un appel dans un `SAVEPOINT` que l'appelant annule donne l'aperçu de la requalification.
     """
-    pub_ids = publication_repo.find_ids_by_journal_id(journal_id)
-    if not pub_ids:
-        return 0
-
-    before = publication_repo.find_doc_types_by_ids(pub_ids)
-    _correct_for_journal(conn, correction_queries, journal_id)
-    for pub_id in pub_ids:
-        refresh_from_sources(pub_id, repo=publication_repo)
-    after = publication_repo.find_doc_types_by_ids(pub_ids)
-
-    # Une publication que le refresh a supprimée (orpheline, hors périmètre) manque d'`after` :
-    # elle n'est pas requalifiée, elle a disparu.
-    changed = sum(
-        1 for pub_id, doc_type in before.items() if after.get(pub_id, doc_type) != doc_type
-    )
-
+    changed = recompute.requalify_publications(conn, journal_id)
     if changed > 0:
         emit_event(
             audit_repo,
