@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.pipeline.journal_recompute import JournalRecompute
+from application.ports.pipeline.pub_count import PubCountRecompute
 from application.ports.read_models.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
@@ -30,6 +31,7 @@ from interfaces.api.deps import (
     db_conn,
     journal_recompute,
     journal_repo,
+    pub_count_recompute,
     publisher_queries,
     publisher_repo,
 )
@@ -176,6 +178,7 @@ def merge(
     journals: JournalRepository = Depends(journal_repo),
     audit: AuditRepository = Depends(audit_repo),
     recompute: JournalRecompute = Depends(journal_recompute),
+    pub_count_recompute: PubCountRecompute = Depends(pub_count_recompute),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
@@ -190,6 +193,7 @@ def merge(
         publisher_id,
         body.source_id,
         recompute=recompute,
+        pub_count_recompute=pub_count_recompute,
         publisher_repo=publishers,
         journal_repo=journals,
         audit_repo=audit,

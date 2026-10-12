@@ -8,6 +8,7 @@ L'ordre de déclaration porte une contrainte : les chemins littéraux — `/sear
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
     IdentifierConflictsResponse,
@@ -40,6 +41,7 @@ from interfaces.api.deps import (
     db_conn,
     person_repo,
     persons_queries,
+    publication_perimeter_recompute,
 )
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
@@ -415,13 +417,21 @@ def set_person_exclusion(
     body: SetPersonExclusion,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
 
     Renvoie 404 sur une personne introuvable (`set_exclusion`).
     """
-    person_commands.set_exclusion(conn, person_id, body.exclusion, repo=repo, audit_repo=audit)
+    person_commands.set_exclusion(
+        conn,
+        person_id,
+        body.exclusion,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit,
+    )
     return OkResponse()
 
 

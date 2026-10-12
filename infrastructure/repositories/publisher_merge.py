@@ -11,7 +11,6 @@ from infrastructure.db.merge_steps import (
     transfer_unique,
     untouched,
 )
-from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
 
 MERGE_STEPS: dict[str, MergeStep] = {
     "journals": transfer("journals", "publisher_id"),
@@ -30,8 +29,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 
 def merge_publisher_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Applique chaque étape de `MERGE_STEPS`, supprime l'éditeur absorbé, puis recalcule le nombre de publications de l'éditeur conservé."""
+    """Applique chaque étape de `MERGE_STEPS`, puis supprime l'éditeur absorbé."""
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
     conn.execute(text("DELETE FROM publishers WHERE id = :s"), {"s": source_id})
-    refresh_publisher_pub_count(conn, target_id)

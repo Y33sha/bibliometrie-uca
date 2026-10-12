@@ -32,6 +32,7 @@ from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from pipeline.containers.find_or_create import match_or_create_publisher
 from pipeline.containers.journal_merge import JournalRecompute
+from pipeline.containers.pub_counts import PubCountRecompute
 from pipeline.containers.publishers import PublisherGatewayQueries
 
 log = setup_logger("backfill_merge_publisher_name_variants", os.path.dirname(__file__))
@@ -91,6 +92,7 @@ def _merge_variants(conn: Connection) -> tuple[int, int]:
                     publisher_repo=publishers,
                     journal_repo=journals,
                     recompute=recompute,
+                    pub_count_recompute=PubCountRecompute(),
                 )
             except PublisherMergeBlockedError as e:
                 savepoint.rollback()

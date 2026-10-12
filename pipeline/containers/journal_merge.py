@@ -11,7 +11,7 @@ from infrastructure.db.merge_steps import (
     transfer_unique,
     untouched,
 )
-from infrastructure.pipeline.authorships.pub_counts import (
+from pipeline.containers.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
 )

@@ -16,7 +16,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
+from pipeline.containers.pub_counts import PgPubCountsQueries
 from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.execution import log, open_tx
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme

@@ -17,6 +17,7 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
+from pipeline.publications.publication_perimeter import PublicationPerimeterRecompute
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 
@@ -159,7 +160,9 @@ class TestEndToEndServiceIntegration:
             set_exclusion(
                 person_id,
                 PersonExclusion.OUT_OF_PERIMETER,
+                conn=sa_sync_conn,
                 repo=person_repository(sa_sync_conn),
+                perimeter_recompute=PublicationPerimeterRecompute(),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
@@ -187,7 +190,9 @@ class TestEndToEndServiceIntegration:
         set_exclusion(
             person_id,
             PersonExclusion.NOT_A_PERSON,
+            conn=sa_sync_conn,
             repo=person_repository(sa_sync_conn),
+            perimeter_recompute=PublicationPerimeterRecompute(),
             audit_repo=audit_repository(sa_sync_conn),
         )
 

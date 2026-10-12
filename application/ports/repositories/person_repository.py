@@ -50,7 +50,7 @@ class PersonRepository(Protocol):
         ...
 
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
-        """Pose le motif d'exclusion d'une personne (`None` la retient) et recalcule `publications.in_perimeter` pour ses publications. Lève `NotFoundError` si la personne est introuvable."""
+        """Pose le motif d'exclusion d'une personne (`None` la retient). Lève `NotFoundError` si la personne est introuvable."""
         ...
 
     # ── persons_rh (fiches RH) ─────────────────────────────────────

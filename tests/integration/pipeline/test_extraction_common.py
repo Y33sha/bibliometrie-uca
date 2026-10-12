@@ -1,4 +1,4 @@
-"""Tests de la persistance et du hash de détection de l'extraction (infrastructure/pipeline)."""
+"""Tests de la persistance et du hash de détection de l'extraction."""
 
 from functools import partial
 

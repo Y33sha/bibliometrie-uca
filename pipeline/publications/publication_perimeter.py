@@ -1,4 +1,4 @@
-"""Recalcul de `publications.in_perimeter` depuis les authorships, partagé par la phase `authorships` et par le dépôt des personnes."""
+"""Recalcul de `publications.in_perimeter` depuis les authorships, par la phase `authorships` et après l'exclusion d'une personne."""
 
 from sqlalchemy import Connection, text
 
@@ -25,3 +25,11 @@ def refresh_publications_in_perimeter(conn: Connection, person_id: int | None = 
         """),
         {"pid": person_id},
     ).rowcount
+
+
+class PublicationPerimeterRecompute:
+    """Recalcul ciblé de `publications.in_perimeter`, exposé à l'API par `pipeline/public.py`."""
+
+    def refresh_publications_of_person(self, conn: Connection, person_id: int) -> int:
+        """Recalcule `publications.in_perimeter` pour les publications de la personne. Rend le nombre de publications changées."""
+        return refresh_publications_in_perimeter(conn, person_id)

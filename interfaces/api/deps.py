@@ -15,6 +15,10 @@ from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.pub_count import PubCountRecompute as PubCountRecomputePort
+from application.ports.pipeline.publication_perimeter import (
+    PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
+)
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.authorships_queries import AuthorshipsQueries
 from application.ports.read_models.config_queries import ConfigQueries
@@ -81,6 +85,8 @@ from pipeline.public import (
     InPerimeterRecompute,
     JournalRecompute,
     PerimeterQueries,
+    PubCountRecompute,
+    PublicationPerimeterRecompute,
 )
 
 logger = logging.getLogger(__name__)
@@ -297,6 +303,23 @@ _journal_recompute_singleton: JournalRecomputePort = JournalRecompute()
 def journal_recompute() -> JournalRecomputePort:
     """Requalification des publications d'une revue après son édition ou sa fusion."""
     return _journal_recompute_singleton
+
+
+# Recalculs sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_publication_perimeter_recompute_singleton: PublicationPerimeterRecomputePort = (
+    PublicationPerimeterRecompute()
+)
+_pub_count_recompute_singleton: PubCountRecomputePort = PubCountRecompute()
+
+
+def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
+    """Appartenance au périmètre des publications d'une personne, après son exclusion."""
+    return _publication_perimeter_recompute_singleton
+
+
+def pub_count_recompute() -> PubCountRecomputePort:
+    """`pub_count` d'un éditeur, après une fusion d'éditeurs."""
+    return _pub_count_recompute_singleton
 
 
 # Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.

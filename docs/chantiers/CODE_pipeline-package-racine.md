@@ -63,7 +63,7 @@ Dans l'ordre du pipeline.
 - [x] Décision d'attribution d'un identifiant dans `domain/`. Le pipeline crée, renomme et attribue avec son propre SQL, sans `PersonRepository` ni `AuthorshipRepository`.
 - [x] Suppression des exceptions aux règles d'import dans `pyproject.toml`. L'enrichissement du pays des éditeurs devient un script de maintenance autonome, avec ses requêtes.
 - [x] `infrastructure/sources` passe dans `pipeline/` : outillage HTTP des sources dans `pipeline/sources`, configuration dans `pipeline/config.py`. Le lien vers la fiche DOAJ d'une revue rejoint le read model des revues.
-- [ ] `infrastructure/pipeline/authorships` : recalculs de `publications.in_perimeter` et des `pub_count`. Des repositories de l'API les appellent directement : celui des personnes, et la fusion d'éditeurs. À réexaminer avec la question des recalculs ciblés.
+- [x] `infrastructure/pipeline` passe dans `pipeline/` : recalcul de `publications.in_perimeter` dans `pipeline/publications`, des `pub_count` dans `pipeline/containers`. L'exclusion d'une personne et la fusion d'éditeurs les appellent depuis les services de l'API, par `public.py`.
 
 ## Questions ouvertes
 

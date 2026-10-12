@@ -9,7 +9,6 @@ from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm
 from domain.persons.person import Person, PersonExclusion
 from infrastructure.db.scalars import scalar_int
-from infrastructure.pipeline.authorships.in_perimeter import refresh_publications_in_perimeter
 
 
 def find_by_id(conn: Connection, person_id: int) -> Person | None:
@@ -110,8 +109,6 @@ def set_exclusion(conn: Connection, person_id: int, exclusion: PersonExclusion |
     )
     if result.rowcount == 0:
         raise NotFoundError(f"Personne {person_id} introuvable")
-    # L'exclusion d'une personne fait basculer l'appartenance de ses publications au périmètre.
-    refresh_publications_in_perimeter(conn, person_id)
 
 
 def find_rh_person_duplicate(
