@@ -26,7 +26,7 @@
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
-- [Résolution des entités avec Splink](CODE_resolution-splink.md)
+- [Résolution des entités avec Splink](DATA_resolution-splink.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Scripts en ligne de commande autonomes](CODE_scripts-autonomes.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
