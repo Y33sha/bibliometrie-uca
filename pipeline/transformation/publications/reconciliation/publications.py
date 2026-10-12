@@ -6,7 +6,7 @@
 
 La réconciliation est suivie de la suppression des publications restées sans source : celles que la réconciliation a vidées, et celles dont la phase `normalize` a retiré les derniers documents disparus.
 
-Les deux étapes — réconciliation, suppression — sont idempotentes ; chacune tourne dans sa propre transaction.
+Les deux nœuds (`pipeline.graph`) — réconciliation, suppression — sont idempotents ; chacun tourne dans sa propre transaction.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -36,20 +37,31 @@ class PublicationsPhase:
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Réconciliation, puis suppression des publications restées sans source."""
-        open_tx, reconciliation_queries, logger = (
-            ctx.open_tx,
-            self.reconciliation_queries,
-            ctx.logger,
+        reconciliation_queries = self.reconciliation_queries
+
+        def reconcile(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            return _reconcile(
+                ctx.open_tx,
+                reconciliation_queries,
+                ctx.logger,
+                self.publication_repo_factory,
+                rebuild=ctx.options.rebuild_publications,
+            )
+
+        def delete_without_sources(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            _delete_publications_without_sources(ctx.open_tx, reconciliation_queries, ctx.logger)
+            return PhaseMetrics()
+
+        by_node = run_nodes(
+            "publications",
+            {
+                "publications.reconcile": NodeStep(reconcile),
+                "publications.delete_without_sources": NodeStep(delete_without_sources),
+            },
+            ctx,
         )
-        metrics = _reconcile(
-            open_tx,
-            reconciliation_queries,
-            logger,
-            self.publication_repo_factory,
-            rebuild=ctx.options.rebuild_publications,
-        )
-        _delete_publications_without_sources(open_tx, reconciliation_queries, logger)
-        with open_tx() as conn:
+        metrics = by_node["publications.reconcile"]
+        with ctx.open_tx() as conn:
             pub_total = reconciliation_queries.count_publications(conn)
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
