@@ -1,11 +1,11 @@
-"""Tests de la suppression des revues vides (`pipeline.publishing.delete_empty_journals`)."""
+"""Tests de la suppression des revues vides (`pipeline.publishing.journals.delete_empty_journals`)."""
 
 import logging
 
-from pipeline.publishing.delete_empty_journals import (
+from pipeline.publishing.journals.delete_empty_journals import (
     run_delete_empty_journals,
 )
-from pipeline.publishing.journals import JournalSummary
+from pipeline.publishing.journals.journals import JournalSummary
 
 
 class _Repo:

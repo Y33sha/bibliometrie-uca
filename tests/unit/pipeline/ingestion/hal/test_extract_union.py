@@ -8,8 +8,8 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
+from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.hal.harvest import HalExtractConfig, extract_union
-from pipeline.ingestion.staging import UpsertOutcome
 from pipeline.runtime.progression import Progression
 
 _LOGGER = logging.getLogger("test")

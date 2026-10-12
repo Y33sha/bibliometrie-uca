@@ -1,4 +1,4 @@
-"""Tests unitaires de `pipeline.ingestion.normalize.SourceNormalizer.run`.
+"""Tests unitaires de `pipeline.ingestion.common.normalize.SourceNormalizer.run`.
 
 Couvre la template method `run()` et ses chemins :
 - `total == 0` (rien à faire)
@@ -17,8 +17,8 @@ from unittest.mock import ANY, MagicMock
 
 import pytest
 
-from pipeline.ingestion.normalize import NormalizeStats, SourceNormalizer
-from pipeline.ingestion.staging import StagingRow
+from pipeline.ingestion.common.normalize import NormalizeStats, SourceNormalizer
+from pipeline.ingestion.common.staging import StagingRow
 
 
 def _row(label: str) -> StagingRow:

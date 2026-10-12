@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.datacite import harvest
 from pipeline.ingestion.datacite.harvest import DataciteExtractor, DatacitePage, build_query
-from pipeline.ingestion.harvest import ExtractionConfigError
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from tests.helpers.extractors import arguments_du_run, extracteur
 

@@ -2,7 +2,7 @@
 
 import logging
 
-from pipeline.ingestion.fetch_stale import FetchStalePhase
+from pipeline.ingestion.common.fetch_stale import FetchStalePhase
 from pipeline.runtime.metrics import PhaseMetrics
 
 

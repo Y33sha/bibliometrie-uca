@@ -19,7 +19,7 @@ from domain.sources.registry import ALL_SOURCES
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.factory import get_raw_store
-from pipeline.ingestion.staging import fetch_existing_source_ids
+from pipeline.ingestion.common.staging import fetch_existing_source_ids
 
 log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 

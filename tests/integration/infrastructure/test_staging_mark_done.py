@@ -5,8 +5,8 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.raw_store.local import LocalFileRawStore
-from pipeline.ingestion.fingerprint import stable_json_bytes
-from pipeline.ingestion.staging import StagingQueries
+from pipeline.ingestion.common.fingerprint import stable_json_bytes
+from pipeline.ingestion.common.staging import StagingQueries
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging OpenAlex « W1 ».

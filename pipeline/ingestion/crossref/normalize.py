@@ -34,27 +34,27 @@ from domain.sources.crossref import (
 )
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.normalize import BibliographicNormalizer
-from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.signatures import (
+from pipeline.ingestion.common.normalize import BibliographicNormalizer
+from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
     SignatureSyncSettings,
     sync_source_authorships,
 )
-from pipeline.ingestion.source_publications import (
+from pipeline.ingestion.common.source_publications import (
     SourcePublicationQueries,
     SourcePublicationUpsert,
 )
-from pipeline.ingestion.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.publishing.containers import ContainerGatewayQueries
 from pipeline.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
     find_or_create_publisher,
 )
-from pipeline.publishing.publishers import PublisherGatewayQueries
+from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS

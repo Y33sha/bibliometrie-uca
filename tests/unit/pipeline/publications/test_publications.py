@@ -6,7 +6,7 @@ Le propos testé ici est l'enchaînement. La réconciliation a ses propres tests
 import logging
 from unittest.mock import patch
 
-from pipeline.publications import publications as phase
+from pipeline.publications.reconciliation import publications as phase
 
 
 class _FakeQueries:

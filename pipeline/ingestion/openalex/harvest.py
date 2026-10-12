@@ -13,7 +13,7 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from pipeline.ingestion.harvest import (
+from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,

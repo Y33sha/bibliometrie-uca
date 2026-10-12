@@ -6,9 +6,9 @@ from sqlalchemy import text
 
 from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
-from pipeline.ingestion.fingerprint import fingerprint
-from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.signatures import (
+from pipeline.ingestion.common.fingerprint import fingerprint
+from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
     SignatureSyncSettings,

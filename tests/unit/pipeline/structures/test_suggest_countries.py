@@ -5,8 +5,8 @@
 
 import logging
 
-from pipeline.structures.countries_queries import SuggestEligibleCounts
-from pipeline.structures.suggest_countries import CountrySuggester, run
+from pipeline.structures.countries.countries_queries import SuggestEligibleCounts
+from pipeline.structures.countries.suggest_countries import CountrySuggester, run
 
 _LOG = logging.getLogger("test")
 

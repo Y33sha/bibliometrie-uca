@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from pipeline.ingestion import harvest
-from pipeline.ingestion.staging import UpsertOutcome
+from pipeline.ingestion.common import harvest
+from pipeline.ingestion.common.staging import UpsertOutcome
 
 # Signaux `(inserted, changed)` d'`upsert_staging` pour chaque issue.
 _SIGNAUX = {

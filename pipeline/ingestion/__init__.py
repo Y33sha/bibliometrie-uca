@@ -1,1 +1,1 @@
-"""Acquisition et normalisation des sources : un sous-paquet par source, et ce que les sources partagent (écriture dans `staging`, patron des moissonneurs, détection des changements)."""
+"""Acquisition et normalisation des sources : un sous-paquet par source, `common` pour ce que les sources partagent, `complements` pour les API consultées en complément."""

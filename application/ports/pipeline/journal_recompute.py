@@ -1,6 +1,6 @@
 """Port : recalculs, par le pipeline, des publications d'une revue après son édition ou sa fusion.
 
-Implémenté par `pipeline.publishing.journal_merge.JournalRecompute`.
+Implémenté par `pipeline.publishing.journals.journal_merge.JournalRecompute`.
 """
 
 from typing import Protocol

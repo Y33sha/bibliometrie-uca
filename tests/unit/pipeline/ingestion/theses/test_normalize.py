@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.pub_metadata import PublicationMetadata
-from pipeline.ingestion.signatures import SignatureSyncSettings
+from pipeline.ingestion.common.pub_metadata import PublicationMetadata
+from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.theses import normalize as normalize_theses
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,

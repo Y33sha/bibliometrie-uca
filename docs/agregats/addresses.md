@@ -30,7 +30,7 @@ Quatre phases écrivent ces tables, dans l'ordre où le pipeline les enchaîne.
 
 ### `normalize` — création des adresses
 
-Les adresses extraites des sources sont dédoublonnées, insérées, puis reliées aux signatures par `pipeline/ingestion/signatures.py`.
+Les adresses extraites des sources sont dédoublonnées, insérées, puis reliées aux signatures par `pipeline/ingestion/common/signatures.py`.
 
 ### `affiliations` — résolution en structures
 
@@ -40,7 +40,7 @@ La résolution compare l'état détecté à l'état enregistré et n'écrit que 
 
 ### `countries` — détection des pays
 
-`pipeline/structures/countries.py` détecte le pays, du signal le plus sûr au moins sûr :
+`pipeline/structures/countries/countries.py` détecte le pays, du signal le plus sûr au moins sûr :
 
 - le nom de pays en fin d'adresse ;
 - le nom de lieu, par automate sur les formes `institution` et `city` — le pays n'est écrit que si un seul code ISO ressort ;
@@ -81,6 +81,6 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 
 ## Points d'attention
 
-**Le recalcul des pays des publications est déclenché depuis les adresses.** Il appartient au pipeline (`pipeline/structures/countries_queries.py`), qui l'expose à l'API par le port `CountryRecompute` : une édition de pays d'adresse le lance en tâche de fond. L'ajout par lot et la recopie vers les adresses jumelles passent par `PgAddressRepository`.
+**Le recalcul des pays des publications est déclenché depuis les adresses.** Il appartient au pipeline (`pipeline/structures/countries/countries_queries.py`), qui l'expose à l'API par le port `CountryRecompute` : une édition de pays d'adresse le lance en tâche de fond. L'ajout par lot et la recopie vers les adresses jumelles passent par `PgAddressRepository`.
 
 **Les vues matérialisées peuvent être en retard.** L'édition manuelle recalcule `in_perimeter` depuis les tables de base sans rafraîchir `source_authorship_structures` ni `authorship_structures` : elles attendent le prochain passage du pipeline.

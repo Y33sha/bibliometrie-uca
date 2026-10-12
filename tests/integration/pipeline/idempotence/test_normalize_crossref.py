@@ -93,14 +93,14 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-    from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.source_publications import (
+    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+    from pipeline.ingestion.common.source_publications import (
         SourcePublicationQueries,
     )
-    from pipeline.ingestion.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
     from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.publishers import PublisherGatewayQueries
+    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()

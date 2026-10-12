@@ -21,7 +21,7 @@ import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.pub_metadata import PublicationMetadata
+from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.wos import normalize as normalize_wos
 from pipeline.ingestion.wos.normalize import (
     WosNormalizer,

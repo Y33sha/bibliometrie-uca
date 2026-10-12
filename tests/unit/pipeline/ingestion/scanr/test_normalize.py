@@ -17,7 +17,7 @@ import pytest
 
 from domain.journals.issns import JournalIssn
 from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.pub_metadata import PublicationMetadata
+from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.scanr import normalize as normalize_scanr
 from pipeline.ingestion.scanr.normalize import (
     ScanrNormalizer,

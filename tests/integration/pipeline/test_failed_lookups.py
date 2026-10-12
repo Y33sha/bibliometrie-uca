@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from sqlalchemy import text
 
-from pipeline.ingestion.failed_lookups import (
+from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
     record_failed_lookup,
 )

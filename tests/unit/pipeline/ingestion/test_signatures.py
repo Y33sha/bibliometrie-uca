@@ -3,8 +3,8 @@
 from unittest.mock import MagicMock
 
 from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.fingerprint import fingerprint
-from pipeline.ingestion.signatures import (
+from pipeline.ingestion.common.fingerprint import fingerprint
+from pipeline.ingestion.common.signatures import (
     AuthorRecord,
     signature_name_fields,
     write_source_authorships,

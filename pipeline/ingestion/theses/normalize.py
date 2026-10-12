@@ -21,21 +21,21 @@ from domain.sources.theses import (
     derive_theses_doc_type,
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.ingestion.normalize import SourceNormalizer
-from pipeline.ingestion.pub_metadata import PublicationMetadata
-from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.signatures import (
+from pipeline.ingestion.common.normalize import SourceNormalizer
+from pipeline.ingestion.common.pub_metadata import PublicationMetadata
+from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
     SignatureSyncSettings,
     sync_source_authorships,
 )
-from pipeline.ingestion.source_publications import (
+from pipeline.ingestion.common.source_publications import (
     SourcePublicationQueries,
     SourcePublicationUpsert,
 )
-from pipeline.ingestion.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 
 # =============================================================
 # PUBLICATIONS

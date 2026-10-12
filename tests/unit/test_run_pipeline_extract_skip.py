@@ -9,8 +9,8 @@ incrémentale (daily).
 
 from unittest.mock import patch
 
-from pipeline.ingestion import extract
-from pipeline.ingestion.harvest import ExtractionConfigError
+from pipeline.ingestion.common import extract
+from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.metrics import PhaseMetrics

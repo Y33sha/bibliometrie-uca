@@ -10,8 +10,8 @@ transformation.
 
 from unittest.mock import AsyncMock, patch
 
-from pipeline.ingestion import extract, normalize
-from pipeline.ingestion.normalize import NormalizeStats
+from pipeline.ingestion.common import extract, normalize
+from pipeline.ingestion.common.normalize import NormalizeStats
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context

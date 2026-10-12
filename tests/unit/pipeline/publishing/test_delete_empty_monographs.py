@@ -1,8 +1,8 @@
-"""Tests de la suppression des monographies vides (`pipeline.publishing.delete_empty_monographs`)."""
+"""Tests de la suppression des monographies vides (`pipeline.publishing.monographs.delete_empty_monographs`)."""
 
 import logging
 
-from pipeline.publishing.delete_empty_monographs import (
+from pipeline.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
 

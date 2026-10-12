@@ -1,8 +1,8 @@
-"""Tests de la fusion des revues en double (`pipeline.publishing.merge_duplicate_journals`)."""
+"""Tests de la fusion des revues en double (`pipeline.publishing.journals.merge_duplicate_journals`)."""
 
 import logging
 
-from pipeline.publishing.journals import (
+from pipeline.publishing.journals.journals import (
     JournalIssnGroup,
     JournalMergeCandidate,
     JournalMergeGroup,
@@ -10,7 +10,7 @@ from pipeline.publishing.journals import (
     JournalSummary,
     JournalTitleRow,
 )
-from pipeline.publishing.merge_duplicate_journals import (
+from pipeline.publishing.journals.merge_duplicate_journals import (
     run_merge_duplicate_journals,
 )
 

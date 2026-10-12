@@ -1,0 +1,53 @@
+"""Orchestrateur de la phase `subjects` : sujets / mots-clés et co-occurrences.
+
+Deux sous-étapes enchaînées, indissociables, chacune dans sa propre transaction :
+
+1. **ingestion** (`subjects` + `publication_subjects`) — incrémentale et publication-centrée : ingère seulement les publications jamais ingérées, ou recalculées depuis leurs sources après leur dernière ingestion, à partir des `topics` de leurs `source_publications`. Purge en fin les sujets devenus orphelins.
+2. **co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`) — recalcule l'usage de chaque sujet et rafraîchit la matview des paires de sujets co-présents sur une même publication.
+
+Aucun filtre périmètre : la phase `authorships` a purgé en amont les publications orphelines, donc `publication_subjects` ne porte que du périmètre et les deux caches en héritent. Idempotente.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from pipeline.publications.subjects.subject_cooccurrences import run as run_cooccurrences
+from pipeline.publications.subjects.subject_ingestion import run as run_ingest
+from pipeline.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.metrics import PhaseMetrics
+
+
+@dataclass(frozen=True)
+class SubjectsPhase:
+    queries: SubjectsIngestionQueries
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
+        open_tx, queries, logger = ctx.open_tx, self.queries, ctx.logger
+        with open_tx() as conn:
+            metrics = run_ingest(conn, queries, logger, rebuild=ctx.options.rebuild_subjects)
+
+        with open_tx() as conn:
+            run_cooccurrences(conn, queries, logger)
+        # Chaque sous-étape journalise son résultat : une ligne de clôture le répéterait.
+        metrics.resume = ""
+        return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Sujets et mots-clés : ingestion, puis recalcul des décomptes.
+
+    L'ingestion reprend les publications dont le contenu a changé depuis leur dernier passage, lit les sujets de leurs documents sources, et purge les sujets restés sans lien. Le recalcul qui suit compte les publications de chaque sujet et rafraîchit la matview des paires de sujets présents sur une même publication.
+
+    La phase `authorships` ayant supprimé les publications sans auteur, `publication_subjects` contient seulement le périmètre, dont les deux décomptes héritent.
+
+    `--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
+    """
+    from pipeline.publications.subjects.subjects_queries import SubjectsIngestionQueries
+
+    return SubjectsPhase(SubjectsIngestionQueries())

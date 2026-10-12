@@ -19,9 +19,9 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISBN, issn_rejection_reason
 from domain.publishers.names import publisher_name_key
 from pipeline.publishing.containers import ContainerGatewayQueries
-from pipeline.publishing.journals import JournalGatewayQueries
-from pipeline.publishing.monographs import MonographGatewayQueries
-from pipeline.publishing.publishers import PublisherGatewayQueries
+from pipeline.publishing.journals.journals import JournalGatewayQueries
+from pipeline.publishing.monographs.monographs import MonographGatewayQueries
+from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
 
 logger = logging.getLogger(__name__)
 

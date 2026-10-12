@@ -10,10 +10,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.hal import harvest
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.ingestion.hal.harvest import HalExtractor, build_collections_fq, build_query
-from pipeline.ingestion.harvest import ExtractionConfigError
 from tests.helpers.extractors import arguments_du_run
 
 _LOGGER = logging.getLogger("test")

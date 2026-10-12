@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import httpx2
 
-from pipeline.ingestion.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.ingestion.hal.fetch_missing import search_one
 from pipeline.ingestion.hal.fields import extract_doi
 from pipeline.ingestion.http.lookup import NotFound, Unavailable

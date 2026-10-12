@@ -1,4 +1,4 @@
-"""Nouvelle lecture des documents anciens (`pipeline.ingestion.fetch_stale.refresh`).
+"""Nouvelle lecture des documents anciens (`pipeline.ingestion.common.fetch_stale.refresh`).
 
 Les trois issues d'une lecture par identifiant natif sont routées correctement :
 - document trouvé (empreinte changée / inchangée) → écriture dans `staging` (updated / unchanged) ;
@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion import fetch_stale
-from pipeline.ingestion.fetch_stale import FetchedRecord, StaleRefetch, refresh
+from pipeline.ingestion.common import fetch_stale
+from pipeline.ingestion.common.fetch_stale import FetchedRecord, StaleRefetch, refresh
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 
 

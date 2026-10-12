@@ -14,13 +14,13 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
-from pipeline.ingestion.harvest import (
+from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
     scoped_logger,
     stage_document,
 )
+from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.runtime.config import get_extraction_api_ids, get_years
