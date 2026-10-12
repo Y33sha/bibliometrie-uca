@@ -14,7 +14,7 @@ L'API déclenche sept recalculs du pipeline après une édition. Ils sont export
 
 Le pipeline reporte aussi des traitements au run suivant. `pipeline/graph.py` déclare 39 lectures de données du run précédent (`previous_run`). D'autres données attendent le run suivant sans lecture à rebours : `fetch_missing` n'est pas récursif, donc un document rapatrié déclenche ses propres recherches au run suivant.
 
-Les deux questions se répondent. Un recalcul ciblé retiré laisse la donnée au run suivant. Un report supprimé peut rendre un recalcul ciblé inutile.
+Les deux questions concernent ce qui attend le run suivant : une édition de l'administration pour les recalculs ciblés, une donnée produite plus loin dans le run pour les reports.
 
 ## Décisions
 
@@ -24,8 +24,11 @@ Les deux questions se répondent. Un recalcul ciblé retiré laisse la donnée a
 
 ### Phase 1 — Inventaire
 
-- [ ] Pour chaque recalcul ciblé : l'édition qui le déclenche, l'effet visible dans l'interface, le délai sans lui.
-- [ ] Pour chaque report : la donnée concernée, le retard qu'il introduit, le coût de sa suppression.
+Voir l'[inventaire](CODE_recalculs-cibles-et-reports_inventaire.md).
+
+- [x] Pour chaque recalcul ciblé : l'édition qui le déclenche, l'effet visible dans l'interface, le délai sans lui.
+- [x] Pour chaque report : la donnée concernée, le retard qu'il introduit.
+- [ ] Pour chaque report : le coût de sa suppression.
 
 ### Phase 2 — Décisions
 
