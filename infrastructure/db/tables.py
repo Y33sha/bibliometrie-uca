@@ -108,6 +108,7 @@ audit_log = Table(
         "Trace des opérations destructives/décisionnelles déclenchées via "
         "l'admin HTTP. Les opérations du pipeline ne sont pas auditées."
     ),
+    schema="ops",
 )
 
 
@@ -138,6 +139,7 @@ config = Table(
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
     ),
+    schema="ops",
 )
 
 
@@ -155,6 +157,7 @@ perimeters = Table(
         server_default=text("'{}'::integer[]"),
     ),
     UniqueConstraint("code", name="perimeters_code_key"),
+    schema="structures",
 )
 
 
@@ -171,6 +174,7 @@ perimeter_structures = Table(
         "structure_id",
         name="perimeter_structures_pkey",
     ),
+    schema="structures",
 )
 
 
@@ -214,6 +218,7 @@ structures = Table(
     Column("api_ids", Jsonb),
     UniqueConstraint("code", name="structures_code_key"),
     UniqueConstraint("ror_id", name="structures_ror_id_key"),
+    schema="structures",
 )
 
 
@@ -230,6 +235,7 @@ structure_tutelles = Table(
         name="structure_tutelles_parent_id_child_id_key",
     ),
     CheckConstraint("parent_id <> child_id", name="structure_tutelles_no_self_reference"),
+    schema="structures",
 )
 
 
@@ -250,6 +256,7 @@ structure_name_forms = Table(
         "char_length(form_text) > 6 OR is_word_boundary",
         name="ck_structure_name_forms_short_word_boundary",
     ),
+    schema="structures",
 )
 
 
@@ -268,6 +275,7 @@ ror_organizations = Table(
         "Organisations du Research Organization Registry, chargées depuis son dump. "
         "Référentiel externe en lecture seule : structures.ror_id le relie au référentiel interne."
     ),
+    schema="ref",
 )
 
 
@@ -279,6 +287,7 @@ ror_relations = Table(
     PrimaryKeyConstraint("parent_ror_id", "child_ror_id", name="ror_relations_pkey"),
     CheckConstraint("parent_ror_id <> child_ror_id", name="ror_relations_no_self_reference"),
     comment="Relations parent/enfant entre organisations du Research Organization Registry.",
+    schema="ref",
 )
 
 
@@ -288,6 +297,7 @@ ror_dump_imports = Table(
     Column("version", Text, primary_key=True),
     Column("imported_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     comment="Imports du dump ROR : nom de l'archive importée et date de l'import.",
+    schema="ref",
 )
 
 
@@ -315,6 +325,7 @@ journals = Table(
     # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
+    schema="publishing",
 )
 
 
@@ -366,6 +377,7 @@ journal_issns = Table(
     comment=(
         "ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base."
     ),
+    schema="publishing",
 )
 
 
@@ -378,6 +390,7 @@ journal_name_forms = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
     UniqueConstraint("form_normalized", "publisher_id", name="uq_jnl_nf_form_publisher"),
+    schema="publishing",
 )
 
 
@@ -388,6 +401,7 @@ journal_doi_namespaces = Table(
     Column("journal_id", Integer, nullable=False),
     Column("dois", Integer, nullable=False),
     Column("share", Float, nullable=False),
+    schema="publishing",
 )
 
 
@@ -420,6 +434,7 @@ monographs = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("isbn", name="monographs_isbn_key"),
     UniqueConstraint("eisbn", name="monographs_eisbn_key"),
+    schema="publishing",
 )
 
 
@@ -442,6 +457,7 @@ publishers = Table(
     # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.pub_count`.
     Column("pub_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
+    schema="publishing",
 )
 
 
@@ -453,6 +469,7 @@ publisher_name_forms = Table(
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="publisher_name_forms_form_normalized_key"),
+    schema="publishing",
 )
 
 
@@ -470,6 +487,7 @@ doi_prefixes = Table(
     Column("datacite_client_symbol", Text),
     Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("publisher_checked_at", DateTime(timezone=True)),
+    schema="publishing",
 )
 
 
@@ -525,6 +543,7 @@ addresses = Table(
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
     # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
+    schema="structures",
 )
 
 
@@ -545,6 +564,7 @@ place_name_forms = Table(
         f"kind IN ({', '.join(repr(kind.value) for kind in PlaceNameKind)})",
         name="place_name_forms_kind_check",
     ),
+    schema="ref",
 )
 
 
@@ -559,6 +579,7 @@ address_structures = Table(
     UniqueConstraint(
         "address_id", "structure_id", name="address_structures_address_id_structure_id_key"
     ),
+    schema="structures",
 )
 
 
@@ -577,6 +598,7 @@ authorships = Table(
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
     UniqueConstraint("publication_id", "person_id", name="authorships_publication_person_uq"),
+    schema="publications",
 )
 
 
@@ -600,6 +622,7 @@ rejected_authorships = Table(
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     PrimaryKeyConstraint("source_publication_id", "person_id", name="rejected_authorships_pkey"),
+    schema="persons",
 )
 
 
@@ -647,6 +670,7 @@ author_identifying_keys = Table(
         name="author_identifying_keys_key",
         postgresql_nulls_not_distinct=True,
     ),
+    schema="sources",
 )
 
 
@@ -659,6 +683,7 @@ confirmed_authorships = Table(
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("source_authorship_id", name="confirmed_authorships_pkey"),
+    schema="persons",
 )
 
 
@@ -723,6 +748,7 @@ source_authorships = Table(
     # `identity_id` en colonne incluse permet l'index-only scan de la projection
     # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
     # qui rejoint `author_identifying_keys` sur `identity_id`.
+    schema="sources",
 )
 
 
@@ -737,6 +763,7 @@ source_authorship_addresses = Table(
         "address_id",
         name="source_authorship_addresses_source_authorship_id_address_id_key",
     ),
+    schema="sources",
 )
 
 
@@ -750,6 +777,7 @@ source_authorship_rors = Table(
         "ROR attribués par la source à une signature. ror_id est sans clé étrangère vers "
         "ror_organizations : une source peut citer un ROR absent du dump importé."
     ),
+    schema="sources",
 )
 
 
@@ -782,6 +810,7 @@ persons = Table(
             "Nul pour une personne retenue."
         ),
     ),
+    schema="persons",
 )
 
 
@@ -798,6 +827,7 @@ persons_rh = Table(
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("person_id", name="persons_rh_person_id_key"),
+    schema="persons",
 )
 
 
@@ -812,6 +842,7 @@ person_identifiers = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     UniqueConstraint("id_type", "id_value", name="person_identifiers_id_type_id_value_key"),
+    schema="persons",
 )
 
 
@@ -826,6 +857,7 @@ person_name_forms = Table(
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
+    schema="persons",
 )
 
 
@@ -876,6 +908,7 @@ publications = Table(
     # l'unique pub-ancre de la partition `(composante ∩ DOI)`). Partiel : les
     # publications sans DOI (NULL) ne sont pas contraintes.
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
+    schema="publications",
 )
 
 
@@ -890,6 +923,7 @@ publications_detail = Table(
     Column("keywords", ARRAY(Text)),
     Column("topics", Jsonb),
     Column("biblio", Jsonb),
+    schema="publications",
 )
 
 
@@ -960,6 +994,7 @@ source_publications = Table(
         "jsonb_typeof(raw_metadata) = 'object'",
         name="source_publications_raw_metadata_is_object",
     ),
+    schema="sources",
 )
 
 
@@ -976,6 +1011,7 @@ distinct_persons = Table(
         "person_id_b",
         name="distinct_persons_person_id_a_person_id_b_key",
     ),
+    schema="persons",
 )
 
 
@@ -1019,6 +1055,7 @@ apc_payments = Table(
         "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
     ),
     # Index sur expression lower(doi) — complété à la main.
+    schema="publishing",
 )
 
 
@@ -1027,6 +1064,7 @@ countries = Table(
     metadata,
     Column("code", CHAR(2), primary_key=True),
     Column("name", Text, nullable=False),
+    schema="ref",
 )
 
 
@@ -1039,6 +1077,7 @@ languages = Table(
         "Référentiel des langues. code : ISO 639-1, ou ISO 639-3 pour une langue sans code "
         "à deux lettres. name : nom français, affiché."
     ),
+    schema="ref",
 )
 
 
@@ -1051,6 +1090,7 @@ language_forms = Table(
         "Formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux "
         "et trois lettres, nom anglais."
     ),
+    schema="ref",
 )
 
 
@@ -1097,6 +1137,7 @@ staging = Table(
         "(processed FALSE, raw_data porte le payload de la source), normalisée (processed "
         "TRUE, raw_data vidé)."
     ),
+    schema="sources",
 )
 
 
@@ -1119,6 +1160,7 @@ failed_lookups = Table(
         "est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : "
         "l'échec est alors définitif."
     ),
+    schema="sources",
 )
 
 
@@ -1130,6 +1172,7 @@ subjects = Table(
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
+    schema="publications",
 )
 
 
@@ -1142,6 +1185,7 @@ publication_subjects = Table(
     Column("rejected", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("publication_id", "subject_id", "source"),
+    schema="publications",
 )
 
 
@@ -1177,6 +1221,7 @@ publication_relations = Table(
         name="publication_relations_uq",
         postgresql_nulls_not_distinct=True,
     ),
+    schema="publications",
 )
 
 
@@ -1200,6 +1245,7 @@ pipeline_phase_executions = Table(
         "status = ANY (ARRAY['ok'::text, 'warning'::text, 'error'::text])",
         name="pipeline_phase_executions_status_check",
     ),
+    schema="ops",
 )
 
 

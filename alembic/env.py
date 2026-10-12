@@ -40,6 +40,20 @@ def _include_object(
     return type_ not in ("foreign_key_constraint", "index")
 
 
+_PROJECT_SCHEMAS = {table.schema for table in metadata.tables.values()}
+
+
+def _include_name(name: str | None, type_: str, parent_names: object) -> bool:
+    """Limite la comparaison aux schémas des tables du projet et au schéma par défaut."""
+    return type_ != "schema" or name is None or name in _PROJECT_SCHEMAS
+
+
+# Les migrations se connectent avec `public` pour seul `search_path` : le schéma par défaut ne
+# rend alors visibles que les objets de `public`, et chaque table se compare sous son schéma.
+# Une migration écrite à la main qualifie donc ses tables par leur schéma.
+_CONNECT_ARGS = {"options": "-c search_path=public"}
+
+
 def _build_url() -> str:
     # Permet à un caller (ex. fixture pytest) d'imposer une URL via
     # `cfg.set_main_option("sqlalchemy.url", ...)`. Sinon, on construit
@@ -59,6 +73,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_object=_include_object,
+        include_schemas=True,
+        include_name=_include_name,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -71,12 +87,15 @@ def run_migrations_online() -> None:
         ini_section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_CONNECT_ARGS,
     )
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             include_object=_include_object,
+            include_schemas=True,
+            include_name=_include_name,
         )
         with context.begin_transaction():
             context.run_migrations()

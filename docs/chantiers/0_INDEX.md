@@ -5,6 +5,7 @@
 ### En cours
 
 - [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
+- [Un schéma PostgreSQL par domaine](CODE_schemas-par-domaine.md)
 
 ### En pause
 
