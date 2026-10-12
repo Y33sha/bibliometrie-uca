@@ -19,6 +19,7 @@
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
+- [Le SQL métier partagé hors d'`infrastructure/db`](CODE_infrastructure-db.md)
 - [Licences des publications](DATA_licences.md)
 - [Modularité du pipeline](CODE_pipeline.md)
 - [Monographies](DATA_monographies.md)
