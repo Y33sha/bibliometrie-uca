@@ -53,7 +53,7 @@ def _run(contexte, lots, *, rebuild_authorships=False, build_metrics=None):
     metrics.details.setdefault("summary", {})
     with patch.object(
         phase,
-        "build",
+        "build_authorships",
         side_effect=lambda conn, queries, logger, *, rebuild_full: (
             vus.__setitem__("rebuild_full", rebuild_full) or metrics
         ),
@@ -128,7 +128,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     metrics = PhaseMetrics(new=1)
     metrics.details["summary"] = {}
     with (
-        patch.object(phase, "build", return_value=metrics),
+        patch.object(phase, "build_authorships", return_value=metrics),
         caplog.at_level(logging.INFO, logger="test"),
     ):
         rendu = phase.AuthorshipsPhase(

@@ -10,9 +10,11 @@ Quatre sous-étapes, chacune dans sa propre transaction :
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
-from pipeline.context import OpenTransaction, PhaseContext
+from pipeline.context import OpenTransaction, Phase, PhaseContext
 from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODES
 from pipeline.structures import (
@@ -64,3 +66,13 @@ class CountriesPhase:
         # Chaque sous-étape journalise ce qu'elle a résolu : une ligne de clôture les répéterait.
         metrics.resume = ""
         return metrics
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Détection des pays des adresses et recalcul sur les publications."""
+    from pipeline.structures.countries_queries import CountryQueries
+
+    return CountriesPhase(CountryQueries())

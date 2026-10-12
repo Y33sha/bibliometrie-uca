@@ -13,6 +13,8 @@ Les relations de même œuvre (versions, formes variantes, pièces de package) r
 Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -26,7 +28,7 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from pipeline.context import PhaseContext
+from pipeline.context import Phase, PhaseContext
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.publications.relations_queries import (
@@ -232,3 +234,16 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
         libelle = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
         par_libelle[libelle] = par_libelle.get(libelle, 0) + count
     return dict(sorted(par_libelle.items(), key=lambda item: item[1], reverse=True))
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Population des relations sémantiques entre publications distinctes.
+
+    La phase suit `publications`, qui a rattaché les documents sources et permet de résoudre les DOI cibles en `publication_id`. Elle reconstruit `publication_relations` depuis les relations que les sources déclarent — `meta.related_identifiers` chez DataCite, `meta.relation` chez Crossref — complétées par les clés partagées et le rapprochement par titre. Les liens entre formes d'une même œuvre relèvent du dédoublonnage, en phase `metadata_correction`.
+    """
+    from pipeline.publications.relations_queries import PublicationRelationsQueries
+
+    return RelationsPhase(PublicationRelationsQueries())

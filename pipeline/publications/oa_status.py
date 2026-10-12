@@ -5,6 +5,8 @@ Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut
 Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
@@ -15,7 +17,8 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
 from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.context import PhaseContext
+from pipeline.context import Phase, PhaseContext
+from pipeline.execution import UnderCircuitBreaker, credentials_missing
 from pipeline.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -217,3 +220,39 @@ async def _verifier(
     )
 
     return _result()
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Enrichissement de `publications.oa_status`, une publication à la fois, via Unpaywall.
+
+    Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée. La phase tourne sous le circuit-breaker d'Unpaywall.
+    """
+
+    from infrastructure.sources.api_params import API_BASE_URLS
+    from infrastructure.sources.config import (
+        get_polite_pool_email_optional,
+        get_unpaywall_max_per_run,
+        get_unpaywall_recheck_after_days,
+    )
+    from pipeline.publications.oa_status_queries import OaStatusQueries
+    from pipeline.sources.unpaywall import fetch_oa_status
+
+    base_url = API_BASE_URLS["unpaywall"]
+    email = get_polite_pool_email_optional() or ""
+
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
+        return await fetch_oa_status(client, doi, base_url=base_url, email=email)
+
+    return UnderCircuitBreaker(
+        "unpaywall",
+        OaStatusPhase(
+            OaStatusQueries(),
+            fetcher,
+            credentials_missing=credentials_missing,
+            staleness_days=get_unpaywall_recheck_after_days,
+            max_per_run=get_unpaywall_max_per_run,
+        ),
+    )

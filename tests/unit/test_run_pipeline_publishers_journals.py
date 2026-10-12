@@ -5,9 +5,9 @@ La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, en
 
 from unittest.mock import patch
 
-from interfaces.cli.phases import publishers_journals
-from interfaces.cli.phases.execution import phase_context
+from pipeline.containers import publishers_journals
 from pipeline.context import RunOptions
+from pipeline.execution import phase_context
 from pipeline.metrics import PhaseMetrics
 
 

@@ -20,7 +20,8 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from infrastructure.db.scalars import scalar_int
-from pipeline.context import PhaseContext
+from pipeline.context import Phase, PhaseContext
+from pipeline.execution import log, open_tx
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
@@ -144,3 +145,36 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
         refresh_source_authorship_structures(conn)
         sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+
+
+# ── Câblage ───────────────────────────────────────────────────
+
+
+def build() -> Phase:
+    """Rattachement des signatures aux structures du périmètre, par leurs adresses."""
+    from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
+    from pipeline.structures.address_resolution import (
+        AddressResolutionQueries,
+    )
+
+    return AffiliationsPhase(
+        AddressResolutionQueries(),
+        PgPerimeterStructuresQueries(),
+        refresh_ror=_run_refresh_ror,
+    )
+
+
+def _run_refresh_ror() -> PhaseMetrics:
+    """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
+    from infrastructure.repositories import ror_repository
+    from infrastructure.sources.config import get_polite_pool_email_optional
+    from infrastructure.sources.polite_pool import build_user_agent
+    from infrastructure.sources.ror.dump import ZenodoRorDumpSource
+    from pipeline.structures.ror import run_refresh_ror
+
+    # Le dump est public : l'adresse du polite pool y est facultative.
+    source = ZenodoRorDumpSource(
+        user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=log
+    )
+    with open_tx() as conn:
+        return run_refresh_ror(conn, source=source, repo=ror_repository(conn), logger=log)
