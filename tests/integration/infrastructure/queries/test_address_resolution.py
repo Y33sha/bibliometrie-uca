@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `pipeline.structures.address_resolution`."""
+"""Tests d'intégration pour `pipeline.transformation.structures.address_resolution`."""
 
 from functools import partial
 
 from sqlalchemy import text
 
-from pipeline.structures.address_resolution import (
+from pipeline.transformation.structures.address_resolution import (
     AddressResolutionQueries,
     DetectedStructure,
     KeptPair,

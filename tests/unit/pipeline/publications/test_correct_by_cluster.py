@@ -8,11 +8,11 @@ from domain.source_publications.metadata_correction.shared_doi import (
     resolve_cluster_doi_corrections,
 )
 from domain.source_publications.raw_metadata import stash_entry
-from pipeline.publications.correction.correct_by_cluster import (
+from pipeline.transformation.publications.correction.correct_by_cluster import (
     compute_updates,
     tally_doi_corrections,
 )
-from pipeline.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.metadata_correction_queries import (
     DoiClusterRow,
     DoiCorrectionUpdate,
 )

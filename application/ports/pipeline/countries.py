@@ -1,6 +1,6 @@
 """Port : recalcul, par le pipeline, des pays des notices et des publications d'un lot d'adresses, après une modification manuelle de leurs pays.
 
-Implémenté par `pipeline.structures.countries.countries_queries.CountryQueries`.
+Implémenté par `pipeline.transformation.structures.countries.countries_queries.CountryQueries`.
 """
 
 from typing import Protocol

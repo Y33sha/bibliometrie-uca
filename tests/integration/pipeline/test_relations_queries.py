@@ -11,8 +11,8 @@ from functools import partial
 
 from sqlalchemy import text
 
-from pipeline.publications.reconciliation.refresh import PublicationStore
-from pipeline.publications.relations_queries import (
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.relations_queries import (
     DoiPublication,
     PublicationRelationsQueries,
     RelationEdge,

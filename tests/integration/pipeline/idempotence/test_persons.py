@@ -61,10 +61,10 @@ def run_create_persons(conn):
 
     from sqlalchemy import text
 
-    from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
-    from pipeline.persons.cascade import run_cascade
-    from pipeline.persons.matching import PersonsMatchingQueries
-    from pipeline.persons.person_writes import PersonWrites
+    from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
+    from pipeline.transformation.persons.cascade import run_cascade
+    from pipeline.transformation.persons.matching import PersonsMatchingQueries
+    from pipeline.transformation.persons.person_writes import PersonWrites
 
     queries = PersonsMatchingQueries()
     logger = logging.getLogger("test")

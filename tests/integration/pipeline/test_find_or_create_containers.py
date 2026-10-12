@@ -5,8 +5,8 @@ from sqlalchemy import text
 
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
-from pipeline.publishing.containers import ContainerGatewayQueries
-from pipeline.publishing.find_or_create import (
+from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
     find_or_create_journal,

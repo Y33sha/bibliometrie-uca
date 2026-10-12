@@ -17,7 +17,7 @@ from pipeline.ingestion.http.circuit_breaker import (
 )
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:

@@ -49,7 +49,7 @@ Deux tables contiennent les arbitrages saisis à la main sur les signatures, et 
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `persons` | mixte | créées par le pipeline (phase persons, `pipeline/persons/cascade.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
+| `persons` | mixte | créées par le pipeline (phase persons, `pipeline/transformation/persons/cascade.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
 | `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |

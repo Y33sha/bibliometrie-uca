@@ -17,7 +17,10 @@ import pytest
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
-from pipeline.publications.reconciliation.refresh import PublicationStore, refresh_from_sources
+from pipeline.transformation.publications.reconciliation.refresh import (
+    PublicationStore,
+    refresh_from_sources,
+)
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_publication

@@ -29,11 +29,10 @@ from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.publishing.containers import ContainerGatewayQueries
-from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
-from pipeline.runtime.libelles import (
+from pipeline.runtime.modes import MODES
+from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
     SUITE_DE_BRANCHE,
     accord,
@@ -41,11 +40,12 @@ from pipeline.runtime.libelles import (
     etape,
     rien_a_faire,
 )
-from pipeline.runtime.logging_scope import scoped_logger
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.modes import MODES
-from pipeline.runtime.progression import attente, progression
+from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import attente, progression
 from pipeline.runtime.savepoint import rollback_unless_invalidated, savepoint
+from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -406,8 +406,8 @@ def _normalize_builders(
     from pipeline.ingestion.scanr.normalize import ScanrNormalizer
     from pipeline.ingestion.theses.normalize import ThesesNormalizer
     from pipeline.ingestion.wos.normalize import WosNormalizer
-    from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
     raw_store = get_raw_store() if archive else NullRawStore()
     sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)

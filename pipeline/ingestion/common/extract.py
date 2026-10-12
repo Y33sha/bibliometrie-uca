@@ -33,15 +33,15 @@ from pipeline.ingestion.common.parallel import RunParallel
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import circuit_breaker, open_tx, signal_if_tripped
-from pipeline.runtime.libelles import etape
-from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.runtime.modes import MODES
-from pipeline.runtime.signals import (
+from pipeline.runtime.observability.libelles import etape
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import (
     signal_source_unavailable,
     signal_source_unconfigured,
     timed_metrics,
 )
-from pipeline.structures.perimeter import EmptyExtractionPerimeterError
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -268,7 +268,7 @@ def build() -> Phase:
 
 def _extraction_structure_count() -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
-    from pipeline.structures.perimeter import PerimeterQueries
+    from pipeline.transformation.structures.perimeter import PerimeterQueries
 
     with open_tx() as conn:
         return PerimeterQueries().count_extraction_structures(conn)

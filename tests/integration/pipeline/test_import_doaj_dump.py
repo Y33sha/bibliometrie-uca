@@ -4,10 +4,10 @@ import logging
 
 from sqlalchemy import text
 
-from pipeline.publishing.journals.import_journals_from_doaj_dump import (
+from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from pipeline.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn
 
 

@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'édition de l'agrégat Journal dans l'administration.
 
-L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). La fusion de deux revues appartient au pipeline (`pipeline/publishing/journals/journal_merge.py`).
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). La fusion de deux revues appartient au pipeline (`pipeline/transformation/publishing/journals/journal_merge.py`).
 
 Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """

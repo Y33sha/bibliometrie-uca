@@ -37,25 +37,25 @@ from infrastructure.observability.log import (
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.ingestion.common import extract, fetch_missing, fetch_stale, normalize
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.persons import persons
-from pipeline.publications import oa_status, relations
-from pipeline.publications.authorships import authorships
-from pipeline.publications.correction import metadata_correction
-from pipeline.publications.reconciliation import publications
-from pipeline.publications.subjects import subjects
-from pipeline.publishing import publishers_journals, resolve_ra
 from pipeline.runtime.context import Phase, RunOptions
-from pipeline.runtime.exception_chain import failure_message, is_user_interruption
 from pipeline.runtime.execution import log, open_tx, phase_context
-from pipeline.runtime.libelles import accord
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
-from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.runtime.modes import MODE_NAMES
+from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
+from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.runtime.observability.signals import select_targets
 from pipeline.runtime.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
-from pipeline.runtime.progression import ecrire_hors_barre, set_flux_barres
-from pipeline.runtime.signals import select_targets
-from pipeline.structures import affiliations
-from pipeline.structures.countries import countries
+from pipeline.transformation.persons import persons
+from pipeline.transformation.publications import oa_status, relations
+from pipeline.transformation.publications.authorships import authorships
+from pipeline.transformation.publications.correction import metadata_correction
+from pipeline.transformation.publications.reconciliation import publications
+from pipeline.transformation.publications.subjects import subjects
+from pipeline.transformation.publishing import publishers_journals, resolve_ra
+from pipeline.transformation.structures import affiliations
+from pipeline.transformation.structures.countries import countries
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())
@@ -455,7 +455,7 @@ def _execute_phases(
 
     # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
     # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
-    from pipeline.structures.perimeter import refresh_perimeter_structures
+    from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
     with open_tx() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)

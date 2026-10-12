@@ -3,7 +3,10 @@
 from sqlalchemy import text
 
 from domain.persons.matching import ResolutionMode
-from pipeline.persons.matching import MisplacedNeutralizations, PersonsMatchingQueries
+from pipeline.transformation.persons.matching import (
+    MisplacedNeutralizations,
+    PersonsMatchingQueries,
+)
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication

@@ -1,4 +1,4 @@
-"""Tests d'intégration du « trouver ou créer » des éditeurs et des revues (`pipeline/publishing/find_or_create.py`)."""
+"""Tests d'intégration du « trouver ou créer » des éditeurs et des revues (`pipeline/transformation/publishing/find_or_create.py`)."""
 
 from functools import partial
 from types import SimpleNamespace
@@ -7,9 +7,12 @@ import pytest
 from sqlalchemy import text
 
 from domain.journals.issns import source_issns
-from pipeline.publishing.find_or_create import find_or_create_journal, find_or_create_publisher
-from pipeline.publishing.journals.journals import JournalGatewayQueries
-from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.find_or_create import (
+    find_or_create_journal,
+    find_or_create_publisher,
+)
+from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 from tests.integration.helpers.journals import (
     insert_journal_with_issns,
     insert_publisher,

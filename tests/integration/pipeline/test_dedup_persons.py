@@ -23,10 +23,10 @@ from sqlalchemy import text
 
 from application.services.persons.core import add_name_form, create_person
 from infrastructure.repositories import person_repository
-from pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
-from pipeline.persons.cascade import run_cascade
-from pipeline.persons.matching import PersonsMatchingQueries
-from pipeline.persons.person_writes import PersonWrites
+from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
+from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.person_writes import PersonWrites
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,

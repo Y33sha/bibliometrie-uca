@@ -97,7 +97,7 @@ AUTHOR_SOURCES = ALL_SOURCES
 # question est « quelle source gagne ? ». Couvre :
 #
 # - l'agrégation multi-sources des métadonnées publication
-#   (`refresh_from_sources` dans `pipeline/publications/reconciliation/refresh.py`)
+#   (`refresh_from_sources` dans `pipeline/transformation/publications/reconciliation/refresh.py`)
 # - la résolution de `author_position` quand plusieurs sources
 #   attestent une même authorship
 # - l'ordre d'exécution des normalizers dans le pipeline

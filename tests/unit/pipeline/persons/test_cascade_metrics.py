@@ -5,7 +5,7 @@ Une même signature revient sur chaque publication d'une collaboration : le nomb
 
 import logging
 
-from pipeline.persons.metrics import (
+from pipeline.transformation.persons.metrics import (
     CascadeResult,
     build_metrics,
     log_matching_breakdown,

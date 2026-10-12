@@ -19,7 +19,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.settings import settings
 from interfaces.cli.dev.pg_tools import owner_connection_args, owner_env, resolve_pg_tool
-from pipeline.structures.perimeter import refresh_perimeter_structures
+from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 log = setup_logger("create_instance", os.path.dirname(__file__))
 

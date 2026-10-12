@@ -15,8 +15,8 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.context import Phase, PhaseContext, RunOptions
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.signals import signal_source_unavailable
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unavailable
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection

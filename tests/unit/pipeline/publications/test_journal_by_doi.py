@@ -2,8 +2,8 @@
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_publications.raw_metadata import stash_entry
-from pipeline.publications.correction.journal_by_doi import compute_updates
-from pipeline.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.journal_by_doi import compute_updates
+from pipeline.transformation.publications.correction.metadata_correction_queries import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
 )

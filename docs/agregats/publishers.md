@@ -18,7 +18,7 @@ Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `
 
 ## Écriture par le pipeline
 
-**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur.
+**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur.
 
 **Résolution par préfixe de DOI (`publishers_journals`).** Pour chaque préfixe non encore résolu, `resolve_publishers` détermine l'agence d'enregistrement du DOI, interroge Crossref ou DataCite, enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom — la même opération que dans `normalize` — et renseigne `doi_prefixes.publisher_id`. `publisher_checked_at` retient une réponse de l'API, préfixe connu ou non : le préfixe n'est plus interrogé. Un préfixe dont l'API est indisponible est repris au run suivant.
 

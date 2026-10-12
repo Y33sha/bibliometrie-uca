@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `pipeline.structures.countries.refresh_publication_countries`.
+"""Tests d'intégration pour `pipeline.transformation.structures.countries.refresh_publication_countries`.
 
 Recalcul des caches pays depuis `addresses.countries` :
 1. `source_publications.countries` — union des pays des adresses des source_authorships du document.
@@ -13,8 +13,8 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from pipeline.structures.countries.countries_queries import CountryQueries
-from pipeline.structures.countries.refresh_publication_countries import refresh
+from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.structures.countries.refresh_publication_countries import refresh
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (

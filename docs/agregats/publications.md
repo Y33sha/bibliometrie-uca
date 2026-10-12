@@ -22,11 +22,11 @@ En amont se trouvent les [enregistrements sources](source_publications.md). La c
 
 La phase `publications` constitue les publications ; les phases `relations`, `oa_status`, `countries` et `authorships` enrichissent ensuite certaines colonnes.
 
-**Regroupement (`pipeline/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
+**Regroupement (`pipeline/transformation/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
 
 **Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail. Une publication qu'aucune source n'atteste plus, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent.
 
-**Relations (`pipeline/publications/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
+**Relations (`pipeline/transformation/publications/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
 
 - les relations déclarées par DataCite et Crossref ;
 - les clés de confirmation partagées entre deux DOI distincts, dont le type se déduit du couple de types de document ;
@@ -34,7 +34,7 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 Les liens vont du dépendant vers le parent, et les liens inverses sont dédoublonnés. Le type imprécis `is_related_to` marque une paire à clé partagée que le couple de types de document ne permet pas de qualifier ; une relation précise déjà déclarée le remplace.
 
-**Statut *open access* (`pipeline/publications/oa_status.py`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
+**Statut *open access* (`pipeline/transformation/publications/oa_status.py`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
 
 **Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
 

@@ -35,8 +35,10 @@ from infrastructure.repositories import (
     person_repository,
 )
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-from pipeline.publications.reconciliation.publication_perimeter import PublicationPerimeterRecompute
+from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
+from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+    PublicationPerimeterRecompute,
+)
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,

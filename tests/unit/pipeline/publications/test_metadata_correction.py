@@ -7,10 +7,12 @@ La phase assemble ensuite un bilan : les compteurs des trois passes, et la venti
 
 from unittest.mock import patch
 
-from pipeline.publications.correction import metadata_correction as phase
-from pipeline.publications.correction.correct_by_cluster import ClusterCorrectionStats
-from pipeline.publications.correction.correct_unary import UnaryCorrectionStats
-from pipeline.publications.correction.journal_by_doi import JournalByDoiStats
+from pipeline.transformation.publications.correction import metadata_correction as phase
+from pipeline.transformation.publications.correction.correct_by_cluster import (
+    ClusterCorrectionStats,
+)
+from pipeline.transformation.publications.correction.correct_unary import UnaryCorrectionStats
+from pipeline.transformation.publications.correction.journal_by_doi import JournalByDoiStats
 
 
 def _run(contexte, *, journal=None, unary=None, cluster=None):

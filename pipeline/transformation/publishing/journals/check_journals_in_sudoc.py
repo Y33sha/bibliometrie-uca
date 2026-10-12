@@ -1,0 +1,205 @@
+"""Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
+
+Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
+
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
+"""
+
+import logging
+from collections.abc import Awaitable, Callable, Sequence
+from datetime import UTC, datetime
+
+import httpx2
+from sqlalchemy import Connection
+
+from domain.journals.issn_check import (
+    JournalIssns,
+    SudocCheck,
+    check_journal_issns,
+    correction_candidates,
+)
+from domain.journals.issns import IssnStatus
+from domain.journals.series import ContainerLevel, container_level, holds_volumes
+from domain.sources.sudoc import SudocSerialRecord
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.ingestion.http.fetch_pool import RequestPace, run_fetch_pool
+from pipeline.runtime.observability.libelles import BRANCHE, accord, forme
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import progression
+from pipeline.transformation.publishing.journals.journals import (
+    JournalGatewayQueries,
+    JournalSudocRow,
+)
+
+LIBELLE = "Vérification des ISSN dans le Sudoc"
+"""Libellé de la sous-étape dans le journal de la phase."""
+
+COMMIT_EVERY = 50  # revues par commit
+
+FetchPpns = Callable[[httpx2.AsyncClient, Sequence[str]], Awaitable[dict[str, tuple[str, ...]]]]
+"""`(client, issns) -> {issn: ppns}` : PPN des notices Sudoc de chaque ISSN connu du Sudoc."""
+
+FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | None]]
+"""`(client, ppn) -> notice`, ou `None` si la notice est introuvable ou illisible."""
+
+# Le sort des ISSN d'une revue tient du détail : le terminal le masque, le journal le garde.
+_DETAIL = {"detail": True}
+
+
+def _journal_issns(row: JournalSudocRow) -> JournalIssns:
+    return JournalIssns(
+        row.title, row.issns, row.document_issns, holds_volumes=holds_volumes(row.journal_type)
+    )
+
+
+def _adopted(row: JournalSudocRow, check: SudocCheck) -> tuple[str, ...]:
+    """ISSN venus des enregistrements de la revue que la vérification rend actifs."""
+    active = {r.issn for r in check.issns if r.status is IssnStatus.ACTIVE}
+    return tuple(i for i in row.document_issns if i in active)
+
+
+def _log_check(logger: logging.Logger, row: JournalSudocRow, check: SudocCheck) -> None:
+    label = f"Revue {row.id} ({row.title!r})"
+    for issn in _adopted(row, check):
+        logger.info(
+            "%s : ISSN %s d'un enregistrement ajouté à la revue", label, issn, extra=_DETAIL
+        )
+    if check.conflict:
+        logger.info(
+            "%s : ISSN de deux publications à égalité — laissés en l'état", label, extra=_DETAIL
+        )
+    for issn, reason in check.set_aside:
+        logger.info("%s : ISSN %s mis de côté (%s)", label, issn, reason, extra=_DETAIL)
+    for issn, reason in check.discarded:
+        logger.info("%s : ISSN %s écarté (%s)", label, issn, reason, extra=_DETAIL)
+    for raw, corrected in check.corrections:
+        logger.info("%s : ISSN mal formé %r corrigé en %s", label, raw, corrected, extra=_DETAIL)
+    if check.title is not None:
+        logger.info("%s : titre de série « %s »", label, check.title, extra=_DETAIL)
+
+
+async def run_check_journals_in_sudoc(
+    conn: Connection,
+    logger: logging.Logger,
+    *,
+    journal_repo: JournalGatewayQueries,
+    fetch_ppns: FetchPpns,
+    fetch_record: FetchRecord,
+    breaker: SourceCircuitBreaker,
+    max_concurrent: int,
+    max_per_second: float,
+) -> PhaseMetrics:
+    """Vérifie les revues à vérifier, `max_concurrent` à la fois, à `max_per_second` requêtes par seconde au plus."""
+    titled_as_volumes = [
+        j.id
+        for j in journal_repo.find_titles_of_journals_with_issn()
+        if holds_volumes(j.journal_type) and container_level(j.title) is ContainerLevel.VOLUME
+    ]
+    rows = journal_repo.find_journals_to_check_in_sudoc(also=titled_as_volumes)
+    total = len(rows)
+    metrics = PhaseMetrics()
+    if total == 0:
+        return metrics
+    metrics.add(total=total)
+
+    record_by_ppn: dict[str, SudocSerialRecord | None] = {}
+    pace = RequestPace(max_per_second)
+
+    async def _read(
+        client: httpx2.AsyncClient, issns: Sequence[str], records: dict[str, SudocSerialRecord]
+    ) -> None:
+        """Ajoute à `records` la notice de chaque ISSN connu du Sudoc. `record_by_ppn` garde les notices déjà lues."""
+        await pace.wait()
+        ppns_by_issn = await fetch_ppns(client, issns)
+        for issn in issns:
+            if not (ppns := ppns_by_issn.get(issn)):
+                continue
+            if ppns[0] not in record_by_ppn:
+                await pace.wait()
+                record_by_ppn[ppns[0]] = await fetch_record(client, ppns[0])
+            if (record := record_by_ppn[ppns[0]]) is not None:
+                records[issn] = record
+
+    async def _fetch(
+        client: httpx2.AsyncClient, row: JournalSudocRow
+    ) -> dict[str, SudocSerialRecord] | None:
+        """Notices utiles à la vérification de la revue, ou `None` si une requête a échoué."""
+        journal = _journal_issns(row)
+        issns = (*journal.examined(), *correction_candidates(journal.malformed()))
+        records: dict[str, SudocSerialRecord] = {}
+        try:
+            await _read(client, issns, records)
+            # L'ISSN d'autre support qu'une notice désigne complète une colonne vide : sa propre notice donne son support.
+            others = list(
+                dict.fromkeys(
+                    x for r in records.values() for x in r.other_support_issns if x not in issns
+                )
+            )
+            if others:
+                await _read(client, others, records)
+        except (httpx2.HTTPError, SourceUnavailableError) as exc:
+            logger.warning(
+                "Revue %d : requête Sudoc en échec, reprise au prochain run (%s)", row.id, exc
+            )
+            return None
+        return records
+
+    # Le compteur de la barre porte les revues présentes dans le Sudoc.
+    with progression(
+        total, f"{BRANCHE}{LIBELLE}", logger, compte_retenus=True, efface=True
+    ) as avancement:
+
+        def _write(
+            conn: Connection, row: JournalSudocRow, records: dict[str, SudocSerialRecord] | None
+        ) -> None:
+            avancement.avance()
+            if records is None:
+                metrics.add(errors=1)
+                return
+            check = check_journal_issns(_journal_issns(row), records)
+            _log_check(logger, row, check)
+            journal_repo.record_sudoc_check(
+                row.id,
+                issns=check.issns,
+                released=check.released,
+                checked_at=datetime.now(UTC),
+                title=check.title,
+            )
+            changed = set(check.issns) != set(row.issns) or bool(check.released)
+            metrics.add(
+                updated=int(changed),
+                unchanged=int(not changed),
+                sudoc_found=int(check.found),
+                issn_set_aside=len(check.set_aside),
+                issn_discarded=len(check.discarded),
+                issn_corrected=len(check.corrections),
+                issn_conflicts=int(check.conflict),
+                issn_from_documents=len(_adopted(row, check)),
+                series_titled=int(check.title is not None),
+            )
+            avancement.retient(int(check.found))
+
+        await run_fetch_pool(
+            rows,
+            conn,
+            max_concurrent=max_concurrent,
+            commit_every=COMMIT_EVERY,
+            fetch=_fetch,
+            write=_write,
+            should_continue=lambda: not breaker.tripped,
+        )
+
+    checked = metrics.updated + metrics.unchanged
+    if breaker.tripped:
+        logger.warning(
+            "⚡ Coupe-circuit Sudoc : vérification interrompue à %d/%d, reste repris au prochain run.",
+            checked,
+            total,
+        )
+    found = metrics.extras.get("sudoc_found", 0)
+    metrics.resume = (
+        f"{accord(total, 'revue vérifiée', 'revues vérifiées')}, "
+        f"{accord(found, 'présente', 'présentes')} dans le Sudoc, "
+        f"{metrics.updated} {forme(metrics.updated, 'modifiée')}"
+    )
+    return metrics

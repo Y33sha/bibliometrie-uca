@@ -11,13 +11,13 @@ import logging
 
 import pytest
 
-from pipeline.persons import populate_person_name_forms
-from pipeline.persons.name_forms import (
+from pipeline.transformation.persons import populate_person_name_forms
+from pipeline.transformation.persons.name_forms import (
     PersonNameRow,
     RawFormBatchItem,
     SyncCounts,
 )
-from pipeline.persons.populate_person_name_forms import BATCH_SIZE, populate
+from pipeline.transformation.persons.populate_person_name_forms import BATCH_SIZE, populate
 
 
 class _FakeQueries:

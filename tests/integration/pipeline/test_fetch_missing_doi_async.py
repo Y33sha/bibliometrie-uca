@@ -22,7 +22,7 @@ from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # ── helpers ──────────────────────────────────────────────────────
 

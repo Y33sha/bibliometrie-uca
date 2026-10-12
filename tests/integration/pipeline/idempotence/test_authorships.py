@@ -10,8 +10,10 @@ def _run_build_authorships(conn):
     """Exécute build_authorships sur la Connection SA de test."""
     import logging
 
-    from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-    from pipeline.publications.authorships.build_authorships import build
+    from pipeline.transformation.publications.authorships.authorships_queries import (
+        AuthorshipsBuild,
+    )
+    from pipeline.transformation.publications.authorships.build_authorships import build
 
     build(conn, AuthorshipsBuild(), logging.getLogger("test"))
 
@@ -65,8 +67,10 @@ class TestBuildAuthorshipsRebuildFull:
     def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
         import logging
 
-        from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-        from pipeline.publications.authorships.build_authorships import build
+        from pipeline.transformation.publications.authorships.authorships_queries import (
+            AuthorshipsBuild,
+        )
+        from pipeline.transformation.publications.authorships.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -93,8 +97,10 @@ class TestBuildAuthorshipsRebuildFull:
 
         from sqlalchemy import text
 
-        from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-        from pipeline.publications.authorships.build_authorships import build
+        from pipeline.transformation.publications.authorships.authorships_queries import (
+            AuthorshipsBuild,
+        )
+        from pipeline.transformation.publications.authorships.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -121,8 +127,10 @@ class TestBuildAuthorshipsRebuildRollback:
 
         from sqlalchemy import text
 
-        from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-        from pipeline.publications.authorships.build_authorships import build
+        from pipeline.transformation.publications.authorships.authorships_queries import (
+            AuthorshipsBuild,
+        )
+        from pipeline.transformation.publications.authorships.build_authorships import build
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -197,8 +205,10 @@ class TestIncrementalEqualsFull:
         # Rebuild full (purge + reconstruction) sur le même état source → snapshot.
         import logging
 
-        from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-        from pipeline.publications.authorships.build_authorships import build
+        from pipeline.transformation.publications.authorships.authorships_queries import (
+            AuthorshipsBuild,
+        )
+        from pipeline.transformation.publications.authorships.build_authorships import build
 
         build(
             sa_sync_conn,

@@ -40,13 +40,13 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.publishing.containers import ContainerGatewayQueries
-from pipeline.publishing.find_or_create import (
+from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
     find_or_create_publisher,
 )
-from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
 # =============================================================
 # UTILITAIRES

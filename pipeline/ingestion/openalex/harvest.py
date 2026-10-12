@@ -30,8 +30,8 @@ from pipeline.runtime.config import (
     get_years,
     source_credentials_missing,
 )
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import Progression
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
 

@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.structures.countries import countries as phase
-from pipeline.structures.countries.countries_queries import AddressCountryStatus
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.structures.countries import countries as phase
+from pipeline.transformation.structures.countries.countries_queries import AddressCountryStatus
 
 
 class _FakeCountryQueries:

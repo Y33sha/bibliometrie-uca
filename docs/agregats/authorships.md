@@ -21,7 +21,7 @@ Les signatures elles-mêmes relèvent de la fiche [source_publications](source_p
 
 ## Écriture par le pipeline
 
-La table n'est écrite que par la phase `authorships` (`pipeline/publications/authorships/authorships.py`), qui enchaîne la construction proprement dite, la suppression par lots des publications restées sans aucune authorship, puis le rafraîchissement des compteurs de publications des revues et des éditeurs, qui dépendent du périmètre.
+La table n'est écrite que par la phase `authorships` (`pipeline/transformation/publications/authorships/authorships.py`), qui enchaîne la construction proprement dite, la suppression par lots des publications restées sans aucune authorship, puis le rafraîchissement des compteurs de publications des revues et des éditeurs, qui dépendent du périmètre.
 
 La construction (`build_authorships.py`) se rejoue sans dommage et converge vers le même état.
 

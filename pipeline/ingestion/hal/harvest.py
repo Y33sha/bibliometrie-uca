@@ -26,8 +26,8 @@ from pipeline.ingestion.http.api_params import HAL_DELAY, HAL_PER_PAGE
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
 from pipeline.runtime.config import get_hal_collections, get_years
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import Progression
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression
 
 type SolrParams = dict[str, str | int | float | bool | None]
 

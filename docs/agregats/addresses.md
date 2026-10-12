@@ -34,13 +34,13 @@ Les adresses extraites des sources sont dédoublonnées, insérées, puis relié
 
 ### `affiliations` — résolution en structures
 
-`pipeline/structures/address_resolution.py` balaie les adresses et cherche dans leur texte normalisé les formes de noms déclarées par les structures, au moyen d'un automate Aho-Corasick.
+`pipeline/transformation/structures/address_resolution.py` balaie les adresses et cherche dans leur texte normalisé les formes de noms déclarées par les structures, au moyen d'un automate Aho-Corasick.
 
 La résolution compare l'état détecté à l'état enregistré et n'écrit que l'écart. Un rattachement posé ou confirmé à la main survit.
 
 ### `countries` — détection des pays
 
-`pipeline/structures/countries/countries.py` détecte le pays, du signal le plus sûr au moins sûr :
+`pipeline/transformation/structures/countries/countries.py` détecte le pays, du signal le plus sûr au moins sûr :
 
 - le nom de pays en fin d'adresse ;
 - le nom de lieu, par automate sur les formes `institution` et `city` — le pays n'est écrit que si un seul code ISO ressort ;
@@ -52,7 +52,7 @@ Toute écriture dans `countries` pose `addresses.countries_dirty`, ce qui décle
 
 Deux chaînes portent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_authorships.in_perimeter`, et `addresses.countries` → `source_publications.countries` → `publications.countries`.
 
-**Appartenance au périmètre.** Troisième étape d'`affiliations` (`populate`, dans `pipeline/structures/affiliations.py`) : la vue matérialisée est rafraîchie, puis comparée aux signatures actuellement marquées `in_perimeter`. Seul l'écart est écrit. C'est là que les rattachements décident finalement du périmètre.
+**Appartenance au périmètre.** Troisième étape d'`affiliations` (`populate`, dans `pipeline/transformation/structures/affiliations.py`) : la vue matérialisée est rafraîchie, puis comparée aux signatures actuellement marquées `in_perimeter`. Seul l'écart est écrit. C'est là que les rattachements décident finalement du périmètre.
 
 **Pays.** Étape finale de `countries` (`refresh_publication_countries.py`) : les signatures marquées sales — soit par `normalize` à leur création, soit par une adresse dont le pays vient de changer — voient leur publication source recalculée, puis la publication elle-même. Les deux marqueurs sont ensuite remis à zéro.
 
@@ -81,6 +81,6 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 
 ## Points d'attention
 
-**Le recalcul des pays des publications est déclenché depuis les adresses.** Il appartient au pipeline (`pipeline/structures/countries/countries_queries.py`), qui l'expose à l'API par le port `CountryRecompute` : une édition de pays d'adresse le lance en tâche de fond. L'ajout par lot et la recopie vers les adresses jumelles passent par `PgAddressRepository`.
+**Le recalcul des pays des publications est déclenché depuis les adresses.** Il appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`), qui l'expose à l'API par le port `CountryRecompute` : une édition de pays d'adresse le lance en tâche de fond. L'ajout par lot et la recopie vers les adresses jumelles passent par `PgAddressRepository`.
 
 **Les vues matérialisées peuvent être en retard.** L'édition manuelle recalcule `in_perimeter` depuis les tables de base sans rafraîchir `source_authorship_structures` ni `authorship_structures` : elles attendent le prochain passage du pipeline.

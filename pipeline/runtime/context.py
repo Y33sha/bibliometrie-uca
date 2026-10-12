@@ -13,7 +13,7 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Ouvreur de transaction : un appelable qui rend une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
 OpenTransaction = Callable[[], AbstractContextManager[Connection]]

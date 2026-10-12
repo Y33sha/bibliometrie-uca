@@ -5,7 +5,9 @@ Le nom d'une colonne s'écrit dans le texte de la requête — un paramètre li�
 
 import pytest
 
-from pipeline.publications.correction.metadata_correction_queries import _persist_updates
+from pipeline.transformation.publications.correction.metadata_correction_queries import (
+    _persist_updates,
+)
 
 
 class TestColonnesCorrigibles:

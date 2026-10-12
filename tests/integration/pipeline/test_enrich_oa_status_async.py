@@ -1,4 +1,4 @@
-"""Tests pour `pipeline.publications.oa_status.OaStatusPhase` (async).
+"""Tests pour `pipeline.transformation.publications.oa_status.OaStatusPhase` (async).
 
 Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
 end-to-end avec le `fetcher` concret depuis `pipeline.ingestion.complements.unpaywall` :
@@ -25,9 +25,13 @@ import pytest
 
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.ingestion.http.lookup import LookupOutcome
-from pipeline.publications.oa_status import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publications.oa_status import (
+    MAX_CONCURRENT,
+    OaStatusFetcher,
+    OaStatusPhase,
+)
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"

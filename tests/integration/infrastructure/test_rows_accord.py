@@ -17,8 +17,10 @@ from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
-from pipeline.publications.correction.metadata_correction_queries import PgMetadataCorrectionQueries
-from pipeline.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.correction.metadata_correction_queries import (
+    PgMetadataCorrectionQueries,
+)
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.structures import (
     insert_perimeter,

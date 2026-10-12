@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays des adresses (attribution unitaire ou par lot, recopie vers les adresses jumelles).
 
-Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/structures/countries/countries_queries.py`).
+Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`).
 """
 
 from sqlalchemy import Connection, delete, select, text, update
