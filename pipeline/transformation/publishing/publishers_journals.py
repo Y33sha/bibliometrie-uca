@@ -23,7 +23,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from pipeline.ingestion.http.source_access import access_source
+from pipeline.ingestion.http.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape

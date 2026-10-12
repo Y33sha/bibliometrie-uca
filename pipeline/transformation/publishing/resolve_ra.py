@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
+from pipeline.ingestion.http.access_source import SourcePhase
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics

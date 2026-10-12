@@ -24,8 +24,8 @@ import httpx2
 import pytest
 
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
+from pipeline.ingestion.http.access_source import SourcePhase
 from pipeline.ingestion.http.lookup import LookupOutcome
-from pipeline.ingestion.http.source_access import SourcePhase
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.oa_status import (
