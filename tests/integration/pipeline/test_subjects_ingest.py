@@ -7,16 +7,16 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from pipeline.publications.reconciliation.refresh import PublicationStore
-from pipeline.publications.subjects.subject_extractors import (
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.subjects.subject_extractors import (
     hal_labels,
     openalex_labels,
     scanr_labels,
     theses_labels,
     wos_labels,
 )
-from pipeline.publications.subjects.subject_ingestion import run
-from pipeline.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.transformation.publications.subjects.subject_ingestion import run
+from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.subjects import insert_subject

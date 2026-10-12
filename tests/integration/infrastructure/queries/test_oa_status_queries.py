@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `pipeline.publications.oa_status_queries` : la file de vérification Unpaywall et les compteurs du bilan de phase."""
+"""Tests d'intégration pour `pipeline.transformation.publications.oa_status_queries` : la file de vérification Unpaywall et les compteurs du bilan de phase."""
 
 from sqlalchemy import text
 
-from pipeline.publications.oa_status_queries import OaStatusQueries
+from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 from tests.integration.helpers.publications import insert_publication
 
 _Q = OaStatusQueries()

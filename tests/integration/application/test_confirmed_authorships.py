@@ -107,7 +107,7 @@ def test_enforce_restores_pinned_signature(sa_sync_conn):
     )
     assert _sa_person(sa_sync_conn, sa) is None
 
-    from pipeline.persons.matching import PersonsMatchingQueries
+    from pipeline.transformation.persons.matching import PersonsMatchingQueries
 
     assert PersonsMatchingQueries().enforce_confirmed_authorships(sa_sync_conn) == 1
     assert _sa_person(sa_sync_conn, sa) == pid

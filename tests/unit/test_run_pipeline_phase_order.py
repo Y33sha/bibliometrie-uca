@@ -5,9 +5,9 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 from pipeline import run as run_pipeline
-from pipeline.publications.authorships import authorships as authorships_phase
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publications.authorships import authorships as authorships_phase
 
 
 @contextmanager

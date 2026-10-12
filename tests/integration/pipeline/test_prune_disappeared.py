@@ -12,7 +12,7 @@ from pipeline.ingestion.common.staging import (
     StagingQueries,
     delete_disappeared_source_publications,
 )
-from pipeline.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.staging import insert_staging
 

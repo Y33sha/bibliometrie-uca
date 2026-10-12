@@ -1,4 +1,4 @@
-"""Tests d'intégration des écritures de la phase `persons` (`pipeline/persons/person_writes.py`)."""
+"""Tests d'intégration des écritures de la phase `persons` (`pipeline/transformation/persons/person_writes.py`)."""
 
 from functools import partial
 
@@ -6,7 +6,10 @@ import pytest
 from sqlalchemy import text
 
 from domain.errors import ValidationError
-from pipeline.persons.person_writes import PersonWrites, add_identifiers_from_authorships
+from pipeline.transformation.persons.person_writes import (
+    PersonWrites,
+    add_identifiers_from_authorships,
+)
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication

@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `pipeline.publications.subjects.subjects_queries`."""
+"""Tests d'intégration pour `pipeline.transformation.publications.subjects.subjects_queries`."""
 
 from sqlalchemy import text
 
-from pipeline.publications.subjects.subjects_queries import (
+from pipeline.transformation.publications.subjects.subjects_queries import (
     PublicationSubjectLink,
     SubjectsIngestionQueries,
 )

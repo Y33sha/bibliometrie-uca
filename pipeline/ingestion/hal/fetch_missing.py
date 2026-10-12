@@ -31,9 +31,9 @@ from pipeline.ingestion.http.api_params import API_BASE_URLS, HAL_DELAY
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.http_retry import lookup_json_async
 from pipeline.ingestion.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
-from pipeline.runtime.libelles import DERNIERE_BRANCHE, rien_a_faire
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import progression
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import progression
 
 # HAL ne publie pas de seuil officiel : 5 workers et une pause de HAL_DELAY par worker donnent ~6-7 req/s, sans rafale.
 HAL_MAX_CONCURRENT = 5

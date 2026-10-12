@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal,

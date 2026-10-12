@@ -8,7 +8,7 @@ filtre propre.
 
 from sqlalchemy import text
 
-from pipeline.publications.reconciliation.purge_orphan_publications import (
+from pipeline.transformation.publications.reconciliation.purge_orphan_publications import (
     PurgeOrphanPublicationsQueries,
 )
 from tests.integration.helpers.authorships import insert_authorship

@@ -2,7 +2,7 @@ from sqlalchemy import text
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
-from pipeline.structures.ror import RorDumpQueries
+from pipeline.transformation.structures.ror import RorDumpQueries
 
 UNIV, LABO = RorId("01a8ajp46"), RorId("03vgfxd91")
 

@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `pipeline.persons.name_forms`."""
+"""Tests d'intégration pour `pipeline.transformation.persons.name_forms`."""
 
 from sqlalchemy import text
 
-from pipeline.persons.name_forms import PersonNameFormsQueries
+from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
 
 _Q = PersonNameFormsQueries()
 from tests.integration.helpers.persons import insert_person, insert_person_name_form

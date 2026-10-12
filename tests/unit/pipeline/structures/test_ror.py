@@ -4,7 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 from pipeline.ingestion.http.dump_download import DumpUnavailableError
-from pipeline.structures.ror import run_refresh_ror
+from pipeline.transformation.structures.ror import run_refresh_ror
 
 _LOG = logging.getLogger("test")
 

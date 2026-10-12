@@ -2,8 +2,8 @@
 
 import logging
 
-from pipeline.publishing.publishers_journals import PublishersJournalsPhase
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
 
 _CHAMPS = (
     "resolve_publishers",

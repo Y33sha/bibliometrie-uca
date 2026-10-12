@@ -1,7 +1,7 @@
 """Tests de `find_or_create_monograph`."""
 
 from domain.monographs.matching import MonographCandidate
-from pipeline.publishing.find_or_create import find_or_create_monograph
+from pipeline.transformation.publishing.find_or_create import find_or_create_monograph
 
 # ISBN valides : Springer (papier et électronique), ISBN-10 converti.
 _PAPER = "9783030580803"

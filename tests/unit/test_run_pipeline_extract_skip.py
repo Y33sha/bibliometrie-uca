@@ -13,7 +13,7 @@ from pipeline.ingestion.common import extract
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _table_keys(metrics: PhaseMetrics) -> set[str]:

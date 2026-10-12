@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.structures import affiliations as phase
-from pipeline.structures.address_resolution import ResolutionStats
-from pipeline.structures.perimeter import EmptyExtractionPerimeterError
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.structures import affiliations as phase
+from pipeline.transformation.structures.address_resolution import ResolutionStats
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 PERIMETRE = [10, 20]
 

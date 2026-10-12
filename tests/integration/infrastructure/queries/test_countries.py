@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `pipeline.structures.countries.countries_queries`."""
+"""Tests d'intégration pour `pipeline.transformation.structures.countries.countries_queries`."""
 
 from sqlalchemy import text
 
-from pipeline.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (

@@ -45,7 +45,7 @@ from pipeline.ingestion.crossref.normalize import (
     upsert_containers,
     upsert_publisher,
 )
-from pipeline.publishing.find_or_create import Containers
+from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,

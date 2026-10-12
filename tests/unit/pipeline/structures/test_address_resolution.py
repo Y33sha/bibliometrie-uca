@@ -6,7 +6,7 @@ import pytest
 
 from domain.structures.name_forms import is_short_form
 from domain.structures.structure import StructureType
-from pipeline.structures.address_resolution import (
+from pipeline.transformation.structures.address_resolution import (
     AddressMatcher,
     DetectedStructure,
     KeptPair,

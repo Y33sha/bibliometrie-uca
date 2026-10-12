@@ -18,10 +18,15 @@ from sqlalchemy import Connection
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
-from pipeline.runtime.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
-from pipeline.runtime.logging_scope import ScopedOrPlainLogger, scoped_logger
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import Progression, progression
+from pipeline.runtime.observability.libelles import (
+    SUITE_DE_BRANCHE,
+    accord,
+    branche_de_source,
+    forme,
+)
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression, progression
 
 __all__ = [
     "ExtractLogger",
@@ -32,7 +37,7 @@ __all__ = [
 ]
 
 
-# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition est dans `pipeline.runtime.logging_scope`.
+# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition est dans `pipeline.runtime.observability.logging_scope`.
 ExtractLogger = ScopedOrPlainLogger
 
 

@@ -24,8 +24,8 @@ from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.runtime.config import get_extraction_api_ids
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import Progression, progression
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression, progression
 
 
 @dataclass(frozen=True)

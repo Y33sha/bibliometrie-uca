@@ -11,7 +11,10 @@ from application.services.persons.core import merge_person
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository
-from pipeline.publications.reconciliation.refresh import PublicationStore, refresh_from_sources
+from pipeline.transformation.publications.reconciliation.refresh import (
+    PublicationStore,
+    refresh_from_sources,
+)
 from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.persons import (
     insert_person,

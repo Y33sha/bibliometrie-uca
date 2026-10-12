@@ -2,11 +2,11 @@
 
 from unittest.mock import ANY, MagicMock
 
-from pipeline.persons.matching import (
+from pipeline.transformation.persons.matching import (
     IdentityIdentifier,
     MisplacedNeutralizations,
 )
-from pipeline.persons.requalify_identifiers import (
+from pipeline.transformation.persons.requalify_identifiers import (
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
 )

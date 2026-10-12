@@ -1,15 +1,15 @@
-"""Tests du typage en recueil d'actes (`pipeline.publishing.journals.type_proceedings_journals`)."""
+"""Tests du typage en recueil d'actes (`pipeline.transformation.publishing.journals.type_proceedings_journals`)."""
 
 import logging
 from collections.abc import Sequence
 
 from domain.journals.journal import JournalType
-from pipeline.publishing.journals.journals import (
+from pipeline.transformation.publishing.journals.journals import (
     JournalRecordTypes,
     JournalSummary,
     JournalTitleIssnRow,
 )
-from pipeline.publishing.journals.type_proceedings_journals import (
+from pipeline.transformation.publishing.journals.type_proceedings_journals import (
     run_type_proceedings_journals,
 )
 

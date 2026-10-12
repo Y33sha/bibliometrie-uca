@@ -26,7 +26,7 @@ from domain.structures.structure import StructureType
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.structures.address_resolution import (
+from pipeline.transformation.structures.address_resolution import (
     AddressMatcher,
     AddressResolutionQueries,
     StructureNameForm,

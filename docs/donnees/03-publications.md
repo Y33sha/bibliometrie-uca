@@ -39,7 +39,7 @@ Légende :
 
 ## `authorships` — table consolidée des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `pipeline/publications/authorships/build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `pipeline/transformation/publications/authorships/build_authorships.py` à partir des *authorships* sources.
 
 **Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_authorships`.
 
@@ -66,9 +66,9 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `publications` | pipeline | `pipeline/publications/reconciliation/refresh.py` (`refresh_from_sources` recalcule depuis les sources) |
-| `publications_detail` | pipeline | `pipeline/publications/reconciliation/refresh.py` |
+| `publications` | pipeline | `pipeline/transformation/publications/reconciliation/refresh.py` (`refresh_from_sources` recalcule depuis les sources) |
+| `publications_detail` | pipeline | `pipeline/transformation/publications/reconciliation/refresh.py` |
 | `publication_relations` | pipeline | phase `relations` |
 | `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
-| `subjects`, `publication_subjects` | pipeline | `pipeline/publications/subjects/subject_ingestion.py` |
-| `subject_cooccurrences` | pipeline | `pipeline/publications/subjects/subject_cooccurrences.py` (matview) |
+| `subjects`, `publication_subjects` | pipeline | `pipeline/transformation/publications/subjects/subject_ingestion.py` |
+| `subject_cooccurrences` | pipeline | `pipeline/transformation/publications/subjects/subject_cooccurrences.py` (matview) |

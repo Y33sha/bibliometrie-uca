@@ -5,8 +5,8 @@ import logging
 
 from sqlalchemy import text
 
-from pipeline.publications.subjects.subject_cooccurrences import run
-from pipeline.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.transformation.publications.subjects.subject_cooccurrences import run
+from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 

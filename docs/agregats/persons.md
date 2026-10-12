@@ -21,7 +21,7 @@ Le rattachement d'une signature à une personne est porté par `source_authorshi
 
 ## Écriture par le pipeline
 
-`pipeline/persons/persons.py` exécute six étapes dans une transaction unique. La phase lit les signatures du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des signatures, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
+`pipeline/transformation/persons/persons.py` exécute six étapes dans une transaction unique. La phase lit les signatures du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des signatures, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
 
 1. **Appliquer les décisions humaines.** Les rattachements épinglés à la main sont reposés en premier ; les étapes suivantes ne les défont pas.
 2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des signatures qui le portent sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les signatures portant cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les signatures qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
@@ -56,7 +56,7 @@ Aucun point d'entrée n'écrit `persons_rh` : la fiche annuaire vient d'un impor
 
 ## Lecture par le pipeline
 
-La cascade lit tout en bloc, par `PersonsMatchingQueries` (`pipeline/persons/matching.py`) :
+La cascade lit tout en bloc, par `PersonsMatchingQueries` (`pipeline/transformation/persons/matching.py`) :
 
 - les correspondances identifiant → personne pour IdRef, ORCID et compte HAL, avec le nom normalisé joint pour corroborer ;
 - les correspondances forme de nom → personnes, et les décisions humaines sur les couples forme–personne ;

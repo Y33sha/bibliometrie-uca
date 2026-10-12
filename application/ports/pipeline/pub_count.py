@@ -1,6 +1,6 @@
 """Port : recalcul, par le pipeline, du `pub_count` d'un éditeur, après une fusion d'éditeurs.
 
-Implémenté par `pipeline.publishing.pub_counts.PubCountRecompute`.
+Implémenté par `pipeline.transformation.publishing.pub_counts.PubCountRecompute`.
 """
 
 from typing import Protocol

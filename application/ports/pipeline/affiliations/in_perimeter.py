@@ -1,6 +1,6 @@
 """Port : recalcul ciblé de `in_perimeter` sur des signatures, après une édition d'adresse par l'administration.
 
-Implémenté par `pipeline.structures.in_perimeter.InPerimeterRecompute`.
+Implémenté par `pipeline.transformation.structures.in_perimeter.InPerimeterRecompute`.
 """
 
 from typing import Protocol

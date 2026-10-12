@@ -72,8 +72,8 @@ def run_normalize_hal(conn):
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.hal.normalize import process_work
-    from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()

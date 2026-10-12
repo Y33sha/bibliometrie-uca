@@ -7,10 +7,12 @@ from functools import partial
 from sqlalchemy import text
 
 from domain.dates import today
-from pipeline.publications.correction import journal_by_doi
-from pipeline.publications.correction.correct_by_cluster import compute_updates
-from pipeline.publications.correction.correct_unary import compute_update
-from pipeline.publications.correction.metadata_correction_queries import PgMetadataCorrectionQueries
+from pipeline.transformation.publications.correction import journal_by_doi
+from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
+from pipeline.transformation.publications.correction.correct_unary import compute_update
+from pipeline.transformation.publications.correction.metadata_correction_queries import (
+    PgMetadataCorrectionQueries,
+)
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal,

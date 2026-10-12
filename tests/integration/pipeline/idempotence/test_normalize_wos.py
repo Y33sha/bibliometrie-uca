@@ -72,8 +72,8 @@ def run_normalize_wos(conn):
     )
     from pipeline.ingestion.common.staging import StagingQueries
     from pipeline.ingestion.wos.normalize import process_record
-    from pipeline.publishing.containers import ContainerGatewayQueries
-    from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()

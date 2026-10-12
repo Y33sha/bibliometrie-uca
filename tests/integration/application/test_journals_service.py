@@ -28,10 +28,10 @@ from infrastructure.repositories import (
     journal_repository,
     publisher_repository,
 )
-from pipeline.publishing.journals.journal_merge import JournalRecompute
-from pipeline.publishing.journals.journals import JournalGatewayQueries
-from pipeline.publishing.pub_counts import PubCountRecompute
-from pipeline.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
+from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.pub_counts import PubCountRecompute
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal_with_issns,

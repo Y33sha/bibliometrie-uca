@@ -75,7 +75,7 @@ def _setup_affiliations_test_data(conn):
 
     # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.
-    from pipeline.structures.perimeter import refresh_perimeter_structures
+    from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
     refresh_perimeter_structures(conn)
 
@@ -85,7 +85,7 @@ def _run_populate_affiliations(conn):
     import logging
 
     from infrastructure.read_models.perimeters import get_persons_structure_ids
-    from pipeline.structures.affiliations import populate
+    from pipeline.transformation.structures.affiliations import populate
 
     populate(
         conn,
@@ -155,7 +155,7 @@ class TestPopulateAffiliationsIdempotence:
         from sqlalchemy import text
 
         from infrastructure.read_models.perimeters import get_persons_structure_ids
-        from pipeline.structures.affiliations import populate
+        from pipeline.transformation.structures.affiliations import populate
 
         _setup_affiliations_test_data(sa_sync_conn)
 
@@ -271,7 +271,7 @@ class TestEntreeDansLePerimetre:
         assert _keys_dirty(sa_sync_conn, 80002) is False
 
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
-        from pipeline.structures.in_perimeter import InPerimeterRecompute
+        from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
 
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)

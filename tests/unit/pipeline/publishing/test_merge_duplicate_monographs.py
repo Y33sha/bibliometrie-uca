@@ -1,12 +1,12 @@
-"""Tests de la fusion des monographies en double (`pipeline.publishing.monographs.merge_duplicate_monographs`)."""
+"""Tests de la fusion des monographies en double (`pipeline.transformation.publishing.monographs.merge_duplicate_monographs`)."""
 
 import logging
 
 from domain.monographs.matching import MonographCandidate
-from pipeline.publishing.monographs.merge_duplicate_monographs import (
+from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
     run_merge_duplicate_monographs,
 )
-from pipeline.publishing.monographs.monographs import MonographTitleGroup
+from pipeline.transformation.publishing.monographs.monographs import MonographTitleGroup
 
 
 class _Repo:

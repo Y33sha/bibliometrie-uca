@@ -29,12 +29,12 @@ from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
-from pipeline.runtime.libelles import DERNIERE_BRANCHE, branche_de_source
-from pipeline.runtime.logging_scope import scoped_logger
-from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.runtime.modes import MODES
-from pipeline.runtime.progression import progression
-from pipeline.runtime.signals import filter_configured, select_targets, timed_metrics
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
+from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.signals import filter_configured, select_targets, timed_metrics
 
 COMMIT_EVERY = 50
 

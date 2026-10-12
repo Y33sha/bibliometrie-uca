@@ -4,8 +4,8 @@ import logging
 from unittest.mock import MagicMock
 
 from domain.persons.matching import PersonNameForms
-from pipeline.persons.person_writes import IdentifierConflict
-from pipeline.persons.resolve_identifier_transfers import (
+from pipeline.transformation.persons.person_writes import IdentifierConflict
+from pipeline.transformation.persons.resolve_identifier_transfers import (
     resolve_identifier_transfers,
 )
 

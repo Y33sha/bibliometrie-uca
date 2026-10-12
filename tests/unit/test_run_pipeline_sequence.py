@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.phase_order import EXTRA_PHASES
 
 
@@ -243,7 +243,7 @@ class TestExecutePhases:
         """Neutralise l'ouverture de la base et le journal d'observabilité."""
         recorder = _FakeRecorder()
         import infrastructure.observability.phase_executions as observabilite
-        import pipeline.structures.perimeter as perimetre
+        import pipeline.transformation.structures.perimeter as perimetre
 
         def _start_run(**kw):
             recorder.demarrage = kw

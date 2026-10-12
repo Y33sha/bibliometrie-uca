@@ -127,9 +127,9 @@ Dans [`tests/unit/domain/source_publications/test_correction.py`](../../tests/un
 
 Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.journal_type`, `journal.oa_model`) :
 
-1. **Recompute des corrections** : `correct_journal_records` (`pipeline/publications/correction/requalify_journal.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
+1. **Recompute des corrections** : `correct_journal_records` (`pipeline/transformation/publications/correction/requalify_journal.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
 2. **Service de requalification** dans `application/services/<table>/core.py`, modèle [`requalify_publications_for_journal`](../../application/services/journals/core.py) (recompute + refresh + audit ; le preview l'exécute dans un `SAVEPOINT` annulé).
-3. **Lecture** : `PublicationStore.find_ids_by_<key>` (`pipeline/publications/reconciliation/refresh.py`).
+3. **Lecture** : `PublicationStore.find_ids_by_<key>` (`pipeline/transformation/publications/reconciliation/refresh.py`).
 4. **Endpoints API** : `POST /api/<table>/{id}/<field>-change-impact`, avec la nouvelle valeur dans le corps → `{count: N}` (preview) ; `PUT /api/<table>/{id}` détecte le changement et déclenche la requalification synchrone dans la même transaction.
 5. **Modèles Pydantic** dédiés dans `interfaces/api/models/<table>.py` (jamais `body: dict`).
 6. **Frontend** : appel preview au save, modale de confirmation, **message générique** sur le nombre de publications recalculées (l'agrégation finale dépend de toutes les sources, pas seulement de l'input modifié).

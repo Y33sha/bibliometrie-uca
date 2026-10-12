@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from interfaces.cli.imports.import_apc import import_payments
-from pipeline.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
 
 

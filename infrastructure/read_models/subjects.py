@@ -1,6 +1,6 @@
 """Query service : lectures des sujets servies par les routes `/api/subjects/*`.
 
-Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/publications/subjects/subjects_queries.py`).
+Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subjects_queries.py`).
 """
 
 from sqlalchemy import Connection, Row, text

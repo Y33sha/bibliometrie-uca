@@ -1,11 +1,13 @@
-"""Tests unitaires du recalcul d'une publication (`pipeline/publications/reconciliation/refresh.py`).
+"""Tests unitaires du recalcul d'une publication (`pipeline/transformation/publications/reconciliation/refresh.py`).
 
 Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `journal_id` de la publication peuvent venir de `source_publications` différentes. Une correction qui dépend de la revue, appliquée à chaque source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
 """
 
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
-from pipeline.publications.reconciliation.refresh import _apply_canonical_doc_type_correction
+from pipeline.transformation.publications.reconciliation.refresh import (
+    _apply_canonical_doc_type_correction,
+)
 
 
 class _FakeRepo:

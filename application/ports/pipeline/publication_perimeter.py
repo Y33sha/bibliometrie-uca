@@ -1,6 +1,6 @@
 """Port : recalcul, par le pipeline, de l'appartenance au périmètre des publications d'une personne, après son exclusion.
 
-Implémenté par `pipeline.publications.reconciliation.publication_perimeter.PublicationPerimeterRecompute`.
+Implémenté par `pipeline.transformation.publications.reconciliation.publication_perimeter.PublicationPerimeterRecompute`.
 """
 
 from typing import Protocol

@@ -57,6 +57,6 @@ Le détail d'une publication montre sa **provenance** : la liste de ses enregist
 
 ## Points d'attention
 
-**Les clés de résolution sont décrites à deux endroits.** Le voisinage se calcule en SQL : `pipeline/publications/reconciliation/reconciliation.py` réunit par `UNION` un `SELECT` par famille de clé — DOI, clés scalaires d'`external_ids`, identifiant HAL, jeton de métadonnées.
+**Les clés de résolution sont décrites à deux endroits.** Le voisinage se calcule en SQL : `pipeline/transformation/publications/reconciliation/reconciliation.py` réunit par `UNION` un `SELECT` par famille de clé — DOI, clés scalaires d'`external_ids`, identifiant HAL, jeton de métadonnées.
 
 Le `SELECT` des clés scalaires est engendré depuis l'énumération du domaine. Les trois autres sont écrits à la main, chaque famille demandant sa propre jointure : égalité sur une colonne pour le DOI, appartenance à un tableau pour l'identifiant HAL, égalité sur trois colonnes pour le jeton. Ajouter une clé de confirmation demande donc de toucher aussi ce fichier.

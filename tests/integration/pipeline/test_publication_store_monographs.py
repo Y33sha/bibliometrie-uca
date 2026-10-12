@@ -1,6 +1,6 @@
 """Tests d'intégration de `PublicationStore.get_monograph_journal_ids`."""
 
-from pipeline.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.journals import insert_journal, insert_monograph
 
 

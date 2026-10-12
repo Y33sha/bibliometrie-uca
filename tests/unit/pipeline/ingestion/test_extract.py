@@ -12,8 +12,8 @@ import pytest
 from pipeline.ingestion.common.extract import ExtractOne, ExtractPhase
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.structures.perimeter import EmptyExtractionPerimeterError
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 
 def _sync_run_parallel(thunks):

@@ -18,9 +18,9 @@ from application.services.authorships.core import (
 from domain.errors import NotFoundError
 from infrastructure.repositories import authorship_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.publications.authorships.authorships_queries import AuthorshipsBuild
-from pipeline.structures.in_perimeter import InPerimeterRecompute
-from pipeline.structures.perimeter import PerimeterQueries
+from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
+from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
+from pipeline.transformation.structures.perimeter import PerimeterQueries
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.config import set_config
@@ -457,7 +457,7 @@ class TestPropagateUcaForAddresses:
         `perimeter_extraction` + `perimeter_structures` sont requis pour que la
         matview `source_authorship_structures` rattache les structures du périmètre.
         """
-        from pipeline.structures.perimeter import refresh_perimeter_structures
+        from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
         uca_id = insert_persons_perimeter(conn)
         set_config(conn, "perimeter_extraction", "uca")

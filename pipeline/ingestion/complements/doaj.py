@@ -1,6 +1,6 @@
 """Téléchargement du dump CSV public DOAJ + helpers d'URL de fiche.
 
-Le dump CSV (toutes les revues DOAJ, https://doaj.org/csv) est la **source de vérité** pour `journals.doaj_payload` / `is_in_doaj` : il est importé par `pipeline/publishing/journals/import_journals_from_doaj_dump` (et, sur fichier local, par la CLI `interfaces/cli/imports/import_doaj_csv`).
+Le dump CSV (toutes les revues DOAJ, https://doaj.org/csv) est la **source de vérité** pour `journals.doaj_payload` / `is_in_doaj` : il est importé par `pipeline/transformation/publishing/journals/import_journals_from_doaj_dump` (et, sur fichier local, par la CLI `interfaces/cli/imports/import_doaj_csv`).
 
 `doaj_payload` est stocké aux **clés du dump CSV** ; les consommateurs SQL en dépendent (`doaj_payload->>'X'`, front `READABLE_DOAJ_FIELDS`, audit APC qui requête `doaj_payload->>'APC amount'`).
 """

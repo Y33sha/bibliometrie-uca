@@ -1,13 +1,13 @@
-"""Tests du rattachement des monographies à leur collection (`pipeline.publishing.monographs.link_monographs_to_collections`)."""
+"""Tests du rattachement des monographies à leur collection (`pipeline.transformation.publishing.monographs.link_monographs_to_collections`)."""
 
 import logging
 
 from domain.journals.journal import JournalType
-from pipeline.publishing.monographs import link_monographs_to_collections as mod
-from pipeline.publishing.monographs.link_monographs_to_collections import (
+from pipeline.transformation.publishing.monographs import link_monographs_to_collections as mod
+from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
-from pipeline.publishing.monographs.monographs import MonographJournalCandidates
+from pipeline.transformation.publishing.monographs.monographs import MonographJournalCandidates
 
 
 class _Repo:

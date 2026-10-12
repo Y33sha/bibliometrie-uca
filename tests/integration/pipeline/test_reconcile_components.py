@@ -9,14 +9,14 @@ from functools import partial
 from sqlalchemy import bindparam, text
 
 from domain.source_publications.keys import project_confirmation_keys
-from pipeline.publications.reconciliation.reconcile_components import reconcile, run
-from pipeline.publications.reconciliation.reconciliation import (
+from pipeline.transformation.publications.reconciliation.reconcile_components import reconcile, run
+from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,
     mark_keys_dirty,
 )
 
 _Q = PublicationsReconciliationQueries()
-from pipeline.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 # Notice OpenAlex de 2024, de titre « T », article par défaut.

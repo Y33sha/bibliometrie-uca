@@ -24,9 +24,9 @@ from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import UnderCircuitBreaker
-from pipeline.runtime.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import progression
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import progression
 
 COMMIT_EVERY = 50
 # Plafond OpenAlex 10 req/s.

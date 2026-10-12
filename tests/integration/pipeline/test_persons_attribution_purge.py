@@ -4,7 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from pipeline.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication

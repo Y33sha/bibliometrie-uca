@@ -18,7 +18,7 @@ from interfaces.cli.imports.import_apc import (
     parse_year,
     read_payments,
 )
-from pipeline.structures.address_resolution import StructureNameForm
+from pipeline.transformation.structures.address_resolution import StructureNameForm
 
 
 class TestParseAmount:

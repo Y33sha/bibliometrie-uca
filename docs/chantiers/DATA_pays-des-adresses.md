@@ -10,9 +10,9 @@ Six endroits écrivent l'un ou l'autre :
 |---|---|---|
 | `pipeline/sources/scanr/normalize.py` | pays déclaré par ScanR | `countries` |
 | `pipeline/sources/openalex/normalize.py` | pays de la structure désambiguïsée par OpenAlex | `suggested_countries` |
-| `pipeline/structures/countries/detect_by_country_name.py` | nom de pays en fin d'adresse | `countries` |
-| `pipeline/structures/countries/detect_by_place_name.py` | nom d'institution ou de ville, via `place_name_forms` | `countries` |
-| `pipeline/structures/countries/suggest_countries.py` | emprunt du pays d'une adresse qui contient celle-ci | `suggested_countries` |
+| `pipeline/transformation/structures/countries/detect_by_country_name.py` | nom de pays en fin d'adresse | `countries` |
+| `pipeline/transformation/structures/countries/detect_by_place_name.py` | nom d'institution ou de ville, via `place_name_forms` | `countries` |
+| `pipeline/transformation/structures/countries/suggest_countries.py` | emprunt du pays d'une adresse qui contient celle-ci | `suggested_countries` |
 | `application/services/addresses/countries.py` | saisie à la main | `countries` |
 
 Couverture obtenue, sur 431 912 adresses : 415 397 ont un pays faisant autorité (96,2 %), 12 986 n'ont qu'une suggestion (3,0 %), 3 529 n'ont rien (0,8 %).

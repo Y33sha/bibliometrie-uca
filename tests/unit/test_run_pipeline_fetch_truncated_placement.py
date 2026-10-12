@@ -15,7 +15,7 @@ from pipeline.ingestion.common.normalize import NormalizeStats
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
-from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Le nœud de la phase `fetch_truncated`, lancé via `asyncio.run`.
 _REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"

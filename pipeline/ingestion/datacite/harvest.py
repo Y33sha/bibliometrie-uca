@@ -24,8 +24,8 @@ from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, recor
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.runtime.config import get_extraction_api_ids, get_years
-from pipeline.runtime.metrics import PhaseMetrics
-from pipeline.runtime.progression import Progression
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression
 
 # Plafond de l'API DataCite pour la taille d'une page.
 _PAGE_SIZE = 1000
