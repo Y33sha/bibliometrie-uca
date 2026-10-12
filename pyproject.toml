@@ -130,7 +130,6 @@ source_modules = ["interfaces.api"]
 forbidden_modules = [
     "infrastructure.repositories",
     "infrastructure.read_models",
-    "infrastructure.pipeline",
 ]
 # Verrouillage d'une règle de docs/architecture/01-vue-d-ensemble.md :
 # seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les routers et autres modules
@@ -358,7 +357,6 @@ combine-as-imports = true
 # toujours par des paramètres liés. La règle reste active partout ailleurs — un SQL composé
 # à la main dans `interfaces/api` ou `application` doit se signaler.
 "infrastructure/read_models/*" = ["S608"]
-"infrastructure/pipeline/*" = ["S608"]
 "pipeline/*" = ["S101", "S608"]
 "infrastructure/repositories/*" = ["S608"]
 "infrastructure/db/sql_fragments.py" = ["S608"]

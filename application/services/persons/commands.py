@@ -5,6 +5,7 @@ Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement 
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
@@ -82,10 +83,18 @@ def set_exclusion(
     exclusion: PersonExclusion | None,
     *,
     repo: PersonRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> None:
     """Exclut ou retient une personne."""
-    persons_service.set_exclusion(person_id, exclusion, repo=repo, audit_repo=audit_repo)
+    persons_service.set_exclusion(
+        person_id,
+        exclusion,
+        conn=conn,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit_repo,
+    )
     conn.commit()
 
 

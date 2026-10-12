@@ -38,6 +38,7 @@ from infrastructure.repositories import (
     person_repository,
 )
 from pipeline.publications.authorships_queries import AuthorshipsBuild
+from pipeline.publications.publication_perimeter import PublicationPerimeterRecompute
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
@@ -62,6 +63,7 @@ _jean_dupont_signature = partial(insert_signature, author_name_normalized="jean 
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
 _BUILD_QUERIES = AuthorshipsBuild()
+_PERIMETER = PublicationPerimeterRecompute()
 
 
 @pytest.fixture
@@ -321,19 +323,37 @@ class TestSetExclusion:
 
     def test_excludes(self, sa_sync_conn, repo):
         p = _person(sa_sync_conn)
-        set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER, repo=repo)
+        set_exclusion(
+            p,
+            PersonExclusion.OUT_OF_PERIMETER,
+            conn=sa_sync_conn,
+            repo=repo,
+            perimeter_recompute=_PERIMETER,
+        )
         assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
         assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
 
     def test_retains(self, sa_sync_conn, repo):
         p = _person(sa_sync_conn)
-        set_exclusion(p, PersonExclusion.NOT_A_PERSON, repo=repo)
-        set_exclusion(p, None, repo=repo)
+        set_exclusion(
+            p,
+            PersonExclusion.NOT_A_PERSON,
+            conn=sa_sync_conn,
+            repo=repo,
+            perimeter_recompute=_PERIMETER,
+        )
+        set_exclusion(p, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
         assert self._exclusion(sa_sync_conn, p) is None
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            set_exclusion(999999, PersonExclusion.NOT_A_PERSON, repo=repo)
+            set_exclusion(
+                999999,
+                PersonExclusion.NOT_A_PERSON,
+                conn=sa_sync_conn,
+                repo=repo,
+                perimeter_recompute=_PERIMETER,
+            )
 
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
         excluded = _person(sa_sync_conn, last_name="Exclue", first_name="Ée")
@@ -359,10 +379,16 @@ class TestSetExclusion:
                 sa_sync_conn, "SELECT in_perimeter FROM publications WHERE id = :p", p=pub
             )
 
-        set_exclusion(excluded, PersonExclusion.OUT_OF_PERIMETER, repo=repo)
+        set_exclusion(
+            excluded,
+            PersonExclusion.OUT_OF_PERIMETER,
+            conn=sa_sync_conn,
+            repo=repo,
+            perimeter_recompute=_PERIMETER,
+        )
         assert (flag(alone), flag(shared), flag(unrelated)) == (False, True, False)
 
-        set_exclusion(excluded, None, repo=repo)
+        set_exclusion(excluded, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
         assert flag(alone) is True
 
 

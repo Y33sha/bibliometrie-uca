@@ -3,7 +3,7 @@
 `journals.pub_count` = nombre de publications in-perimeter de la revue.
 `publishers.pub_count` = somme des `pub_count` de ses revues.
 
-Les deux recalculs en masse tournent dans le pipeline après que `in_perimeter` est posé (phase `authorships`), les éditeurs après les revues dont ils somment le compteur. Les variantes scopées servent aux fusions admin (on ne recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
+Les deux recalculs en masse tournent dans la phase `authorships`, après `in_perimeter`, les éditeurs après les revues dont ils somment le compteur. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
 """
 
 from sqlalchemy import Connection, text
@@ -81,3 +81,11 @@ class PgPubCountsQueries:
                 WHERE p2.id = p.id AND p.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
             """)
         ).rowcount
+
+
+class PubCountRecompute:
+    """Recalcul ciblé du `pub_count` d'un éditeur, exposé à l'API par `pipeline/public.py`."""
+
+    def refresh_publisher_pub_count(self, conn: Connection, publisher_id: int) -> None:
+        """Recalcule le `pub_count` de l'éditeur, somme de celui de ses revues."""
+        refresh_publisher_pub_count(conn, publisher_id)

@@ -8,7 +8,10 @@ from collections import Counter
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
+from sqlalchemy import Connection
+
 from application.audit_log import emit_event
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
@@ -71,14 +74,17 @@ def set_exclusion(
     person_id: int,
     exclusion: PersonExclusion | None,
     *,
+    conn: Connection,
     repo: PersonRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Exclut une personne pour le motif `exclusion`, ou la retient si `exclusion` est `None`.
 
-    Lève NotFoundError si la personne n'existe pas.
+    L'exclusion fait basculer l'appartenance au périmètre de ses publications : le pipeline la recalcule. Lève NotFoundError si la personne n'existe pas.
     """
     repo.set_exclusion(person_id, exclusion)
+    perimeter_recompute.refresh_publications_of_person(conn, person_id)
     emit_event(
         audit_repo,
         "person.exclusion",

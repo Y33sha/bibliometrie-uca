@@ -30,6 +30,7 @@ from infrastructure.repositories import (
 )
 from pipeline.containers.journal_merge import JournalRecompute
 from pipeline.containers.journals import JournalGatewayQueries
+from pipeline.containers.pub_counts import PubCountRecompute
 from pipeline.containers.publishers import PublisherGatewayQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
@@ -334,6 +335,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn,
@@ -352,6 +354,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
     def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -364,6 +367,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
     def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -376,6 +380,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
     def test_transfers_journals_and_deletes_source(
@@ -392,6 +397,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
 
         assert (
@@ -413,6 +419,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
 
         row = _fetch_one(
@@ -435,6 +442,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
 
         row = _fetch_one(
@@ -457,6 +465,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -481,6 +490,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -503,6 +513,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
         blockers = exc_info.value.blocking_journals
@@ -534,6 +545,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
         blockers = exc_info.value.blocking_journals
@@ -558,6 +570,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
+                pub_count_recompute=PubCountRecompute(),
             )
 
         assert len(exc_info.value.blocking_journals) == 2
@@ -575,6 +588,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -594,6 +608,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
+            pub_count_recompute=PubCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target

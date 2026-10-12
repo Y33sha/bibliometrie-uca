@@ -4,8 +4,10 @@ Elle exporte l'ordre des phases et les recalculs ciblés. `application/` déclar
 """
 
 from pipeline.containers.journal_merge import JournalRecompute
+from pipeline.containers.pub_counts import PubCountRecompute
 from pipeline.phase_order import PHASE_ORDER
 from pipeline.publications.authorships_queries import AuthorshipsBuild
+from pipeline.publications.publication_perimeter import PublicationPerimeterRecompute
 from pipeline.structures.countries_queries import CountryQueries
 from pipeline.structures.in_perimeter import InPerimeterRecompute
 from pipeline.structures.perimeter import PerimeterQueries
@@ -17,4 +19,6 @@ __all__ = [
     "InPerimeterRecompute",
     "JournalRecompute",
     "PerimeterQueries",
+    "PubCountRecompute",
+    "PublicationPerimeterRecompute",
 ]
