@@ -1,9 +1,8 @@
 """Phase `affiliations` : rattachement des signatures aux structures du périmètre, par leurs adresses.
 
-Quatre sous-étapes, chacune dans sa propre transaction :
+La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent trois nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
-0. **Référentiel ROR** : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
-1. **Périmètre** : la phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. `run.py` matérialise `perimeter_structures` avant toute phase.
+1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
 3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
 """
@@ -19,9 +18,10 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
 from pipeline.transformation.structures.address_resolution import (
@@ -41,34 +41,47 @@ class AffiliationsPhase:
     refresh_ror: Callable[[], PhaseMetrics]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne les quatre sous-étapes et assemble les métriques de la phase."""
-        open_tx, logger, perimeter_queries = ctx.open_tx, ctx.logger, self.perimeter_queries
-        ror = self.refresh_ror()
-
-        with open_tx() as conn:
-            if perimeter_queries.count_extraction_structures(conn) == 0:
+        """Contrôle le périmètre d'extraction, exécute les trois nœuds et assemble les métriques de la phase."""
+        with ctx.open_tx() as conn:
+            if self.perimeter_queries.count_extraction_structures(conn) == 0:
                 raise EmptyExtractionPerimeterError()
 
-        etape(logger, "Identification des structures dans les adresses institutionnelles")
-        with open_tx() as conn:
-            # Périmètre lu une fois, réutilisé par les deux sous-étapes suivantes.
-            perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
-            stats = run_resolution(conn, self.address_queries, perimeter_ids, logger)
+        by_node = run_nodes(
+            "affiliations",
+            {
+                "affiliations.refresh_ror": NodeStep(lambda _ctx, _breaker: self.refresh_ror()),
+                "affiliations.resolve_addresses": NodeStep(
+                    self._resolve_addresses,
+                    section="Identification des structures dans les adresses institutionnelles",
+                ),
+                "affiliations.populate": NodeStep(
+                    self._populate, section="Rattachement des structures aux auteurs des documents"
+                ),
+            },
+            ctx,
+        )
+        metrics = by_node["affiliations.resolve_addresses"]
+        metrics.details.update(by_node["affiliations.refresh_ror"].details)
+        metrics.resume = ""
+        return metrics
 
+    def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            perimeter_ids = set(self.perimeter_queries.get_persons_structure_ids_list(conn))
+            stats = run_resolution(conn, self.address_queries, perimeter_ids, ctx.logger)
         metrics = PhaseMetrics()
         metrics.add(total=stats.processed)
         metrics.details["summary"] = {
             "adresses": stats.processed,
             "in_perimeter": stats.in_perimeter,
         }
-        metrics.details.update(ror.details)
-
-        etape(logger, "Rattachement des structures aux auteurs des documents")
-        with open_tx() as conn:
-            populate(conn, logger, perimeter_ids)
-
-        metrics.resume = ""
         return metrics
+
+    def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            perimeter_ids = set(self.perimeter_queries.get_persons_structure_ids_list(conn))
+            populate(conn, ctx.logger, perimeter_ids)
+        return PhaseMetrics()
 
 
 # ── Signatures du périmètre ───────────────────────────────────
@@ -170,7 +183,6 @@ def build() -> Phase:
 
 def _run_refresh_ror() -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-    from pipeline.ingestion.http.access_source import access_source
     from pipeline.ingestion.http.polite_pool import build_user_agent
     from pipeline.ingestion.ror.dump import ZenodoRorDumpSource
     from pipeline.runtime.config import get_polite_pool_email_optional
@@ -181,11 +193,4 @@ def _run_refresh_ror() -> PhaseMetrics:
         user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=log
     )
     with open_tx() as conn:
-        return access_source(
-            "zenodo",
-            lambda _breaker: run_refresh_ror(
-                conn, source=source, repo=RorDumpQueries(conn), logger=log
-            ),
-            phase="affiliations",
-            logger=log,
-        )
+        return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=log)
