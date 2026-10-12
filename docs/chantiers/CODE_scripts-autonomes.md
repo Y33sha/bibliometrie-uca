@@ -24,7 +24,7 @@ Une partie de leur code est dispersée dans les couches : des services, des port
 
 - [x] Rapport de cohérence du ROR dans `maintenance/report_ror_coherence.py`.
 - [x] Import RH dans `imports/import_persons.py`.
-- [ ] Import des ORCID authentifiés dans `maintenance/import_authenticated_orcids.py`.
+- [x] Import des ORCID authentifiés dans `maintenance/import_authenticated_orcids.py`.
 
 ### Phase 3 — Oneshot
 

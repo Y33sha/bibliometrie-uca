@@ -24,7 +24,6 @@ from infrastructure.repositories.person_repository._merge import (
 
 if TYPE_CHECKING:
     from application.ports.repositories.person_repository import (
-        AuthenticateOrcidOutcome,
         IdentifierStatusRow,
         NameFormStatusRow,
     )
@@ -52,11 +51,6 @@ class PgPersonRepository(PersonRepository):
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
         _core.set_exclusion(self._conn, person_id, exclusion)
 
-    # ── persons_rh (fiches RH) ─────────────────────────────────────
-
-    def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
-        return _core.map_rh_emails_to_person_ids(self._conn)
-
     # ── Fusion ─────────────────────────────────────────────────────
 
     def ids_with_rh(self, person_ids: list[int]) -> set[int]:
@@ -75,11 +69,6 @@ class PgPersonRepository(PersonRepository):
     def find_identifier(self, id_type: str, id_value: str) -> "IdentifierAttribution | None":
         return _identifiers.find_identifier(self._conn, id_type, id_value)
 
-    def find_identifier_holders(
-        self, id_type: str, id_values: list[str]
-    ) -> dict[str, tuple[int, str]]:
-        return _identifiers.find_identifier_holders(self._conn, id_type, id_values)
-
     def insert_identifier(self, ident: "IdentifierAttribution") -> int:
         return _identifiers.insert_identifier(self._conn, ident)
 
@@ -97,12 +86,6 @@ class PgPersonRepository(PersonRepository):
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
         _identifiers.reassign_identifier(self._conn, ident_id, target_person_id)
-
-    def begin_authenticated_orcid_import(self) -> None:
-        _identifiers.begin_authenticated_orcid_import(self._conn)
-
-    def authenticate_orcid(self, person_id: int, orcid: str) -> "AuthenticateOrcidOutcome":
-        return _identifiers.authenticate_orcid(self._conn, person_id, orcid)
 
     # ── person_name_forms ──────────────────────────────────────────
 

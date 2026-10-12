@@ -11,9 +11,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
 from interfaces.cli.maintenance import import_authenticated_orcids as module
 from interfaces.cli.maintenance.import_authenticated_orcids import (
+    AuthenticateOrcidOutcome,
     _load_rows,
     find_reassignments,
     main,
@@ -97,18 +97,6 @@ class TestFindReassignments:
         assert find_reassignments([(7, _ORCID)], {}) == []
 
 
-class _FakeRepo:
-    def __init__(self, emails, detenteurs) -> None:
-        self._emails = emails
-        self._detenteurs = detenteurs
-
-    def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
-        return self._emails
-
-    def find_identifier_holders(self, kind: str, values) -> dict[str, tuple[int, ...]]:
-        return {v: self._detenteurs[v] for v in values if v in self._detenteurs}
-
-
 class TestMain:
     @pytest.fixture
     def lancer(self, tmp_path, monkeypatch):
@@ -129,15 +117,18 @@ class TestMain:
                     connect=lambda: _contexte(object()), begin=lambda: _contexte(object())
                 ),
             )
+            monkeypatch.setattr(module, "rh_emails_to_person_ids", lambda conn: emails or {})
             monkeypatch.setattr(
                 module,
-                "person_repository",
-                lambda conn: _FakeRepo(emails or {}, detenteurs or {}),
+                "orcid_holders",
+                lambda conn, orcids: {
+                    o: (detenteurs or {})[o] for o in orcids if o in (detenteurs or {})
+                },
             )
             monkeypatch.setattr(
                 module,
                 "authenticate_orcids",
-                lambda entries, *, repo: (
+                lambda conn, entries: (
                     authentifies.append(entries) or dict.fromkeys(AuthenticateOrcidOutcome, 0)
                 ),
             )

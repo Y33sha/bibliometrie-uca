@@ -1,19 +1,9 @@
 """Port PersonRepository — contrat d'accès à l'agrégat Person."""
 
-from enum import StrEnum
 from typing import Protocol, TypedDict
 
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.person import Person, PersonExclusion
-
-
-class AuthenticateOrcidOutcome(StrEnum):
-    """Issue de l'authentification d'un ORCID par `authenticate_orcid`."""
-
-    INSERTED = "inserted"  # l'ORCID n'existait pas, créé authentifié
-    UPGRADED = "upgraded"  # déjà rattaché à cette personne, statut renforcé
-    REASSIGNED = "reassigned"  # déplacé depuis une autre personne, puis authentifié
-    NOOP = "noop"  # déjà authentifié sur cette personne
 
 
 class IdentifierStatusRow(TypedDict):
@@ -53,12 +43,6 @@ class PersonRepository(Protocol):
         """Pose le motif d'exclusion d'une personne (`None` la retient). Lève `NotFoundError` si la personne est introuvable."""
         ...
 
-    # ── persons_rh (fiches RH) ─────────────────────────────────────
-
-    def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
-        """`{email minusculisé: [person_id, ...]}` depuis `persons_rh` — résout les emails de l'import des ORCID authentifiés vers les personnes qui les portent."""
-        ...
-
     # ── Fusion ─────────────────────────────────────────────────────
 
     def ids_with_rh(self, person_ids: list[int]) -> set[int]:
@@ -85,12 +69,6 @@ class PersonRepository(Protocol):
         """Charge le `IdentifierAttribution` d'une paire `(id_type, id_value)` (unique dans la table), ou `None` si absent."""
         ...
 
-    def find_identifier_holders(
-        self, id_type: str, id_values: list[str]
-    ) -> dict[str, tuple[int, str]]:
-        """`{id_value: (person_id, statut)}` des porteurs actuels des valeurs `id_values` déjà présentes sous ce type d'identifiant — pour prévoir les déplacements avant l'import des ORCID authentifiés."""
-        ...
-
     def insert_identifier(self, ident: IdentifierAttribution) -> int:
         """Insère le `IdentifierAttribution` et retourne son id (posé aussi sur `ident.id`). Lève si `(id_type, id_value)` existe déjà ; l'unicité est vérifiée en amont via `find_identifier`."""
         ...
@@ -113,14 +91,6 @@ class PersonRepository(Protocol):
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
         """Réattribue un identifiant à une autre personne, statut repassé à `pending`. Lève `NotFoundError` s'il est absent."""
-        ...
-
-    def begin_authenticated_orcid_import(self) -> None:
-        """Ouvre, pour la transaction courante, le droit d'écrire le statut `authenticated`. À appeler avant `authenticate_orcid`, dans la même transaction ; réservé à l'import des ORCID authentifiés, seul contexte autorisé à poser ce statut."""
-        ...
-
-    def authenticate_orcid(self, person_id: int, orcid: str) -> AuthenticateOrcidOutcome:
-        """Pose le statut `authenticated` sur `orcid`, rattaché à `person_id`, et retourne l'issue. Requiert `begin_authenticated_orcid_import` dans la même transaction. Idempotent ; `orcid` supposé normalisé. Un ORCID porté par une autre personne est déplacé, l'authentification faisant autorité sur l'identité."""
         ...
 
     # ── person_name_forms ──────────────────────────────────────────

@@ -23,16 +23,17 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+from collections import Counter
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
-from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
-from application.services.persons.core import authenticate_orcids
+from sqlalchemy import Connection, text
+
 from domain.normalize import sanitize_optional_text
-from domain.persons.identifiers import normalize_orcid
+from domain.persons.identifiers import IdentifierOrigin, normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import person_repository
 
 log = setup_logger("import_authenticated_orcids", os.path.dirname(__file__))
 
@@ -111,6 +112,85 @@ def find_reassignments(
     ]
 
 
+class AuthenticateOrcidOutcome(StrEnum):
+    """Issue de l'authentification d'un ORCID par `authenticate_orcid`."""
+
+    INSERTED = "inserted"  # l'ORCID n'existait pas, créé authentifié
+    UPGRADED = "upgraded"  # déjà rattaché à cette personne, statut renforcé
+    REASSIGNED = "reassigned"  # déplacé depuis une autre personne, puis authentifié
+    NOOP = "noop"  # déjà authentifié sur cette personne
+
+
+def rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
+    """`{email en minuscules: [person_id, ...]}` des fiches `persons_rh` qui ont un email."""
+    rows = conn.execute(
+        text(
+            "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
+            "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
+        )
+    )
+    return {r.email: list(r.pids) for r in rows}
+
+
+def orcid_holders(conn: Connection, orcids: list[str]) -> dict[str, tuple[int, str]]:
+    """`{orcid: (person_id, statut)}` des ORCID de `orcids` déjà présents en base."""
+    rows = conn.execute(
+        text(
+            "SELECT id_value, person_id, CAST(status AS text) AS status "
+            "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = ANY(:v)"
+        ),
+        {"v": orcids},
+    )
+    return {r.id_value: (r.person_id, r.status) for r in rows}
+
+
+def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> AuthenticateOrcidOutcome:
+    """Pose le statut `authenticated` sur `orcid`, rattaché à `person_id`. Un ORCID d'une autre personne est déplacé."""
+    existing = conn.execute(
+        text(
+            "SELECT id, person_id, CAST(status AS text) AS status "
+            "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = :v"
+        ),
+        {"v": orcid},
+    ).first()
+    if existing is None:
+        conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:pid, 'orcid', :v, :src, 'authenticated')"
+            ),
+            {"pid": person_id, "v": orcid, "src": IdentifierOrigin.MANUAL.value},
+        )
+        return AuthenticateOrcidOutcome.INSERTED
+    if existing.person_id == person_id and existing.status == "authenticated":
+        return AuthenticateOrcidOutcome.NOOP
+    outcome = (
+        AuthenticateOrcidOutcome.REASSIGNED
+        if existing.person_id != person_id
+        else AuthenticateOrcidOutcome.UPGRADED
+    )
+    conn.execute(
+        text(
+            "UPDATE person_identifiers "
+            "SET person_id = :pid, status = 'authenticated', source = :src "
+            "WHERE id = :id"
+        ),
+        {"pid": person_id, "id": existing.id, "src": IdentifierOrigin.MANUAL.value},
+    )
+    return outcome
+
+
+def authenticate_orcids(
+    conn: Connection, entries: list[tuple[int, str]]
+) -> Counter[AuthenticateOrcidOutcome]:
+    """Authentifie les paires `(person_id, orcid)` et rend le décompte des issues.
+
+    Le paramètre de session `app.orcid_authenticated_import` autorise l'écriture du statut, que le trigger `protect_authenticated_identifier` refuse ailleurs. `SET LOCAL` le borne à la transaction.
+    """
+    conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
+    return Counter(authenticate_orcid(conn, person_id, orcid) for person_id, orcid in entries)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -126,14 +206,11 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        repo = person_repository(conn)
-        email_to_persons = repo.map_rh_emails_to_person_ids()
-
-        plan = plan_authentications(rows, email_to_persons)
+        plan = plan_authentications(rows, rh_emails_to_person_ids(conn))
         entries = plan.entries
 
         # État courant des ORCID du fichier, pour prévoir les déplacements.
-        current = repo.find_identifier_holders("orcid", [o for _, o in entries])
+        current = orcid_holders(conn, [o for _, o in entries])
         reassignments = find_reassignments(entries, current)
 
     if plan.malformed:
@@ -166,8 +243,7 @@ def main() -> int:
         return 0
 
     with engine.begin() as conn:
-        repo = person_repository(conn)
-        outcomes = authenticate_orcids(entries, repo=repo)
+        outcomes = authenticate_orcids(conn, entries)
 
     log.info(
         "✓ Terminé — insérés %d, renforcés %d, déplacés %d, inchangés %d.",

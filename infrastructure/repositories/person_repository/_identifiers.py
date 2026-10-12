@@ -5,7 +5,6 @@ from typing import cast
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.person_repository import (
-    AuthenticateOrcidOutcome,
     IdentifierStatusRow,
 )
 from domain.errors import NotFoundError
@@ -35,22 +34,6 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> Identifier
         status=AttributionStatus(m["status"]),
         source=IdentifierOrigin(m["source"]),
     )
-
-
-def find_identifier_holders(
-    conn: Connection, id_type: str, id_values: list[str]
-) -> dict[str, tuple[int, str]]:
-    """Pour chaque valeur de `id_values` déjà présente sous ce type : `{id_value: (person_id, statut)}` de son porteur actuel. Sert à prévoir les déplacements avant l'import des ORCID authentifiés."""
-    return {
-        r.id_value: (r.person_id, r.status)
-        for r in conn.execute(
-            text(
-                "SELECT id_value, person_id, CAST(status AS text) AS status "
-                "FROM person_identifiers WHERE id_type = :it AND id_value = ANY(:v)"
-            ),
-            {"it": id_type, "v": id_values},
-        )
-    }
 
 
 def insert_identifier(conn: Connection, ident: IdentifierAttribution) -> int:
@@ -169,46 +152,6 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
         ),
         {"st": status, "ids": list(peer_ids)},
     ).rowcount
-
-
-def begin_authenticated_orcid_import(conn: Connection) -> None:
-    """Pose le paramètre de session lu par le trigger `protect_authenticated_identifier`. `SET LOCAL` : l'effet est borné à la transaction et disparaît au commit/rollback."""
-    conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
-
-
-def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> AuthenticateOrcidOutcome:
-    existing = conn.execute(
-        text(
-            "SELECT id, person_id, CAST(status AS text) AS status "
-            "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = :v"
-        ),
-        {"v": orcid},
-    ).first()
-    if existing is None:
-        conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:pid, 'orcid', :v, :src, 'authenticated')"
-            ),
-            {"pid": person_id, "v": orcid, "src": IdentifierOrigin.MANUAL.value},
-        )
-        return AuthenticateOrcidOutcome.INSERTED
-    if existing.person_id == person_id and existing.status == "authenticated":
-        return AuthenticateOrcidOutcome.NOOP
-    outcome = (
-        AuthenticateOrcidOutcome.REASSIGNED
-        if existing.person_id != person_id
-        else AuthenticateOrcidOutcome.UPGRADED
-    )
-    conn.execute(
-        text(
-            "UPDATE person_identifiers "
-            "SET person_id = :pid, status = 'authenticated', source = :src "
-            "WHERE id = :id"
-        ),
-        {"pid": person_id, "id": existing.id, "src": IdentifierOrigin.MANUAL.value},
-    )
-    return outcome
 
 
 def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:
