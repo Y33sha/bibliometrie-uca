@@ -49,6 +49,18 @@ def test_4xx_fails_fast_without_retry():
     assert _API_KEY not in str(excinfo.value)
 
 
+def test_une_erreur_reseau_sans_message_est_journalisee_par_son_type(caplog):
+    """Un délai dépassé de httpx a un message vide : le journal donne au moins son type."""
+    resp = _resp(200)
+    with (
+        patch.object(http_retry.httpx2, "request", side_effect=[httpx2.ReadTimeout(""), resp]),
+        patch.object(http_retry.time, "sleep"),
+        caplog.at_level("WARNING"),
+    ):
+        http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
+    assert "ReadTimeout" in caplog.text
+
+
 def test_5xx_is_retried():
     resp = _resp(503)
     with (
