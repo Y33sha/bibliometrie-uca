@@ -1,6 +1,8 @@
 """Le graphe de dépendances du pipeline (`pipeline.graph`) est cohérent avec l'ordre d'exécution."""
 
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES, SOURCE_PRIORITY
 from pipeline.graph import NODES, Node, order_violations
+from pipeline.ingestion.common.normalize import _normalize_builders
 from pipeline.runtime.phase_order import PHASE_ORDER
 
 
@@ -16,6 +18,22 @@ def test_groupes_dans_l_ordre_des_phases():
     assert [n.group for n in NODES] == sorted(
         (n.group for n in NODES), key=["run", *PHASE_ORDER].index
     )
+
+
+def test_un_noeud_de_recherche_par_doi_par_source_interrogeable():
+    """HAL aussi : `fetch_missing` l'interroge par DOI, en plus des canaux hal-id et NNT."""
+    doi_nodes = [n.name for n in NODES if n.name.startswith("fetch_missing.doi.")]
+    assert doi_nodes == [f"fetch_missing.doi.{s}" for s in DOI_SEARCHABLE_SOURCES]
+
+
+def test_normalisation_dans_l_ordre_de_priorite_des_sources():
+    normalize_nodes = [
+        n.name.removeprefix("normalize.")
+        for n in NODES
+        if n.group == "normalize" and n.name.removeprefix("normalize.") in set(SOURCE_PRIORITY)
+    ]
+    assert normalize_nodes == [s.value for s in SOURCE_PRIORITY]
+    assert set(_normalize_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
 
 
 def test_aucun_noeud_ne_lit_une_donnee_ecrite_apres_lui():

@@ -1,8 +1,8 @@
 """Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Nœuds `normalize.<source>`.
 
-La phase enchaîne, dans l'ordre de priorité des sources (la plus fiable en premier, pour que les suivantes n'écrasent pas les métadonnées déjà posées) :
+La phase enchaîne :
 
-1. la normalisation de chaque source retenue ;
+1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
 3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
 4. le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
 from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET, SOURCE_PRIORITY
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
@@ -351,7 +351,7 @@ class _NormalizeSelonOptions:
             return _run_normalize(registry[source])
 
         return NormalizePhase(
-            ordered_sources=list(registry),
+            ordered_sources=[source.value for source in SOURCE_PRIORITY],
             normalize_one=normalize_one,
             prune_disappeared=_run_prune_disappeared,
             cleanup_orphan_identities=_run_cleanup_orphan_identities,
@@ -390,7 +390,7 @@ def _vacuum_staging(full: bool = False) -> None:
 def _normalize_builders(
     *, archive: bool = True, full: bool = False
 ) -> dict[str, ConstructeurNormalizer]:
-    """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
+    """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from infrastructure.raw_store import NullRawStore, get_raw_store
     from pipeline.ingestion.common.fingerprint import fingerprint
     from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries

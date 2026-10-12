@@ -100,9 +100,7 @@ AUTHOR_SOURCES = ALL_SOURCES
 #   (`refresh_from_sources` dans `pipeline/transformation/publications/reconciliation/refresh.py`)
 # - la résolution de `author_position` quand plusieurs sources
 #   attestent une même authorship
-# - l'ordre d'exécution des normalizers dans le pipeline
-#   (theses en premier → son autorité métadonnées est appliquée
-#   avant tout enrichissement)
+# - l'ordre d'exécution des normaliseurs dans le pipeline
 #
 # theses.fr fait autorité sur les métadonnées de thèse ; CrossRef et DataCite
 # sont les autorités officielles de l'enregistrement DOI
