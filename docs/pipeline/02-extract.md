@@ -21,14 +21,14 @@ En mode `daily`, seul HAL est moissonné : les notices modifiées depuis la dern
 Le moissonnage interroge les sources sur le critère de l'affiliation : un document peut être présent dans une source et ne pas être trouvé par moissonnage, si l'affiliation n'y est pas correctement renseignée. On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
 
 **Étape 1 — `fetch_missing_hal` : HAL ids manquants.**
-Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging. Code dans `pipeline/sources/hal/fetch_missing.py`.
+Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging. Code dans `pipeline/ingestion/hal/fetch_missing.py`.
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les sources Crossref et DataCite sont seulement interrogées ici : elles sont omises du moissonnage initial car non interrogeables par affiliation.
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
 
-Boucle et sélection des DOI dans `pipeline/sources/fetch_missing.py`, requête propre à chaque source dans `pipeline/sources/<source>/fetch_missing.py`.
+Boucle et sélection des DOI dans `pipeline/ingestion/fetch_missing.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`.
 
 **Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
 
