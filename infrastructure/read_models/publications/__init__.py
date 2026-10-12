@@ -6,8 +6,6 @@ Le package est organisé par thème :
 - `detail` : `get_publication_detail`
 - `source_publications` : `get_publication_sources`
 
-Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipeline.metadata_correction`) vivent côté `infrastructure/pipeline/`.
-
 `PgPublicationsQueries` agrège ces lectures sous le port `application.ports.read_models.publications_queries.PublicationsQueries`.
 """
 

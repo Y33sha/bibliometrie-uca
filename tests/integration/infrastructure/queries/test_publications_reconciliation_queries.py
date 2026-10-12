@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from infrastructure.pipeline.publications.reconciliation import PgPublicationsReconciliationQueries
+from pipeline.publications.reconciliation import PublicationsReconciliationQueries
 
-_Q = PgPublicationsReconciliationQueries()
+_Q = PublicationsReconciliationQueries()
 
 
 def test_count_publications_s_execute(sa_sync_conn):

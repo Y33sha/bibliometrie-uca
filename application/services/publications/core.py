@@ -53,7 +53,7 @@ def refresh_from_sources(
 
     Deux cas de suppression : la publication sans source rattachée, qu'aucune source n'atteste ; et celle dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (invariant « hors périmètre = jamais matérialisé »). Le `delete` détache les `source_publications` (FK ON DELETE SET NULL) et emporte les `authorships` canoniques en cascade.
 
-    Ne touche que la publication reçue et ses sources : quelles `source_publications` forment une même œuvre relève de la réconciliation (`application/pipeline/publications`). Laisse `notes` et `sources` inchangés (`update_sources` les pose).
+    Ne touche que la publication reçue et ses sources : quelles `source_publications` forment une même œuvre relève de la réconciliation (`pipeline/publications`). Laisse `notes` et `sources` inchangés (`update_sources` les pose).
     """
     pub = repo.find_by_id(pub_id)
     if pub is None:

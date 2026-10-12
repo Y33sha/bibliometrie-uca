@@ -8,14 +8,14 @@ from functools import partial
 
 from sqlalchemy import bindparam, text
 
-from application.pipeline.publications.reconcile_components import reconcile, run
 from domain.source_publications.keys import project_confirmation_keys
-from infrastructure.pipeline.publications.reconciliation import (
-    PgPublicationsReconciliationQueries,
+from pipeline.publications.reconcile_components import reconcile, run
+from pipeline.publications.reconciliation import (
+    PublicationsReconciliationQueries,
     mark_keys_dirty,
 )
 
-_Q = PgPublicationsReconciliationQueries()
+_Q = PublicationsReconciliationQueries()
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -134,7 +134,7 @@ class TestEndToEnd:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -155,7 +155,7 @@ class TestEndToEnd:
         with caplog.at_level(logging.INFO, logger=logger.name):
             run(
                 conn,
-                PgPublicationsReconciliationQueries(),
+                PublicationsReconciliationQueries(),
                 logger,
                 publication_repo=publication_repository(conn),
             )
@@ -175,7 +175,7 @@ class TestEndToEnd:
         with caplog.at_level(logging.INFO, logger=logger.name):
             run(
                 conn,
-                PgPublicationsReconciliationQueries(),
+                PublicationsReconciliationQueries(),
                 logger,
                 publication_repo=publication_repository(conn),
             )
@@ -191,7 +191,7 @@ class TestEndToEnd:
         with caplog.at_level(logging.INFO, logger=logger.name):
             run(
                 conn,
-                PgPublicationsReconciliationQueries(),
+                PublicationsReconciliationQueries(),
                 logger,
                 publication_repo=publication_repository(conn),
                 rebuild=True,
@@ -211,7 +211,7 @@ class TestEndToEnd:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -247,7 +247,7 @@ class TestEndToEnd:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -269,7 +269,7 @@ class TestEndToEnd:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -299,7 +299,7 @@ class TestMetadataBlock:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -325,7 +325,7 @@ class TestMetadataBlock:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -350,7 +350,7 @@ class TestMetadataBlock:
 
         run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             logger,
             publication_repo=publication_repository(conn),
         )
@@ -504,7 +504,7 @@ class TestExternalDoiCarrier:
 
         reconcile(
             conn,
-            PgPublicationsReconciliationQueries(),
+            PublicationsReconciliationQueries(),
             publication_repo=publication_repository(conn),
         )
 

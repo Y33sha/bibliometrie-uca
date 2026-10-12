@@ -15,7 +15,7 @@ import os
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.publications.reconciliation import mark_keys_dirty
+from pipeline.publications.reconciliation import mark_keys_dirty
 
 log = setup_logger("backfill_mark_orphans_in_perimeter_dirty", os.path.dirname(__file__))
 

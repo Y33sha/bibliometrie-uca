@@ -7,10 +7,6 @@ réimplémenter l'assignation.
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.publications.reconcile_components import reconcile
-from infrastructure.pipeline.publications.reconciliation import (
-    PgPublicationsReconciliationQueries,
-)
 from infrastructure.repositories import publication_repository
 from pipeline.publications.correct_by_cluster import (
     compute_updates as compute_cluster_updates,
@@ -19,6 +15,10 @@ from pipeline.publications.correct_unary import (
     compute_update as compute_unary_update,
 )
 from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
+from pipeline.publications.reconcile_components import reconcile
+from pipeline.publications.reconciliation import (
+    PublicationsReconciliationQueries,
+)
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
@@ -69,7 +69,7 @@ def create_all_publications(conn: Connection) -> None:
     apply_metadata_corrections(conn)
 
     reconcile(
-        conn, PgPublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
+        conn, PublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
     )
 
 

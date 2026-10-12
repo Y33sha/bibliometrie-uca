@@ -10,7 +10,7 @@ Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_m
 
 Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux source_publications co-rattachées à une publication avec une SP dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
-L'orchestrateur dépend du port `PublicationsReconciliationQueries` ; il est appelé par `run_pipeline`.
+Nœud `publications.reconcile` ; le SQL est dans `pipeline/publications/reconciliation.py`.
 """
 
 import logging
@@ -19,10 +19,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.publications.reconciliation import (
-    PublicationsReconciliationQueries,
-    ReconcileRow,
-)
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications.core import create_publication, refresh_from_sources
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
@@ -36,6 +32,10 @@ from pipeline.libelles import (
     rien_a_faire,
 )
 from pipeline.progression import attente, progression
+from pipeline.publications.reconciliation import (
+    PublicationsReconciliationQueries,
+    ReconcileRow,
+)
 from pipeline.savepoint import savepoint
 
 
