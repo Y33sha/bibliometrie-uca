@@ -7,18 +7,18 @@ réimplémenter l'assignation.
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.metadata_correction.correct_by_cluster import (
-    compute_updates as compute_cluster_updates,
-)
-from application.pipeline.metadata_correction.correct_unary import (
-    compute_update as compute_unary_update,
-)
 from application.pipeline.publications.reconcile_components import reconcile
-from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publications.reconciliation import (
     PgPublicationsReconciliationQueries,
 )
 from infrastructure.repositories import publication_repository
+from pipeline.publications.correct_by_cluster import (
+    compute_updates as compute_cluster_updates,
+)
+from pipeline.publications.correct_unary import (
+    compute_update as compute_unary_update,
+)
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
 
 def apply_metadata_corrections(conn: Connection) -> None:

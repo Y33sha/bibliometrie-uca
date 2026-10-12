@@ -1,12 +1,12 @@
 """Tests de `compute_updates` : rattachement de la revue manquante par l'espace de noms du DOI."""
 
-from application.pipeline.metadata_correction.journal_by_doi import compute_updates
 from application.ports.pipeline.metadata_correction import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
 )
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_publications.raw_metadata import stash_entry
+from pipeline.publications.journal_by_doi import compute_updates
 
 _NAMESPACES = [
     DoiNamespace("10.64628/aak.", 7, 300, 1.0),

@@ -34,7 +34,6 @@ from domain.errors import (
 )
 from domain.journals.issns import IssnSupport, JournalIssn, source_issns
 from domain.journals.journal import JournalType, OaModel
-from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,
@@ -42,6 +41,7 @@ from infrastructure.repositories import (
 )
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.containers.publishers import PublisherGatewayQueries
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal_with_issns,

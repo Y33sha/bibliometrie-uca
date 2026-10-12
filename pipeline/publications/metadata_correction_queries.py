@@ -1,6 +1,6 @@
-"""Query service : SQL de la phase `metadata_correction`.
+"""SQL de la phase `metadata_correction`, et du recalcul ciblé des corrections que l'API lance après une édition de revue.
 
-Appelé par `application/pipeline/metadata_correction/`. Implémente le port `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
+Implémente le port `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
 """
 
 from sqlalchemy import Connection, bindparam, text

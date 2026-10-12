@@ -137,13 +137,13 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
 
 def _run_merge_duplicate_journals() -> PhaseMetrics:
     from application.services.journals.commands import merge_journals
-    from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
     from infrastructure.repositories.journal_repository import PgJournalRepository
     from infrastructure.repositories.publication_repository import PgPublicationRepository
     from pipeline.containers.journals import JournalGatewayQueries
     from pipeline.containers.merge_duplicate_journals import (
         run_merge_duplicate_journals,
     )
+    from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
     with open_tx() as conn:
         corrections = PgMetadataCorrectionQueries()

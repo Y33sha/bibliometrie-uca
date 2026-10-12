@@ -28,11 +28,11 @@ from domain.publishers.names import publisher_name_key
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from pipeline.containers.publishers import PublisherGatewayQueries
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
 log = setup_logger("backfill_merge_publisher_name_variants", os.path.dirname(__file__))
 

@@ -10,7 +10,7 @@ Une correction est une règle déterministe « si tel signal, alors le champ can
 
 - **Source unique** : la règle vit dans [`domain/source_publications/metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py) (fonction pure, zéro I/O), comme entrée du dict `_RULES`. `effective_metadata(view)` parcourt la cascade et renvoie un `CorrectedFields` (valeur corrigée + règle d'origine par champ).
 - **Forme déclarative** : une règle = `{applies_to: {prédicats AND-és}, applies_correction: {champ: valeur cible}}`. Le moteur `_check_predicate` interprète chaque prédicat selon le TypedDict `_AppliesTo`. Une règle qui rentre dans les prédicats listés n'est *que* cette entrée — pas de logique supplémentaire.
-- **Réversibilité** : la sous-étape unaire ([`correct_unary.py`](../../application/pipeline/metadata_correction/correct_unary.py)) reconstruit le brut depuis `raw_metadata`, **mappe** le `doc_type` source vers le canonique (`map_doc_type`), applique `effective_metadata`, écrit l'effective dans les colonnes et stashe le brut écrasé sous `raw_metadata.<champ>` avec sa provenance `corrected_by` (le membre `MetadataCorrectionRule`, ou le marqueur `DOC_TYPE_MAP` quand seul le mapping a changé la valeur).
+- **Réversibilité** : la sous-étape unaire ([`correct_unary.py`](../../pipeline/publications/correct_unary.py)) reconstruit le brut depuis `raw_metadata`, **mappe** le `doc_type` source vers le canonique (`map_doc_type`), applique `effective_metadata`, écrit l'effective dans les colonnes et stashe le brut écrasé sous `raw_metadata.<champ>` avec sa provenance `corrected_by` (le membre `MetadataCorrectionRule`, ou le marqueur `DOC_TYPE_MAP` quand seul le mapping a changé la valeur).
 - **Idempotence** : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 - **Cascade par champ** (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. `_correct_field(sp, "<field>")` parcourt `_RULES` dans l'ordre d'insertion et retourne la première règle qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent. L'ordre intra-cascade traduit la spécificité du signal (signaux forts d'abord : URL > `journal_type` > titre).
 - **Mutation de clé ⇒ résolution** : persister une correction qui change `doc_type`, `external_ids` ou `doi` pose `keys_dirty` sur la SP — `doc_type` entre dans le token `metadata_block`, le `doi` est un token. La phase `publications` résout à nouveau ces SP au run suivant.
@@ -100,7 +100,7 @@ return CorrectedFields(
 )
 ```
 
-`_correct_field` est paramétrique sur le champ — aucune logique additionnelle. La sous-étape unaire stashe et persiste le champ ajouté en l'inscrivant dans `_UNARY_FIELDS` ([`correct_unary.py`](../../application/pipeline/metadata_correction/correct_unary.py)).
+`_correct_field` est paramétrique sur le champ — aucune logique additionnelle. La sous-étape unaire stashe et persiste le champ ajouté en l'inscrivant dans `_UNARY_FIELDS` ([`correct_unary.py`](../../pipeline/publications/correct_unary.py)).
 
 ### 4. Étendre le contrat si nécessaire (rare)
 
@@ -108,7 +108,7 @@ Si l'input est absent de `MetadataForCorrection` :
 
 1. champ ajouté au contrat ([`metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
 2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
-3. colonne ajoutée au `_SELECT` de l'adaptateur ([`metadata_correction.py`](../../infrastructure/pipeline/metadata_correction.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
+3. colonne ajoutée au `_SELECT` de l'adaptateur ([`metadata_correction_queries.py`](../../pipeline/publications/metadata_correction_queries.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
 4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur une publication canonique, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu canonique. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)) depuis la valeur arbitrée.
 
 Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
@@ -148,7 +148,7 @@ Le catalogue des règles actives est le dict `_RULES` lui-même (entrées + comm
 
 Les règles `_RULES` décident d'une SP **seule**. D'autres corrections demandent de regarder le **groupe de SP partageant un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon la résolution les fusionnerait à tort).
 
-La décision est dans `resolve_cluster_doi_corrections` (`correction.py`) — pure, agnostique de la source. La sous-étape [`correct_by_cluster.py`](../../application/pipeline/metadata_correction/correct_by_cluster.py) regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, substitue ou nulle le DOI et stashe le brut sous la provenance `DoiClusterCase`. Cas couverts : versions DataCite → DOI concept ; ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (tous le perdent).
+La décision est dans `resolve_cluster_doi_corrections` (`correction.py`) — pure, agnostique de la source. La sous-étape [`correct_by_cluster.py`](../../pipeline/publications/correct_by_cluster.py) regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, substitue ou nulle le DOI et stashe le brut sous la provenance `DoiClusterCase`. Cas couverts : versions DataCite → DOI concept ; ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (tous le perdent).
 
 Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dans son commentaire) + la branche correspondante dans `resolve_cluster_doi_corrections`.
 
