@@ -6,16 +6,16 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import PERSON_DATA, merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
-from infrastructure.db.merge_steps import (
+from infrastructure.repositories.authorship_repository import (
+    delete_orphan_authorships,
+    detach_rejected_signatures,
+)
+from infrastructure.repositories.merge_steps import (
     MergeStep,
     transfer,
     transfer_unique,
     untouched,
     without_decision_sql,
-)
-from infrastructure.repositories.authorship_repository import (
-    delete_orphan_authorships,
-    detach_rejected_signatures,
 )
 from infrastructure.repositories.person_repository import _name_forms
 

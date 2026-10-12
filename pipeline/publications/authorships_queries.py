@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.sql_fragments import case_priority, publication_rejected_for
+from infrastructure.sql_fragments import case_priority, publication_rejected_for
 from pipeline.publications.publication_perimeter import refresh_publications_in_perimeter
 
 

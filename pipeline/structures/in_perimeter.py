@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR
+from infrastructure.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR
 
 # Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
 _MARK_ORPHANS_DIRTY = """

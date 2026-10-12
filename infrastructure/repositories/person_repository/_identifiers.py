@@ -12,7 +12,7 @@ from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin, PersonIdentifierType
 from infrastructure.db.scalars import row_int
-from infrastructure.db.sql_fragments import identifier_neutralized
+from infrastructure.sql_fragments import identifier_neutralized
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> IdentifierAttribution | None:

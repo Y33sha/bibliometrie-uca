@@ -45,10 +45,10 @@ from domain.journals.journal import (
 )
 from domain.normalize import normalize_text
 from domain.publications.identifiers import issn_search_prefix
-from infrastructure.db.sql_fragments import active_issns, has_active_issn
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
+from infrastructure.sql_fragments import active_issns, has_active_issn
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
 _JOURNAL_LIST_COLUMNS = f"""

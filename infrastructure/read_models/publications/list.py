@@ -18,7 +18,6 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
-from infrastructure.db.sql_fragments import has_author_role
 from infrastructure.read_models.filters import (
     OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
@@ -47,6 +46,7 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
+from infrastructure.read_models.sql_fragments import has_author_role
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}

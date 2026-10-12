@@ -23,9 +23,9 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.dates import today
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
-from infrastructure.db.sql_fragments import authorship_has_signature_from, has_author_role
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.sql_fragments import authorship_has_signature_from, has_author_role
 
 
 def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | None:
