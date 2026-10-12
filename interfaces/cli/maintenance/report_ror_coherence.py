@@ -8,11 +8,61 @@ Usage :
 """
 
 import sys
+from collections.abc import Iterable
+from dataclasses import dataclass
 
-from application.services.structures.ror import RorCoherenceReport, ror_coherence_report
+from sqlalchemy import Connection, text
+
 from domain.structures.identifiers import RorId
+from domain.structures.ror_coherence import TutelleCoherence, tutelle_coherence
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.ror import PgRorCoherenceQueries
+
+
+@dataclass(frozen=True, slots=True)
+class RorCoherenceReport:
+    """Écarts entre les référentiels, avec le code de chaque structure et le nom de chaque organisation ROR citée."""
+
+    coherence: TutelleCoherence
+    codes: dict[int, str]
+    ror_ids: dict[int, RorId]
+    ror_names: dict[RorId, str]
+
+
+def ror_relations(conn: Connection) -> list[tuple[RorId, RorId]]:
+    """Couples `(parent, enfant)` de `ror_relations`."""
+    rows = conn.execute(text("SELECT parent_ror_id, child_ror_id FROM ror_relations"))
+    return [(RorId(r.parent_ror_id), RorId(r.child_ror_id)) for r in rows]
+
+
+def ror_names(conn: Connection, ror_ids: Iterable[RorId]) -> dict[RorId, str]:
+    rows = conn.execute(
+        text("SELECT ror_id, name FROM ror_organizations WHERE ror_id = ANY(:ids)"),
+        {"ids": [r.value for r in ror_ids]},
+    )
+    return {RorId(r.ror_id): r.name for r in rows}
+
+
+def ror_coherence_report(conn: Connection) -> RorCoherenceReport:
+    """Compare `structure_tutelles` aux relations du ROR, pour toutes les structures qui ont un ROR."""
+    structures = conn.execute(text("SELECT id, code, ror_id FROM structures ORDER BY code")).all()
+    structure_rors = {
+        s.id: ror_id for s in structures if (ror_id := RorId.try_parse(s.ror_id)) is not None
+    }
+    tutelles = conn.execute(text("SELECT parent_id, child_id FROM structure_tutelles"))
+    perimeter = conn.execute(text("SELECT DISTINCT structure_id FROM perimeter_structures"))
+    coherence = tutelle_coherence(
+        structure_rors=structure_rors,
+        tutelles=[(r.parent_id, r.child_id) for r in tutelles],
+        ror_edges=ror_relations(conn),
+        scope=frozenset(perimeter.scalars()),
+    )
+    cited = {r for _, r in coherence.outside_parents | coherence.outside_children}
+    return RorCoherenceReport(
+        coherence=coherence,
+        codes={s.id: s.code for s in structures},
+        ror_ids=structure_rors,
+        ror_names=ror_names(conn, cited | coherence.shared_ror_ids),
+    )
 
 
 def _section(title: str, lines: list[str]) -> None:
@@ -54,14 +104,13 @@ def _print(report: RorCoherenceReport) -> None:
 
 def main() -> int:
     with get_sync_engine().connect() as conn:
-        queries = PgRorCoherenceQueries(conn)
-        if not queries.ror_relations():
+        if not ror_relations(conn):
             print(
                 "Référentiel ROR vide : lancer python -m interfaces.cli.imports.import_ror_dump",
                 file=sys.stderr,
             )
             return 1
-        _print(ror_coherence_report(queries))
+        _print(ror_coherence_report(conn))
     return 0
 
 

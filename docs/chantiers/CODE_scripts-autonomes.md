@@ -14,12 +14,17 @@ Une partie de leur code est dispersée dans les couches : des services, des port
 
 ### Phase 1 — Inventaire
 
-- [ ] Recenser les services, ports et read models qu'un script est seul à utiliser.
+- [x] Recenser les services, ports et read models qu'un script est seul à utiliser.
+  - `maintenance/report_ror_coherence.py` : service `structures/ror.py`, port `RorCoherenceQueries`, read model `read_models/ror.py`.
+  - `imports/import_persons.py` : service `import_rh_person` ; méthodes `find_rh_person_duplicate` et `insert_rh_record` du repository des personnes.
+  - `maintenance/import_authenticated_orcids.py` : service `authenticate_orcids` ; méthodes `begin_authenticated_orcid_import`, `authenticate_orcid`, `find_identifier_holders` et `map_rh_emails_to_person_ids` du repository des personnes.
+  - `oneshot/propagate_identifier_decisions.py` : méthode `hal_account_peers` du repository des personnes.
 
 ### Phase 2 — Rapatriement
 
-- [ ] Rapport de cohérence du ROR dans `maintenance/report_ror_coherence.py`.
-- [ ] Les autres cas de l'inventaire.
+- [x] Rapport de cohérence du ROR dans `maintenance/report_ror_coherence.py`.
+- [ ] Import RH dans `imports/import_persons.py`.
+- [ ] Import des ORCID authentifiés dans `maintenance/import_authenticated_orcids.py`.
 
 ### Phase 3 — Oneshot
 
