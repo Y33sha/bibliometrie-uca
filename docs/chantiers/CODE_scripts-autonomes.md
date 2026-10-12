@@ -28,7 +28,7 @@ Une partie de leur code est dispersée dans les couches : des services, des port
 
 ### Phase 3 — Oneshot
 
-- [ ] Trier les scripts `oneshot/` déjà joués.
+- [x] Trier les scripts `oneshot/` déjà joués : suppression de ceux qui ont un journal d'exécution et plus de 7 jours, sauf `snapshot_record_containers`, dont la comparaison sert à l'audit avant/après du chantier des monographies.
 
 ## Questions ouvertes
 

@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même. La phase `persons` du pipeline a ses propres écritures (`pipeline/persons/person_writes.py`), sur les mêmes règles du domaine.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. La phase `persons` du pipeline a ses propres écritures (`pipeline/persons/person_writes.py`), sur les mêmes règles du domaine.
 """
 
 import logging
