@@ -39,8 +39,6 @@ def build(
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.
     with attente(f"{BRANCHE}création des liens en cours", logger) as ligne:
-        # Stats fraîches sur person_id, que les phases précédentes (normalize, persons) réécrivent en masse.
-        queries.analyze_source_authorships(conn)
         inserted = queries.insert_missing_authorships(conn)
         ligne.conclut(
             f"{BRANCHE}{accord(inserted, 'nouveau lien', 'nouveaux liens')} {forme(inserted, 'créé')}"

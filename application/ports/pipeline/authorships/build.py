@@ -39,13 +39,6 @@ class AuthorshipsBuildQueries(Protocol):
         """
         ...
 
-    def analyze_source_authorships(self, conn: Connection) -> None:
-        """Met à jour les stats Postgres sur `source_authorships`.
-
-        À appeler avant une requête qui filtre sur une colonne réécrite en masse : `person_id` (phases normalize et persons) avant `insert_missing_authorships`. Avec des stats périmées (`null_frac ≈ 1`), le planner estime `rows = 1` sur `WHERE ... IS NOT NULL` et part en Nested Loop. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante.
-        """
-        ...
-
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         """Recompose les attributs dérivés de chaque authorship depuis les `source_authorships` qui l'attestent : même publication par leur notice, même personne. Retourne le nombre d'authorships modifiées.
 

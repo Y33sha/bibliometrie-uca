@@ -1,6 +1,6 @@
 """Orchestrateur unique de la phase personnes.
 
-Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
+Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve` et tournent sur **une seule** transaction : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de nœud laisserait sinon des signatures détachées jusqu'au run suivant. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
@@ -25,6 +25,7 @@ from sqlalchemy import Connection
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -47,10 +48,33 @@ class PersonsPhase:
     orphans_log: logging.Logger | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques.
+        """Exécute les trois nœuds de la phase personnes et rend ses métriques.
 
         `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
         """
+        by_node = run_nodes(
+            "persons",
+            {
+                "persons.resolve": NodeStep(self._resolve),
+                "persons.populate_person_name_forms": NodeStep(
+                    self._populate,
+                    section="Rafraîchissement des formes de nom associées aux personnes",
+                ),
+                "persons.purge": NodeStep(self._purge),
+            },
+            ctx,
+        )
+        metrics = by_node["persons.resolve"]
+        purge_counts = by_node["persons.purge"].extras
+        summary = metrics.details["summary"]
+        assert isinstance(summary, dict)
+        summary["reorphaned_nominal"] = purge_counts.get("reorphaned", 0)
+        summary["deleted_empty_persons"] = purge_counts.get("deleted_persons", 0)
+        metrics.resume = ""
+        return metrics
+
+    def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        """Épinglages, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         persons_queries, logger = self.persons_queries, ctx.logger
         with ctx.open_tx() as conn:
             writes = self.writes_factory(conn)
@@ -81,22 +105,26 @@ class PersonsPhase:
             )
             cross_source_detached = persons_queries.detach_source_authorships(conn, stale)
 
-            etape(logger, "Rafraîchissement des formes de nom associées aux personnes")
-            t0 = time.perf_counter()
-            with attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", logger) as ligne:
-                populate(conn, self.name_forms_queries, logger)
-                purge_counts = purge(conn, persons_queries, logger)
-                ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        return build_metrics(
+            cascade_result,
+            transferred=arbitration["transferred"],
+            cross_source_detached=cross_source_detached,
+        )
 
-            metrics = build_metrics(
-                cascade_result,
-                transferred=arbitration["transferred"],
-                cross_source_detached=cross_source_detached,
-                reorphaned=purge_counts["reorphaned"],
-                deleted_persons=purge_counts["deleted_persons"],
-            )
-            metrics.resume = ""
-        return metrics
+    def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        t0 = time.perf_counter()
+        with (
+            ctx.open_tx() as conn,
+            attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", ctx.logger) as ligne,
+        ):
+            populate(conn, self.name_forms_queries, ctx.logger)
+            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        return PhaseMetrics()
+
+    def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            counts = purge(conn, self.persons_queries, ctx.logger)
+        return PhaseMetrics(extras=dict(counts))
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -105,7 +133,7 @@ class PersonsPhase:
 def build() -> Phase:
     """Rattachement des signatures aux personnes, et création des personnes inconnues.
 
-    Une seule transaction enchaîne : la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues, la création des personnes pour les signatures restantes, la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées. Les publications hors scope sont écartées (`domain/publications/scope`).
+    Une transaction enchaîne la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
     """
     from pipeline.transformation.persons.matching import PersonsMatchingQueries
     from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
