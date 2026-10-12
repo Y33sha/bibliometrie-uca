@@ -27,13 +27,13 @@ from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.registry import ALL_SOURCES_SET
 from pipeline.containers.containers import ContainerGatewayQueries
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import log, open_tx
 from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.signatures import SignatureSyncSettings
 from pipeline.ingestion.source_publications import SourcePublicationQueries
 from pipeline.ingestion.staging import StagingQueries, StagingRow
-from pipeline.libelles import (
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import log, open_tx
+from pipeline.runtime.libelles import (
     DERNIERE_BRANCHE,
     SUITE_DE_BRANCHE,
     accord,
@@ -41,11 +41,11 @@ from pipeline.libelles import (
     etape,
     rien_a_faire,
 )
-from pipeline.logging_scope import scoped_logger
-from pipeline.metrics import PhaseMetrics
-from pipeline.modes import MODES
-from pipeline.progression import attente, progression
-from pipeline.savepoint import rollback_unless_invalidated, savepoint
+from pipeline.runtime.logging_scope import scoped_logger
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.modes import MODES
+from pipeline.runtime.progression import attente, progression
+from pipeline.runtime.savepoint import rollback_unless_invalidated, savepoint
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection

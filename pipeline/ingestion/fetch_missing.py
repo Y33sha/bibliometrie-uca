@@ -22,17 +22,17 @@ from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCHABLE_SOURCES
 from domain.types import JsonValue
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.ingestion.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.parallel import RunParallel
-from pipeline.libelles import branche_de_source, etape, rien_a_faire
-from pipeline.logging_scope import scoped_logger
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
-from pipeline.signals import filter_configured, select_targets, timed_metrics
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import credentials_missing, log, open_tx, under_circuit_breaker
+from pipeline.runtime.libelles import branche_de_source, etape, rien_a_faire
+from pipeline.runtime.logging_scope import scoped_logger
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
+from pipeline.runtime.signals import filter_configured, select_targets, timed_metrics
 
 FetchChannel = Callable[[], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
@@ -330,8 +330,8 @@ def build() -> Phase:
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
-    from pipeline.config import get_fetch_missing_retry_after_days
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
+    from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
@@ -347,8 +347,8 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
-    from pipeline.config import get_fetch_missing_retry_after_days
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
+    from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
@@ -383,7 +383,7 @@ def _make_doi_search(target: str) -> DoiSearch:
 
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
-    from pipeline.config import (
+    from pipeline.runtime.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
     )

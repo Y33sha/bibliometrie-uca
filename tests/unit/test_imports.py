@@ -46,7 +46,7 @@ MODULES = [
     "application.services.journals.core",
     "domain.source_publications.doc_types",
     "domain.sources",
-    "pipeline.config",
+    "pipeline.runtime.config",
 ]
 
 

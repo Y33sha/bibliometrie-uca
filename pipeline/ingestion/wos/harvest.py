@@ -14,11 +14,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping
-from pipeline.config import (
-    get_extraction_api_ids,
-    get_years,
-    source_credentials_missing,
-)
 from pipeline.ingestion.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -37,8 +32,13 @@ from pipeline.ingestion.wos.fields import (
     get_records,
     get_records_found,
 )
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import Progression
+from pipeline.runtime.config import (
+    get_extraction_api_ids,
+    get_years,
+    source_credentials_missing,
+)
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import Progression
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
 

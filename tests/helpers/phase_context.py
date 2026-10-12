@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from pipeline.context import PhaseContext, RunOptions
+from pipeline.runtime.context import PhaseContext, RunOptions
 
 
 class FakeConnection:

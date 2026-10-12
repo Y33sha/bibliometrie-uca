@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from domain.dates import today
-from pipeline.config import (
+from pipeline.runtime.config import (
     FETCH_STALE_AFTER_DAYS_DEFAULT,
     UNPAYWALL_MAX_PER_RUN_DEFAULT,
     get_doaj_refresh_after_days,

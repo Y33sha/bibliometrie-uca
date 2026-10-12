@@ -25,12 +25,12 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.config import get_extraction_api_ids
 from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.openalex.api import auth_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_openalex_id
 from pipeline.ingestion.openalex.harvest import build_params
+from pipeline.runtime.config import get_extraction_api_ids
 
 log = setup_logger("audit_openalex_inline_truncation", os.path.dirname(__file__))
 

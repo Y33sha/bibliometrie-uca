@@ -16,10 +16,11 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import UnderCircuitBreaker, credentials_missing
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.libelles import (
+from pipeline.publications.oa_status_queries import OaStatusQueries
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import UnderCircuitBreaker, credentials_missing
+from pipeline.runtime.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
     accord,
@@ -27,10 +28,9 @@ from pipeline.libelles import (
     forme,
     rien_a_faire,
 )
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
-from pipeline.publications.oa_status_queries import OaStatusQueries
-from pipeline.signals import filter_configured
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
+from pipeline.runtime.signals import filter_configured
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""
@@ -231,14 +231,14 @@ def build() -> Phase:
     Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. Unpaywall exige l'adresse électronique du polite pool ; sans elle, la phase est sautée. La phase tourne sous le circuit-breaker d'Unpaywall.
     """
 
-    from pipeline.config import (
+    from pipeline.ingestion.http.api_params import API_BASE_URLS
+    from pipeline.ingestion.unpaywall import fetch_oa_status
+    from pipeline.publications.oa_status_queries import OaStatusQueries
+    from pipeline.runtime.config import (
         get_polite_pool_email_optional,
         get_unpaywall_max_per_run,
         get_unpaywall_recheck_after_days,
     )
-    from pipeline.ingestion.http.api_params import API_BASE_URLS
-    from pipeline.ingestion.unpaywall import fetch_oa_status
-    from pipeline.publications.oa_status_queries import OaStatusQueries
 
     base_url = API_BASE_URLS["unpaywall"]
     email = get_polite_pool_email_optional() or ""

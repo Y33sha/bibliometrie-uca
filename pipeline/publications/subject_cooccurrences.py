@@ -10,9 +10,9 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
-from pipeline.progression import attente
 from pipeline.publications.subjects_queries import SubjectsIngestionQueries
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.progression import attente
 
 
 def run(

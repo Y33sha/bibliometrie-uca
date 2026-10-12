@@ -10,7 +10,7 @@ import pytest
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.libelles import DERNIERE_BRANCHE
 
 _LOG = logging.getLogger("test")
 

@@ -6,8 +6,8 @@ Un éditeur vide ne porte ni revue, ni monographie, ni préfixe DOI, ni paiement
 import logging
 
 from pipeline.containers.publishers import PublisherGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Éditeurs vides"
 """Libellé de la sous-étape dans le journal de la phase."""

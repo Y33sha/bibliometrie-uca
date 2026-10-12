@@ -28,15 +28,15 @@ from typing import TYPE_CHECKING, Protocol
 from domain.dates import date_to_french, today
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import circuit_breaker, open_tx, signal_if_tripped
 from pipeline.ingestion.harvest import ExtractionConfigError
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.ingestion.parallel import RunParallel
-from pipeline.libelles import etape
-from pipeline.metrics import PhaseMetrics
-from pipeline.modes import MODES
-from pipeline.signals import (
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import circuit_breaker, open_tx, signal_if_tripped
+from pipeline.runtime.libelles import etape
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.modes import MODES
+from pipeline.runtime.signals import (
     signal_source_unavailable,
     signal_source_unconfigured,
     timed_metrics,
@@ -248,7 +248,7 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 def build() -> Phase:
     """Extraction des sources vers staging.
 
-    `pipeline/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `pipeline/ingestion/extract.py` ; ici, le câblage : registre des extracteurs, primitif de parallélisme, lecture de la date de dernière extraction.
+    `pipeline/runtime/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `pipeline/ingestion/extract.py` ; ici, le câblage : registre des extracteurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from infrastructure.observability.phase_executions import get_last_daily_extract_date
     from pipeline.ingestion.parallel import run_parallel
@@ -304,15 +304,15 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
         return OpenalexExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
     def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
-        from pipeline.config import get_wos_api_key
         from pipeline.ingestion.wos.harvest import WosClient, WosExtractor
+        from pipeline.runtime.config import get_wos_api_key
 
         client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, client)
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
-        from pipeline.config import get_scanr_credentials
         from pipeline.ingestion.scanr.harvest import ScanrClient, ScanrExtractor
+        from pipeline.runtime.config import get_scanr_credentials
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
         return ScanrExtractor(conn, source_log, client)

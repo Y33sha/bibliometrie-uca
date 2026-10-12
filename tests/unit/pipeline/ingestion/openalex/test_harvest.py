@@ -14,7 +14,7 @@ from pipeline.ingestion.harvest import ExtractionConfigError
 from pipeline.ingestion.openalex import api, harvest
 from pipeline.ingestion.openalex.harvest import OpenalexExtractor, build_params, extract_period
 from pipeline.ingestion.staging import UpsertOutcome
-from pipeline.progression import Progression
+from pipeline.runtime.progression import Progression
 from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
 
 _LOGGER = logging.getLogger("test")

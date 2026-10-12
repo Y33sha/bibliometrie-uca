@@ -8,11 +8,11 @@ la phase `oa_status` s'en sert comme garde d'entrée.
 import logging
 from unittest.mock import AsyncMock, patch
 
-from pipeline.context import RunOptions
-from pipeline.execution import phase_context
-from pipeline.metrics import PhaseMetrics
 from pipeline.publications import oa_status
-from pipeline.signals import filter_configured
+from pipeline.runtime.context import RunOptions
+from pipeline.runtime.execution import phase_context
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.signals import filter_configured
 
 _RUN_ENRICH = "pipeline.publications.oa_status._verifier"
 _LOG = logging.getLogger("test")
@@ -57,7 +57,7 @@ def test_phase_oa_status_skips_without_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         patch(
-            "pipeline.config.source_credentials_missing",
+            "pipeline.runtime.config.source_credentials_missing",
             return_value="email polite pool absent (config.polite_pool_email)",
         ),
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
@@ -71,8 +71,8 @@ def test_phase_oa_status_skips_without_email():
 def test_phase_oa_status_runs_with_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch("pipeline.config.source_credentials_missing", return_value=None),
-        patch("pipeline.config.get_polite_pool_email_optional", return_value="e@x"),
+        patch("pipeline.runtime.config.source_credentials_missing", return_value=None),
+        patch("pipeline.runtime.config.get_polite_pool_email_optional", return_value="e@x"),
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
         metrics = oa_status.build().run(phase_context(RunOptions()))

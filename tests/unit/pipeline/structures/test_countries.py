@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.structures import countries as phase
 from pipeline.structures.countries_queries import AddressCountryStatus
 

@@ -16,7 +16,10 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import (
+from pipeline.publications.subject_cache import SubjectCache
+from pipeline.publications.subject_extractors import SUBJECT_EXTRACTORS
+from pipeline.publications.subjects_queries import PublicationSubjectLink, SubjectsIngestionQueries
+from pipeline.runtime.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
     accord,
@@ -24,11 +27,8 @@ from pipeline.libelles import (
     forme,
     rien_a_faire,
 )
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
-from pipeline.publications.subject_cache import SubjectCache
-from pipeline.publications.subject_extractors import SUBJECT_EXTRACTORS
-from pipeline.publications.subjects_queries import PublicationSubjectLink, SubjectsIngestionQueries
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
 
 
 def run(

@@ -7,7 +7,6 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import BRANCHE, accord, etape
 from pipeline.persons.matching import PersonsMatchingQueries
 from pipeline.persons.person_writes import PersonWrites
 from pipeline.persons.requalify_identifiers import (
@@ -18,7 +17,8 @@ from pipeline.persons.resolve_identifier_transfers import (
     detect_identifier_conflicts,
     resolve_identifier_transfers,
 )
-from pipeline.progression import attente
+from pipeline.runtime.libelles import BRANCHE, accord, etape
+from pipeline.runtime.progression import attente
 
 
 def arbitrate_identifier_conflicts(

@@ -19,14 +19,14 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
-from pipeline.context import Phase, PhaseContext
-from pipeline.execution import UnderCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
-from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import progression
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.execution import UnderCircuitBreaker
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import progression
 
 COMMIT_EVERY = 50
 # Plafond OpenAlex 10 req/s.

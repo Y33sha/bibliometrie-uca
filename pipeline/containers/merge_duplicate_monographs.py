@@ -7,8 +7,8 @@ import logging
 
 from domain.monographs.matching import duplicate_monographs
 from pipeline.containers.monographs import MonographGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Fusion des monographies en double"
 """Libellé de la sous-étape dans le journal de la phase."""

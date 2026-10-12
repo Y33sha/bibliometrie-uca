@@ -17,7 +17,7 @@ from sqlalchemy import text
 from pipeline.ingestion.fingerprint import fingerprint
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.openalex.harvest import stage_work
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.metrics import PhaseMetrics
 from tests.integration.helpers.staging import insert_staging
 
 

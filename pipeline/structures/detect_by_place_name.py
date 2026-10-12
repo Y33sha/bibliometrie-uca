@@ -9,8 +9,8 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.metrics import PhaseMetrics
 from pipeline.structures.countries_queries import CountryQueries
 from pipeline.structures.place_name_detector import PlaceNameDetector
 

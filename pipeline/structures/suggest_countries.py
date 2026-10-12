@@ -16,9 +16,9 @@ from collections.abc import Iterable, Sequence
 import ahocorasick
 from sqlalchemy import Connection
 
-from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme, rien_a_faire
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import attente
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, accord, etape, forme, rien_a_faire
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import attente
 from pipeline.structures.countries_queries import CountryQueries
 
 BATCH_SIZE = 50000

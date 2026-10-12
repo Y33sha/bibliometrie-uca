@@ -11,10 +11,10 @@ import time
 
 from sqlalchemy import Connection
 
-from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import attente
 from pipeline.publications.authorships_queries import AuthorshipsBuild
+from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import attente
 
 
 def build(

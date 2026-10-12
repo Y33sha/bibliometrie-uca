@@ -6,8 +6,8 @@ Une monographie vide n'est portée par aucun enregistrement ni aucune publicatio
 import logging
 
 from pipeline.containers.monographs import MonographGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Monographies vides"
 """Libellé de la sous-étape dans le journal de la phase."""

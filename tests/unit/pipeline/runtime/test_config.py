@@ -9,8 +9,8 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy.exc import SQLAlchemyError
 
-from pipeline import config as module
-from pipeline.config import (
+from pipeline.runtime import config as module
+from pipeline.runtime.config import (
     get_extraction_api_ids,
     get_hal_collections,
     get_openalex_api_key,

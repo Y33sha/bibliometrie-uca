@@ -17,7 +17,6 @@ from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from pipeline.config import get_polite_pool_email
 from pipeline.ingestion.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.fetch_missing import DoiBatchResult
 from pipeline.ingestion.http.api_params import API_BASE_URLS
@@ -25,6 +24,7 @@ from pipeline.ingestion.http.http_retry import lookup_json_async
 from pipeline.ingestion.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.http.polite_pool import build_user_agent
 from pipeline.ingestion.staging import upsert_staging
+from pipeline.runtime.config import get_polite_pool_email
 
 
 class CrossrefDoiSearch:

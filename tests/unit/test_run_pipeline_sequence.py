@@ -15,8 +15,8 @@ import pytest
 from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
-from pipeline.metrics import PhaseMetrics
-from pipeline.phase_order import EXTRA_PHASES
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.phase_order import EXTRA_PHASES
 
 
 def _args(**surcharges) -> argparse.Namespace:

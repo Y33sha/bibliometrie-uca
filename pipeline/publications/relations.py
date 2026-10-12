@@ -28,9 +28,6 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from pipeline.context import Phase, PhaseContext
-from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.metrics import PhaseMetrics
 from pipeline.publications.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
@@ -40,6 +37,9 @@ from pipeline.publications.relations_queries import (
     SharedKeyPair,
     TitleMatch,
 )
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.metrics import PhaseMetrics
 
 
 def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:

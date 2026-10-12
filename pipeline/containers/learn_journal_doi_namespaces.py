@@ -7,8 +7,8 @@ import logging
 
 from domain.journals.doi_namespaces import designated_by_namespace, learn_namespaces
 from pipeline.containers.journals import JournalGatewayQueries
-from pipeline.libelles import accord
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import accord
+from pipeline.runtime.metrics import PhaseMetrics
 
 LIBELLE = "Espaces de noms DOI"
 """Libellé de la sous-étape dans le journal de la phase."""

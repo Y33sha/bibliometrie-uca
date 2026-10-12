@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from domain.pipeline_runs import PhaseMetricsPayload, Signal
-from pipeline.libelles import forme
+from pipeline.runtime.libelles import forme
 
 LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     "already_complete": "déjà complet",

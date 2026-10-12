@@ -20,8 +20,8 @@ from infrastructure.db.tables import (
 )
 from pipeline.ingestion.http.dump_download import DumpUnavailableError
 from pipeline.ingestion.ror.dump import ZenodoRorDumpSource
-from pipeline.libelles import DERNIERE_BRANCHE, etape
-from pipeline.metrics import PhaseMetrics
+from pipeline.runtime.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.metrics import PhaseMetrics
 
 _BATCH_SIZE = 5000
 

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 from pipeline.ingestion.hal.harvest import HalExtractConfig, extract_union
 from pipeline.ingestion.staging import UpsertOutcome
-from pipeline.progression import Progression
+from pipeline.runtime.progression import Progression
 
 _LOGGER = logging.getLogger("test")
 _CONFIG = HalExtractConfig(all_collections={"C": "Coll"})

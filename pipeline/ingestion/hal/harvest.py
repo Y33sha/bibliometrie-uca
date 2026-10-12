@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from pipeline.config import get_hal_collections, get_years
 from pipeline.ingestion.hal.fields import HAL_FIELDS, extract_doi, extract_id
 from pipeline.ingestion.harvest import (
     ExtractionConfigError,
@@ -26,8 +25,9 @@ from pipeline.ingestion.harvest import (
 from pipeline.ingestion.http.api_params import HAL_DELAY, HAL_PER_PAGE
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import Progression
+from pipeline.runtime.config import get_hal_collections, get_years
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import Progression
 
 type SolrParams = dict[str, str | int | float | bool | None]
 

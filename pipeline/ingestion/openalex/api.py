@@ -7,11 +7,11 @@ from collections.abc import Mapping
 import httpx2
 
 from domain.types import JsonValue, as_mapping
-from pipeline.config import get_openalex_api_key, get_polite_pool_email_optional
 from pipeline.ingestion.http.api_params import API_BASE_URLS
 from pipeline.ingestion.http.http_retry import lookup_json_async
 from pipeline.ingestion.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS
+from pipeline.runtime.config import get_openalex_api_key, get_polite_pool_email_optional
 
 
 def credential_params() -> dict[str, str]:

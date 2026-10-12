@@ -13,11 +13,6 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from pipeline.config import (
-    get_extraction_api_ids,
-    get_years,
-    source_credentials_missing,
-)
 from pipeline.ingestion.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -30,8 +25,13 @@ from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
 from pipeline.ingestion.openalex.api import auth_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
-from pipeline.metrics import PhaseMetrics
-from pipeline.progression import Progression
+from pipeline.runtime.config import (
+    get_extraction_api_ids,
+    get_years,
+    source_credentials_missing,
+)
+from pipeline.runtime.metrics import PhaseMetrics
+from pipeline.runtime.progression import Progression
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
 
