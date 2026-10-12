@@ -18,7 +18,6 @@
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
 - [Instances par établissement](METIER_instances-par-etablissement.md)
-- [Le SQL métier partagé hors d'`infrastructure/db`](CODE_infrastructure-db.md)
 - [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
 - [Normalisation par lots de documents](CODE_batch-normalize.md)
@@ -33,6 +32,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)
 - 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)
 - 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
 - 2026-10-11 — [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md)

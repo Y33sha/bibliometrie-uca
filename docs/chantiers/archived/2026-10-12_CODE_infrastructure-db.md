@@ -47,4 +47,5 @@ Trois modules y contiennent du SQL métier, partagé entre les repositories ou r
 
 - [x] Fragments partagés vers `infrastructure/sql_fragments.py`, fragments des read models vers `infrastructure/read_models/sql_fragments.py`.
 - [x] `journal_issns.py` et `merge_steps.py` vers `infrastructure/repositories/`.
+- [x] Identifiants de `rows.py` et `scalars.py` en anglais.
 - [x] Mise à jour de la documentation.
