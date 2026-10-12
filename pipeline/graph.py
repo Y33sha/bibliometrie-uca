@@ -625,9 +625,7 @@ NODES: tuple[Node, ...] = (
             "person_identifiers",
             "person_name_forms",
             "persons",
-            "persons_rh",
             "rejected_authorships",
-            "distinct_persons",
         ),
         writes=(
             "source_authorships.person_id",
@@ -637,7 +635,14 @@ NODES: tuple[Node, ...] = (
             "person_identifiers",
             "person_name_forms",
         ),
-        previous_run=("person_name_forms",),
+        # Formes de nom peuplées, signatures détachées et personnes supprimées par `populate_person_name_forms` et `purge`.
+        previous_run=(
+            "person_name_forms",
+            "persons",
+            "person_identifiers",
+            "source_authorships.person_id",
+            "source_authorships.resolution_mode",
+        ),
     ),
     _node(
         "persons.populate_person_name_forms",
@@ -650,6 +655,36 @@ NODES: tuple[Node, ...] = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
+        # Signatures détachées et personnes supprimées par `purge`.
+        previous_run=("persons", "person_name_forms", "source_authorships.person_id"),
+    ),
+    _node(
+        "persons.purge",
+        "persons",
+        reads=(
+            "source_authorships.person_id",
+            "source_authorships.resolution_mode",
+            "source_authorships.identity_id",
+            "source_authorships.source_publication_id",
+            "source_authorships.neutralized_identifiers",
+            "source_publications.publication_id",
+            "author_identifying_keys",
+            "person_name_forms",
+            "person_identifiers",
+            "persons",
+            "persons_rh",
+            "confirmed_authorships",
+            "rejected_authorships",
+            "distinct_persons",
+        ),
+        # La suppression d'une personne emporte ses formes de nom.
+        writes=(
+            "source_authorships.person_id",
+            "source_authorships.resolution_mode",
+            "person_identifiers.id",
+            "persons.id",
+            "person_name_forms.id",
+        ),
     ),
     _node(
         "authorships.build",

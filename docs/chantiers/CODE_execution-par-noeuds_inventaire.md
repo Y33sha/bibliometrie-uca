@@ -107,7 +107,7 @@ Les onze étapes correspondent une à une aux onze nœuds, dans le même ordre.
 | `persons.resolve` | passe de création | ▶ Création de nouvelles personnes ; ├─ ; ├─ barre ; └─ N personnes créées |
 | `persons.resolve` | détachement des signatures cross-source sans ancre | aucun |
 | `persons.populate_person_name_forms` | formes de nom des personnes | ▶ Rafraîchissement des formes de nom associées aux personnes ; └─ Terminé en… |
-| `persons.resolve` | purge : signatures ambiguës, attributions automatiques sans appui, personnes vides | (même ligne) |
+| `persons.purge` | purge : signatures ambiguës, attributions automatiques sans appui, personnes vides | (même ligne) |
 
 ## authorships
 
