@@ -4,7 +4,7 @@ Une donnée se désigne par sa table (`"journals"`) ou par une colonne (`"journa
 
 Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une lecture déclarée `previous_run` lit aussi ce qu'un nœud placé après lui, ou lui-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucun nœud une donnée écrite après lui, sauf lecture du run précédent déclarée.
 
-La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance.
+La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des nœuds consécutifs du même `lot` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucun ne dépend d'un autre du lot.
 """
 
 from collections.abc import Iterable, Sequence
@@ -32,6 +32,8 @@ class Node:
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE authorships`.
     maintenance: tuple[str, ...] = ()
+    # Lot de nœuds consécutifs exécutés en parallèle.
+    lot: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +72,7 @@ def _node(
     previous_run: Iterable[str] = (),
     network: str | None = None,
     maintenance: tuple[str, ...] = (),
+    lot: str | None = None,
 ) -> Node:
     """Nœud de `group`, avec les lectures et écritures communes à la phase (`_GROUP_IO`)."""
     shared = _GROUP_IO.get(group, _GroupIo())
@@ -81,6 +84,7 @@ def _node(
         frozenset((*shared.previous_run, *previous_run)),
         network,
         maintenance,
+        lot,
     )
 
 
@@ -107,9 +111,13 @@ def _writes_read(reader: Node, writer: Node) -> list[str]:
 
 
 def dependencies(nodes: Sequence[Node]) -> dict[str, set[str]]:
-    """Pour chaque nœud, les nœuds placés avant lui qui écrivent ce qu'il lit."""
+    """Pour chaque nœud, les nœuds placés avant lui, hors de son lot, qui écrivent ce qu'il lit."""
     return {
-        reader.name: {writer.name for writer in nodes[:i] if _writes_read(reader, writer)}
+        reader.name: {
+            writer.name
+            for writer in nodes[:i]
+            if (reader.lot is None or writer.lot != reader.lot) and _writes_read(reader, writer)
+        }
         for i, reader in enumerate(nodes)
     }
 
@@ -164,6 +172,7 @@ NODES: tuple[Node, ...] = (
             writes=("staging",),
             previous_run=("staging", "pipeline_phase_executions"),
             network=source,
+            lot="extract",
         )
         for source in HARVESTED_SOURCES
     ),
@@ -186,6 +195,7 @@ NODES: tuple[Node, ...] = (
             ),
             previous_run=("doi_prefixes", "publication_relations"),
             network=source,
+            lot="fetch_missing.doi",
         )
         for source in DOI_SEARCHABLE_SOURCES
     ),
