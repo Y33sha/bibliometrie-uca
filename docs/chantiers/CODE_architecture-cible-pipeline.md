@@ -113,7 +113,7 @@ Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_
 
 ## Hors de la cible, à décider plus tard
 
-- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des entités avec Splink](CODE_resolution-splink.md).
+- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des entités avec Splink](DATA_resolution-splink.md).
 - Outillage : orchestrateur par *assets* (Dagster), dbt, publication en bloc après contrôle (*Write-Audit-Publish*).
 
 ## Mise en pratique
