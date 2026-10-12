@@ -903,6 +903,7 @@ NODES: tuple[Node, ...] = (
             "config",
         ),
         writes=("publications.oa_status", "publications.unpaywall_checked_at"),
+        network="unpaywall",
     ),
 )
 
