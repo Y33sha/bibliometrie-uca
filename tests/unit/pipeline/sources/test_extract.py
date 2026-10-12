@@ -9,8 +9,8 @@ from datetime import date
 
 import pytest
 
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.extract import ExtractOne, ExtractPhase
 from pipeline.sources.harvest import ExtractionConfigError
 from pipeline.structures.perimeter import EmptyExtractionPerimeterError

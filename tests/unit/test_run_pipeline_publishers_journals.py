@@ -13,7 +13,7 @@ from pipeline.metrics import PhaseMetrics
 
 def _patch_credentials_present():
     return patch(
-        "infrastructure.sources.config.source_credentials_missing",
+        "pipeline.config.source_credentials_missing",
         side_effect=lambda source: None,
     )
 

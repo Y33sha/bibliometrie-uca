@@ -12,20 +12,20 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
-from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
-from infrastructure.sources.config import (
+from pipeline.config import (
     get_extraction_api_ids,
     get_years,
     source_credentials_missing,
 )
-from infrastructure.sources.http_retry import http_request_with_retry
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from pipeline.sources.harvest import (
     ExtractionConfigError,
     SourceExtractor,
     stage_document,
 )
+from pipeline.sources.http_retry import http_request_with_retry
 from pipeline.sources.scanr.fields import extract_doi, extract_id
 from pipeline.sources.throttle import Throttle
 

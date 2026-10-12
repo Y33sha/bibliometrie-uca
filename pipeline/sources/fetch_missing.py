@@ -23,7 +23,6 @@ from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCHABLE_SOURCES
 from domain.types import JsonValue
 from infrastructure.parallel import RunParallel
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.fetch_pool import run_fetch_pool
@@ -32,6 +31,7 @@ from pipeline.logging_scope import scoped_logger
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
 from pipeline.signals import filter_configured, select_targets, timed_metrics
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker
 from pipeline.sources.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 
 FetchChannel = Callable[[], PhaseMetrics]
@@ -330,7 +330,7 @@ def build() -> Phase:
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
-    from infrastructure.sources.config import get_fetch_missing_retry_after_days
+    from pipeline.config import get_fetch_missing_retry_after_days
     from pipeline.sources.hal.fetch_missing import fetch_missing_hal_by_id
 
     with open_tx() as conn:
@@ -347,7 +347,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
-    from infrastructure.sources.config import get_fetch_missing_retry_after_days
+    from pipeline.config import get_fetch_missing_retry_after_days
     from pipeline.sources.hal.fetch_missing import fetch_missing_hal_by_nnt
 
     with open_tx() as conn:
@@ -383,7 +383,7 @@ def _make_doi_search(target: str) -> DoiSearch:
 
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
-    from infrastructure.sources.config import (
+    from pipeline.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
     )

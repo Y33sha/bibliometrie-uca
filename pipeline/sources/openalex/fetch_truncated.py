@@ -19,13 +19,13 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.sources.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import UnderCircuitBreaker
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
+from pipeline.sources.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.sources.openalex.api import fetch_work
 
 COMMIT_EVERY = 50

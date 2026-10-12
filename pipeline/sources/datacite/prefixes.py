@@ -13,9 +13,9 @@ import httpx2
 
 from domain.publications.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
+from pipeline.sources.api_params import API_BASE_URLS
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 
 
 async def fetch_datacite_prefix(

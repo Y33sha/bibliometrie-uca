@@ -16,12 +16,12 @@ from pathlib import Path
 
 import httpx2
 
-from infrastructure.sources.dump_download import (
+from pipeline.sources.dump_download import (
     DumpDownloadError,
     DumpUnavailableError,
     write_capped,
 )
-from infrastructure.sources.http_status import raise_for_status
+from pipeline.sources.http_status import raise_for_status
 
 DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""

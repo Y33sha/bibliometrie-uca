@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
 from pipeline.progression import Progression
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.harvest import ExtractionConfigError
 from pipeline.sources.staging import UpsertOutcome
 from pipeline.sources.wos import harvest

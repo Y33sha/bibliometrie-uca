@@ -16,11 +16,11 @@ from typing import ClassVar
 from sqlalchemy import Connection
 
 from domain.types import JsonValue
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.libelles import SUITE_DE_BRANCHE, accord, branche_de_source, forme
 from pipeline.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression, progression
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.sources.staging import UpsertOutcome, upsert_staging
 
 __all__ = [

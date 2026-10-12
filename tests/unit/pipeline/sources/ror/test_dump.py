@@ -10,9 +10,9 @@ import pytest
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
-from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.dump_download import DumpDownloadError, DumpUnavailableError
-from infrastructure.sources.ror.dump import (
+from pipeline.sources.api_params import API_BASE_URLS
+from pipeline.sources.dump_download import DumpDownloadError, DumpUnavailableError
+from pipeline.sources.ror.dump import (
     ZenodoRorDumpSource,
     fetch_ror_dump,
     find_latest_ror_dump,

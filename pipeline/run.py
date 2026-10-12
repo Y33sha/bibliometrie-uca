@@ -249,7 +249,7 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 
 def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    from infrastructure.sources.config import get_fetch_stale_after_days
+    from pipeline.config import get_fetch_stale_after_days
 
     return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
 

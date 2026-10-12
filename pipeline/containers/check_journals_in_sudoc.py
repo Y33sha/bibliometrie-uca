@@ -2,7 +2,7 @@
 
 Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
-Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/sudoc`).
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/sources/sudoc.py`).
 """
 
 import logging
@@ -21,12 +21,12 @@ from domain.journals.issn_check import (
 from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord
-from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.containers.journals import JournalGatewayQueries, JournalSudocRow
 from pipeline.fetch_pool import RequestPace, run_fetch_pool
 from pipeline.libelles import BRANCHE, accord, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
+from pipeline.sources.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 
 LIBELLE = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""

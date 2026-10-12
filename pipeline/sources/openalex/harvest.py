@@ -13,15 +13,14 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
-from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
-from infrastructure.sources.config import (
+from pipeline.config import (
     get_extraction_api_ids,
     get_years,
     source_credentials_missing,
 )
-from infrastructure.sources.http_retry import http_request_with_retry
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from pipeline.sources.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -29,6 +28,7 @@ from pipeline.sources.harvest import (
     scoped_logger,
     stage_document,
 )
+from pipeline.sources.http_retry import http_request_with_retry
 from pipeline.sources.openalex.api import auth_params
 from pipeline.sources.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
 from pipeline.sources.throttle import Throttle

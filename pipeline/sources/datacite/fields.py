@@ -4,8 +4,8 @@ from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from infrastructure.sources.config import get_polite_pool_email
-from infrastructure.sources.polite_pool import build_user_agent
+from pipeline.config import get_polite_pool_email
+from pipeline.sources.polite_pool import build_user_agent
 
 
 def api_headers() -> dict[str, str]:

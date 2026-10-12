@@ -5,7 +5,7 @@ Le dump CSV stocke tantôt l'URL toute faite (`URL in DOAJ`), tantôt le seul id
 
 import pytest
 
-from infrastructure.sources.doaj.urls import build_doaj_toc_url, resolve_doaj_url
+from infrastructure.read_models.doaj_links import build_doaj_toc_url, resolve_doaj_url
 
 
 class TestBuildDoajTocUrl:

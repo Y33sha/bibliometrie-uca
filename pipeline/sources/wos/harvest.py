@@ -14,16 +14,15 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping
-from infrastructure.sources.api_params import WOS_DELAY, WOS_PER_PAGE
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
-from infrastructure.sources.config import (
+from pipeline.config import (
     get_extraction_api_ids,
     get_years,
     source_credentials_missing,
 )
-from infrastructure.sources.http_retry import http_request_with_retry
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression
+from pipeline.sources.api_params import WOS_DELAY, WOS_PER_PAGE
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -31,6 +30,7 @@ from pipeline.sources.harvest import (
     scoped_logger,
     stage_document,
 )
+from pipeline.sources.http_retry import http_request_with_retry
 from pipeline.sources.throttle import Throttle
 from pipeline.sources.wos.fields import (
     build_query,

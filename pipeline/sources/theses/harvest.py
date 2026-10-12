@@ -12,11 +12,10 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_int, as_mapping, as_sequence
-from infrastructure.sources.api_params import THESES_DELAY, THESES_PER_PAGE
-from infrastructure.sources.config import get_extraction_api_ids
-from infrastructure.sources.http_retry import http_request_with_retry
+from pipeline.config import get_extraction_api_ids
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import Progression, progression
+from pipeline.sources.api_params import THESES_DELAY, THESES_PER_PAGE
 from pipeline.sources.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -24,6 +23,7 @@ from pipeline.sources.harvest import (
     scoped_logger,
     stage_document,
 )
+from pipeline.sources.http_retry import http_request_with_retry
 from pipeline.sources.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.sources.throttle import Throttle
 

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.sources.circuit_breaker import SourceUnavailableError
+from pipeline.sources.circuit_breaker import SourceUnavailableError
 from pipeline.sources.datacite import harvest
 from pipeline.sources.datacite.harvest import DataciteExtractor, DatacitePage, build_query
 from pipeline.sources.harvest import ExtractionConfigError

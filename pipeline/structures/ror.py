@@ -18,10 +18,10 @@ from infrastructure.db.tables import (
     ror_organizations,
     ror_relations as ror_relations_table,
 )
-from infrastructure.sources.dump_download import DumpUnavailableError
-from infrastructure.sources.ror.dump import ZenodoRorDumpSource
 from pipeline.libelles import DERNIERE_BRANCHE, etape
 from pipeline.metrics import PhaseMetrics
+from pipeline.sources.dump_download import DumpUnavailableError
+from pipeline.sources.ror.dump import ZenodoRorDumpSource
 
 _BATCH_SIZE = 5000
 

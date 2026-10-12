@@ -6,7 +6,7 @@ Non-régression : la clé d'API OpenAlex voyage en paramètre de requête, et le
 import httpx2
 import pytest
 
-from infrastructure.sources.http_status import raise_for_status
+from pipeline.sources.http_status import raise_for_status
 
 _API_KEY = "cle-secrete-de-test"
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.sources.circuit_breaker import (
+from pipeline.sources.circuit_breaker import (
     SourceCircuitBreaker,
     SourceUnavailableError,
 )

@@ -316,7 +316,7 @@ max-complexity = 15
 # d'architecture qui ferme les autres modules réseau à cette couche ne sait pas nommer le
 # sous-module d'un paquet qu'il tient pour externe. Fermer la source obtient la même
 # transitivité, sans avoir à suivre les chemins.
-"urllib.request".msg = "Le client HTTP du projet est httpx2, et le trafic sortant appartient au pipeline (infrastructure/sources)."
+"urllib.request".msg = "Le client HTTP du projet est httpx2, et le trafic sortant appartient au pipeline (pipeline/sources)."
 
 # Le projet n'a qu'un engine, construit par `infrastructure/db/engine.py`, seul endroit d'où
 # une connexion peut naître. C'est lui qui choisit l'identité de connexion selon le processus

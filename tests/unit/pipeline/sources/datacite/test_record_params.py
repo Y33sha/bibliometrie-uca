@@ -5,7 +5,7 @@ import asyncio
 import httpx2
 import pytest
 
-from infrastructure.sources.api_params import API_BASE_URLS
+from pipeline.sources.api_params import API_BASE_URLS
 from pipeline.sources.datacite import fields
 from pipeline.sources.datacite.fetch_missing import DataciteDoiSearch
 from pipeline.sources.datacite.fetch_stale import DataciteStaleRefetch

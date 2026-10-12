@@ -8,10 +8,10 @@ from __future__ import annotations
 import httpx2
 
 from domain.types import as_mapping, as_sequence, as_str
-from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
-from infrastructure.sources.http_retry import lookup_json_async
-from infrastructure.sources.lookup import NOT_FOUND, NotFound, Unavailable
+from pipeline.sources.api_params import API_BASE_URLS, THESES_DELAY
 from pipeline.sources.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.sources.http_retry import lookup_json_async
+from pipeline.sources.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.sources.theses.fields import extract_doi
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.
