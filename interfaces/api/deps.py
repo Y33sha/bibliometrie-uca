@@ -77,11 +77,13 @@ from infrastructure.repositories import (
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
 from interfaces.api.session import read_session
-from pipeline.publications.authorships_queries import AuthorshipsBuild
-from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
-from pipeline.structures.countries_queries import CountryQueries
-from pipeline.structures.in_perimeter import InPerimeterRecompute
-from pipeline.structures.perimeter import PerimeterQueries
+from pipeline.public import (
+    AuthorshipsBuild,
+    CountryQueries,
+    InPerimeterRecompute,
+    PerimeterQueries,
+    PgMetadataCorrectionQueries,
+)
 
 logger = logging.getLogger(__name__)
 
