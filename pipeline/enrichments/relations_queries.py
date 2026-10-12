@@ -1,19 +1,9 @@
-"""Query service : SQL de la phase `relations`.
+"""SQL de la phase `relations`."""
 
-Appelé par `application/pipeline/relations/phase.py`. Implémente le port `application.ports.pipeline.relations.PublicationRelationsQueries`.
-"""
+from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.relations import (
-    DeclaredRelationSource,
-    DoiPublication,
-    PublicationRelationsQueries,
-    RelationEdge,
-    RelationsRebuild,
-    SharedKeyPair,
-    TitleMatch,
-)
 from domain.publications.doc_types import DocType
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.keys import (
@@ -21,8 +11,72 @@ from domain.source_publications.keys import (
     SCALAR_CONFIRMATION_ID_TYPES,
 )
 from domain.sources.registry import Source
+from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
+
+
+class DeclaredRelationSource(NamedTuple):
+    """Une `source_publication` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
+
+    Son DOI d'origine et son `notice_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
+    """
+
+    publication_id: int
+    source: str
+    meta: dict[str, JsonValue]
+    doi: str | None = None
+    doc_type: str | None = None
+    notice_doc_type: str | None = None
+
+
+class DoiPublication(NamedTuple):
+    """Une publication du corpus, désignée par un DOI qu'une relation déclarée prend pour cible."""
+
+    id: int
+    doc_type: str | None
+
+
+class RelationEdge(NamedTuple):
+    """Une arête de relation à persister : publication déclarante → cible, typée.
+
+    La cible est désignée par `target_doi` (relations issues des sources, qui pointent toujours un DOI — résolu en `target_publication_id` à l'insertion) **ou** directement par `target_publication_id` (relations dérivées en interne vers une publication au corpus, qui peut ne pas avoir de DOI). Au moins l'un des deux est présent."""
+
+    from_publication_id: int
+    relation_type: str
+    target_doi: str | None
+    source: str
+    target_publication_id: int | None = None
+
+
+class SharedKeyPair(NamedTuple):
+    """Deux publications distinctes partageant une clé de confirmation (hal_id, arXiv, PMID, NNT). `a_id < b_id` par construction. Le type de relation se déduit du couple de `doc_type` (`domain.publications.relations.infer_shared_key_relation`)."""
+
+    a_id: int
+    a_doc_type: str | None
+    a_doi: str | None
+    b_id: int
+    b_doc_type: str | None
+    b_doi: str | None
+
+
+class TitleMatch(NamedTuple):
+    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). `child` porte la relation dirigée vers `parent` (`is_correction_of`, `is_preprint_of`)."""
+
+    child_id: int
+    parent_id: int
+    parent_doi: str | None
+
+
+class RelationsRebuild(NamedTuple):
+    """Ce qu'une reconstruction de `publication_relations` laisse : les arêtes écrites, celles qu'elle ajoute (par type, décroissant) et le nombre de celles qui disparaissent.
+
+    Une arête ajoutée est présente après la reconstruction et absente avant ; une arête disparue, l'inverse. Les deux se comptent contre l'état de la table au début de la phase, pas contre le nombre d'arêtes soumises : la table est reconstruite entière à chaque run, et l'essentiel de ce qu'elle reçoit s'y trouvait déjà."""
+
+    written: int
+    added_by_type: list[tuple[str, int]]
+    removed: int
+
 
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
@@ -115,10 +169,11 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
 """)
 
 
-class PgPublicationRelationsQueries(PublicationRelationsQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.relations.PublicationRelationsQueries`."""
+class PublicationRelationsQueries:
+    """Requêtes de la phase `relations`."""
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
+        """Les `source_publications` rattachées dont le `meta` déclare des relations."""
         # Le DOI d'origine, et non le DOI corrigé : c'est lui que la notice déclare, et c'est son
         # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
@@ -142,6 +197,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     def fetch_publications_by_doi(
         self, conn: Connection, dois: list[str]
     ) -> dict[str, DoiPublication]:
+        """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules."""
         if not dois:
             return {}
         rows = conn.execute(
@@ -154,6 +210,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
         return {r.doi: DoiPublication(r.id, r.doc_type) for r in rows}
 
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
+        """Les paires de publications distinctes (DOI distincts) partageant une clé de confirmation (signal #2)."""
         rows = conn.execute(_SHARED_KEY_PAIRS_SQL).all()
         return [
             SharedKeyPair(r.a_id, r.a_doc_type, r.a_doi, r.b_id, r.b_doc_type, r.b_doi)
@@ -161,6 +218,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
         ]
 
     def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
+        """Les paires déjà reliées par une relation déclarée (signal #1), pour écarter un `is_related_to` redondant."""
         rows = conn.execute(
             text(f"""
                 SELECT from_publication_id AS a, target_publication_id AS b
@@ -172,10 +230,16 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
         return {frozenset((r.a, r.b)) for r in rows}
 
     def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
+        """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
+
+        Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de l'erratum (le titre parent est reproduit verbatim après un préfixe « Erratum: »). Garde d'ambiguïté : on ne rapproche que si **exactement un** candidat « substantiel » (hors `preprint` et `dataset`, simples formes de la même œuvre) porte ce titre."""
         rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
         return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
     def fetch_preprint_title_matches(self, conn: Connection) -> list[TitleMatch]:
+        """Les preprints rapprochés par titre de leur version publiée (signal #3).
+
+        Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée portent le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
         rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
         return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
@@ -184,6 +248,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     _IDENTITE = "from_publication_id, relation_type, target_publication_id, target_doi"
 
     def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
+        """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
         # La table temporaire vit le temps de l'appel : créée avant la purge, elle sert le diff puis
         # disparaît. Un échec en cours de route annule sa création avec le reste de la transaction.
         conn.execute(
@@ -251,6 +316,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
         return conn.execute(stmt, {"payload": payload}).rowcount
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
+        """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
         # Alias `rel_type` / `cnt` : nommer une colonne `t` heurterait l'attribut déprécié `Row.t` de SQLAlchemy (`r.t` renverrait la Row entière, non la colonne).
         rows = conn.execute(
             text(

@@ -2,21 +2,21 @@
 
 import logging
 
-from application.pipeline.relations.phase import (
+from domain.publications.relations import RelationType
+from pipeline.enrichments.relations import (
     _build_distinct_work_edges,
     _build_shared_key_edges,
     _build_title_match_edges,
     _count_by_pair_label,
     _log_changes,
 )
-from application.ports.pipeline.relations import (
+from pipeline.enrichments.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
     RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
 )
-from domain.publications.relations import RelationType
 
 
 def _pair(a_id, a_dt, b_id, b_dt):
