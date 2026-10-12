@@ -48,7 +48,7 @@ bibliometrie-uca/
 │   └── cli/             Imports, maintenance
 ├── pipeline/            Pipeline (orchestrateur run.py)
 │   ├── ingestion/       Extraction et normalisation par source (hal, openalex, wos, scanr, theses…)
-│   └── …                Transformation par entité (structures, containers, publications, persons)
+│   └── …                Transformation par entité (structures, publishing, publications, persons)
 ├── alembic/             Migrations
 ├── tests/               pytest (unit + integration)
 └── docs/                Documentation

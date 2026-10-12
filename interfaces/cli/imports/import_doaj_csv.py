@@ -3,7 +3,7 @@
 
 Le pipeline télécharge et importe le dump automatiquement, au terme du délai `doaj_refresh_after_days` (cf. `_run_enrich_journals_from_doaj`). Cette CLI sert à forcer l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
 
-La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit dans `pipeline/containers/import_journals_from_doaj_dump` ; ce script n'est qu'un point d'entrée CLI.
+La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit dans `pipeline/publishing/import_journals_from_doaj_dump` ; ce script n'est qu'un point d'entrée CLI.
 
 Usage :
     python -m interfaces.cli.imports.import_doaj_csv data/doaj/doaj_dump.csv
@@ -15,11 +15,11 @@ import os
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.containers.import_journals_from_doaj_dump import (
+from pipeline.ingestion.doaj import read_doaj_dump_rows
+from pipeline.publishing.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from pipeline.containers.journals import JournalGatewayQueries
-from pipeline.ingestion.doaj import read_doaj_dump_rows
+from pipeline.publishing.journals import JournalGatewayQueries
 from pipeline.runtime.libelles import accord
 
 log = setup_logger("import_doaj_csv", os.path.dirname(__file__))

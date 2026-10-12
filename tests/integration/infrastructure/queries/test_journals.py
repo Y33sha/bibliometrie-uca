@@ -11,7 +11,7 @@ from sqlalchemy import text
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
-from pipeline.containers.journals import JournalGatewayQueries
+from pipeline.publishing.journals import JournalGatewayQueries
 from tests.integration.helpers.journals import (
     insert_journal,
     insert_journal_issn,

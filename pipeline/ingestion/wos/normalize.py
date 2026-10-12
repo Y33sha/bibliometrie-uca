@@ -25,13 +25,6 @@ from domain.sources.wos import (
 )
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
-from pipeline.containers.containers import ContainerGatewayQueries
-from pipeline.containers.find_or_create import (
-    Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
-)
-from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.ingestion.normalize import BibliographicNormalizer
 from pipeline.ingestion.pub_metadata import PublicationMetadata
 from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
@@ -47,6 +40,13 @@ from pipeline.ingestion.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.staging import StagingQueries, StagingRow
+from pipeline.publishing.containers import ContainerGatewayQueries
+from pipeline.publishing.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.publishing.publishers import PublisherGatewayQueries
 
 # =============================================================
 # UTILITAIRES

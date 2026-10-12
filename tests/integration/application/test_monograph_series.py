@@ -5,8 +5,8 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from pipeline.containers.containers import ContainerGatewayQueries
-from pipeline.containers.link_monographs_to_collections import (
+from pipeline.publishing.containers import ContainerGatewayQueries
+from pipeline.publishing.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
 from tests.integration.helpers.journals import insert_journal

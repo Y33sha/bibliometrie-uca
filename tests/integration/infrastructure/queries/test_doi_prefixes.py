@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pipeline.containers.doi_prefixes import DoiPrefixesQueries
+from pipeline.publishing.doi_prefixes import DoiPrefixesQueries
 
 
 def test_breakdown_by_registration_agency_s_execute(sa_sync_conn):

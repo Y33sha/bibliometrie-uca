@@ -20,7 +20,6 @@ import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
-from pipeline.containers.find_or_create import Containers
 from pipeline.ingestion.crossref import normalize as normalize_crossref
 from pipeline.ingestion.crossref.normalize import (
     CrossrefNormalizer,
@@ -46,6 +45,7 @@ from pipeline.ingestion.crossref.normalize import (
     upsert_containers,
     upsert_publisher,
 )
+from pipeline.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
