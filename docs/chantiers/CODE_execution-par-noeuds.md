@@ -13,6 +13,8 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 - **Le journal du terminal garde sa forme** : cadre par phase, titre de section, ligne de bilan par étape, barres de progression.
 - **Un nœud interroge au plus une source.** Une étape qui interroge plusieurs sources se découpe en un nœud par source.
 - **Une seule fonction d'accès à une source** : elle contrôle les identifiants, saute l'étape avec un avertissement s'ils manquent, pose le circuit-breaker et signale une source indisponible ou coupée. Tout appel à une API passe par elle, scripts compris.
+- **`--only` et `--from` désignent une phase**, jamais un nœud : relancer une phase entière reste rapide.
+- **Les métriques restent par phase**, dans `pipeline_phase_executions`. L'exécuteur additionne les métriques des nœuds d'une phase. Les détails propres à une phase (tables, synthèse) viennent d'une fonction d'assemblage de la phase, comme `_assemble` dans `publishers_journals`.
 
 ## Phasage
 
@@ -52,13 +54,13 @@ Accès aux sources :
 ### Phase 4 — Exécution par nœuds
 
 - [ ] Chaque nœud désigne sa fonction. `run.py` exécute les nœuds dans l'ordre du graphe. Il affiche le cadre quand le groupe change, le titre de section quand la section change, puis le bilan du nœud.
+- [x] Exécuteur `pipeline/node_runner.py` : une phase fournit pour chaque nœud sa fonction, sa section et son libellé. Première phase convertie : `publishers_journals`.
+- [ ] Conversion des autres phases.
 - [ ] Un nœud qui déclare un `network` s'exécute dans la fonction d'accès à sa source, posée par l'exécuteur.
 - [ ] L'exécuteur lance la maintenance déclarée d'un nœud à la fin du nœud. `authorships.build` se découpe en deux nœuds, pour que `ANALYZE authorships` tombe entre la création des paires et la propagation de leurs attributs.
 - [ ] Mise à jour de la documentation, dont `publisher_checked_at` et `resolve_publishers` dans `docs/pipeline/05-publishers-journals.md`, `docs/agregats/publishers.md` et `docs/sources/`, et la matérialisation de `perimeter_structures` dans `docs/donnees/08-donnees-derivees.md`.
 
 ## Questions ouvertes
 
-- Granularité de `--only` et `--from` : groupe, nœud, ou les deux.
-- Métriques et signaux enregistrés dans `pipeline_phase_executions` : par nœud ou par groupe. Le ruban de l'interface lit cette table.
 - Conditions d'exécution d'un nœud (options `--rebuild-*`, mode, rien à faire) : déclarées dans le graphe ou gardées dans la fonction du nœud.
 - Nœuds qui tournent en parallèle dans leur phase (`extract.<source>`, `fetch_missing.doi.<source>`) : comment le graphe le déclare.

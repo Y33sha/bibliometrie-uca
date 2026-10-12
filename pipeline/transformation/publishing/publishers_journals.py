@@ -13,20 +13,19 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
-Chaque sous-étape tient une ligne du journal, sous le titre de son groupe. Une sous-étape qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Les runners de sous-étape (connexion, accès à la source, adapters) sont injectés par le câblage ; ici, la séquence et l'assemblage des métriques.
+Chaque sous-étape est un nœud du graphe (`pipeline.graph`), exécuté par `pipeline.node_runner` dans l'ordre du graphe : une ligne du journal par nœud, sous le titre de sa section. Un nœud qui interroge une source passe par l'accès à cette source : sans identifiants, il est sauté avec un signal `source_unconfigured`. Ici, les étapes de chaque nœud et l'assemblage des métriques.
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from pipeline.ingestion.http.access_source import access_source
+from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
@@ -43,89 +42,21 @@ from pipeline.transformation.publishing.monographs import (
 )
 from pipeline.transformation.publishing.publishers import resolve_publishers
 
-RunSubstep = Callable[[], PhaseMetrics]
-
-
-@dataclass(frozen=True)
-class _SousEtape:
-    """Sous-étape de la phase : le champ de `PublishersJournalsPhase` qui l'exécute, et son libellé."""
-
-    champ: str
-    libelle: str
-
-
-_GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
-    (
-        "Éditeurs",
-        (
-            _SousEtape("resolve_crossref_publishers", resolve_publishers.LIBELLES["Crossref"]),
-            _SousEtape("resolve_datacite_publishers", resolve_publishers.LIBELLES["DataCite"]),
-        ),
-    ),
-    (
-        "Revues",
-        (
-            _SousEtape("enrich_journals_from_openalex", enrich_journals_from_openalex.LIBELLE),
-            _SousEtape("check_journals_in_sudoc", check_journals_in_sudoc.LIBELLE),
-            _SousEtape("merge_duplicate_journals", merge_duplicate_journals.LIBELLE),
-            _SousEtape("type_proceedings_journals", type_proceedings_journals.LIBELLE),
-            _SousEtape("learn_journal_doi_namespaces", learn_journal_doi_namespaces.LIBELLE),
-            _SousEtape("enrich_journals_from_doaj", import_journals_from_doaj_dump.LIBELLE),
-        ),
-    ),
-    (
-        "Monographies",
-        (
-            _SousEtape("merge_duplicate_monographs", merge_duplicate_monographs.LIBELLE),
-            _SousEtape("link_monographs_to_collections", link_monographs_to_collections.LIBELLE),
-            _SousEtape("type_proceedings_volumes", type_proceedings_volumes.LIBELLE),
-        ),
-    ),
-)
+_GROUP = "publishers_journals"
 
 
 @dataclass(frozen=True)
 class PublishersJournalsPhase:
-    resolve_crossref_publishers: RunSubstep
-    resolve_datacite_publishers: RunSubstep
-    enrich_journals_from_openalex: RunSubstep
-    check_journals_in_sudoc: RunSubstep
-    merge_duplicate_journals: RunSubstep
-    type_proceedings_journals: RunSubstep
-    learn_journal_doi_namespaces: RunSubstep
-    enrich_journals_from_doaj: RunSubstep
-    merge_duplicate_monographs: RunSubstep
-    link_monographs_to_collections: RunSubstep
-    type_proceedings_volumes: RunSubstep
+    """`steps` associe à chaque nœud de la phase son étape (`NodeStep`)."""
+
+    steps: Mapping[str, NodeStep]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne les groupes de sous-étapes, écrit une ligne par sous-étape et assemble les métriques de la phase."""
-        logger = ctx.logger
+        """Exécute les nœuds de la phase et assemble ses métriques."""
+        by_node = run_nodes(_GROUP, self.steps, ctx.logger)
         metrics = PhaseMetrics()
-        by_step: dict[str, PhaseMetrics] = {}
-        for titre, sous_etapes in _GROUPES:
-            etape(logger, titre)
-            for indice, sous_etape in enumerate(sous_etapes):
-                branche = DERNIERE_BRANCHE if indice == len(sous_etapes) - 1 else BRANCHE
-                by_step[sous_etape.champ] = self._run_one(sous_etape, branche, logger)
-        _assemble(metrics, by_step)
+        _assemble(metrics, {name.removeprefix(f"{_GROUP}."): m for name, m in by_node.items()})
         return metrics
-
-    def _run_one(
-        self, sous_etape: _SousEtape, branche: str, logger: logging.Logger
-    ) -> PhaseMetrics:
-        """Exécute une sous-étape et écrit sa ligne de bilan."""
-        sub: PhaseMetrics = getattr(self, sous_etape.champ)()
-        if sub.resume is not None:
-            bilan = sub.resume
-        elif any(s["code"] == "source_unconfigured" for s in sub.signals):
-            bilan = "sautée, accès non configuré"
-        elif sub.signals:
-            bilan = "interrompue"
-        else:
-            bilan = "rien à faire"
-        logger.info("%s%s : %s", branche, sous_etape.libelle, bilan)
-        return sub
 
 
 # Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié.
@@ -216,21 +147,69 @@ def build() -> Phase:
     """
 
     return PublishersJournalsPhase(
-        resolve_crossref_publishers=_run_resolve_crossref_publishers,
-        resolve_datacite_publishers=_run_resolve_datacite_publishers,
-        enrich_journals_from_openalex=_run_enrich_journals_from_openalex,
-        check_journals_in_sudoc=_run_check_journals_in_sudoc,
-        merge_duplicate_journals=_run_merge_duplicate_journals,
-        type_proceedings_journals=_run_type_proceedings_journals,
-        learn_journal_doi_namespaces=_run_learn_journal_doi_namespaces,
-        enrich_journals_from_doaj=_run_enrich_journals_from_doaj,
-        merge_duplicate_monographs=_run_merge_duplicate_monographs,
-        link_monographs_to_collections=_run_link_monographs_to_collections,
-        type_proceedings_volumes=_run_type_proceedings_volumes,
+        {
+            f"{_GROUP}.{name}": step
+            for name, step in {
+                "resolve_crossref_publishers": NodeStep(
+                    _run_resolve_crossref_publishers,
+                    "Éditeurs",
+                    resolve_publishers.LIBELLES["Crossref"],
+                ),
+                "resolve_datacite_publishers": NodeStep(
+                    _run_resolve_datacite_publishers,
+                    "Éditeurs",
+                    resolve_publishers.LIBELLES["DataCite"],
+                ),
+                # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
+                "enrich_journals_from_openalex": NodeStep(
+                    _run_enrich_journals_from_openalex,
+                    "Revues",
+                    enrich_journals_from_openalex.LIBELLE,
+                    threshold=3,
+                ),
+                "check_journals_in_sudoc": NodeStep(
+                    _run_check_journals_in_sudoc,
+                    "Revues",
+                    check_journals_in_sudoc.LIBELLE,
+                    threshold=3,
+                ),
+                "merge_duplicate_journals": NodeStep(
+                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LIBELLE
+                ),
+                "type_proceedings_journals": NodeStep(
+                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LIBELLE
+                ),
+                "learn_journal_doi_namespaces": NodeStep(
+                    _run_learn_journal_doi_namespaces,
+                    "Revues",
+                    learn_journal_doi_namespaces.LIBELLE,
+                ),
+                "enrich_journals_from_doaj": NodeStep(
+                    _run_enrich_journals_from_doaj,
+                    "Revues",
+                    import_journals_from_doaj_dump.LIBELLE,
+                ),
+                "merge_duplicate_monographs": NodeStep(
+                    _run_merge_duplicate_monographs,
+                    "Monographies",
+                    merge_duplicate_monographs.LIBELLE,
+                ),
+                "link_monographs_to_collections": NodeStep(
+                    _run_link_monographs_to_collections,
+                    "Monographies",
+                    link_monographs_to_collections.LIBELLE,
+                ),
+                "type_proceedings_volumes": NodeStep(
+                    _run_type_proceedings_volumes,
+                    "Monographies",
+                    type_proceedings_volumes.LIBELLE,
+                ),
+            }.items()
+        }
     )
 
 
-def _run_resolve_crossref_publishers() -> PhaseMetrics:
+def _run_resolve_crossref_publishers(breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -240,24 +219,19 @@ def _run_resolve_crossref_publishers() -> PhaseMetrics:
 
     user_agent = _prefixes_user_agent()
     with open_tx() as conn:
-        return access_source(
-            "crossref",
-            lambda breaker: run_resolve_crossref_publishers(
-                conn,
-                log,
-                repo=DoiPrefixesQueries(conn),
-                publisher_repo=PublisherGatewayQueries(conn),
-                fetch_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
-                    client, prefix, sample_doi, user_agent=user_agent
-                ),
-                breaker=breaker,
+        return run_resolve_crossref_publishers(
+            conn,
+            log,
+            repo=DoiPrefixesQueries(conn),
+            publisher_repo=PublisherGatewayQueries(conn),
+            fetch_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
+                client, prefix, sample_doi, user_agent=user_agent
             ),
-            phase="publishers_journals",
-            logger=log,
+            breaker=breaker,
         )
 
 
-def _run_resolve_datacite_publishers() -> PhaseMetrics:
+def _run_resolve_datacite_publishers(breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -267,20 +241,15 @@ def _run_resolve_datacite_publishers() -> PhaseMetrics:
 
     user_agent = _prefixes_user_agent()
     with open_tx() as conn:
-        return access_source(
-            "datacite",
-            lambda breaker: run_resolve_datacite_publishers(
-                conn,
-                log,
-                repo=DoiPrefixesQueries(conn),
-                publisher_repo=PublisherGatewayQueries(conn),
-                fetch_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
-                    client, prefix, user_agent=user_agent
-                ),
-                breaker=breaker,
+        return run_resolve_datacite_publishers(
+            conn,
+            log,
+            repo=DoiPrefixesQueries(conn),
+            publisher_repo=PublisherGatewayQueries(conn),
+            fetch_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
+                client, prefix, user_agent=user_agent
             ),
-            phase="publishers_journals",
-            logger=log,
+            breaker=breaker,
         )
 
 
@@ -291,7 +260,8 @@ def _prefixes_user_agent() -> str:
     return build_user_agent(get_polite_pool_email_optional() or "")
 
 
-def _run_enrich_journals_from_openalex() -> PhaseMetrics:
+def _run_enrich_journals_from_openalex(breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+    assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
     from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
     from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
     from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
@@ -301,27 +271,20 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
 
     sources_api = API_BASE_URLS["openalex_sources"]
     with open_tx() as conn:
-        # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend
-        # le run suivant.
-        return access_source(
-            "openalex",
-            lambda breaker: run_enrich_journals_from_openalex(
-                conn,
-                log,
-                journal_repo=JournalGatewayQueries(conn),
-                fetch_batch=lambda oa_ids: fetch_sources_batch(
-                    oa_ids, openalex_sources_api=sources_api
-                ),
-                breaker=breaker,
-                rate_delay=OPENALEX_DELAY,
+        return run_enrich_journals_from_openalex(
+            conn,
+            log,
+            journal_repo=JournalGatewayQueries(conn),
+            fetch_batch=lambda oa_ids: fetch_sources_batch(
+                oa_ids, openalex_sources_api=sources_api
             ),
-            phase="publishers_journals",
-            logger=log,
-            threshold=3,
+            breaker=breaker,
+            rate_delay=OPENALEX_DELAY,
         )
 
 
-def _run_check_journals_in_sudoc() -> PhaseMetrics:
+def _run_check_journals_in_sudoc(breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+    assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
     from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
     from pipeline.ingestion.http.api_params import (
         API_BASE_URLS,
@@ -336,29 +299,23 @@ def _run_check_journals_in_sudoc() -> PhaseMetrics:
     base_url = API_BASE_URLS["sudoc"]
     with open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
-        return access_source(
-            "sudoc",
-            lambda breaker: asyncio.run(
-                run_check_journals_in_sudoc(
-                    conn,
-                    log,
-                    journal_repo=JournalGatewayQueries(conn),
-                    fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
-                    fetch_record=lambda client, ppn: fetch_serial_record(
-                        client, ppn, base_url=base_url
-                    ),
-                    breaker=breaker,
-                    max_concurrent=SUDOC_MAX_CONCURRENT,
-                    max_per_second=SUDOC_MAX_PER_SECOND,
-                )
-            ),
-            phase="publishers_journals",
-            logger=log,
-            threshold=3,
+        return asyncio.run(
+            run_check_journals_in_sudoc(
+                conn,
+                log,
+                journal_repo=JournalGatewayQueries(conn),
+                fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
+                fetch_record=lambda client, ppn: fetch_serial_record(
+                    client, ppn, base_url=base_url
+                ),
+                breaker=breaker,
+                max_concurrent=SUDOC_MAX_CONCURRENT,
+                max_per_second=SUDOC_MAX_PER_SECOND,
+            )
         )
 
 
-def _run_merge_duplicate_journals() -> PhaseMetrics:
+def _run_merge_duplicate_journals(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.journals.journal_merge import merge_journals
     from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
     from pipeline.transformation.publishing.journals.merge_duplicate_journals import (
@@ -376,7 +333,7 @@ def _run_merge_duplicate_journals() -> PhaseMetrics:
         )
 
 
-def _run_merge_duplicate_monographs() -> PhaseMetrics:
+def _run_merge_duplicate_monographs(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
         run_merge_duplicate_monographs,
     )
@@ -386,7 +343,7 @@ def _run_merge_duplicate_monographs() -> PhaseMetrics:
         return run_merge_duplicate_monographs(log, monograph_repo=MonographGatewayQueries(conn))
 
 
-def _run_link_monographs_to_collections() -> PhaseMetrics:
+def _run_link_monographs_to_collections(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.containers import ContainerGatewayQueries
     from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
         run_link_monographs_to_collections,
@@ -396,7 +353,7 @@ def _run_link_monographs_to_collections() -> PhaseMetrics:
         return run_link_monographs_to_collections(log, monograph_repo=ContainerGatewayQueries(conn))
 
 
-def _run_type_proceedings_volumes() -> PhaseMetrics:
+def _run_type_proceedings_volumes(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
     from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
         run_type_proceedings_volumes,
@@ -406,7 +363,7 @@ def _run_type_proceedings_volumes() -> PhaseMetrics:
         return run_type_proceedings_volumes(log, monograph_repo=MonographGatewayQueries(conn))
 
 
-def _run_type_proceedings_journals() -> PhaseMetrics:
+def _run_type_proceedings_journals(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
     from pipeline.transformation.publishing.journals.type_proceedings_journals import (
         run_type_proceedings_journals,
@@ -416,7 +373,7 @@ def _run_type_proceedings_journals() -> PhaseMetrics:
         return run_type_proceedings_journals(log, journal_repo=JournalGatewayQueries(conn))
 
 
-def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
+def _run_learn_journal_doi_namespaces(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
     from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
         run_learn_journal_doi_namespaces,
@@ -426,7 +383,7 @@ def _run_learn_journal_doi_namespaces() -> PhaseMetrics:
         return run_learn_journal_doi_namespaces(log, journal_repo=JournalGatewayQueries(conn))
 
 
-def _run_enrich_journals_from_doaj() -> PhaseMetrics:
+def _run_enrich_journals_from_doaj(_breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
     from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
     from pipeline.ingestion.http.polite_pool import build_user_agent
     from pipeline.runtime.config import (
@@ -441,15 +398,10 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
     with open_tx() as conn:
-        return access_source(
-            "doaj",
-            lambda _breaker: run_enrich_journals_from_doaj(
-                conn,
-                log,
-                journal_repo=JournalGatewayQueries(conn),
-                refresh_after_days=get_doaj_refresh_after_days(conn),
-                download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
-            ),
-            phase="publishers_journals",
-            logger=log,
+        return run_enrich_journals_from_doaj(
+            conn,
+            log,
+            journal_repo=JournalGatewayQueries(conn),
+            refresh_after_days=get_doaj_refresh_after_days(conn),
+            download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=log),
         )
