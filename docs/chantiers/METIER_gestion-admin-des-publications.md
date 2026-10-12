@@ -67,4 +67,4 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](archiv
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
 - **Disposition du volet** : une colonne par notice et une ligne par champ, à l'essai. À partir de combien de notices la disposition inverse devient-elle plus lisible ? Largeur ?
-- **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les notices sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation.
+- **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les notices sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation. Le jeton de fusion forcée équivaut aux arêtes affirmées de CRISalid (voir `benchmark-pipelines.md`).

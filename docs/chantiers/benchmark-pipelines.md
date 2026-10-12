@@ -2,240 +2,217 @@
 
 ## Contexte
 
-Document de référence, extérieur aux fiches chantier. Lecture du code de six projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit.
+Document de référence, extérieur aux fiches chantier. Lecture du code de six projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit et se clôt sur un verdict. Le récapitulatif les liste.
 
 - **CRISalid** : le moissonneur (`svp-harvester`), le graphe (`crisalid-ikg`), et le modèle de données de l'interface (`sovisuplus`).
 - **rialto-airflow** : le pipeline de Stanford.
-- **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell.
-- **dnet-dedup** : le dédoublonnage du graphe d'OpenAIRE. Lecture partielle, voir la liste des dépôts.
-- **Academic Observatory** : les workflows de l'observatoire de l'université Curtin.
-- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Tous les dépôts, lus depuis des archives.
+- **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell. Il pose le problème par personne. Pour chaque personne de l'annuaire, il cherche des articles candidats dans PubMed, puis note chaque candidat. Il ne regroupe pas les signatures entre elles : le code de regroupement existe encore dans le dépôt, mais le moteur ne l'appelle plus.
+- **OpenAIRE** : le graphe européen de la recherche. Lu dans la documentation du graphe, et pour le dédoublonnage dans le code (`dnet-dedup`, `dnet-hadoop`), en partie : voir la liste des dépôts. La chaîne d'ensemble, dans l'ordre de la [documentation](https://graph.openaire.eu/docs/graph-production-workflow/) :
+  1. **Agrégation.** Les entrepôts conformes aux directives d'OpenAIRE sont moissonnés en OAI-PMH. Les autres sources (Crossref, ORCID, PubMed, DataCite…) ont chacune leur traitement. Crossref est repris par dump complet, chaque mois.
+  2. **Fusion par identifiant.** Les enregistrements de même identifiant sont fusionnés, sans comparaison.
+  3. **Enrichissement par identifiant.** Les ORCID sont rattachés aux auteurs.
+  4. **Enrichissement par fouille.** Affiliations, citations, classification, à partir des métadonnées et du texte intégral.
+  5. **Nettoyage.** Les valeurs sont ramenées à des vocabulaires contrôlés.
+  6. **Dédoublonnage.** Produits de recherche et organisations.
+  7. **Déduction et propagation.** Des propriétés passent d'un objet à un autre par règle.
+  8. **Indicateurs**, **finalisation**, **indexation**, **statistiques**.
+
+  Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque produit, et aucune étape ne désambiguïse les auteurs entre produits.
+- **Academic Observatory** : les workflows de l'observatoire de l'université Curtin. Un pipeline ELT au sens strict : des dumps complets de sources ouvertes chargés dans BigQuery, puis une chaîne de requêtes SQL qui produit une table par DOI et des agrégats par établissement, pays, revue, financeur. Pas d'établissement de référence, pas de personnes, pas de décisions humaines.
+- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) le dépôt de présentation (`awesome-biblioref`), le schéma de la base (`bdd`) et l'API (`backend`, 25 700 lignes de TypeScript). L'interface (`frontend`, Angular) n'a pas été lue. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
 
 Les liens vers les dépôts sont en fin de document.
 
-## Organisation du code
+## Récapitulatif
 
-### Le graphe du run dans un seul fichier
+| Point | Projet | Verdict |
+|---|---|---|
+| Le graphe du run dans un seul fichier | rialto | adopté |
+| Une requête par fichier, nommée par ce qu'elle fait | CRISalid | écarté |
+| Un schéma de travail et un schéma de diffusion | rialto | écarté |
+| Des notices d'exemple pour les tests | rialto | adopté |
+| Les réglages hors du code | CRISalid | écarté |
+| Un graphe qui attend ses sources | Academic Observatory | écarté |
+| Un connecteur par source : un service et une base chacun | BiblioRef | écarté |
+| Le moissonnage part de l'annuaire | BiblioRef | écarté |
+| Des versions datées plutôt que des mises à jour | Academic Observatory | écarté |
+| Le contrôle du schéma des sources | Academic Observatory | à étudier |
+| Un fichier par champ consolidé | rialto | écarté |
+| La notice la plus riche, par score | CRISalid | écarté |
+| L'origine de chaque champ consolidé | BiblioRef | en projet |
+| Des vocabulaires de synonymes, réappliqués en fin de chaîne | OpenAIRE | équivalent en place |
+| Des identifiants de rapprochement déduits | CRISalid | équivalent en place |
+| Les libellés des concepts complétés | CRISalid | en projet |
+| La fusion par identifiant, avant le dédoublonnage | OpenAIRE | équivalent en place |
+| Des identifiants de confiance et d'autres non | OpenAIRE | équivalent en place |
+| Le blocage et ses garde-fous | OpenAIRE | écarté |
+| Quatre étapes, une table entre chacune | dnet-dedup | à l'étude |
+| Un identifiant de groupe qui survit aux runs | dnet-dedup | équivalent en place |
+| Les règles déclarées dans un fichier par type d'entité | dnet-dedup | écarté |
+| Une liste de titres exclus du rapprochement | dnet-dedup | équivalent en place |
+| Les rôles des signatures | CRISalid | équivalent en place |
+| Le rapprochement des auteurs en deux temps | CRISalid | équivalent en place |
+| Un dossier par type d'indice | ReCiter | à l'étude |
+| Chaque indice laisse une trace lisible | ReCiter | à l'étude |
+| Les indices activés et pondérés en configuration | ReCiter | écarté |
+| Une classe par manière de chercher des candidats | ReCiter | équivalent en place |
+| L'origine et la confiance de chaque valeur déduite | OpenAIRE | équivalent en place |
+| Le rattachement des ORCID aux auteurs | OpenAIRE | écarté |
+| La fusion humaine, arête entre notices | CRISalid | en projet |
+| Les décisions humaines entrent entre les étapes 2 et 3 | dnet-dedup | à l'étude |
+| Les décisions humaines servent trois fois | ReCiter | en place ; à l'étude |
+| Les corrections de champs stockées à part | CRISalid | équivalent en place ; en projet pour les publications |
+| Le verrouillage | BiblioRef | écarté |
+| La trace de l'entité absorbée | CRISalid | adopté |
+| L'alignement des affiliations sur ROR | OpenAIRE | écarté |
+| Des affiliations élargies par la hiérarchie de ROR | Academic Observatory | à l'étude |
+| La manière dont une structure a été attribuée | BiblioRef | équivalent en place |
+| Un annuaire riche | BiblioRef | à étudier |
 
-- Où : rialto, [`dags/harvest_incremental.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/dags/harvest_incremental.py), 227 lignes.
+## Organisation du code et du run
+
+### Le graphe du run dans un seul fichier (rialto)
+
+- Où : [`dags/harvest_incremental.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/dags/harvest_incremental.py), 227 lignes.
 - Chaque tâche a une docstring et se réduit à un appel de fonction d'un module.
 - Les groupes (moissonnage, complétion par DOI) servent à l'affichage, pas à l'ordre.
-- La forme ne dépend pas d'Airflow : c'est ce que serait `run.py`.
+- **Verdict : adopté**, dans `pipeline/graph.py`. Le graphe déclare en plus ce que chaque nœud lit et écrit, et les tests en vérifient l'ordre. La fonction qui exécute un nœud est déclarée dans le `build()` de sa phase : le graphe reste une déclaration, lisible sans importer le code des phases.
 
-### Un module par source, qui contient tout ce qui la concerne
-
-- Où : rialto, [`harvest_incremental/openalex.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/harvest_incremental/openalex.py). Le même fichier porte `harvest()` (moissonnage) et `fill_in()` (récupération par DOI).
-- Le code est rangé par source, le graphe fixe l'ordre.
-- Chez nous : `extract`, `fetch_missing`, `fetch_stale` et `fetch_truncated` d'une même source iraient dans un seul module.
-
-### Les mêmes rôles de fichiers dans chaque source
-
-- Où : svp-harvester, [`app/harvesters/hal/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/harvesters/hal) et les dossiers voisins.
-- Quand une source dépasse un fichier, chaque dossier contient les mêmes rôles : client HTTP, constructeur de requêtes, convertisseur vers le modèle commun, table des types de document.
-- Les sources actives sont déclarées dans [`harvesters.yml`](https://github.com/CRISalid-esr/svp-harvester/blob/dev-main/harvesters.yml).
-
-### Une requête par fichier, nommée par ce qu'elle fait
+### Une requête par fichier, nommée par ce qu'elle fait (CRISalid)
 
 - Où : crisalid-ikg, [`app/graph/neo4j/queries/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/graph/neo4j/queries). Plus d'une centaine de fichiers `.cypher`, chargés par leur nom.
-- Chez nous : des fichiers `.sql` à côté de chaque étape. Un développeur peut les lire sans connaître Python.
+- **Verdict : écarté.** Une partie de nos requêtes est assemblée par le code (portée optionnelle, filtres). La requête reste à côté du code qui lie ses paramètres et lit son résultat.
 
-### Un fichier par champ consolidé
+### Un schéma de travail et un schéma de diffusion (rialto)
 
-- Où : rialto, [`distiller/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/distiller) : `title.py`, `pub_year.py`, `journal_issn.py`, `open_access.py`…
-- Chaque fichier est une courte liste de règles, par ordre de priorité des sources. [`title.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/distiller/title.py) fait 26 lignes.
-- Pour savoir quelle source donne le titre, on ouvre le fichier qui porte ce nom.
-- Chez nous : la logique de `refresh_from_sources`, éclatée par champ.
-
-### Un schéma de travail et un schéma de diffusion
-
-- Où : rialto, [`schema/rialto.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/schema/rialto.py) pour la base de travail, [`schema/reports.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/schema/reports.py) pour la base que lit Tableau, alimentée par [`publish/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/publish).
+- Où : [`schema/rialto.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/schema/rialto.py) pour la base de travail, [`schema/reports.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/schema/reports.py) pour la base que lit Tableau, alimentée par [`publish/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/publish).
 - Les consommateurs ne lisent jamais la base de travail.
+- **Verdict : écarté.** L'administration édite les tables du pipeline, et ses éditions ont un effet immédiat dans l'interface publique par les recalculs ciblés. Une base de diffusion retarderait cet effet jusqu'à la publication suivante. La question se pose si un consommateur en lecture seule apparaît en production.
 
-### Des tests en miroir
+### Des notices d'exemple pour les tests (rialto)
 
-- Où : rialto, [`test/`](https://github.com/sul-dlss/rialto-airflow/tree/main/test). Un fichier de test par module, même arborescence, avec un dossier `data/` de notices d'exemple.
+- Où : [`test/`](https://github.com/sul-dlss/rialto-airflow/tree/main/test), dossier `data/`.
+- Les tests lisent des notices d'exemple figées dans le dépôt.
+- **Verdict : adopté**, par le jeu de données commun aux tests du pipeline : quelques notices réelles par source, avec les réponses des API enregistrées.
 
-### Les réglages hors du code
+### Les réglages hors du code (CRISalid)
 
 - Où : crisalid-ikg, [`publication_sources_policies.yaml`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/publication_sources_policies.yaml) : ordre des sources et stratégie de fusion par type de document.
 - Où : svp-harvester, [`identifiers.yml`](https://github.com/CRISalid-esr/svp-harvester/blob/dev-main/identifiers.yml) : types d'identifiants de personnes, par ordre de priorité.
+- **Verdict : écarté.** Les priorités entre sources restent dans le code (`domain/sources/registry.py`) : leur logique est appelée à changer (assouplissement selon les cas, consensus entre sources), au-delà d'un simple ordre réglable.
 
-## Résolution d'entités et décisions humaines
+### Un graphe qui attend ses sources (Academic Observatory)
 
-### Un lien entre notices typé par son origine
+- Le workflow de consolidation commence par des capteurs qui attendent la fin de chaque workflow de source.
+- Acquisition et transformation sont deux graphes distincts. La transformation ne fait aucun appel réseau, à une exception près : l'alignement des noms d'entrepôts d'Unpaywall sur ROR.
+- **Verdict : écarté.** Les enrichissements (agence des DOI, DOAJ, Sudoc, Unpaywall) appellent des API à partir des données transformées : ils restent dans la transformation. L'attente des sources relève d'un orchestrateur comme Airflow.
 
-- Où : crisalid-ikg, [`equivalence_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/source_records/equivalence_service.py) et [`source_record_dao.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/graph/neo4j/source_record_dao.py).
-- L'étiquette porte sur une arête entre deux notices, pas sur le groupe :
-  - `INFERRED_EQUIVALENT` : déduite des identifiants partagés, recalculée librement ;
-  - `ASSERTED_EQUIVALENT` : posée par une fusion humaine, jamais recalculée ;
-  - `PREDICTED_EQUIVALENT` : lue par le code, créée nulle part pour l'instant.
-- Le groupe est la composante connexe sur les trois types d'arêtes. Le document en est la matérialisation.
-- Chez nous : savoir, pour chaque rattachement, s'il vient d'une règle ou d'une décision.
+## Acquisition des sources
 
-### La fusion humaine est une entrée du regroupement
+### Un connecteur par source : un service et une base chacun (BiblioRef)
 
-- Où : crisalid-ikg, `merge_documents` dans [`document_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/documents/document_service.py).
-- Fusionner A et B crée une arête affirmée entre chaque notice de A et chaque notice de B, puis relance le calcul des composantes.
-- La fusion n'est pas une correction rejouée après coup : elle contraint le calcul.
+- Où : [`utils/tools.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/tools.py), [`start.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/start.py), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base) et son [guide de création d'un connecteur](https://gitlab.com/biblioref/connectors/connector-base/-/blob/main/FORK_GUIDE.md).
+- Chaque source (HAL, OpenAlex, Sudoc) est un service à part, qui expose trois routes : `/ping`, `/researchproducts/?start_date=…` (notices nouvelles ou modifiées depuis une date), `/researchproduct/<id>` (une notice).
+- Chaque connecteur est une copie (« fork ») du connecteur de base : même arborescence, mêmes classes, seuls `connector/data_collector.py` et `connector/data_binding.py` changent vraiment.
+- Chaque connecteur a sa propre base PostgreSQL, où il range ses notices dans un modèle commun. Une notice déjà connue est supprimée puis recréée si la source donne une date de modification plus récente.
+- Le moissonneur interroge d'abord chaque connecteur actif ; si l'un ne répond pas, le run s'arrête et l'échec est journalisé. Il lit ensuite les bases des connecteurs par leur API.
+- Les connecteurs actifs, leur adresse et leur ordre de priorité sont dans une table `source`.
+- Un run hebdomadaire par cron, qui demande les notices modifiées depuis la date du dernier run réussi.
+- **Verdict : écarté.** Nos sources sont des modules d'un même paquet, qui partagent leur code commun et leur base. Une source qui ne répond pas est coupée par son circuit-breaker, et le run continue sans elle.
 
-### La trace de l'entité absorbée
+### Le moissonnage part de l'annuaire (BiblioRef)
 
-- Où : crisalid-ikg, [`create_or_update_document.cypher`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/graph/neo4j/queries/create_or_update_document.cypher).
-- Le document absorbé reçoit une arête `TO_BE_MERGED_INTO` vers celui qui survit.
-- Chez nous : la table de redirection des identifiants fusionnés.
+- Où : `collectDatasByAuthor` dans [`connector-hal/connector/data_collector.py`](https://gitlab.com/biblioref/connectors/connector-hal/-/blob/main/connector/data_collector.py), et `getQueryAuthors` dans `classes/utils/tools.py`.
+- Les connecteurs lisent dans la base principale les personnes de l'annuaire rattachées à une structure du périmètre, leurs identifiants et leurs périodes de présence.
+- Chaque personne est interrogée par ses identifiants, sur la seule période où elle était dans une structure du périmètre (date de publication entre la date d'entrée et la date de sortie).
+- HAL peut aussi être interrogé par structure, avec l'identifiant AuréHAL. OpenAlex et le Sudoc ne le sont que par personne.
+- Le champ de la source qui correspond à chaque type d'identifiant est déclaré en base (`sourceidentifiertype`), pas dans le code.
+- Une nouvelle période de présence ajoutée à l'annuaire est marquée ; le run suivant moissonne cette période, puis le marqueur est levé.
+- **Verdict : écarté.** Nous moissonnons par affiliation au périmètre, et les personnes naissent des signatures : une personne absente d'un annuaire a ses publications.
 
-### Les corrections de champs stockées à part
+### Des versions datées plutôt que des mises à jour (Academic Observatory)
 
-- Où : crisalid-ikg, [`change_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/changes/change_service.py) et [`processors/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/services/changes/processors).
-- Titre, résumé, type et sujets corrigés sont des nœuds attachés au document, réappliqués après chaque recalcul à partir des notices.
-- Le résultat est le même qu'une saisie humaine prioritaire. Ce qui compte : la valeur humaine n'est jamais stockée seulement dans la colonne dérivée.
+- Chaque source est chargée comme un instantané daté (tables suffixées par la date). La consolidation désigne explicitement l'instantané qu'elle lit.
+- Une table de « releases » garde, par source, la date du dernier instantané traité ; un run sans nouvel instantané s'arrête au premier test.
+- **Verdict : écarté.** Chaque import d'une notice écrase le précédent, et un document disparu de sa source disparaît : la base représente ce qui existe en ligne.
 
-### Le rapprochement des auteurs en deux temps
+### Le contrôle du schéma des sources (Academic Observatory)
 
-- Où : crisalid-ikg, [`source_contributor_mapping_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/source_contributors/source_contributor_mapping_service.py).
-- Premier temps : à l'intérieur d'un document, les auteurs des différentes sources sont regroupés par similarité de nom.
-- Second temps : chaque groupe est rattaché à une personne, par identifiant puis par nom.
-- À comparer avec notre cascade, qui part des signatures une à une.
+- Où : `compare_schemas` dans [`openalex_telescope/tasks.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/openalex_telescope/tasks.py).
+- Le schéma déduit du dump est comparé au schéma attendu, versionné dans le dépôt. Un écart envoie une alerte, sans bloquer le chargement.
+- **Verdict : à étudier.** Un changement de format d'une source passe inaperçu : la normalisation lit une valeur vide.
 
-### Des identifiants de rapprochement déduits
+## Métadonnées
+
+### Un fichier par champ consolidé (rialto)
+
+- Où : [`distiller/`](https://github.com/sul-dlss/rialto-airflow/tree/main/rialto_airflow/distiller) : `title.py`, `pub_year.py`, `journal_issn.py`, `open_access.py`…
+- Chaque fichier est une courte liste de règles, par ordre de priorité des sources. [`title.py`](https://github.com/sul-dlss/rialto-airflow/blob/main/rialto_airflow/distiller/title.py) fait 26 lignes.
+- Pour savoir quelle source donne le titre, on ouvre le fichier de ce nom.
+- **Verdict : écarté.** Chez nous, la plupart des champs suivent une règle commune (priorité des sources, union des listes), appliquée en une ligne dans `refresh_from_sources`. Les champs à règle propre (`doc_type`, `oa_status`) ont leur fonction dans `domain/publications/`.
+
+### La notice la plus riche, par score (CRISalid)
+
+- Où : crisalid-ikg, [`global_richest_merge_strategy.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/documents/merge_strategies/global_richest_merge_strategy.py).
+- Chaque notice reçoit un score pondéré : longueur du résumé, nombre de contributeurs, de mots-clés, présence d'une date. La mieux notée fournit les métadonnées.
+- Une autre manière de choisir que la priorité fixe entre sources.
+- **Verdict : écarté.** La richesse d'une notice ne dit rien de la justesse de chacun de ses champs. Les règles de choix entre sources restent champ par champ.
+
+### L'origine de chaque champ consolidé (BiblioRef)
+
+- Où : [`classes/interfaces/researchproduct.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/researchproduct.py), [`utils/fields_origin.json`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/fields_origin.json).
+- Les notices d'un même document sont triées par priorité de source ; pour chaque champ (titre, type, auteurs, disciplines, mots-clés, open access…), la première source qui le renseigne l'emporte.
+- La source et l'identifiant de la notice retenue sont enregistrés champ par champ, dans une colonne JSON (`researchproductorigin`).
+- **Verdict : en projet**, dans le chantier « Gestion des publications dans l'administration » : le volet d'une publication compare ses notices champ par champ. La règle qui choisit entre elles est déterministe : l'origine de la valeur retenue s'y lit sans être stockée.
+
+### Des vocabulaires de synonymes, réappliqués en fin de chaîne (OpenAIRE)
+
+- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/cleaning).
+- Un vocabulaire associe à chaque terme la liste de ses synonymes. « Article » et « Article (author) » donnent « Article ».
+- Le nettoyage est rejoué en fin de chaîne, parce que les vocabulaires changent après l'agrégation d'une source.
+- **Verdict : équivalent en place.** La traduction des types de document et des langues vers notre vocabulaire se fait avec les corrections, à partir de la valeur brute de la source. Cette étape relit toutes les notices à chaque run : un synonyme ajouté ou une règle de correction modifiée s'applique au stock dès le run suivant.
+
+### Des identifiants de rapprochement déduits (CRISalid)
 
 - Où : svp-harvester, [`services/identifiers/rules/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/services/identifiers/rules).
 - Deux règles : l'identifiant HAL tiré de l'URL, le PPN Sudoc tiré de l'identifiant ScanR (`sudoc258403519`).
 - Une règle par fichier, appliquée à la notice avant tout regroupement.
+- **Verdict : équivalent en place.** La normalisation tire l'identifiant HAL et le DOI des URL et des identifiants OAI, l'identifiant arXiv des URL arxiv.org (`domain/publications/identifiers.py`), avant la réconciliation. Le PPN Sudoc ne sert de clé de rapprochement à aucune de nos sources.
 
-### Le vocabulaire
+### Les libellés des concepts complétés (CRISalid)
 
-- `SourcePerson` : l'auteur tel que la source le décrit.
-- `SourceContribution` : son lien à la notice, avec un rôle. Le terme couvre aussi les éditeurs scientifiques et les directeurs de thèse.
-- Les rôles sont ceux du vocabulaire de la Library of Congress (`aut`, `edt`…).
+- Où : svp-harvester, [`services/concepts/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/services/concepts).
+- Pour un sujet fourni avec un identifiant (IdRef, Wikidata, JEL), le référentiel est interrogé et ses libellés préférés et alternatifs sont enregistrés.
+- Cela unifie les libellés. Cela ne filtre pas les sujets aberrants.
+- **Verdict : en projet**, dans le chantier sur la qualité des sujets : les notices stockent les codes des sujets, une table remplie depuis les référentiels des sources donne leurs libellés.
 
-## Attribution des publications aux personnes : ReCiter
+## Regroupement des publications
 
-ReCiter pose le problème par personne. Pour chaque personne de l'annuaire, il cherche des articles candidats dans PubMed, puis note chaque candidat. Il ne regroupe pas les signatures entre elles : le code de regroupement existe encore dans le dépôt, mais le moteur ne l'appelle plus.
-
-### Un dossier par type d'indice
-
-- Où : [`algorithm/evidence/targetauthor/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/algorithm/evidence/targetauthor) : `name/`, `email/`, `affiliation/`, `department/`, `grant/`, `knownrelationship/`, `journalcategory/`, `degree/`…
-- Chaque indice est une classe qui reçoit les articles et la personne, et rend un score.
-- Les indices ne se lisent pas entre eux. Le moteur les lance en parallèle : l'ordre n'a pas d'effet sur le résultat.
-- Chez nous : une alternative à la cascade, où chaque passe dépend des précédentes.
-
-### Chaque indice laisse une trace lisible
-
-- Où : [`ReCiterFeatureGenerator.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/ReCiterFeatureGenerator.java).
-- Un indice n'écrit pas seulement un score. Il enregistre ce qui a concordé : l'adresse électronique trouvée, la forme du nom, l'affiliation.
-- La sortie, pour chaque article, réunit le score total, la décision humaine éventuelle et la liste de ces traces. L'interface de validation les affiche.
-- Chez nous : plus riche que `resolution_mode`, qui ne dit que la règle qui a rattaché.
-
-### Les indices activés et pondérés en configuration
-
-- Où : [`application.properties`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/resources/application.properties).
-- Une ligne par indice pour l'activer (`strategy.email=true`), une ligne par poids (`strategy.email.emailMatchScore=8`).
-- Les mots-clés qui reconnaissent l'établissement dans une affiliation y sont aussi.
-
-### Les décisions humaines servent trois fois
-
-- **Elles s'imposent.** Un article accepté ou rejeté garde son statut quel que soit son score.
-- **Elles deviennent des indices pour les autres articles.** Où : [`evidence/targetauthor/feedback/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/algorithm/evidence/targetauthor/feedback). Pour un candidat, on compte les articles déjà acceptés et rejetés de la même personne qui partagent sa revue, un co-auteur, un mot-clé, une institution, une citation. Quinze indices de ce type.
-- **Elles servent à entraîner et à mesurer.** Où : [`resources/scripts/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/resources/scripts) et [`Analysis.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/erroranalysis/Analysis.java). Les scores des indices sont combinés par un petit réseau de neurones entraîné sur les acceptations et les rejets. La précision et le rappel sont calculés contre ces mêmes décisions.
-
-Pour l'entraînement, le score d'un article est calculé sans sa propre décision, pour qu'elle ne s'explique pas par elle-même.
-
-### Repérer l'auteur visé, puis noter
-
-- Où : [`TargetAuthorSelection.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/algorithm/evidence/targetauthor/TargetAuthorSelection.java).
-- Première étape : trouver, parmi les auteurs de la notice, celui qui peut être la personne. Seconde étape : noter l'article à partir de cet auteur.
-- Les deux questions sont séparées dans le code.
-
-### Une classe par manière de chercher des candidats
-
-- Où : [`xml/retriever/pubmed/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/xml/retriever/pubmed) : par nom complet, par initiale, par adresse électronique, par affiliation, par financement, par ORCID.
-- L'équivalent du blocage dans le couplage d'enregistrements : chaque stratégie élargit ou resserre l'ensemble des candidats.
-
-### Ce qu'on écarte chez ReCiter
-
-- **Une classe de contexte par indice**, de 11 à 30 lignes, qui ne fait que déléguer. En Python, une fonction par indice suffit.
-- **Des fichiers de plus de 1 000 lignes** pour le nom et pour le repérage de l'auteur visé.
-- **L'appel du modèle par un script Python lancé depuis Java**, avec échange de fichiers.
-- **L'infrastructure** : DynamoDB, S3 et files SQS d'Amazon.
-- **Le code mort** : le regroupement d'articles n'est plus appelé mais reste dans le dépôt.
-
-## Le graphe d'OpenAIRE
-
-Lu dans la documentation du graphe, et pour le dédoublonnage dans le code (`dnet-dedup`, `dnet-hadoop`).
-
-### La chaîne d'ensemble
-
-Dans l'ordre de la [documentation](https://graph.openaire.eu/docs/graph-production-workflow/) :
-
-1. **Agrégation.** Les entrepôts conformes aux directives d'OpenAIRE sont moissonnés en OAI-PMH. Les autres sources (Crossref, ORCID, PubMed, DataCite…) ont chacune leur traitement. Crossref est repris par dump complet, chaque mois.
-2. **Fusion par identifiant.** Les enregistrements qui portent le même identifiant sont fusionnés, sans comparaison.
-3. **Enrichissement par identifiant.** Les ORCID sont rattachés aux auteurs.
-4. **Enrichissement par fouille.** Affiliations, citations, classification, à partir des métadonnées et du texte intégral.
-5. **Nettoyage.** Les valeurs sont ramenées à des vocabulaires contrôlés.
-6. **Dédoublonnage.** Produits de recherche et organisations.
-7. **Déduction et propagation.** Des propriétés passent d'un objet à un autre par règle.
-8. **Indicateurs**, **finalisation**, **indexation**, **statistiques**.
-
-Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque produit, et aucune étape ne désambiguïse les auteurs entre produits.
-
-### La fusion par identifiant, avant le dédoublonnage
+### La fusion par identifiant, avant le dédoublonnage (OpenAIRE)
 
 - Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/merge-by-id).
 - Étape distincte et antérieure au dédoublonnage : regroupement par égalité stricte de l'identifiant, fusion des propriétés et des provenances.
 - En cas de types contradictoires, un ordre fixe : publication, jeu de données, logiciel, autre.
 - Le dédoublonnage par similarité ne traite ensuite que ce qui reste.
+- **Verdict : équivalent en place.** La réconciliation regroupe les notices par égalité de leurs identifiants, ou du triplet type, titre normalisé et année, sans comparaison de similarité. Le dédoublonnage par similarité qui la suivrait est à l'étude dans le chantier de résolution avec Splink.
 
-### Des identifiants de confiance et d'autres non
+### Des identifiants de confiance et d'autres non (OpenAIRE)
 
 - Où : [dédoublonnage des produits de recherche](https://graph.openaire.eu/docs/graph-production-workflow/deduplication/research-products).
 - Un identifiant de confiance égal suffit à regrouper deux enregistrements.
 - Un identifiant égal mais non garanti (champ `alternateid`) ne suffit pas : il faut en plus des titres similaires à plus de 0,9.
 - Sans identifiant commun, le contrôle est strict : nombres d'auteurs cohérents, versions cohérentes dans le titre, titres similaires à plus de 0,95, et une part d'auteurs communs (plus de 60 % si le titre dépasse 30 caractères, plus de 90 % sinon).
 - Des types incompatibles interdisent le regroupement.
-- Chez nous : répond à la situation « deux publications regroupées à tort par un DOI commun ».
+- **Verdict : équivalent en place**, sous une autre forme. La correction des métadonnées efface le DOI des notices qui le partagent à tort avec une autre œuvre (ouvrage et chapitre, chapitres de titres différents). La réconciliation ne regroupe que par des identifiants corrigés.
 
-### Le blocage et ses garde-fous
+### Le blocage et ses garde-fous (OpenAIRE)
 
 - Clés de blocage des publications : l'identifiant ; ou le nombre d'auteurs, le nombre de mots du titre et des fragments de ses trois premiers mots.
 - Dans un bloc, les enregistrements sont triés par titre et chacun n'est comparé qu'aux 50 suivants.
 - Un groupe est plafonné à 200 membres.
+- **Verdict : écarté.** Notre volume ne demande ni fenêtre glissante ni blocage approximatif. Un plafond de taille séparerait à tort les jeux de données de plusieurs centaines de pièces.
 
-### L'origine et la confiance de chaque valeur déduite
-
-- Où : [Crossref](https://graph.openaire.eu/docs/graph-production-workflow/aggregation/non-compatible-sources/crossref_unpaywall), [propagation](https://graph.openaire.eu/docs/graph-production-workflow/deduction-and-propagation/propagation).
-- Un ORCID fourni par Crossref est étiqueté `pending_orcid`, avec une confiance de 0,9. Un ORCID obtenu par propagation est marqué « potentiel ».
-- Chez nous : à rapprocher du statut des identifiants de personnes.
-
-### Le rattachement des ORCID aux auteurs
-
-- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/enrichment-by-pid/orcid-enrichment).
-- Le rapprochement passe par l'œuvre : on prend les œuvres déclarées dans le profil ORCID, on retrouve le produit de même identifiant, puis on compare les noms à l'intérieur de ce seul produit.
-- Comparaison des noms par stratégies successives, de la plus sûre à la plus lâche : nom complet, nom inversé, mots triés avec tolérance des initiales, nom de crédit, autres noms.
-- Un profil ORCID rattaché à un auteur est retiré des comparaisons suivantes.
-
-### Des vocabulaires de synonymes, réappliqués en fin de chaîne
-
-- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/cleaning).
-- Un vocabulaire associe à chaque terme la liste de ses synonymes. « Article » et « Article (author) » donnent « Article ».
-- Le nettoyage est rejoué en fin de chaîne, parce que les vocabulaires changent après l'agrégation d'une source.
-- Chez nous : la situation « règle de correction modifiée ».
-
-### L'alignement des affiliations sur ROR
-
-- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/enrichment-by-mining/affiliation_matching).
-- Méthode : classer l'affiliation (université, laboratoire, hôpital, entreprise), raccourcir la chaîne autour de ses mots-clés, comparer aux noms de ROR par similarité cosinus, puis départager les homonymes avec la chaîne complète.
-- Seuils : 0,64 pour les universités, 0,87 pour les autres.
-- Chez nous : pour les organisations des co-auteurs.
-
-### Des affiliations déduites par règle
-
-- Un produit moissonné dans l'entrepôt d'un établissement est affilié à cet établissement.
-- Une affiliation à une organisation fille est reportée sur l'organisation mère, d'un seul niveau.
-
-## Dédoublonnage par étapes : dnet-dedup (OpenAIRE)
-
-### Quatre étapes, une table entre chacune
+### Quatre étapes, une table entre chacune (dnet-dedup)
 
 - Où : les jobs [`SparkCreateSimRels`, `SparkCreateMergeRels`, `SparkCreateDedupEntity`](https://github.com/dnet-team/dnet-dedup/tree/master/dnet-dedup-test/src/main/java/eu/dnetlib/jobs).
 - Les étapes :
@@ -244,16 +221,9 @@ Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque p
   3. **relations de fusion** : composantes connexes sur les relations de similarité, puis choix de l'identifiant du groupe ;
   4. **enregistrement représentant** : construit à partir des membres du groupe.
 - Chaque étape lit ce que la précédente a écrit. Rien ne passe en mémoire de l'une à l'autre.
-- Chez nous : `publications.reconcile` est un seul nœud parce que le plan et son application partagent le voisinage en mémoire. Ce découpage montre où le scinder.
+- **Verdict : à l'étude**, dans le chantier de résolution avec Splink : le découpage de `publications.reconcile` suivrait ces étapes.
 
-### Les décisions humaines entrent entre les étapes 2 et 3
-
-- Où : dans le code actuel, les jobs `SparkCopyOpenorgsSimRels`, `SparkCopyOpenorgsMergeRels` et `SparkWhitelistSimRels` ([dossier](https://code-repo.d4science.org/D-Net/dnet-hadoop/src/branch/master/dhp-workflows/dhp-dedup-openaire/src/main/java/eu/dnetlib/dhp/oa/dedup)). Le dernier n'a pas pu être lu.
-- Pour les organisations, l'algorithme produit des suggestions. Des curateurs les approuvent, les écartent, ou créent une relation que l'algorithme n'a pas vue ([documentation](https://graph.openaire.eu/docs/data-provision/deduplication/organizations)).
-- Ces décisions sont des relations ajoutées ou retirées avant le calcul des composantes.
-- C'est la même forme que les arêtes affirmées de CRISalid, et c'est la place qu'auraient nos confirmations et rejets autour de Splink : après la comparaison des paires, avant le regroupement.
-
-### Un identifiant de groupe qui survit aux runs
+### Un identifiant de groupe qui survit aux runs (dnet-dedup)
 
 - Où : `SparkCreateMergeRels.java` et `IdGenerator.java`, même dossier.
 - Dans chaque groupe, un enregistrement pivot est élu. L'identifiant du groupe est dérivé de celui du pivot.
@@ -261,167 +231,190 @@ Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque p
 - Le code et la documentation ne donnent pas le même ordre pour les deux premiers critères. Non vérifié directement.
 - Une table d'historique conserve les pivots pendant 12 mois.
 - Quand un ancien pivot se retrouve dans un groupe mené par un autre, une relation de fusion relie l'ancien identifiant de groupe au nouveau.
-- Chez nous : la stabilisation des identifiants et la table de redirection, dans le cas où le regroupement serait recalculé.
+- **Verdict : équivalent en place.** La réconciliation conserve la publication qui a déjà le DOI du groupe, sinon une publication à laquelle une notice du groupe est déjà rattachée. La relation de l'identifiant absorbé vers l'identifiant conservé est la table de redirection (voir « La trace de l'entité absorbée »).
 
-### Les règles déclarées dans un fichier par type d'entité
+### Les règles déclarées dans un fichier par type d'entité (dnet-dedup)
 
 - Où : par exemple [`pub.new.tree.conf.json`](https://github.com/dnet-team/dnet-dedup/blob/master/dnet-pace-core/src/test/resources/eu/dnetlib/pace/config/pub.new.tree.conf.json).
 - Le fichier déclare les champs, les fonctions de blocage, et un arbre de décision : à chaque nœud, un comparateur, un seuil, et la suite selon le résultat.
 - Le résultat a trois valeurs : concordant, non concordant, indéterminé quand le champ manque. Chaque cas a sa branche.
 - Pour les publications : identifiants égaux, sinon contrôle du type, de la version dans le titre et du nombre d'auteurs, puis titre presque identique.
 - Les comparateurs sont une classe chacun, dans [`pace/tree/`](https://github.com/dnet-team/dnet-dedup/tree/master/dnet-pace-core/src/main/java/eu/dnetlib/pace/tree).
+- **Verdict : écarté.** Les réglages de Splink tiennent ce rôle, y compris le cas du champ manquant, qui a son propre niveau dans chaque comparaison.
 
-### Une liste de titres exclus du rapprochement
+### Une liste de titres exclus du rapprochement (dnet-dedup)
 
 - Où : la clé `blacklists` du même fichier.
 - Des expressions régulières écartent les titres génériques : « Inside Front Cover », « Note from the Editor », « Poster presentations »…
-- Chez nous : à comparer avec le rapprochement par titre long, type et année.
+- **Verdict : équivalent en place.** La clé de rapprochement par type, titre normalisé et année n'est posée que pour un titre de plus de 30 caractères, ce qui élimine les titres génériques.
 
-### Ce qu'on écarte chez dnet-dedup
+## Attribution des publications aux personnes
 
-- **Spark, Oozie et Java** : dimensionnés pour des centaines de millions d'enregistrements.
-- **L'arbre de décision en JSON** : un langage de règles maison. Les réglages de Splink tiennent ce rôle.
+### Les rôles des signatures (CRISalid)
 
-## Entrepôt à l'échelle mondiale : Academic Observatory (Curtin)
+- `SourcePerson` : l'auteur tel que la source le décrit.
+- `SourceContribution` : son lien à la notice, avec un rôle. Le terme couvre aussi les éditeurs scientifiques et les directeurs de thèse.
+- Les rôles sont ceux du vocabulaire de la Library of Congress (`aut`, `edt`…).
+- **Verdict : équivalent en place.** La signature (`source_authorships`) a ses rôles, dans notre vocabulaire (`author`, `editor`, `thesis_director`…). `domain/publications/authorship_roles.py` y traduit les rôles de chaque source, dont les codes MARC Relator (Library of Congress) que fournissent HAL et ScanR.
 
-Un pipeline ELT au sens strict : des dumps complets de sources ouvertes chargés dans BigQuery, puis une chaîne de requêtes SQL qui produit une table par DOI et des agrégats par établissement, pays, revue, financeur. Pas d'établissement de référence, pas de personnes, pas de décisions humaines.
+### Le rapprochement des auteurs en deux temps (CRISalid)
 
-### Un dossier par source, avec les mêmes fichiers
+- Où : crisalid-ikg, [`source_contributor_mapping_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/source_contributors/source_contributor_mapping_service.py).
+- Premier temps : à l'intérieur d'un document, les auteurs des différentes sources sont regroupés par similarité de nom.
+- Second temps : chaque groupe est rattaché à une personne, par identifiant puis par nom.
+- **Verdict : équivalent en place.** Le rattachement « cross-source » de la cascade rattache une signature à la personne de sa jumelle d'une autre source, dans la même publication et à la même position d'auteur. Il intervient avant toute création de personne.
 
-- Où : [`academic_observatory_workflows/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows), un dossier `<source>_telescope/` par source.
-- Chaque dossier contient `telescope.py` (le graphe des tâches), `tasks.py` (les fonctions appelées), `schema/` (le schéma attendu des tables), `tests/fixtures/` (un extrait de dump et le résultat attendu).
-- Le fichier de graphe ne contient que l'enchaînement ; la logique est dans `tasks.py`. Même partage que rialto.
+### Un dossier par type d'indice (ReCiter)
 
-### La consolidation en SQL, une requête par source
+- Où : [`algorithm/evidence/targetauthor/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/algorithm/evidence/targetauthor) : `name/`, `email/`, `affiliation/`, `department/`, `grant/`, `knownrelationship/`, `journalcategory/`, `degree/`…
+- Chaque indice est une classe qui reçoit les articles et la personne, et rend un score.
+- Les indices ne se lisent pas entre eux. Le moteur les lance en parallèle : l'ordre n'a pas d'effet sur le résultat.
+- **Verdict : à l'étude**, dans le chantier de résolution avec Splink : chaque comparaison de Splink joue le rôle d'un indice.
 
-- Où : [`doi_workflow/sql/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/sql) : `crossref_metadata.sql.jinja2`, `openalex.sql.jinja2`, `unpaywall.sql.jinja2`, `ror.sql.jinja2`… puis `doi.sql.jinja2` qui les joint.
-- Les requêtes sont déclarées comme données dans [`queries.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/queries.py) : nom, tables d'entrée, table de sortie. Les requêtes d'une même liste n'ont pas de dépendance entre elles.
-- La réconciliation se réduit à une jointure sur le DOI, Crossref servant de référence : une publication sans DOI Crossref n'existe pas.
+### Chaque indice laisse une trace lisible (ReCiter)
 
-### Un graphe qui attend ses sources
+- Où : [`ReCiterFeatureGenerator.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/ReCiterFeatureGenerator.java).
+- Un indice n'écrit pas seulement un score. Il enregistre ce qui a concordé : l'adresse électronique trouvée, la forme du nom, l'affiliation.
+- La sortie, pour chaque article, réunit le score total, la décision humaine éventuelle et la liste de ces traces. L'interface de validation les affiche.
+- **Verdict : à l'étude**, dans le chantier de résolution avec Splink.
 
-- Le workflow de consolidation commence par des capteurs qui attendent la fin de chaque workflow de source.
-- Acquisition et transformation sont deux graphes distincts. La transformation ne fait aucun appel réseau, à une exception près (voir plus bas).
+### Les indices activés et pondérés en configuration (ReCiter)
 
-### Des versions datées plutôt que des mises à jour
+- Où : [`application.properties`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/resources/application.properties).
+- Une ligne par indice pour l'activer (`strategy.email=true`), une ligne par poids (`strategy.email.emailMatchScore=8`).
+- Les mots-clés qui reconnaissent l'établissement dans une affiliation y sont aussi.
+- **Verdict : écarté.** La cascade actuelle n'a pas de poids : elle applique des règles ordonnées, qui restent dans le code. Si Splink remplace la cascade, Splink estime les poids à partir des données : un réglage manuel est sans objet.
 
-- Chaque source est chargée comme un instantané daté (tables suffixées par la date). La consolidation désigne explicitement l'instantané qu'elle lit.
-- Une table de « releases » garde, par source, la date du dernier instantané traité ; un run sans nouvel instantané s'arrête au premier test.
-- Chez nous : l'équivalent de `pipeline_phase_executions`, pour savoir ce que le dernier run a lu.
+### Une classe par manière de chercher des candidats (ReCiter)
 
-### Le contrôle du schéma des sources
+- Où : [`xml/retriever/pubmed/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/xml/retriever/pubmed) : par nom complet, par initiale, par adresse électronique, par affiliation, par financement, par ORCID.
+- L'équivalent du blocage dans le couplage d'enregistrements : chaque stratégie élargit ou resserre l'ensemble des candidats.
+- **Verdict : équivalent en place.** La cascade charge ses candidats par plusieurs voies réunies (identifiant fort partagé, position déjà rattachée dans une autre source, forme de nom). Avec Splink, les règles de blocage tiennent ce rôle.
 
-- Où : `compare_schemas` dans [`openalex_telescope/tasks.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/openalex_telescope/tasks.py).
-- Le schéma déduit du dump est comparé au schéma attendu, versionné dans le dépôt. Un écart envoie une alerte, sans bloquer le chargement.
-- Chez nous : détecter qu'une source a changé de format avant que la normalisation échoue ou perde des champs en silence.
+### L'origine et la confiance de chaque valeur déduite (OpenAIRE)
 
-### Des affiliations élargies par la hiérarchie de ROR
+- Où : [Crossref](https://graph.openaire.eu/docs/graph-production-workflow/aggregation/non-compatible-sources/crossref_unpaywall), [propagation](https://graph.openaire.eu/docs/graph-production-workflow/deduction-and-propagation/propagation).
+- Un ORCID fourni par Crossref est étiqueté `pending_orcid`, avec une confiance de 0,9. Un ORCID obtenu par propagation est marqué « potentiel ».
+- **Verdict : équivalent en place.** La fiabilité d'un identifiant dépend aussi de son origine, sans degré intermédiaire : un ORCID déposé par l'auteur est retenu (`raw_orcid` d'OpenAlex), un ORCID attribué par l'algorithme d'une source est ignoré (ORCID de WoS, `author.orcid` d'OpenAlex).
+
+### Le rattachement des ORCID aux auteurs (OpenAIRE)
+
+- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/enrichment-by-pid/orcid-enrichment).
+- Le rapprochement passe par l'œuvre : on prend les œuvres déclarées dans le profil ORCID, on retrouve le produit de même identifiant, puis on compare les noms à l'intérieur de ce seul produit.
+- Comparaison des noms par stratégies successives, de la plus sûre à la plus lâche : nom complet, nom inversé, mots triés avec tolérance des initiales, nom de crédit, autres noms.
+- Un profil ORCID rattaché à un auteur est retiré des comparaisons suivantes.
+- **Verdict : écarté.** Les œuvres d'un profil ORCID y arrivent pour l'essentiel depuis Crossref et DataCite, quand l'ORCID y est déposé. Ces dépôts sont déjà lus par nos sources. Les déclarations manuelles sont rares.
+
+## Décisions humaines
+
+### La fusion humaine, arête entre notices (CRISalid)
+
+- Où : crisalid-ikg, [`equivalence_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/source_records/equivalence_service.py), [`source_record_dao.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/graph/neo4j/source_record_dao.py), et `merge_documents` dans [`document_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/documents/document_service.py).
+- L'étiquette concerne une arête entre deux notices, pas le groupe :
+  - `INFERRED_EQUIVALENT` : déduite des identifiants partagés, recalculée librement ;
+  - `ASSERTED_EQUIVALENT` : posée par une fusion humaine, jamais recalculée ;
+  - `PREDICTED_EQUIVALENT` : lue par le code, créée nulle part pour l'instant.
+- Le groupe est la composante connexe sur les trois types d'arêtes. Le document en est la matérialisation.
+- Fusionner A et B crée une arête affirmée entre chaque notice de A et chaque notice de B, puis relance le calcul des composantes. La fusion contraint le calcul.
+- **Verdict : en projet**, dans le chantier « Gestion des publications dans l'administration ». Une décision humaine sur un lien est une entrée de la résolution. Pour les publications, un jeton de fusion forcée posé sur des notices jouerait le rôle de l'arête affirmée : une clé commune, prise en compte par le même regroupement. CRISalid n'a pas de contrainte de scission.
+
+### Les décisions humaines entrent entre les étapes 2 et 3 (dnet-dedup)
+
+- Où : dans le code actuel, les jobs `SparkCopyOpenorgsSimRels`, `SparkCopyOpenorgsMergeRels` et `SparkWhitelistSimRels` ([dossier](https://code-repo.d4science.org/D-Net/dnet-hadoop/src/branch/master/dhp-workflows/dhp-dedup-openaire/src/main/java/eu/dnetlib/dhp/oa/dedup)). Le dernier n'a pas pu être lu.
+- Pour les organisations, l'algorithme produit des suggestions. Des curateurs les approuvent, les écartent, ou créent une relation que l'algorithme n'a pas vue ([documentation](https://graph.openaire.eu/docs/data-provision/deduplication/organizations)).
+- Ces décisions sont des relations ajoutées ou retirées avant le calcul des composantes.
+- **Verdict : à l'étude**, dans le chantier de résolution avec Splink.
+
+### Les décisions humaines servent trois fois (ReCiter)
+
+- **Elles s'imposent.** Un article accepté ou rejeté garde son statut quel que soit son score.
+- **Elles deviennent des indices pour les autres articles.** Où : [`evidence/targetauthor/feedback/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/algorithm/evidence/targetauthor/feedback). Pour un candidat, on compte les articles déjà acceptés et rejetés de la même personne qui partagent sa revue, un co-auteur, un mot-clé, une institution, une citation. Quinze indices de ce type.
+- **Elles servent à entraîner et à mesurer.** Où : [`resources/scripts/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/resources/scripts) et [`Analysis.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/erroranalysis/Analysis.java). Les scores des indices sont combinés par un petit réseau de neurones entraîné sur les acceptations et les rejets. La précision et le rappel sont calculés contre ces mêmes décisions.
+
+- Pour l'entraînement, le score d'un article est calculé sans sa propre décision, pour qu'elle ne s'explique pas par elle-même.
+- **Verdict : en place** pour la première : les confirmations et les rejets sont des entrées de la résolution. Les deux autres sont à l'étude dans le chantier de résolution avec Splink.
+
+### Les corrections de champs stockées à part (CRISalid)
+
+- Où : crisalid-ikg, [`change_service.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/changes/change_service.py) et [`processors/`](https://github.com/CRISalid-esr/crisalid-ikg/tree/dev-main/app/services/changes/processors).
+- Titre, résumé, type et sujets corrigés sont des nœuds attachés au document, réappliqués après chaque recalcul à partir des notices.
+- Le résultat est le même qu'une saisie humaine prioritaire. Ce qui compte : la valeur humaine n'est jamais stockée seulement dans la colonne dérivée.
+- **Verdict : équivalent en place** pour les revues et les éditeurs. Une correction de revue est écrite dans la colonne, et le champ est marqué (`manual_fields`) : le pipeline n'écrit plus un champ marqué. Le pipeline remplit seulement les champs vides d'un éditeur. La correction des publications reste à faire, dans le chantier « Gestion des publications dans l'administration ».
+
+### Le verrouillage (BiblioRef)
+
+- Une publication ou un auteur a un booléen `locked`. Une publication verrouillée n'est plus touchée par le dédoublonnage.
+- C'est le troisième mécanisme de la gestion des données de référence (après la source prioritaire et la contrainte de la résolution), avec sa limite : la publication ne reçoit plus les mises à jour des sources.
+- **Verdict : écarté.** Une décision humaine vise un champ ou un lien, pas l'entité entière : le reste de l'entité suit les sources.
+
+### La trace de l'entité absorbée (CRISalid)
+
+- Où : crisalid-ikg, [`create_or_update_document.cypher`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/graph/neo4j/queries/create_or_update_document.cypher).
+- Le document absorbé reçoit une arête `TO_BE_MERGED_INTO` vers celui qui survit.
+- **Verdict : adopté**, pour les entités qui ont une page publique : une table de redirection des identifiants absorbés, écrite par chaque fusion. À faire avant la mise en production de l'interface publique.
+
+## Structures et affiliations
+
+### L'alignement des affiliations sur ROR (OpenAIRE)
+
+- Où : [documentation](https://graph.openaire.eu/docs/graph-production-workflow/enrichment-by-mining/affiliation_matching).
+- Méthode : classer l'affiliation (université, laboratoire, hôpital, entreprise), raccourcir la chaîne autour de ses mots-clés, comparer aux noms de ROR par similarité cosinus, puis départager les homonymes avec la chaîne complète.
+- Seuils : 0,64 pour les universités, 0,87 pour les autres.
+- **Verdict : écarté.** Les sources fournissent le ROR des organisations des signatures (OpenAlex pour quasiment toutes, WoS pour 98 %).
+
+### Des affiliations élargies par la hiérarchie de ROR (Academic Observatory)
 
 - Où : `doi.sql.jinja2` et `create_ror_hierarchy_table` dans [`doi_workflow/tasks.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/tasks.py).
 - Une table matérialise, pour chaque organisation ROR, tous ses ascendants. Une publication est attribuée à l'organisation de l'auteur et à toute sa généalogie.
-- Chez nous : l'équivalent de `perimeter_structures`, appliqué aux organisations des co-auteurs.
+- **Verdict : à l'étude**, dans le chantier sur les collaborations entre structures : l'agrégation des organisations des co-auteurs par ROR cité, ou par établissement obtenu en remontant la hiérarchie de ROR.
 
-### Les entrepôts rattachés à un établissement
+### La manière dont une structure a été attribuée (BiblioRef)
 
-- Où : `create_repo_institution_to_ror_table`, même fichier.
-- Les noms d'entrepôts d'Unpaywall sont alignés sur ROR par l'API d'affiliation de ROR. C'est le seul appel réseau de la consolidation.
-- Sert à compter le dépôt en archive ouverte par établissement.
+- Où : [`classes/interfaces/structure.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/structure.py), [`utils/structurechoice.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/structurechoice.py).
+- Chaque lien signature-structure a un code, qui dit comment il a été établi. Les valeurs : saisie manuelle, fourni par la source, appartenance datée de la personne dans l'annuaire à la date de publication, structure de l'annuaire retrouvée parmi celles de la signature, structure du périmètre, ou premier type de structure dans un ordre fixe (laboratoire, unité, établissement…).
+- **Verdict : équivalent en place.** Un lien entre adresse et structure a la forme de nom qui l'a établi, ou aucune s'il est manuel, et son statut de confirmation.
 
-### Ce qu'on écarte chez Academic Observatory
+### Un annuaire riche (BiblioRef)
+
+- Où : [`bdd`](https://gitlab.com/biblioref/saas-app/bdd), fichier `1_Création/biblioref.sql`.
+- Pour chaque personne : appartenances datées aux structures, grades, diplômes, disciplines, sections, mots-clés, identifiants.
+- Pour chaque structure : tutelles typées (principale ou non), formes de nom, et un historique des créations, fusions et scissions (`structurecreation`, avec les structures d'origine).
+- **Verdict : à étudier.** Nos structures n'ont pas d'historique : une fusion de laboratoires n'est pas gérée. Un historique des fusions et des scissions, prolongé vers le passé, rattacherait une publication ancienne à l'unité qui a succédé à son laboratoire.
+
+## Ce qu'on écarte en bloc
+
+### CRISalid
+
+- **L'enchaînement par événements et RabbitMQ**. Adapté à un usage interactif et à des règles locales. Avec une résolution qui compare des noms sur tout le corpus, le traitement notice par notice serait lent et dépendrait de l'ordre d'arrivée.
+- **Les DAO génériques à une seule implémentation** : une interface et une classe pour chaque accès aux données, sans seconde implémentation.
+- **Une classe par type de message**. Une trentaine de fichiers pour émettre des événements.
+- **Le type élu par ordre des sources**. Le premier type connu gagne, sans règle de cohérence.
+- **La liste entière des contributeurs remplacée par la dernière correction**. Nos confirmations et rejets visent un lien à la fois.
+- **Le dédoublonnage par identifiants seuls**. Aucun rapprochement par titre.
+- **Le lien structure-publication par l'appartenance des personnes**. Les publications d'un laboratoire sont celles de ses membres dans l'annuaire, sans lecture des adresses.
+
+### rialto
+
+- **Le traitement publication par publication en Python** (`distill.py`). Convient à leur volume, pas à nos étapes ensemblistes.
+- **Le dédoublonnage par identifiants seuls**. Aucun rapprochement par titre.
+
+### ReCiter
+
+- **Une classe de contexte par indice**, de 11 à 30 lignes, qui ne fait que déléguer. En Python, une fonction par indice suffit.
+- **L'appel du modèle par un script Python lancé depuis Java**, avec échange de fichiers.
+- **L'infrastructure** : DynamoDB, S3 et files SQS d'Amazon.
+
+### dnet-dedup
+
+- **Spark, Oozie et Java** : dimensionnés pour des centaines de millions d'enregistrements.
+
+### Academic Observatory
 
 - **BigQuery, Google Cloud, Astronomer, Kubernetes** : dimensionnés pour des dumps de plusieurs centaines de gigaoctets.
 - **Le DOI comme seule clé** : rien pour les documents sans DOI, ni pour un DOI erroné.
 - **Les affiliations d'OpenAlex reprises telles quelles** : aucune lecture des adresses.
 
-## Outil d'établissement : BiblioRef (Lyon 3)
-
-Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) le dépôt de présentation (`awesome-biblioref`), le schéma de la base (`bdd`) et l'API (`backend`, 25 700 lignes de TypeScript). L'interface (`frontend`, Angular) n'a pas été lue. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
-
-### Des connecteurs en services séparés, derrière un contrat commun
-
-- Où : [`utils/tools.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/tools.py), [`start.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/start.py).
-- Chaque source (HAL, OpenAlex, Sudoc) est un service à part, qui expose trois routes : `/ping`, `/researchproducts/?start_date=…` (notices nouvelles ou modifiées depuis une date), `/researchproduct/<id>` (une notice).
-- Le moissonneur interroge d'abord chaque connecteur actif ; si l'un ne répond pas, le run s'arrête et l'échec est journalisé.
-- Les connecteurs actifs, leur adresse et leur ordre de priorité sont dans une table `source`.
-- Un run hebdomadaire par cron, qui demande les notices modifiées depuis la date du dernier run réussi.
-
-### Un connecteur par source, chacun avec sa base
-
-- Où : [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), et son [guide de création d'un connecteur](https://gitlab.com/biblioref/connectors/connector-base/-/blob/main/FORK_GUIDE.md).
-- Chaque connecteur est une copie (« fork ») du connecteur de base : même arborescence, mêmes classes, seuls `connector/data_collector.py` et `connector/data_binding.py` changent vraiment.
-- Chaque connecteur a sa propre base PostgreSQL, où il range ses notices dans un modèle commun. Le moissonneur lit ensuite ces bases par l'API de chaque connecteur.
-- Dans la base d'un connecteur, une notice déjà connue est supprimée puis recréée si la source donne une date de modification plus récente.
-- Chez nous : l'équivalent de `staging` et de `source_publications`, découpé en une base par source. La duplication du code entre connecteurs est le prix de cette indépendance.
-
-### Le moissonnage part de l'annuaire
-
-- Où : `collectDatasByAuthor` dans [`connector-hal/connector/data_collector.py`](https://gitlab.com/biblioref/connectors/connector-hal/-/blob/main/connector/data_collector.py), et `getQueryAuthors` dans `classes/utils/tools.py`.
-- Les connecteurs lisent dans la base principale les personnes de l'annuaire rattachées à une structure du périmètre, leurs identifiants et leurs périodes de présence.
-- Chaque personne est interrogée par ses identifiants, sur la seule période où elle était dans une structure du périmètre (date de publication entre la date d'entrée et la date de sortie).
-- HAL peut aussi être interrogé par structure, avec l'identifiant AuréHAL. OpenAlex et le Sudoc ne le sont que par personne.
-- Le champ de la source qui correspond à chaque type d'identifiant est déclaré en base (`sourceidentifiertype`), pas dans le code.
-- Une nouvelle période de présence ajoutée à l'annuaire est marquée ; le run suivant moissonne cette période, puis le marqueur est levé.
-- Chez nous : l'inverse du moissonnage par affiliation. Une personne absente de l'annuaire ou sans identifiant n'a pas de publications, sauf dans HAL par structure.
-
-### Les mises à jour
-
-- HAL : notices modifiées depuis un nombre de jours donné.
-- OpenAlex : par date de publication seulement. Un commentaire du code note que le filtre par date de mise à jour est payant.
-- Le Sudoc : requête SPARQL par IdRef, puis notice complète en MARCXML.
-- Aucune gestion des notices disparues d'une source.
-
-### Les corrections manuelles
-
-- Où : [`backend`](https://gitlab.com/biblioref/saas-app/backend), dossier `src/modules/`, un module par table (contrôleur, modèle, routes).
-- L'API est un CRUD par table : une modification écrit directement dans les tables que remplit le moissonneur.
-- La seule protection est le verrou posé à la main sur une publication (`locked`). Une publication corrigée mais non verrouillée peut être supprimée et recréée par la fusion suivante, et la correction est perdue.
-- Une table `trace` journalise chaque modification : utilisateur, table, identifiant de la ligne, type d'opération. C'est un journal d'audit, pas un journal de décisions rejouable.
-- Des imports par tableur pour l'annuaire, les unités de recherche et les publications ; le modèle d'import des publications a une colonne « verrouillé ».
-
-### Un annuaire riche
-
-- Où : [`bdd`](https://gitlab.com/biblioref/saas-app/bdd), fichier `1_Création/biblioref.sql`.
-- Pour chaque personne : appartenances datées aux structures, grades, diplômes, disciplines, sections, mots-clés, identifiants.
-- Pour chaque structure : tutelles typées (principale ou non), formes de nom, et un historique des créations, fusions et scissions (`structurecreation`, avec les structures d'origine).
-- Chez nous : l'historique des structures manque à `structure_tutelles` ; il sert à rattacher une publication ancienne à une unité qui a depuis fusionné.
-
-### Les collections thématiques par expression régulière
-
-- Une collection (`tag`) est définie par une expression régulière, stockée en base. Je n'ai pas trouvé où elle est appliquée aux publications.
-
-### L'origine de chaque champ consolidé
-
-- Où : [`classes/interfaces/researchproduct.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/researchproduct.py), [`utils/fields_origin.json`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/fields_origin.json).
-- Les notices d'un même document sont triées par priorité de source ; pour chaque champ (titre, type, auteurs, disciplines, mots-clés, accès ouvert…), la première source qui le renseigne l'emporte.
-- La source et l'identifiant de la notice retenue sont enregistrés champ par champ, dans une colonne JSON (`researchproductorigin`).
-- Chez nous : savoir d'où vient la valeur affichée, sans recalculer.
-
-### La manière dont une structure a été attribuée
-
-- Où : [`classes/interfaces/structure.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/structure.py), [`utils/structurechoice.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/structurechoice.py).
-- Chaque lien signature-structure porte un code qui dit comment il a été établi : saisie manuelle, fourni par la source, appartenance datée de la personne dans l'annuaire à la date de publication, structure de l'annuaire retrouvée parmi celles de la signature, structure du périmètre, ou premier type de structure dans un ordre fixe (laboratoire, unité, établissement…).
-- Chez nous : à rapprocher de `matched_form_id` et de `resolution_mode`, avec en plus la saisie manuelle comme valeur du même code.
-
-### Le verrouillage
-
-- Une publication ou un auteur porte un booléen `locked`. Une publication verrouillée n'est plus touchée par le dédoublonnage.
-- C'est le troisième mécanisme de la gestion des données de référence (après la source prioritaire et la contrainte de la résolution), avec sa limite : la publication ne reçoit plus les mises à jour des sources.
-
-### Le dédoublonnage
-
-- Où : [`utils/researchproduct_deduplication.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/researchproduct_deduplication.py), [`utils/data_binding.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/data_binding.py), [`ALGORITHM.md`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/ALGORITHM.md).
-- Conditions obligatoires : même sous-type de document et même date de publication, au jour près.
-- Puis : DOI égal, ou même identifiant de notice, suffit. Sinon il faut au moins un identifiant d'auteur commun, puis des titres proches (score pondéré Levenshtein, Jaro-Winkler et tri des mots, seuil 0,85).
-- Chaque notice entrante est comparée à toutes les publications existantes, en mémoire.
-- Quand un doublon est trouvé, les publications existantes sont supprimées et une nouvelle est construite à partir de toutes les notices, rechargées une à une auprès des connecteurs : l'identifiant de la publication change.
-
-### Les auteurs
-
-- Où : [`classes/interfaces/author.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/author.py).
-- Un annuaire (`authorreference`), avec les appartenances datées aux structures, sert de référence. Une signature y est rattachée par identifiant.
-- Hors annuaire, une signature est rattachée à un auteur déjà connu par identifiant, sinon par égalité exacte du prénom et du nom, sinon un auteur est créé.
-
-### Ce qu'on écarte chez BiblioRef
+### BiblioRef
 
 - **La date de publication au jour près comme condition du dédoublonnage** : deux sources donnent souvent des dates différentes pour le même document.
 - **La suppression puis la recréation de la publication à chaque fusion** : identifiant instable, décisions perdues.
@@ -429,37 +422,6 @@ Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), 
 - **La comparaison de chaque notice à tout le stock en mémoire.**
 - **Le code commun recopié dans chaque connecteur**, au lieu d'une bibliothèque partagée.
 - **Les corrections écrites dans les tables du moissonneur**, protégées seulement par le verrou.
-- **Le script de création de la base au format MySQL**, alors que l'API se connecte à PostgreSQL : le schéma de référence n'est pas évident.
-
-## Métadonnées
-
-### Les types de document traduits par table
-
-- Où : svp-harvester, [`hal_document_type_converter.py`](https://github.com/CRISalid-esr/svp-harvester/blob/dev-main/app/harvesters/hal/hal_document_type_converter.py).
-- Une table par source, du type natif vers un vocabulaire commun.
-
-### La notice la plus riche, par score
-
-- Où : crisalid-ikg, [`global_richest_merge_strategy.py`](https://github.com/CRISalid-esr/crisalid-ikg/blob/dev-main/app/services/documents/merge_strategies/global_richest_merge_strategy.py).
-- Chaque notice reçoit un score pondéré : longueur du résumé, nombre de contributeurs, de mots-clés, présence d'une date. La mieux notée fournit les métadonnées.
-- Une autre manière de choisir que la priorité fixe entre sources.
-
-### Les libellés des concepts complétés
-
-- Où : svp-harvester, [`services/concepts/`](https://github.com/CRISalid-esr/svp-harvester/tree/dev-main/app/services/concepts).
-- Pour un sujet fourni avec un identifiant (IdRef, Wikidata, JEL), le référentiel est interrogé et ses libellés préférés et alternatifs sont enregistrés.
-- Cela unifie les libellés. Cela ne filtre pas les sujets aberrants.
-
-## Ce qu'on écarte, et pourquoi
-
-- **L'enchaînement par événements et RabbitMQ** (CRISalid). Adapté à un usage interactif et à des règles locales. Avec une résolution qui compare des noms sur tout le corpus, le traitement notice par notice serait lent et dépendrait de l'ordre d'arrivée.
-- **Les DAO génériques à une seule implémentation** (CRISalid). Même défaut que nos ports.
-- **Une classe par type de message** (CRISalid). Une trentaine de fichiers pour émettre des événements.
-- **Le traitement publication par publication en Python** (rialto, `distill.py`). Convient à leur volume, pas à nos étapes ensemblistes.
-- **Le type élu par ordre des sources** (CRISalid). Le premier type connu gagne, sans règle de cohérence.
-- **La liste entière des contributeurs remplacée par la dernière correction** (CRISalid). Nos confirmations et rejets portent sur un lien à la fois.
-- **Le dédoublonnage par identifiants seuls** (CRISalid, rialto). Aucun rapprochement par titre.
-- **Le lien structure-publication par l'appartenance des personnes** (CRISalid). Les publications d'un laboratoire sont celles de ses membres dans l'annuaire, sans lecture des adresses.
 
 ## Ce que ces exemples ne montrent pas
 
