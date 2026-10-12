@@ -78,3 +78,9 @@ def test_la_fusion_des_revues_suit_le_typage_openalex():
     """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
     deps = dependencies(NODES)["publishers_journals.merge_duplicate_journals"]
     assert "publishers_journals.enrich_journals_from_openalex" in deps
+
+
+def test_le_nettoyage_des_identites_suit_la_suppression_des_notices_disparues():
+    """Supprimer une notice emporte ses signatures, et donc des identités d'auteur deviennent orphelines."""
+    deps = dependencies(NODES)["normalize.cleanup_orphan_identities"]
+    assert "normalize.prune_disappeared" in deps
