@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays des adresses (attribution unitaire ou par lot, recopie vers les adresses jumelles).
 
-Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`).
+Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque écriture de pays marque l'adresse `countries_dirty` : le run suivant reprend la propagation si le recalcul ciblé a échoué.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
@@ -19,7 +19,8 @@ _ADD_COUNTRY_SET_CLAUSE = """
         WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
         WHEN :cc = ANY(countries) THEN countries
         ELSE array_append(countries, CAST(:cc AS char(2)))
-    END
+    END,
+    countries_dirty = true
 """
 
 
@@ -139,7 +140,7 @@ class PgAddressRepository(AddressRepository):
         result = self._conn.execute(
             update(addresses)
             .where(addresses.c.id == address_id)
-            .values(countries=countries if countries else None)
+            .values(countries=countries if countries else None, countries_dirty=True)
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Adresse {address_id} introuvable")
@@ -198,7 +199,7 @@ class PgAddressRepository(AddressRepository):
         result = self._conn.execute(
             text("""
                 UPDATE addresses a2
-                SET countries = a1.countries
+                SET countries = a1.countries, countries_dirty = true
                 FROM addresses a1
                 WHERE a1.id = ANY(:source_ids)
                   AND a1.countries IS NOT NULL
