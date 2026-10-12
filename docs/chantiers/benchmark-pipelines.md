@@ -2,12 +2,14 @@
 
 ## Contexte
 
-Document de référence, extérieur aux fiches chantier. Lecture du code de quatre projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit.
+Document de référence, extérieur aux fiches chantier. Lecture du code de six projets, au 2026-10-11, sans exécution. Chaque idée renvoie au fichier où elle se voit.
 
 - **CRISalid** : le moissonneur (`svp-harvester`), le graphe (`crisalid-ikg`), et le modèle de données de l'interface (`sovisuplus`).
 - **rialto-airflow** : le pipeline de Stanford.
 - **ReCiter** : l'attribution des publications PubMed aux personnes, à Weill Cornell.
 - **dnet-dedup** : le dédoublonnage du graphe d'OpenAIRE. Lecture partielle, voir la liste des dépôts.
+- **Academic Observatory** : les workflows de l'observatoire de l'université Curtin.
+- **BiblioRef** : l'outil de l'université Jean Moulin Lyon 3. Moissonneur et connecteurs, lus depuis des archives ; application non lue.
 
 Les liens vers les dépôts sont en fin de document.
 
@@ -280,6 +282,134 @@ Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque p
 - **Spark, Oozie et Java** : dimensionnés pour des centaines de millions d'enregistrements.
 - **L'arbre de décision en JSON** : un langage de règles maison. Les réglages de Splink tiennent ce rôle.
 
+## Entrepôt à l'échelle mondiale : Academic Observatory (Curtin)
+
+Un pipeline ELT au sens strict : des dumps complets de sources ouvertes chargés dans BigQuery, puis une chaîne de requêtes SQL qui produit une table par DOI et des agrégats par établissement, pays, revue, financeur. Pas d'établissement de référence, pas de personnes, pas de décisions humaines.
+
+### Un dossier par source, avec les mêmes fichiers
+
+- Où : [`academic_observatory_workflows/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows), un dossier `<source>_telescope/` par source.
+- Chaque dossier contient `telescope.py` (le graphe des tâches), `tasks.py` (les fonctions appelées), `schema/` (le schéma attendu des tables), `tests/fixtures/` (un extrait de dump et le résultat attendu).
+- Le fichier de graphe ne contient que l'enchaînement ; la logique est dans `tasks.py`. Même partage que rialto.
+
+### La consolidation en SQL, une requête par source
+
+- Où : [`doi_workflow/sql/`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/sql) : `crossref_metadata.sql.jinja2`, `openalex.sql.jinja2`, `unpaywall.sql.jinja2`, `ror.sql.jinja2`… puis `doi.sql.jinja2` qui les joint.
+- Les requêtes sont déclarées comme données dans [`queries.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/queries.py) : nom, tables d'entrée, table de sortie. Les requêtes d'une même liste n'ont pas de dépendance entre elles.
+- La réconciliation se réduit à une jointure sur le DOI, Crossref servant de référence : une publication sans DOI Crossref n'existe pas.
+
+### Un graphe qui attend ses sources
+
+- Le workflow de consolidation commence par des capteurs qui attendent la fin de chaque workflow de source.
+- Acquisition et transformation sont deux graphes distincts. La transformation ne fait aucun appel réseau, à une exception près (voir plus bas).
+
+### Des versions datées plutôt que des mises à jour
+
+- Chaque source est chargée comme un instantané daté (tables suffixées par la date). La consolidation désigne explicitement l'instantané qu'elle lit.
+- Une table de « releases » garde, par source, la date du dernier instantané traité ; un run sans nouvel instantané s'arrête au premier test.
+- Chez nous : l'équivalent de `pipeline_phase_executions`, pour savoir ce que le dernier run a lu.
+
+### Le contrôle du schéma des sources
+
+- Où : `compare_schemas` dans [`openalex_telescope/tasks.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/openalex_telescope/tasks.py).
+- Le schéma déduit du dump est comparé au schéma attendu, versionné dans le dépôt. Un écart envoie une alerte, sans bloquer le chargement.
+- Chez nous : détecter qu'une source a changé de format avant que la normalisation échoue ou perde des champs en silence.
+
+### Des affiliations élargies par la hiérarchie de ROR
+
+- Où : `doi.sql.jinja2` et `create_ror_hierarchy_table` dans [`doi_workflow/tasks.py`](https://github.com/The-Academic-Observatory/academic-observatory-workflows/blob/main/academic-observatory-workflows/academic_observatory_workflows/doi_workflow/tasks.py).
+- Une table matérialise, pour chaque organisation ROR, tous ses ascendants. Une publication est attribuée à l'organisation de l'auteur et à toute sa généalogie.
+- Chez nous : l'équivalent de `perimeter_structures`, appliqué aux organisations des co-auteurs.
+
+### Les entrepôts rattachés à un établissement
+
+- Où : `create_repo_institution_to_ror_table`, même fichier.
+- Les noms d'entrepôts d'Unpaywall sont alignés sur ROR par l'API d'affiliation de ROR. C'est le seul appel réseau de la consolidation.
+- Sert à compter le dépôt en archive ouverte par établissement.
+
+### Ce qu'on écarte chez Academic Observatory
+
+- **BigQuery, Google Cloud, Astronomer, Kubernetes** : dimensionnés pour des dumps de plusieurs centaines de gigaoctets.
+- **Le DOI comme seule clé** : rien pour les documents sans DOI, ni pour un DOI erroné.
+- **Les affiliations d'OpenAlex reprises telles quelles** : aucune lecture des adresses.
+
+## Outil d'établissement : BiblioRef (Lyon 3)
+
+Lu à partir d'archives : le moissonneur (`harvester`, 2 600 lignes de Python), les connecteurs (`connector-base`, `connector-hal`, `connector-openalex`, `connector-sudoc`, de 2 400 à 4 100 lignes chacun) et le dépôt de présentation (`awesome-biblioref`). Non lus : le schéma de la base, l'API et l'interface. Chaque dépôt a été publié en un seul commit en septembre 2025, développé par la société DyoNeo pour le SCD de Lyon 3.
+
+### Des connecteurs en services séparés, derrière un contrat commun
+
+- Où : [`utils/tools.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/tools.py), [`start.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/start.py).
+- Chaque source (HAL, OpenAlex, Sudoc) est un service à part, qui expose trois routes : `/ping`, `/researchproducts/?start_date=…` (notices nouvelles ou modifiées depuis une date), `/researchproduct/<id>` (une notice).
+- Le moissonneur interroge d'abord chaque connecteur actif ; si l'un ne répond pas, le run s'arrête et l'échec est journalisé.
+- Les connecteurs actifs, leur adresse et leur ordre de priorité sont dans une table `source`.
+- Un run hebdomadaire par cron, qui demande les notices modifiées depuis la date du dernier run réussi.
+
+### Un connecteur par source, chacun avec sa base
+
+- Où : [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), et son [guide de création d'un connecteur](https://gitlab.com/biblioref/connectors/connector-base/-/blob/main/FORK_GUIDE.md).
+- Chaque connecteur est une copie (« fork ») du connecteur de base : même arborescence, mêmes classes, seuls `connector/data_collector.py` et `connector/data_binding.py` changent vraiment.
+- Chaque connecteur a sa propre base PostgreSQL, où il range ses notices dans un modèle commun. Le moissonneur lit ensuite ces bases par l'API de chaque connecteur.
+- Dans la base d'un connecteur, une notice déjà connue est supprimée puis recréée si la source donne une date de modification plus récente.
+- Chez nous : l'équivalent de `staging` et de `source_publications`, découpé en une base par source. La duplication du code entre connecteurs est le prix de cette indépendance.
+
+### Le moissonnage part de l'annuaire
+
+- Où : `collectDatasByAuthor` dans [`connector-hal/connector/data_collector.py`](https://gitlab.com/biblioref/connectors/connector-hal/-/blob/main/connector/data_collector.py), et `getQueryAuthors` dans `classes/utils/tools.py`.
+- Les connecteurs lisent dans la base principale les personnes de l'annuaire rattachées à une structure du périmètre, leurs identifiants et leurs périodes de présence.
+- Chaque personne est interrogée par ses identifiants, sur la seule période où elle était dans une structure du périmètre (date de publication entre la date d'entrée et la date de sortie).
+- HAL peut aussi être interrogé par structure, avec l'identifiant AuréHAL. OpenAlex et le Sudoc ne le sont que par personne.
+- Le champ de la source qui correspond à chaque type d'identifiant est déclaré en base (`sourceidentifiertype`), pas dans le code.
+- Une nouvelle période de présence ajoutée à l'annuaire est marquée ; le run suivant moissonne cette période, puis le marqueur est levé.
+- Chez nous : l'inverse du moissonnage par affiliation. Une personne absente de l'annuaire ou sans identifiant n'a pas de publications, sauf dans HAL par structure.
+
+### Les mises à jour
+
+- HAL : notices modifiées depuis un nombre de jours donné.
+- OpenAlex : par date de publication seulement. Un commentaire du code note que le filtre par date de mise à jour est payant.
+- Le Sudoc : requête SPARQL par IdRef, puis notice complète en MARCXML.
+- Aucune gestion des notices disparues d'une source.
+
+### L'origine de chaque champ consolidé
+
+- Où : [`classes/interfaces/researchproduct.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/researchproduct.py), [`utils/fields_origin.json`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/fields_origin.json).
+- Les notices d'un même document sont triées par priorité de source ; pour chaque champ (titre, type, auteurs, disciplines, mots-clés, accès ouvert…), la première source qui le renseigne l'emporte.
+- La source et l'identifiant de la notice retenue sont enregistrés champ par champ, dans une colonne JSON (`researchproductorigin`).
+- Chez nous : savoir d'où vient la valeur affichée, sans recalculer.
+
+### La manière dont une structure a été attribuée
+
+- Où : [`classes/interfaces/structure.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/structure.py), [`utils/structurechoice.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/structurechoice.py).
+- Chaque lien signature-structure porte un code qui dit comment il a été établi : saisie manuelle, fourni par la source, appartenance datée de la personne dans l'annuaire à la date de publication, structure de l'annuaire retrouvée parmi celles de la signature, structure du périmètre, ou premier type de structure dans un ordre fixe (laboratoire, unité, établissement…).
+- Chez nous : à rapprocher de `matched_form_id` et de `resolution_mode`, avec en plus la saisie manuelle comme valeur du même code.
+
+### Le verrouillage
+
+- Une publication ou un auteur porte un booléen `locked`. Une publication verrouillée n'est plus touchée par le dédoublonnage.
+- C'est le troisième mécanisme de la gestion des données de référence (après la source prioritaire et la contrainte de la résolution), avec sa limite : la publication ne reçoit plus les mises à jour des sources.
+
+### Le dédoublonnage
+
+- Où : [`utils/researchproduct_deduplication.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/researchproduct_deduplication.py), [`utils/data_binding.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/utils/data_binding.py), [`ALGORITHM.md`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/ALGORITHM.md).
+- Conditions obligatoires : même sous-type de document et même date de publication, au jour près.
+- Puis : DOI égal, ou même identifiant de notice, suffit. Sinon il faut au moins un identifiant d'auteur commun, puis des titres proches (score pondéré Levenshtein, Jaro-Winkler et tri des mots, seuil 0,85).
+- Chaque notice entrante est comparée à toutes les publications existantes, en mémoire.
+- Quand un doublon est trouvé, les publications existantes sont supprimées et une nouvelle est construite à partir de toutes les notices, rechargées une à une auprès des connecteurs : l'identifiant de la publication change.
+
+### Les auteurs
+
+- Où : [`classes/interfaces/author.py`](https://gitlab.com/biblioref/harvester/harvester/-/blob/main/classes/interfaces/author.py).
+- Un annuaire (`authorreference`), avec les appartenances datées aux structures, sert de référence. Une signature y est rattachée par identifiant.
+- Hors annuaire, une signature est rattachée à un auteur déjà connu par identifiant, sinon par égalité exacte du prénom et du nom, sinon un auteur est créé.
+
+### Ce qu'on écarte chez BiblioRef
+
+- **La date de publication au jour près comme condition du dédoublonnage** : deux sources donnent souvent des dates différentes pour le même document.
+- **La suppression puis la recréation de la publication à chaque fusion** : identifiant instable, décisions perdues.
+- **Le rattachement d'auteurs par égalité de nom, sans contrôle des homonymes.**
+- **La comparaison de chaque notice à tout le stock en mémoire.**
+- **Le code commun recopié dans chaque connecteur**, au lieu d'une bibliothèque partagée.
+
 ## Métadonnées
 
 ### Les types de document traduits par table
@@ -330,10 +460,11 @@ Il n'y a pas d'entité « personne ». Un auteur est une propriété de chaque p
 
 - **[dnet-team/dnet-dedup](https://github.com/dnet-team/dnet-dedup)** — dédoublonnage d'OpenAIRE. Java, Spark. Dernier commit sur GitHub : 2022-04-26. Lu : configuration, comparateurs, fonctions de blocage.
 - **[D-Net/dnet-hadoop](https://code-repo.d4science.org/D-Net/dnet-hadoop)** — code actuel du graphe d'OpenAIRE, module `dhp-dedup-openaire`, fichiers datés de 2023-2024. Lu par résumé : `SparkCreateMergeRels.java`, `IdGenerator.java`. Non lu : `SparkWhitelistSimRels.java` (accès refusé). Le miroir GitHub de ce dépôt date de 2019.
+- **[The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)** — université Curtin. Python, Airflow, BigQuery, SQL en gabarits Jinja. 31 000 lignes de Python, dont 7 700 de liste d'établissements. Dernier commit : 2026-10-12.
+- **[biblioref (GitLab)](https://gitlab.com/biblioref)** — université Jean Moulin Lyon 3, développé par DyoNeo. Python pour le moissonneur, Node.js et Angular pour l'application, PostgreSQL. Lus, depuis des archives : [`harvester`](https://gitlab.com/biblioref/harvester/harvester), [`connector-base`](https://gitlab.com/biblioref/connectors/connector-base), [`connector-hal`](https://gitlab.com/biblioref/connectors/connector-hal), [`connector-openalex`](https://gitlab.com/biblioref/connectors/connector-openalex), [`connector-sudoc`](https://gitlab.com/biblioref/connectors/connector-sudoc), [`awesome-biblioref`](https://gitlab.com/biblioref/awesome-biblioref/awesome-biblioref). Un seul commit par dépôt, septembre 2025. Non lus : `bdd`, `backend`, `frontend`. Présentation : [*Arabesques*](https://publications-prairial.fr/arabesques/index.php?id=4433).
 
 ### Repérés, non lus
 
 - **[dataesr/affiliation-matcher](https://github.com/dataesr/affiliation-matcher)** — alignement d'une affiliation brute sur ROR et le RNSR.
-- **[The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)** — workflows Airflow par source.
 - **[ourresearch/openalex-walden](https://github.com/ourresearch/openalex-walden)** — pipelines d'OpenAlex, sur Databricks.
 - **[conditor-project](https://github.com/conditor-project)** — dédoublonnage de la production française, Inist. État de maintenance non vérifié.
