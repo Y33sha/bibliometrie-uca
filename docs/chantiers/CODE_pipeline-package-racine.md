@@ -52,7 +52,8 @@ Dans l'ordre du pipeline.
 
 - [x] `run_pipeline` dans `pipeline/run.py` ; le câblage de chaque phase (`build`) rejoint le module de la phase ; suppression de `interfaces/cli/phases` et des ports techniques (issues de requête, circuit-breaker, dumps, empreinte, parallélisme), repliés dans l'infrastructure. 01d7da467, 6fbbccdab
 - [ ] Les opérations « trouver ou créer » (revues, monographies, éditeurs) et la création d'une publication quittent `application/services` pour `pipeline/containers` et `pipeline/publications`, avec les ports qui ne servent qu'à elles (`containers`, `journals`, `monographs`, `publishers`).
-- [ ] Les ports partagés avec l'API restants dans `application/ports/pipeline`, et leurs adaptateurs dans `infrastructure/pipeline`, selon la réponse à la question des recalculs ciblés.
+- [x] Les implémentations des ports que l'API appelle (clôture des périmètres, `in_perimeter` ciblé, construction des authorships) rejoignent `pipeline/` ; `deps.py` les injecte. 028c1cc33
+- [ ] Les recalculs que les dépôts appellent directement (`publications.in_perimeter` depuis le dépôt des personnes, `pub_count` depuis les fusions de revues et d'éditeurs) restent dans `infrastructure/pipeline/authorships`, selon la réponse à la question des recalculs ciblés.
 
 ## Questions ouvertes
 
