@@ -5,7 +5,7 @@ Une monographie vide n'est portée par aucun enregistrement ni aucune publicatio
 
 import logging
 
-from application.ports.pipeline.monographs import MonographCleanupQueries
+from pipeline.containers.monographs import MonographGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -14,7 +14,7 @@ LIBELLE = "Monographies vides"
 
 
 def run_delete_empty_monographs(
-    logger: logging.Logger, *, monograph_repo: MonographCleanupQueries
+    logger: logging.Logger, *, monograph_repo: MonographGatewayQueries
 ) -> PhaseMetrics:
     """Supprime les monographies vides et journalise chacune."""
     deleted = monograph_repo.delete_empty_monographs()

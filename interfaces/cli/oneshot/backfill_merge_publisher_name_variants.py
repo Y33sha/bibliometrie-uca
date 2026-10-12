@@ -21,7 +21,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, Row, text
 
-from application.services.publishers.core import match_or_create_publisher, merge_publishers
+from application.services.publishers.core import merge_publishers
 from domain.errors import PublisherMergeBlockedError
 from domain.normalize import normalize_text
 from domain.publishers.names import publisher_name_key
@@ -31,6 +31,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
+from pipeline.containers.find_or_create import match_or_create_publisher
 from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 

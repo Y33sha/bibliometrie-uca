@@ -1,15 +1,11 @@
-"""Adapter PostgreSQL de la table `publishers` pour le pipeline (trouve-ou-crée).
+"""Accès PostgreSQL du pipeline à la table `publishers`.
 
-Sert le contrat `application/ports/pipeline/publishers.py`, consommé par le trouve-ou-crée d'éditeur des normaliseurs et le volet publisher de `publishers_journals`. L'édition, la fusion et l'enrichissement pays (maintenance) vivent dans `infrastructure/repositories/publisher_repository.py`.
+L'édition, la fusion et l'enrichissement pays sont dans `infrastructure/repositories/publisher_repository.py`.
 """
 
 from sqlalchemy import Connection, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.pipeline.publishers import (
-    PublisherCleanupQueries,
-    PublisherFindOrCreateQueries,
-)
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import publisher_name_forms, publishers
 
@@ -26,13 +22,14 @@ _DELETE_EMPTY_PUBLISHERS = text("""
 """)
 
 
-class PublisherGatewayQueries(PublisherFindOrCreateQueries, PublisherCleanupQueries):
-    """Accès PostgreSQL à `publishers` pour le pipeline (trouve-ou-crée), via une `Connection` SQLAlchemy."""
+class PublisherGatewayQueries:
+    """Accès PostgreSQL à `publishers` pour le pipeline, via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     def add_publisher_name_form(self, publisher_id: int, form_normalized: str) -> None:
+        """Ajoute une forme de nom normalisée pour un éditeur, si absente (idempotent)."""
         stmt = (
             pg_insert(publisher_name_forms)
             .values(publisher_id=publisher_id, form_normalized=form_normalized)
@@ -50,6 +47,7 @@ class PublisherGatewayQueries(PublisherFindOrCreateQueries, PublisherCleanupQuer
         publisher_id: int,
         openalex_id: str,
     ) -> None:
+        """Attribue un `openalex_id` à l'éditeur s'il n'en a pas déjà un."""
         stmt = (
             update(publishers)
             .where(publishers.c.id == publisher_id)
@@ -61,6 +59,7 @@ class PublisherGatewayQueries(PublisherFindOrCreateQueries, PublisherCleanupQuer
     def match_or_create_by_name_form(
         self, name_raw: str, name_normalized: str, name_key: str
     ) -> tuple[int, bool]:
+        """`(id, created)` : l'éditeur qui a déjà la forme de nom `name_key`, sinon un éditeur créé sous `name_raw` et `name_normalized`, avec sa forme `name_key`."""
         existing = self.find_publisher_by_name_form(name_key)
         if existing is not None:
             return existing, False
@@ -94,5 +93,6 @@ class PublisherGatewayQueries(PublisherFindOrCreateQueries, PublisherCleanupQuer
         return scalar_int(self._conn.execute(stmt))
 
     def delete_empty_publishers(self) -> list[tuple[int, str]]:
+        """Supprime les éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue, et rend `(id, nom)` de chacun."""
         rows = self._conn.execute(_DELETE_EMPTY_PUBLISHERS).all()
         return sorted((r.id, r.name) for r in rows)

@@ -15,8 +15,6 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.publishers.core import match_or_create_publisher
 from domain.normalize import normalize_text, to_plain_text
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from infrastructure.sources.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
@@ -24,6 +22,8 @@ from pipeline.containers.doi_prefixes import (
     DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
+from pipeline.containers.find_or_create import match_or_create_publisher
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
@@ -62,7 +62,7 @@ def run_resolve_publishers(
     log: logging.Logger,
     *,
     repo: DoiPrefixesQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    publisher_repo: PublisherGatewayQueries,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
     breaker: SourceCircuitBreaker | None = None,
@@ -216,7 +216,7 @@ def _attach(
     metrics: PhaseMetrics,
     log: logging.Logger,
     repo: DoiPrefixesQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    publisher_repo: PublisherGatewayQueries,
 ) -> None:
     """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vérifié."""
     metrics.add(total=1)

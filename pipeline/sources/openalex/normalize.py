@@ -5,10 +5,6 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.monographs.containers import Containers, find_or_create_containers
-from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
@@ -41,6 +37,13 @@ from domain.types import (
     as_str,
     as_strs,
 )
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.normalize import BibliographicNormalizer
 from pipeline.sources.pub_metadata import PublicationMetadata
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
@@ -157,7 +160,7 @@ def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
 
 
 def upsert_publisher(
-    work: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+    work: Mapping[str, JsonValue], *, publisher_repo: PublisherGatewayQueries
 ) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
@@ -207,7 +210,7 @@ def upsert_containers(
     work: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
@@ -475,8 +478,8 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerFindOrCreateQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,

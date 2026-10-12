@@ -14,14 +14,14 @@ L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent 
 import logging
 from collections.abc import Callable, Sequence
 
-from application.ports.pipeline.journals import (
+from domain.journals.titles import compatible_titles, nested_titles
+from pipeline.containers.journal_label import journal_label
+from pipeline.containers.journals import (
+    JournalGatewayQueries,
     JournalMergeCandidate,
-    JournalMergeQueries,
     JournalPublicationPair,
     JournalTitleRow,
 )
-from domain.journals.titles import compatible_titles, nested_titles
-from pipeline.containers.journal_label import journal_label
 from pipeline.libelles import BRANCHE, accord
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
@@ -48,7 +48,7 @@ _REGLES = (
 def run_merge_duplicate_journals(
     logger: logging.Logger,
     *,
-    journal_repo: JournalMergeQueries,
+    journal_repo: JournalGatewayQueries,
     merge: MergeJournals,
 ) -> PhaseMetrics:
     """Applique les cinq règles dans l'ordre. Chaque règle lit ses groupes après les fusions des précédentes."""
@@ -124,7 +124,7 @@ def _merge_priority(journal: JournalMergeCandidate) -> tuple[bool, int, int]:
 def _merge_groups(
     logger: logging.Logger,
     metrics: PhaseMetrics,
-    journal_repo: JournalMergeQueries,
+    journal_repo: JournalGatewayQueries,
     merge: MergeJournals,
     absorbed: dict[int, int],
     groups: Sequence[MergeGroup],

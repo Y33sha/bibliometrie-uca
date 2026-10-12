@@ -5,7 +5,7 @@ Un éditeur vide ne porte ni revue, ni monographie, ni préfixe DOI, ni paiement
 
 import logging
 
-from application.ports.pipeline.publishers import PublisherCleanupQueries
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -14,7 +14,7 @@ LIBELLE = "Éditeurs vides"
 
 
 def run_delete_empty_publishers(
-    logger: logging.Logger, *, publisher_repo: PublisherCleanupQueries
+    logger: logging.Logger, *, publisher_repo: PublisherGatewayQueries
 ) -> PhaseMetrics:
     """Supprime les éditeurs vides et journalise chacun."""
     deleted = publisher_repo.delete_empty_publishers()

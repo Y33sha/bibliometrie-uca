@@ -9,7 +9,6 @@ Trois règles de `domain/journals/containers.py` désignent un recueil d'actes :
 
 import logging
 
-from application.ports.pipeline.journals import JournalProceedingsTypingQueries
 from domain.journals.containers import (
     holds_mostly_conference_papers,
     is_dated_event_without_issn,
@@ -17,6 +16,7 @@ from domain.journals.containers import (
 )
 from domain.journals.journal import JournalType
 from pipeline.containers.journal_label import journal_label
+from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -29,7 +29,7 @@ _BY_PROCEEDINGS_TITLE = "titre d'actes"
 
 
 def run_type_proceedings_journals(
-    logger: logging.Logger, *, journal_repo: JournalProceedingsTypingQueries
+    logger: logging.Logger, *, journal_repo: JournalGatewayQueries
 ) -> PhaseMetrics:
     """Type en recueil d'actes les revues que désigne l'une des trois règles, et journalise chacune avec la règle qui la désigne."""
     metrics = PhaseMetrics()

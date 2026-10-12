@@ -2,10 +2,10 @@
 
 import logging
 
-from application.ports.pipeline.journals import JournalSummary
 from pipeline.containers.delete_empty_journals import (
     run_delete_empty_journals,
 )
+from pipeline.containers.journals import JournalSummary
 
 
 class _Repo:

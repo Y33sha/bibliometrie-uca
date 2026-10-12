@@ -1,10 +1,11 @@
-"""Adapter PostgreSQL de la table `journals` pour le pipeline.
+"""Accès PostgreSQL du pipeline à la table `journals`.
 
-Sert les contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-ou-crée d'une revue à partir des sources, enrichissement OpenAlex (typage + APC), vérification des ISSN dans le Sudoc et import du dump DOAJ. La table étant mono-adapter, une seule classe implémente tous les Protocols. L'édition dans l'administration et la fusion passent par `infrastructure/repositories/journal_repository.py`.
+L'édition dans l'administration et la fusion passent par `infrastructure/repositories/journal_repository.py`.
 """
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import NamedTuple
 
 from sqlalchemy import (
     Connection,
@@ -21,28 +22,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.pipeline.journals import (
-    DoiJournalRow,
-    JournalCleanupQueries,
-    JournalDoajQueries,
-    JournalDoiNamespaceQueries,
-    JournalFindOrCreateQueries,
-    JournalIssnGroup,
-    JournalIssnRow,
-    JournalMergeCandidate,
-    JournalMergeGroup,
-    JournalMergeQueries,
-    JournalOpenAlexEnrichmentQueries,
-    JournalProceedingsTypingQueries,
-    JournalPublicationPair,
-    JournalRecordTypes,
-    JournalSudocQueries,
-    JournalSudocRow,
-    JournalSummary,
-    JournalTitleIssnRow,
-    JournalTitleRow,
-    JournalTitleTypeRow,
-)
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType, ManualField, OaModel
@@ -59,7 +38,107 @@ from infrastructure.db.tables import (
     journals,
 )
 
+
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
+class JournalIssnRow(NamedTuple):
+    """Un ISSN valide d'une revue, pour l'index par ISSN."""
+
+    journal_id: int
+    issn: str
+
+
+class JournalSudocRow(NamedTuple):
+    """Une revue à vérifier dans le Sudoc : son titre, ses ISSN et les ISSN de ses enregistrements sans figurer parmi les siens."""
+
+    id: int
+    title: str
+    issns: tuple[JournalIssn, ...]
+    document_issns: tuple[str, ...] = ()
+    journal_type: JournalType = JournalType.UNKNOWN
+
+
+class JournalTitleRow(NamedTuple):
+    """Une revue et son titre."""
+
+    id: int
+    title: str
+
+
+class JournalTitleTypeRow(NamedTuple):
+    """Une revue, son titre et son type."""
+
+    id: int
+    title: str
+    journal_type: JournalType
+
+
+class JournalMergeGroup(NamedTuple):
+    """Revues en double. La cible de la fusion vient en premier."""
+
+    key: str
+    """Ce que les revues partagent : ISSN-L ou titre normalisé."""
+    journal_ids: tuple[int, ...]
+
+
+class JournalSummary(NamedTuple):
+    """Ce que le journal du pipeline dit d'une revue."""
+
+    id: int
+    title: str
+    publisher: str | None
+    issns: tuple[str, ...]
+    """ISSN actifs."""
+
+
+class JournalIssnGroup(NamedTuple):
+    """Revues où le même ISSN est actif. La cible de la fusion vient en premier."""
+
+    issn: str
+    journals: tuple[JournalTitleRow, ...]
+
+
+class JournalMergeCandidate(NamedTuple):
+    """Une revue candidate à une fusion, avec ce qui départage la cible."""
+
+    id: int
+    title: str
+    issns: frozenset[str]
+    """ISSN actifs."""
+    pub_count: int
+
+
+class JournalPublicationPair(NamedTuple):
+    """Deux revues auxquelles sont rattachés des enregistrements d'une même publication."""
+
+    first: JournalMergeCandidate
+    second: JournalMergeCandidate
+    publications: int
+    """Nombre de publications communes."""
+
+
+class JournalRecordTypes(NamedTuple):
+    """Les documents d'une revue : `(source, type brut)` de chacun."""
+
+    journal_id: int
+    records: tuple[tuple[str, str | None], ...]
+
+
+class JournalTitleIssnRow(NamedTuple):
+    """Titre d'une revue, et présence d'un ISSN actif."""
+
+    id: int
+    title: str
+    has_issn: bool
+
+
+class DoiJournalRow(NamedTuple):
+    """Un DOI et la revue que lui donne sa source, avec le type de cette revue."""
+
+    doi: str
+    journal_id: int
+    journal_type: JournalType
+
+
 _DOCUMENT_ISSNS = text("""
     SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
     FROM source_publications s
@@ -115,8 +194,8 @@ _JOURNALS_SHARING_ACTIVE_ISSN = text(f"""
 """)
 
 
-# Paires de revues vérifiées dont l'une porte, inactif, un ISSN actif dans l'autre. La cible de la fusion en tête : la
-# revue dont le premier document est le plus tardif, puis celle qui porte le plus de publications.
+# Paires de revues vérifiées dont l'une a, inactif, un ISSN actif dans l'autre. La cible de la fusion en tête : la
+# revue dont le premier document est le plus tardif, puis celle qui a le plus de publications.
 _JOURNALS_SHARING_AN_INACTIVE_ISSN = text(f"""
     WITH {_VERIFIED}, paires AS (
         SELECT DISTINCT a.issn, least(a.journal_id, b.journal_id) AS x_id,
@@ -140,7 +219,7 @@ _JOURNALS_SHARING_AN_INACTIVE_ISSN = text(f"""
     ORDER BY p.issn
 """)
 
-# Paires de revues seules à porter leur titre, dont au moins une sans ISSN, et dont les
+# Paires de revues seules à avoir leur titre, dont au moins une sans ISSN, et dont les
 # enregistrements partagent un préfixe DOI. La cible de la fusion en tête. Un titre normalisé vide
 # (alphabet non latin, symboles) ne rapproche aucune revue.
 _SAME_TITLE_DUPLICATES = text(f"""
@@ -171,7 +250,7 @@ _SAME_TITLE_DUPLICATES = text(f"""
     ORDER BY x.title_normalized
 """)
 
-# Paires de revues que les enregistrements d'une même publication portent, les plus partagées en tête.
+# Paires de revues auxquelles sont rattachés les enregistrements d'une même publication, les plus partagées en tête.
 _JOURNALS_SHARING_A_PUBLICATION = text(f"""
     WITH rattachements AS (
         SELECT DISTINCT publication_id, journal_id
@@ -242,7 +321,7 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
 """)
 
 
-# Une revue posée par son espace de noms porte sa trace dans `raw_metadata.journal_id`.
+# Une revue posée par son espace de noms laisse sa trace dans `raw_metadata.journal_id`.
 _DOI_JOURNAL_PAIRS = text("""
     SELECT s.doi, s.journal_id, j.journal_type
     FROM source_publications s
@@ -251,16 +330,7 @@ _DOI_JOURNAL_PAIRS = text("""
 """)
 
 
-class JournalGatewayQueries(
-    JournalFindOrCreateQueries,
-    JournalOpenAlexEnrichmentQueries,
-    JournalSudocQueries,
-    JournalMergeQueries,
-    JournalCleanupQueries,
-    JournalProceedingsTypingQueries,
-    JournalDoiNamespaceQueries,
-    JournalDoajQueries,
-):
+class JournalGatewayQueries:
     """Accès PostgreSQL à `journals` pour le pipeline, via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
@@ -274,6 +344,7 @@ class JournalGatewayQueries(
         form_normalized: str,
         publisher_id: int | None,
     ) -> None:
+        """Ajoute une forme de nom normalisée pour une revue, si absente (idempotent). No-op si `form_normalized` est vide."""
         if not form_normalized:
             return
         stmt = (
@@ -292,6 +363,7 @@ class JournalGatewayQueries(
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
+        """Cherche un `journal_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à ISSN électronique actif. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
         stmt = (
             select(journal_name_forms.c.journal_id)
             .select_from(
@@ -325,6 +397,7 @@ class JournalGatewayQueries(
         ).scalar_one_or_none()
 
     def find_journals_of_unknown_type(self, *, limit: int | None = None) -> list[tuple[int, str]]:
+        """`(id, openalex_id)` des revues au `journal_type` indéterminé qui ont un `openalex_id`, à typer via OpenAlex. Le type étant stable par revue, une revue typée sort de la file. `limit` cape le run."""
         rows = self._conn.execute(
             select(journals.c.id, journals.c.openalex_id)
             .where(journals.c.openalex_id.is_not(None))
@@ -335,6 +408,7 @@ class JournalGatewayQueries(
         return [(r.id, r.openalex_id) for r in rows]
 
     def find_journal_issn_index(self) -> list[JournalIssnRow]:
+        """Les ISSN valides des revues, quel que soit leur statut : matière de l'index ISSN → revue à l'import du dump DOAJ."""
         return [
             JournalIssnRow(r.journal_id, r.issn)
             for r in self._conn.execute(
@@ -348,6 +422,7 @@ class JournalGatewayQueries(
         ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
+        """Cherche une revue qui a l'ISSN `issn_value`, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
         return self._conn.execute(
             select(journal_issns.c.journal_id)
             .where(
@@ -372,6 +447,7 @@ class JournalGatewayQueries(
         oa_model: OaModel | None = None,
     ) -> None:
         # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
+        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
         fillable = (
             (journals.c.publisher_id, publisher_id),
             (journals.c.openalex_id, openalex_id),
@@ -412,6 +488,7 @@ class JournalGatewayQueries(
         )
 
     def add_journal_issns(self, journal_id: int, issns: Sequence[JournalIssn]) -> None:
+        """Ajoute à la revue les ISSN qu'elle n'a pas, sans date de vérification : ils attendent la vérification Sudoc. Une ligne sans revue de même ISSN est rattachée à la revue. Un ISSN déjà présent garde ses données ; il reçoit seulement le support qui lui manque."""
         if self._issns_are_manual(journal_id):
             return
         has_linking = self._conn.execute(
@@ -454,6 +531,7 @@ class JournalGatewayQueries(
                 )
 
     def find_journals_to_check_in_sudoc(self, also: Sequence[int] = ()) -> list[JournalSudocRow]:
+        """Revues dont un ISSN n'est pas vérifié dans le Sudoc, revues dont un enregistrement a un ISSN valide absent de leurs ISSN et encore jamais vérifié, et revues `also`."""
         issns_of = issns_by_journal(self._conn)
         released: set[str] = set(
             self._conn.execute(
@@ -506,6 +584,7 @@ class JournalGatewayQueries(
         checked_at: datetime,
         title: str | None = None,
     ) -> None:
+        """Écrit les ISSN vérifiés d'une revue, datés de `checked_at`. `released` : ISSN d'une autre publication, retirés de la revue et gardés sans revue. Un `title` devient le titre de la revue, et une de ses formes de nom."""
         if self._issns_are_manual(journal_id):
             issns, released = [], []
         else:
@@ -544,6 +623,7 @@ class JournalGatewayQueries(
             self.add_journal_name_form(journal_id, normalize_text(title), publisher_id)
 
     def find_titles_of_journals_with_issn(self) -> list[JournalTitleTypeRow]:
+        """Les revues qui ont un ISSN actif, avec leur titre et leur type."""
         rows = self._conn.execute(
             select(journals.c.id, journals.c.title, journals.c.journal_type)
             .where(
@@ -559,12 +639,14 @@ class JournalGatewayQueries(
     # ── typage en recueil d'actes ──────────────────────────────────
 
     def find_record_types_of_unknown_journals(self) -> list[JournalRecordTypes]:
+        """Les revues de type `unknown` qui ont au moins un document, avec le type brut de chaque document."""
         return [
             JournalRecordTypes(r.id, tuple(zip(r.sources, r.raw_types, strict=True)))
             for r in self._conn.execute(_RECORD_TYPES_OF_UNKNOWN_JOURNALS)
         ]
 
     def find_titles_of_non_proceedings_journals(self) -> list[JournalTitleIssnRow]:
+        """Les revues d'un autre type que `proceedings`, avec leur titre et la présence d'un ISSN."""
         rows = self._conn.execute(
             select(
                 journals.c.id,
@@ -584,24 +666,28 @@ class JournalGatewayQueries(
     # ── fusion ─────────────────────────────────────────────────────
 
     def find_journals_sharing_issnl(self) -> list[JournalMergeGroup]:
+        """Groupes de revues vérifiées dans le Sudoc qui partagent leur ISSN-L. La revue qui a le plus de publications vient en premier, puis la plus petite par identifiant."""
         return [
             JournalMergeGroup(r.issnl, tuple(r.ids))
             for r in self._conn.execute(_JOURNALS_SHARING_ISSNL).all()
         ]
 
     def find_same_title_duplicates(self) -> list[JournalMergeGroup]:
+        """Paires de revues seules à avoir leur titre normalisé, dont au moins une sans ISSN, et dont les enregistrements partagent un préfixe DOI. La revue qui a le plus de publications vient en premier, puis celle qui a un ISSN."""
         return [
             JournalMergeGroup(r.title_normalized, tuple(r.ids))
             for r in self._conn.execute(_SAME_TITLE_DUPLICATES).all()
         ]
 
     def find_journals_sharing_an_inactive_issn(self) -> list[JournalMergeGroup]:
+        """Paires de revues vérifiées dans le Sudoc dont l'une a, inactif, un ISSN actif dans l'autre. La revue dont le premier document est le plus tardif vient en premier, puis celle qui a le plus de publications."""
         return [
             JournalMergeGroup(r.issn, tuple(r.ids))
             for r in self._conn.execute(_JOURNALS_SHARING_AN_INACTIVE_ISSN).all()
         ]
 
     def find_journals_sharing_a_publication(self) -> list[JournalPublicationPair]:
+        """Paires de revues auxquelles sont rattachés les enregistrements d'une même publication. Les paires qui partagent le plus de publications viennent en premier."""
         return [
             JournalPublicationPair(
                 JournalMergeCandidate(
@@ -616,12 +702,14 @@ class JournalGatewayQueries(
         ]
 
     def describe_journals(self, journal_ids: Sequence[int]) -> dict[int, JournalSummary]:
+        """Titre, éditeur et ISSN de chaque revue, pour la journalisation des fusions."""
         rows = self._conn.execute(_JOURNAL_SUMMARIES, {"ids": list(journal_ids)}).all()
         return {r.id: JournalSummary(r.id, r.title, r.publisher, tuple(r.issns)) for r in rows}
 
     # ── nettoyage ──────────────────────────────────────────────────
 
     def delete_empty_journals(self) -> list[JournalSummary]:
+        """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les rend."""
         empty = [
             JournalSummary(r.id, r.title, r.publisher, tuple(r.issns))
             for r in self._conn.execute(_EMPTY_JOURNALS).all()
@@ -632,6 +720,7 @@ class JournalGatewayQueries(
         return empty
 
     def find_journals_sharing_active_issn(self) -> list[JournalIssnGroup]:
+        """Groupes de revues vérifiées dans le Sudoc où le même ISSN est actif, dans le même ordre."""
         return [
             JournalIssnGroup(
                 r.issn, tuple(JournalTitleRow(i, t) for i, t in zip(r.ids, r.titles, strict=True))
@@ -670,6 +759,7 @@ class JournalGatewayQueries(
         apc_amount: float | None = None,
         apc_currency: str | None = None,
     ) -> None:
+        """Met à jour le montant et la devise d'APC. COALESCE : un argument `None` laisse la valeur en place."""
         stmt = (
             update(journals)
             .where(journals.c.id == journal_id, _APC_NOT_MANUAL)
@@ -681,6 +771,7 @@ class JournalGatewayQueries(
         self._conn.execute(stmt)
 
     def set_journal_type_if_unknown(self, journal_id: int, journal_type: JournalType) -> None:
+        """Pose le `journal_type` d'une revue encore de type inconnu."""
         self._conn.execute(
             update(journals)
             .where(
@@ -692,6 +783,7 @@ class JournalGatewayQueries(
         )
 
     def set_journal_type(self, journal_id: int, journal_type: JournalType) -> None:
+        """Pose le `journal_type` d'une revue. Écriture directe, sans requalification des publications — c'est l'édition admin, elle, qui rejoue les corrections de `doc_type`."""
         self._conn.execute(
             update(journals)
             .where(journals.c.id == journal_id, _TYPE_NOT_MANUAL)
@@ -701,12 +793,14 @@ class JournalGatewayQueries(
     # ── Espaces de noms DOI ────────────────────────────────────────
 
     def find_doi_journal_pairs(self) -> list[DoiJournalRow]:
+        """Le couple (DOI, revue) de chaque enregistrement. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
         return [
             DoiJournalRow(r.doi, r.journal_id, JournalType(r.journal_type))
             for r in self._conn.execute(_DOI_JOURNAL_PAIRS)
         ]
 
     def store_doi_namespaces(self, namespaces: Sequence[DoiNamespace]) -> None:
+        """Vide `journal_doi_namespaces`, puis y écrit `namespaces`."""
         self._conn.execute(journal_doi_namespaces.delete())
         if namespaces:
             self._conn.execute(journal_doi_namespaces.insert(), [ns._asdict() for ns in namespaces])
@@ -721,6 +815,10 @@ class JournalGatewayQueries(
         imported_at: datetime,
         is_in_doaj: bool,
     ) -> None:
+        """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` en bloc.
+
+        Utilisé par l'import du dump DOAJ pour les revues matchées (`is_in_doaj=True` + payload). Le cas « absente du dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant re-pose).
+        """
         stmt = (
             update(journals)
             .where(journals.c.id == journal_id)
@@ -733,11 +831,13 @@ class JournalGatewayQueries(
         self._conn.execute(stmt)
 
     def reset_is_in_doaj(self) -> int:
+        """Efface le drapeau `is_in_doaj` de toutes les revues où il est posé, le dump DOAJ faisant autorité — l'import le re-pose ensuite sur les revues matchées. Retourne le nombre de drapeaux effacés."""
         return self._conn.execute(
             update(journals).where(journals.c.is_in_doaj).values(is_in_doaj=False)
         ).rowcount
 
     def doaj_last_import_at(self) -> datetime | None:
+        """Date du dernier import DOAJ (`max(doaj_imported_at)`), `None` si jamais importé. Commande la staleness du téléchargement du dump."""
         return scalar_datetime_or_none(
             self._conn.execute(select(func.max(journals.c.doaj_imported_at)))
         )

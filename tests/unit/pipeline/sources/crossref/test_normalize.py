@@ -18,9 +18,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.services.monographs.containers import Containers
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
+from pipeline.containers.find_or_create import Containers
 from pipeline.sources.crossref import normalize as normalize_crossref
 from pipeline.sources.crossref.normalize import (
     CrossrefNormalizer,

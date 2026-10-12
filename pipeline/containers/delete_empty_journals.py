@@ -5,8 +5,8 @@ Une revue vide n'a ni enregistrement, ni publication, ni monographie, ni paiemen
 
 import logging
 
-from application.ports.pipeline.journals import JournalCleanupQueries
 from pipeline.containers.journal_label import journal_label
+from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.libelles import accord
 from pipeline.metrics import PhaseMetrics
 
@@ -15,7 +15,7 @@ LIBELLE = "Revues vides"
 
 
 def run_delete_empty_journals(
-    logger: logging.Logger, *, journal_repo: JournalCleanupQueries
+    logger: logging.Logger, *, journal_repo: JournalGatewayQueries
 ) -> PhaseMetrics:
     """Supprime les revues vides et journalise chacune."""
     deleted = journal_repo.delete_empty_journals()

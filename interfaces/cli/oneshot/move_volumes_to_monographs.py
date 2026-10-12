@@ -24,7 +24,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.services.monographs.containers import Containers, find_or_create_containers
 from domain.journals.containers import (
     ContainerDescription,
     ContainerRole,
@@ -42,6 +41,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.base import RawStore
 from infrastructure.raw_store.factory import get_raw_store
 from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import Containers, find_or_create_containers
 from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.crossref import normalize as normalize_crossref
 from pipeline.sources.datacite import normalize as normalize_datacite

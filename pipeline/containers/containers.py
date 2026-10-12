@@ -1,7 +1,4 @@
-"""Adapter PostgreSQL des conteneurs d'un document : revues et monographies, sur une même connexion.
-
-Sert `ContainerFindOrCreateQueries` (normaliseurs) et `MonographSeriesQueries` (séries des monographies) par la réunion des deux adaptateurs.
-"""
+"""Accès PostgreSQL du pipeline aux conteneurs d'un document : revues et monographies, sur une même connexion."""
 
 from pipeline.containers.journals import JournalGatewayQueries
 from pipeline.containers.monographs import MonographGatewayQueries

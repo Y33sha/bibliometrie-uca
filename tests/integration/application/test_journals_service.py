@@ -1,14 +1,7 @@
-"""Tests de caractérisation pour application/journals/core.py et
-application/publishers/core.py.
-
-Couvre les fonctions sync (find_or_create_*, update_journal_apc — utilisées
-par le pipeline) et les fonctions async (update_journal, update_publisher,
-merge_*).
-"""
+"""Tests de caractérisation des services des revues et des éditeurs : édition, fusion, requalification."""
 
 from datetime import UTC, datetime
 from functools import partial
-from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import text
@@ -16,14 +9,11 @@ from sqlalchemy import text
 from application.ports.repositories.journal_repository import JournalIssnInput, JournalUpdate
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.journals.core import (
-    find_or_create_journal,
     merge_journals,
     requalify_publications_for_journal,
     update_journal,
-    update_journal_apc,
 )
 from application.services.publishers.core import (
-    find_or_create_publisher,
     merge_publishers,
     update_publisher,
 )
@@ -32,7 +22,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
-from domain.journals.issns import IssnSupport, JournalIssn, source_issns
+from domain.journals.issns import IssnSupport, JournalIssn
 from domain.journals.journal import JournalType, OaModel
 from infrastructure.repositories import (
     journal_repository,
@@ -47,6 +37,8 @@ from tests.integration.helpers.journals import (
     insert_journal_with_issns,
     insert_monograph,
     insert_publisher,
+    issn_columns,
+    mark_checked_in_sudoc,
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
@@ -95,44 +87,6 @@ def _fetch_one(conn, sql_text: str, **params):
 
 
 # ── Helpers ──────────────────────────────────────────────────────
-
-
-def _mark_checked_in_sudoc(conn, journal_id: int) -> None:
-    conn.execute(
-        text("UPDATE journal_issns SET sudoc_checked_at = now() WHERE journal_id = :id"),
-        {"id": journal_id},
-    )
-
-
-def _columns(conn, journal_id: int) -> SimpleNamespace:
-    """Premier ISSN papier et électronique actifs, ISSN-L, autres valeurs, et date de vérification si tous les ISSN sont vérifiés."""
-    rows = conn.execute(
-        text(
-            "SELECT issn, support::text AS support, linking, status::text AS status, "
-            "sudoc_checked_at FROM journal_issns WHERE journal_id = :id ORDER BY id"
-        ),
-        {"id": journal_id},
-    ).all()
-
-    def first(support):
-        return next((r.issn for r in rows if r.status == "active" and r.support == support), None)
-
-    issn, eissn = first("print"), first("electronic")
-    issnl = next((r.issn for r in rows if r.linking), None)
-    checked = [r.sudoc_checked_at for r in rows]
-    return SimpleNamespace(
-        issn=issn,
-        eissn=eissn,
-        issnl=issnl,
-        rejected_issns=sorted(r.issn for r in rows if r.issn not in (issn, eissn, issnl)),
-        sudoc_checked_at=min(checked) if checked and all(checked) else None,
-    )
-
-
-def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
-    """`find_or_create_journal` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
-    issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
-    return find_or_create_journal(title, issns=issns, **kwargs)
 
 
 # ── find_by_id (hydratation aggregates) ────────────────────────────
@@ -192,251 +146,6 @@ class TestJournalFindById:
         assert j.oa_model == "full_oa"
 
 
-# ── find_or_create_publisher ───────────────────────────────────────
-
-
-class TestFindOrCreatePublisher:
-    def test_returns_none_on_empty_name(self, sa_sync_conn, publisher_gateway):
-        assert find_or_create_publisher(None, repo=publisher_gateway) is None
-        assert find_or_create_publisher("", repo=publisher_gateway) is None
-
-    def test_creates_new_publisher(self, sa_sync_conn, publisher_gateway):
-        pub_id = find_or_create_publisher("Elsevier", repo=publisher_gateway)
-        assert pub_id is not None
-        row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=pub_id)
-        assert row.name == "Elsevier"
-
-    def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_gateway):
-        existing = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P4310310871")
-        found = find_or_create_publisher(
-            "Elsevier BV", openalex_id="P4310310871", repo=publisher_gateway
-        )
-        assert found == existing
-
-    def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
-        self, sa_sync_conn, publisher_gateway
-    ):
-        """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateJournal`)."""
-        premier = find_or_create_publisher("Taylor & Francis", repo=publisher_gateway)
-        second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_gateway)
-        assert second == premier
-
-    def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_gateway):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
-        found = find_or_create_publisher("elsevier", repo=publisher_gateway)
-        assert found == existing
-
-    def test_variantes_de_nom_rejoignent_le_meme_editeur(self, sa_sync_conn, publisher_gateway):
-        """Cas réels : formes juridiques, dates et « on behalf of » ajoutés par les sources."""
-        elsevier = find_or_create_publisher("Elsevier BV", repo=publisher_gateway)
-        for variant in (
-            "Elsevier [1977-....]",
-            "Elsevier Ltd.",
-            "Elsevier on behalf of the American College of Cardiology Foundation",
-        ):
-            assert find_or_create_publisher(variant, repo=publisher_gateway) == elsevier
-        row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=elsevier)
-        assert row.name == "Elsevier BV"
-
-    def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_gateway):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
-        find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_gateway)
-        row = _fetch_one(
-            sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=existing
-        )
-        assert row.openalex_id == "P123"
-
-
-# ── find_or_create_journal ─────────────────────────────────────────
-
-
-class TestFindOrCreateJournal:
-    def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
-        assert _find_or_create(None, repo=gateway) is None
-        assert _find_or_create("", repo=gateway) is None
-
-    def test_creates_new_journal(self, sa_sync_conn, gateway):
-        j_id = _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT title FROM journals WHERE id = :id", id=j_id)
-        row = SimpleNamespace(title=row.title, issn=_columns(sa_sync_conn, j_id).issn)
-        assert row.title == "Nature"
-        assert row.issn == "0028-0836"
-
-    def test_un_titre_encode_rejoint_le_meme_journal_que_le_titre_en_clair(
-        self, sa_sync_conn, gateway
-    ):
-        """Régression : le titre affiché et la clé de rapprochement dérivent de la même valeur.
-
-        Les sources livrent le même titre tantôt en clair, tantôt avec des entités HTML. Tant
-        que la clé se calculait sur le titre reçu et le titre affiché sur sa mise à plat, les
-        deux formes portaient des clés distinctes (`... amp ...`) et la revue naissait en deux
-        exemplaires — quatre cas relevés en base.
-        """
-        premier = _find_or_create("Wood & Fire Safety", repo=gateway)
-        second = _find_or_create("Wood &amp; Fire Safety", repo=gateway)
-        assert second == premier
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT title, title_normalized FROM journals WHERE id = :id",
-            id=premier,
-        )
-        assert row.title == "Wood & Fire Safety"
-        assert "amp" not in row.title_normalized
-
-    def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, openalex_id="S137773608")
-        found = _find_or_create("Nature Journal", openalex_id="S137773608", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_issn(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, issn="0028-0836")
-        found = _find_or_create("Nature Variant", issn="0028-0836", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_eissn(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, eissn="1476-4687")
-        found = _find_or_create("Nature", eissn="1476-4687", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_issnl(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, issnl="0028-0836")
-        found = _find_or_create("Other Title", issnl="0028-0836", repo=gateway)
-        assert found == existing
-
-    def test_finds_by_name_form(self, sa_sync_conn, gateway):
-        _find_or_create("Nature", repo=gateway)
-        found = _find_or_create("nature", repo=gateway)
-        n = sa_sync_conn.execute(
-            text("SELECT COUNT(*) AS n FROM journals WHERE title_normalized = 'nature'")
-        ).scalar_one()
-        assert n == 1
-        assert found is not None
-
-    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_gateway):
-        """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
-        existing = _journal(sa_sync_conn, issn="0028-0836")
-        pub_id = find_or_create_publisher("Springer", repo=publisher_gateway)
-        _find_or_create(
-            "Nature",
-            issn="0028-0836",
-            eissn="1476-4687",
-            publisher_id=pub_id,
-            repo=gateway,
-        )
-        row = _columns(sa_sync_conn, existing)
-        row.publisher_id = _fetch_one(
-            sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
-        ).publisher_id
-        assert row.eissn == "1476-4687"
-        assert row.publisher_id == pub_id
-
-    def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
-        j_id = _find_or_create("Nature", issn="00280836", eissn="1476-4687", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.issn == "0028-0836"
-        assert row.eissn == "1476-4687"
-
-    def test_finds_by_issn_under_another_form(self, sa_sync_conn, gateway):
-        existing = _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        found = _find_or_create("Nature Variant", issn="ISSN 00280836", repo=gateway)
-        assert found == existing
-
-    def test_titles_emptied_by_normalization_do_not_match(self, sa_sync_conn, gateway):
-        """Cas réel : un titre grec et un titre cyrillique se normalisent tous deux en chaîne vide."""
-        greek = _find_or_create("Παιδαγωγικά ρεύματα στο Αιγαίο", repo=gateway)
-        cyrillic = _find_or_create("Теория вероятностей и ее применения", repo=gateway)
-        assert greek != cyrillic
-
-    def test_invalid_issn_is_kept_aside_and_logged(self, sa_sync_conn, gateway, caplog):
-        j_id = _find_or_create("Nature", issn="(Internet)", eissn="1476-4687", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.issn is None
-        assert row.eissn == "1476-4687"
-        assert row.rejected_issns == ["(Internet)"]
-        assert "ISSN mal formé (revue 'Nature') : '(Internet)'" in caplog.text
-
-    def test_rejected_issns_accumulate_without_duplicates(self, sa_sync_conn, gateway):
-        """Les ISSN invalides s'ajoutent à ceux de la revue trouvée, sans doublon."""
-        j_id = _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        _find_or_create("Nature", issn="0028-0836", issnl="1234-5678", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.rejected_issns == ["1234-5678", "1476-4688"]
-
-    def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
-        """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
-        j_id = _journal(sa_sync_conn, eissn="1476-4687")
-        _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="1476-4687", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.issn is None
-        assert row.eissn == "1476-4687"
-        assert row.sudoc_checked_at is not None
-
-    def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
-        """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
-        j_id = _journal(sa_sync_conn, issnl="0028-0836")
-        _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
-
-    def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
-        """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
-        j_id = _journal(sa_sync_conn, issn="0305-1048", rejected=("1362-4954",))
-        _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        found = _find_or_create("Other title", eissn="1362-4954", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert found == j_id
-        assert row.eissn is None
-        assert row.sudoc_checked_at is not None
-
-    def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn, eissn="1476-4687")
-        _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.issn == "0028-0836"
-        assert row.sudoc_checked_at is None
-
-    def test_new_rejected_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn, issn="0028-0836")
-        _mark_checked_in_sudoc(sa_sync_conn, j_id)
-        _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
-        row = _columns(sa_sync_conn, j_id)
-        assert row.rejected_issns == ["1476-4688"]
-        assert row.sudoc_checked_at is None
-
-
-# ── update_journal_apc ─────────────────────────────────────────────
-
-
-class TestUpdateJournalApc:
-    def test_updates_fields(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn)
-        update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT apc_amount, apc_currency FROM journals WHERE id = :id",
-            id=j_id,
-        )
-        assert float(row.apc_amount) == 3000.0
-        assert row.apc_currency == "EUR"
-
-    def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, gateway):
-        """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
-        DOAJ) n'est jamais touché par l'enrichissement APC."""
-        j_id = _journal(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
-        update_journal_apc(j_id, apc_currency="EUR", repo=gateway)
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = :id",
-            id=j_id,
-        )
-        assert float(row.apc_amount) == 2000.0
-        assert row.apc_currency == "EUR"
-        assert row.is_in_doaj is True
-
-
 class TestUpdateJournal:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
@@ -459,7 +168,7 @@ class TestUpdateJournal:
     def test_partial_update(self, sa_sync_conn, repo):
         """Les ISSN fournis remplacent ceux de la revue ; un ISSN gardé conserve sa date de vérification."""
         j = _journal(sa_sync_conn, issn="0028-0836")
-        _mark_checked_in_sudoc(sa_sync_conn, j)
+        mark_checked_in_sudoc(sa_sync_conn, j)
         update_journal(
             j,
             update=JournalUpdate(
@@ -478,7 +187,7 @@ class TestUpdateJournal:
             ).sudoc_checked_at
             is not None
         )
-        row = _columns(sa_sync_conn, j)
+        row = issn_columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
@@ -491,7 +200,7 @@ class TestUpdateJournal:
             ),
             repo=repo,
         )
-        row = _columns(sa_sync_conn, j)
+        row = issn_columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
 
     def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
@@ -558,8 +267,8 @@ class TestUpdateJournal:
             sa_sync_conn, "SELECT title, manual_fields FROM journals WHERE id = :id", id=j
         )
         assert (row.title, sorted(row.manual_fields)) == ("New", ["issns", "title"])
-        assert _columns(sa_sync_conn, j).eissn == "1476-4687"
-        assert _columns(sa_sync_conn, j).issn is None
+        assert issn_columns(sa_sync_conn, j).eissn == "1476-4687"
+        assert issn_columns(sa_sync_conn, j).issn is None
 
     def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, repo, gateway):
         j = _journal(sa_sync_conn, oa_model="full_oa")
@@ -578,7 +287,7 @@ class TestUpdateJournal:
             update_journal(
                 j, update=JournalUpdate(issns=[JournalIssnInput(issn="1234-5678")]), repo=repo
             )
-        row = _columns(sa_sync_conn, j)
+        row = issn_columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
 
 
@@ -763,7 +472,7 @@ class TestMergePublishers:
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
-        row = _columns(sa_sync_conn, jt)
+        row = issn_columns(sa_sync_conn, jt)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
@@ -1056,7 +765,7 @@ class TestMergeJournals:
         target = _journal(
             sa_sync_conn, title="Target", rejected=("1234-5678",), rejected_status="malformed"
         )
-        _mark_checked_in_sudoc(sa_sync_conn, target)
+        mark_checked_in_sudoc(sa_sync_conn, target)
         source = _journal(
             sa_sync_conn,
             title="Source",
@@ -1073,7 +782,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _columns(sa_sync_conn, target)
+        row = issn_columns(sa_sync_conn, target)
         assert row.rejected_issns == ["(Internet)", "1234-5678"]
         assert row.sudoc_checked_at is None
 
@@ -1097,7 +806,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _columns(sa_sync_conn, target)
+        row = issn_columns(sa_sync_conn, target)
         assert row.eissn == "2731-4553"
         assert row.rejected_issns == ["1471-2296"]
 
@@ -1116,7 +825,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _columns(sa_sync_conn, target)
+        row = issn_columns(sa_sync_conn, target)
         row.is_in_doaj = _fetch_one(
             sa_sync_conn, "SELECT is_in_doaj FROM journals WHERE id = :id", id=target
         ).is_in_doaj
@@ -1138,7 +847,7 @@ class TestMergeJournals:
             publication_repo=publication_repo,
         )
 
-        row = _columns(sa_sync_conn, target)
+        row = issn_columns(sa_sync_conn, target)
         assert row.issn == "0028-0836"
 
     def test_requalifies_absorbed_publications_against_target_type(

@@ -2,12 +2,12 @@
 
 import logging
 
-from application.ports.pipeline.monographs import MonographJournalCandidates
 from domain.journals.journal import JournalType
 from pipeline.containers import link_monographs_to_collections as mod
 from pipeline.containers.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
+from pipeline.containers.monographs import MonographJournalCandidates
 
 
 class _Repo:

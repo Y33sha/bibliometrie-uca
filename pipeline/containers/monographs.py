@@ -1,21 +1,43 @@
-"""Adapter PostgreSQL de la table `monographs` pour le pipeline (`application/ports/pipeline/monographs.py`)."""
+"""Accès PostgreSQL du pipeline à la table `monographs`."""
+
+from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.monographs import (
-    MonographCleanupQueries,
-    MonographCollectionQueries,
-    MonographFindOrCreateQueries,
-    MonographJournalCandidates,
-    MonographMergeQueries,
-    MonographProceedingsFacts,
-    MonographProceedingsQueries,
-    MonographTitleGroup,
-)
 from domain.monographs.matching import MonographCandidate
 from domain.monographs.proceedings import MonographRecord
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.sql_fragments import has_active_issn
+
+
+class MonographTitleGroup(NamedTuple):
+    """Monographies qui partagent un titre normalisé, avec le titre de la plus ancienne."""
+
+    title: str
+    monographs: tuple[MonographCandidate, ...]
+
+
+class MonographJournalCandidates(NamedTuple):
+    """Une monographie, son éditeur, sa nature, son `journal_id`, et les entrées de `journals` de ses enregistrements, à ISSN et sans ISSN."""
+
+    monograph_id: int
+    title: str
+    publisher_id: int | None
+    proceedings: bool
+    journal_id: int | None
+    with_issn: tuple[int, ...]
+    without_issn: tuple[int, ...]
+
+
+class MonographProceedingsFacts(NamedTuple):
+    """Une monographie, sa nature en base, le type de sa collection et ses enregistrements."""
+
+    monograph_id: int
+    title: str
+    proceedings: bool
+    collection_type: str | None
+    records: tuple[MonographRecord, ...]
+
 
 _FIND_BY_ISBN = text("""
     SELECT id FROM monographs WHERE isbn = :isbn OR eisbn = :isbn ORDER BY id LIMIT 1
@@ -35,7 +57,7 @@ _CREATE = text("""
     RETURNING id
 """)
 
-# Un ISBN déjà porté par une autre monographie reste hors des colonnes : la contrainte d'unicité le refuserait.
+# Un ISBN déjà attribué à une autre monographie reste hors des colonnes : la contrainte d'unicité le refuserait.
 _ENRICH = text("""
     UPDATE monographs m SET
         proceedings = m.proceedings OR :proceedings,
@@ -132,19 +154,14 @@ _SET_PROCEEDINGS = text(
 ).bindparams(bindparam("ids"))
 
 
-class MonographGatewayQueries(
-    MonographFindOrCreateQueries,
-    MonographMergeQueries,
-    MonographCollectionQueries,
-    MonographCleanupQueries,
-    MonographProceedingsQueries,
-):
+class MonographGatewayQueries:
     """Accès PostgreSQL à `monographs` pour le pipeline, via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     def find_monographs_sharing_a_title(self) -> list[MonographTitleGroup]:
+        """Groupes d'au moins deux monographies de même titre normalisé."""
         return [
             MonographTitleGroup(
                 r.title,
@@ -157,6 +174,7 @@ class MonographGatewayQueries(
         ]
 
     def merge_monograph_into(self, target_id: int, source_id: int) -> None:
+        """Reporte sur `target_id` les enregistrements et les publications de `source_id`, complète les champs vides de la cible, puis supprime la source."""
         params = {"t": target_id, "s": source_id}
         self._conn.execute(_MOVE_RECORDS, params)
         self._conn.execute(_MOVE_PUBLICATIONS, params)
@@ -175,6 +193,7 @@ class MonographGatewayQueries(
         self._conn.execute(_DELETE_SOURCE, params)
 
     def find_monograph_journal_candidates(self) -> list[MonographJournalCandidates]:
+        """Chaque monographie portée par au moins un enregistrement, avec les entrées de `journals` de ses enregistrements."""
         return [
             MonographJournalCandidates(
                 r.id,
@@ -189,9 +208,11 @@ class MonographGatewayQueries(
         ]
 
     def set_monograph_journal(self, monograph_id: int, journal_id: int | None) -> None:
+        """Pose le `journal_id` d'une monographie."""
         self._conn.execute(_SET_JOURNAL, {"id": monograph_id, "journal_id": journal_id})
 
     def find_monograph_proceedings_facts(self) -> list[MonographProceedingsFacts]:
+        """Chaque monographie, avec le type de sa collection et ses enregistrements."""
         return [
             MonographProceedingsFacts(
                 r.id,
@@ -207,16 +228,20 @@ class MonographGatewayQueries(
         ]
 
     def set_monographs_proceedings(self, monograph_ids: list[int], proceedings: bool) -> None:
+        """Pose la nature d'un ensemble de monographies."""
         if monograph_ids:
             self._conn.execute(_SET_PROCEEDINGS, {"ids": monograph_ids, "proceedings": proceedings})
 
     def delete_empty_monographs(self) -> list[tuple[int, str]]:
+        """Supprime les monographies sans enregistrement ni publication, et rend `(id, titre)` de chacune."""
         return sorted((r.id, r.title) for r in self._conn.execute(_DELETE_EMPTY))
 
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
+        """La monographie qui a `isbn` dans `isbn` ou `eisbn`."""
         return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()
 
     def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
+        """Les monographies de ce titre normalisé, par `id`."""
         rows = self._conn.execute(_FIND_BY_TITLE, {"title_normalized": title_normalized})
         return [MonographCandidate(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
 
@@ -232,6 +257,7 @@ class MonographGatewayQueries(
         publisher_id: int | None,
         journal_id: int | None,
     ) -> int:
+        """Insère une monographie et retourne son `id`."""
         return scalar_int(
             self._conn.execute(
                 _CREATE,
@@ -259,6 +285,7 @@ class MonographGatewayQueries(
         publisher_id: int | None,
         journal_id: int | None,
     ) -> None:
+        """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste hors de ses colonnes. `proceedings` vrai fait d'un livre un volume d'actes."""
         self._conn.execute(
             _ENRICH,
             {

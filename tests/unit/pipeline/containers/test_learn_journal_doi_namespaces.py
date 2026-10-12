@@ -3,9 +3,9 @@
 import logging
 from collections.abc import Sequence
 
-from application.ports.pipeline.journals import DoiJournalRow
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType
+from pipeline.containers.journals import DoiJournalRow
 from pipeline.containers.learn_journal_doi_namespaces import (
     run_learn_journal_doi_namespaces,
 )

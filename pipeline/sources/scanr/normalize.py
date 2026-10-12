@@ -5,10 +5,6 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from application.services.monographs.containers import Containers, find_or_create_containers
-from application.services.publishers.core import find_or_create_publisher
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.identifiers import (
@@ -28,6 +24,13 @@ from domain.sources.scanr import (
 )
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.sources.normalize import BibliographicNormalizer
 from pipeline.sources.pub_metadata import PublicationMetadata
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
@@ -65,7 +68,7 @@ def get_title(doc: Mapping[str, JsonValue]) -> str | None:
 
 
 def upsert_publisher(
-    doc: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+    doc: Mapping[str, JsonValue], *, publisher_repo: PublisherGatewayQueries
 ) -> int | None:
     publisher_name = as_str(as_mapping(doc.get("source")).get("publisher"))
     if not publisher_name:
@@ -106,7 +109,7 @@ def upsert_containers(
     doc: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
@@ -355,8 +358,8 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerFindOrCreateQueries,
-    publisher_repo: PublisherFindOrCreateQueries,
+    container_repo: ContainerGatewayQueries,
+    publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
     sync_settings: SignatureSyncSettings,

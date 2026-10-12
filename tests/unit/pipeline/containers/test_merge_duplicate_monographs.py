@@ -2,11 +2,11 @@
 
 import logging
 
-from application.ports.pipeline.monographs import MonographTitleGroup
 from domain.monographs.matching import MonographCandidate
 from pipeline.containers.merge_duplicate_monographs import (
     run_merge_duplicate_monographs,
 )
+from pipeline.containers.monographs import MonographTitleGroup
 
 
 class _Repo:

@@ -100,18 +100,13 @@ forbidden_modules = ["application", "interfaces"]
 # Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
 # réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
 # Exceptions : `infrastructure/` importe `application.ports` (voir le contrat des couches) ; le
-# code du pipeline encore dans les couches hexagonales, dont les opérations « trouver ou créer »
-# de `application/services`, jusqu'à sa migration dans `pipeline/`.
+# code du pipeline encore dans les couches hexagonales, jusqu'à sa migration dans `pipeline/`.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
     "pipeline.** -> application.ports.pipeline.**",
-    "pipeline.sources.*.normalize -> application.services.monographs.containers",
-    "pipeline.sources.*.normalize -> application.services.publishers.core",
     "pipeline.structures.ror -> application.ports.repositories.ror_repository",
     "pipeline.structures.ror -> application.services.structures.ror",
-    "pipeline.containers.* -> application.services.journals.core",
     "pipeline.containers.publishers_journals -> application.services.journals.commands",
-    "pipeline.containers.* -> application.services.publishers.core",
     "pipeline.containers.enrich_publishers -> application.ports.repositories.publisher_repository",
     "pipeline.publications.* -> application.ports.repositories.publication_repository",
     "pipeline.publications.reconcile_components -> application.services.publications.core",

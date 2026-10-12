@@ -23,10 +23,10 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.containers import ContainerFindOrCreateQueries
-from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.registry import ALL_SOURCES_SET
+from pipeline.containers.containers import ContainerGatewayQueries
+from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import log, open_tx
 from pipeline.libelles import (
@@ -225,17 +225,17 @@ class BibliographicNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
-        container_repo_factory: Callable[[Connection], ContainerFindOrCreateQueries],
-        publisher_repo_factory: Callable[[Connection], PublisherFindOrCreateQueries],
+        container_repo_factory: Callable[[Connection], ContainerGatewayQueries],
+        publisher_repo_factory: Callable[[Connection], PublisherGatewayQueries],
         authorship_queries: AuthorshipsBatchQueries,
         sync_settings: SignatureSyncSettings,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._container_repo_factory = container_repo_factory
-        self._container_repo: ContainerFindOrCreateQueries | None = None
+        self._container_repo: ContainerGatewayQueries | None = None
         self._publisher_repo_factory = publisher_repo_factory
-        self._publisher_repo: PublisherFindOrCreateQueries | None = None
+        self._publisher_repo: PublisherGatewayQueries | None = None
         self._authorship_queries = authorship_queries
         self._sync_settings = sync_settings
 
@@ -246,7 +246,7 @@ class BibliographicNormalizer(SourceNormalizer):
 
     def _require_repos(
         self,
-    ) -> tuple[ContainerFindOrCreateQueries, PublisherFindOrCreateQueries]:
+    ) -> tuple[ContainerGatewayQueries, PublisherGatewayQueries]:
         """Les deux repositories, garantis chargés par `preload_caches`."""
         assert self._container_repo is not None and self._publisher_repo is not None, (
             "preload_caches doit être appelé avant process_work"

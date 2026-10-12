@@ -1,23 +1,15 @@
 """Service Journaux — écritures sur l'agrégat Journal, transaction-agnostiques.
 
-Toute écriture éditoriale passe par ce service, pipeline compris (`find_or_create_journal` au normalize). Les colonnes dérivées que le pipeline recalcule en bloc — `pub_count`, drapeau `is_in_doaj` — s'écrivent en SQL ensembliste (`infrastructure/pipeline/`), hors de ce service qui traite une revue à la fois.
-
 Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `journals.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
 Un champ éditable d'une revue commande le `doc_type` de ses publications : le `journal_type` alimente des règles de correction. D'où `requalify_publications_for_journal` et le volet requalification de `merge_journals`, qui rejouent ces corrections sur le stock après une édition.
 """
 
-import logging
-from collections.abc import Sequence
 from decimal import Decimal
 
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.journals import (
-    JournalFindOrCreateQueries,
-    JournalOpenAlexEnrichmentQueries,
-)
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
@@ -26,113 +18,14 @@ from application.services._merge import load_merge_pair
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.issns import (
-    IssnStatus,
     JournalIssn,
-    received_issns,
     validate_journal_issns,
 )
-from domain.journals.journal import ManualField, OaModel
-from domain.normalize import normalize_text, to_plain_text
-from domain.publications.identifiers import issn_rejection_reason
+from domain.journals.journal import ManualField
 from pipeline.publications.correct_unary import (
     compute_updates,
     hal_origin_ids,
 )
-
-logger = logging.getLogger(__name__)
-
-
-def find_or_create_journal(
-    title: str | None,
-    *,
-    issns: Sequence[JournalIssn] = (),
-    publisher_id: int | None = None,
-    openalex_id: str | None = None,
-    oa_model: OaModel | None = None,
-    repo: JournalFindOrCreateQueries,
-) -> int | None:
-    """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
-
-    Les ISSN passent par `received_issns`. Une valeur invalide est journalisée et gardée parmi les ISSN de la revue, au statut `malformed`.
-
-    Cascade de recherche : `openalex_id`, puis chacun des ISSN valides fournis parmi les ISSN des revues, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
-
-    Un journal trouvé voit ses métadonnées manquantes enrichies et reçoit les ISSN qu'il ne porte pas ; le titre reçu devient une forme de nom — les variantes s'accumulent pour les matchs par titre suivants.
-    """
-    if not title:
-        return None
-
-    # La mise à plat précède tout : la clé de rapprochement et le titre affiché en dérivent
-    # tous deux, sans quoi un titre reçu avec des entités (`Wood &amp; Fire Safety`) porte une
-    # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
-    title = to_plain_text(title)
-    title_normalized = normalize_text(title)
-    issns = received_issns(issns)
-    for row in issns:
-        if row.status is IssnStatus.MALFORMED:
-            # Ligne de détail : le terminal la masque, le journal la garde.
-            logger.warning(
-                "ISSN mal formé (revue %r) : %r — %s, valeur gardée telle que reçue",
-                title,
-                row.issn,
-                issn_rejection_reason(row.issn),
-                extra={"detail": True},
-            )
-
-    def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
-        """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
-        repo.enrich_journal(
-            journal_id,
-            publisher_id=publisher_id,
-            openalex_id=openalex_id if with_openalex else None,
-            oa_model=oa_model if with_openalex else None,
-        )
-        repo.add_journal_issns(journal_id, issns)
-        repo.add_journal_name_form(journal_id, title_normalized, publisher_id)
-        return journal_id
-
-    def _find_or_create() -> int:
-        # 1. Par openalex_id
-        if openalex_id:
-            jid = repo.find_journal_by_openalex_id(openalex_id)
-            if jid:
-                # Cas openalex_id : enrichit sans passer openalex_id/oa_model
-                # (déjà présents par définition)
-                return _match_and_enrich(jid, with_openalex=False)
-            # openalex_id inconnu : on cherche quand même par ISSN/name_form
-            # avant de créer, pour rattacher l'openalex_id à un journal existant
-
-        # 2. Par chacun des ISSN valides, parmi les ISSN des revues
-        for row in issns:
-            if row.status is IssnStatus.MALFORMED:
-                continue
-            jid = repo.find_journal_by_issn_any(row.issn)
-            if jid:
-                return _match_and_enrich(jid)
-
-        # 3. Par forme de nom (priorité aux journals à ISSN électronique actif). Un titre dont la normalisation ne
-        # garde rien (alphabet non latin, symboles) ne désigne aucune revue.
-        jid = (
-            repo.find_journal_by_name_form(title_normalized, publisher_id)
-            if title_normalized
-            else None
-        )
-        if jid:
-            repo.enrich_journal(
-                jid, publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model
-            )
-            repo.add_journal_issns(jid, issns)
-            return jid
-
-        # 4. Créer + enregistrer la forme de nom
-        created = repo.create_journal(
-            title=title, publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model
-        )
-        repo.add_journal_issns(created, issns)
-        repo.add_journal_name_form(created, title_normalized, publisher_id)
-        return created
-
-    return _find_or_create()
 
 
 def update_journal(
@@ -144,9 +37,9 @@ def update_journal(
 ) -> bool:
     """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `journal_type` a effectivement changé — déclencheur de la requalification des publications, orchestrée par le command handler.
 
-    L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
+    L'événement d'audit contient seulement les champs soumis.
 
-    Les ISSN fournis remplacent ceux de la revue ; `validate_journal_issns` les normalise. Un titre, des ISSN, un type, un modèle OA ou un APC modifiés deviennent des champs saisis à la main (`ManualField`) : le pipeline ne les écrit plus. L'APC saisi est en euros.
+    Les ISSN fournis deviennent les ISSN de la revue ; `validate_journal_issns` les normalise. Un titre, des ISSN, un type, un modèle OA ou un APC modifiés deviennent des champs saisis à la main (`ManualField`), que le pipeline laisse en l'état. L'APC saisi est en euros.
 
     Lève `ValidationError` si aucun champ n'est fourni ou si les ISSN sont invalides, `NotFoundError` si la revue n'existe pas.
     """
@@ -163,7 +56,7 @@ def update_journal(
     old_oa_model = journal.oa_model
     old_apc_amount = journal.apc_amount
     champs = update.model_dump(exclude_unset=True, mode="json")
-    # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
+    # Les champs de `JournalUpdate` ont les noms des attributs de l'agrégat.
     for field_name in update.model_fields_set:
         if field_name == "issns":
             journal.issns = validate_journal_issns(
@@ -193,24 +86,6 @@ def update_journal(
     repo.save(journal)
     emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)
     return journal.journal_type != old_type
-
-
-def update_journal_apc(
-    journal_id: int,
-    *,
-    apc_amount: float | None = None,
-    apc_currency: str | None = None,
-    repo: JournalOpenAlexEnrichmentQueries,
-) -> None:
-    """Met à jour les informations APC d'un journal.
-
-    Sans vérification d'existence, à la différence d'`update_journal` : l'appelant est la phase `publishers_journals`, qui boucle sur des ids issus d'une requête.
-    """
-    repo.update_journal_apc(
-        journal_id,
-        apc_amount=apc_amount,
-        apc_currency=apc_currency,
-    )
 
 
 def _correct_for_journal(
@@ -253,7 +128,7 @@ def merge_journals(
 
     repo.merge_journal_into(target_id, source_id)
 
-    # Les enregistrements absorbés portent maintenant `journal_id = target` : recalcule en
+    # Les enregistrements absorbés ont alors `journal_id = target` : recalcule en
     # place leurs corrections (le `journal_type` lu est celui de la cible), puis refresh des
     # publications absorbées (qui lisent les colonnes `source_publication` fraîchement corrigées).
     _correct_for_journal(conn, correction_queries, target_id)
