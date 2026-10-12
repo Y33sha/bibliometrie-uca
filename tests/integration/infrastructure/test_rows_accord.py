@@ -12,13 +12,13 @@ import pytest
 from sqlalchemy import text
 
 from application.ports.read_models.publications_queries import PublicationFilters
-from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publication_repository import PgPublicationRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.structures import (
     insert_perimeter,
@@ -108,7 +108,7 @@ Le test qui suit confronte cette liste aux appariements que porte le code : un a
 
 _APPARIEMENTS = frozenset({"row_as", "rows_as"})
 
-_COUCHES = ("application", "infrastructure")
+_COUCHES = ("application", "infrastructure", "pipeline")
 
 
 def _types_apparies() -> set[str]:

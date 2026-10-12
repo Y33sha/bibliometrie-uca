@@ -49,7 +49,6 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.countries import PgCountryQueries
-from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
@@ -82,6 +81,7 @@ from infrastructure.repositories import (
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
 from interfaces.api.session import read_session
+from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
 logger = logging.getLogger(__name__)
 

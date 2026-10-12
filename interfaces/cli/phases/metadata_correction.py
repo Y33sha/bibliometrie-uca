@@ -8,9 +8,9 @@ from pipeline.context import Phase
 def build() -> Phase:
     """Correction des métadonnées des documents sources.
 
-    Séquence, transactions et métriques dans `application/pipeline/metadata_correction/phase.py`.
+    Séquence, transactions et métriques dans `pipeline/publications/metadata_correction.py`.
     """
-    from application.pipeline.metadata_correction.phase import MetadataCorrectionPhase
-    from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+    from pipeline.publications.metadata_correction import MetadataCorrectionPhase
+    from pipeline.publications.metadata_correction_queries import PgMetadataCorrectionQueries
 
     return MetadataCorrectionPhase(PgMetadataCorrectionQueries())

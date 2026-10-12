@@ -14,10 +14,6 @@ from decimal import Decimal
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.pipeline.metadata_correction.correct_unary import (
-    compute_updates,
-    hal_origin_ids,
-)
 from application.ports.pipeline.journals import (
     JournalFindOrCreateQueries,
     JournalOpenAlexEnrichmentQueries,
@@ -38,6 +34,10 @@ from domain.journals.issns import (
 from domain.journals.journal import ManualField, OaModel
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import issn_rejection_reason
+from pipeline.publications.correct_unary import (
+    compute_updates,
+    hal_origin_ids,
+)
 
 logger = logging.getLogger(__name__)
 
