@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.pipeline.oa_status` : la file de vérification Unpaywall et les compteurs du bilan de phase."""
+"""Tests d'intégration pour `pipeline.publications.oa_status_queries` : la file de vérification Unpaywall et les compteurs du bilan de phase."""
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.oa_status import PgOaStatusQueries
+from pipeline.publications.oa_status_queries import OaStatusQueries
 from tests.integration.helpers.publications import insert_publication
 
-_Q = PgOaStatusQueries()
+_Q = OaStatusQueries()
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests
 

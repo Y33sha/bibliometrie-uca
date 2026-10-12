@@ -54,4 +54,4 @@ Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publi
 
 Incrémentale : pour lisser dans le temps les appels API, chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les publications jamais interrogées, ou dont le statut n'a pas été revu depuis le délai `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Une publication est marquée vérifiée quand Unpaywall a répondu, même sans la trouver. Quand Unpaywall est indisponible, elle est reprise au run suivant.
 
-Code : `application/pipeline/oa_status/phase.py`.
+Code : `pipeline/publications/oa_status.py`.
