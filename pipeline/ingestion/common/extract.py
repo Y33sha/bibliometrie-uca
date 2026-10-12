@@ -5,13 +5,13 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 - s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction quotidienne réussie ;
-- sinon : toutes les sources retenues en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
+- sinon : un nœud par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
 Les dépendances techniques sont injectées par le composition-root :
 
 - `count_extraction_structures()` : le nombre de structures du périmètre d'extraction ;
-- `extract_one(source, args)` : ouvre la connexion, câble l'extracteur, exécute l'extraction par l'accès à la source (les métriques rendues portent déjà les signaux de source non configurée ou indisponible), et lève `ExtractionConfigError` si le périmètre d'interrogation de la source manque ;
+- `extract_one(source, args, breaker)` : ouvre la connexion, câble l'extracteur et l'exécute sous le circuit-breaker de la source ; lève `ExtractionConfigError` si le périmètre d'interrogation de la source manque ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_extract_date` : la date de la dernière extraction quotidienne réussie (branche incrémentale).
 """
@@ -23,7 +23,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES
@@ -31,12 +31,12 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.common.parallel import RunParallel
-from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
+from pipeline.runtime.execution import open_tx
 from pipeline.runtime.modes import MODES
-from pipeline.runtime.observability.libelles import BRANCHE, etape
+from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
     signal_source_unconfigured,
@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
+ExtractOne = Callable[[str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics]
 GetLastDailyExtractDate = Callable[[], date | None]
 
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
@@ -75,15 +75,6 @@ def _source_summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float
     }
 
 
-@dataclass
-class _SourceOutcome:
-    """Issue d'une extraction de source : métriques + durée, ou motif d'absence du périmètre d'interrogation."""
-
-    metrics: PhaseMetrics | None
-    duration: float
-    unconfigured: str | None = None
-
-
 @dataclass(frozen=True)
 class ExtractPhase:
     count_extraction_structures: Callable[[], int]
@@ -92,130 +83,89 @@ class ExtractPhase:
     get_last_daily_extract_date: GetLastDailyExtractDate
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
-        options, logger = ctx.options, ctx.logger
+        """Retient les sources effectives selon le mode, exécute leurs nœuds en parallèle, et assemble les métriques."""
+        options = ctx.options
         if self.count_extraction_structures() == 0:
             raise EmptyExtractionPerimeterError()
         policy = MODES[options.mode]
         effective = set(policy.extract_sources) | ({"wos"} if options.include_wos else set())
         if options.sources:
             effective &= options.sources
+        depuis = self._since_last_daily() if policy.year_selection == "since_last" else None
+        since = depuis[0].isoformat() if depuis else None
+        if depuis is not None:
+            # Le mode quotidien moissonne HAL seul.
+            effective &= {"hal"}
+
+        def node(source: str) -> NodeRun:
+            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+                if depuis is not None and source == "hal":
+                    ctx.logger.info(
+                        "%sMode incrémental : notices HAL modifiées depuis le %s (%s)",
+                        BRANCHE,
+                        date_to_french(depuis[0]),
+                        depuis[1],
+                    )
+                args = _extractor_args(
+                    start_year=options.start_year if source in _YEAR_BOUNDED_SOURCES else None,
+                    year=options.year,
+                    since=since,
+                )
+                try:
+                    metrics, duration = timed_metrics(
+                        lambda: self.extract_one(source, args, breaker)
+                    )
+                except ExtractionConfigError as exc:
+                    metrics = PhaseMetrics()
+                    signal_source_unconfigured(
+                        metrics, source, str(exc), logger=ctx.logger, phase="extract"
+                    )
+                    return metrics
+                metrics.details["duration_s"] = duration
+                return metrics
+
+            return run
+
+        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: source in effective
+
+        by_node = run_nodes(
+            "extract",
+            {
+                f"extract.{source}": NodeStep(
+                    node(source),
+                    section="Extraction des sources",
+                    threshold=5,
+                    when=retenue(source),
+                )
+                for source in HARVESTED_SOURCES
+            },
+            ctx,
+            parallel=self.run_parallel,
+        )
+
         metrics = PhaseMetrics()
-
-        if policy.year_selection == "since_last":
-            by_source = _run_since_last(
-                effective, self.extract_one, self.get_last_daily_extract_date, metrics, logger
-            )
-        else:
-            by_source = _run_parallel_sources(
-                effective,
-                options.year,
-                options.start_year,
-                self.extract_one,
-                self.run_parallel,
-                metrics,
-                logger,
-            )
-
+        by_source: dict[str, dict[str, float]] = {}
+        for source in HARVESTED_SOURCES:
+            source_metrics = by_node[f"extract.{source}"]
+            metrics.merge(source_metrics)
+            if source in effective and not skipped(source_metrics):
+                duration = cast("float", source_metrics.details["duration_s"])
+                by_source[source] = _source_summary(source_metrics, duration)
         if by_source:
             metrics.details["table"] = {
                 "rows": [{"key": source, **summary} for source, summary in by_source.items()]
             }
         return metrics
 
-
-def _run_since_last(
-    effective: set[str],
-    extract_one: ExtractOne,
-    get_last_daily_extract_date: GetLastDailyExtractDate,
-    metrics: PhaseMetrics,
-    logger: logging.Logger,
-) -> dict[str, dict[str, float]]:
-    """Mode quotidien : HAL depuis la dernière extraction quotidienne réussie, ou les 30 derniers jours."""
-    last = get_last_daily_extract_date()
-    if last is not None:
-        depuis = last
-        origine = "dernière extraction quotidienne réussie"
-    else:
-        depuis = today() - timedelta(days=30)
-        origine = "aucune extraction quotidienne réussie, repli sur 30 jours"
-    since = depuis.isoformat()
-    etape(logger, "Extraction des sources")
-    logger.info(
-        "%sMode incrémental : notices HAL modifiées depuis le %s (%s)",
-        BRANCHE,
-        date_to_french(depuis),
-        origine,
-    )
-
-    if "hal" not in effective:
-        return {}
-    try:
-        hal_metrics, hal_duration = timed_metrics(
-            lambda: extract_one("hal", _extractor_args(since=since))
-        )
-    except ExtractionConfigError as exc:
-        signal_source_unconfigured(metrics, "hal", str(exc), logger=logger, phase="extract")
-        return {}
-    metrics.merge(hal_metrics)
-    return {} if skipped(hal_metrics) else {"hal": _source_summary(hal_metrics, hal_duration)}
-
-
-def _run_parallel_sources(
-    effective: set[str],
-    year: int | None,
-    start_year: int | None,
-    extract_one: ExtractOne,
-    run_parallel: RunParallel,
-    metrics: PhaseMetrics,
-    logger: logging.Logger,
-) -> dict[str, dict[str, float]]:
-    """Toutes les sources retenues en parallèle, chacune sur sa propre connexion et staging."""
-    args_by_source = {
-        source: _extractor_args(
-            start_year=start_year if source in _YEAR_BOUNDED_SOURCES else None, year=year
-        )
-        for source in HARVESTED_SOURCES
-        if source in effective
-    }
-    if not args_by_source:
-        return {}
-
-    etape(logger, "Extraction des sources")
-    outcomes = run_parallel(
-        {
-            source: _extraction_thunk(extract_one, source, args)
-            for source, args in args_by_source.items()
-        }
-    )
-
-    by_source: dict[str, dict[str, float]] = {}
-    for source, outcome in outcomes.items():
-        if outcome.unconfigured is not None:
-            signal_source_unconfigured(
-                metrics, source, outcome.unconfigured, logger=logger, phase="extract"
-            )
-            continue
-        assert outcome.metrics is not None
-        metrics.merge(outcome.metrics)
-        if not skipped(outcome.metrics):
-            by_source[source] = _source_summary(outcome.metrics, outcome.duration)
-    return by_source
-
-
-def _extraction_thunk(
-    extract_one: ExtractOne, source: str, args: argparse.Namespace
-) -> Callable[[], _SourceOutcome]:
-    """Enveloppe une extraction en thunk : chronométrée, l'absence de périmètre d'interrogation rendue en valeur (jamais levée hors du thread) pour que le primitif de parallélisme n'ait pas à la connaître."""
-
-    def thunk() -> _SourceOutcome:
-        try:
-            source_metrics, duration = timed_metrics(lambda: extract_one(source, args))
-        except ExtractionConfigError as exc:
-            return _SourceOutcome(None, 0.0, unconfigured=str(exc))
-        return _SourceOutcome(source_metrics, duration)
-
-    return thunk
+    def _since_last_daily(self) -> tuple[date, str]:
+        """Mode quotidien : date depuis laquelle HAL est moissonné, avec son origine — la dernière extraction quotidienne réussie, ou les 30 derniers jours."""
+        last = self.get_last_daily_extract_date()
+        if last is not None:
+            return last, "dernière extraction quotidienne réussie"
+        return today() - timedelta(
+            days=30
+        ), "aucune extraction quotidienne réussie, repli sur 30 jours"
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -249,8 +199,10 @@ def build() -> Phase:
 
     registry = _extractors()
 
-    def extract_one(source: str, args: argparse.Namespace) -> PhaseMetrics:
-        return _run_extract(source, registry[source], args)
+    def extract_one(
+        source: str, args: argparse.Namespace, breaker: SourceCircuitBreaker | None
+    ) -> PhaseMetrics:
+        return _run_extract(source, registry[source], args, breaker)
 
     return ExtractPhase(
         count_extraction_structures=_extraction_structure_count,
@@ -266,20 +218,6 @@ def _extraction_structure_count() -> int:
 
     with open_tx() as conn:
         return PerimeterQueries().count_extraction_structures(conn)
-
-
-def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
-    """Exécute un extracteur par l'accès à sa source, dont le circuit-breaker coupe après cinq échecs.
-
-    Le seuil est plus bas qu'à la phase `fetch_missing`, les extracteurs travaillant sans lots concurrents.
-    """
-    return access_source(
-        source,
-        lambda breaker: extractor.run(args, breaker=breaker),
-        phase="extract",
-        logger=log,
-        threshold=5,
-    )
 
 
 def _extractors() -> dict[str, ConstructeurExtracteur]:
@@ -335,9 +273,12 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
 
 def _run_extract(
-    source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
+    source: str,
+    make_extractor: ConstructeurExtracteur,
+    args: argparse.Namespace,
+    breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:
-    """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous circuit-breaker, fermeture. `make_extractor` contient le câblage propre à la source."""
+    """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous le circuit-breaker de la source, fermeture. `make_extractor` contient le câblage propre à la source."""
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     with open_tx() as conn:
-        return _run_extractor(source, make_extractor(conn, source_log), args)
+        return make_extractor(conn, source_log).run(args, breaker=breaker)

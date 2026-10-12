@@ -111,3 +111,16 @@ def test_les_statistiques_des_signatures_sont_rafraichies_apres_persons():
     """`normalize` et `persons` réécrivent en masse `source_authorships.person_id`, que la construction des authorships filtre ensuite."""
     purge = next(n for n in NODES if n.name == "persons.purge")
     assert "ANALYZE source_authorships" in purge.maintenance
+
+
+def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():
+    deps = dependencies(NODES)
+    lots: dict[str, list[int]] = {}
+    for index, node in enumerate(NODES):
+        if node.lot is not None:
+            lots.setdefault(node.lot, []).append(index)
+    assert lots
+    for indices in lots.values():
+        assert indices == list(range(indices[0], indices[-1] + 1))
+        noms = {NODES[i].name for i in indices}
+        assert all(not (deps[NODES[i].name] & noms) for i in indices)

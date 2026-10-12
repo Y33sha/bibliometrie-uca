@@ -8,8 +8,10 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 
 from pipeline.graph import NODES, Node
+from pipeline.ingestion.common.parallel import RunParallel, run_parallel
 from pipeline.ingestion.http.access_source import access_source
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.context import Phase, PhaseContext
@@ -36,11 +38,15 @@ class NodeStep:
 
 
 def run_nodes(
-    group: str, steps: Mapping[str, NodeStep], ctx: PhaseContext
+    group: str,
+    steps: Mapping[str, NodeStep],
+    ctx: PhaseContext,
+    *,
+    parallel: RunParallel = run_parallel,
 ) -> dict[str, PhaseMetrics]:
     """Exécute les nœuds de `group` dans l'ordre du graphe et rend leurs métriques, par nom de nœud.
 
-    Lève `ValueError` si `steps` ne couvre pas exactement les nœuds du groupe.
+    Les nœuds consécutifs d'un même lot s'exécutent ensemble par `parallel` ; leurs lignes de bilan suivent, dans l'ordre du graphe. Lève `ValueError` si `steps` ne couvre pas exactement les nœuds du groupe.
     """
     nodes = [node for node in NODES if node.group == group]
     if set(steps) != {node.name for node in nodes}:
@@ -48,29 +54,53 @@ def run_nodes(
             f"Les étapes de {group} et ses nœuds divergent : "
             f"{set(steps) ^ {node.name for node in nodes}}"
         )
-    logger = ctx.logger
     results: dict[str, PhaseMetrics] = {node.name: PhaseMetrics() for node in nodes}
     retenus = [node for node in nodes if _retenu(steps[node.name], ctx)]
-    for index, node in enumerate(retenus):
-        step = steps[node.name]
-        precedente = steps[retenus[index - 1].name].section if index else None
-        suivante = steps[retenus[index + 1].name].section if index + 1 < len(retenus) else None
-        if step.section is not None and step.section != precedente:
-            etape(logger, step.section)
-        metrics = _execute(node, step, group, ctx)
-        fin_de_section = step.section != suivante
-        lignes = [
-            *([(step.libelle, _bilan(metrics))] if step.libelle is not None else []),
-            *_maintain(node, ctx),
-        ]
-        for rang, (libelle, bilan) in enumerate(lignes):
-            if step.section is None:
-                logger.info("%s : %s", libelle, bilan, extra={"detail": True})
-                continue
-            dernier = fin_de_section and rang == len(lignes) - 1
-            logger.info("%s%s : %s", DERNIERE_BRANCHE if dernier else BRANCHE, libelle, bilan)
-        results[node.name] = metrics
+    debut = 0
+    while debut < len(retenus):
+        fin = debut + 1
+        lot = retenus[debut].lot
+        while lot is not None and fin < len(retenus) and retenus[fin].lot == lot:
+            fin += 1
+        precedente = steps[retenus[debut - 1].name].section if debut else None
+        section = steps[retenus[debut].name].section
+        if section is not None and section != precedente:
+            etape(ctx.logger, section)
+        tranche = retenus[debut:fin]
+        if len(tranche) == 1:
+            node = tranche[0]
+            results[node.name] = _execute(node, steps[node.name], group, ctx)
+        else:
+            results.update(
+                parallel(
+                    {
+                        node.name: partial(_execute, node, steps[node.name], group, ctx)
+                        for node in tranche
+                    }
+                )
+            )
+        for index in range(debut, fin):
+            node = retenus[index]
+            suivante = steps[retenus[index + 1].name].section if index + 1 < len(retenus) else None
+            _write_lines(node, steps[node.name], results[node.name], suivante, ctx)
+        debut = fin
     return results
+
+
+def _write_lines(
+    node: Node, step: NodeStep, metrics: PhaseMetrics, suivante: str | None, ctx: PhaseContext
+) -> None:
+    """Écrit la ligne de bilan du nœud, lance sa maintenance et écrit une ligne par opération."""
+    lignes = [
+        *([(step.libelle, _bilan(metrics))] if step.libelle is not None else []),
+        *_maintain(node, ctx),
+    ]
+    for rang, (libelle, bilan) in enumerate(lignes):
+        if step.section is None:
+            ctx.logger.info("%s : %s", libelle, bilan, extra={"detail": True})
+            continue
+        dernier = step.section != suivante and rang == len(lignes) - 1
+        ctx.logger.info("%s%s : %s", DERNIERE_BRANCHE if dernier else BRANCHE, libelle, bilan)
 
 
 def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
