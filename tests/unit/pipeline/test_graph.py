@@ -6,7 +6,7 @@ from domain.sources.registry import (
     HARVESTED_SOURCES,
     SOURCE_PRIORITY,
 )
-from pipeline.graph import NODES, PHASE_ORDER, Node, order_violations
+from pipeline.graph import NODES, PHASE_ORDER, Node, dependencies, order_violations
 from pipeline.ingestion.common import extract
 from pipeline.ingestion.common.normalize import _normalize_builders
 
@@ -72,3 +72,9 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
     column_writer = Node("b", "g", writes=frozenset({"t.c"}))
     id_reader = Node("a", "g", reads=frozenset({"t.id"}))
     assert order_violations([id_reader, column_writer]) == []
+
+
+def test_la_fusion_des_revues_suit_le_typage_openalex():
+    """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
+    deps = dependencies(NODES)["publishers_journals.merge_duplicate_journals"]
+    assert "publishers_journals.enrich_journals_from_openalex" in deps
