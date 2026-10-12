@@ -31,7 +31,7 @@ MODULES = [
     "pipeline.persons.cascade",
     "pipeline.persons.purge",
     "pipeline.persons.persons",
-    "application.pipeline.authorships.build_authorships",
+    "pipeline.publications.build_authorships",
     "pipeline.structures.affiliations",
     "pipeline.persons.populate_person_name_forms",
     "application.pipeline.countries.detect_by_country_name",

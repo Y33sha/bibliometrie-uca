@@ -4,7 +4,7 @@
 
 ## `authorships` — table consolidée des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `pipeline/publications/build_authorships.py` à partir des *authorships* sources.
 
 **Couverture partielle assumée** : la table ne contient des entrées que pour les signataires ayant une `person_id`. Les co-auteurs hors périmètre n'apparaissent pas ici ; la liste exhaustive des auteurs d'une publication se lit dans `source_authorships`.
 

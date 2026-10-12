@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `authorships` : construction de la table `authorships`.
+"""Phase `authorships` : construction de la table `authorships`.
 
 Quatre sous-étapes :
 
@@ -14,17 +14,17 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from application.pipeline.authorships.build_authorships import build
-from application.ports.pipeline.authorships.address_pub_count import AddressPubCountQueries
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
-from application.ports.pipeline.authorships.purge_orphan_publications import (
-    PurgeOrphanPublicationsQueries,
-)
 from pipeline.context import OpenTransaction, PhaseContext
 from pipeline.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import attente
+from pipeline.publications.address_pub_count import AddressPubCountQueries
+from pipeline.publications.build_authorships import build
+from pipeline.publications.purge_orphan_publications import (
+    PurgeOrphanPublicationsQueries,
+)
 
 # Taille des lots du DELETE de purge (un commit par lot).
 _PURGE_BATCH_SIZE = 5000

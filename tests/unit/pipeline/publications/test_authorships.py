@@ -6,8 +6,8 @@ Le propos testé ici est l'enchaînement et la boucle de purge : celle-ci suppri
 import logging
 from unittest.mock import patch
 
-from application.pipeline.authorships import phase
 from pipeline.metrics import PhaseMetrics
+from pipeline.publications import authorships as phase
 
 
 class _FakePurgeQueries:

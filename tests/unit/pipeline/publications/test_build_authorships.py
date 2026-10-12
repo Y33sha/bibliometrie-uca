@@ -2,7 +2,7 @@
 
 import logging
 
-from application.pipeline.authorships.build_authorships import build
+from pipeline.publications.build_authorships import build
 
 
 class _QueriesEnregistrees:
