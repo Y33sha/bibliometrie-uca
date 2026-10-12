@@ -35,6 +35,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
+from pipeline.graph import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.ingestion.common import extract, fetch_missing, fetch_stale, normalize
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import Phase, RunOptions
@@ -46,7 +47,6 @@ from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import ecrire_hors_barre, set_flux_barres
 from pipeline.runtime.observability.signals import select_targets
-from pipeline.runtime.phase_order import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, relations
 from pipeline.transformation.publications.authorships import authorships

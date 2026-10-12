@@ -8,13 +8,13 @@ import sys
 
 import pytest
 
+from pipeline.graph import PHASE_LIBELLES, PHASE_ORDER
 from pipeline.run import (
     LARGEUR_TITRE_PHASE,
     _libelle_de_phase,
     _titre_de_phase,
     _titre_du_run,
 )
-from pipeline.runtime.phase_order import PHASE_LIBELLES, PHASE_ORDER
 
 
 @pytest.fixture

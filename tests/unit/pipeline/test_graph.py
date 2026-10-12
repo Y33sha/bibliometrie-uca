@@ -6,10 +6,9 @@ from domain.sources.registry import (
     HARVESTED_SOURCES,
     SOURCE_PRIORITY,
 )
-from pipeline.graph import NODES, Node, order_violations
+from pipeline.graph import NODES, PHASE_ORDER, Node, order_violations
 from pipeline.ingestion.common import extract
 from pipeline.ingestion.common.normalize import _normalize_builders
-from pipeline.runtime.phase_order import PHASE_ORDER
 
 
 def test_noms_uniques():
@@ -17,13 +16,12 @@ def test_noms_uniques():
     assert len(names) == len(set(names))
 
 
-def test_groupes_dans_l_ordre_des_phases():
-    """Les nœuds sont déclarés dans l'ordre d'exécution : le périmètre matérialisé, puis les phases dans leur ordre."""
-    groups = list(dict.fromkeys(n.group for n in NODES))
-    assert groups == ["run", *PHASE_ORDER]
-    assert [n.group for n in NODES] == sorted(
-        (n.group for n in NODES), key=["run", *PHASE_ORDER].index
-    )
+def test_les_noeuds_d_une_phase_se_suivent():
+    """Le périmètre matérialisé d'abord, puis les nœuds de chaque phase d'un seul tenant : l'ordre des phases se lit sur leurs nœuds."""
+    order = ["run", *PHASE_ORDER]
+    groups = [n.group for n in NODES]
+    assert groups[0] == "run"
+    assert groups == sorted(groups, key=order.index)
 
 
 def test_un_noeud_d_extraction_par_source_moissonnee():
