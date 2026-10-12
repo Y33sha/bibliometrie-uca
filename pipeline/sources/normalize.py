@@ -391,12 +391,12 @@ def _normalize_builders(
     *, archive: bool = True, full: bool = False
 ) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
-    from infrastructure.fingerprint import fingerprint
     from infrastructure.raw_store import NullRawStore, get_raw_store
     from pipeline.containers.containers import ContainerGatewayQueries
     from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.sources.crossref.normalize import CrossrefNormalizer
     from pipeline.sources.datacite.normalize import DataciteNormalizer
+    from pipeline.sources.fingerprint import fingerprint
     from pipeline.sources.hal.normalize import HalNormalizer
     from pipeline.sources.openalex.normalize import OpenalexNormalizer
     from pipeline.sources.scanr.normalize import ScanrNormalizer

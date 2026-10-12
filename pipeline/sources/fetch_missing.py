@@ -22,13 +22,13 @@ from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCHABLE_SOURCES
 from domain.types import JsonValue
-from infrastructure.parallel import RunParallel
 from pipeline.context import Phase, PhaseContext
 from pipeline.execution import credentials_missing, log, open_tx, under_circuit_breaker
 from pipeline.fetch_pool import run_fetch_pool
 from pipeline.libelles import branche_de_source, etape, rien_a_faire
 from pipeline.logging_scope import scoped_logger
 from pipeline.metrics import PhaseMetrics
+from pipeline.parallel import RunParallel
 from pipeline.progression import progression
 from pipeline.signals import filter_configured, select_targets, timed_metrics
 from pipeline.sources.circuit_breaker import SourceCircuitBreaker
@@ -317,7 +317,7 @@ def build() -> Phase:
 
     Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
     """
-    from infrastructure.parallel import run_parallel
+    from pipeline.parallel import run_parallel
 
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,

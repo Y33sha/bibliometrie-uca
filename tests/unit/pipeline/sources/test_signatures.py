@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 from domain.persons.signature_name import SignatureName
-from infrastructure.fingerprint import fingerprint
+from pipeline.sources.fingerprint import fingerprint
 from pipeline.sources.signatures import (
     AuthorRecord,
     signature_name_fields,

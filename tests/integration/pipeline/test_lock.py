@@ -9,7 +9,7 @@ import socket
 import pytest
 from sqlalchemy import create_engine, text
 
-from infrastructure.pipeline_lock import (
+from pipeline.lock import (
     PIPELINE_LOCK_KEY,
     PipelineAlreadyRunningError,
     _detenteur,

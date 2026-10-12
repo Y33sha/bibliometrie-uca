@@ -35,12 +35,12 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
-from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.containers import publishers_journals, resolve_ra
 from pipeline.context import Phase, RunOptions
 from pipeline.exception_chain import failure_message, is_user_interruption
 from pipeline.execution import log, open_tx, phase_context
 from pipeline.libelles import accord
+from pipeline.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.metrics import PhaseMetrics
 from pipeline.modes import MODE_NAMES
 from pipeline.persons import persons

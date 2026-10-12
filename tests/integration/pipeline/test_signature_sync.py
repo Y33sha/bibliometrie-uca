@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
-from infrastructure.fingerprint import fingerprint
+from pipeline.sources.fingerprint import fingerprint
 from pipeline.sources.signature_queries import AuthorshipsBatchQueries
 from pipeline.sources.signatures import (
     AddressRecord,
