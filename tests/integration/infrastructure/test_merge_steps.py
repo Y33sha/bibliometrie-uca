@@ -39,7 +39,11 @@ def test_steps_cover_schema(sa_sync_conn, table, data, steps):
     entity_columns = sa_sync_conn.execute(
         text("""
             SELECT table_name::text, column_name::text FROM information_schema.columns
-            WHERE table_schema = current_schema() AND table_name = :table AND column_name <> 'id'
+            WHERE table_schema::text = (
+                SELECT relnamespace::regnamespace::text FROM pg_class
+                WHERE oid = CAST(:table AS regclass)
+            )
+              AND table_name::text = CAST(:table AS text) AND column_name <> 'id'
         """),
         {"table": table},
     ).all()

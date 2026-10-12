@@ -132,7 +132,9 @@ def _structure_code(org: RorOrganization, taken: set[str]) -> str:
 
 
 def _rows(table_name: str, dicts: list[dict[str, JsonValue]]) -> list[tuple[JsonValue, ...]]:
-    columns = exported_columns(tables.metadata.tables[table_name])
+    # `metadata.tables` indexe les tables par `schéma.nom`.
+    table = next(t for t in tables.metadata.tables.values() if t.name == table_name)
+    columns = exported_columns(table)
     return [tuple(row[column] for column in columns) for row in dicts]
 
 
