@@ -35,7 +35,6 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
-from pipeline.containers import publishers_journals, resolve_ra
 from pipeline.ingestion import extract, fetch_missing, fetch_stale, normalize
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.persons import persons
@@ -47,6 +46,7 @@ from pipeline.publications import (
     relations,
     subjects,
 )
+from pipeline.publishing import publishers_journals, resolve_ra
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.exception_chain import failure_message, is_user_interruption
 from pipeline.runtime.execution import log, open_tx, phase_context

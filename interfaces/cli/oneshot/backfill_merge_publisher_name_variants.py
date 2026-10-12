@@ -30,10 +30,10 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
-from pipeline.containers.find_or_create import match_or_create_publisher
-from pipeline.containers.journal_merge import JournalRecompute
-from pipeline.containers.pub_counts import PubCountRecompute
-from pipeline.containers.publishers import PublisherGatewayQueries
+from pipeline.publishing.find_or_create import match_or_create_publisher
+from pipeline.publishing.journal_merge import JournalRecompute
+from pipeline.publishing.pub_counts import PubCountRecompute
+from pipeline.publishing.publishers import PublisherGatewayQueries
 
 log = setup_logger("backfill_merge_publisher_name_variants", os.path.dirname(__file__))
 

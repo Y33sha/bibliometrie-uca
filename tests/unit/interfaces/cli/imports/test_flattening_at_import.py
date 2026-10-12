@@ -10,7 +10,7 @@ import pytest
 from interfaces.cli.imports.import_apc import clean
 from interfaces.cli.imports.import_persons import read_csv_tsv
 from interfaces.cli.maintenance.import_authenticated_orcids import _load_rows
-from pipeline.containers.import_journals_from_doaj_dump import clean_doaj_row
+from pipeline.publishing.import_journals_from_doaj_dump import clean_doaj_row
 
 
 class TestPaiementsApc:

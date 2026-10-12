@@ -21,7 +21,6 @@ import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
-from pipeline.containers.find_or_create import Containers
 from pipeline.ingestion.pub_metadata import PublicationMetadata
 from pipeline.ingestion.wos import normalize as normalize_wos
 from pipeline.ingestion.wos.normalize import (
@@ -43,6 +42,7 @@ from pipeline.ingestion.wos.normalize import (
     upsert_containers,
     upsert_publisher,
 )
+from pipeline.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     staging_row,
 )

@@ -16,13 +16,13 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from pipeline.containers.pub_counts import PgPubCountsQueries
 from pipeline.publications.address_pub_count import AddressPubCountQueries
 from pipeline.publications.authorships_queries import AuthorshipsBuild
 from pipeline.publications.build_authorships import build as build_authorships
 from pipeline.publications.purge_orphan_publications import (
     PurgeOrphanPublicationsQueries,
 )
+from pipeline.publishing.pub_counts import PgPubCountsQueries
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
@@ -144,15 +144,15 @@ def build() -> Phase:
 
     Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée. `run_pipeline --rebuild-authorships` la purge et la reconstruit depuis zéro, en récupération.
     """
-    from pipeline.containers import (
-        delete_empty_journals,
-        delete_empty_monographs,
-        delete_empty_publishers,
-    )
     from pipeline.publications.address_pub_count import AddressPubCountQueries
     from pipeline.publications.authorships_queries import AuthorshipsBuild
     from pipeline.publications.purge_orphan_publications import (
         PurgeOrphanPublicationsQueries,
+    )
+    from pipeline.publishing import (
+        delete_empty_journals,
+        delete_empty_monographs,
+        delete_empty_publishers,
     )
 
     return AuthorshipsPhase(
@@ -169,30 +169,30 @@ def build() -> Phase:
 
 
 def _run_delete_empty_monographs() -> PhaseMetrics:
-    from pipeline.containers.delete_empty_monographs import (
+    from pipeline.publishing.delete_empty_monographs import (
         run_delete_empty_monographs,
     )
-    from pipeline.containers.monographs import MonographGatewayQueries
+    from pipeline.publishing.monographs import MonographGatewayQueries
 
     with open_tx() as conn:
         return run_delete_empty_monographs(log, monograph_repo=MonographGatewayQueries(conn))
 
 
 def _run_delete_empty_journals() -> PhaseMetrics:
-    from pipeline.containers.delete_empty_journals import (
+    from pipeline.publishing.delete_empty_journals import (
         run_delete_empty_journals,
     )
-    from pipeline.containers.journals import JournalGatewayQueries
+    from pipeline.publishing.journals import JournalGatewayQueries
 
     with open_tx() as conn:
         return run_delete_empty_journals(log, journal_repo=JournalGatewayQueries(conn))
 
 
 def _run_delete_empty_publishers() -> PhaseMetrics:
-    from pipeline.containers.delete_empty_publishers import (
+    from pipeline.publishing.delete_empty_publishers import (
         run_delete_empty_publishers,
     )
-    from pipeline.containers.publishers import PublisherGatewayQueries
+    from pipeline.publishing.publishers import PublisherGatewayQueries
 
     with open_tx() as conn:
         return run_delete_empty_publishers(log, publisher_repo=PublisherGatewayQueries(conn))

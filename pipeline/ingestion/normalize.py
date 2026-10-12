@@ -25,12 +25,12 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.registry import ALL_SOURCES_SET
-from pipeline.containers.containers import ContainerGatewayQueries
-from pipeline.containers.publishers import PublisherGatewayQueries
 from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.signatures import SignatureSyncSettings
 from pipeline.ingestion.source_publications import SourcePublicationQueries
 from pipeline.ingestion.staging import StagingQueries, StagingRow
+from pipeline.publishing.containers import ContainerGatewayQueries
+from pipeline.publishing.publishers import PublisherGatewayQueries
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.libelles import (
@@ -392,8 +392,6 @@ def _normalize_builders(
 ) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source, dans l'ordre de `SOURCE_PRIORITY` : la source qui fait le plus autorité passe en premier, les suivantes complètent les métadonnées qu'elle a posées. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from infrastructure.raw_store import NullRawStore, get_raw_store
-    from pipeline.containers.containers import ContainerGatewayQueries
-    from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
     from pipeline.ingestion.datacite.normalize import DataciteNormalizer
     from pipeline.ingestion.fingerprint import fingerprint
@@ -408,6 +406,8 @@ def _normalize_builders(
     from pipeline.ingestion.staging import StagingQueries
     from pipeline.ingestion.theses.normalize import ThesesNormalizer
     from pipeline.ingestion.wos.normalize import WosNormalizer
+    from pipeline.publishing.containers import ContainerGatewayQueries
+    from pipeline.publishing.publishers import PublisherGatewayQueries
 
     raw_store = get_raw_store() if archive else NullRawStore()
     sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)

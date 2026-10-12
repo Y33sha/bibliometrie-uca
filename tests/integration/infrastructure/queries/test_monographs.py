@@ -6,8 +6,8 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from pipeline.containers.monographs import MonographGatewayQueries
-from pipeline.containers.type_proceedings_volumes import (
+from pipeline.publishing.monographs import MonographGatewayQueries
+from pipeline.publishing.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher

@@ -29,7 +29,6 @@ Ce qui se dégage :
 - Tous séparent l'acquisition, un dossier ou un module par source, de la transformation. CRISalid en fait deux applications, l'Academic Observatory deux familles de workflows.
 - La transformation est rangée par entité produite (walden, crisalid-ikg) ou par produit (Academic Observatory), jamais par source.
 - La diffusion, quand elle existe, est un troisième temps distinct (rialto, `publish/`).
-- Chez nous, `pipeline/sources/<source>` contient à la fois l'acquisition (`harvest`, `fetch_missing`, `fetch_stale`) et la normalisation (`normalize`). Les dossiers de domaine (`structures`, `containers`, `publications`, `persons`) contiennent la transformation et des appels réseau : Sudoc, DOAJ, OpenAlex Sources, Unpaywall.
 
 ### Le graphe du run dans un seul fichier
 

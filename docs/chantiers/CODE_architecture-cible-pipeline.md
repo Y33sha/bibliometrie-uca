@@ -75,8 +75,7 @@ Chaque table relève d'une catégorie :
 
 Les tables mixtes sont les entités centrales : un schéma par catégorie les range dans le dérivé, et les droits ne disent plus qui écrit quoi. Seules les tables de décision et les référentiels tenus à la main relèvent de l'API seule.
 
-**À mettre en œuvre**
-- Les schémas de domaine et le rattachement de chaque table. Proposition : `sources`, `persons`, `publications`, `containers` (revues, éditeurs, monographies), `structures` (structures, adresses, périmètres), `ref` (pays, langues, ROR, configuration), `ops` (audit, exécutions, migrations).
+**En cours** : les schémas de domaine et le rattachement de chaque table, chantier [Un schéma PostgreSQL par domaine](CODE_schemas-par-domaine.md).
 
 ### 4. Graphe
 
@@ -99,7 +98,7 @@ Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_
 
 **Acquis**
 - Un paquet racine `pipeline/`, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
-- `pipeline/ingestion/<source>` contient l'extraction et la normalisation de chaque source, et les clients des enrichissements. La transformation est rangée par entité : `structures`, `containers`, `publications`, `persons`.
+- `pipeline/ingestion/<source>` contient l'extraction et la normalisation de chaque source, et les clients des enrichissements. La transformation est rangée par entité : `structures`, `publishing`, `publications`, `persons`.
 - L'API importe seulement `pipeline/public.py`, qui exporte les recalculs ciblés. Les écritures directes d'une entité existent de chaque côté, avec leurs règles dans `domain/`.
 - `import-linter` vérifie ces règles d'import.
 

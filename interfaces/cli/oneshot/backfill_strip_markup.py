@@ -34,7 +34,7 @@ from domain.normalize import (
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.containers.import_journals_from_doaj_dump import (
+from pipeline.publishing.import_journals_from_doaj_dump import (
     clean_doaj_row,
 )
 

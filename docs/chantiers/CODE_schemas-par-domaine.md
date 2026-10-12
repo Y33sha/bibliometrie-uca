@@ -30,7 +30,7 @@ Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du
 
 ### Phase 2 — Code
 
-- [ ] `pipeline/containers` devient `pipeline/publishing`.
+- [x] `pipeline/containers` devient `pipeline/publishing`.
 
 ### Phase 3 — Documentation
 

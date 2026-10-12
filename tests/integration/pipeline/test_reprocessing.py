@@ -50,14 +50,14 @@ def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
     import logging
 
-    from pipeline.containers.containers import ContainerGatewayQueries
-    from pipeline.containers.publishers import PublisherGatewayQueries
     from pipeline.ingestion.hal.normalize import process_work
     from pipeline.ingestion.signature_queries import AuthorshipsBatchQueries
     from pipeline.ingestion.source_publications import (
         SourcePublicationQueries,
     )
     from pipeline.ingestion.staging import StagingQueries, StagingRow
+    from pipeline.publishing.containers import ContainerGatewayQueries
+    from pipeline.publishing.publishers import PublisherGatewayQueries
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()
