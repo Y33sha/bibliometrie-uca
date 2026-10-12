@@ -137,7 +137,7 @@ Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur*
 
 Un PID peut avoir quatre statuts: *pending*, *confirmed*, *rejected*, *authenticated*. Le statut par défaut est *pending*. La confirmation ou le rejet se fait manuellement depuis `admin/persons`, après vérification. Si une personne n'a pas de PID, on peut aussi les ajouter manuellement après recherche sur http://orcid.org/ ou https://www.idref.fr/.
 
-Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-personnes.md). Un PID ne peut être attribué qu'à une personne. Une tentative de réattribuer un PID déjà attribué (avec statut *confirmed* ou *pending*) lèvera une exception. La réattribution est possible quand le PID a un statut *rejected*.
+Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/05-persons.md). Un PID ne peut être attribué qu'à une personne. Une tentative de réattribuer un PID déjà attribué (avec statut *confirmed* ou *pending*) lèvera une exception. La réattribution est possible quand le PID a un statut *rejected*.
 
 TODO: expliquer *authenticated*
 

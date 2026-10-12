@@ -1,6 +1,6 @@
-# Personnes
+# Schéma `persons`
 
-*À jour le 2026-09-05.*
+*À jour le 2026-10-12.*
 
 Référentiel des individus.
 
@@ -38,6 +38,13 @@ Légende :
 - **`person_name_forms`** : formes de noms normalisées, servant à reconnaître une personne existante lors de la création.
 - **`distinct_persons`** : paires de personnes déclarées **distinctes malgré une forme de nom commune** ; les files de triage par nom et par identifiant du référentiel `admin/persons` écartent la paire.
 
+## Décisions humaines
+
+Deux tables contiennent les arbitrages saisis à la main sur les signatures, et survivent aux reconstructions de la table `authorships` :
+
+- **`rejected_authorships`** — paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`.
+- **`confirmed_authorships`** — signatures épinglées sur une personne. Clé primaire `source_authorship_id`.
+
 ## Propriété des tables
 
 | Table | Auteur | Écrit par |
@@ -47,3 +54,5 @@ Légende :
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |
 | `persons_rh` | import CSV | `interfaces/cli/imports/import_persons.py` |
+| `rejected_authorships` | admin | `application/services/authorships/core.py` |
+| `confirmed_authorships` | admin | `application/services/authorships/assign_orphans.py` |
