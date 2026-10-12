@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `subjects` : sujets / mots-clés et co-occurrences.
 
-Deux sous-étapes enchaînées, indissociables, chacune dans sa propre transaction :
+Deux nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
 1. **ingestion** (`subjects` + `publication_subjects`) — incrémentale et publication-centrée : ingère seulement les publications jamais ingérées, ou recalculées depuis leurs sources après leur dernière ingestion, à partir des `topics` de leurs `source_publications`. Purge en fin les sujets devenus orphelins.
 2. **co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`) — recalcule l'usage de chaque sujet et rafraîchit la matview des paires de sujets co-présents sur une même publication.
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.subjects.subject_cooccurrences import (
@@ -27,13 +28,24 @@ class SubjectsPhase:
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
-        open_tx, queries, logger = ctx.open_tx, self.queries, ctx.logger
-        with open_tx() as conn:
-            metrics = run_ingest(conn, queries, logger, rebuild=ctx.options.rebuild_subjects)
+        queries = self.queries
 
-        with open_tx() as conn:
-            run_cooccurrences(conn, queries, logger)
-        # Chaque sous-étape journalise son résultat : une ligne de clôture le répéterait.
+        def ingest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                return run_ingest(conn, queries, ctx.logger, rebuild=ctx.options.rebuild_subjects)
+
+        def usage(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                run_cooccurrences(conn, queries, ctx.logger)
+            return PhaseMetrics()
+
+        by_node = run_nodes(
+            "subjects",
+            {"subjects.ingest": NodeStep(ingest), "subjects.usage": NodeStep(usage)},
+            ctx,
+        )
+        metrics = by_node["subjects.ingest"]
+        # Chaque nœud journalise son résultat : une ligne de clôture le répéterait.
         metrics.resume = ""
         return metrics
 

@@ -1,11 +1,11 @@
 """Orchestrateur de la phase `countries` : détection du pays des adresses et recalcul en cascade.
 
-Quatre sous-étapes, chacune dans sa propre transaction :
+Trois nœuds (`pipeline.graph`) et quatre sous-étapes, chacune dans sa propre transaction :
 
-1. **detect_by_country_name** — pays déduit du nom de pays qui termine l'adresse.
-2. **detect_by_place_name** — pays déduit d'un nom de lieu (institution, ville).
-3. **suggest_address_countries** — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
-4. **refresh_publication_countries** — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
+1. **detect_by_country_name** (nœud `countries.detect`) — pays déduit du nom de pays qui termine l'adresse.
+2. **detect_by_place_name** (nœud `countries.detect`) — pays déduit d'un nom de lieu (institution, ville).
+3. **suggest_address_countries** (nœud `countries.suggest`) — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
+4. **refresh_publication_countries** (nœud `countries.refresh_publication_countries`) — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
 
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -40,20 +41,40 @@ class CountriesPhase:
     queries: CountryQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Enchaîne les quatre sous-étapes, borne l'entonnoir par les deux relevés et assemble les métriques."""
-        open_tx, queries, logger = ctx.open_tx, self.queries, ctx.logger
-        retry_empty = MODES[ctx.options.mode].retry_empty_country_suggestions
-        metrics = PhaseMetrics()
+        """Exécute les trois nœuds, borne l'entonnoir par les deux relevés et assemble les métriques."""
+        open_tx, queries = ctx.open_tx, self.queries
         initial = _etat_des_adresses(open_tx, queries)
 
-        with open_tx() as conn:
-            metrics.merge(detect_by_country_name.run(conn, queries, logger))
-        with open_tx() as conn:
-            metrics.merge(detect_by_place_name.run(conn, queries, logger))
-        with open_tx() as conn:
-            metrics.merge(suggest_countries.run(conn, queries, logger, retry_empty=retry_empty))
-        with open_tx() as conn:
-            refresh_publication_countries.refresh(conn, queries, logger)
+        def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            metrics = PhaseMetrics()
+            with ctx.open_tx() as conn:
+                metrics.merge(detect_by_country_name.run(conn, queries, ctx.logger))
+            with ctx.open_tx() as conn:
+                metrics.merge(detect_by_place_name.run(conn, queries, ctx.logger))
+            return metrics
+
+        def suggest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            retry_empty = MODES[ctx.options.mode].retry_empty_country_suggestions
+            with ctx.open_tx() as conn:
+                return suggest_countries.run(conn, queries, ctx.logger, retry_empty=retry_empty)
+
+        def refresh(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                refresh_publication_countries.refresh(conn, queries, ctx.logger)
+            return PhaseMetrics()
+
+        by_node = run_nodes(
+            "countries",
+            {
+                "countries.detect": NodeStep(detect),
+                "countries.suggest": NodeStep(suggest),
+                "countries.refresh_publication_countries": NodeStep(refresh),
+            },
+            ctx,
+        )
+        metrics = PhaseMetrics()
+        for node_metrics in by_node.values():
+            metrics.merge(node_metrics)
 
         final = _etat_des_adresses(open_tx, queries)
         total = final.total
