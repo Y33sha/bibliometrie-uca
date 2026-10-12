@@ -34,7 +34,7 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 Les liens vont du dépendant vers le parent, et les liens inverses sont dédoublonnés. Le type imprécis `is_related_to` marque une paire à clé partagée que le couple de types de document ne permet pas de qualifier ; une relation précise déjà déclarée le remplace.
 
-**Statut *open access* (`application/pipeline/oa_status/`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
+**Statut *open access* (`pipeline/publications/oa_status.py`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
 
 **Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
 

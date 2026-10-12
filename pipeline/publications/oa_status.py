@@ -1,5 +1,4 @@
-"""
-Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
+"""Phase `oa_status` : statut d'accès ouvert des publications (`publications.oa_status`), lu dans Unpaywall.
 
 Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Une publication est marquée vérifiée seulement si Unpaywall a répondu ; quand Unpaywall est indisponible, elle attend le run suivant. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' n'est pas remplacé par 'gold' ; 'embargoed' n'est pas remplacé par 'closed' ou 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
 
@@ -15,7 +14,6 @@ import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.lookup import LookupOutcome, NotFound, Unavailable
-from application.ports.pipeline.oa_status import OaStatusQueries
 from domain.publications.metadata import decide_oa_status
 from pipeline.context import PhaseContext
 from pipeline.libelles import (
@@ -28,6 +26,7 @@ from pipeline.libelles import (
 )
 from pipeline.metrics import PhaseMetrics
 from pipeline.progression import progression
+from pipeline.publications.oa_status_queries import OaStatusQueries
 from pipeline.signals import filter_configured
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]

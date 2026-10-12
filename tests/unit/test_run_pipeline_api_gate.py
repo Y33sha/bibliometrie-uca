@@ -14,7 +14,7 @@ from pipeline.context import RunOptions
 from pipeline.metrics import PhaseMetrics
 from pipeline.signals import filter_configured
 
-_RUN_ENRICH = "application.pipeline.oa_status.phase._verifier"
+_RUN_ENRICH = "pipeline.publications.oa_status._verifier"
 _LOG = logging.getLogger("test")
 
 

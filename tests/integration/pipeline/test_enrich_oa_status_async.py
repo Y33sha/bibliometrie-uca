@@ -1,7 +1,7 @@
-"""Tests pour `application.pipeline.oa_status.phase.OaStatusPhase` (async).
+"""Tests pour `pipeline.publications.oa_status.OaStatusPhase` (async).
 
 Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
-end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.client` :
+end-to-end avec le `fetcher` concret depuis `pipeline.sources.unpaywall` :
 - happy path (3 publis, statuts mappés, update DB)
 - 404 Unpaywall → `not_found`
 - Unpaywall indisponible → publication laissée dans la file
@@ -23,11 +23,11 @@ from unittest.mock import MagicMock
 import httpx2
 import pytest
 
-from application.pipeline.oa_status.phase import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
 from application.ports.pipeline.lookup import LookupOutcome
-from infrastructure.sources.unpaywall.client import fetch_oa_status
 from pipeline.context import PhaseContext, RunOptions
 from pipeline.metrics import PhaseMetrics
+from pipeline.publications.oa_status import MAX_CONCURRENT, OaStatusFetcher, OaStatusPhase
+from pipeline.sources.unpaywall import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"
