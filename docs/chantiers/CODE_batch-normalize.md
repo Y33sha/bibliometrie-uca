@@ -37,7 +37,9 @@ L'upsert de `source_publications` et les `find_or_create` de revues, éditeurs e
 
 ### 1. Mesure
 
-- [ ] Profil de `normalize` sur un échantillon par source, avec et sans `--normalize-full` : part de l'analyse, des lectures et des écritures. L'échantillon se rejoue depuis le raw store (`rehydrate_staging_from_raw_store`, puis `run_pipeline --only normalize --sources <source>`).
+- [ ] Profil de `normalize` sur HAL et OpenAlex, avec `--normalize-full` : part de l'analyse, des lectures et des écritures. L'échantillon se rejoue depuis le raw store (`rehydrate_staging_from_raw_store`, puis `run_pipeline --only normalize --sources <source>`).
+- [x] HAL, 3 545 notices en 450 s : la lecture des signatures stockées prend la moitié du temps. Le planificateur sous-estime le nombre de notices distinctes de `source_authorships` et choisit un plan parallèle, dont le lancement coûte 55 ms par requête. Une migration fixe l'estimation (`n_distinct`).
+- [ ] Nouvelle mesure de HAL après la migration.
 
 ### 2. Lectures et écritures des signatures par lot
 
