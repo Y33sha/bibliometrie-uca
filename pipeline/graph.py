@@ -226,8 +226,22 @@ NODES: tuple[Node, ...] = (
     _node(
         "normalize.prune_disappeared",
         "normalize",
-        reads=("staging.disappeared_at", "source_publications.id"),
-        writes=("source_publications.id", "source_publications.keys_dirty"),
+        reads=(
+            "staging.disappeared_at",
+            "source_publications.id",
+            "source_publications.staging_id",
+            "source_publications.publication_id",
+        ),
+        # La suppression d'une notice emporte ses signatures, leurs adresses et ROR, et les décisions qui les visent.
+        writes=(
+            "source_publications.id",
+            "source_publications.keys_dirty",
+            "source_authorships.id",
+            "source_authorship_addresses",
+            "source_authorship_rors",
+            "confirmed_authorships",
+            "rejected_authorships",
+        ),
         previous_run=("source_publications",),
     ),
     _node(
