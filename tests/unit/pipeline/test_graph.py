@@ -84,3 +84,16 @@ def test_le_nettoyage_des_identites_suit_la_suppression_des_notices_disparues():
     """Supprimer une notice emporte ses signatures, et donc des identités d'auteur deviennent orphelines."""
     deps = dependencies(NODES)["normalize.cleanup_orphan_identities"]
     assert "normalize.prune_disappeared" in deps
+
+
+def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
+    """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
+    deps = dependencies(NODES)["subjects.usage"]
+    assert "authorships.publications_in_perimeter" not in deps
+
+
+def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publication():
+    theses = next(n for n in NODES if n.name == "normalize.theses")
+    assert not any(
+        item.startswith(("journals", "publishers", "monographs")) for item in theses.writes
+    )

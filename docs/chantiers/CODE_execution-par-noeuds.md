@@ -32,7 +32,7 @@ Le journal du terminal suit déjà la structure du graphe : un cadre par phase, 
 - [x] `merge_duplicate_journals` lit `journal_type`, l'APC, `oa_model`, `manual_fields` et `title` des revues sans les déclarer. Le graphe ignore donc qu'il dépend d'`enrich_journals_from_openalex`.
 - [x] `normalize.prune_disappeared` ne déclare pas la suppression en cascade des signatures, de leurs adresses et ROR, des signatures confirmées et rejetées. `cleanup_orphan_identities` n'en dépend donc pas.
 - [x] `publications.reconcile` lit `journals.journal_type` et `monographs.journal_id` sans les déclarer.
-- [ ] Lectures déclarées à tort : `language_forms` par `normalize.<source>`, les référentiels de publication par `normalize.theses`, `publications` par `subjects.usage`, `countries` par `countries.detect`, `source_publications.external_ids` par `oa_status.verify_unpaywall`.
+- [x] Lectures déclarées à tort : `language_forms` par `normalize.<source>`, les référentiels de publication par `normalize.theses`, `publications` par `subjects.usage`, `countries` par `countries.detect`, `source_publications.external_ids` par `oa_status.verify_unpaywall`.
 - [ ] `oa_status.verify_unpaywall` interroge Unpaywall sans déclarer de `network`.
 - [ ] Étapes sans nœud : import du dump ROR et seconde matérialisation de `perimeter_structures` au début d'`affiliations`, `VACUUM` du staging.
 - [ ] Les canaux de `fetch_missing` partagent une même déclaration, trop large pour chacun.
