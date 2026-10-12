@@ -5,7 +5,6 @@ Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le 
 
 import logging
 from collections import Counter
-from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
 from sqlalchemy import Connection
@@ -118,51 +117,6 @@ def update_name(
         person_id,
         {"last_name": last_name, "first_name": first_name},
     )
-
-
-# ── Import RH ──
-
-
-class RhImportOutcome(StrEnum):
-    """Issue de l'import d'une ligne de fichier RH par `import_rh_person`."""
-
-    INSERTED = "inserted"  # personne créée et fiche RH ajoutée
-    DUPLICATE = "duplicate"  # même nom et même fiche RH déjà en base (ignorée)
-    SKIPPED = "skipped"  # nom ou prénom manquant
-
-
-def import_rh_person(
-    last_name: str,
-    first_name: str,
-    *,
-    email: str | None = None,
-    department: str | None = None,
-    role: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    export_date: str | None = None,
-    repo: PersonRepository,
-) -> RhImportOutcome:
-    """Importe une ligne d'un fichier RH : crée la personne et sa fiche `persons_rh`, sauf doublon.
-
-    Exige nom ET prénom (`SKIPPED` sinon) : l'import RH ne retient que les personnes pleinement identifiées. Déduplique sur nom et prénom normalisés + service + fonction (`DUPLICATE` si une même fiche existe déjà). La création délègue à `create_person`, formes de nom dérivées comprises.
-    """
-    last_name, first_name = last_name.strip(), first_name.strip()
-    if not last_name or not first_name:
-        return RhImportOutcome.SKIPPED
-    if repo.find_rh_person_duplicate(last_name, first_name, department, role) is not None:
-        return RhImportOutcome.DUPLICATE
-    person_id = create_person(last_name, first_name, repo=repo)
-    repo.insert_rh_record(
-        person_id,
-        email=email,
-        role=role,
-        department=department,
-        start_date=start_date,
-        end_date=end_date,
-        export_date=export_date,
-    )
-    return RhImportOutcome.INSERTED
 
 
 # ── Identifiants ──
