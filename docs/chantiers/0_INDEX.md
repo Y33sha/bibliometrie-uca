@@ -2,10 +2,6 @@
 
 ## Chantiers non archivés
 
-### En cours
-
-- [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md)
-
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
@@ -25,12 +21,14 @@
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
+- [Recalculs ciblés et reports au run suivant](CODE_recalculs-cibles-et-reports.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-10-12 — [Architecture cible du pipeline](archived/2026-10-12_CODE_architecture-cible-pipeline.md)
 - 2026-10-12 — [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md)
 - 2026-10-12 — [Scripts en ligne de commande autonomes](archived/2026-10-12_CODE_scripts-autonomes.md)
 - 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)

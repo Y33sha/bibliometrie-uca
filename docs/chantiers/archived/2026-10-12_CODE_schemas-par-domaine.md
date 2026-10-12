@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du pipeline](CODE_architecture-cible-pipeline.md) décide un schéma par domaine (question 3) : le découpage suit la lecture du modèle.
+Toutes les tables sont dans le schéma `public`. La fiche [Architecture cible du pipeline](2026-10-12_CODE_architecture-cible-pipeline.md) décide un schéma par domaine (question 3) : le découpage suit la lecture du modèle.
 
 ## Décisions
 

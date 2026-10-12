@@ -4,7 +4,7 @@
 
 Le pipeline tient sur quatre couches de l'architecture hexagonale : orchestrateurs dans `application/pipeline`, ports dans `application/ports/pipeline`, adaptateurs SQL dans `infrastructure/pipeline`, câblage dans `interfaces/cli/phases`. Pour une suite de transformations de tables en tables, la séparation entre logique et SQL est artificielle : la logique est souvent le SQL. Les opérations du pipeline (« trouver ou créer » une revue, créer une publication, rattacher une signature) vivent dans `application/services`, que seul le pipeline appelle.
 
-La cible est posée par la question 5 de la fiche [Architecture cible du pipeline](../CODE_architecture-cible-pipeline.md).
+La cible est posée par la question 5 de la fiche [Architecture cible du pipeline](2026-10-12_CODE_architecture-cible-pipeline.md).
 
 ## Décisions
 

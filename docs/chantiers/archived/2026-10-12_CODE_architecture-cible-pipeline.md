@@ -35,7 +35,7 @@ Quelles entités gardent leur identifiant d'un run à l'autre, et que devient l'
 
 ### 2. Décisions humaines et données de référence
 
-Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité par le chantier [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md).
+Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité par le chantier [Décisions humaines durables](2026-10-11_DATA_decisions-humaines-durables.md).
 
 **Acquis**
 - Trois formes de stockage : tables dédiées (rejets, confirmations, non-doublons) ; statuts dans des tables que le pipeline remplit aussi (identifiants, formes de nom, liens adresse-structure) ; marqueurs dans la ligne (`journals.manual_fields`, `persons.exclusion`).
@@ -44,7 +44,7 @@ Comment une intervention humaine survit-elle aux recalculs du pipeline ? Traité
 - Une entité visée par un lien confirmé ou rejeté, ou par une exclusion, n'est pas supprimée quand elle se vide.
 - Chaque fusion (personnes, revues, éditeurs) applique la règle de fusion de chaque donnée de l'entité, recensée dans le domaine ; un test confronte ce recensement au schéma.
 
-- Fusions automatiques : aucun besoin de veto constaté pour les revues. Pour les publications, des verdicts durables de scission et de fusion forcée, relus par la réconciliation : chantier [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md).
+- Fusions automatiques : aucun besoin de veto constaté pour les revues. Pour les publications, des verdicts durables de scission et de fusion forcée, relus par la réconciliation : chantier [Gestion des publications dans l'administration](../METIER_gestion-admin-des-publications.md).
 
 ### 3. Nature de chaque table
 
@@ -62,8 +62,8 @@ Chaque table relève d'une catégorie :
 **Piste : la diffusion est un schéma de vues.** Les consommateurs en lecture seule, l'API comprise, lisent un schéma `diffusion` fait de vues sur les tables des domaines, et n'ont aucun droit ailleurs. Les vues fixent le contrat (noms, colonnes, filtres) : les tables internes changent sans toucher les consommateurs.
 
 **Acquis**
-- L'inventaire des lectures et écritures de chaque table : [inventaire](archived/2026-10-11_CODE_pipeline-dag_inventaire.md).
-- Les schémas de domaine et le rattachement de chaque table : chantier [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md).
+- L'inventaire des lectures et écritures de chaque table : [inventaire](2026-10-11_CODE_pipeline-dag_inventaire.md).
+- Les schémas de domaine et le rattachement de chaque table : chantier [Un schéma PostgreSQL par domaine](2026-10-12_CODE_schemas-par-domaine.md).
 
 **Classement proposé** (51 tables et vues matérialisées)
 - **brut** : `staging`, `ror_organizations`, `ror_relations`, `ror_dump_imports`, `persons_rh`, `apc_payments`.
@@ -76,7 +76,7 @@ Chaque table relève d'une catégorie :
 
 ### 4. Graphe
 
-Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md) ; la déclaration est `pipeline/graph.py`.
+Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère sont posés dans le chantier [Graphe de dépendances du pipeline](2026-10-11_CODE_pipeline-dag.md) ; la déclaration est `pipeline/graph.py`.
 
 **Acquis**
 - Les nœuds, avec les données qu'ils lisent et écrivent et leurs lectures du run précédent ; un test vérifie que l'ordre d'exécution les respecte.
@@ -84,15 +84,16 @@ Le graphe est un contrat vérifié par les tests. Ses nœuds et son critère son
 - `resolve_ra` résout les DOI du run, juste avant `publishers_journals`. Les référentiels vides sont supprimés dans le run qui les vide.
 - Le recalcul est incrémental, et documenté nœud par nœud.
 - Les appels réseau restent dans les nœuds qui en ont besoin, certains après des transformations. Leur code est regroupé dans `pipeline/ingestion`.
-- Chaque phase exécute ses nœuds dans l'ordre du graphe, par l'exécuteur `pipeline/node_runner.py` : chantier [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md).
+- Chaque phase exécute ses nœuds dans l'ordre du graphe, par l'exécuteur `pipeline/node_runner.py` : chantier [Exécution du pipeline par nœuds](2026-10-12_CODE_execution-par-noeuds.md).
 
-**Ouvert**
-- À étudier : l'exécution en parallèle des nœuds sans dépendance entre eux (`affiliations` et `publishers_journals`, les quatre enrichissements finaux).
-- Reports au run suivant : peser chaque lecture `previous_run` que déclare `pipeline/graph.py`, et les données différées sans lecture à rebours (`fetch_missing` n'est pas récursif), puis garder ou supprimer chaque report.
+**Décisions**
+- Pas d'exécution en parallèle des nœuds sans dépendance entre eux, tant que l'orchestration est locale, sur un seul poste : le gain est faible et les journaux de progression deviennent moins lisibles. La question se rouvre avec un orchestrateur de type Airflow.
+
+**Suite** : les reports au run suivant sont traités par le chantier [Recalculs ciblés et reports au run suivant](../CODE_recalculs-cibles-et-reports.md).
 
 ### 5. Organisation du code
 
-Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md).
+Traité par le chantier [Le pipeline en paquet racine](2026-10-12_CODE_pipeline-package-racine.md).
 
 **Acquis**
 - Un paquet racine `pipeline/`, hors des couches hexagonales, sans ports : chaque nœud contient son SQL. Les règles pures restent dans `domain/`.
@@ -100,23 +101,18 @@ Traité par le chantier [Le pipeline en paquet racine](archived/2026-10-12_CODE_
 - L'API importe seulement `pipeline/public.py`, qui exporte les recalculs ciblés. Les écritures directes d'une entité existent de chaque côté, avec leurs règles dans `domain/`.
 - `import-linter` vérifie ces règles d'import.
 
-**Hypothèses**
-- Fusion des métadonnées d'une publication : un fichier par champ consolidé, qui liste ses règles par ordre de priorité des sources.
-- Tests sur le [jeu de données commun](CODE_jeu-de-donnees-commun.md).
+**Décisions**
+- Les priorités entre sources et les seuils restent dans le code (`SOURCE_PRIORITY`), pas dans la configuration : le système de priorité n'a pas vocation à durer tel quel.
+- Fusion des métadonnées d'une publication : les règles complexes d'un champ vont dans `domain/`, en fonctions dédiées. La qualité des métadonnées repose d'abord sur la correction en amont de la fusion.
+- Tests sur le [jeu de données commun](../CODE_jeu-de-donnees-commun.md).
 
-**Ouvert**
-- Recalculs ciblés appelés par l'API : lesquels garder, lesquels laisser au run suivant ? Concerne la clôture des périmètres, `in_perimeter` après la revue d'une adresse ou l'exclusion d'une personne, la construction des authorships à l'attribution d'orphelines, les pays d'un lot d'adresses, la requalification et la fusion des revues, le `pub_count` d'un éditeur fusionné. Chaque recalcul gardé se justifie par un effet immédiat attendu dans l'interface.
-- Priorités entre sources et seuils : dans le domaine, testés avec le code (`SOURCE_PRIORITY`), ou dans un fichier de configuration modifiable sans toucher au code ?
+**Suite** : les recalculs ciblés appelés par l'API sont traités par le chantier [Recalculs ciblés et reports au run suivant](../CODE_recalculs-cibles-et-reports.md).
 
 ## Hors de la cible, à décider plus tard
 
-- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des entités avec Splink](DATA_resolution-splink.md).
+- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des entités avec Splink](../DATA_resolution-splink.md).
 - Outillage : orchestrateur par *assets* (Dagster), dbt, publication en bloc après contrôle (*Write-Audit-Publish*).
-
-## Mise en pratique
-
-Après les cinq questions. La refonte avance nœud par nœud. Elle commence par un test de non-régression : sur une copie figée de la base, on compare les tables produites avant et après chaque modification.
 
 ## Documents liés
 
-- [benchmark-pipelines.md](benchmark-pipelines.md) : idées relevées dans le code d'autres pipelines de publications (Stanford, CRISalid, ReCiter, OpenAIRE), avec les liens vers les fichiers.
+- [benchmark-pipelines.md](../benchmark-pipelines.md) : idées relevées dans le code d'autres pipelines de publications (Stanford, CRISalid, ReCiter, OpenAIRE), avec les liens vers les fichiers.
