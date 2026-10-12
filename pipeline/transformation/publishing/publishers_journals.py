@@ -2,7 +2,7 @@
 
 Trois groupes de sous-étapes, dans l'ordre :
 
-- **Éditeurs** — `resolve_publishers` : éditeur Crossref ou repository DataCite de chaque préfixe DOI en attente.
+- **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente.
 - **Revues** — `enrich_journals_from_openalex` (type et frais de publication), `check_journals_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_journals`, `type_proceedings_journals`, `learn_journal_doi_namespaces`, `enrich_journals_from_doaj`.
 - **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
 
@@ -60,7 +60,18 @@ class _SousEtape:
 _GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
     (
         "Éditeurs",
-        (_SousEtape("resolve_publishers", resolve_publishers.LIBELLE, ("crossref", "datacite")),),
+        (
+            _SousEtape(
+                "resolve_crossref_publishers",
+                resolve_publishers.LIBELLES["Crossref"],
+                ("crossref",),
+            ),
+            _SousEtape(
+                "resolve_datacite_publishers",
+                resolve_publishers.LIBELLES["DataCite"],
+                ("datacite",),
+            ),
+        ),
     ),
     (
         "Revues",
@@ -90,7 +101,8 @@ _GROUPES: tuple[tuple[str, tuple[_SousEtape, ...]], ...] = (
 
 @dataclass(frozen=True)
 class PublishersJournalsPhase:
-    resolve_publishers: RunSubstep
+    resolve_crossref_publishers: RunSubstep
+    resolve_datacite_publishers: RunSubstep
     enrich_journals_from_openalex: RunSubstep
     check_journals_in_sudoc: RunSubstep
     merge_duplicate_journals: RunSubstep
@@ -142,8 +154,13 @@ class PublishersJournalsPhase:
 # Ligne de la table d'observabilité de chaque sous-étape : son champ, son libellé, et ce qui compte comme identifié.
 _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
     (
-        "resolve_publishers",
-        "préfixes DOI → publishers",
+        "resolve_crossref_publishers",
+        "préfixes DOI Crossref → éditeurs",
+        lambda m: m.extras.get("publisher_matched", 0),
+    ),
+    (
+        "resolve_datacite_publishers",
+        "préfixes DOI DataCite → éditeurs",
         lambda m: m.extras.get("publisher_matched", 0),
     ),
     ("enrich_journals_from_openalex", "revues OpenAlex", lambda m: m.updated),
@@ -191,16 +208,13 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     for sub in by_step.values():
         metrics.merge(sub)
 
-    publishers = by_step["resolve_publishers"]
     metrics.details["table"] = {
         "rows": [
             {
                 "key": key,
                 "traités": by_step[champ].total,
                 "identifiés": identifies(by_step[champ]),
-                "créés": publishers.extras.get("publisher_created", 0)
-                if champ == "resolve_publishers"
-                else 0,
+                "créés": by_step[champ].extras.get("publisher_created", 0),
             }
             for champ, key, identifies in _TABLE
         ]
@@ -219,13 +233,14 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
 def build() -> Phase:
     """Enrichissement du référentiel `journals`.
 
-    `resolve_publishers` rattache chaque préfixe DOI à son éditeur Crossref ou à son repository DataCite, via les API `/prefixes`, pour les préfixes en attente d'éditeur. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `check_journals_in_sudoc` vérifie dans le Sudoc les ISSN des revues jamais vérifiées, les corrige et les range par support. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
+    `resolve_crossref_publishers` et `resolve_datacite_publishers` rattachent chaque préfixe DOI en attente à son éditeur, via l'API `/prefixes` de son agence. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `check_journals_in_sudoc` vérifie dans le Sudoc les ISSN des revues jamais vérifiées, les corrige et les range par support. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
 
     La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
     """
 
     return PublishersJournalsPhase(
-        resolve_publishers=_run_resolve_publishers,
+        resolve_crossref_publishers=_run_resolve_crossref_publishers,
+        resolve_datacite_publishers=_run_resolve_datacite_publishers,
         enrich_journals_from_openalex=_run_enrich_journals_from_openalex,
         check_journals_in_sudoc=_run_check_journals_in_sudoc,
         merge_duplicate_journals=_run_merge_duplicate_journals,
@@ -239,30 +254,51 @@ def build() -> Phase:
     )
 
 
-def _run_resolve_publishers() -> PhaseMetrics:
+def _run_resolve_crossref_publishers() -> PhaseMetrics:
     from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
-    from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
-    from pipeline.ingestion.http.polite_pool import build_user_agent
-    from pipeline.runtime.config import get_polite_pool_email_optional
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
     from pipeline.transformation.publishing.publishers.resolve_publishers import (
-        run_resolve_publishers,
+        run_resolve_crossref_publishers,
     )
 
-    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    user_agent = _prefixes_user_agent()
     with open_tx() as conn:
         return under_circuit_breaker(
-            "crossref/datacite prefixes",
-            lambda breaker: run_resolve_publishers(
+            "crossref",
+            lambda breaker: run_resolve_crossref_publishers(
                 conn,
                 log,
                 repo=DoiPrefixesQueries(conn),
                 publisher_repo=PublisherGatewayQueries(conn),
-                fetch_crossref_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
+                fetch_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
                     client, prefix, sample_doi, user_agent=user_agent
                 ),
-                fetch_datacite_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
+                breaker=breaker,
+            ),
+            phase="publishers_journals",
+            logger=log,
+        )
+
+
+def _run_resolve_datacite_publishers() -> PhaseMetrics:
+    from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
+    from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
+    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.transformation.publishing.publishers.resolve_publishers import (
+        run_resolve_datacite_publishers,
+    )
+
+    user_agent = _prefixes_user_agent()
+    with open_tx() as conn:
+        return under_circuit_breaker(
+            "datacite",
+            lambda breaker: run_resolve_datacite_publishers(
+                conn,
+                log,
+                repo=DoiPrefixesQueries(conn),
+                publisher_repo=PublisherGatewayQueries(conn),
+                fetch_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
                     client, prefix, user_agent=user_agent
                 ),
                 breaker=breaker,
@@ -270,6 +306,13 @@ def _run_resolve_publishers() -> PhaseMetrics:
             phase="publishers_journals",
             logger=log,
         )
+
+
+def _prefixes_user_agent() -> str:
+    from pipeline.ingestion.http.polite_pool import build_user_agent
+    from pipeline.runtime.config import get_polite_pool_email_optional
+
+    return build_user_agent(get_polite_pool_email_optional() or "")
 
 
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:

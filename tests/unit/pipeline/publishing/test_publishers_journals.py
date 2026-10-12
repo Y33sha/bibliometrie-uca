@@ -6,7 +6,8 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
 
 _CHAMPS = (
-    "resolve_publishers",
+    "resolve_crossref_publishers",
+    "resolve_datacite_publishers",
     "enrich_journals_from_openalex",
     "check_journals_in_sudoc",
     "merge_duplicate_journals",
@@ -48,7 +49,11 @@ def test_chaque_sous_etape_ecrit_sa_ligne_sous_son_groupe(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, merge_duplicate_journals=fusion)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
-    assert lignes[:2] == ["▶ Éditeurs", "  └─ Éditeurs des préfixes DOI : rien à faire"]
+    assert lignes[:3] == [
+        "▶ Éditeurs",
+        "  ├─ Éditeurs des préfixes DOI Crossref : rien à faire",
+        "  └─ Éditeurs des préfixes DOI DataCite : rien à faire",
+    ]
     assert "  ├─ Fusion des revues en double : 2 revues fusionnées" in lignes
     assert lignes[-1] == "  └─ Nature des monographies : rien à faire"
 
@@ -56,7 +61,7 @@ def test_chaque_sous_etape_ecrit_sa_ligne_sous_son_groupe(contexte, caplog):
 def test_les_compteurs_des_sous_etapes_remontent_a_la_phase(contexte):
     worked = PhaseMetrics()
     worked.add(total=3)
-    metrics = _run(contexte, resolve_publishers=worked)
+    metrics = _run(contexte, resolve_crossref_publishers=worked)
     assert metrics.total == 3
 
 

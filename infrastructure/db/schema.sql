@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YSGx6FGXxQbiNFzux0MF5bS2srPKovIzhEh5bz038c0MkVyxQ8nKAYZhVnlCpaw
+\restrict hzPIu8i2Jb6dSVyvM6lKzF1edhqdM5YqG0ywOz9taaDb9hZgnXQHLV4OOwE6OPU
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1205,7 +1205,8 @@ CREATE TABLE publishing.doi_prefixes (
     client_name_raw text,
     client_name_normalized text,
     datacite_client_symbol text,
-    publisher_checked_at timestamp with time zone
+    crossref_checked_at timestamp with time zone,
+    datacite_checked_at timestamp with time zone
 );
 
 
@@ -3186,13 +3187,6 @@ CREATE INDEX idx_doi_prefixes_publisher_name_normalized ON publishing.doi_prefix
 
 
 --
--- Name: idx_doi_prefixes_publisher_pending; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_doi_prefixes_publisher_pending ON publishing.doi_prefixes USING btree (prefix) WHERE ((publisher_id IS NULL) AND (publisher_checked_at IS NULL));
-
-
---
 -- Name: idx_doi_prefixes_ra; Type: INDEX; Schema: publishing; Owner: -
 --
 
@@ -4033,5 +4027,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YSGx6FGXxQbiNFzux0MF5bS2srPKovIzhEh5bz038c0MkVyxQ8nKAYZhVnlCpaw
+\unrestrict hzPIu8i2Jb6dSVyvM6lKzF1edhqdM5YqG0ywOz9taaDb9hZgnXQHLV4OOwE6OPU
 

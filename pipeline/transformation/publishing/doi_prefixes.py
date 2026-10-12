@@ -1,19 +1,36 @@
 """Table `doi_prefixes` : agence d'enregistrement (Registration Agency) et éditeur de chaque préfixe DOI.
 
-Peuplée en deux temps : la phase `resolve_ra` insère `(prefix, ra)` ; le volet publisher de la phase `publishers_journals` interroge les API `/prefixes` pour les préfixes non encore vérifiés (`publisher_checked_at IS NULL`), renseigne les métadonnées et attache l'éditeur. Pour un préfixe DataCite, le nom et le symbole du client DataCite (repository) occupent des colonnes dédiées (`client_name_*`, `datacite_client_symbol`) ; le provider DataCite occupe les colonnes `publisher_*`, comme l'éditeur Crossref.
+Peuplée en deux temps : la phase `resolve_ra` insère `(prefix, ra)` ; le volet publisher de la phase `publishers_journals` interroge l'API `/prefixes` de Crossref, puis celle de DataCite, renseigne les métadonnées et attache l'éditeur. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Pour un préfixe DataCite, le nom et le symbole du client DataCite (repository) occupent des colonnes dédiées (`client_name_*`, `datacite_client_symbol`) ; le provider DataCite occupe les colonnes `publisher_*`, comme l'éditeur Crossref.
 
 Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
 """
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from sqlalchemy import Connection, text
 
 from domain.source_publications.external_ids import ExternalIdType
 
+type Agency = Literal["Crossref", "DataCite"]
+"""Agence dont l'API `/prefixes` donne l'éditeur d'un préfixe."""
+
+# Préfixes qu'une agence n'a pas encore vus. Un préfixe d'agence inconnue passe chez DataCite après que Crossref l'a interrogé sans le trouver.
+_PENDING: dict[Agency, str] = {
+    "Crossref": "crossref_checked_at IS NULL AND ra IN ('Crossref', 'unknown')",
+    "DataCite": (
+        "datacite_checked_at IS NULL"
+        " AND (ra = 'DataCite' OR (ra = 'unknown' AND crossref_checked_at IS NOT NULL))"
+    ),
+}
+
+_CHECKED_COLUMN: dict[Agency, str] = {
+    "Crossref": "crossref_checked_at",
+    "DataCite": "datacite_checked_at",
+}
+
 
 class PendingPublisherPrefix(NamedTuple):
-    """Row `doi_prefixes` dont le publisher reste à déterminer : `publisher_id IS NULL` et `publisher_checked_at IS NULL` (`/prefixes` jamais tenté). `publisher_name_*` sont en général NULL (créées par `resolve_ra` avec la RA seule) mais peuvent être renseignés pour des rows héritées — le volet attache alors directement sans re-fetch."""
+    """Row `doi_prefixes` dont l'éditeur reste à déterminer. `publisher_name_*` sont en général NULL, la row créée par `resolve_ra` avec la RA seule. Renseignés, le volet attache l'éditeur sans requête."""
 
     prefix: str
     ra: str
@@ -60,7 +77,7 @@ class DoiPrefixesQueries:
         return [row.prefix for row in result]
 
     def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        """Insère un préfixe avec sa RA seule (`publisher_*` NULL, `publisher_checked_at` NULL). `ra='unknown'` si doi.org ne connaît pas le préfixe. Retourne True si inséré, False si déjà présent (`ON CONFLICT (prefix) DO NOTHING`)."""
+        """Insère un préfixe avec sa RA seule. `ra='unknown'` si doi.org ne connaît pas le préfixe. Retourne True si inséré, False si déjà présent (`ON CONFLICT (prefix) DO NOTHING`)."""
         result = self._conn.execute(
             text(
                 "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
@@ -88,16 +105,14 @@ class DoiPrefixesQueries:
         )
         return [(row.ra, int(row.dois), int(row.prefixes)) for row in result]
 
-    def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
-        """Rows à traiter par le volet publisher : `publisher_id IS NULL`, `publisher_checked_at IS NULL`, et `ra` gérée (`Crossref`/`DataCite`/`unknown` — les autres RAs n'ont pas d'endpoint `/prefixes` exploitable). Ordre par `prefix` ASC pour des logs reproductibles."""
+    def get_prefixes_pending_publisher(self, agency: Agency) -> list[PendingPublisherPrefix]:
+        """Préfixes sans éditeur que l'agence n'a pas encore vus, par ordre de préfixe."""
         result = self._conn.execute(
             text(
-                """
+                f"""
                 SELECT prefix, ra, publisher_name_raw, publisher_name_normalized
                 FROM doi_prefixes
-                WHERE publisher_id IS NULL
-                  AND publisher_checked_at IS NULL
-                  AND ra IN ('Crossref', 'DataCite', 'unknown')
+                WHERE publisher_id IS NULL AND {_PENDING[agency]}
                 ORDER BY prefix
                 """
             )
@@ -124,7 +139,7 @@ class DoiPrefixesQueries:
         client_name_normalized: str | None,
         datacite_client_symbol: str | None,
     ) -> None:
-        """Renseigne les métadonnées publisher d'une row après fetch `/prefixes` (et corrige `ra` si elle était `unknown`). N'attache pas le `publisher_id` (cf. `update_publisher_id`) ni ne marque la row vérifiée (cf. `mark_publisher_checked`)."""
+        """Renseigne les métadonnées publisher d'une row après fetch `/prefixes` (et corrige `ra` si elle était `unknown`). N'attache pas le `publisher_id` (cf. `update_publisher_id`) ni ne marque la row vérifiée (cf. `mark_checked`)."""
         self._conn.execute(
             text(
                 """
@@ -165,9 +180,11 @@ class DoiPrefixesQueries:
             {"pid": publisher_id, "prefix": prefix},
         )
 
-    def mark_publisher_checked(self, prefix: str) -> None:
-        """Pose `publisher_checked_at = now()` : `/prefixes` a répondu, préfixe trouvé ou absent → la row ne sera plus reprise par le volet."""
+    def mark_checked(self, prefix: str, agency: Agency) -> None:
+        """Retient que l'agence a répondu pour ce préfixe, connu d'elle ou non."""
         self._conn.execute(
-            text("UPDATE doi_prefixes SET publisher_checked_at = now() WHERE prefix = :prefix"),
+            text(
+                f"UPDATE doi_prefixes SET {_CHECKED_COLUMN[agency]} = now() WHERE prefix = :prefix"
+            ),
             {"prefix": prefix},
         )

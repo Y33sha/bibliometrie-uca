@@ -47,13 +47,13 @@ Constats hors du graphe :
 Accès aux sources :
 
 - [ ] Fonction d'accès à une source dans `pipeline/ingestion/http/`, à partir de `breaker_scope.py`. Elle remplace `filter_configured`, les contrôles des moissonneurs OpenAlex, WoS et ScanR, et les trois formes du circuit-breaker. L'extraction de DataCite et `fetch_truncated` contrôlent ainsi leurs identifiants.
-- [ ] `resolve_publishers` se découpe en deux nœuds, Crossref et DataCite, qui choisissent leurs préfixes par agence d'enregistrement. Les préfixes d'agence inconnue passent par Crossref, puis par DataCite s'ils sont absents de Crossref.
+- [x] `resolve_publishers` se découpe en deux nœuds, Crossref et DataCite, qui choisissent leurs préfixes par agence d'enregistrement. `crossref_checked_at` et `datacite_checked_at` remplacent `publisher_checked_at`. Les préfixes d'agence inconnue passent par Crossref, puis par DataCite quand Crossref les a interrogés sans les trouver.
 
 ### Phase 4 — Exécution par nœuds
 
 - [ ] Chaque nœud désigne sa fonction. `run.py` exécute les nœuds dans l'ordre du graphe. Il affiche le cadre quand le groupe change, le titre de section quand la section change, puis le bilan du nœud.
 - [ ] Un nœud qui déclare un `network` s'exécute dans la fonction d'accès à sa source, posée par l'exécuteur.
-- [ ] Mise à jour de la documentation.
+- [ ] Mise à jour de la documentation, dont `publisher_checked_at` et `resolve_publishers` dans `docs/pipeline/05-publishers-journals.md`, `docs/agregats/publishers.md` et `docs/sources/`.
 
 ## Questions ouvertes
 

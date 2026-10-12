@@ -432,7 +432,7 @@ class TestMergePublishers:
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
         insert_doi_prefix(
-            sa_sync_conn, "10.99999", ra="Crossref", publisher_id=source, publisher_checked=True
+            sa_sync_conn, "10.99999", ra="Crossref", publisher_id=source, checked=True
         )
 
         merge_publishers(

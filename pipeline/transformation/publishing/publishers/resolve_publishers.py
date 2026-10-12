@@ -1,8 +1,8 @@
-"""Volet publisher de `publishers_journals` : préfixe DOI → éditeur / repository, après `normalize`.
+"""Volet publisher de `publishers_journals` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
 
-Pour chaque row en attente (`publisher_id IS NULL` et `publisher_checked_at IS NULL`, RA gérée), interroge `/prefixes` en routant par Registration Agency (`Crossref`/`DataCite` → l'endpoint correspondant ; `unknown` → tente les deux et corrige la RA), renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), puis match ou crée le publisher contre `publisher_name_forms` et l'attache. Une row dont le préfixe est trouvé ou absent est marquée vérifiée (`publisher_checked_at`) et n'est plus reprise. Une row dont l'API est indisponible reste en attente du run suivant. Placé après `normalize` pour matcher contre les publishers déjà créés par les sources.
+L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue que Crossref ne connaît pas. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), corrige l'agence d'un préfixe inconnu qu'elle trouve, puis reconnaît ou crée l'éditeur contre `publisher_name_forms` et l'attache. Un préfixe dont l'API a répondu est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Un préfixe dont l'API est indisponible reste en attente du run suivant.
 
-Les requêtes `/prefixes` partent en concurrence via `run_fetch_pool` ; les écritures, dont la création d'éditeurs, restent sérialisées. La Registration Agency de chaque préfixe est posée en amont par la phase `resolve_ra`. Les clients HTTP (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`) sont injectés en callables, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
+Les requêtes `/prefixes` partent en concurrence via `run_fetch_pool` ; les écritures, dont la création d'éditeurs, restent sérialisées. Les clients HTTP sont injectés en callables.
 """
 
 from __future__ import annotations
@@ -23,14 +23,18 @@ from pipeline.runtime.observability.libelles import BRANCHE, accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
 from pipeline.transformation.publishing.doi_prefixes import (
+    Agency,
     DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
 from pipeline.transformation.publishing.find_or_create import match_or_create_publisher
 from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
-LIBELLE = "Éditeurs des préfixes DOI"
-"""Libellé de la sous-étape dans le journal de la phase."""
+LIBELLES: dict[Agency, str] = {
+    "Crossref": "Éditeurs des préfixes DOI Crossref",
+    "DataCite": "Éditeurs des préfixes DOI DataCite",
+}
+"""Libellé de chaque étape dans le journal de la phase."""
 
 MAX_CONCURRENT = 3
 """Requêtes `/prefixes` simultanées, sous les plafonds des pools polis Crossref et DataCite."""
@@ -47,40 +51,96 @@ type FetchDataCitePrefixFn = Callable[
 ]
 """Signature : `(client, prefix) -> (provider_name, client_name, client_symbol) | NOT_FOUND | UNAVAILABLE`."""
 
+type _Ask = Callable[
+    [httpx2.AsyncClient, PendingPublisherPrefix], Awaitable[_PrefixAnswer | Unavailable]
+]
+
 
 @dataclass(frozen=True)
 class _PrefixAnswer:
-    """Réponse de `/prefixes` pour un préfixe : RA retenue, et les informations de l'agence qui le connaît (aucune si le préfixe est absent des deux)."""
+    """Réponse de `/prefixes` pour un préfixe : RA retenue, et les informations de l'agence qui le connaît (aucune si elle ne le connaît pas)."""
 
     ra: str
     crossref: tuple[str, int | None] | None = None
     datacite: tuple[str, str, str] | None = None
 
 
-def run_resolve_publishers(
+def run_resolve_crossref_publishers(
     conn: Connection,
     log: logging.Logger,
     *,
     repo: DoiPrefixesQueries,
     publisher_repo: PublisherGatewayQueries,
-    fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
-    fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
+    fetch_prefix_fn: FetchCrossrefPrefixFn,
     breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
-    """Détermine et attache le publisher des préfixes en attente via `/prefixes`.
+    """Attache l'éditeur Crossref des préfixes en attente. Un DOI du préfixe, lu avant l'appel, retrouve le membre déposant d'un compte sans dépôt."""
 
-    `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (RA gérée mais préfixe inconnu de `/prefixes`). S'arrête si le `breaker` a tripé.
+    async def ask(
+        client: httpx2.AsyncClient, row: PendingPublisherPrefix
+    ) -> _PrefixAnswer | Unavailable:
+        answer = await fetch_prefix_fn(client, row.prefix, row.sample_doi)
+        if isinstance(answer, Unavailable):
+            return UNAVAILABLE
+        if isinstance(answer, NotFound):
+            return _PrefixAnswer(row.ra)
+        return _PrefixAnswer("Crossref", crossref=answer)
+
+    def prepare(conn: Connection, row: PendingPublisherPrefix) -> PendingPublisherPrefix:  # noqa: ARG001
+        return row._replace(sample_doi=repo.find_doi_with_prefix(row.prefix))
+
+    return _resolve(conn, log, "Crossref", ask, prepare, repo, publisher_repo, breaker)
+
+
+def run_resolve_datacite_publishers(
+    conn: Connection,
+    log: logging.Logger,
+    *,
+    repo: DoiPrefixesQueries,
+    publisher_repo: PublisherGatewayQueries,
+    fetch_prefix_fn: FetchDataCitePrefixFn,
+    breaker: SourceCircuitBreaker | None = None,
+) -> PhaseMetrics:
+    """Attache le provider DataCite des préfixes en attente, et retient le repository qui a déposé les DOI."""
+
+    async def ask(
+        client: httpx2.AsyncClient, row: PendingPublisherPrefix
+    ) -> _PrefixAnswer | Unavailable:
+        answer = await fetch_prefix_fn(client, row.prefix)
+        if isinstance(answer, Unavailable):
+            return UNAVAILABLE
+        if isinstance(answer, NotFound):
+            return _PrefixAnswer(row.ra)
+        return _PrefixAnswer("DataCite", datacite=answer)
+
+    return _resolve(conn, log, "DataCite", ask, None, repo, publisher_repo, breaker)
+
+
+def _resolve(
+    conn: Connection,
+    log: logging.Logger,
+    agency: Agency,
+    ask: _Ask,
+    prepare: Callable[[Connection, PendingPublisherPrefix], PendingPublisherPrefix] | None,
+    repo: DoiPrefixesQueries,
+    publisher_repo: PublisherGatewayQueries,
+    breaker: SourceCircuitBreaker | None,
+) -> PhaseMetrics:
+    """Traite les préfixes en attente auprès de l'agence.
+
+    `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence). S'arrête si le `breaker` a coupé.
     """
     metrics = PhaseMetrics()
-    rows = repo.get_prefixes_pending_publisher()
+    rows = repo.get_prefixes_pending_publisher(agency)
     if not rows:
         return metrics
-    with progression(len(rows), f"{BRANCHE}{LIBELLE}", log, efface=True) as avancement:
+    with progression(len(rows), f"{BRANCHE}{LIBELLES[agency]}", log, efface=True) as avancement:
         # Nom déjà stocké : rattachement direct, sans requête.
         for row in rows:
             if row.publisher_name_normalized is not None:
                 _attach(
                     row,
+                    agency,
                     row.publisher_name_raw,
                     row.publisher_name_normalized,
                     metrics,
@@ -90,20 +150,6 @@ def run_resolve_publishers(
                 )
                 avancement.avance()
         to_fetch = [row for row in rows if row.publisher_name_normalized is None]
-
-        def _prepare(conn: Connection, row: PendingPublisherPrefix) -> PendingPublisherPrefix:  # noqa: ARG001
-            # Le DOI témoin sert au seul cas du compte sans dépôt, mais se lit avant l'appel : la recherche
-            # d'un DOI du préfixe est une requête, l'appel HTTP en est déjà une de plus.
-            if row.ra == "DataCite":
-                return row
-            return row._replace(sample_doi=repo.find_doi_with_prefix(row.prefix))
-
-        async def _fetch(
-            client: httpx2.AsyncClient, row: PendingPublisherPrefix
-        ) -> _PrefixAnswer | Unavailable:
-            return await _ask_prefixes(
-                client, row, fetch_crossref_prefix_fn, fetch_datacite_prefix_fn
-            )
 
         def _write(
             conn: Connection,  # noqa: ARG001
@@ -119,7 +165,7 @@ def run_resolve_publishers(
                 )
             else:
                 name_raw, name_normalized = _store_publisher_metadata(row, answer, repo)
-                _attach(row, name_raw, name_normalized, metrics, log, repo, publisher_repo)
+                _attach(row, agency, name_raw, name_normalized, metrics, log, repo, publisher_repo)
             avancement.avance()
 
         asyncio.run(
@@ -128,14 +174,14 @@ def run_resolve_publishers(
                 conn,
                 max_concurrent=MAX_CONCURRENT,
                 commit_every=COMMIT_EVERY,
-                fetch=_fetch,
+                fetch=ask,
                 write=_write,
                 should_continue=lambda: breaker is None or not breaker.tripped,
-                prepare=_prepare,
+                prepare=prepare,
             )
         )
     if breaker is not None and breaker.tripped:
-        log.warning("resolve_publishers : circuit-breaker tripé, arrêt")
+        log.warning("resolve_publishers : circuit-breaker %s coupé, arrêt", agency)
 
     metrics.resume = (
         f"{accord(metrics.total, 'préfixe')} : "
@@ -146,29 +192,6 @@ def run_resolve_publishers(
     if metrics.errors:
         metrics.resume += f", {accord(metrics.errors, 'reporté', 'reportés')}"
     return metrics
-
-
-async def _ask_prefixes(
-    client: httpx2.AsyncClient,
-    row: PendingPublisherPrefix,
-    fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
-    fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
-) -> _PrefixAnswer | Unavailable:
-    """Interroge `/prefixes` selon la RA de la row. RA `unknown` : Crossref, puis DataCite si Crossref ignore le préfixe ; la RA est corrigée d'après l'agence qui répond."""
-    if row.ra in ("Crossref", "unknown"):
-        crossref = await fetch_crossref_prefix_fn(client, row.prefix, row.sample_doi)
-        if isinstance(crossref, Unavailable):
-            return UNAVAILABLE
-        if not isinstance(crossref, NotFound):
-            return _PrefixAnswer("Crossref", crossref=crossref)
-        if row.ra == "Crossref":
-            return _PrefixAnswer(row.ra)
-    datacite = await fetch_datacite_prefix_fn(client, row.prefix)
-    if isinstance(datacite, Unavailable):
-        return UNAVAILABLE
-    if isinstance(datacite, NotFound):
-        return _PrefixAnswer(row.ra)
-    return _PrefixAnswer("DataCite", datacite=datacite)
 
 
 def _store_publisher_metadata(
@@ -195,7 +218,7 @@ def _store_publisher_metadata(
         publisher_name_normalized = normalize_text(publisher_name_raw) or None
         client_name_normalized = normalize_text(client_name_raw) or None
 
-    # Persiste même si le nom est vide : la row sera marquée vérifiée, donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
+    # Persiste même si le nom est vide : la row sera marquée vue par l'agence, donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
     repo.set_prefix_publisher_metadata(
         prefix=row.prefix,
         ra=answer.ra,
@@ -211,6 +234,7 @@ def _store_publisher_metadata(
 
 def _attach(
     row: PendingPublisherPrefix,
+    agency: Agency,
     name_raw: str | None,
     name_normalized: str | None,
     metrics: PhaseMetrics,
@@ -218,7 +242,7 @@ def _attach(
     repo: DoiPrefixesQueries,
     publisher_repo: PublisherGatewayQueries,
 ) -> None:
-    """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vérifié."""
+    """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vu par l'agence."""
     metrics.add(total=1)
     matched = (
         match_or_create_publisher(name_raw, repo=publisher_repo)
@@ -239,6 +263,6 @@ def _attach(
         )
     else:
         metrics.add(no_publisher=1)
-        log.info("%s → éditeur inconnu de %s", row.prefix, row.ra, extra={"detail": True})
+        log.info("%s → éditeur inconnu de %s", row.prefix, agency, extra={"detail": True})
 
-    repo.mark_publisher_checked(row.prefix)
+    repo.mark_checked(row.prefix, agency)

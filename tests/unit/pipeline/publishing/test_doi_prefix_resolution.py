@@ -1,6 +1,6 @@
 """Tests des deux passes de résolution des préfixes DOI :
-`ResolveRaPhase` (RA seule, via doi.org) et `run_resolve_publishers` (publisher via
-les API /prefixes). Fakes pour les ports, callables locales pour les clients HTTP —
+`ResolveRaPhase` (RA seule, via doi.org) et les étapes Crossref et DataCite de
+`resolve_publishers` (publisher via les API /prefixes). Fakes pour les ports, callables locales pour les clients HTTP —
 pas de réseau, pas de DB.
 """
 
@@ -13,7 +13,10 @@ from unittest.mock import MagicMock
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.transformation.publishing.doi_prefixes import PendingPublisherPrefix
-from pipeline.transformation.publishing.publishers.resolve_publishers import run_resolve_publishers
+from pipeline.transformation.publishing.publishers.resolve_publishers import (
+    run_resolve_crossref_publishers,
+    run_resolve_datacite_publishers,
+)
 from pipeline.transformation.publishing.resolve_ra import ResolveRaPhase
 
 
@@ -28,7 +31,8 @@ class _Row:
     client_name_raw: str | None = None
     client_name_normalized: str | None = None
     datacite_client_symbol: str | None = None
-    checked: bool = False
+    crossref_checked: bool = False
+    datacite_checked: bool = False
 
 
 @dataclass
@@ -55,15 +59,20 @@ class FakeDoiPrefixRepo:
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
         return list(self.ra_breakdown)
 
-    def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
+    def get_prefixes_pending_publisher(self, agency: str) -> list[PendingPublisherPrefix]:
+        def pending(r: _Row) -> bool:
+            if agency == "Crossref":
+                return not r.crossref_checked and r.ra in ("Crossref", "unknown")
+            return not r.datacite_checked and (
+                r.ra == "DataCite" or (r.ra == "unknown" and r.crossref_checked)
+            )
+
         return [
             PendingPublisherPrefix(
                 r.prefix, r.ra, r.publisher_name_raw, r.publisher_name_normalized
             )
             for r in sorted(self.rows.values(), key=lambda r: r.prefix)
-            if r.publisher_id is None
-            and not r.checked
-            and r.ra in ("Crossref", "DataCite", "unknown")
+            if r.publisher_id is None and pending(r)
         ]
 
     def set_prefix_publisher_metadata(
@@ -90,8 +99,11 @@ class FakeDoiPrefixRepo:
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
         self.rows[prefix].publisher_id = publisher_id
 
-    def mark_publisher_checked(self, prefix: str) -> None:
-        self.rows[prefix].checked = True
+    def mark_checked(self, prefix: str, agency: str) -> None:
+        if agency == "Crossref":
+            self.rows[prefix].crossref_checked = True
+        else:
+            self.rows[prefix].datacite_checked = True
 
 
 @dataclass
@@ -173,16 +185,24 @@ def _run_ra(contexte, repo, ras_fn):
     return ResolveRaPhase(lambda conn: repo, ras_fn).run(contexte())  # noqa: ARG005
 
 
-def _run_pub(repo, pubrepo, cr=None, dc=None, **kw):
-    return run_resolve_publishers(
+def _run_pub(repo, pubrepo, cr=None, dc=None):
+    """Étape Crossref puis étape DataCite, dans l'ordre de la phase ; rend les métriques des deux."""
+    crossref = run_resolve_crossref_publishers(
         MagicMock(),
         _LOG,
         repo=repo,
         publisher_repo=pubrepo,
-        fetch_crossref_prefix_fn=cr if cr is not None else StubCrossref(),
-        fetch_datacite_prefix_fn=dc if dc is not None else StubDataCite(),
-        **kw,
+        fetch_prefix_fn=cr if cr is not None else StubCrossref(),
     )
+    datacite = run_resolve_datacite_publishers(
+        MagicMock(),
+        _LOG,
+        repo=repo,
+        publisher_repo=pubrepo,
+        fetch_prefix_fn=dc if dc is not None else StubDataCite(),
+    )
+    crossref.merge(datacite)
+    return crossref
 
 
 # ── ResolveRaPhase ─────────────────────────────────────────────────
@@ -265,7 +285,7 @@ def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, con
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
-# ── run_resolve_publishers ─────────────────────────────────────────
+# ── resolve_publishers ─────────────────────────────────────────
 
 
 def test_publishers_crossref_match():
@@ -281,7 +301,7 @@ def test_publishers_crossref_match():
     assert row.publisher_id == 42
     assert row.publisher_name_normalized == "nature publishing group"
     assert row.crossref_member_id == 297
-    assert row.checked is True
+    assert row.crossref_checked is True
     assert metrics.extras.get("publisher_matched") == 1
 
 
@@ -341,8 +361,8 @@ def test_publishers_unknown_tries_both_and_corrects_ra():
 
 
 def test_publishers_unknown_both_muet_marks_checked_no_publisher():
-    """ra=unknown, /prefixes muet partout → pas de publisher, mais row marquée vérifiée
-    (garde : ne sera plus reprise au run suivant)."""
+    """ra=unknown, /prefixes muet partout → pas de publisher, mais row marquée vue par les deux
+    agences (garde : ne sera plus reprise au run suivant)."""
     repo = FakeDoiPrefixRepo(rows={"10.9012": _Row("10.9012", "unknown")})
     pubrepo = FakePublisherRepo()
     cr = StubCrossref()
@@ -352,16 +372,17 @@ def test_publishers_unknown_both_muet_marks_checked_no_publisher():
 
     row = repo.rows["10.9012"]
     assert row.publisher_id is None
-    assert row.checked is True  # garde anti-réinterrogation
-    assert metrics.extras.get("no_publisher") == 1
+    assert row.crossref_checked and row.datacite_checked  # garde anti-réinterrogation
+    assert metrics.extras.get("no_publisher") == 2  # inconnu de Crossref, puis de DataCite
     # Un second run ne reprend plus cette row.
-    assert repo.get_prefixes_pending_publisher() == []
+    assert repo.get_prefixes_pending_publisher("Crossref") == []
+    assert repo.get_prefixes_pending_publisher("DataCite") == []
 
 
 def test_publishers_skips_already_checked_and_unmanaged_ra():
     repo = FakeDoiPrefixRepo(
         rows={
-            "10.9011": _Row("10.9011", "Crossref", checked=True),
+            "10.9011": _Row("10.9011", "Crossref", crossref_checked=True),
             "10.9013": _Row("10.9013", "mEDRA"),
         }
     )
@@ -433,10 +454,10 @@ def test_publishers_crossref_unavailable_leaves_prefix_pending():
     metrics = _run_pub(repo, FakePublisherRepo(), cr)
 
     row = repo.rows["10.1038"]
-    assert row.checked is False
+    assert row.crossref_checked is False
     assert row.publisher_id is None
     assert metrics.errors == 1
-    assert [r.prefix for r in repo.get_prefixes_pending_publisher()] == ["10.1038"]
+    assert [r.prefix for r in repo.get_prefixes_pending_publisher("Crossref")] == ["10.1038"]
 
 
 def test_publishers_unknown_crossref_unavailable_does_not_ask_datacite():
@@ -450,7 +471,7 @@ def test_publishers_unknown_crossref_unavailable_does_not_ask_datacite():
     assert dc.calls == []
     row = repo.rows["10.14758"]
     assert row.ra == "unknown"
-    assert row.checked is False
+    assert row.crossref_checked is False
 
 
 def test_publishers_datacite_unavailable_leaves_prefix_pending():
@@ -459,4 +480,4 @@ def test_publishers_datacite_unavailable_leaves_prefix_pending():
 
     _run_pub(repo, FakePublisherRepo(), dc=dc)
 
-    assert repo.rows["10.5281"].checked is False
+    assert repo.rows["10.5281"].datacite_checked is False

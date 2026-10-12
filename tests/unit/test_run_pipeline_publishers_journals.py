@@ -27,7 +27,12 @@ def test_phase_aggregates_substep_counters():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         _patch_credentials_present(),
-        patch.object(publishers_journals, "_run_resolve_publishers", return_value=publishers),
+        patch.object(
+            publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
+        ),
+        patch.object(
+            publishers_journals, "_run_resolve_datacite_publishers", return_value=PhaseMetrics()
+        ),
         patch.object(
             publishers_journals, "_run_enrich_journals_from_openalex", return_value=openalex
         ),
@@ -54,7 +59,12 @@ def test_phase_propagates_substep_signals():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
         _patch_credentials_present(),
-        patch.object(publishers_journals, "_run_resolve_publishers", return_value=publishers),
+        patch.object(
+            publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
+        ),
+        patch.object(
+            publishers_journals, "_run_resolve_datacite_publishers", return_value=PhaseMetrics()
+        ),
         patch.object(
             publishers_journals,
             "_run_enrich_journals_from_openalex",
