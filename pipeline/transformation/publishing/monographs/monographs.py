@@ -4,9 +4,11 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.merge import MergedEntity
 from domain.monographs.matching import MonographCandidate
 from domain.monographs.proceedings import MonographRecord
 from infrastructure.db.scalars import scalar_int
+from infrastructure.repositories.merge_steps import record_redirect
 from infrastructure.sql_fragments import has_active_issn
 
 
@@ -174,7 +176,7 @@ class MonographGatewayQueries:
         ]
 
     def merge_monograph_into(self, target_id: int, source_id: int) -> None:
-        """Reporte sur `target_id` les enregistrements et les publications de `source_id`, complète les champs vides de la cible, puis supprime la source."""
+        """Reporte sur `target_id` les enregistrements et les publications de `source_id`, complète les champs vides de la cible, supprime la source et enregistre sa redirection."""
         params = {"t": target_id, "s": source_id}
         self._conn.execute(_MOVE_RECORDS, params)
         self._conn.execute(_MOVE_PUBLICATIONS, params)
@@ -191,6 +193,7 @@ class MonographGatewayQueries:
             journal_id=source.journal_id,
         )
         self._conn.execute(_DELETE_SOURCE, params)
+        record_redirect(self._conn, MergedEntity.MONOGRAPH, target_id, source_id)
 
     def find_monograph_journal_candidates(self) -> list[MonographJournalCandidates]:
         """Chaque monographie portée par au moins un enregistrement, avec les entrées de `journals` de ses enregistrements."""

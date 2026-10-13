@@ -3,7 +3,7 @@
 Recalcule les composantes connexes du voisinage 1-hop des `source_publications` marquées `keys_dirty` et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision est portée par `domain.publications.reconciliation.plan_reconciliation` (pure) ; ici on applique :
 
 - **groupes** : on rattache les SP de chaque groupe à son ancre (pub existant conservé), ou à un **nouveau** pub créé quand la partition n'a pas d'ancre existante (split) ;
-- **publications dissoutes** (vidées de toutes leurs SP par un merge) : leurs paiements APC (`apc_payments`) sont re-pointés vers le successeur, puis `refresh_from_sources` les supprime (orphelines) ;
+- **publications dissoutes** (vidées de toutes leurs SP par un merge) : leurs paiements APC (`apc_payments`) et leur identifiant sont redirigés vers le successeur, puis `refresh_from_sources` les supprime (orphelines) ;
 - **rafraîchissement** : `refresh_from_sources` recompute les métadonnées canoniques de chaque pub touché (et supprime les orphelines).
 
 Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des SP et les métadonnées des publications, pas la projection authorships.
@@ -174,7 +174,7 @@ def reconcile(
                 with savepoint(conn):
                     refresh_from_sources(pub_id, repo=publication_repo)
 
-        # 3. Dissolutions : les paiements APC passent au successeur, puis
+        # 3. Dissolutions : les paiements APC et l'identifiant passent au successeur, puis
         # `refresh_from_sources` supprime la publication vidée. Avant les survivants, pour libérer
         # le DOI qu'un survivant reprend — la contrainte unique le refuserait autrement.
         for dissolved in plan.dissolved:

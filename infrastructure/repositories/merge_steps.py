@@ -1,6 +1,8 @@
 """Étapes SQL de la fusion de deux entités, une par donnée recensée dans le domaine (`domain.merge`).
 
 Chaque étape déclare les colonnes qui rattachent sa donnée à l'entité : clés étrangères vers la table de l'entité, ou colonnes de cette table. Un test par entité confronte ces colonnes au schéma.
+
+Chaque fusion enregistre aussi la redirection de l'identifiant absorbé (`record_redirect`).
 """
 
 from collections.abc import Callable
@@ -8,7 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedData
+from domain.merge import DataNature, MergedData, MergedEntity
 
 type MergeApply = Callable[[Connection, int, int], None]
 
@@ -111,3 +113,22 @@ def without_decision_sql(
                     f"NOT EXISTS (SELECT 1 FROM {column_table} WHERE {column} = {alias}.id)"
                 )
     return " AND ".join(clauses)
+
+
+def record_redirect(conn: Connection, entity: MergedEntity, target_id: int, source_id: int) -> None:
+    """Enregistre que l'identifiant absorbé `source_id` mène à `target_id`. Les identifiants qui menaient à `source_id` mènent ensuite à `target_id`."""
+    params = {"entity": entity.value, "t": target_id, "s": source_id}
+    conn.execute(
+        text("""
+            UPDATE merge_redirects SET kept_id = :t
+            WHERE entity = CAST(:entity AS merged_entity) AND kept_id = :s
+        """),
+        params,
+    )
+    conn.execute(
+        text("""
+            INSERT INTO merge_redirects (entity, absorbed_id, kept_id)
+            VALUES (CAST(:entity AS merged_entity), :s, :t)
+        """),
+        params,
+    )

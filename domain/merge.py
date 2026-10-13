@@ -37,6 +37,16 @@ class DataNature(StrEnum):
     MIXED = "mixed"
 
 
+class MergedEntity(StrEnum):
+    """Entité fusionnable dont l'identifiant absorbé redirige vers l'identifiant conservé."""
+
+    PERSON = "person"
+    JOURNAL = "journal"
+    PUBLISHER = "publisher"
+    MONOGRAPH = "monograph"
+    PUBLICATION = "publication"
+
+
 @dataclass(frozen=True, slots=True)
 class MergedData:
     rule: MergeRule

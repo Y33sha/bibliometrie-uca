@@ -14,7 +14,9 @@ Les fusions concernent cinq entités qui ont une page publique (`/<entité>/[id]
 
 ## Décisions
 
-- Une table de redirection : type d'entité, identifiant absorbé, identifiant conservé. Chaque fusion l'écrit.
+- Une table de redirection, `merge_redirects` : type d'entité, identifiant absorbé, identifiant conservé. Chaque fusion l'écrit, par `record_redirect`.
+- Une entité supprimée sans fusion mène à une page introuvable, comme une redirection vers une entité conservée puis supprimée.
+- Les fusions antérieures à la table restent sans redirection.
 - Une redirection en chaîne (A absorbé par B, puis B par C) se résout à l'écriture : A mène directement à C.
 - L'API redirige un identifiant absorbé vers l'identifiant conservé ; l'interface publique suit la redirection.
 - À faire avant la mise en production de l'interface publique.
@@ -23,15 +25,11 @@ Les fusions concernent cinq entités qui ont une page publique (`/<entité>/[id]
 
 ### Phase 1 — Table et écritures
 
-- [ ] Table de redirection, migration Alembic.
-- [ ] Écriture par les fusions de l'administration (personnes, revues, éditeurs).
-- [ ] Écriture par les fusions du pipeline (revues, monographies, publications).
+- [x] Table de redirection, migration Alembic.
+- [x] Écriture par les fusions de l'administration (personnes, revues, éditeurs).
+- [x] Écriture par les fusions du pipeline (revues, monographies, publications).
 
 ### Phase 2 — Lecture
 
 - [ ] Redirection dans l'API, pour les pages de détail.
 - [ ] Suivi de la redirection dans l'interface publique.
-
-## Questions ouvertes
-
-- Une entité supprimée sans fusion (publication orpheline purgée, revue vide) : page introuvable, ou page qui dit que l'entité a été retirée ?

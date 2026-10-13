@@ -2,6 +2,7 @@
 
 from sqlalchemy import Connection, text
 
+from domain.merge import MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import PERSON_DATA, merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
@@ -12,6 +13,7 @@ from infrastructure.repositories.authorship_repository import (
 )
 from infrastructure.repositories.merge_steps import (
     MergeStep,
+    record_redirect,
     transfer,
     transfer_unique,
     untouched,
@@ -105,7 +107,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 
 def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Applique chaque étape de `MERGE_STEPS`, puis supprime la personne absorbée, dans la transaction du caller.
+    """Applique chaque étape de `MERGE_STEPS`, supprime la personne absorbée et enregistre sa redirection, dans la transaction du caller.
 
     Après les transferts, la personne conservée peut réunir la contribution de l'une et le rejet de l'autre pour la même publication : le rejet l'emporte, comme au rejet d'une paire.
     """
@@ -114,6 +116,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     detach_rejected_signatures(conn, target_id)
     delete_orphan_authorships(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
+    record_redirect(conn, MergedEntity.PERSON, target_id, source_id)
 
 
 def person_without_decision_sql(alias: str) -> str:
