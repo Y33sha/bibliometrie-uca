@@ -3,6 +3,10 @@
 Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une signature), et des expressions SQL figées.
 """
 
+from domain.persons.identifiers import PersonIdentifierType
+from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
+from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
+
 
 def in_clause(values: tuple[str, ...]) -> str:
     """Contenu d'une clause SQL `IN` : `('a', 'b', …)`, prêt à interpoler dans `col IN {...}`."""
@@ -33,6 +37,65 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
         f"CASE WHEN {identifier_neutralized(id_type, signature)} THEN NULL"
         f" ELSE {identity}.person_identifiers ->> {id_type} END"
     )
+
+
+def strong_identifier_signatures(
+    id_type: PersonIdentifierType,
+    *,
+    identifiers: str,
+    select: str,
+    joins: str = "",
+    where: str = "",
+) -> str:
+    """Requête des signatures `sa_auth` dont l'identité contient l'identifiant `id_type` d'une ligne de `identifiers`.
+
+    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et l'ORCID des sources hors `ORCID_MATCH_SOURCES`. La requête rejoint les signatures par `identity_id` après un rapprochement sur `author_identifying_keys`.
+    """
+    orcid_sources = (
+        f"AND sa_auth.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
+        if id_type == PersonIdentifierType.ORCID
+        else ""
+    )
+    return f"""
+        SELECT {select}
+        FROM {identifiers} pi
+        JOIN author_identifying_keys aik ON aik.person_identifiers->>'{id_type}' = pi.id_value
+        JOIN source_authorships sa_auth ON sa_auth.identity_id = aik.id
+        {joins}
+        WHERE pi.id_type = '{id_type}'
+          AND aik.person_identifiers ? '{id_type}'
+          AND NOT {identifier_neutralized(f"'{id_type}'", "sa_auth")}
+          {orcid_sources}
+          {f"AND {where}" if where else ""}
+    """
+
+
+# Identifiants forts des personnes RH, aux statuts qui les font interroger, avec les années de début et de fin de contrat (9999 sans fin).
+_RH_IDENTIFIERS = f"""(
+    SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
+           extract(year FROM r.start_date)::int AS first_year,
+           coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
+    FROM person_identifiers pi
+    JOIN persons_rh r ON r.person_id = pi.person_id
+    WHERE pi.status::text IN {in_clause(tuple(sorted(SEARCHED_IDENTIFIER_STATUSES)))}
+)"""
+
+RH_IDENTITY_SIGNATURES = " UNION ".join(
+    strong_identifier_signatures(
+        id_type,
+        identifiers=_RH_IDENTIFIERS,
+        select="sa_auth.id",
+        joins="JOIN source_publications sp_rh ON sp_rh.id = sa_auth.source_publication_id",
+        where=(
+            "sp_rh.pub_year BETWEEN pi.first_year AND pi.last_year"
+            " AND NOT EXISTS (SELECT 1 FROM rejected_authorships rej"
+            " WHERE rej.source_publication_id = sa_auth.source_publication_id"
+            " AND rej.person_id = pi.person_id)"
+        ),
+    )
+    for id_type in STRONG_IDENTIFIER_TYPES
+)
+"""Ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre les années de début et de fin de son contrat, sans rejet de la personne pour la notice."""
 
 
 # Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est.

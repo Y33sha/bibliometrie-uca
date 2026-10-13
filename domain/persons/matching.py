@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Literal, NamedTuple
 
 from domain.normalize import normalize_name
+from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.name_matching import (
     first_name_initials,
     initials_extend,
@@ -46,6 +47,13 @@ ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
 - `hal` : ORCID attaché à l'auteur dans le TEI HAL (`label_xml`).
 
 `wos` et `scanr` sont exclus : leur ORCID est dérivé (matching algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas déposé par l'auteur. Il reste enregistré sur `person_identifiers` mais n'est pas utilisé comme signal de matching."""
+
+STRONG_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
+    PersonIdentifierType.ORCID,
+    PersonIdentifierType.IDREF,
+    PersonIdentifierType.HAL_PERSON_ID,
+)
+"""Identifiants qui rattachent une signature à une personne sans forme de nom : hors périmètre, et pour l'entrée dans le périmètre d'une personne RH."""
 
 
 class ResolutionMode(StrEnum):
