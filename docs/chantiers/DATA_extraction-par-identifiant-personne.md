@@ -10,6 +10,8 @@ Mesures du 2026-10-13 sur DataCite.
 
 - **Affiliation par ROR.** 884 DOI ont un créateur affilié à l'université par son ROR. 880 sont dans la base. La moisson par nom d'affiliation couvre donc les dépôts affiliés.
 - **ORCID.** Les 1 772 ORCID confirmés ou authentifiés des auteurs du périmètre actifs depuis 2021 désignent environ 59 400 DOI publiés de 2021 à 2026, doublons compris.
+- **Crossref.** Les 1 091 ORCID des personnes RH désignent 9 697 œuvres parues de 2017 à 2026.
+- **Grandes collaborations.** Une notice compte jusqu'à un millier d'auteurs : environ 200 Kio dans DataCite, 500 Kio dans Crossref. Une page trop grande dépasse le délai de DataCite (502) ou la taille de réponse de Crossref (100 Mio).
 
 ### Personnes interrogées
 
@@ -43,7 +45,7 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 - L'extraction par personne suit la plage d'années des autres extractions.
 - Périmètre : la signature d'une personne RH entre dans le périmètre quand le document paraît entre ses dates de début et de fin de contrat, même sans affiliation au périmètre.
 - Règle appliquée par la phase `affiliations`, avec `in_perimeter` : la signature contient un identifiant fort (ORCID, IdRef, `hal_person_id`) confirmé ou authentifié d'une personne RH. Les filtres de confiance sont ceux de la phase `persons` (identifiant neutralisé, ORCID des seules sources à dépôt auteur), dans un fragment SQL commun.
-- Dates : année de publication comparée aux années de début et de fin de contrat, bornes incluses.
+- Dates : année de publication comparée aux années de début et de fin de contrat, bornes incluses. Une date inconnue ne borne pas.
 - Une signature entrée par l'identité n'est rattachée à aucun laboratoire.
 - `in_perimeter` reste booléen.
 
@@ -62,8 +64,10 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ### Phase 3 — Extraction
 
-- [x] Nœud DataCite, par lots de 10 ORCID
-- [ ] Nœuds OpenAlex, Crossref, HAL, ScanR
+- [x] Nœud DataCite, par lots de 10 ORCID, pages de 25 notices
+- [x] Socle commun des nœuds : lots, pagination, document écrit une fois par run
+- [x] Nœud Crossref, par lots de 10 ORCID, pages de 50 œuvres
+- [ ] Nœuds OpenAlex, HAL, ScanR
 
 ### Phase 4 — Fin de chantier
 
