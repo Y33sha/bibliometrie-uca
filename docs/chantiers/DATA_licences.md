@@ -80,8 +80,9 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 - [x] Inventaire des formes de OpenAlex, scanR, Crossref et DataCite
 - [ ] Inventaire des formes de HAL, après un moissonnage complet. Échantillon de 1 223 notices : 10 formes, toutes reconnues.
 - [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
-- [ ] Emplacement du stockage : migration
-- [ ] Licences OpenAlex et scanR extraites à la normalisation ; stock rejoué depuis le raw store
+- [x] Emplacement du stockage : migration
+- [x] Licence normalisée de chaque notice source, calculée par les normaliseurs
+- [ ] Stock rejoué depuis le raw store
 - [ ] Règle d'arbitrage entre sources
 
 ### Phase 3 — Fin de chantier
