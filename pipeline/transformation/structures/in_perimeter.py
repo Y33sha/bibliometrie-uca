@@ -2,7 +2,10 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR
+from infrastructure.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR, rh_identity_signatures
+
+# Signatures recalculées qui entrent dans le périmètre par l'identité d'une personne RH.
+_RH_IDENTITY_OF_TARGETS = rh_identity_signatures("sa_auth.id = ANY(:source_authorship_ids)")
 
 # Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
 _MARK_ORPHANS_DIRTY = """
@@ -22,7 +25,7 @@ class InPerimeterRecompute:
         perimeter_structure_ids: list[int],
     ) -> None:
         conn.execute(
-            text("""
+            text(f"""
                 UPDATE source_authorships sa
                 SET in_perimeter = EXISTS (
                     SELECT 1
@@ -31,7 +34,7 @@ class InPerimeterRecompute:
                     WHERE saa.source_authorship_id = sa.id
                       AND ast.structure_id = ANY(:struct_ids)
                       AND ast.is_confirmed IS DISTINCT FROM FALSE
-                )
+                ) OR sa.id IN ({_RH_IDENTITY_OF_TARGETS})
                 WHERE sa.id = ANY(:source_authorship_ids)
             """),
             {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},

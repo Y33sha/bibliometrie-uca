@@ -345,13 +345,26 @@ NODES: tuple[Node, ...] = (
             "source_authorship_addresses",
             "source_authorships.source_publication_id",
             "source_publications.publication_id",
+            # Identité des personnes RH : `rh_identity_signatures`.
+            "persons_rh",
+            "person_identifiers",
+            "rejected_authorships",
+            "author_identifying_keys",
+            "source_authorships.identity_id",
+            "source_authorships.neutralized_identifiers",
+            "source_authorships.source",
+            "source_publications.pub_year",
         ),
         writes=(
             "source_authorship_structures",
             "source_authorships.in_perimeter",
             "source_publications.keys_dirty",
         ),
-        previous_run=("source_publications.publication_id",),
+        previous_run=(
+            "source_publications.publication_id",
+            "person_identifiers",
+            "source_authorships.neutralized_identifiers",
+        ),
     ),
     _node(
         "resolve_ra.resolve_prefixes",

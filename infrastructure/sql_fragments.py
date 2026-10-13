@@ -70,32 +70,42 @@ def strong_identifier_signatures(
     """
 
 
-# Identifiants forts des personnes RH, aux statuts qui les font interroger, avec les années de début et de fin de contrat (9999 sans fin).
+# Identifiants des personnes RH, aux statuts qui les font interroger, avec les années de début et de fin de contrat. Une date inconnue ne borne pas : 0 sans début, 9999 sans fin.
 _RH_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
-           extract(year FROM r.start_date)::int AS first_year,
+           coalesce(extract(year FROM r.start_date)::int, 0) AS first_year,
            coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
     FROM person_identifiers pi
     JOIN persons_rh r ON r.person_id = pi.person_id
     WHERE pi.status::text IN {in_clause(tuple(sorted(SEARCHED_IDENTIFIER_STATUSES)))}
 )"""
 
-RH_IDENTITY_SIGNATURES = " UNION ".join(
-    strong_identifier_signatures(
-        id_type,
-        identifiers=_RH_IDENTIFIERS,
-        select="sa_auth.id",
-        joins="JOIN source_publications sp_rh ON sp_rh.id = sa_auth.source_publication_id",
-        where=(
-            "sp_rh.pub_year BETWEEN pi.first_year AND pi.last_year"
-            " AND NOT EXISTS (SELECT 1 FROM rejected_authorships rej"
+
+def rh_identity_signatures(signature_filter: str = "") -> str:
+    """Requête des ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre les années de début et de fin de son contrat, sans rejet de la personne pour la notice.
+
+    `signature_filter` : condition supplémentaire sur la signature `sa_auth`.
+    """
+    conditions = [
+        "sp_rh.pub_year BETWEEN pi.first_year AND pi.last_year",
+        (
+            "NOT EXISTS (SELECT 1 FROM rejected_authorships rej"
             " WHERE rej.source_publication_id = sa_auth.source_publication_id"
             " AND rej.person_id = pi.person_id)"
         ),
+    ]
+    if signature_filter:
+        conditions.append(signature_filter)
+    return " UNION ".join(
+        strong_identifier_signatures(
+            id_type,
+            identifiers=_RH_IDENTIFIERS,
+            select="sa_auth.id",
+            joins="JOIN source_publications sp_rh ON sp_rh.id = sa_auth.source_publication_id",
+            where=" AND ".join(conditions),
+        )
+        for id_type in STRONG_IDENTIFIER_TYPES
     )
-    for id_type in STRONG_IDENTIFIER_TYPES
-)
-"""Ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre les années de début et de fin de son contrat, sans rejet de la personne pour la notice."""
 
 
 # Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est.

@@ -4,7 +4,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 
 1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
-3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
+3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose `in_perimeter` sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH (`rh_identity_signatures`).
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
+from infrastructure.sql_fragments import rh_identity_signatures
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
@@ -94,12 +95,14 @@ class InPerimeterSyncCounts(NamedTuple):
     removed: int  # passées à FALSE (sorties du périmètre)
 
 
-# Ensembles d'ids des deux UPDATE de `sync_in_perimeter` : `should` (signatures du périmètre, via la matview) et `currently` (à TRUE, via l'index partiel). Delta par EXCEPT ; un run stable produit un delta vide.
-_DELTA_CTE = """
+# Ensembles d'ids des deux UPDATE de `sync_in_perimeter` : `should` (signatures du périmètre, par la matview ou par l'identité d'une personne RH) et `currently` (à TRUE, via l'index partiel). Delta par EXCEPT ; un run stable produit un delta vide.
+_DELTA_CTE = f"""
     WITH should AS (
-        SELECT DISTINCT source_authorship_id AS id
+        SELECT source_authorship_id AS id
         FROM source_authorship_structures
         WHERE structure_id = ANY(:perimeter_ids)
+        UNION
+        {rh_identity_signatures()}
     ),
     currently AS (
         SELECT id FROM source_authorships WHERE in_perimeter
@@ -145,7 +148,7 @@ def refresh_source_authorship_structures(conn: Connection) -> None:
 
 
 def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> InPerimeterSyncCounts:
-    """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, en écrivant seulement les changements.
+    """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, et sur l'identité des personnes RH, en écrivant seulement les changements.
 
     Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty`.
     """
