@@ -155,6 +155,7 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (
     Source.CROSSREF,
     Source.OPENALEX,
     Source.HAL,
+    Source.SCANR,
 )
 
 

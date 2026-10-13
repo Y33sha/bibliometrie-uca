@@ -135,4 +135,18 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
         return HalPersonExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
-    return {"datacite": datacite, "crossref": crossref, "openalex": openalex, "hal": hal}
+    def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from pipeline.ingestion.scanr.harvest import ScanrClient
+        from pipeline.ingestion.scanr.person_search import ScanrPersonExtractor
+        from pipeline.runtime.config import get_scanr_credentials
+
+        client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
+        return ScanrPersonExtractor(conn, source_log, client)
+
+    return {
+        "datacite": datacite,
+        "crossref": crossref,
+        "openalex": openalex,
+        "hal": hal,
+        "scanr": scanr,
+    }
