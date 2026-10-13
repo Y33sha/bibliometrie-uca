@@ -20,6 +20,7 @@
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
+- [Périmètre](DATA_perimetre.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
