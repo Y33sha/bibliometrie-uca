@@ -114,7 +114,10 @@
 </div>
 
 <div class="container">
-  {@render children()}
+  <!-- Une page de détail se monte pour un identifiant : naviguer vers un autre identifiant de la même route la remonte, avec ses chargements au montage. -->
+  {#key $page.params.id}
+    {@render children()}
+  {/key}
 </div>
 
 <DialogHost />
