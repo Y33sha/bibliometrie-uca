@@ -41,7 +41,26 @@ Le Web of Science et theses.fr ne donnent aucune licence.
 
 La licence HAL porte sur le fichier déposé. Elle peut différer de la licence de la version éditeur.
 
+### Licence `other-oa` d'OpenAlex
+
+Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` en localisation principale. Cette localisation est une archive : HAL (3 447), theses.fr (1 319), Zenodo (395). 548 de ces travaux sont dans Crossref, dont 367 sans licence de la version éditeur.
+
 ## Décisions
+
+- **Vocabulaire fermé**, enum du domaine :
+  - `cc-by`, `cc-by-sa`, `cc-by-nd`, `cc-by-nc`, `cc-by-nc-sa`, `cc-by-nc-nd`, sans numéro de version ;
+  - `cc0`, `public-domain-mark`, distincts ;
+  - `licence-ouverte` : Licence Ouverte Etalab, toutes versions ;
+  - `open-source` : licences de logiciel libre (MIT, BSD, GPL, LGPL, Apache, CeCILL, AFL) ;
+  - `repository-distribution` : autorisation de diffusion HAL, licence non exclusive arXiv ;
+  - `publisher-open` : `publisher-specific-oa` d'OpenAlex et de scanR ;
+  - `other-oa` : `other-oa` d'OpenAlex ;
+  - `all-rights-reserved` : copyright HAL, `rightsstatements.org` InC, `reserved` ;
+  - `other` : politiques de données, formes non classées.
+- **Normalisation** : une règle du domaine ramène une forme brute (URL, identifiant SPDX, code OpenAlex) à l'enum. L'URL d'une licence d'éditeur dans Crossref reste sans valeur normalisée. Les droits d'accès (COAR, `info:eu-repo`) et les licences de fouille de texte (`tdm`, `stm-asf`) sont écartés.
+- **Stockage** : licence normalisée et forme brute par notice source ; licence de la version éditeur par publication ; licence du fichier déposé dans HAL à part.
+- **Arbitrage** de la licence de la version éditeur : Crossref (`vor`), puis OpenAlex (localisation éditeur), puis scanR. DataCite pour les jeux de données.
+- **HAL** : `licence_s` extrait dans `source_publications.meta`, clé `licence`.
 
 ## Phasage
 
@@ -54,8 +73,12 @@ La licence HAL porte sur le fichier déposé. Elle peut différer de la licence 
 
 ### Phase 2 — Modèle
 
-- [ ] Référentiel des licences et formes observées
-- [ ] Emplacement du stockage : publication, version, source
+- [x] Extraction de `licence_s` dans HAL
+- [x] Inventaire des formes de OpenAlex, scanR, Crossref et DataCite
+- [ ] Inventaire des formes de HAL, après un moissonnage complet
+- [ ] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire
+- [ ] Emplacement du stockage : migration
+- [ ] Licences OpenAlex et scanR extraites à la normalisation ; stock rejoué depuis le raw store
 - [ ] Règle d'arbitrage entre sources
 
 ### Phase 3 — Fin de chantier
