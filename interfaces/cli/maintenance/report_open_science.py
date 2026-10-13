@@ -166,21 +166,6 @@ class OpenScienceReport:
         s = self._one("SELECT name, acronym FROM structures WHERE id = :structure_id")
         return f"# Bilan Science ouverte {self.year} — {s.acronym or s.name}\n\n{s.name}.\n\nDonnées extraites de la base bibliométrique le {today():%d/%m/%Y}. Document de travail."
 
-    def coverage(self) -> str:
-        r = self._one(f"""
-            SELECT COUNT(*) AS total,
-                   COUNT(*) FILTER (WHERE 'hal' = ANY(p.sources)) AS hal,
-                   COUNT(*) FILTER (WHERE 'openalex' = ANY(p.sources)) AS openalex,
-                   COUNT(*) FILTER (WHERE p.doi IS NOT NULL) AS doi
-            FROM ({LAB_PUBLICATIONS}) p WHERE p.pub_year = :year
-        """)
-        return (
-            "## Méthode et périmètre\n\n"
-            "Une publication appartient au laboratoire si au moins une adresse d'auteur est rattachée au laboratoire. "
-            "Sources : HAL, OpenAlex, Web of Science, scanR, theses.fr, Crossref, DataCite. Une publication présente dans plusieurs sources compte une fois.\n\n"
-            f"Couverture {self.year} : {r.hal} publications sur {r.total} sont présentes dans HAL, {r.openalex} dans OpenAlex, {r.doi} ont un DOI."
-        )
-
     def typology(self) -> str:
         rows = self._rows(f"""
             SELECT p.doc_type, COUNT(*) AS n FROM ({LAB_PUBLICATIONS}) p
@@ -539,8 +524,7 @@ class OpenScienceReport:
                 [(_license_label(r.license), r.n) for r in rows],
             )
             + f"\n\n{closed} textes intégraux sur {total} sont déposés sans licence ouverte : "
-            "autorisation de diffusion HAL, droits réservés, ou licence non renseignée. "
-            "Un texte intégral signalé par un lien HAL vers arXiv ou PubMed Central n'a pas de licence HAL."
+            "autorisation de diffusion HAL, droits réservés, ou licence non renseignée."
         )
 
     def preprints(self) -> str:
@@ -578,9 +562,6 @@ class OpenScienceReport:
                 ["Licence", "Preprints"],
                 Counter(_license_label(r.license) for r in rows).most_common(),
             )
-            + "\n\nServeur de preprints : entrepôt doté d'un préfixe DOI propre, qui héberge presque uniquement des preprints. Le serveur se déduit du préfixe DOI. "
-            "OpenAlex distingue bioRxiv et medRxiv, qui partagent leurs préfixes. "
-            "Une archive qui attribue son propre DOI à la copie d'un preprint (DESY, RWTH) est remplacée par le serveur que désigne OpenAlex."
         )
 
     def sources(self) -> str:
@@ -649,7 +630,6 @@ class OpenScienceReport:
         sections = [
             self.title(),
             self.synthesis(oa_current, orcid),
-            self.coverage(),
             self.typology(),
             oa_text,
             self.journal_models() + "\n\n" + self.apc(),
