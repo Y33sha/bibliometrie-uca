@@ -103,7 +103,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `ror_organizations` | organisations du Research Organization Registry | [ref](07-ref-et-ops.md) |
 | `ror_relations` | relations parent/enfant entre organisations ROR | [ref](07-ref-et-ops.md) |
 | `source_authorship_addresses` | liaison authorship source ↔ adresse | [sources](02-sources.md) |
-| `source_authorship_rors` | ROR attribués par la source à une signature | [sources](02-sources.md) |
+| `source_authorship_rors` | ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
 | `source_authorship_structures` | *vue matérialisée* : affiliations résolues d'un authorship source | [sources](02-sources.md) |
 | `source_authorships` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
 | `source_publications` | un enregistrement par document par source | [sources](02-sources.md) |

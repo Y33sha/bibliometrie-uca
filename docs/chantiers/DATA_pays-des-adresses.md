@@ -29,7 +29,7 @@ Le dispositif fonctionne. Ce sont les conséquences de la modélisation en deux 
 
 **Les désaccords sont perdus.** Quand plusieurs lieux reconnus dans une adresse désignent des pays différents, la détection abandonne l'adresse sans conserver ce qu'elle a trouvé.
 
-**Le ROR des signatures donne un pays.** La normalisation rattache aux signatures les organisations ROR fournies par les sources (`source_authorship_rors`). Le référentiel ROR donne le pays de chaque organisation (`ror_organizations.country_code`).
+**Le ROR des signatures donne un pays.** La normalisation rattache à chaque adresse de signature les organisations ROR de son affiliation (`source_authorship_rors.address_id`). Le référentiel ROR donne le pays de chaque organisation (`ror_organizations.country_code`).
 
 ## Décisions
 
@@ -48,6 +48,8 @@ address_country_candidates
 Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `ror`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres. La copie d'une saisie manuelle vers les adresses de même `normalized_text` est un candidat `manual`.
 
 Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
+
+**Le ROR compte pour l'adresse de son affiliation.** Les sources donnent le ROR de chaque affiliation ; un ROR sans texte d'affiliation reste sur la signature et ne propose pas de pays (7a884ae53).
 
 **La préséance s'écrit à un seul endroit.** Une fonction du domaine lit les candidats d'une adresse et compose l'ensemble retenu. `manual` l'emporte sur tout. Le reste du classement est fixé par la mesure, non a priori.
 
@@ -107,8 +109,6 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 - **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score a du sens seulement si un moyen produit des propositions de qualité inégale, ce que la mesure dira.
 - **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
-- **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
 - **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
 - **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. Pour 1 262 textes normalisés, les lignes ont des pays différents.
-- **ROR par affiliation.** `source_authorship_rors` rattache les ROR à la signature : leur pays se pose sur toutes les adresses de la signature, d'où 15,6 % de sur-ensembles. OpenAlex et ScanR donnent le ROR de chaque affiliation. Faut-il rattacher le ROR au lien entre signature et adresse ?
 - **Adresses qui ne sont pas des textes d'affiliation.** Les noms de structures HAL et ScanR et les adresses des thèses relèvent du chantier `DATA_perimetre.md`.
