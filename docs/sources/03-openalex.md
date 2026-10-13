@@ -1,6 +1,6 @@
 # OpenAlex
 
-*À jour le 2026-09-07.*
+*À jour le 2026-10-13.*
 
 https://openalex.org/
 
@@ -11,6 +11,7 @@ https://developers.openalex.org/
 **Works API** (https://api.openalex.org/works) — moissonnage des publications.
 - Nécessite *mailto* ou clé API (création via un compte gratuit)
 - Requête par institution (filtre `lineage`) + année de publication
+- [Moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
 - Pagination par cursor, 200 résultats/page, 0.2s de délai
 
 **Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency` et `journal_type`.
@@ -20,6 +21,7 @@ https://developers.openalex.org/
 ## Données récupérées
 
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, OA status, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
+- **Licence** : celle de la localisation principale, normalisée seulement pour une localisation d'éditeur
 - **Auteurs** : nom tel qu'il apparaît dans la signature, drapeau corresponding, ORCID si présent. Le nom unifié de l'entité auteur OpenAlex est conservé séparément, utilisé uniquement pour vérifier que l'ORCID attribué par OA correspond bien à notre auteur (cf. Particularités).
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Journaux/éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur

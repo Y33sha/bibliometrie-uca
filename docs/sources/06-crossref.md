@@ -1,6 +1,6 @@
 # CrossRef
 
-*À jour le 2026-09-07.*
+*À jour le 2026-10-13.*
 
 https://www.crossref.org/
 
@@ -8,11 +8,13 @@ Documentation API:
 - https://www.crossref.org/documentation/retrieve-metadata/rest-api/
 - https://api.crossref.org/swagger-ui/index.html
 
-Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
+Le pipeline interroge CrossRef par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person)). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
 
 ## API utilisée
 
-**Works API** (`https://api.crossref.org/works/{doi}`) — interrogation unitaire par DOI.
+**Works API** :
+- `https://api.crossref.org/works/{doi}` : interrogation unitaire par DOI ;
+- `https://api.crossref.org/works?filter=orcid:…` : œuvres d'un lot d'ORCID, paginées par curseur, 50 par page (moissonnage par personne). Une page trop grande dépasse la taille de réponse de Crossref, à cause des notices de grandes collaborations.
 
 - Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adaptateur colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
