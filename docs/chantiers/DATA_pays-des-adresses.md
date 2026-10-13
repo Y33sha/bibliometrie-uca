@@ -65,12 +65,22 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 ### 1. Script de candidats, hors pipeline
 
-- [ ] Script en lecture seule : pour chaque adresse du stock, les candidats de chaque moyen, écrits dans un fichier.
-- [ ] Moyens `country_name`, `institution`, `city` : détecteurs du pipeline réutilisés, `institution` et `city` séparés par la nature du lieu (`place_name_forms.kind`).
-- [ ] Moyen `similarity` : emprunt au pool des adresses à pays.
-- [ ] Moyens `source_scanr`, `source_openalex` : pays lus dans les payloads du raw store, rattachés aux adresses par leur texte.
-- [ ] Moyen `ror` : pays des organisations ROR de la signature, pour chaque adresse de la signature.
-- [ ] Volume : nombre de candidats par adresse et par moyen.
+- [x] Script en lecture seule : pour chaque adresse du stock, les candidats de chaque moyen, écrits dans un fichier (`interfaces/cli/oneshot/measure_address_country_candidates.py`, 56c33a438).
+- [x] Moyens `country_name`, `institution`, `city` : détecteurs du pipeline réutilisés, `institution` et `city` séparés par la nature du lieu (`place_name_forms.kind`).
+- [x] Moyen `similarity` : emprunt au pool des adresses à pays, jumelles exclues.
+- [x] Moyens `source_scanr`, `source_openalex` : pays lus dans les payloads du raw store, rattachés aux adresses par leur texte.
+- [x] Moyen `ror` : pays des organisations ROR de la signature, pour chaque adresse de la signature.
+- [x] Volume, sur 508 057 adresses de la base de test : 1 734 200 candidats.
+
+| Moyen | Candidats | Adresses couvertes |
+|---|---|---|
+| `country_name` | 401 908 | 79,1 % |
+| `institution` | 362 450 | 70,0 % |
+| `city` | 236 942 | 46,4 % |
+| `source_openalex` | 407 235 | 56,8 % |
+| `ror` | 130 161 | 18,4 % |
+| `similarity` | 108 005 | 20,5 % |
+| `source_scanr` | 87 499 | 11,6 % |
 
 ### 2. Mesure et fonction de préséance
 
