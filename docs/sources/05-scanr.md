@@ -1,6 +1,6 @@
 # ScanR
 
-*À jour le 2026-09-07.*
+*À jour le 2026-10-13.*
 
 https://scanr.enseignementsup-recherche.gouv.fr/
 
@@ -12,11 +12,12 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 - Login et mot de passe nécessaires : accordés gratuitement sur demande par mail: https://scanr.enseignementsup-recherche.gouv.fr/about/contact
 - Requête : année + affiliation par identifiant SIREN
+- [Moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : clause réunissant l'IdRef (`authors.person`, sous la forme `idref<IdRef>`) et l'ORCID (`authors.denormalized.orcid`) d'un lot de personnes RH
 - Pagination par `search_after` sur `id.keyword`, taille `SCANR_PER_PAGE`, délai `SCANR_DELAY` entre requêtes
 
 ## Données récupérées
 
-- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID)
+- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
 - **Journal/éditeur** : titre, ISSN, eISSN, éditeur
 - **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents
 

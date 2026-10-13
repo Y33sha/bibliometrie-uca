@@ -54,6 +54,7 @@
 A jour au 2026-10-11
 
 `extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses/DataCite
+`extract_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
 `fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
 `fetch_stale` — Rafraîchissement des docs stale
 `fetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)

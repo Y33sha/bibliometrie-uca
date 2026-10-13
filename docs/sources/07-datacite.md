@@ -1,6 +1,6 @@
 # DataCite
 
-*À jour le 2026-10-05.*
+*À jour le 2026-10-13.*
 
 https://datacite.org/
 
@@ -10,16 +10,17 @@ Documentation API :
 
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
-Le pipeline interroge DataCite de deux façons :
+Le pipeline interroge DataCite de trois façons :
 - [moissonnage](../pipeline/02-extract.md#moissonnage-par-affiliation-extract), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ « DataCite » de l'admin des structures) ;
-- [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources.
+- [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources ;
+- [moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : les DOI dont un créateur a l'ORCID d'une personne RH (`creators.nameIdentifiers.nameIdentifier`).
 
-Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent seulement par la seconde voie.
+Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent par les deux dernières voies.
 
 ## API utilisée
 
 **DOIs API** — réponse au format JSON:API (les métadonnées sont dans `data.attributes`) :
-- `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnage, `fetch_missing_doi`) ;
+- `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnages, `fetch_missing_doi`). Le moissonnage par personne demande 25 notices par page : une notice de grande collaboration compte un millier de créateurs, et une page plus grande dépasse le délai de DataCite ;
 - `https://api.datacite.org/dois/{doi}` : interrogation unitaire (`fetch_stale`).
 
 Les deux routes rendent un même DOI sous deux formes. Le hash de détection de changement ignore ces différences et les compteurs de consultation.

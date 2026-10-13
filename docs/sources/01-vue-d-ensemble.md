@@ -1,6 +1,6 @@
 # Vue d'ensemble
 
-*À jour le 2026-09-10.*
+*À jour le 2026-10-13.*
 
 Le système intègre 7 sources bibliographiques principales, complétées par des sources d'enrichissement et des imports manuels.
 
@@ -21,17 +21,17 @@ Le système intègre 7 sources bibliographiques principales, complétées par de
 
 Ce que le projet interroge dans chaque source, indépendamment de ce que l'API offre par ailleurs.
 
-| Source | Moissonnage par affiliation | Recherche par identifiant de document |
-|---|---|---|
-| HAL | collection HAL + année | hal-id, NNT, DOI |
-| OpenAlex | institution (filtre `lineage`) + année | DOI |
-| Web of Science | champ OG (Organization) + année | DOI |
-| ScanR | identifiant SIREN + année | DOI |
-| theses.fr | PPN d'établissement | NNT |
-| Crossref | — | DOI |
-| DataCite | — | DOI |
+| Source | Moissonnage par affiliation | Moissonnage par personne | Recherche par identifiant de document |
+|---|---|---|---|
+| HAL | collection HAL + année | ORCID, idHAL, IdRef | hal-id, NNT, DOI |
+| OpenAlex | institution (filtre `lineage`) + année | ORCID | DOI |
+| Web of Science | champ OG (Organization) + année | — | DOI |
+| ScanR | identifiant SIREN + année | ORCID, IdRef | DOI |
+| theses.fr | PPN d'établissement | — | NNT |
+| Crossref | — | ORCID | DOI |
+| DataCite | mot-clé d'affiliation + année | ORCID | DOI |
 
-Crossref et DataCite ne portent l'affiliation qu'en chaîne libre, sans identifiant d'établissement : le moissonnage par affiliation y serait peu commode. Le troisième mode envisageable, l'interrogation par identifiant de personne (ORCID, idHAL), n'est employé pour aucune source. <!--TODO: à mettre en place?-->
+Crossref donne l'affiliation en chaîne libre, sans identifiant d'établissement : le moissonnage par affiliation y serait peu commode. Le moissonnage par personne interroge les identifiants des personnes RH, confirmés ou authentifiés.
 
 > **Sources envisagées mais pas exploitées actuellement**
 >

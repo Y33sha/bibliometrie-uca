@@ -1,6 +1,6 @@
 # HAL
 
-*À jour le 2026-09-07.*
+*À jour le 2026-10-13.*
 
 https://hal.science/
 
@@ -13,12 +13,13 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 **Search API** (https://api.archives-ouvertes.fr/search) — moissonnage des publications.
 - Pas de credentials nécessaires.
 - Requête par [collection HAL](../glossaire.md#collection-hal) + année de publication
+- [Moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : filtre réunissant les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) d'un lot de personnes RH
 - Champs Solr récupérés : voir [pipeline/ingestion/hal/fields.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/hal/fields.py) (`HAL_FIELDS`)
-- Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
+- Pagination par `cursorMark`, 100 résultats/page, 0.5s de délai entre requêtes
 
 ## Données récupérées
 
-- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` de la notice TEI `label_xml`, seul endroit où HAL le donne), OA, URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
+- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` de la notice TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
 - **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
 - **Affiliations** : structures HAL rattachées à chaque auteur via `authIdHasStructure_fs` (pas d'adresses textuelles)
 
