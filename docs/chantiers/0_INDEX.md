@@ -22,13 +22,13 @@
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
-- [Redirection des identifiants fusionnés](CODE_redirection-identifiants-fusionnes.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-10-13 — [Redirection des identifiants fusionnés](archived/2026-10-13_CODE_redirection-identifiants-fusionnes.md)
 - 2026-10-12 — [Benchmark des pipelines de publications d'autres établissements](archived/2026-10-12_benchmark-pipelines.md)
 - 2026-10-12 — [Recalculs ciblés et reports au run suivant](archived/2026-10-12_CODE_recalculs-cibles-et-reports.md)
 - 2026-10-12 — [Architecture cible du pipeline](archived/2026-10-12_CODE_architecture-cible-pipeline.md)
