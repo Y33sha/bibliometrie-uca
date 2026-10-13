@@ -13,8 +13,8 @@ class License(StrEnum):
     CC_BY_NC = "cc-by-nc"
     CC_BY_NC_SA = "cc-by-nc-sa"
     CC_BY_NC_ND = "cc-by-nc-nd"
-    CC0 = "cc0"
-    PUBLIC_DOMAIN_MARK = "public-domain-mark"
+    # Domaine public : renonciation CC0, Public Domain Mark (œuvre d'un agent fédéral américain, par exemple).
+    PUBLIC_DOMAIN = "public-domain"
     # Licence Ouverte Etalab.
     LICENCE_OUVERTE = "licence-ouverte"
     # Licence de logiciel libre : MIT, BSD, GPL, LGPL, Apache, CeCILL, AFL.
@@ -42,8 +42,9 @@ _CC_CODES = {
 }
 
 # Codes sans URL : vocabulaire OpenAlex et scanR, identifiants SPDX et libellés de DataCite.
-# OpenAlex range CC0 et Public Domain Mark sous `public-domain` : la forme reste sans valeur.
 _CODES = {
+    "public-domain": License.PUBLIC_DOMAIN,
+    "cc-pddc": License.PUBLIC_DOMAIN,
     "publisher-specific-oa": License.PUBLISHER_OPEN,
     "other-oa": License.OTHER_OA,
     "other-open": License.OTHER_OA,
@@ -59,10 +60,10 @@ _CC0_CODE = re.compile(r"^cc0(-\d+(\.\d+)*)?$")
 
 # URL sans schéma ni `www.`, en minuscules : préfixe → licence.
 _URL_PREFIXES = (
-    ("creativecommons.org/publicdomain/zero", License.CC0),
-    ("creativecommons.org/share-your-work/public-domain/cc0", License.CC0),
-    ("creativecommons.org/publicdomain/mark", License.PUBLIC_DOMAIN_MARK),
-    ("creativecommons.org/public-domain/pdm", License.PUBLIC_DOMAIN_MARK),
+    ("creativecommons.org/publicdomain/", License.PUBLIC_DOMAIN),
+    ("creativecommons.org/share-your-work/public-domain/", License.PUBLIC_DOMAIN),
+    ("creativecommons.org/public-domain/", License.PUBLIC_DOMAIN),
+    ("creativecommons.org/licenses/publicdomain", License.PUBLIC_DOMAIN),
     ("about.hal.science/hal-authorisation", License.REPOSITORY_DISTRIBUTION),
     ("arxiv.org/licenses/nonexclusive-distrib", License.REPOSITORY_DISTRIBUTION),
     ("arxiv.org/licenses/assumed-1991-2003", License.REPOSITORY_DISTRIBUTION),
@@ -96,7 +97,7 @@ def _from_code(code: str) -> License | None:
     if code in _CODES:
         return _CODES[code]
     if _CC0_CODE.match(code):
-        return License.CC0
+        return License.PUBLIC_DOMAIN
     if code.startswith("cc-"):
         elements = re.match(r"^cc-((?:by|nc|sa|nd)(?:-(?:by|nc|sa|nd))*)", code)
         return _cc_code(elements.group(1)) if elements else None

@@ -25,15 +25,16 @@ from domain.publications.licenses import License, normalize_license
         ("https://www.creativecommons.org/licenses/by-sa/4.0/", License.CC_BY_SA),
         ("https://creativecommons.org/licenses/by-nd-nc/1.0/legalcode", License.CC_BY_NC_ND),
         # Domaine public.
-        ("https://creativecommons.org/publicdomain/zero/1.0/legalcode", License.CC0),
-        ("https://creativecommons.org/share-your-work/public-domain/cc0", License.CC0),
-        ("https://creativecommons.org/publicdomain/mark/1.0/", License.PUBLIC_DOMAIN_MARK),
-        ("creativecommons.org/public-domain/pdm", License.PUBLIC_DOMAIN_MARK),
+        ("https://creativecommons.org/publicdomain/zero/1.0/legalcode", License.PUBLIC_DOMAIN),
+        ("https://creativecommons.org/share-your-work/public-domain/cc0", License.PUBLIC_DOMAIN),
+        ("https://creativecommons.org/publicdomain/mark/1.0/", License.PUBLIC_DOMAIN),
+        ("creativecommons.org/public-domain/pdm", License.PUBLIC_DOMAIN),
+        ("public-domain", License.PUBLIC_DOMAIN),
         # DataCite : identifiants SPDX et libellés.
         ("cc-by-4.0", License.CC_BY),
         ("CC BY 4.0", License.CC_BY),
         ("cc-by-nc-sa-1.0", License.CC_BY_NC_SA),
-        ("cc0-1.0", License.CC0),
+        ("cc0-1.0", License.PUBLIC_DOMAIN),
         ("etalab-2.0", License.LICENCE_OUVERTE),
         ("gpl-3.0+", License.OPEN_SOURCE),
         ("bsd-3-clause", License.OPEN_SOURCE),
@@ -77,8 +78,6 @@ def test_forme_reconnue(raw, attendue):
         # URL d'éditeur : la licence ouverte se lit ailleurs (OpenAlex).
         "https://www.elsevier.com/open-access/userlicense/1.0/",
         "https://onlinelibrary.wiley.com/termsAndConditions#vor",
-        # OpenAlex confond CC0 et Public Domain Mark.
-        "public-domain",
         "notspecified",
         "openaccess",
     ],
