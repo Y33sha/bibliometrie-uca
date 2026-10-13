@@ -40,6 +40,8 @@ HAL_FIELDS = [
     "source_s",
     "openAccess_bool",
     "fileMain_s",
+    # Licence du fichier déposé (URL), présente quand un fichier est déposé.
+    "licence_s",
     "linkExtId_s",
     "linkExtUrl_s",
     "uri_s",

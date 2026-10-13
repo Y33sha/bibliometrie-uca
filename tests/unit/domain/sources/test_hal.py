@@ -24,6 +24,10 @@ class TestExtractHalMeta:
     def test_sans_actes(self):
         assert extract_hal_meta({"proceedings_s": "0"}) == {"proceedings": False}
 
+    def test_licence_du_fichier_depose(self):
+        doc = {"licence_s": "https://creativecommons.org/licenses/by/4.0/"}
+        assert extract_hal_meta(doc) == {"licence": "https://creativecommons.org/licenses/by/4.0/"}
+
     def test_notice_muette(self):
         assert extract_hal_meta({"title_s": ["Titre"]}) is None
 
