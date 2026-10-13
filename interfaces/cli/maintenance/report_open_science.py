@@ -29,6 +29,8 @@ THESIS_YEARS = 10
 TOP_JOURNAL_MIN_ARTICLES = 2
 TOP_COUNTRIES = 6
 
+type SqlRow = Row[tuple[object, ...]]
+
 # Types comptés dans le taux d'open access.
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
 # Types parus dans une revue, pour les modèles de revues et les APC.
@@ -156,10 +158,10 @@ class OpenScienceReport:
         self._binds: dict[str, object] = {"structure_id": structure_id, "year": year}
         self.year = year
 
-    def _rows(self, sql: str, **binds: object) -> Sequence[Row]:
+    def _rows(self, sql: str, **binds: object) -> Sequence[SqlRow]:
         return self._conn.execute(text(sql), {**self._binds, **binds}).all()
 
-    def _one(self, sql: str, **binds: object) -> Row:
+    def _one(self, sql: str, **binds: object) -> SqlRow:
         return self._conn.execute(text(sql), {**self._binds, **binds}).one()
 
     def title(self) -> str:
@@ -181,7 +183,7 @@ class OpenScienceReport:
             + f"\n\nLe taux d'open access porte sur les articles, revues de littérature, lettres et textes publiés dans des actes de congrès : {n_oa} publications en {self.year}."
         )
 
-    def oa_evolution(self) -> tuple[str, Row]:
+    def oa_evolution(self) -> tuple[str, SqlRow | None]:
         rows = self._rows(
             f"""
             SELECT p.pub_year AS year, COUNT(*) AS total,
@@ -321,11 +323,11 @@ class OpenScienceReport:
         top = [r for r in rows if r.n >= TOP_JOURNAL_MIN_ARTICLES]
         others = len(rows) - len(top)
 
-        def model(r: Row) -> str:
+        def model(r: SqlRow) -> str:
             label = MODEL_LABELS.get(r.oa_model, "Inconnu")
             return f"{label} (diamant)" if r.diamond else label
 
-        def price(r: Row) -> str:
+        def price(r: SqlRow) -> str:
             return f"{_num(r.apc_amount)} {r.apc_currency}" if r.apc_amount is not None else "—"
 
         return (
@@ -436,7 +438,7 @@ class OpenScienceReport:
             f"Autres publications : {r.other_open} sur {r.other_oa_base} ({_pct(r.other_open, r.other_oa_base)})."
         )
 
-    def orcid(self) -> Row:
+    def orcid(self) -> SqlRow:
         return self._one(f"""
             WITH lab_authors AS (
                 SELECT DISTINCT a.person_id
@@ -458,7 +460,7 @@ class OpenScienceReport:
                    (SELECT COUNT(*) FROM hal_accounts WHERE has_orcid) AS hal_with_orcid
         """)
 
-    def orcid_section(self, r: Row) -> str:
+    def orcid_section(self, r: SqlRow) -> str:
         return (
             "## ORCID et idHAL\n\n"
             f"{r.with_orcid} des {r.authors} auteurs du laboratoire en {self.year} ont un ORCID connu de la base.\n\n"
@@ -575,7 +577,7 @@ class OpenScienceReport:
             [(source_label(r.source), r.n) for r in rows],
         )
 
-    def synthesis(self, oa: Row | None, orcid: Row) -> str:
+    def synthesis(self, oa: SqlRow | None, orcid: SqlRow) -> str:
         r = self._one(
             f"""
             SELECT COUNT(*) AS total,
