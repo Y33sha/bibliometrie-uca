@@ -14,7 +14,7 @@ Le pipeline interroge CrossRef par DOI, pour les documents découverts par les a
 
 **Works API** :
 - `https://api.crossref.org/works/{doi}` : interrogation unitaire par DOI ;
-- `https://api.crossref.org/works?filter=orcid:…` : œuvres d'un lot d'ORCID, paginées par curseur, 50 par page (moissonnage par personne). Une page trop grande dépasse la taille de réponse de Crossref, à cause des notices de grandes collaborations.
+- `https://api.crossref.org/works?filter=orcid:…` : œuvres d'un lot d'ORCID, paginées par curseur (moissonnage par personne).
 
 - Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adaptateur colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)

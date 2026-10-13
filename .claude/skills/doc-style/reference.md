@@ -163,6 +163,14 @@ AVANT :
 APRÈS :
     Signatures épinglées sur une personne. Clé primaire `source_authorship_id` seul : une signature ne s'épingle qu'à une personne. La phase `persons` réapplique l'épingle à chaque exécution, et une signature épinglée n'est ni ré-orphelinée ni réattribuée.
 
+Dans une doc de haut niveau, une règle d'implémentation glissée en incise rend la phrase inintelligible sans le contexte du code. La règle va dans la docstring ; la doc nomme seulement la donnée.
+
+AVANT :
+    - **Licence** : celle de la localisation principale, normalisée seulement pour une localisation d'éditeur
+
+APRÈS :
+    - **Licence** : licence de la localisation principale (`primary_location`)
+
 
 ## Doc qui explique ce qu'on ne fait pas, sans dire ce qu'il faut faire
 
