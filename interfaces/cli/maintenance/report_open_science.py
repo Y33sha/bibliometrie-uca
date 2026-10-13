@@ -254,10 +254,10 @@ class OpenScienceReport:
 
     def apc(self) -> str:
         paid = self._rows(f"""
-            SELECT ap.pub_year AS year, ap.open_access_fee, COUNT(*) AS n, SUM(ap.amount_eur_ht) AS amount
+            SELECT p.pub_year AS year, ap.open_access_fee, COUNT(*) AS n, SUM(ap.amount_eur_ht) AS amount
             FROM publishing.apc_payments ap
             JOIN ({LAB_PUBLICATIONS}) p ON p.id = ap.publication_id
-            WHERE ap.pub_year IN (:year, :year - 1)
+            WHERE p.pub_year IN (:year, :year - 1)
             GROUP BY 1, 2
         """)
 
@@ -283,8 +283,8 @@ class OpenScienceReport:
         corresponding = sum(1 for r in catalogue if r.lab_corresponding)
         return (
             "### APC\n\n"
-            f"Paiements de frais d'open access recensés (Open APC) : {paid_line(self.year, True)} pour {self.year}, {paid_line(self.year - 1, True)} pour {self.year - 1}. "
-            f"Autres frais de publication (enquête nationale) : {paid_line(self.year, False)} pour {self.year}.\n\n"
+            f"Frais d'open access payés (Open APC, enquête APC) : {paid_line(self.year, True)} pour les publications de {self.year}, {paid_line(self.year - 1, True)} pour celles de {self.year - 1}. "
+            f"Autres frais de publication : {paid_line(self.year, False)} pour {self.year}.\n\n"
             f"Prix catalogue des revues pour les {len(catalogue)} articles gold et hybrides de {self.year} : environ {_num(round(total, -3))} €, "
             f"après conversion des montants en devise étrangère. Le prix de {len(catalogue) - len(known)} revues est inconnu. "
             "Ce montant est un plafond : il ignore les accords transformants et les remises. "
