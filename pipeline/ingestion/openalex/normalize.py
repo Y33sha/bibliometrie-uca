@@ -1,6 +1,7 @@
 """Normalisation des données OpenAlex : staging → tables structurées."""
 
 import logging
+from collections import defaultdict
 from collections.abc import Mapping
 
 from sqlalchemy import Connection
@@ -405,7 +406,8 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
     - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
-    - `country_code` OpenAlex (rattaché à la structure désambiguïsée, algorithmique et faillible) en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
+    - adresses : les `raw_affiliation_strings`, à défaut le nom des institutions ;
+    - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte (institutions désambiguïsées par OpenAlex, algorithmiques et faillibles), en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
     - ROR des institutions → `ror_ids` ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
@@ -420,21 +422,39 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
             continue
 
         institutions = [as_mapping(i) for i in as_sequence(authorship.get("institutions"))]
-        suggested_countries = sorted(
-            {
-                pays
-                for i in institutions
-                if (pays := normalize_country_code(as_str(i.get("country_code"))))
-            }
-        )
+        country_by_institution = {
+            institution_id: pays
+            for i in institutions
+            if (institution_id := as_str(i.get("id")))
+            and (pays := normalize_country_code(as_str(i.get("country_code"))))
+        }
+        countries_by_text: dict[str, set[str]] = defaultdict(set)
+        for affiliation in as_sequence(authorship.get("affiliations")):
+            affiliation = as_mapping(affiliation)
+            if texte := as_str(affiliation.get("raw_affiliation_string")):
+                countries_by_text[texte].update(
+                    pays
+                    for institution_id in as_sequence(affiliation.get("institution_ids"))
+                    if (pays := country_by_institution.get(as_str(institution_id) or ""))
+                )
         raw_strings = [
             texte
             for e in as_sequence(authorship.get("raw_affiliation_strings"))
             if (texte := as_str(e))
         ]
-        addr_parts = raw_strings or [
-            nom for i in institutions if (nom := as_str(i.get("display_name")))
-        ]
+        if raw_strings:
+            addr_parts = [(texte, countries_by_text.get(texte, set())) for texte in raw_strings]
+        else:
+            addr_parts = [
+                (
+                    nom,
+                    {pays}
+                    if (pays := country_by_institution.get(as_str(i.get("id")) or ""))
+                    else set(),
+                )
+                for i in institutions
+                if (nom := as_str(i.get("display_name")))
+            ]
 
         ids = ids_by_position[position]
         records.append(
@@ -445,8 +465,8 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=[
-                    AddressRecord(text=part, suggested_countries=suggested_countries or None)
-                    for part in addr_parts
+                    AddressRecord(text=part, suggested_countries=sorted(countries) or None)
+                    for part, countries in addr_parts
                 ],
                 ror_ids=parse_ror_ids(as_str(i.get("ror")) for i in institutions),
             )

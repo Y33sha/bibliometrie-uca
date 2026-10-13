@@ -212,8 +212,8 @@ class TestBuildScanrAuthorRecords:
         doc = {"authors": [{"fullName": "Marie Dupont", "affiliations": [{"name": "Lab A"}]}]}
         assert build_scanr_author_records(doc)[0].name == SignatureName(raw="Marie Dupont")
 
-    def test_affiliation_sans_nom_garde_son_pays(self):
-        """Une affiliation réduite à son pays n'écrit pas d'adresse, mais son pays compte."""
+    def test_affiliation_sans_nom_ne_donne_pas_son_pays_aux_autres(self):
+        """Une affiliation sans nom n'écrit pas d'adresse, et son pays n'est posé sur aucune autre."""
         doc = {
             "authors": [
                 {
@@ -229,8 +229,28 @@ class TestBuildScanrAuthorRecords:
         rec = build_scanr_author_records(doc)[0]
 
         assert [a.text for a in rec.addresses] == ["Lab A"]
-        assert rec.addresses[0].countries == ["be", "fr"]
+        assert rec.addresses[0].countries == ["be"]
         assert rec.addresses[0].suggested_countries is None
+
+    def test_chaque_adresse_garde_les_pays_de_son_affiliation(self):
+        doc = {
+            "authors": [
+                {
+                    "fullName": "Marie Dupont",
+                    "affiliations": [
+                        {"name": "Lab Paris", "detected_countries": ["fr"]},
+                        {"name": "Lab Boston", "detected_countries": ["us"]},
+                    ],
+                }
+            ]
+        }
+
+        rec = build_scanr_author_records(doc)[0]
+
+        assert [(a.text, a.countries) for a in rec.addresses] == [
+            ("Lab Paris", ["fr"]),
+            ("Lab Boston", ["us"]),
+        ]
 
 
 class TestExtractDoi:
