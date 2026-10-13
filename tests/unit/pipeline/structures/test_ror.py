@@ -10,10 +10,15 @@ _LOG = logging.getLogger("test")
 
 
 class _FakeSource:
-    def __init__(self, latest="v2.14-2026-10-06-ror-data.zip", error=None):
-        self.latest, self.error, self.read = latest, error, []
+    def __init__(self, latest="v2.14-2026-10-06-ror-data.zip", error=None, published=None):
+        self.latest, self.error, self.published, self.read = latest, error, published, []
+        self.zenodo_calls = 0
+
+    def published_version(self):
+        return self.published
 
     def latest_version(self):
+        self.zenodo_calls += 1
         if self.error:
             raise self.error
         return self.latest
@@ -35,6 +40,22 @@ def test_version_deja_importee_laissee_en_l_etat():
     assert source.read == []
     repo.replace_all.assert_not_called()
     assert metrics.details["ror"]["imported"] is False
+
+
+def test_version_publiee_deja_importee_sans_interroger_zenodo():
+    source = _FakeSource(published="v2.14")
+    repo = _repo("v2.14-2026-10-06-ror-data.zip")
+    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    assert source.zenodo_calls == 0
+    assert metrics.details["ror"] == {"version": "v2.14-2026-10-06-ror-data.zip", "imported": False}
+
+
+def test_version_publiee_differente_interroge_zenodo():
+    source = _FakeSource(published="v2.15", latest="v2.15-2026-11-03-ror-data.zip")
+    repo = _repo("v2.14-2026-10-06-ror-data.zip")
+    run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    assert source.zenodo_calls == 1
+    assert source.read == ["v2.15-2026-11-03-ror-data.zip"]
 
 
 def test_version_plus_recente_importee():
