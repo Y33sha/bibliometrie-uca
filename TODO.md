@@ -1,13 +1,7 @@
-# Oneshots à lancer
-backfill_mark_truncated_fetch_missing_openalex.py
-set -a; . ./.env; set +a
-psql -U "$DB_OWNER_USER" -h "$DB_HOST" -p "$DB_PORT" -d bibliometrie -f infrastructure/db/roles.sql
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * plafond d'interrogations sudoc
 ## Extraction
-* [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ## Suite du traitement
@@ -31,6 +25,7 @@ psql -U "$DB_OWNER_USER" -h "$DB_HOST" -p "$DB_PORT" -d bibliometrie -f infrastr
 * [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 * [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * [ ] titres de revues: OpenAlex zappe les apostrophes; corriger
+* [ ] conserver l'historique des structures
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
