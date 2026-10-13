@@ -59,10 +59,10 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
   - `other` : politiques de données, formes non classées.
 - **Normalisation** : une règle du domaine ramène une forme brute (URL, identifiant SPDX, code OpenAlex) à l'enum. L'URL d'une licence d'éditeur dans Crossref reste sans valeur normalisée. Les droits d'accès (COAR, `info:eu-repo`) et les licences de fouille de texte (`tdm`, `stm-asf`) sont écartés.
 - **Stockage** : type PostgreSQL `license_type`, reflet de l'enum.
-  - `source_publications.license` : licence normalisée de la notice, calculée à la normalisation. La forme brute reste dans `meta`. Crossref : `vor`, sinon `unspecified`. DataCite : identifiant SPDX, sinon URI. OpenAlex : localisation principale seule. HAL : fichier déposé.
+  - `source_publications.license` : licence normalisée de la notice, calculée à la normalisation. La forme brute reste dans `meta`. Crossref : `vor`, sinon `unspecified`. DataCite : identifiant SPDX, sinon URI. OpenAlex : localisation principale seule, quand elle est celle d'un éditeur. HAL : fichier déposé.
   - `publications.license` : licence de la version éditeur, arbitrée entre les sources.
   - `publications.deposit_license` : licence du fichier déposé dans HAL.
-- **Arbitrage** de la licence de la version éditeur : Crossref (`vor`), puis OpenAlex (localisation éditeur), puis scanR. DataCite pour les jeux de données.
+- **Arbitrage** de la licence de la version éditeur : Crossref (`vor`), puis OpenAlex (localisation éditeur), puis scanR, puis DataCite. Pour un jeu de données ou un logiciel, DataCite passe en tête.
 - **HAL** : `licence_s` extrait dans `source_publications.meta`, clé `licence`.
 
 ## Phasage
@@ -83,7 +83,7 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 - [x] Emplacement du stockage : migration
 - [x] Licence normalisée de chaque notice source, calculée par les normaliseurs
 - [ ] Stock rejoué depuis le raw store
-- [ ] Règle d'arbitrage entre sources
+- [x] Règle d'arbitrage entre sources, dans la phase `publications`
 
 ### Phase 3 — Fin de chantier
 
