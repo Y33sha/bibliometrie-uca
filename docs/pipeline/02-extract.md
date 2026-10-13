@@ -1,10 +1,10 @@
 # Moissonnage
 
-*À jour le 2026-10-05.*
+*À jour le 2026-10-13.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
-## Moissonnage (`extract`)
+## Moissonnage par affiliation (`extract`)
 
 **Critères de requête**:
 - **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
@@ -15,6 +15,16 @@ En mode `daily`, seul HAL est moissonné : les notices modifiées depuis la dern
 **Gestion des changements**:
 - Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
 - Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
+
+## Moissonnage par personne (`extract_by_person`)
+
+Une publication dont les auteurs signent sans affiliation au périmètre échappe au moissonnage par affiliation. Cette phase, jouée en mode `full`, interroge chaque source sur les identifiants des personnes RH, confirmés ou authentifiés, sur la même plage d'années.
+
+- **Identifiants par source** : ORCID dans toutes les sources ; idHAL dans HAL ; IdRef dans HAL et ScanR (`domain/sources/person_search.py`).
+- **Lots de personnes** : une requête réunit tous les identifiants d'un lot de personnes. Un document que plusieurs lots ramènent est écrit une fois.
+- **Provenance** : les lignes créées ont le mode d'entrée `person_identifier`.
+
+Socle commun dans `pipeline/ingestion/common/person_search.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/person_search.py`.
 
 ## Documents absents d'une source (`fetch_missing`)
 
