@@ -1,9 +1,18 @@
 """Règles sur les pays des publications.
 
-Les pays d'une publication se lisent dans `publications.countries`, alimenté depuis les adresses de ses signatures. Deux codes y portent une sémantique propre, que ce module nomme.
+Les pays d'une publication se lisent dans `publications.countries`, alimenté depuis les adresses de ses signatures. Les codes sont ceux de l'ISO 3166-1, en minuscules. Deux codes y portent une sémantique propre, que ce module nomme.
 """
 
+import re
 from enum import StrEnum
+
+_COUNTRY_CODE = re.compile(r"^[a-z]{2}$")
+
+
+def normalize_country_code(raw: str | None) -> str | None:
+    """Code pays de `raw` en minuscules, ou `None` si `raw` n'a pas la forme d'un code à deux lettres (« -- »)."""
+    code = (raw or "").strip().lower()
+    return code if _COUNTRY_CODE.match(code) else None
 
 
 class PlaceNameKind(StrEnum):

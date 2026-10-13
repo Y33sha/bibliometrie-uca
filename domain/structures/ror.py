@@ -3,14 +3,12 @@
 Le ROR décrit les organisations de recherche du monde entier et leurs relations parent/enfant. `structures.ror_id` relie le référentiel interne à ce référentiel.
 """
 
-import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from domain.countries import normalize_country_code
 from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
-
-_COUNTRY_CODE = re.compile(r"^[a-z]{2}$")
 
 
 class RorStatus(StrEnum):
@@ -50,7 +48,7 @@ class RorOrganization:
     def __post_init__(self) -> None:
         if not self.name:
             raise ValidationError(f"Organisation ROR sans nom : {self.ror_id}")
-        if not _COUNTRY_CODE.match(self.country_code):
+        if normalize_country_code(self.country_code) != self.country_code:
             raise ValidationError(
                 f"Code pays invalide pour l'organisation ROR {self.ror_id} : {self.country_code!r}"
             )
