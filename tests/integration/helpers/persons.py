@@ -1,5 +1,7 @@
 """Semis de personnes, de leurs identifiants, formes de nom, fiches RH et rejets, pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
+import datetime
+
 from sqlalchemy import Connection, text
 
 from tests.integration.helpers.rows import insert_row
@@ -91,6 +93,8 @@ def insert_person_rh(
     email: str | None = None,
     department_name: str | None = None,
     role_title: str | None = None,
+    start_date: datetime.date | None = None,
+    end_date: datetime.date | None = None,
 ) -> int:
     """Insère une fiche RH de la personne `person_id` et renvoie son `id`."""
     return insert_row(
@@ -101,6 +105,8 @@ def insert_person_rh(
             "email": email,
             "department_name": department_name,
             "role_title": role_title,
+            "start_date": start_date,
+            "end_date": end_date,
         },
     )
 
