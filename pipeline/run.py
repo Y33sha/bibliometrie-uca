@@ -36,7 +36,13 @@ from infrastructure.observability.log import (
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.graph import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
-from pipeline.ingestion.common import extract, fetch_missing, fetch_stale, normalize
+from pipeline.ingestion.common import (
+    extract,
+    extract_by_person,
+    fetch_missing,
+    fetch_stale,
+    normalize,
+)
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
@@ -72,6 +78,7 @@ type PhaseBuilder = Callable[[], Phase]
 # démarrage vérifie que le registre couvre exactement les phases qu'il nomme.
 _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "extract": extract.build,
+    "extract_by_person": extract_by_person.build,
     "resolve_ra": resolve_ra.build,
     "fetch_missing": fetch_missing.build,
     "fetch_stale": fetch_stale.build,

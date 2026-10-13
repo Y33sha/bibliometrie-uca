@@ -149,6 +149,10 @@ _CONTAINERS = (
 )
 
 
+# Sources que la phase `extract_by_person` interroge.
+PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (Source.DATACITE,)
+
+
 def _containers(source: Source) -> tuple[str, ...]:
     """Référentiels de publication que lit et écrit la normalisation de `source` : aucun pour theses.fr."""
     return () if source == Source.THESES else _CONTAINERS
@@ -180,6 +184,19 @@ NODES: tuple[Node, ...] = (
             lot="extract",
         )
         for source in HARVESTED_SOURCES
+    ),
+    # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
+    *(
+        _node(
+            f"extract_by_person.{source}",
+            "extract_by_person",
+            reads=("config", "persons_rh", "person_identifiers", "staging"),
+            writes=("staging",),
+            previous_run=("staging", "person_identifiers"),
+            network=source,
+            lot="extract_by_person",
+        )
+        for source in PERSON_SEARCHED_SOURCES
     ),
     _node("fetch_missing.hal_by_id", "fetch_missing", network="hal"),
     _node(
@@ -997,6 +1014,7 @@ PHASE_ORDER: tuple[str, ...] = tuple(
 
 PHASE_LIBELLES: dict[str, str] = {
     "extract": "Moissonnage des sources",
+    "extract_by_person": "Interrogation des sources par l'identifiant des personnes RH",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
     "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
     "fetch_stale": "Recherche des documents non revus depuis {delai}",

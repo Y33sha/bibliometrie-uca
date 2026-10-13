@@ -45,7 +45,7 @@ def test_suit_le_curseur_jusqu_a_la_derniere_page(configuration, ecritures):
         ]
     )
     assert extracteur(DataciteExtractor, client).run(arguments_du_run()).new == 3
-    assert [c.args[2] for c in client.fetch_page.call_args_list] == [None, "https://next/1"]
+    assert [c.args[1] for c in client.fetch_page.call_args_list] == [None, "https://next/1"]
 
 
 def test_noeud_sans_doi_ignore(configuration, ecritures):
