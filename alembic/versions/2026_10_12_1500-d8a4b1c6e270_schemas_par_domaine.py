@@ -112,11 +112,11 @@ _DEFAULT_PRIVILEGES = {
 
 
 def _set_search_path(value: str) -> None:
+    """Règle le `search_path` de la base, que prennent les connexions suivantes. La session des migrations garde le sien (`alembic/env.py`) : une migration suivante, jouée dans la même session, qualifie ses tables comme si elle était jouée seule."""
     op.execute(
         f"DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET search_path = {value}', "
         "current_database()); END $$"
     )
-    op.execute(f"SET search_path = {value}")
 
 
 def _for_existing_role(role: str, statements: list[str]) -> None:

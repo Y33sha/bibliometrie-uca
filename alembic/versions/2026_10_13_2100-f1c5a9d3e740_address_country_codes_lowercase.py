@@ -24,10 +24,10 @@ def upgrade() -> None:
                    (SELECT array_agg(DISTINCT lower(c) ORDER BY lower(c))
                     FROM unnest(a.countries) c
                     WHERE lower(c) ~ '^[a-z]{2}$')::char(2)[] AS countries
-            FROM addresses a
+            FROM structures.addresses a
             WHERE EXISTS (SELECT 1 FROM unnest(a.countries) c WHERE c !~ '^[a-z]{2}$')
         )
-        UPDATE addresses a
+        UPDATE structures.addresses a
         SET countries = fixed.countries, countries_dirty = true
         FROM fixed
         WHERE a.id = fixed.id
