@@ -45,6 +45,18 @@ La licence HAL porte sur le fichier déposé. Elle peut différer de la licence 
 
 Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` en localisation principale. Cette localisation est une archive : HAL (3 447), theses.fr (1 319), Zenodo (395). 548 de ces travaux sont dans Crossref, dont 367 sans licence de la version éditeur.
 
+### Licences normalisées
+
+Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. HAL attend un moissonnage complet.
+
+| Source | Notices avec licence | Notices |
+| --- | --- | --- |
+| OpenAlex | 20 907 | 100 295 |
+| scanR | 23 630 | 61 623 |
+| Crossref | 12 930 | 38 498 |
+| DataCite | 8 682 | 17 320 |
+| HAL | 3 861 | 62 846 |
+
 ## Décisions
 
 - **Vocabulaire fermé**, enum du domaine :
@@ -82,13 +94,11 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 - [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
 - [x] Emplacement du stockage : migration
 - [x] Licence normalisée de chaque notice source, calculée par les normaliseurs
-- [ ] Stock rejoué depuis le raw store
+- [x] Stock OpenAlex, scanR, Crossref et DataCite rejoué depuis le raw store
+- [ ] Stock HAL : moissonnage complet
 - [x] Règle d'arbitrage entre sources, dans la phase `publications`
+- [ ] Licences des publications calculées par la phase `publications`
 
 ### Phase 3 — Fin de chantier
 
-- [ ] Mise à jour de la documentation
-
-## Questions ouvertes
-
-- Licence de la version déposée dans HAL face à la licence de l'éditeur.
+- [x] Mise à jour de la documentation : `docs/pipeline`, `docs/sources`
