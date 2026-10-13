@@ -217,6 +217,8 @@ def insert_scanr_document(  # noqa: C901
     seen: set[str] = set()
     oa_ev = as_mapping(doc.get("oaEvidence"))
     raw_license = as_str(oa_ev.get("license"))
+    # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `meta`, sans licence normalisée : HAL donne la licence de ses dépôts.
+    publisher_license = raw_license if oa_ev.get("hostType") == "publisher" else None
     adresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
     adresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
     for brut in adresses:
@@ -262,7 +264,7 @@ def insert_scanr_document(  # noqa: C901
             keywords=keywords,
             topics=topics,
             oa_status=pub_meta.oa_status,
-            license=normalize_license(raw_license),
+            license=normalize_license(publisher_license),
             urls=urls or None,
             impact=Impact(cited_by_count=cited_by_count).to_json(),
             meta={"license": raw_license} if raw_license else None,
