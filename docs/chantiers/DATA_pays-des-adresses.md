@@ -4,18 +4,20 @@
 
 Le pays d'une adresse est déduit par plusieurs moyens de fiabilité inégale, et le résultat est rangé dans deux colonnes de `addresses` : `countries` pour ce qui fait autorité, `suggested_countries` pour ce qui attend une confirmation humaine.
 
-Six endroits écrivent l'un ou l'autre :
+Six moyens écrivent l'un ou l'autre :
 
-| Site | Moyen | Colonne écrite |
+| Moyen | Site | Colonne écrite |
 |---|---|---|
-| `pipeline/sources/scanr/normalize.py` | pays déclaré par ScanR | `countries` |
-| `pipeline/sources/openalex/normalize.py` | pays de la structure désambiguïsée par OpenAlex | `suggested_countries` |
-| `pipeline/transformation/structures/countries/detect_by_country_name.py` | nom de pays en fin d'adresse | `countries` |
-| `pipeline/transformation/structures/countries/detect_by_place_name.py` | nom d'institution ou de ville, via `place_name_forms` | `countries` |
-| `pipeline/transformation/structures/countries/suggest_countries.py` | emprunt du pays d'une adresse qui contient celle-ci | `suggested_countries` |
-| `application/services/addresses/countries.py` | saisie à la main | `countries` |
+| pays détectés par ScanR dans le texte de l'affiliation (`detected_countries`) | `pipeline/ingestion/scanr/normalize.py`, écrit par `pipeline/ingestion/common/signatures.py` | `countries` |
+| pays de la structure désambiguïsée par OpenAlex | `pipeline/ingestion/openalex/normalize.py`, écrit par `pipeline/ingestion/common/signatures.py` | `suggested_countries` |
+| nom de pays en fin d'adresse | `pipeline/transformation/structures/countries/detect_by_country_name.py` | `countries` |
+| nom d'institution ou de ville, via `ref.place_name_forms` | `pipeline/transformation/structures/countries/detect_by_place_name.py` | `countries` |
+| emprunt du pays d'une adresse qui contient celle-ci | `pipeline/transformation/structures/countries/suggest_countries.py` | `suggested_countries` |
+| saisie à la main, recopiée sur les adresses de même `normalized_text` | `application/services/addresses/countries.py` | `countries` |
 
-Couverture obtenue, sur 431 912 adresses : 415 397 ont un pays faisant autorité (96,2 %), 12 986 n'ont qu'une suggestion (3,0 %), 3 529 n'ont rien (0,8 %).
+Les sources écrivent seulement sur une adresse sans pays : la première notice normalisée l'emporte. Les détections du pipeline traitent seulement les adresses sans pays. Une suggestion vide (`[]`) marque une adresse tentée sans résultat.
+
+Couverture obtenue, sur 507 902 adresses de la base de test : 483 838 ont un pays faisant autorité (95,3 %), 19 154 n'ont qu'une suggestion (3,8 %), 4 910 n'ont rien (1,0 %). La base de test vaut la base de prod pour les adresses et les pays.
 
 Le dispositif fonctionne. Ce sont les conséquences de la modélisation en deux colonnes qui motivent ce chantier.
 
@@ -43,45 +45,49 @@ address_country_candidates
   PRIMARY KEY (address_id, country_code, method)
 ```
 
-Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `ror`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier — elle est un moyen parmi les autres, mesurable comme les autres.
+Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `ror`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres. La copie d'une saisie manuelle vers les adresses de même `normalized_text` est un candidat `manual`.
 
-Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
+Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
 
-**La préséance s'écrit à un seul endroit.** Une étape de résolution lit les candidats d'une adresse et compose l'ensemble retenu : `manual` l'emporte sur tout ; les moyens tenus pour sûrs composent l'ensemble quand ils s'accordent ; `similarity` n'accède jamais seule à l'ensemble retenu et reste offerte à la confirmation humaine. Le classement précis des moyens est fixé par la mesure de la phase 3, non a priori.
+**La préséance s'écrit à un seul endroit.** Une fonction du domaine lit les candidats d'une adresse et compose l'ensemble retenu. `manual` l'emporte sur tout. Le reste du classement est fixé par la mesure, non a priori.
 
-**`addresses.countries` demeure**, comme cache dénormalisé lu par la cascade vers les publications et par les facettes de l'interface. Il change de statut : dérivé des candidats par la seule étape de résolution, au lieu d'être écrit par six sites.
+**La mesure se fait hors pipeline.** Un script lit le stock entier et exécute chaque moyen sur chaque adresse, indépendamment des autres moyens. Les pays des sources viennent des payloads du raw store, lus directement : `staging` reste intact. Le script écrit les candidats dans des fichiers, et la base reste intacte. Il applique ensuite la fonction de préséance et compare son résultat à `addresses.countries`. Le pipeline ne réévalue jamais tout le stock : il traite les adresses nouvelles.
 
-**`addresses.suggested_countries` disparaît.** Une suggestion est un candidat dont le moyen n'accède pas seul à l'ensemble retenu.
+**Le câblage dépend du gain mesuré.** Tant que la mesure ne montre pas de gain, rien ne change dans le schéma ni dans le pipeline.
+
+**Au câblage :**
+- les candidats du stock viennent des fichiers du script, et aucune colonne existante n'est reprise ;
+- `addresses.countries` demeure, comme cache dénormalisé lu par la cascade vers les publications et par les facettes de l'interface, dérivé des candidats par la seule fonction de préséance ;
+- `addresses.suggested_countries` disparaît : une suggestion est un candidat dont le moyen n'accède pas seul à l'ensemble retenu ;
+- le marqueur « tentée sans résultat » (`[]`) disparaît avec elle.
 
 ## Phasage
 
-### 1. Table de candidats et reprise de l'existant
+### 1. Script de candidats, hors pipeline
+
+- [ ] Script en lecture seule : pour chaque adresse du stock, les candidats de chaque moyen, écrits dans un fichier.
+- [ ] Moyens `country_name`, `institution`, `city` : détecteurs du pipeline réutilisés, `institution` et `city` séparés par la nature du lieu (`place_name_forms.kind`).
+- [ ] Moyen `similarity` : emprunt au pool des adresses à pays.
+- [ ] Moyens `source_scanr`, `source_openalex` : pays lus dans les payloads du raw store, rattachés aux adresses par leur texte.
+- [ ] Moyen `ror` : pays des organisations ROR de la signature, pour chaque adresse de la signature.
+- [ ] Volume : nombre de candidats par adresse et par moyen.
+
+### 2. Mesure et fonction de préséance
+
+- [ ] Par moyen : taux d'accord, de désaccord et de silence avec les autres moyens et avec `addresses.countries`.
+- [ ] Revue à la main d'un échantillon de désaccords, qui sert de référence.
+- [ ] Trancher l'asymétrie OpenAlex / ScanR, et le sort de `similarity`.
+- [ ] Fonction de préséance du domaine, testée. Le script l'applique au stock.
+- [ ] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`. Décision de câblage.
+
+### 3. Câblage
 
 - [ ] Migration : table `address_country_candidates`, énumération `country_detection_method`, index sur `address_id`.
-- [ ] Reprise des deux colonnes existantes : `countries` en `method = 'legacy'`, `suggested_countries` en `method = 'similarity'`.
-- [ ] Aucun changement de comportement : rien ne lit encore la table.
+- [ ] Chargement des candidats du stock depuis les fichiers du script.
+- [ ] Chaque moyen du pipeline écrit son candidat pour les adresses nouvelles ; `pipeline/graph.py` déclare la table.
+- [ ] Étape de résolution : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
 
-### 2. Chaque moyen écrit son candidat
-
-- [ ] Les six sites d'écriture ajoutent leur candidat, en conservant l'écriture actuelle des deux colonnes.
-- [ ] `detect_by_place_name` enregistre aussi les désaccords, au lieu d'abandonner l'adresse.
-- [ ] Moyen `ror` : le pays des organisations ROR d'une signature devient candidat pour les adresses de cette signature.
-- [ ] Toujours aucun changement de comportement : les colonnes restent la source de vérité.
-
-### 3. Mesure de la justesse de chaque moyen
-
-- [ ] Confronter chaque `method` à l'ensemble retenu, adresse par adresse : taux d'accord, de désaccord, de silence.
-- [ ] Trancher l'asymétrie OpenAlex / ScanR sur cette mesure.
-- [ ] Décider du sort de `similarity` : son taux d'accord détermine si elle est conservée, promue ou retirée.
-- [ ] Arrêter le classement de préséance en conséquence.
-
-### 4. Résolution dérivée et bascule des écritures
-
-- [ ] Écrire l'étape de résolution appliquant la préséance arrêtée en phase 3.
-- [ ] Vérifier qu'elle reproduit `addresses.countries` à l'identique sur tout le stock, aux écarts près que la phase 3 justifie. Ce contrôle autorise la bascule.
-- [ ] Les moyens cessent d'écrire `addresses.countries` ; la résolution en devient seule écrivaine et pose `countries_dirty`.
-
-### 5. Édition manuelle et retrait de la seconde colonne
+### 4. Édition manuelle et retrait de la seconde colonne
 
 - [ ] La page d'administration des pays lit les candidats et leur moyen, au lieu de `suggested_countries`.
 - [ ] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé.
@@ -89,9 +95,9 @@ Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adre
 
 ## Questions ouvertes
 
-- **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score n'a de sens que si un moyen produit des propositions de qualité inégale, ce que la phase 3 dira.
-- **Désaccords.** Une fois conservés, où sont-ils présentés ? Une adresse dont les moyens se contredisent demande une décision humaine, pas un rejet silencieux — reste à décider si elle rejoint la file existante ou la sienne.
-- **Rétention.** Les candidats d'un moyen retiré sont-ils supprimés, ou conservés comme trace de ce qui a été essayé ?
+- **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score a du sens seulement si un moyen produit des propositions de qualité inégale, ce que la mesure dira.
+- **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
 - **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
-- **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils alors redondants pour les signatures OpenAlex ?
-- **Volume.** Le nombre de candidats par adresse conditionne la taille de la table ; à mesurer en phase 2 sur le stock réel.
+- **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
+- **Saisies manuelles passées.** Le stock les confond avec les autres moyens dans `addresses.countries`. L'audit garde seulement les saisies unitaires ; une saisie par filtre garde son filtre, pas ses adresses. Le stock a-t-il un candidat `manual` ?
+- **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. 1 262 textes normalisés portent des pays différents selon la ligne.
