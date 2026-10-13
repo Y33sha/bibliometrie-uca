@@ -12,6 +12,8 @@ from interfaces.cli.imports.import_apc import (
     FileFormat,
     StructureResolver,
     detect_format,
+    institution_survey_payment,
+    institution_survey_payments,
     non_oa_fee_payment,
     open_apc_payment,
     parse_amount,
@@ -146,6 +148,89 @@ class TestStructureResolver:
     def test_plusieurs_structures_ne_designent_aucune(self):
         resolver = StructureResolver(self._FORMS)
         assert resolver.resolve("CNRS / Université Clermont Auvergne", PAYER_TYPES) is None
+
+
+class TestInstitutionSurvey:
+    _HEADER = "laboratoire_sigle,doi,montant_euros_ht,ror,budget,année_facturation,commentaire,Réponse Couperin"
+
+    @staticmethod
+    def _row(lab: str, doi: str, amount: str, comment: str = "", couperin: str = "") -> dict:
+        return {
+            "laboratoire_sigle": lab,
+            "doi": doi,
+            "montant_euros_ht": amount,
+            "ror": "https://ror.org/01a8ajp46",
+            "budget": "",
+            "année_facturation": "2025",
+            "commentaire": comment,
+            "Réponse Couperin": couperin,
+        }
+
+    def test_detect_format(self):
+        assert detect_format(self._HEADER.split(",")) is FileFormat.INSTITUTION_SURVEY
+
+    def test_paiement_complet(self):
+        payment = institution_survey_payment(
+            self._row("NEURO-DOL ", " 10.3390/BIOM15050740.", "2 883,13", "Co-écrit", "Retenu"),
+            open_access_fee=True,
+        )
+        assert payment["doi"] == "10.3390/biom15050740"
+        assert payment["amount_eur_ht"] == 2883.13
+        assert payment["billing_year"] == 2025
+        assert payment["pub_year"] is None
+        assert payment["payer_ror"] == "01a8ajp46"
+        assert payment["lab_name"] == "NEURO-DOL"
+        assert payment["remarks"] == "Co-écrit — Couperin : Retenu"
+
+    def test_sections(self):
+        rows = [
+            self._row("LMGE", "10.1/a", "100"),
+            self._row("", "", "100"),
+            self._row("Pas d'APC mais des frais de publication", "", ""),
+            self._row("ICCF", "10.1/b", "200"),
+            self._row("Retour Couperin", "", ""),
+            self._row("MEDIS", "10.1/c", "300"),
+        ]
+        payments = institution_survey_payments(rows)
+        assert [(p["doi"], p["open_access_fee"]) for p in payments] == [
+            ("10.1/a", True),
+            ("10.1/b", False),
+        ]
+
+    def test_un_montant_negatif_annule_un_paiement_de_meme_valeur(self):
+        rows = [
+            self._row("IMoST", "10.1/a", "-2390"),
+            self._row("IMoST", "10.1/a", "2390"),
+            self._row("IMoST", "10.1/a", "2390"),
+            self._row("IMoST", "10.1/a", "-55"),
+            self._row("IMoST", "10.1/a", "55"),
+            self._row("IMoST", "10.1/a", "55"),
+            self._row("M2iSH", "10.1/b", "-2481,64"),
+            self._row("M2iSH", "10.1/b", "2436"),
+            self._row("M2iSH", "10.1/b", "2481,64"),
+        ]
+        payments = institution_survey_payments(rows)
+        assert [(p["doi"], p["amount_eur_ht"]) for p in payments] == [
+            ("10.1/a", 2390.0),
+            ("10.1/a", 55.0),
+            ("10.1/b", 2436.0),
+        ]
+
+    def test_paiements_scindes_conserves(self):
+        rows = [self._row("LPC", "10.1/a", "3000"), self._row("LPC", "10.1/a", "565,62")]
+        assert [p["amount_eur_ht"] for p in institution_survey_payments(rows)] == [3000.0, 565.62]
+
+    def test_preambule_avant_l_en_tete(self, tmp_path):
+        path = tmp_path / "apc_2025.csv"
+        path.write_text(
+            ",,,,,,,\nEnquête APC 2025,,,,,,,\n"
+            + self._HEADER
+            + "\nLMGE,10.1/a,100,https://ror.org/01a8ajp46,,2025,,\n",
+            encoding="utf-8",
+        )
+        file_format, payments = read_payments(path)
+        assert file_format is FileFormat.INSTITUTION_SURVEY
+        assert [p["doi"] for p in payments] == ["10.1/a"]
 
 
 def test_read_payments_reconnait_le_format(tmp_path):

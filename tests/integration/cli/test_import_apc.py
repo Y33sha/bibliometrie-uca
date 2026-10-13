@@ -101,6 +101,30 @@ def test_laboratoire_et_payeur_rattaches_par_les_formes_de_noms(sa_sync_conn):
     assert all(u.label not in ("LTAPC", "Université Test APC") for u in stats.unresolved)
 
 
+def test_payeur_designe_par_son_ror(sa_sync_conn):
+    """Le payeur prend le nom du registre ROR. Un ROR absent du registre sert de nom : le réimport reste sans doublon."""
+    _publication(sa_sync_conn, "10.9/apc-e")
+    sa_sync_conn.execute(
+        text("""
+            INSERT INTO ror_organizations (ror_id, name, country_code, types, status)
+            VALUES ('0testapc1', 'Université ROR test APC', 'fr', ARRAY['education']::ror_type[], 'active')
+        """)
+    )
+    payments = [
+        {**_payment("10.9/apc-e", amount=100.0), "institution": None, "payer_ror": "0testapc1"},
+        {**_payment("10.9/apc-e", amount=200.0), "institution": None, "payer_ror": "0testapc2"},
+    ]
+
+    import_payments(sa_sync_conn, payments, "f.csv")
+    second = import_payments(sa_sync_conn, payments, "f.csv")
+
+    institutions = sa_sync_conn.execute(
+        text("SELECT institution FROM apc_payments WHERE doi = '10.9/apc-e' ORDER BY amount_eur_ht")
+    ).scalars()
+    assert list(institutions) == ["Université ROR test APC", "0testapc2"]
+    assert second.inserted == 0
+
+
 def test_frais_d_open_access_et_hors_oa_distincts(sa_sync_conn):
     _publication(sa_sync_conn, "10.9/apc-c")
 
