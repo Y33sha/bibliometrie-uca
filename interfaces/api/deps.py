@@ -254,7 +254,7 @@ def entity_label_queries(conn: Connection = Depends(db_conn)) -> EntityLabelQuer
     return PgEntityLabelQueries(conn)
 
 
-def entity_detail(entity: MergedEntity) -> Callable[..., EntityDetail]:
+def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], EntityDetail]:
     """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
 
     def dependency(request: Request, conn: Connection = Depends(db_conn)) -> EntityDetail:
