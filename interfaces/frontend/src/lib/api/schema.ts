@@ -1837,7 +1837,7 @@ export interface paths {
          * Get Publisher
          * @description Profil complet d'un éditeur, pour sa page publique.
          *
-         *     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications. Renvoie 404 sur un éditeur inconnu.
+         *     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
          */
         get: operations["get_publisher_api_publishers__publisher_id__get"];
         /**
@@ -2209,7 +2209,7 @@ export interface paths {
          * Get Journal
          * @description Profil complet d'une revue, pour sa page publique.
          *
-         *     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications. Renvoie 404 sur une revue inconnue.
+         *     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
          */
         get: operations["get_journal_api_journals__journal_id__get"];
         /**
@@ -2389,7 +2389,7 @@ export interface paths {
         };
         /**
          * Get Monograph
-         * @description Fiche d'une monographie. Renvoie 404 sur une monographie inconnue.
+         * @description Fiche d'une monographie.
          */
         get: operations["get_monograph_api_monographs__monograph_id__get"];
         put?: never;

@@ -3,7 +3,7 @@
 Les chemins littéraux `/facets` et `/facets/entities` précèdent `/{monograph_id}`, qui l'accepterait sinon comme identifiant.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from application.ports.read_models._common import EntityFacetResponse
 from application.ports.read_models.monographs_queries import (
@@ -16,7 +16,9 @@ from application.ports.read_models.monographs_queries import (
     MonographsFacetsResponse,
     MonographSort,
 )
-from interfaces.api.deps import monograph_queries
+from domain.merge import MergedEntity
+from interfaces.api.deps import entity_detail, monograph_queries
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
 
@@ -83,9 +85,7 @@ def monographs_entity_facet(
 def get_monograph(
     monograph_id: int,
     queries: MonographQueries = Depends(monograph_queries),
+    detail: EntityDetail = Depends(entity_detail(MergedEntity.MONOGRAPH)),
 ) -> MonographListItem:
-    """Fiche d'une monographie. Renvoie 404 sur une monographie inconnue."""
-    row = queries.get_monograph(monograph_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Monographie introuvable")
-    return row
+    """Fiche d'une monographie."""
+    return detail.found(queries.get_monograph(monograph_id))

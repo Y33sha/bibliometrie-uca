@@ -47,6 +47,7 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import countries as countries_service
 from application.services.authorships.core import propagate_in_perimeter_for_addresses
+from domain.merge import MergedEntity
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
@@ -57,6 +58,7 @@ from infrastructure.read_models.entity_labels import PgEntityLabelQueries
 from infrastructure.read_models.feedback import PgFeedbackQueries
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from infrastructure.read_models.journals import PgJournalQueries
+from infrastructure.read_models.merge_redirects import PgMergeRedirectQueries
 from infrastructure.read_models.monographs import PgMonographQueries
 from infrastructure.read_models.perimeters import PgPerimetersQueries
 from infrastructure.read_models.persons import PgPersonsQueries
@@ -78,6 +80,7 @@ from infrastructure.repositories import (
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
     AuthorshipsBuild,
@@ -249,6 +252,15 @@ def stats_queries(conn: Connection = Depends(db_conn)) -> StatsQueries:
 
 def entity_label_queries(conn: Connection = Depends(db_conn)) -> EntityLabelQueries:
     return PgEntityLabelQueries(conn)
+
+
+def entity_detail(entity: MergedEntity) -> Callable[..., EntityDetail]:
+    """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
+
+    def dependency(request: Request, conn: Connection = Depends(db_conn)) -> EntityDetail:
+        return EntityDetail(entity, request, PgMergeRedirectQueries(conn))
+
+    return dependency
 
 
 def structure_repo(conn: Connection = Depends(db_conn)) -> StructureRepository:

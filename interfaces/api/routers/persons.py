@@ -33,16 +33,19 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import commands as person_commands
+from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
     audit_repo,
     authorship_repo,
     db_conn,
+    entity_detail,
     person_repo,
     persons_queries,
     publication_perimeter_recompute,
 )
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     AddIdentifier,
@@ -281,12 +284,10 @@ def reassign_identifier(
 def person_profile(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries),
+    detail: EntityDetail = Depends(entity_detail(MergedEntity.PERSON)),
 ) -> PersonProfileResponse:
     """Profil public complet d'une personne."""
-    profile = queries.person_profile(person_id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Personne introuvable")
-    return profile
+    return detail.found(queries.person_profile(person_id))
 
 
 @router.get("/{person_id}/curation", response_model=PersonOut)

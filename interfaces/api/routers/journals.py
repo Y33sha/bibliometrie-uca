@@ -32,13 +32,16 @@ from domain.journals.journal import (
     OA_MODEL_LABELS_FR,
     OA_MODELS,
 )
+from domain.merge import MergedEntity
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
+    entity_detail,
     journal_queries,
     journal_recompute,
     journal_repo,
 )
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
     EnumOption,
@@ -213,15 +216,13 @@ def doi_namespace_conflicts(
 def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries),
+    detail: EntityDetail = Depends(entity_detail(MergedEntity.JOURNAL)),
 ) -> JournalDetailResponse:
     """Profil complet d'une revue, pour sa page publique.
 
-    Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications. Renvoie 404 sur une revue inconnue.
+    Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
     """
-    row = queries.get_journal_detail(journal_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Revue introuvable")
-    return row
+    return detail.found(queries.get_journal_detail(journal_id))
 
 
 @router.get("/{journal_id}/dashboard", response_model=JournalDashboardResponse)
