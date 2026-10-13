@@ -21,7 +21,7 @@ Couverture obtenue, sur 507 902 adresses de la base de test : 483 838 ont un pay
 
 Le dispositif fonctionne. Ce sont les conséquences de la modélisation en deux colonnes qui motivent ce chantier.
 
-**La confiance est encodée dans le schéma.** L'autorité d'une valeur se déduit de la colonne qui la porte. Chaque écriture doit donc maintenir « je n'écris la suggestion qu'en l'absence de pays », par une clause `WHERE` répétée à chaque site ; chaque lecture doit connaître la règle de promotion.
+**La confiance est encodée dans le schéma.** L'autorité d'une valeur se déduit de la colonne qui la contient. Chaque écriture doit donc maintenir « je n'écris la suggestion qu'en l'absence de pays », par une clause `WHERE` répétée à chaque site ; chaque lecture doit connaître la règle de promotion.
 
 **Le moyen qui a produit une valeur n'est conservé nulle part.** Une fois `countries` écrit, rien ne dit si le pays vient de ScanR, d'un nom de pays en fin d'adresse ou d'une institution reconnue. La justesse de chaque moyen est donc invérifiable, et les arbitrages entre moyens reposent sur des jugements a priori.
 
@@ -109,6 +109,6 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
 - **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
 - **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
-- **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. 1 262 textes normalisés portent des pays différents selon la ligne.
+- **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. Pour 1 262 textes normalisés, les lignes ont des pays différents.
 - **ROR par affiliation.** `source_authorship_rors` rattache les ROR à la signature : leur pays se pose sur toutes les adresses de la signature, d'où 15,6 % de sur-ensembles. OpenAlex et ScanR donnent le ROR de chaque affiliation. Faut-il rattacher le ROR au lien entre signature et adresse ?
 - **Adresses qui ne sont pas des textes d'affiliation.** Les noms de structures HAL et ScanR et les adresses des thèses relèvent du chantier `DATA_perimetre.md`.
