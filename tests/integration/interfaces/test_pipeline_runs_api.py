@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from pipeline.public import PHASE_ORDER
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import seed_phase_execution
 
@@ -117,11 +118,7 @@ def test_list_runs_aggrege_et_ordonne(client, seeded_runs):
 
 
 def test_list_phases(client):
-    phases = client.get("/api/pipeline/phases").json()
-    assert phases[0] == "extract"
-    assert "normalize" in phases
-    assert phases[-1] == "oa_status"
-    assert len(phases) == 16
+    assert client.get("/api/pipeline/phases").json() == list(PHASE_ORDER)
 
 
 def test_get_run_detail(client, seeded_runs):
