@@ -126,7 +126,7 @@ class ExtractPhase:
             {
                 f"extract.{source}": NodeStep(
                     node(source),
-                    section="Extraction des sources",
+                    section="Moissonnage par affiliation",
                     threshold=5,
                     when=retenue(source),
                 )

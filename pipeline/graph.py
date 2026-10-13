@@ -1013,8 +1013,8 @@ PHASE_ORDER: tuple[str, ...] = tuple(
 """Ordre d'exécution des phases : celui de leurs nœuds dans `NODES`."""
 
 PHASE_LIBELLES: dict[str, str] = {
-    "extract": "Moissonnage des sources",
-    "extract_by_person": "Interrogation des sources par l'identifiant des personnes RH",
+    "extract": "Moissonnage par affiliation",
+    "extract_by_person": "Moissonnage par personne",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
     "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
     "fetch_stale": "Recherche des documents non revus depuis {delai}",
