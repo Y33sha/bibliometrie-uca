@@ -59,6 +59,11 @@ def build_params(
         filter_str = f"authorships.institutions.lineage:{lineage_filter},from_updated_date:{since}"
     else:
         filter_str = f"authorships.institutions.lineage:{lineage_filter},publication_year:{year}"
+    return filter_params(filter_str, cursor=cursor)
+
+
+def filter_params(filter_str: str, *, cursor: str = "*") -> QueryParams:
+    """Paramètres d'une page de `/works` que désigne le filtre `filter_str`."""
     return {
         "filter": filter_str,
         "select": SELECT_FIELDS,
@@ -104,6 +109,12 @@ class OpenalexClient:
         """Une page de works ; `cursor` vaut `"*"` au premier appel, puis le `next_cursor` de la page précédente."""
         params = build_params(institution_ids, year=year, cursor=cursor, since=since)
         return self._get(params, f"OpenAlex {since or year}")
+
+    def fetch_filtered_page(
+        self, filter_str: str, cursor: str, label: str
+    ) -> Mapping[str, JsonValue]:
+        """Une page des works que désigne `filter_str` ; `cursor` vaut `"*"` au premier appel."""
+        return self._get(filter_params(filter_str, cursor=cursor), label)
 
 
 def stage_work(conn: Connection, metrics: PhaseMetrics, work: Mapping[str, JsonValue]) -> None:

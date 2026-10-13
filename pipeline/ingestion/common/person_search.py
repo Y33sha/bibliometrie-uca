@@ -79,8 +79,12 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
         """Une page des documents des `identifiers` parus entre les deux années de `years` : la première quand `next_token` est `None`."""
 
     @abstractmethod
-    def record_doi(self, record: Mapping[str, JsonValue]) -> str | None:
-        """DOI normalisé d'un document, identifiant de la ligne de `staging`."""
+    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+        """Identifiant de la ligne de `staging` et DOI normalisé d'un document, ou `None` pour un document sans identifiant."""
+
+    def authors_truncated(self, record: Mapping[str, JsonValue]) -> bool:  # noqa: ARG002
+        """Vrai si la source a tronqué la liste d'auteurs du document."""
+        return False
 
     def load_config(self, conn: Connection) -> PersonSearchConfig:
         identifiers = searched_identifiers(conn, self.ID_TYPE)
@@ -132,21 +136,23 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
         seen: set[str],
         metrics: PhaseMetrics,
     ) -> None:
-        """Écrit les documents d'un lot, page après page. Un document sans DOI, ou déjà écrit dans le run, est ignoré."""
+        """Écrit les documents d'un lot, page après page. Un document sans identifiant, ou déjà écrit dans le run, est ignoré."""
         next_token: str | None = None
         while True:
             page = self.fetch_page(batch, years, next_token, label)
             for record in page.records:
-                doi = self.record_doi(record)
-                if doi and doi not in seen:
-                    seen.add(doi)
+                identity = self.record_identity(record)
+                if identity and identity[0] not in seen:
+                    source_id, doi = identity
+                    seen.add(source_id)
                     stage_document(
                         self.conn,
                         metrics,
                         source=self.SOURCE,
-                        source_id=doi,
+                        source_id=source_id,
                         doi=doi,
                         raw_data=record,
+                        authors_truncated=self.authors_truncated(record),
                         entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
             self.conn.commit()

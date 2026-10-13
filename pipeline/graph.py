@@ -150,7 +150,7 @@ _CONTAINERS = (
 
 
 # Sources que la phase `extract_by_person` interroge.
-PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (Source.DATACITE, Source.CROSSREF)
+PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (Source.DATACITE, Source.CROSSREF, Source.OPENALEX)
 
 
 def _containers(source: Source) -> tuple[str, ...]:

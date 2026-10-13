@@ -123,4 +123,10 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
         return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
 
-    return {"datacite": datacite, "crossref": crossref}
+    def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from pipeline.ingestion.openalex.harvest import OpenalexClient
+        from pipeline.ingestion.openalex.person_search import OpenalexPersonExtractor
+
+        return OpenalexPersonExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
+
+    return {"datacite": datacite, "crossref": crossref, "openalex": openalex}
