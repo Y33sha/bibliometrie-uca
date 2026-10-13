@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
-	import { api } from '$lib/api';
+	import { api, apiDetail } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
 	import { docTypeSingular, issnLabel } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
@@ -75,7 +75,7 @@
 
 	async function loadJournal() {
 		try {
-			journal = await api<JournalDetail>(`/api/journals/${journalId}`);
+			journal = await apiDetail<JournalDetail>(`/api/journals/${journalId}`);
 		} catch {
 			error = true;
 		}

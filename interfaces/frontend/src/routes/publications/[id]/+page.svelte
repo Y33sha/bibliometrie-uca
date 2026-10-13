@@ -2,7 +2,7 @@
   import { pageTitle } from "$lib/institution.svelte";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { api, auth } from "$lib/api";
+  import { apiDetail, auth } from "$lib/api";
   import PublicationAbstract from "$lib/components/PublicationAbstract.svelte";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
@@ -101,7 +101,7 @@
   const hasSourceConflict = $derived(sourceRows.some((r) => r.conflict));
 
   async function loadData(id: string) {
-    data = await api<PubResponse>(`/api/publications/${id}`);
+    data = await apiDetail<PubResponse>(`/api/publications/${id}`);
   }
 
   // Recharge à chaque changement d'`id`. La navigation d'une publication à une autre réutilise la même route `[id]` sans remonter le composant : `onMount` ne suffit pas, il faut un effet réactif sur `pubId` (sinon l'URL change mais le contenu reste).

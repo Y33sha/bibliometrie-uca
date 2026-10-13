@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, api, latestRequest, post, put, patch, del } from './client';
+import { ApiError, api, apiDetail, latestRequest, post, put, patch, del } from './client';
 
 type RequeteEnVol = {
 	url: string;
@@ -235,5 +235,32 @@ describe('écriture', () => {
 		expect(erreur).toBeInstanceOf(ApiError);
 		expect((erreur as ApiError).status).toBe(409);
 		expect((erreur as ApiError).detailMessage).toBe('Doublon');
+	});
+});
+
+describe('apiDetail', () => {
+	it('recharge la page sur l’identifiant conservé quand l’API redirige', async () => {
+		const replace = vi.fn();
+		vi.stubGlobal('window', {
+			location: { pathname: '/journals/7', search: '?tab=dashboard', hash: '', replace }
+		});
+		const promesse = apiDetail('/api/journals/7');
+		await toursDeBoucle();
+		const reponse = reponseJson({ id: 12 });
+		Object.defineProperties(reponse, {
+			redirected: { value: true },
+			url: { value: 'http://localhost/api/journals/12' }
+		});
+		enVol[0].resoudre(reponse);
+
+		expect(await reglementOuSuspens(promesse)).toBe('en suspens');
+		expect(replace).toHaveBeenCalledWith('/journals/12?tab=dashboard');
+	});
+
+	it('rend le corps JSON sans redirection', async () => {
+		const promesse = apiDetail<{ id: number }>('/api/journals/7');
+		await toursDeBoucle();
+		enVol[0].resoudre(reponseJson({ id: 7 }));
+		expect(await promesse).toEqual({ id: 7 });
 	});
 });
