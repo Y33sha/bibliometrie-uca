@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import pytest
 
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.common import harvest
+from pipeline.ingestion.common import harvest, person_search
 from pipeline.ingestion.common.staging import UpsertOutcome
 
 # Signaux `(inserted, changed)` d'`upsert_staging` pour chaque issue.
@@ -77,6 +77,17 @@ def ecritures(monkeypatch) -> list[Ecriture]:
 
     monkeypatch.setattr(harvest, "upsert_staging", _upsert)
     return ecrits
+
+
+@pytest.fixture
+def identifiants_rh(monkeypatch, configuration):
+    """Pose les identifiants interrogés par le moissonnage par personne, sur les années 2024 et 2025."""
+    configuration(person_search, annees=[2024, 2025])
+
+    def _poser(valeurs: list[str]) -> None:
+        monkeypatch.setattr(person_search, "searched_identifiers", lambda conn, id_type: valeurs)
+
+    return _poser
 
 
 @pytest.fixture

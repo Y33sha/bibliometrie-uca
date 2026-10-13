@@ -1,6 +1,6 @@
-"""Phase `extract_by_person` : interrogation des sources par l'identifiant des personnes RH, vers le staging.
+"""Phase `extract_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
 
-Un nœud par source interrogée, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode quotidien saute la phase. Les sources retenues sont celles du mode et de `--sources`.
+Un nœud par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode quotidien saute la phase. `--sources` restreint les sources.
 
 Les identifiants de personne que chaque source accepte sont dans `domain/sources/person_search.py`.
 """
@@ -42,7 +42,7 @@ class ExtractByPersonPhase:
         """Exécute en parallèle le nœud de chaque source retenue et assemble les métriques."""
         options = ctx.options
         policy = MODES[options.mode]
-        effective = set(policy.extract_sources) if policy.year_selection == "full" else set()
+        effective = set(PERSON_SEARCHED_SOURCES) if policy.year_selection == "full" else set()
         if options.sources:
             effective &= options.sources
 
@@ -90,7 +90,7 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 
 
 def build() -> Phase:
-    """Interrogation des sources par l'identifiant des personnes RH, vers le staging."""
+    """Moissonnage des sources par l'identifiant des personnes RH, vers le staging."""
     from pipeline.ingestion.common.parallel import run_parallel
 
     registry = _extractors()
@@ -115,4 +115,12 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
         return DatacitePersonExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
 
-    return {"datacite": datacite}
+    def crossref(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from pipeline.ingestion.crossref.person_search import (
+            CrossrefClient,
+            CrossrefPersonExtractor,
+        )
+
+        return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
+
+    return {"datacite": datacite, "crossref": crossref}
