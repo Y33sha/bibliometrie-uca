@@ -21,7 +21,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - Effectif du laboratoire : l'export RH omet certains laboratoires.
 - CV HAL.
 - Régime de diffusion des thèses et délai de mise en ligne.
-- Entrepôts et licences des jeux de données.
+- Jeux de données des entrepôts sans DOI (GEO, ENA, PDB), cités par numéro d'accession.
 
 ### Pistes d'enrichissement
 
@@ -29,11 +29,11 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - **Lien ORCID–idHAL.** Déductible de `author_identifying_keys` : un `hal_person_id` associé à un ORCID (40 631 clés sur 55 559 clés HAL).
 - **Revues diamant.** `journals.oa_model` ne distingue pas le diamant. Le payload DOAJ (`journals.doaj_payload`) indique les APC (`APC`) et les autres frais (`Has other fees`) : 835 revues sont sans APC ni autres frais.
 - **Thèses.** L'ouverture d'une thèse se mesure sur plusieurs années : les thèses récentes sont en traitement ou sous embargo.
-- **Licences.** Chantier [Licences](DATA_licences.md). La licence des jeux de données vient de DataCite (`meta->'rights'`).
+- **Licences.** Chantier [Licences](DATA_licences.md) : `publications.license` (version éditeur) et `publications.deposit_license` (fichier déposé dans HAL).
 - **Serveurs de preprints.** `journals.journal_type = preprint_server` et `publication_relations` (`is_preprint_of`) donnent une partie de l'information.
-- **Entrepôts de jeux de données.** Des entrepôts où déposent les laboratoires sont absents des sources de la base.
+- **Entrepôts de jeux de données.** Chantier [Extraction par identifiant de personne](DATA_extraction-par-identifiant-personne.md). Le moissonnage de DataCite par ORCID ajoute 49 jeux de données au périmètre, dont ceux de quatre entrepôts absents jusque-là : EarthChem Library, ICOS Carbon Portal, Build Environment Data_Experiments, DANDI Archive.
 - **Affiliations des coauteurs.** Seul le pays est résolu pour les adresses hors périmètre. Les institutions partenaires demandent une résolution des adresses vers un référentiel (ROR).
-- **Financements ANR et européens.** Crossref fournit les financeurs (`meta->'funder'`, avec numéro de projet). HAL expose `anrProjectReference_s` et `europeanProjectReference_s`, non extraits. OpenAlex expose `grants`, non extrait.
+- **Financements ANR et européens.** Crossref fournit les financeurs (`meta->'funder'`, avec numéro de projet) : 4 938 des 18 360 articles du périmètre parus de 2021 à 2025. Il déclare les financeurs de tous les coauteurs. HAL expose `anrProjectReference_s` et `europeanProjectReference_s`, saisis par les déposants, non extraits. OpenAlex expose `grants`, non extrait.
 
 ## Décisions
 
@@ -57,9 +57,10 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - [x] Thèses : ouverture sur plusieurs années de soutenance
 - [x] Montants d'APC : import de l'extraction 2025, montant dans le rapport
 - [x] Licences des jeux de données
-- [ ] Licences des publications (chantier dédié)
+- [ ] Licences des publications : section du rapport, d'après `publications.license` et `publications.deposit_license`
 - [x] Serveurs de preprints : les plus utilisés, d'après le préfixe DOI
-- [ ] Entrepôts de jeux de données absents de la base
+- [x] Entrepôts de jeux de données absents de la base : moissonnage de DataCite par ORCID
+- [x] idHAL des auteurs du laboratoire
 - [ ] Affiliations des coauteurs
 - [ ] Financements
 
