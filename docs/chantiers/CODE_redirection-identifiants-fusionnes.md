@@ -18,7 +18,7 @@ Les fusions concernent cinq entités qui ont une page publique (`/<entité>/[id]
 - Une entité supprimée sans fusion mène à une page introuvable, comme une redirection vers une entité conservée puis supprimée.
 - Les fusions antérieures à la table restent sans redirection.
 - Une redirection en chaîne (A absorbé par B, puis B par C) se résout à l'écriture : A mène directement à C.
-- L'API redirige un identifiant absorbé vers l'identifiant conservé ; l'interface publique suit la redirection.
+- L'API redirige un identifiant absorbé vers l'identifiant conservé (308, `EntityDetail`), qui centralise aussi le 404 des routes de détail. L'interface publique suit la redirection par un rechargement de la page (`apiDetail`).
 - À faire avant la mise en production de l'interface publique.
 
 ## Phasage
@@ -31,5 +31,5 @@ Les fusions concernent cinq entités qui ont une page publique (`/<entité>/[id]
 
 ### Phase 2 — Lecture
 
-- [ ] Redirection dans l'API, pour les pages de détail.
-- [ ] Suivi de la redirection dans l'interface publique.
+- [x] Redirection dans l'API, pour les pages de détail.
+- [x] Suivi de la redirection dans l'interface publique.

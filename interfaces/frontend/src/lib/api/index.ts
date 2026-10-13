@@ -1,13 +1,13 @@
 /**
  * Client API centralisé.
  *
- * - Helpers HTTP : `api` (GET avec annulation), `post`, `put`, `patch`, `del` exposés pour les appels ad-hoc.
+ * - Helpers HTTP : `api` (GET avec annulation), `apiDetail` (GET du détail d'une entité, qui suit la redirection d'un identifiant fusionné), `post`, `put`, `patch`, `del` exposés pour les appels ad-hoc.
  * - Endpoints par domaine : exports groupés (`auth`, `persons`, `publications`, `structures`, …) — cf. fichiers frères de ce dossier.
  *
  * Règle : aucun `fetch()` direct dans `src/routes/*` ni dans `src/lib/*`. Toute nouvelle API doit passer par un endpoint typé ici.
  */
 
-export { api, cancel, latestRequest, post, put, patch, del, ApiError } from './client';
+export { api, apiDetail, cancel, latestRequest, post, put, patch, del, ApiError } from './client';
 
 export * as auth from './auth';
 export * as persons from './persons';

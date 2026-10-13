@@ -2,7 +2,7 @@
 	import { pageTitle } from '$lib/institution.svelte';
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
-	import { api } from '$lib/api';
+	import { api, apiDetail } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
 	import { docTypeSingular } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
@@ -57,7 +57,7 @@
 
 	async function loadPublisher() {
 		try {
-			publisher = await api<PublisherDetail>(`/api/publishers/${publisherId}`);
+			publisher = await apiDetail<PublisherDetail>(`/api/publishers/${publisherId}`);
 		} catch {
 			error = true;
 		}

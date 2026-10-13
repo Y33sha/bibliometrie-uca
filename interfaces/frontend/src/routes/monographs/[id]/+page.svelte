@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
+	import { apiDetail } from '$lib/api';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import type { components } from '$lib/api/schema';
 
@@ -20,7 +20,7 @@
 			(window as any).navigation?.canGoBack ??
 			document.referrer.startsWith(window.location.origin);
 		try {
-			monograph = await api<Monograph>(`/api/monographs/${monographId}`);
+			monograph = await apiDetail<Monograph>(`/api/monographs/${monographId}`);
 		} catch {
 			error = true;
 		}

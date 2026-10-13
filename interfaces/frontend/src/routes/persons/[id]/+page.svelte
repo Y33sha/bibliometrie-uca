@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api, auth, authorships } from '$lib/api';
+	import { api, apiDetail, auth, authorships } from '$lib/api';
 	import { titleCase, formatDate } from '$lib/utils';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
@@ -133,7 +133,7 @@
 		addresses.page = 1;
 		dashboardLoaded = false;
 		try {
-			const profileData = await api<ProfileResponse>(`/api/persons/${id}`);
+			const profileData = await apiDetail<ProfileResponse>(`/api/persons/${id}`);
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
 			thesesCount = profileData.theses_count;
