@@ -57,8 +57,8 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 ### Phase 2 — Modèle
 
 - [x] Entrée en staging : mode d'entrée `person_identifier`
-- [ ] Fragment SQL commun des signatures qui contiennent l'identifiant fort d'une personne, repris par la phase `persons`
-- [ ] Règle d'entrée dans le périmètre par l'identité : phase `affiliations` et recalcul après édition d'une adresse
+- [x] Fragment SQL commun des signatures qui contiennent l'identifiant fort d'une personne, repris par la phase `persons`
+- [x] Règle d'entrée dans le périmètre par l'identité : phase `affiliations` et recalcul après édition d'une adresse
 
 ### Phase 3 — Extraction
 
