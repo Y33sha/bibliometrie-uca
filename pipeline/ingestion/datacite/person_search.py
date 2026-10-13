@@ -50,7 +50,7 @@ def build_orcid_query(orcids: list[str], first_year: int, last_year: int) -> str
 
 
 def _skipped(remaining: int) -> str:
-    return f"{forme(remaining, 'lot')} {forme(remaining, 'sauté')}"
+    return f"{remaining} ORCID {forme(remaining, 'sauté')}"
 
 
 class DatacitePersonExtractor(SourceExtractor[DatacitePersonConfig, DataciteClient]):
@@ -74,7 +74,8 @@ class DatacitePersonExtractor(SourceExtractor[DatacitePersonConfig, DataciteClie
         def extrait(avancement: Progression) -> PhaseMetrics:
             metrics = PhaseMetrics()
             for i, batch in enumerate(batches):
-                if self._stop_on_tripped(_skipped(len(batches) - i)):
+                remaining = len(config.orcids) - i * BATCH_SIZE
+                if self._stop_on_tripped(_skipped(remaining)):
                     break
                 label = f"lot {i + 1}"
                 try:
@@ -82,16 +83,16 @@ class DatacitePersonExtractor(SourceExtractor[DatacitePersonConfig, DataciteClie
                         build_orcid_query(batch, min(years), max(years)), label, seen, metrics
                     )
                 except SourceUnavailableError:
-                    self._warn_stopped(_skipped(len(batches) - i))
+                    self._warn_stopped(_skipped(remaining))
                     break
                 except Exception as e:
                     scoped_logger(self.logger, self.SOURCE, label).error(
                         "erreur : %s — passage au suivant", e
                     )
-                avancement.avance(1)
+                avancement.avance(len(batch))
             return metrics
 
-        return self._extrait_d_un_tenant(len(batches), extrait)
+        return self._extrait_d_un_tenant(len(config.orcids), extrait)
 
     def _extract_batch(self, query: str, label: str, seen: set[str], metrics: PhaseMetrics) -> None:
         """Écrit les documents d'un lot d'ORCID, page après page. Un document sans DOI, ou déjà écrit dans le run, est ignoré."""
