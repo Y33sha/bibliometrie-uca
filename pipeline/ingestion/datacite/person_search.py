@@ -7,9 +7,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from domain.persons.identifiers import orcid_uri
+from domain.persons.identifiers import PersonIdentifierType, orcid_uri
 from domain.types import JsonValue
-from pipeline.ingestion.common.person_search import PersonSearchExtractor, PersonSearchPage
+from pipeline.ingestion.common.person_search import (
+    Identifiers,
+    PersonSearchExtractor,
+    PersonSearchPage,
+)
 from pipeline.ingestion.datacite.fields import record_doi
 from pipeline.ingestion.datacite.harvest import DataciteClient
 
@@ -33,13 +37,16 @@ class DatacitePersonExtractor(PersonSearchExtractor[DataciteClient]):
 
     def fetch_page(
         self,
-        identifiers: list[str],
+        identifiers: Identifiers,
         years: tuple[int, int],
         next_token: str | None,
         label: str,
     ) -> PersonSearchPage:
         page = self._client.fetch_page(
-            build_orcid_query(identifiers, *years), next_token, label, page_size=_PAGE_SIZE
+            build_orcid_query(identifiers[PersonIdentifierType.ORCID], *years),
+            next_token,
+            label,
+            page_size=_PAGE_SIZE,
         )
         return PersonSearchPage(records=page.records, next_token=page.next_url)
 

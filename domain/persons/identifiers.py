@@ -58,6 +58,13 @@ class PersonIdentifierType(StrEnum):
     HAL_PERSON_ID = "hal_person_id"
 
 
+PERSON_IDENTIFIER_LABELS: dict[PersonIdentifierType, str] = {
+    PersonIdentifierType.ORCID: "ORCID",
+    PersonIdentifierType.IDHAL: "idHAL",
+    PersonIdentifierType.IDREF: "IdRef",
+    PersonIdentifierType.HAL_PERSON_ID: "compte HAL",
+}
+
 # Deux vues du vocabulaire :
 #
 # - `PERSON_IDENTIFIER_TYPES` : tous les types admissibles dans `person_identifiers`. La promotion depuis les `source_authorships` (`add_identifiers_from_authorships`) et l'interface d'administration les couvrent tous.

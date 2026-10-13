@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from domain.persons.identifiers import PersonIdentifierType
 from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common import harvest, person_search
 from pipeline.ingestion.common.staging import UpsertOutcome
@@ -81,11 +82,17 @@ def ecritures(monkeypatch) -> list[Ecriture]:
 
 @pytest.fixture
 def identifiants_rh(monkeypatch, configuration):
-    """Pose les identifiants interrogés par le moissonnage par personne, sur les années 2024 et 2025."""
+    """Pose les personnes interrogées par le moissonnage par personne, sur les années 2024 et 2025.
+
+    Une chaîne désigne une personne à un seul ORCID ; un dictionnaire, les identifiants d'une personne par type.
+    """
     configuration(person_search, annees=[2024, 2025])
 
-    def _poser(valeurs: list[str]) -> None:
-        monkeypatch.setattr(person_search, "searched_identifiers", lambda conn, id_type: valeurs)
+    def _poser(personnes: list) -> None:
+        identifiants = [
+            p if isinstance(p, dict) else {PersonIdentifierType.ORCID: [p]} for p in personnes
+        ]
+        monkeypatch.setattr(person_search, "searched_persons", lambda conn, id_types: identifiants)
 
     return _poser
 
