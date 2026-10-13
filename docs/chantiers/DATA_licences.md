@@ -76,7 +76,7 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 - [x] Extraction de `licence_s` dans HAL
 - [x] Inventaire des formes de OpenAlex, scanR, Crossref et DataCite
 - [ ] Inventaire des formes de HAL, après un moissonnage complet
-- [ ] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire
+- [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
 - [ ] Emplacement du stockage : migration
 - [ ] Licences OpenAlex et scanR extraites à la normalisation ; stock rejoué depuis le raw store
 - [ ] Règle d'arbitrage entre sources
@@ -88,3 +88,4 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 ## Questions ouvertes
 
 - Licence de la version déposée dans HAL face à la licence de l'éditeur.
+- `public-domain` d'OpenAlex réunit CC0 et Public Domain Mark (486 travaux en localisation principale). La forme reste sans valeur normalisée.
