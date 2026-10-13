@@ -197,14 +197,16 @@ class TestBuildScanrAuthorRecords:
             "authors": [
                 {
                     "fullName": "X",
-                    "affiliations": [{"name": "Lab A", "detected_countries": ["FR", "BE"]}],
+                    "affiliations": [
+                        {"name": "Lab A", "detected_countries": ["FR", "fr", "BE", "--"]}
+                    ],
                 }
             ]
         }
         rec = build_scanr_author_records(doc)[0]
         assert [a.text for a in rec.addresses] == ["Lab A"]
-        # detected_countries = pays d'autorité (dédupliqués, triés), jamais suggested.
-        assert rec.addresses[0].countries == ["BE", "FR"]
+        # detected_countries = pays d'autorité (en minuscules, dédupliqués, triés), jamais suggested.
+        assert rec.addresses[0].countries == ["be", "fr"]
 
     def test_le_nom_de_l_affiliation_n_ecrase_pas_celui_de_l_auteur(self):
         doc = {"authors": [{"fullName": "Marie Dupont", "affiliations": [{"name": "Lab A"}]}]}
@@ -227,7 +229,7 @@ class TestBuildScanrAuthorRecords:
         rec = build_scanr_author_records(doc)[0]
 
         assert [a.text for a in rec.addresses] == ["Lab A"]
-        assert rec.addresses[0].countries == ["BE", "FR"]
+        assert rec.addresses[0].countries == ["be", "fr"]
         assert rec.addresses[0].suggested_countries is None
 
 

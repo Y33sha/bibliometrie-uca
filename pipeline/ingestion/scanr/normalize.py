@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
+from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.identifiers import (
@@ -311,7 +312,9 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
             if name:
                 addr_parts.append(name)
             detected_countries.update(
-                pays for p in as_sequence(aff.get("detected_countries")) if (pays := as_str(p))
+                pays
+                for p in as_sequence(aff.get("detected_countries"))
+                if (pays := normalize_country_code(as_str(p)))
             )
         countries = sorted(detected_countries) or None
 

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
+from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
@@ -420,7 +421,11 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
         institutions = [as_mapping(i) for i in as_sequence(authorship.get("institutions"))]
         suggested_countries = sorted(
-            {pays.lower() for i in institutions if (pays := as_str(i.get("country_code")))}
+            {
+                pays
+                for i in institutions
+                if (pays := normalize_country_code(as_str(i.get("country_code"))))
+            }
         )
         raw_strings = [
             texte
