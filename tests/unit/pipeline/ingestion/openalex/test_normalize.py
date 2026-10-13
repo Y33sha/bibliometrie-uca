@@ -555,14 +555,21 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records(work)[0].addresses == []
 
     def test_country_code_to_suggested(self):
-        """`country_code` OpenAlex (structure désambiguïsée) → `suggested_countries`
-        sur l'adresse, jamais `countries`. Union dédupliquée et en minuscules
-        (code canonique = `countries.code`)."""
+        """`country_code` des institutions de l'affiliation → `suggested_countries` de son adresse, jamais `countries`. Union dédupliquée et en minuscules (code canonique = `countries.code`)."""
         work = {
             "authorships": [
                 {
                     "raw_author_name": "X",
                     "raw_affiliation_strings": ["Some affiliation"],
+                    "affiliations": [
+                        {
+                            "raw_affiliation_string": "Some affiliation",
+                            "institution_ids": [
+                                "https://openalex.org/I1",
+                                "https://openalex.org/I2",
+                            ],
+                        }
+                    ],
                     "institutions": [
                         {
                             "id": "https://openalex.org/I1",
@@ -581,6 +588,43 @@ class TestBuildOpenalexAuthorRecords:
         addr = build_openalex_author_records(work)[0].addresses[0]
         assert addr.suggested_countries == ["fr", "us"]
         assert addr.countries is None
+
+    def test_each_address_gets_the_countries_of_its_own_affiliation(self):
+        work = {
+            "authorships": [
+                {
+                    "raw_author_name": "X",
+                    "raw_affiliation_strings": ["Lab Paris", "Lab Boston"],
+                    "affiliations": [
+                        {
+                            "raw_affiliation_string": "Lab Paris",
+                            "institution_ids": ["https://openalex.org/I1"],
+                        },
+                        {
+                            "raw_affiliation_string": "Lab Boston",
+                            "institution_ids": ["https://openalex.org/I2"],
+                        },
+                    ],
+                    "institutions": [
+                        {
+                            "id": "https://openalex.org/I1",
+                            "display_name": "A",
+                            "country_code": "FR",
+                        },
+                        {
+                            "id": "https://openalex.org/I2",
+                            "display_name": "B",
+                            "country_code": "US",
+                        },
+                    ],
+                }
+            ]
+        }
+        addresses = build_openalex_author_records(work)[0].addresses
+        assert [(a.text, a.suggested_countries) for a in addresses] == [
+            ("Lab Paris", ["fr"]),
+            ("Lab Boston", ["us"]),
+        ]
 
     def test_no_country_code_no_suggestion(self):
         work = {

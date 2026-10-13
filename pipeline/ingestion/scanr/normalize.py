@@ -283,7 +283,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
-    - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
+    - affiliations feuilles → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
     - ROR de toutes les affiliations, tutelles comprises → `ror_ids`.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
@@ -304,19 +304,17 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         ids = ids_by_position[position]
         roles, _ = map_role("scanr", as_str(author_data.get("role")))
 
-        addr_parts: list[str] = []
-        detected_countries: set[str] = set()
+        addresses: list[AddressRecord] = []
         affiliations = [as_mapping(a) for a in as_sequence(author_data.get("affiliations"))]
         for aff in select_leaf_affiliations(affiliations):
             name = (as_str(aff.get("name")) or "").strip()
             if name:
-                addr_parts.append(name)
-            detected_countries.update(
-                pays
-                for p in as_sequence(aff.get("detected_countries"))
-                if (pays := normalize_country_code(as_str(p)))
-            )
-        countries = sorted(detected_countries) or None
+                countries = {
+                    pays
+                    for p in as_sequence(aff.get("detected_countries"))
+                    if (pays := normalize_country_code(as_str(p)))
+                }
+                addresses.append(AddressRecord(text=name, countries=sorted(countries) or None))
 
         records.append(
             AuthorRecord(
@@ -324,7 +322,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 name=signature_name,
                 roles=roles or None,
                 person_identifiers=ids if ids else None,
-                addresses=[AddressRecord(text=part, countries=countries) for part in addr_parts],
+                addresses=addresses,
                 ror_ids=parse_ror_ids(as_str(aff.get("ror")) for aff in affiliations),
             )
         )
