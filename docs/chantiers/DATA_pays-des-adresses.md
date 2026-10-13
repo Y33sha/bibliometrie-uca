@@ -70,17 +70,17 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Moyen `similarity` : emprunt au pool des adresses à pays, jumelles exclues.
 - [x] Moyens `source_scanr`, `source_openalex` : pays lus dans les payloads du raw store, rattachés aux adresses par leur texte.
 - [x] Moyen `ror` : pays des organisations ROR de la signature, pour chaque adresse de la signature.
-- [x] Volume, sur 508 057 adresses de la base de test : 1 734 200 candidats.
+- [x] Volume, sur 508 057 adresses de la base de test : 1 576 622 candidats. Les sources donnent le pays de chaque affiliation (6c7dec11d).
 
 | Moyen | Candidats | Adresses couvertes |
 |---|---|---|
 | `country_name` | 401 908 | 79,1 % |
 | `institution` | 362 450 | 70,0 % |
 | `city` | 236 942 | 46,4 % |
-| `source_openalex` | 407 235 | 56,8 % |
+| `source_openalex` | 280 539 | 54,2 % |
 | `ror` | 130 161 | 18,4 % |
 | `similarity` | 108 005 | 20,5 % |
-| `source_scanr` | 87 499 | 11,6 % |
+| `source_scanr` | 56 617 | 11,1 % |
 
 ### 2. Mesure et fonction de préséance
 
@@ -110,3 +110,6 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
 - **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
 - **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. 1 262 textes normalisés portent des pays différents selon la ligne.
+- **Affiliations ScanR.** `authors[].affiliations` mêle des textes bruts (sans `structId`) et des fiches de structure HAL (`structId`, `hal_docid`), dont le `name` met bout à bout nom, sigles, tutelles et adresse postale. `select_leaf_affiliations` garde seulement l'affiliation marquée `id_name_author_labo` quand l'auteur en a une, et écarte les autres textes bruts de l'auteur. Faut-il prendre pour adresses tous les textes bruts, et aucune fiche de structure ?
+- **Affiliations HAL.** Les adresses HAL sont des noms de structures du référentiel HAL, faute de texte brut. Une publication présente seulement dans HAL n'entre dans le périmètre que par elles. Deux voies : marquer l'origine (texte brut ou nom de structure) sur le lien entre signature et adresse, une même adresse pouvant venir des deux ; ou relier la signature à sa structure HAL par son identifiant, sur le modèle de `source_authorship_rors`, avec un référentiel des structures HAL (API structures de HAL) qui donne leur pays.
+- **ROR par affiliation.** `source_authorship_rors` rattache les ROR à la signature : leur pays se pose sur toutes les adresses de la signature, d'où 15,6 % de sur-ensembles. OpenAlex et ScanR donnent le ROR de chaque affiliation. Faut-il rattacher le ROR au lien entre signature et adresse ?
