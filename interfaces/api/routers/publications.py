@@ -24,11 +24,13 @@ from application.ports.read_models.publications_queries import (
     PublicationSourcesResponse,
     PublicationsQueries,
 )
+from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
-from interfaces.api.deps import publications_queries
+from interfaces.api.deps import entity_detail, publications_queries
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (
     TOGGLE_VALUES,
     parse_int_csv,
@@ -225,12 +227,10 @@ def export_theses_csv(
 def get_publication(
     pub_id: int,
     queries: PublicationsQueries = Depends(publications_queries),
+    detail: EntityDetail = Depends(entity_detail(MergedEntity.PUBLICATION)),
 ) -> PublicationDetailResponse:
     """Détail complet d'une publication."""
-    detail = queries.get_publication_detail(pub_id)
-    if detail is None:
-        raise HTTPException(status_code=404, detail="Publication introuvable")
-    return detail
+    return detail.found(queries.get_publication_detail(pub_id))
 
 
 @router.get("/{pub_id}/sources", response_model=PublicationSourcesResponse)

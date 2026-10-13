@@ -25,16 +25,19 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdate,
 )
 from application.services.publishers import commands as publisher_commands
+from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
+    entity_detail,
     journal_recompute,
     journal_repo,
     pub_count_recompute,
     publisher_queries,
     publisher_repo,
 )
+from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     EnumOption,
@@ -108,15 +111,13 @@ def list_publishers(
 def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
+    detail: EntityDetail = Depends(entity_detail(MergedEntity.PUBLISHER)),
 ) -> Publisher:
     """Profil complet d'un éditeur, pour sa page publique.
 
-    Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications. Renvoie 404 sur un éditeur inconnu.
+    Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
     """
-    row = queries.get_publisher_detail(publisher_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Éditeur introuvable")
-    return row
+    return detail.found(queries.get_publisher_detail(publisher_id))
 
 
 @router.get("/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
