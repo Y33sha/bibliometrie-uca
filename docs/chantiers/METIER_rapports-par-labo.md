@@ -40,7 +40,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - **Livraison.** Un prototype de rapport, converti ensuite en PDF avec graphiques et feuille de style.
 - **Ordre des enrichissements.** Les plus rapides d'abord.
 - **Thèses.** Analyse pluriannuelle.
-- **Licences.** Affichées au moins pour les jeux de données.
+- **Licences.** Affichées pour les jeux de données, les preprints et les dépôts HAL, avec le nombre de textes intégraux déposés sans licence ouverte.
 
 ## Phasage
 
@@ -57,7 +57,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - [x] Thèses : ouverture sur plusieurs années de soutenance
 - [x] Montants d'APC : import de l'extraction 2025, montant dans le rapport
 - [x] Licences des jeux de données
-- [ ] Licences des publications : section du rapport, d'après `publications.license` et `publications.deposit_license`
+- [x] Licences des dépôts HAL, des preprints et des jeux de données, d'après `publications.license` et `publications.deposit_license`. Pour les articles, le taux d'ouverture suffit.
 - [x] Serveurs de preprints : les plus utilisés, d'après le préfixe DOI
 - [x] Entrepôts de jeux de données absents de la base : moissonnage de DataCite par ORCID
 - [x] idHAL des auteurs du laboratoire
