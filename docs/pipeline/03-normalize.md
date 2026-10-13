@@ -1,6 +1,6 @@
 #  Normalisation
 
-*À jour le 2026-10-09.*
+*À jour le 2026-10-13.*
 
 ```mermaid
 flowchart LR
@@ -20,6 +20,8 @@ Phase `normalize` : transforme les données brutes (`staging`) en tables structu
 Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. Les plateformes d'ebooks d'OpenAlex ne créent pas de revue.
 
 Chaque normaliseur reporte dans `source_authorships` ce que sa source fournit pour chaque signature : identifiants de l'auteur (ORCID, IdRef…) et affiliations.
+
+Chaque normaliseur pose aussi la licence de la notice (`source_publications.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `meta`.
 
 En fin de phase, les `source_publications` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_authorships` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 

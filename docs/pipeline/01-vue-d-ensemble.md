@@ -1,12 +1,13 @@
 # Vue d'ensemble
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-13.*
 
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/03-pipeline.md).
 
 ## Moissonnage
 
-- [Moissonnage](02-extract.md#moissonnage-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
+- [Moissonnage par affiliation](02-extract.md#moissonnage-par-affiliation-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
+- [Moissonnage par personne](02-extract.md#moissonnage-par-personne-extract_by_person) : interroge chaque source sur les identifiants (ORCID, idHAL, IdRef) des personnes RH.
 - [Documents absents d'une source](02-extract.md#documents-absents-dune-source-fetch_missing) : cherche dans chaque source les documents que le moissonnage initial n'y a pas trouvés.
 - [Documents périmés et disparus](02-extract.md#documents-périmés-et-disparus-fetch_stale) : réinterroge les documents non revus depuis un délai réglable (90 jours par défaut), rafraîchit leurs métadonnées et marque (`disappeared_at`) ceux qui ont disparu.
 - [Listes d'auteurs tronquées](02-extract.md#listes-dauteurs-tronquées-fetch_truncated) : retélécharge un par un les documents OpenAlex de 100 auteurs, que le plafond de l'API a tronqués.
@@ -17,7 +18,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des structures
 
-- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources.
+- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources, par la structure de l'adresse ou par l'identité d'une personne RH.
 
 ## Résolution des publications
 
