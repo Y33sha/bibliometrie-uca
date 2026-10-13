@@ -13,6 +13,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
+    STRONG_IDENTIFIER_TYPES,
     IdentifiedPerson,
     Namesake,
     PersonNameForms,
@@ -26,6 +27,7 @@ from infrastructure.sql_fragments import (
     REJECTED_PAIRS,
     identifier_neutralized,
     publication_rejected_for,
+    strong_identifier_signatures,
     usable_identifier,
 )
 
@@ -136,27 +138,18 @@ _OOP_COMMON_WHERE = """
 """
 
 
-def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
-    """Branche « identifiant-ancré » : signature hors-périmètre dont l'identifiant `id_type` (jsonb) est déjà porté par une personne connue (non rejetée).
-
-    Le rapprochement par valeur jsonb (`->>'{id_type}' = pi.id_value`) porte sur `author_identifying_keys` (~645 k identités), non sur les 19 M signatures : la valeur jsonb reste non indexable, mais scannée sur la table d'identités, 25× plus petite. On rejoint ensuite les signatures par `identity_id` (index `idx_sa_identity`). `person_identifiers ? '{id_type}'`, la neutralisation par la signature et la restriction de source ORCID sont des filtres de correction, pas d'optimisation.
-    """
-    neutralized = identifier_neutralized(f"'{id_type}'", "sa_auth")
-    return f"""
-        SELECT {_OOP_PROJECTION}
-        FROM person_identifiers pi
-        JOIN author_identifying_keys aik
-            ON aik.person_identifiers->>'{id_type}' = pi.id_value
-        JOIN source_authorships sa_auth ON sa_auth.identity_id = aik.id
-        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-        JOIN publications pub ON pub.id = sd.publication_id
-        WHERE pi.id_type = '{id_type}'
-          AND pi.status <> '{AttributionStatus.REJECTED.value}'
-          AND aik.person_identifiers ? '{id_type}'
-          AND NOT {neutralized}
-          {source_filter}
-          AND {_OOP_COMMON_WHERE}
-    """
+def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
+    """Branche « identifiant-ancré » : signature hors-périmètre dont l'identifiant fort `id_type` est déjà celui d'une personne connue (non rejeté)."""
+    return strong_identifier_signatures(
+        id_type,
+        identifiers="person_identifiers",
+        select=_OOP_PROJECTION,
+        joins="""
+            JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
+            JOIN publications pub ON pub.id = sd.publication_id
+        """,
+        where=f"pi.status <> '{AttributionStatus.REJECTED.value}' AND {_OOP_COMMON_WHERE}",
+    )
 
 
 # Branche « cross-source-ancrée » : signature hors-périmètre à une (publication,
@@ -178,18 +171,8 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
       AND {_OOP_COMMON_WHERE}
 """
 
-# ORCID : restreint aux sources à ORCID déposé par l'auteur (`ORCID_MATCH_SOURCES` du domaine,
-# passé en bind param `:orcid_sources`). L'ORCID WoS/ScanR est dérivé algorithmiquement, pas un
-# signal de matching.
 _OOP_CANDIDATES_SQL = " UNION ".join(
-    [
-        _oop_identifier_branch(
-            PersonIdentifierType.ORCID, source_filter="AND sa_auth.source = ANY(:orcid_sources)"
-        ),
-        _oop_identifier_branch(PersonIdentifierType.IDREF),
-        _oop_identifier_branch(PersonIdentifierType.HAL_PERSON_ID),
-        _OOP_CROSS_SOURCE_BRANCH,
-    ]
+    [*(_oop_identifier_branch(t) for t in STRONG_IDENTIFIER_TYPES), _OOP_CROSS_SOURCE_BRANCH]
 )
 
 
@@ -224,9 +207,7 @@ class PersonsMatchingQueries:
 
         Seules les signatures ancrées sur une personne existante (identifiant partagé) ou sur une position déjà rattachée (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source porte l'essentiel de son coût.
         """
-        rows = conn.execute(
-            text(_OOP_CANDIDATES_SQL), {"orcid_sources": list(ORCID_MATCH_SOURCES)}
-        ).all()
+        rows = conn.execute(text(_OOP_CANDIDATES_SQL)).all()
         return [_to_bare(r) for r in rows]
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
