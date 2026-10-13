@@ -12,6 +12,8 @@ Mesures du 2026-10-13 sur DataCite.
 - **ORCID.** Les 1 772 ORCID confirmés ou authentifiés des auteurs du périmètre actifs depuis 2021 désignent environ 59 400 DOI publiés de 2021 à 2026, doublons compris.
 - **Crossref.** Les 1 091 ORCID des personnes RH désignent 9 697 œuvres parues de 2017 à 2026.
 - **OpenAlex.** Les mêmes ORCID désignent 71 131 works parus de 2017 à 2026.
+- **HAL.** Les ORCID, idHAL et IdRef de 1 300 personnes RH désignent 27 134 notices parues de 2017 à 2026, doublons compris.
+- **ScanR.** Les ORCID et IdRef de 1 294 personnes RH désignent 39 101 documents parus de 2017 à 2026, doublons compris.
 - **Grandes collaborations.** Une notice compte jusqu'à un millier d'auteurs : environ 200 Kio dans DataCite, 500 Kio dans Crossref. Une page trop grande dépasse le délai de DataCite (502) ou la taille de réponse de Crossref (100 Mio).
 
 ### Personnes interrogées
@@ -35,11 +37,12 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 | DataCite | `creators.nameIdentifiers.nameIdentifier` (ORCID) |
 | OpenAlex | filtre `authorships.author.orcid` |
 | Crossref | filtre `orcid` |
-| HAL | `authIdHal_s` (idHAL) |
+| HAL | `authORCIDIdExt_s` (ORCID), `authIdHal_s` (idHAL), `authIdRefIdExt_s` (IdRef) |
+| ScanR | `authors.denormalized.orcid` (ORCID), `authors.person` (`idref<IdRef>`) |
 
 ## Décisions
 
-- Phase `extract_by_person`, après `extract` : un nœud par source.
+- Phase `extract_by_person`, après `extract` : un nœud par source. Une requête réunit tous les identifiants d'un lot de personnes, dans les types que la source accepte. L'avancement se compte en personnes.
 - Identifiants acceptés : ORCID dans toutes les sources, idHAL dans HAL, IdRef dans HAL et ScanR (`domain/sources/person_search.py`).
 - Personnes interrogées : celles de l'export RH, avec un identifiant confirmé ou authentifié.
 - Mode d'entrée en staging : `person_identifier`.
@@ -65,11 +68,12 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ### Phase 3 — Extraction
 
-- [x] Nœud DataCite, par lots de 10 ORCID, pages de 25 notices
-- [x] Socle commun des nœuds : lots, pagination, document écrit une fois par run
-- [x] Nœud Crossref, par lots de 10 ORCID, pages de 50 œuvres
-- [x] Nœud OpenAlex, par lots de 50 ORCID, pages de 200 works
-- [ ] Nœuds HAL, ScanR
+- [x] Nœud DataCite, par lots de 10 personnes (ORCID), pages de 25 notices
+- [x] Socle commun des nœuds : lots de personnes, pagination, document écrit une fois par run
+- [x] Nœud Crossref, par lots de 10 personnes (ORCID), pages de 50 œuvres
+- [x] Nœud OpenAlex, par lots de 50 personnes (ORCID), pages de 200 works
+- [x] Nœud HAL, par lots de 30 personnes (ORCID, idHAL, IdRef)
+- [x] Nœud ScanR, par lots de 30 personnes (ORCID, IdRef)
 
 ### Phase 4 — Fin de chantier
 
