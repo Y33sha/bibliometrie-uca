@@ -49,7 +49,7 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 
 - **Vocabulaire fermé**, enum du domaine :
   - `cc-by`, `cc-by-sa`, `cc-by-nd`, `cc-by-nc`, `cc-by-nc-sa`, `cc-by-nc-nd`, sans numéro de version ;
-  - `cc0`, `public-domain-mark`, distincts ;
+  - `public-domain` : CC0, Public Domain Mark, `public-domain` d'OpenAlex ;
   - `licence-ouverte` : Licence Ouverte Etalab, toutes versions ;
   - `open-source` : licences de logiciel libre (MIT, BSD, GPL, LGPL, Apache, CeCILL, AFL) ;
   - `repository-distribution` : autorisation de diffusion HAL, licence non exclusive arXiv ;
@@ -58,7 +58,10 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
   - `all-rights-reserved` : copyright HAL, `rightsstatements.org` InC, `reserved` ;
   - `other` : politiques de données, formes non classées.
 - **Normalisation** : une règle du domaine ramène une forme brute (URL, identifiant SPDX, code OpenAlex) à l'enum. L'URL d'une licence d'éditeur dans Crossref reste sans valeur normalisée. Les droits d'accès (COAR, `info:eu-repo`) et les licences de fouille de texte (`tdm`, `stm-asf`) sont écartés.
-- **Stockage** : licence normalisée et forme brute par notice source ; licence de la version éditeur par publication ; licence du fichier déposé dans HAL à part.
+- **Stockage** : type PostgreSQL `license_type`, reflet de l'enum.
+  - `source_publications.license` : licence normalisée de la notice, calculée à la normalisation. La forme brute reste dans `meta`. Crossref : `vor`, sinon `unspecified`. DataCite : identifiant SPDX, sinon URI. OpenAlex : localisation principale seule. HAL : fichier déposé.
+  - `publications.license` : licence de la version éditeur, arbitrée entre les sources.
+  - `publications.deposit_license` : licence du fichier déposé dans HAL.
 - **Arbitrage** de la licence de la version éditeur : Crossref (`vor`), puis OpenAlex (localisation éditeur), puis scanR. DataCite pour les jeux de données.
 - **HAL** : `licence_s` extrait dans `source_publications.meta`, clé `licence`.
 
@@ -75,7 +78,7 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 
 - [x] Extraction de `licence_s` dans HAL
 - [x] Inventaire des formes de OpenAlex, scanR, Crossref et DataCite
-- [ ] Inventaire des formes de HAL, après un moissonnage complet
+- [ ] Inventaire des formes de HAL, après un moissonnage complet. Échantillon de 1 223 notices : 10 formes, toutes reconnues.
 - [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
 - [ ] Emplacement du stockage : migration
 - [ ] Licences OpenAlex et scanR extraites à la normalisation ; stock rejoué depuis le raw store
@@ -88,4 +91,3 @@ Mesure du 2026-10-13 sur le raw store. 6 295 travaux ont la licence `other-oa` e
 ## Questions ouvertes
 
 - Licence de la version déposée dans HAL face à la licence de l'éditeur.
-- `public-domain` d'OpenAlex réunit CC0 et Public Domain Mark (486 travaux en localisation principale). La forme reste sans valeur normalisée.
