@@ -29,8 +29,8 @@ from pipeline.runtime.observability.progression import Progression
 
 # ORCID par requête.
 BATCH_SIZE = 10
-# Documents par page.
-_PAGE_SIZE = 200
+# Documents par page. Une notice de grande collaboration compte un millier de créateurs (environ 200 Kio).
+_PAGE_SIZE = 25
 
 
 @dataclass(frozen=True)
