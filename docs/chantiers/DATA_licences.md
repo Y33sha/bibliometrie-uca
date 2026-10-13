@@ -71,7 +71,7 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
   - `other` : politiques de données, formes non classées.
 - **Normalisation** : une règle du domaine ramène une forme brute (URL, identifiant SPDX, code OpenAlex) à l'enum. L'URL d'une licence d'éditeur dans Crossref reste sans valeur normalisée. Les droits d'accès (COAR, `info:eu-repo`) et les licences de fouille de texte (`tdm`, `stm-asf`) sont écartés.
 - **Stockage** : type PostgreSQL `license_type`, reflet de l'enum.
-  - `source_publications.license` : licence normalisée de la notice, calculée à la normalisation. La forme brute reste dans `meta`. Crossref : `vor`, sinon `unspecified`. DataCite : identifiant SPDX, sinon URI. OpenAlex : localisation principale seule, quand elle est celle d'un éditeur. HAL : fichier déposé.
+  - `source_publications.license` : licence normalisée de la notice, calculée à la normalisation. La forme brute reste dans `meta`. Crossref : `vor`, sinon `unspecified`. DataCite : identifiant SPDX, sinon URI. OpenAlex : localisation principale seule, quand elle est celle d'un éditeur. scanR : meilleure localisation, quand elle est celle d'un éditeur. HAL : fichier déposé.
   - `publications.license` : licence de la version éditeur, arbitrée entre les sources.
   - `publications.deposit_license` : licence du fichier déposé dans HAL.
 - **Arbitrage** de la licence de la version éditeur : Crossref (`vor`), puis OpenAlex (localisation éditeur), puis scanR, puis DataCite. Pour un jeu de données ou un logiciel, DataCite passe en tête.
@@ -94,7 +94,8 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
 - [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
 - [x] Emplacement du stockage : migration
 - [x] Licence normalisée de chaque notice source, calculée par les normaliseurs
-- [x] Stock OpenAlex, scanR, Crossref et DataCite rejoué depuis le raw store
+- [x] Stock OpenAlex, Crossref et DataCite rejoué depuis le raw store
+- [ ] Stock scanR rejoué depuis le raw store, avec la licence des seules localisations d'éditeur
 - [ ] Stock HAL : moissonnage complet
 - [x] Règle d'arbitrage entre sources, dans la phase `publications`
 - [ ] Licences des publications calculées par la phase `publications`
