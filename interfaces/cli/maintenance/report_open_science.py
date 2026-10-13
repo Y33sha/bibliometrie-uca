@@ -438,18 +438,18 @@ class OpenScienceReport:
                 GROUP BY la.person_id
             )
             SELECT (SELECT COUNT(*) FROM lab_authors) AS authors,
-                   (SELECT COUNT(DISTINCT pi.person_id) FROM person_identifiers pi
-                    JOIN lab_authors la ON la.person_id = pi.person_id
-                    WHERE pi.id_type = 'orcid' AND pi.status <> 'rejected') AS with_orcid,
+                   {_with_identifier("orcid")} AS with_orcid,
+                   {_with_identifier("idhal")} AS with_idhal,
                    (SELECT COUNT(*) FROM hal_accounts) AS hal_accounts,
                    (SELECT COUNT(*) FROM hal_accounts WHERE has_orcid) AS hal_with_orcid
         """)
 
     def orcid_section(self, r: Row) -> str:
         return (
-            "## ORCID\n\n"
+            "## ORCID et idHAL\n\n"
             f"{r.with_orcid} des {r.authors} auteurs du laboratoire en {self.year} ont un ORCID connu de la base.\n\n"
             f"{r.hal_accounts} auteurs ont un compte HAL. Le compte HAL de {r.hal_with_orcid} d'entre eux est lié à un ORCID.\n\n"
+            f"{r.with_idhal} auteurs ont un idHAL, préalable au CV HAL.\n\n"
             "Absent de la base : effectif du laboratoire, CV HAL."
         )
 
@@ -615,6 +615,13 @@ class OpenScienceReport:
             self.sources(),
         ]
         return "\n\n".join(sections) + "\n"
+
+
+def _with_identifier(id_type: str) -> str:
+    """Sous-requête : nombre d'auteurs de `lab_authors` dont un identifiant `id_type` n'est pas rejeté."""
+    return f"""(SELECT COUNT(DISTINCT pi.person_id) FROM person_identifiers pi
+                JOIN lab_authors la ON la.person_id = pi.person_id
+                WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""
 
 
 def preprint_server(prefixes: Sequence[str], openalex_sources: Sequence[str]) -> str | None:
