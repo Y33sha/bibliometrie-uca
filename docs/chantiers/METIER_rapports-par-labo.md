@@ -58,7 +58,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - [ ] Montants d'APC : import de l'extraction 2025, montant dans le rapport
 - [x] Licences des jeux de données
 - [ ] Licences des publications (chantier dédié)
-- [ ] Serveurs de preprints : les plus utilisés
+- [x] Serveurs de preprints : les plus utilisés, d'après le préfixe DOI
 - [ ] Entrepôts de jeux de données absents de la base
 - [ ] Affiliations des coauteurs
 - [ ] Financements
