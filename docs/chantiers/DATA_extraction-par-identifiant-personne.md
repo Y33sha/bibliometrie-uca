@@ -38,6 +38,8 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 - Interrogation des sources par identifiant de personne, après l'interrogation par affiliation.
 - Personnes interrogées : celles de l'export RH, avec un identifiant confirmé ou authentifié.
+- Extraction sans bornage dans le temps.
+- Périmètre : la signature d'une personne RH entre dans le périmètre quand le document paraît entre ses dates de début et de fin de contrat, même sans affiliation au périmètre.
 
 ## Phasage
 
@@ -61,6 +63,5 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ## Questions ouvertes
 
-- Entrée dans le périmètre d'une signature sans affiliation au périmètre, quand l'auteur est une personne RH trouvée par son identifiant.
-- Bornage par les dates de contrat : documents publiés avant l'arrivée ou après le départ de la personne.
-- Suppléments d'articles déposés par les éditeurs (figshare) : jeux de données à part entière ou bruit.
+- Représentation du périmètre d'une signature : booléen `in_perimeter`, ou valeur qui dit pourquoi la signature entre dans le périmètre (affiliation, personne RH dans ses dates). Une notice hors périmètre ne devient pas une publication, donc le périmètre se décide sur `source_authorships`, avant la phase `publications`. La règle lit l'identifiant de la signature (`author_identifying_keys`), sans attendre le rattachement aux personnes.
+- Suppléments d'articles déposés par les éditeurs sur figshare. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.
