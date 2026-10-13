@@ -2,7 +2,12 @@
 
 import pytest
 
-from domain.publications.licenses import License, normalize_license
+from domain.publications.licenses import (
+    License,
+    crossref_license,
+    datacite_license,
+    normalize_license,
+)
 
 
 @pytest.mark.parametrize(
@@ -84,3 +89,60 @@ def test_forme_reconnue(raw, attendue):
 )
 def test_forme_sans_licence(raw):
     assert normalize_license(raw) is None
+
+
+class TestCrossrefLicense:
+    def test_version_editeur_prioritaire(self):
+        entries = [
+            {"content-version": "tdm", "URL": "https://creativecommons.org/licenses/by/4.0/"},
+            {
+                "content-version": "unspecified",
+                "URL": "https://creativecommons.org/licenses/by-nc/4.0/",
+            },
+            {"content-version": "vor", "URL": "https://creativecommons.org/licenses/by-nd/4.0/"},
+        ]
+        assert crossref_license(entries) is License.CC_BY_ND
+
+    def test_unspecified_a_defaut_de_version_editeur_reconnue(self):
+        entries = [
+            {
+                "content-version": "vor",
+                "URL": "https://onlinelibrary.wiley.com/termsAndConditions#vor",
+            },
+            {
+                "content-version": "unspecified",
+                "URL": "https://creativecommons.org/licenses/by/4.0/",
+            },
+        ]
+        assert crossref_license(entries) is License.CC_BY
+
+    def test_fouille_de_texte_et_manuscrit_ignores(self):
+        entries = [
+            {"content-version": "tdm", "URL": "https://creativecommons.org/licenses/by/4.0/"},
+            {"content-version": "am", "URL": "https://creativecommons.org/licenses/by/4.0/"},
+        ]
+        assert crossref_license(entries) is None
+        assert crossref_license(None) is None
+
+
+class TestDataciteLicense:
+    def test_identifiant_spdx_puis_uri(self):
+        rights = [
+            {"rightsUri": "info:eu-repo/semantics/openAccess"},
+            {"rightsIdentifier": "cc-by-4.0", "rightsUri": "https://example.org/x"},
+        ]
+        assert datacite_license(rights) is License.CC_BY
+        assert datacite_license([{"rightsUri": "https://opensource.org/licenses/MIT"}]) is (
+            License.OPEN_SOURCE
+        )
+
+    def test_licence_declaree_non_reconnue(self):
+        rights = [{"rightsUri": "https://www.actris.eu/data-policy.pdf"}]
+        assert datacite_license(rights) is License.OTHER
+
+    def test_droit_d_acces_seul(self):
+        rights = [
+            {"rightsUri": "info:eu-repo/semantics/openAccess"},
+            {"rightsIdentifier": "notspecified"},
+        ]
+        assert datacite_license(rights) is None

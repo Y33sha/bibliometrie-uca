@@ -12,6 +12,7 @@ from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
 from domain.source_publications.external_ids import normalize_external_ids
 from domain.types import JsonValue
@@ -57,6 +58,7 @@ class SourcePublicationUpsert:
 
     # Accès ouvert
     oa_status: str | None = None
+    license: License | None = None
     urls: list[str] | None = None
     embargo_until: date | None = None
 
@@ -89,10 +91,19 @@ _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id")
 # hors JSONB). Un champ JSONB ajouté au contrat est typé sans autre geste.
 _JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
+# Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
+_ENUM_CASTS = {"license": "license_type"}
+
+
+def _value(column: str) -> str:
+    cast = _ENUM_CASTS.get(column)
+    return f"CAST(:{column} AS {cast})" if cast else f":{column}"
+
+
 _UPSERT_SQL = text(
     f"""
     INSERT INTO source_publications ({", ".join(_COLUMNS)})
-    VALUES ({", ".join(f":{c}" for c in _COLUMNS)})
+    VALUES ({", ".join(_value(c) for c in _COLUMNS)})
     ON CONFLICT (source, source_id) DO UPDATE SET
         {", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATED_COLUMNS)},
         raw_metadata = '{{}}'::jsonb,

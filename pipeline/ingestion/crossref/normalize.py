@@ -21,6 +21,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi
+from domain.publications.licenses import crossref_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
 from domain.sources.crossref import (
@@ -405,6 +406,7 @@ def process_work(
             abstract=get_abstract(msg),
             keywords=get_keywords(msg),
             oa_status=None,
+            license=crossref_license(msg.get("license")),
             impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
             meta=meta,
         ),

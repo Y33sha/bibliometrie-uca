@@ -28,6 +28,7 @@ from domain.publications.identifiers import (
     normalize_pmcid,
     normalize_pmid,
 )
+from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.structures.identifiers import parse_ror_ids
@@ -281,6 +282,7 @@ def insert_hal_document(
             keywords=keywords,
             topics=topics,
             oa_status=pub_meta.oa_status,
+            license=normalize_license(hal_text_field(doc.get("licence_s"))),
             urls=urls,
             embargo_until=pub_meta.embargo_until,
             hal_collections=collections_array,
