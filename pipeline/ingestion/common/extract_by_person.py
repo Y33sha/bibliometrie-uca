@@ -68,7 +68,7 @@ class ExtractByPersonPhase:
             {
                 f"extract_by_person.{source}": NodeStep(
                     node(source),
-                    section="Interrogation des sources par personne",
+                    section="Moissonnage par personne",
                     threshold=5,
                     when=retenue(source),
                 )
