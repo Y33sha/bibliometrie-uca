@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7vkfgkEacADGmV0tRLMFZ8r4mJ3FpP2o7qtDRRc40i63UzDf23C7zP2CcqGkrJD
+\restrict vQZmoqd45AlNKqSS1e3ahg9XRcmc9niIPAZFrAzShOdUL6EU1vARYV3CBRWRuD1
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -190,6 +190,28 @@ CREATE TYPE public.journal_type AS ENUM (
     'media',
     'ebook_platform',
     'unknown'
+);
+
+
+--
+-- Name: license_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.license_type AS ENUM (
+    'cc-by',
+    'cc-by-sa',
+    'cc-by-nd',
+    'cc-by-nc',
+    'cc-by-nc-sa',
+    'cc-by-nc-nd',
+    'public-domain',
+    'licence-ouverte',
+    'open-source',
+    'repository-distribution',
+    'publisher-open',
+    'other-oa',
+    'all-rights-reserved',
+    'other'
 );
 
 
@@ -921,6 +943,7 @@ CREATE TABLE sources.source_publications (
     monograph_id integer,
     authors_hash text,
     impact jsonb,
+    license public.license_type,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
@@ -1049,7 +1072,9 @@ CREATE TABLE publications.publications (
     in_perimeter boolean DEFAULT false NOT NULL,
     unpaywall_checked_at timestamp with time zone,
     subjects_ingested_at timestamp with time zone,
-    monograph_id integer
+    monograph_id integer,
+    license public.license_type,
+    deposit_license public.license_type
 );
 
 
@@ -4036,5 +4061,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7vkfgkEacADGmV0tRLMFZ8r4mJ3FpP2o7qtDRRc40i63UzDf23C7zP2CcqGkrJD
+\unrestrict vQZmoqd45AlNKqSS1e3ahg9XRcmc9niIPAZFrAzShOdUL6EU1vARYV3CBRWRuD1
 
