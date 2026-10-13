@@ -1,19 +1,27 @@
 # STATUS: recurring (imports)
 """Importe un fichier de frais de publication dans `apc_payments`.
 
-Deux formats, reconnus aux colonnes du fichier : le jeu de données Open APC (frais d'open access) et le fichier « frais hors OA » de l'enquête nationale (autres frais de publication). Sont importés les seuls paiements dont le DOI désigne une publication de la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
+Trois formats, reconnus aux colonnes du fichier :
+
+- le jeu de données Open APC (frais d'open access) ;
+- le fichier « frais hors OA » de l'enquête nationale (autres frais de publication) ;
+- la réponse d'un établissement à l'enquête APC, export CSV de sa feuille de paiements. Ses montants négatifs annulent un paiement.
+
+Sont importés les seuls paiements dont le DOI désigne une publication de la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
 
 Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms des structures, comme les adresses d'affiliation. Le script liste les libellés sans structure.
 
 Usage :
-    python -m interfaces.cli.imports.import_apc data/apc_de.csv
+    python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv
     python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --dry-run
+    python -m interfaces.cli.imports.import_apc "data/apc/APC_2025_… .csv"
 """
 
 import argparse
 import csv
 import os
-from collections.abc import Callable, Mapping
+from collections import Counter
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -22,6 +30,7 @@ from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text, sanitize_optional_text
 from domain.publications.identifiers import clean_doi
+from domain.structures.identifiers import RorId
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
@@ -42,13 +51,19 @@ class FileFormat(StrEnum):
 
     OPEN_APC = "open_apc"
     NON_OA_FEES = "non_oa_fees"
+    INSTITUTION_SURVEY = "institution_survey"
 
 
 # Colonne propre à chaque format, qui le désigne.
 _FORMAT_MARKERS = {
     "euro": FileFormat.OPEN_APC,
     "Montant payé en EURHT": FileFormat.NON_OA_FEES,
+    "montant_euros_ht": FileFormat.INSTITUTION_SURVEY,
 }
+
+# Titres de section de la réponse d'un établissement à l'enquête APC, dans la colonne du laboratoire.
+_NON_OA_FEES_SECTION = "Pas d'APC"
+_REJECTED_SECTION = "Retour Couperin"
 
 _INSERT = text("""
     INSERT INTO apc_payments (
@@ -66,7 +81,7 @@ _INSERT = text("""
 
 
 def clean(cell: str | None) -> str | None:
-    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle ne porte rien."""
+    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle est vide."""
     return sanitize_optional_text(cell)
 
 
@@ -93,7 +108,9 @@ def detect_format(columns: list[str]) -> FileFormat:
     for marker, file_format in _FORMAT_MARKERS.items():
         if marker in columns:
             return file_format
-    raise ValueError("Format inconnu : ni fichier Open APC, ni fichier des frais hors OA")
+    raise ValueError(
+        "Format inconnu : ni fichier Open APC, ni fichier des frais hors OA, ni réponse d'établissement à l'enquête APC"
+    )
 
 
 def open_apc_payment(row: Mapping[str, str]) -> Payment:
@@ -140,6 +157,69 @@ def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
     }
 
 
+def institution_survey_payment(row: Mapping[str, str], *, open_access_fee: bool) -> Payment:
+    """Paiement d'une ligne de la réponse d'un établissement à l'enquête APC.
+
+    Le payeur est désigné par son ROR (`payer_ror`), nommé à l'import. La remarque réunit le commentaire de l'établissement et la réponse de Couperin.
+    """
+    ror = RorId.try_parse(row.get("ror"))
+    couperin = clean(row.get("Réponse Couperin"))
+    remarks = [clean(row.get("commentaire")), f"Couperin : {couperin}" if couperin else None]
+    return {
+        "doi": clean_doi(row.get("doi")),
+        "amount_eur_ht": parse_amount(row.get("montant_euros_ht")),
+        "billing_year": parse_year(row.get("année_facturation")),
+        "pub_year": None,
+        "publisher_name": None,
+        "journal_name": None,
+        "issn": None,
+        "institution": None,
+        "payer_ror": ror.value if ror else None,
+        "budget": clean(row.get("budget")),
+        "coman_id": None,
+        "lab_name": clean(row.get("laboratoire_sigle")),
+        "remarks": " — ".join(r for r in remarks if r) or None,
+        "open_access_fee": open_access_fee,
+    }
+
+
+def institution_survey_payments(rows: Iterable[Mapping[str, str]]) -> list[Payment]:
+    """Paiements de la réponse d'un établissement à l'enquête APC.
+
+    Les lignes qui suivent le titre « Pas d'APC… » sont des frais hors open access. Celles qui suivent « Retour Couperin » sont écartées par Couperin et ignorées. Une ligne sans laboratoire, comme le total, est ignorée.
+    """
+    payments: list[Payment] = []
+    open_access_fee = True
+    for row in rows:
+        lab = (row.get("laboratoire_sigle") or "").strip()
+        if lab.startswith(_REJECTED_SECTION):
+            break
+        if lab.startswith(_NON_OA_FEES_SECTION):
+            open_access_fee = False
+        elif lab:
+            payments.append(institution_survey_payment(row, open_access_fee=open_access_fee))
+    return cancel_refunds(payments)
+
+
+def cancel_refunds(payments: list[Payment]) -> list[Payment]:
+    """Retire les paiements annulés : chaque montant négatif annule un montant positif de même valeur, même DOI, même laboratoire, même type de frais."""
+    refunds: Counter[tuple[JsonValue, ...]] = Counter()
+    for p in payments:
+        if isinstance(amount := p["amount_eur_ht"], float) and amount < 0:
+            refunds[(p["doi"], p["lab_name"], p["open_access_fee"], -amount)] += 1
+    kept: list[Payment] = []
+    for p in payments:
+        amount = p["amount_eur_ht"]
+        if isinstance(amount, float) and amount < 0:
+            continue
+        key = (p["doi"], p["lab_name"], p["open_access_fee"], amount)
+        if refunds[key]:
+            refunds[key] -= 1
+        else:
+            kept.append(p)
+    return kept
+
+
 _MAPPERS: dict[FileFormat, Callable[[Mapping[str, str]], Payment]] = {
     FileFormat.OPEN_APC: open_apc_payment,
     FileFormat.NON_OA_FEES: non_oa_fee_payment,
@@ -147,12 +227,19 @@ _MAPPERS: dict[FileFormat, Callable[[Mapping[str, str]], Payment]] = {
 
 
 def read_payments(path: Path) -> tuple[FileFormat, list[Payment]]:
-    """Format du fichier et paiements de ses lignes."""
+    """Format du fichier et paiements de ses lignes. L'en-tête est la première ligne qui désigne un format : les lignes qui la précèdent sont ignorées."""
     with path.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        file_format = detect_format(list(reader.fieldnames or []))
-        mapper = _MAPPERS[file_format]
-        return file_format, [mapper(row) for row in reader]
+        lines = [line for line in csv.reader(f) if any(cell.strip() for cell in line)]
+    header_index = next(
+        (i for i, line in enumerate(lines) if any(m in line for m in _FORMAT_MARKERS)), 0
+    )
+    header = lines[header_index] if lines else []
+    file_format = detect_format(header)
+    rows = [dict(zip(header, line, strict=False)) for line in lines[header_index + 1 :]]
+    if file_format is FileFormat.INSTITUTION_SURVEY:
+        return file_format, institution_survey_payments(rows)
+    mapper = _MAPPERS[file_format]
+    return file_format, [mapper(row) for row in rows]
 
 
 LAB_TYPES = frozenset({StructureType.LABO})
@@ -252,6 +339,7 @@ class ImportStats:
 
 def import_payments(conn: Connection, payments: list[Payment], source_file: str) -> ImportStats:
     """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues, éditeurs et structures."""
+    payments = name_payers(conn, payments)
     publication_by_doi = {
         row.doi: row.id
         for row in conn.execute(
@@ -272,6 +360,26 @@ def import_payments(conn: Connection, payments: list[Payment], source_file: str)
     return ImportStats(
         read=len(payments), in_base=len(in_base), inserted=inserted, unresolved=unresolved
     )
+
+
+def name_payers(conn: Connection, payments: list[Payment]) -> list[Payment]:
+    """Nomme le payeur désigné par son ROR, d'après le registre ROR. Un ROR absent du registre sert de nom."""
+    rors = [ror for p in payments if isinstance(ror := p.get("payer_ror"), str)]
+    if not rors:
+        return payments
+    names = {
+        r.ror_id: r.name
+        for r in conn.execute(
+            text("SELECT ror_id, name FROM ror_organizations WHERE ror_id = ANY(:ids)"),
+            {"ids": sorted(set(rors))},
+        )
+    }
+    return [
+        {**p, "institution": names.get(ror, ror)}
+        if isinstance(ror := p.get("payer_ror"), str)
+        else p
+        for p in payments
+    ]
 
 
 def map_publications(conn: Connection) -> int:
@@ -320,7 +428,7 @@ def map_publishers(conn: Connection) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import d'un fichier de frais de publication")
-    parser.add_argument("csv_file", type=Path, help="Fichier CSV Open APC ou des frais hors OA")
+    parser.add_argument("csv_file", type=Path, help="Fichier CSV d'un des trois formats")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans écrire")
     args = parser.parse_args()
 

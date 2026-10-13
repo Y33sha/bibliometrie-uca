@@ -81,6 +81,8 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [x] Import des frais hors OA : même mécanisme, sur le fichier de l'enquête.
 - [x] DOI normalisé par `clean_doi`, journalisation par `infrastructure/observability/log.py`.
 - [x] Tests : `tests/unit/interfaces/cli/imports/`, `tests/integration/cli/`.
+- [x] Réponse d'un établissement à l'enquête APC : troisième format. Un montant négatif annule un paiement de même valeur, même DOI, même laboratoire. Le payeur est désigné par son ROR.
+- [ ] Import de la réponse de l'Université à l'enquête APC 2025.
 - [ ] Reprise : réimport d'Open APC et des frais hors OA ; suppression des lignes du fichier APC de l'enquête.
 
 ### 4. Structures
@@ -103,3 +105,5 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - **Laboratoire d'un frais d'open access**, reporté. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `authorships`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
 
 - **Clé d'unicité des lignes hors OA sans DOI** (étape de l'établissement). Une ligne sans DOI n'a ni DOI ni titre : 11 paiements identiques de 940 € du CNRS en 2017 restent indiscernables. Le nom du fichier change d'une mise à jour à l'autre et ne peut pas entrer dans la clé. Proposition : contenu de la ligne et rang parmi les lignes identiques du fichier.
+
+- **Priorité entre la réponse d'un établissement et Open APC**, reportée. Open APC reprend les réponses à l'enquête, sous une forme variable : il additionne parfois les lignes d'un même article, garde parfois la première seule, ou les garde toutes. La clé d'unicité, qui contient le montant, laisse alors passer un doublon. Proposition : à l'import Open APC, un couple (DOI, établissement) déjà présent depuis la réponse de l'établissement est ignoré. La réponse de l'établissement est plus détaillée : laboratoire, facture ligne à ligne.
