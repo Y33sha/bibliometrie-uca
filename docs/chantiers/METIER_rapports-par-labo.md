@@ -48,15 +48,16 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 
 - [x] Maquette peuplée pour un laboratoire, année 2025
 - [x] Choix du format de livraison
-- [ ] Production du rapport pour un laboratoire quelconque
+- [x] Production du rapport pour un laboratoire quelconque : `interfaces/cli/maintenance/report_open_science.py`
 
 ### Phase 2 — Enrichissements
 
-- [ ] Lien ORCID–idHAL : auteurs du laboratoire dont le compte HAL est lié à un ORCID
-- [ ] Revues diamant : identification et part des articles du laboratoire
-- [ ] Thèses : ouverture sur plusieurs années de soutenance
+- [x] Lien ORCID–idHAL : auteurs du laboratoire dont le compte HAL est lié à un ORCID
+- [x] Revues diamant : identification et part des articles du laboratoire
+- [x] Thèses : ouverture sur plusieurs années de soutenance
 - [ ] Montants d'APC : import de l'extraction 2025, montant dans le rapport
-- [ ] Licences : licence des jeux de données, puis des publications (chantier dédié)
+- [x] Licences des jeux de données
+- [ ] Licences des publications (chantier dédié)
 - [ ] Serveurs de preprints : les plus utilisés
 - [ ] Entrepôts de jeux de données absents de la base
 - [ ] Affiliations des coauteurs
