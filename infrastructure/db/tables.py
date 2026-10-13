@@ -40,6 +40,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
 from domain.publications.doc_types import DOC_TYPES
+from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
@@ -516,6 +517,8 @@ source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
 # Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
 oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
+license_type_enum = PgEnum(*License, name="license_type", create_type=False)
+
 resolution_mode_enum = PgEnum(
     *ResolutionMode,
     name="resolution_mode",
@@ -876,6 +879,9 @@ publications = Table(
     Column("pub_year", SmallInteger, nullable=False),
     Column("doi", Text),
     Column("oa_status", oa_type_enum, server_default="unknown"),
+    # Licence de la version éditeur, et licence du fichier déposé dans HAL.
+    Column("license", license_type_enum),
+    Column("deposit_license", license_type_enum),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("container_title", Text),
@@ -962,6 +968,8 @@ source_publications = Table(
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("oa_status", Text),
+    # Licence normalisée de la notice ; la forme brute reste dans `meta`.
+    Column("license", license_type_enum),
     Column("embargo_until", Date),
     Column("language", Text),
     Column("container_title", Text),
