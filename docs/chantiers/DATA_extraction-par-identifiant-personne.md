@@ -11,6 +11,7 @@ Mesures du 2026-10-13 sur DataCite.
 - **Affiliation par ROR.** 884 DOI ont un créateur affilié à l'université par son ROR. 880 sont dans la base. La moisson par nom d'affiliation couvre donc les dépôts affiliés.
 - **ORCID.** Les 1 772 ORCID confirmés ou authentifiés des auteurs du périmètre actifs depuis 2021 désignent environ 59 400 DOI publiés de 2021 à 2026, doublons compris.
 - **Crossref.** Les 1 091 ORCID des personnes RH désignent 9 697 œuvres parues de 2017 à 2026.
+- **OpenAlex.** Les mêmes ORCID désignent 71 131 works parus de 2017 à 2026.
 - **Grandes collaborations.** Une notice compte jusqu'à un millier d'auteurs : environ 200 Kio dans DataCite, 500 Kio dans Crossref. Une page trop grande dépasse le délai de DataCite (502) ou la taille de réponse de Crossref (100 Mio).
 
 ### Personnes interrogées
@@ -32,7 +33,7 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 | Source | Champ |
 | --- | --- |
 | DataCite | `creators.nameIdentifiers.nameIdentifier` (ORCID) |
-| OpenAlex | filtre `author.orcid` |
+| OpenAlex | filtre `authorships.author.orcid` |
 | Crossref | filtre `orcid` |
 | HAL | `authIdHal_s` (idHAL) |
 
@@ -67,7 +68,8 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 - [x] Nœud DataCite, par lots de 10 ORCID, pages de 25 notices
 - [x] Socle commun des nœuds : lots, pagination, document écrit une fois par run
 - [x] Nœud Crossref, par lots de 10 ORCID, pages de 50 œuvres
-- [ ] Nœuds OpenAlex, HAL, ScanR
+- [x] Nœud OpenAlex, par lots de 50 ORCID, pages de 200 works
+- [ ] Nœuds HAL, ScanR
 
 ### Phase 4 — Fin de chantier
 
