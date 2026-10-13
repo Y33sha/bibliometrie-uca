@@ -27,8 +27,8 @@ def _affiliation_param(route):
 def test_extraction(http_mock):
     route = http_mock.get(_DOIS).mock(return_value=httpx2.Response(200, json=_EMPTY))
     client = DataciteClient(API_BASE_URLS["datacite"])
-    client.count(2024, ["Clermont"])
-    client.fetch_page(2024, ["Clermont"], None)
+    client.count("publicationYear:2024", "2024")
+    client.fetch_page("publicationYear:2024", None, "2024")
     assert _affiliation_param(route) == ["true", "true"]
 
 

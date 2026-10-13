@@ -15,6 +15,7 @@ from typing import ClassVar
 
 from sqlalchemy import Connection
 
+from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
@@ -70,6 +71,7 @@ def stage_document(
     doi: str | None,
     raw_data: Mapping[str, JsonValue],
     authors_truncated: bool = False,
+    entry_mode: StagingEntryMode = StagingEntryMode.BULK,
 ) -> None:
     """Écrit un document dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé."""
     inserted, changed = upsert_staging(
@@ -79,6 +81,7 @@ def stage_document(
         doi=doi,
         raw_data=raw_data,
         authors_truncated=authors_truncated,
+        entry_mode=entry_mode,
     )
     match UpsertOutcome.of(inserted=inserted, changed=changed):
         case UpsertOutcome.NEW:

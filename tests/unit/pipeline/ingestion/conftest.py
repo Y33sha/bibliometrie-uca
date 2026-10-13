@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common import harvest
 from pipeline.ingestion.common.staging import UpsertOutcome
 
@@ -26,6 +27,7 @@ class Ecriture:
     source_id: str
     doi: str | None
     authors_truncated: bool
+    entry_mode: StagingEntryMode = StagingEntryMode.BULK
 
 
 @pytest.fixture
@@ -60,8 +62,17 @@ def ecritures(monkeypatch) -> list[Ecriture]:
     """
     ecrits: list[Ecriture] = []
 
-    def _upsert(conn, *, source, source_id, doi, raw_data, authors_truncated=False):
-        ecrits.append(Ecriture(source, source_id, doi, authors_truncated))
+    def _upsert(
+        conn,
+        *,
+        source,
+        source_id,
+        doi,
+        raw_data,
+        authors_truncated=False,
+        entry_mode=StagingEntryMode.BULK,
+    ):
+        ecrits.append(Ecriture(source, source_id, doi, authors_truncated, entry_mode))
         return _SIGNAUX[raw_data.get("_route", UpsertOutcome.NEW)]
 
     monkeypatch.setattr(harvest, "upsert_staging", _upsert)

@@ -72,31 +72,28 @@ class DataciteClient:
             )
         )
 
-    def count(self, year: int, keywords: list[str]) -> int:
-        """Nombre de DOI d'une année, lu sur une page vide (`page[size]=0`)."""
+    def count(self, query: str, label: str) -> int:
+        """Nombre de DOI que désigne `query`, lu sur une page vide (`page[size]=0`). `label` nomme la requête dans le journal."""
         data = self._get(
             self._url,
-            {"query": build_query(year, keywords), "page[size]": 0, **RECORD_PARAMS},
-            label=f"({year}, comptage)",
+            {"query": query, "page[size]": 0, **RECORD_PARAMS},
+            label=f"({label}, comptage)",
         )
         total = as_mapping(data.get("meta")).get("total")
         return total if isinstance(total, int) else 0
 
-    def fetch_page(self, year: int, keywords: list[str], next_url: str | None) -> DatacitePage:
-        """Une page de résultats : la première quand `next_url` est `None`, sinon celle que désigne `next_url`."""
+    def fetch_page(
+        self, query: str, next_url: str | None, label: str, *, page_size: int = _PAGE_SIZE
+    ) -> DatacitePage:
+        """Une page des DOI que désigne `query` : la première quand `next_url` est `None`, sinon celle que désigne `next_url`."""
         if next_url is None:
             data = self._get(
                 self._url,
-                {
-                    "query": build_query(year, keywords),
-                    "page[size]": _PAGE_SIZE,
-                    "page[cursor]": 1,
-                    **RECORD_PARAMS,
-                },
-                label=f"({year}, première page)",
+                {"query": query, "page[size]": page_size, "page[cursor]": 1, **RECORD_PARAMS},
+                label=f"({label}, première page)",
             )
         else:
-            data = self._get(next_url, None, label=f"({year}, page suivante)")
+            data = self._get(next_url, None, label=f"({label}, page suivante)")
         records = [as_mapping(r) for r in as_sequence(data.get("data"))]
         following = as_str(as_mapping(data.get("links")).get("next"))
         # Une page vide clôt la pagination, même si l'API annonce encore une suite.
@@ -115,8 +112,9 @@ def extract_year(
 ) -> None:
     """Moissonne les DOI d'une année, page après page, et les compte dans `metrics`. Un nœud sans DOI est ignoré."""
     next_url: str | None = None
+    query = build_query(year, keywords)
     while True:
-        page = client.fetch_page(year, keywords, next_url)
+        page = client.fetch_page(query, next_url, str(year))
         for record in page.records:
             if doi := record_doi(record):
                 stage_document(
@@ -152,7 +150,7 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteClient]):
 
         def compte(annee: int) -> int:
             try:
-                return client.count(annee, keywords)
+                return client.count(build_query(annee, keywords), str(annee))
             except SourceUnavailableError:
                 raise
             except Exception:

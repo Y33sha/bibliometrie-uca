@@ -102,6 +102,11 @@ def normalize_orcid(raw: str | None) -> str | None:
     return s
 
 
+def orcid_uri(orcid: str) -> str:
+    """Forme URI d'un ORCID normalisé : `https://orcid.org/XXXX-XXXX-XXXX-XXXX`."""
+    return f"{_ORCID_URL_PREFIXES[0]}{orcid}"
+
+
 @dataclass(frozen=True)
 class ORCID:
     """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
