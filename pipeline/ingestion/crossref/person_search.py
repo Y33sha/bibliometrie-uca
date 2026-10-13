@@ -68,5 +68,6 @@ class CrossrefPersonExtractor(PersonSearchExtractor[CrossrefClient]):
     ) -> PersonSearchPage:
         return self._client.fetch_page(build_orcid_filter(identifiers, *years), next_token, label)
 
-    def record_doi(self, record: Mapping[str, JsonValue]) -> str | None:
-        return clean_doi(as_str(record.get("DOI")))
+    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+        doi = clean_doi(as_str(record.get("DOI")))
+        return (doi, doi) if doi else None
