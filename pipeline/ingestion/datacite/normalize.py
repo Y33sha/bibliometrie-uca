@@ -174,30 +174,33 @@ def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
     return None
 
 
-def _creator_affiliation_strings(creator: Mapping[str, JsonValue]) -> list[str]:
-    """Affiliations textuelles. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}`."""
-    out: list[str] = []
+def _creator_affiliations(
+    creator: Mapping[str, JsonValue],
+) -> tuple[list[AddressRecord], frozenset[RorId]]:
+    """Adresses des affiliations à texte, chacune avec son ROR (`affiliationIdentifier` de schéma `ROR`), et ROR des affiliations sans texte. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}`."""
+    addresses: list[AddressRecord] = []
+    without_text: set[RorId] = set()
     for aff in as_sequence(creator.get("affiliation")):
         if (texte := as_str(aff)) and texte.strip():
-            out.append(texte.strip())
-        elif (name := as_str(as_mapping(aff).get("name"))) and name.strip():
-            out.append(name.strip())
-    return out
-
-
-def _creator_ror_ids(creator: Mapping[str, JsonValue]) -> frozenset[RorId]:
-    """ROR des affiliations : `affiliationIdentifier` de schéma `ROR`."""
-    return parse_ror_ids(
-        as_str(aff.get("affiliationIdentifier"))
-        for aff in (as_mapping(a) for a in as_sequence(creator.get("affiliation")))
-        if aff.get("affiliationIdentifierScheme") == "ROR"
-    )
+            addresses.append(AddressRecord(text=texte.strip()))
+            continue
+        obj = as_mapping(aff)
+        rors = parse_ror_ids(
+            [as_str(obj.get("affiliationIdentifier"))]
+            if obj.get("affiliationIdentifierScheme") == "ROR"
+            else []
+        )
+        if (name := as_str(obj.get("name"))) and name.strip():
+            addresses.append(AddressRecord(text=name.strip(), ror_ids=rors))
+        else:
+            without_text |= rors
+    return addresses, frozenset(without_text)
 
 
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR des affiliations → `ror_ids`, `roles=['author']` explicite.
+    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -218,16 +221,15 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
         if name is None:
             continue
         ids = ids_by_position[position]
+        addresses, signature_rors = _creator_affiliations(creator)
         records.append(
             AuthorRecord(
                 position=position,
                 name=name,
                 roles=["author"],
                 person_identifiers=ids if ids else None,
-                addresses=[
-                    AddressRecord(text=aff) for aff in _creator_affiliation_strings(creator)
-                ],
-                ror_ids=_creator_ror_ids(creator),
+                addresses=addresses,
+                ror_ids=signature_rors,
             )
         )
     return records

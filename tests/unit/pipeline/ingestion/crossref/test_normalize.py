@@ -4,7 +4,7 @@ Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`,
 `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`,
 `get_external_ids`, `get_biblio`, `_author_name`,
-`_author_affiliation_strings`.
+`_author_affiliations`.
 
 Les délégations vers `domain.sources.crossref` (`extract_crossref_meta`,
 `extract_crossref_pub_year`, `parse_crossref_issns`, `strip_jats_tags`)
@@ -23,7 +23,7 @@ from domain.persons.signature_name import SignatureName
 from pipeline.ingestion.crossref import normalize as normalize_crossref
 from pipeline.ingestion.crossref.normalize import (
     CrossrefNormalizer,
-    _author_affiliation_strings,
+    _author_affiliations,
     _author_name,
     build_crossref_author_records,
     get_abstract,
@@ -349,34 +349,22 @@ class TestAuthorName:
         assert _author_name({"given": "  ", "family": "  "}) is None
 
 
-class TestAuthorAffiliationStrings:
+def _texts(author: dict) -> list[str]:
+    return [a.text for a in _author_affiliations(author)[0]]
+
+
+class TestAuthorAffiliations:
     def test_extracts_names(self):
-        assert _author_affiliation_strings(
-            {"affiliation": [{"name": "UCA"}, {"name": "CNRS"}]}
-        ) == ["UCA", "CNRS"]
+        assert _texts({"affiliation": [{"name": "UCA"}, {"name": "CNRS"}]}) == ["UCA", "CNRS"]
 
     def test_strips_names(self):
-        assert _author_affiliation_strings({"affiliation": [{"name": "  UCA  "}]}) == ["UCA"]
-
-    def test_skips_non_dict_entries(self):
-        # Si une entrée n'est pas un dict, on l'ignore silencieusement.
-        assert _author_affiliation_strings(
-            {"affiliation": [{"name": "UCA"}, "not-a-dict", {"name": "CNRS"}]}
-        ) == ["UCA", "CNRS"]
+        assert _texts({"affiliation": [{"name": "  UCA  "}]}) == ["UCA"]
 
     def test_skips_entries_without_name(self):
-        assert _author_affiliation_strings(
-            {"affiliation": [{"name": "UCA"}, {"id": "x"}, {"name": ""}]}
-        ) == ["UCA"]
+        assert _texts({"affiliation": [{"name": "UCA"}, {"id": "x"}, {"name": ""}]}) == ["UCA"]
 
     def test_empty_when_absent(self):
-        assert _author_affiliation_strings({}) == []
-
-    def test_empty_when_not_list(self):
-        # `author.get("affiliation") or []` rend une liste vide si None
-        # ou absent ; un truc autre que list passe quand même par la boucle
-        # (qui ne yield rien si pas itérable comme dict).
-        assert _author_affiliation_strings({"affiliation": None}) == []
+        assert _texts({}) == []
 
 
 # ── build_crossref_author_records (parsing pur) ──────────────────

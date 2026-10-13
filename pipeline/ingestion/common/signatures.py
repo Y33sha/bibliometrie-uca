@@ -44,11 +44,13 @@ class AddressRecord:
     `text` : texte de l'affiliation, assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas.
     `countries` : codes pays d'autorité (ScanR, détectés dans le texte).
     `suggested_countries` : suggestion à valider (OpenAlex, `country_code` de structure désambiguïsée — faillible). Tous deux propagés sur la row `addresses` partagée, jamais écrasés.
+    `ror_ids` : ROR que la source attribue à cette affiliation.
     """
 
     text: str
     countries: list[str] | None = None
     suggested_countries: list[str] | None = None
+    ror_ids: frozenset[RorId] = frozenset()
 
     def __post_init__(self) -> None:
         self.text = sanitize_raw_text(self.text)
@@ -58,7 +60,7 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature.
+    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont portés par son `AddressRecord`.
     """
 
     position: int | None
@@ -142,7 +144,13 @@ def write_source_authorships(
                         roles=rec.roles,
                         neutralized_identifiers=neutralized,
                         addresses=[
-                            (a.text, a.countries, a.suggested_countries) for a in rec.addresses
+                            (
+                                a.text,
+                                a.countries,
+                                a.suggested_countries,
+                                [r.value for r in a.ror_ids],
+                            )
+                            for a in rec.addresses
                         ],
                         ror_ids=[r.value for r in rec.ror_ids],
                     )
@@ -179,19 +187,25 @@ def write_source_authorships(
             known_ids={s.id for s in stored},
             inserted={key: items[key] for key in plan.inserts},
         )
-    write_addresses(
+    addr_id_by_text = write_addresses(
         conn,
         queries,
         [(sa_id_by_key[key], records[key].addresses) for key in sorted(sa_id_by_key)],
     )
-    queries.insert_source_authorship_rors_batch(
-        conn,
-        [
-            AuthorshipRorItem(sa_id=sa_id, ror_id=ror_id.value)
-            for key, sa_id in sorted(sa_id_by_key.items())
-            for ror_id in sorted(records[key].ror_ids, key=str)
-        ],
-    )
+    ror_items: dict[tuple[int, str, int | None], AuthorshipRorItem] = {}
+    for key, sa_id in sorted(sa_id_by_key.items()):
+        # Un ROR que porte une adresse de la signature n'est pas répété sur la signature seule.
+        on_addresses = frozenset().union(*(a.ror_ids for a in records[key].addresses))
+        rors_by_address: list[tuple[frozenset[RorId], int | None]] = [
+            (records[key].ror_ids - on_addresses, None),
+            *((a.ror_ids, addr_id_by_text.get(a.text)) for a in records[key].addresses),
+        ]
+        for ror_ids, addr_id in rors_by_address:
+            for ror_id in sorted(ror_ids, key=str):
+                ror_items[(sa_id, ror_id.value, addr_id)] = AuthorshipRorItem(
+                    sa_id=sa_id, ror_id=ror_id.value, addr_id=addr_id
+                )
+    queries.insert_source_authorship_rors_batch(conn, list(ror_items.values()))
 
 
 def _inserted_ids(
@@ -245,8 +259,8 @@ def write_addresses(
     conn: Connection,
     queries: AuthorshipsBatchQueries,
     sa_addresses: list[tuple[int | None, list[AddressRecord]]],
-) -> None:
-    """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`.
+) -> dict[str, int]:
+    """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`, et rend l'identifiant de chaque adresse par son texte.
 
     `sa_addresses` : les couples `(sa_id, adresses)` du document. Les textes uniques sont upsertés puis leurs ids récupérés en une passe, les pays propagés sur la ligne `addresses`, et les liens insérés en une requête. Un `sa_id` None est ignoré.
     """
@@ -260,7 +274,7 @@ def write_addresses(
             addr_suggested[addr.text] = addr.suggested_countries
 
     if not addr_countries:
-        return
+        return {}
 
     addr_texts = list(addr_countries)
     queries.upsert_addresses_batch(
@@ -290,3 +304,4 @@ def write_addresses(
             seen.add(addr_id)
             link_values.append({"sa_id": sa_id, "addr_id": addr_id})
     queries.insert_source_authorship_addresses_batch(conn, link_values)
+    return addr_id_by_text

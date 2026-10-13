@@ -6,7 +6,7 @@ Chaque moyen s'exécute sur toutes les adresses, indépendamment des autres moye
 - `country_name` : nom de pays en fin d'adresse (détecteur de `detect_by_country_name`) ;
 - `institution`, `city` : nom de lieu de cette nature, cherché dans tout le texte (`PlaceNameDetector`) ;
 - `similarity` : pays le plus fréquent parmi les adresses à pays qui contiennent celle-ci, ses jumelles (même `normalized_text`) exclues ;
-- `ror` : pays des organisations ROR de chaque signature, pour chaque adresse de la signature ;
+- `ror` : pays des organisations ROR rattachées à l'adresse ;
 - `source_scanr`, `source_openalex` : pays que la source rattache à l'auteur, lus dans les payloads du raw store, pour chaque adresse de l'auteur. Seuls les documents présents dans `staging` comptent.
 
 Le script lit la base et le raw store, et n'écrit ni dans l'une ni dans l'autre. Il écrit un fichier CSV compressé, une ligne par candidat : `address_id,country_code,method`. Le journal donne, par moyen, le nombre de candidats et d'adresses couvertes.
@@ -130,10 +130,10 @@ def similarity_candidates(addresses: list[Address]) -> Iterator[Candidate]:
 def ror_candidates(conn: Connection) -> Iterator[Candidate]:
     rows = conn.execute(
         text("""
-            SELECT DISTINCT saa.address_id, ro.country_code
-            FROM source_authorship_addresses saa
-            JOIN source_authorship_rors sar USING (source_authorship_id)
+            SELECT DISTINCT sar.address_id, ro.country_code
+            FROM source_authorship_rors sar
             JOIN ror_organizations ro USING (ror_id)
+            WHERE sar.address_id IS NOT NULL
         """)
     )
     for r in rows:

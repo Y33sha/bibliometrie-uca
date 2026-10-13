@@ -202,6 +202,38 @@ def test_ror_ecrits_a_l_insertion_et_reecrits_si_modifies(sa_sync_conn):
     assert _rors(conn, sa_id) == ["03vgfxd91"]
 
 
+def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
+    """Un ROR d'affiliation pointe sur son adresse ; un ROR sans texte d'affiliation sur la seule signature."""
+    conn = sa_sync_conn
+    sp = _notice(conn)
+    univ, labo = RorId("01a8ajp46"), RorId("03vgfxd91")
+    _write(
+        conn,
+        sp,
+        [
+            _rec(
+                0,
+                "Dupont, Jean",
+                addresses=[AddressRecord("Labo A", ror_ids=frozenset({labo}))],
+                ror_ids=frozenset({univ}),
+            )
+        ],
+    )
+    sa_id = _signatures(conn, sp)[0][0]
+
+    rows = conn.execute(
+        text("""
+            SELECT r.ror_id, a.raw_text
+            FROM source_authorship_rors r
+            LEFT JOIN addresses a ON a.id = r.address_id
+            WHERE r.source_authorship_id = :i
+            ORDER BY r.ror_id
+        """),
+        {"i": sa_id},
+    ).all()
+    assert [tuple(r) for r in rows] == [("01a8ajp46", None), ("03vgfxd91", "Labo A")]
+
+
 def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
     """Une signature inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
     conn = sa_sync_conn

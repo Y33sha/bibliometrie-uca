@@ -2,7 +2,7 @@
 
 import logging
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from sqlalchemy import Connection
 
@@ -29,7 +29,7 @@ from domain.sources.openalex import (
     short_openalex_id,
     should_skip_publisher_journal,
 )
-from domain.structures.identifiers import parse_ror_ids
+from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import (
     JsonValue,
     as_bool,
@@ -401,6 +401,24 @@ def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
 # =============================================================
 
 
+def _countries(institutions: Iterable[Mapping[str, JsonValue]]) -> list[str] | None:
+    """Codes pays des institutions, triés, ou `None` sans pays."""
+    return (
+        sorted(
+            {
+                pays
+                for i in institutions
+                if (pays := normalize_country_code(as_str(i.get("country_code"))))
+            }
+        )
+        or None
+    )
+
+
+def _rors(institutions: Iterable[Mapping[str, JsonValue]]) -> frozenset[RorId]:
+    return parse_ror_ids(as_str(i.get("ror")) for i in institutions)
+
+
 def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
 
@@ -408,7 +426,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
     - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte (institutions désambiguïsées par OpenAlex, algorithmiques et faillibles), en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
-    - ROR des institutions → `ror_ids` ;
+    - ROR des institutions : sur l'adresse dont le texte les désigne, sur la signature pour les autres ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
@@ -421,27 +439,26 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
             # Sans nom, l'authorship est inexploitable pour le matching personnes.
             continue
 
-        institutions = [as_mapping(i) for i in as_sequence(authorship.get("institutions"))]
-        country_by_institution = {
-            institution_id: pays
-            for i in institutions
+        institutions = {
+            institution_id: i
+            for i in (as_mapping(e) for e in as_sequence(authorship.get("institutions")))
             if (institution_id := as_str(i.get("id")))
-            and (pays := normalize_country_code(as_str(i.get("country_code"))))
         }
-        countries_by_text: dict[str, set[str]] = defaultdict(set)
+        institutions_by_text: dict[str, set[str]] = defaultdict(set)
         for affiliation in as_sequence(authorship.get("affiliations")):
             affiliation = as_mapping(affiliation)
             if texte := as_str(affiliation.get("raw_affiliation_string")):
-                countries_by_text[texte].update(
-                    pays
-                    for institution_id in as_sequence(affiliation.get("institution_ids"))
-                    if (pays := country_by_institution.get(as_str(institution_id) or ""))
+                institutions_by_text[texte].update(
+                    institution_id
+                    for e in as_sequence(affiliation.get("institution_ids"))
+                    if (institution_id := as_str(e)) in institutions
                 )
         raw_strings = [
             texte
             for e in as_sequence(authorship.get("raw_affiliation_strings"))
             if (texte := as_str(e))
         ]
+        with_text = {i for texte in raw_strings for i in institutions_by_text.get(texte, ())}
 
         ids = ids_by_position[position]
         records.append(
@@ -454,11 +471,14 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 addresses=[
                     AddressRecord(
                         text=texte,
-                        suggested_countries=sorted(countries_by_text.get(texte, ())) or None,
+                        suggested_countries=_countries(
+                            institutions[i] for i in institutions_by_text.get(texte, ())
+                        ),
+                        ror_ids=_rors(institutions[i] for i in institutions_by_text.get(texte, ())),
                     )
                     for texte in raw_strings
                 ],
-                ror_ids=parse_ror_ids(as_str(i.get("ror")) for i in institutions),
+                ror_ids=_rors(institutions[i] for i in institutions.keys() - with_text),
             )
         )
     return records
