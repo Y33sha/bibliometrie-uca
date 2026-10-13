@@ -23,7 +23,7 @@ async def fetch_datacite_prefix(
 ) -> LookupOutcome[tuple[str, str, str]]:
     """Interroge `api.datacite.org/prefixes/<prefix>` pour récupérer provider + client.
 
-    Renvoie `(provider_name, client_name, client_symbol)`. `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite, ou une réponse sans provider ni client.
+    Renvoie `(provider_name, client_name, client_symbol)`. `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite (404 ou 400), ou une réponse sans provider ni client.
     """
     parsed = DoiPrefix.try_parse(prefix)
     cleaned = str(parsed) if parsed else None
@@ -37,6 +37,8 @@ async def fetch_datacite_prefix(
         headers={"User-Agent": user_agent, "Accept": "application/vnd.api+json"},
         timeout=15,
         max_retries=3,
+        # DataCite répond 400 à chaque appel pour certains préfixes qu'il ne gère pas (10.1713).
+        not_found_statuses=frozenset({400, 404}),
         label=f"datacite prefix {cleaned}",
     )
     if isinstance(outcome, NotFound | Unavailable):
