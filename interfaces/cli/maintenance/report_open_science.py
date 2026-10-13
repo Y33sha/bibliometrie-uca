@@ -4,7 +4,7 @@
 Une publication appartient au laboratoire quand au moins un de ses auteurs du périmètre signe avec lui. Les évolutions portent sur les cinq années qui finissent à l'année du bilan, les thèses sur dix années.
 
 Usage :
-    python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/so-m2ish-2025.md]
+    python -m interfaces.cli.maintenance.report_open_science --structure m2ish --year 2025 [--output data/reports/science-ouverte/m2ish-2025.md]
 """
 
 import argparse
@@ -18,6 +18,7 @@ from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
 from domain.publications.metadata import OaStatus
+from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.structures import AUTHOR_SIGNATURE, AUTHORED_PUBLICATION
 
@@ -58,16 +59,6 @@ DOC_TYPE_LABELS = {
     DocType.MEDIA: "Média",
     DocType.ERRATUM: "Erratum",
     DocType.OTHER: "Autre",
-}
-
-SOURCE_LABELS = {
-    "hal": "HAL",
-    "openalex": "OpenAlex",
-    "wos": "Web of Science",
-    "scanr": "scanR",
-    "theses": "theses.fr",
-    "crossref": "Crossref",
-    "datacite": "DataCite",
 }
 
 MODEL_LABELS = {"full_oa": "Open access", "subscription": "Abonnement"}
@@ -378,8 +369,9 @@ class OpenScienceReport:
         binds = {"domestic": sorted(NON_INTERNATIONAL_COUNTRY_CODES)}
         countries = self._rows(
             f"""
-            SELECT c AS country, COUNT(*) AS n
+            SELECT COALESCE(rc.name, upper(c)) AS country, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p, unnest(p.countries) AS c
+            LEFT JOIN ref.countries rc ON rc.code = c
             WHERE p.pub_year = :year AND c <> ALL(:domestic)
             GROUP BY 1 ORDER BY 2 DESC, 1
             """,
@@ -403,7 +395,7 @@ class OpenScienceReport:
             open=_values(OPEN_STATUSES),
             **binds,
         )
-        top = ", ".join(f"{c.country.upper()} ({c.n})" for c in countries[:TOP_COUNTRIES])
+        top = ", ".join(f"{c.country} ({c.n})" for c in countries[:TOP_COUNTRIES])
         return (
             "## Collaborations internationales\n\n"
             f"{r.international} publications sur {r.total} ont au moins un coauteur affilié hors de France, avec {len(countries)} pays au total. "
@@ -497,7 +489,7 @@ class OpenScienceReport:
         """)
         return "## Sources\n\n" + _table(
             ["Source", f"Publications {self.year}"],
-            [(SOURCE_LABELS.get(r.source, r.source), r.n) for r in rows],
+            [(source_label(r.source), r.n) for r in rows],
         )
 
     def synthesis(self, oa: Row | None, orcid: Row) -> str:
