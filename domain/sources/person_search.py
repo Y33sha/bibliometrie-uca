@@ -1,4 +1,4 @@
-"""Interrogation des sources par l'identifiant d'une personne : identifiants acceptés par source, personnes interrogées."""
+"""Moissonnage des sources par l'identifiant d'une personne : identifiants acceptés par source, statuts des identifiants interrogés."""
 
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.sources.registry import Source
