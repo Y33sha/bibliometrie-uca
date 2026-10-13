@@ -14,6 +14,7 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection
 
+from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
@@ -111,7 +112,7 @@ class WosDoiSearch:
             source_id=extract_ut(record),
             doi=doi,
             raw_data=record,
-            entry_mode="fetch_missing_doi",
+            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
         )
         forget_failed_doi_lookups(conn, "wos", [doi])
         return inserted

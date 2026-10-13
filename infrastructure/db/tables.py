@@ -44,6 +44,7 @@ from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
+from domain.sources.staging import StagingEntryMode
 from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
 from infrastructure.db.jsonb import Jsonb
@@ -1125,12 +1126,13 @@ staging = Table(
     # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
     # Posé à l'extraction, consommé puis effacé par `fetch_truncated`.
     Column("authors_truncated", Boolean, nullable=False, server_default="false"),
-    # Provenance d'entrée : 'bulk' (extraction), 'fetch_missing_doi' / 'fetch_missing_hal', ou 'manual_export' (import d'un export de l'interface de la source).
-    Column("entry_mode", Text, nullable=False, server_default="bulk"),
+    # Provenance d'entrée : vocabulaire `StagingEntryMode`.
+    Column("entry_mode", Text, nullable=False, server_default=StagingEntryMode.BULK.value),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
-        "entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, "
-        "'fetch_missing_hal'::text, 'manual_export'::text])",
+        "entry_mode = ANY (ARRAY["
+        + ", ".join(f"'{mode.value}'::text" for mode in StagingEntryMode)
+        + "])",
         name="staging_entry_mode_check",
     ),
     comment=(

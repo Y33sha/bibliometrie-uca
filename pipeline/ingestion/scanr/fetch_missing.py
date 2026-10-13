@@ -13,6 +13,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
+from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
@@ -85,7 +86,7 @@ class ScanrDoiSearch:
             source_id=scanr_id,
             doi=dois[0] if dois else None,
             raw_data=record,
-            entry_mode="fetch_missing_doi",
+            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
         )
         # ScanR rend un même document pour chacun de ses DOI : aucun n'est introuvable.
         forget_failed_doi_lookups(conn, "scanr", dois)

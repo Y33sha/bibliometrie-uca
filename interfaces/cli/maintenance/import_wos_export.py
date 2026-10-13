@@ -22,6 +22,7 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
+from domain.sources.staging import StagingEntryMode
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.staging import upsert_staging
@@ -29,7 +30,6 @@ from pipeline.ingestion.wos.fields import extract_doi
 
 log = setup_logger("import_wos_export", os.path.dirname(__file__))
 
-ENTRY_MODE = "manual_export"
 _COMMIT_BATCH = 500
 
 
@@ -80,7 +80,7 @@ def main() -> None:
                     source_id=ut,
                     doi=extract_doi(record),
                     raw_data=record,
-                    entry_mode=ENTRY_MODE,
+                    entry_mode=StagingEntryMode.MANUAL_EXPORT,
                 )
                 inserted += was_inserted
                 changed += was_changed and not was_inserted

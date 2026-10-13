@@ -17,6 +17,7 @@ import httpx2
 from sqlalchemy import Connection, text
 
 from domain.source_publications.external_ids import ExternalIdType
+from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
@@ -131,7 +132,7 @@ def _stage(conn: Connection, doc: Mapping[str, JsonValue]) -> bool:
         source_id=extract_id(doc),
         doi=extract_doi(doc),
         raw_data=doc,
-        entry_mode="fetch_missing_hal",
+        entry_mode=StagingEntryMode.FETCH_MISSING_HAL,
     )
     return inserted
 
@@ -249,7 +250,7 @@ class HalDoiSearch:
             source_id=extract_id(record),
             doi=extract_doi(record),
             raw_data=record,
-            entry_mode="fetch_missing_doi",
+            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
         )
         forget_failed_doi_lookups(conn, "hal", [extract_doi(record)])
         return inserted
