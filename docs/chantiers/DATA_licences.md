@@ -102,3 +102,5 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
 ### Phase 3 — Fin de chantier
 
 - [x] Mise à jour de la documentation : `docs/pipeline`, `docs/sources`
+
+## Questions ouvertes
