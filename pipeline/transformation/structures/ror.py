@@ -1,6 +1,6 @@
 """Référentiel ROR (`ror_organizations`, `ror_relations`, `ror_dump_imports`) : import de son dump, et rafraîchissement en tête de la phase `affiliations`.
 
-Le dump est importé seulement si sa version diffère de celle du dernier import. Un dump inaccessible laisse le référentiel en l'état.
+Le dump est importé seulement si sa version diffère de celle du dernier import. La version publiée se lit d'abord chez DataCite : Zenodo est interrogé seulement quand elle diffère, ou quand DataCite ne répond pas. Un dump inaccessible laisse le référentiel en l'état.
 """
 
 import logging
@@ -19,7 +19,7 @@ from infrastructure.db.tables import (
     ror_relations as ror_relations_table,
 )
 from pipeline.ingestion.http.dump_download import DumpUnavailableError
-from pipeline.ingestion.ror.dump import ZenodoRorDumpSource
+from pipeline.ingestion.ror.dump import ZenodoRorDumpSource, dump_version
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -112,9 +112,15 @@ def run_refresh_ror(
     """Importe la dernière version du dump ROR si elle n'est pas déjà importée."""
     metrics = PhaseMetrics()
     etape(logger, "Référentiel ROR")
+    last = repo.last_imported_version()
+    published = source.published_version()
+    if last and published and dump_version(last) == published:
+        logger.info("%sVersion %s déjà importée", DERNIERE_BRANCHE, last)
+        metrics.details["ror"] = {"version": last, "imported": False}
+        return metrics
     try:
         latest = source.latest_version()
-        if latest == repo.last_imported_version():
+        if latest == last:
             logger.info("%sVersion %s déjà importée", DERNIERE_BRANCHE, latest)
             metrics.details["ror"] = {"version": latest, "imported": False}
             return metrics

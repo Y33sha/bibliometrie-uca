@@ -38,6 +38,29 @@ MAX_DUMP_BYTES = 256 * 1024 * 1024
 _ARCHIVE_SUFFIX = "-ror-data.zip"
 _CSV_SUFFIX = "-ror-data.csv"
 
+ROR_DATA_CONCEPT_DOI = "10.5281/zenodo.6347574"
+"""DOI conceptuel du dump sur Zenodo. Sa notice DataCite donne la version la plus récente (`v2.14`)."""
+
+
+def dump_version(archive_name: str) -> str:
+    """Version d'une archive du dump : `v2.14` pour `v2.14-2026-10-06-ror-data.zip`."""
+    return archive_name.split("-", 1)[0]
+
+
+def published_ror_version(*, user_agent: str) -> str | None:
+    """Version la plus récente du dump, d'après la notice DataCite de son DOI conceptuel. `None` si DataCite ne répond pas."""
+    try:
+        response = httpx2.get(
+            f"{API_BASE_URLS['datacite']}/dois/{ROR_DATA_CONCEPT_DOI}",
+            headers={"User-Agent": user_agent},
+            timeout=15,
+        )
+        raise_for_status(response)
+        attributes = as_mapping(as_mapping(response.json().get("data")).get("attributes"))
+    except (httpx2.HTTPError, ValueError):
+        return None
+    return as_str(attributes.get("version"))
+
 
 @dataclass(frozen=True, slots=True)
 class RorDumpFile:
@@ -159,6 +182,10 @@ class ZenodoRorDumpSource:
         self._user_agent = user_agent
         self._logger = logger
         self._latest: RorDumpFile | None = None
+
+    def published_version(self) -> str | None:
+        """Version la plus récente du dump selon DataCite (`v2.14`), `None` si DataCite ne répond pas."""
+        return published_ror_version(user_agent=self._user_agent)
 
     def latest_version(self) -> str:
         """Nom de l'archive de la version la plus récente. Lève `DumpUnavailableError`."""
