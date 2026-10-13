@@ -43,7 +43,7 @@
     }
   }
 
-  // Recharge à chaque changement d'id.
+  // Charge le sujet de l'identifiant de la page et ses voisins.
   $effect(() => {
     const id = subjectId;
     loadFor(id, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);

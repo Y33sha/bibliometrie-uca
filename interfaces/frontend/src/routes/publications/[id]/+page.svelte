@@ -104,7 +104,7 @@
     data = await apiDetail<PubResponse>(`/api/publications/${id}`);
   }
 
-  // Recharge à chaque changement d'`id`. La navigation d'une publication à une autre réutilise la même route `[id]` sans remonter le composant : `onMount` ne suffit pas, il faut un effet réactif sur `pubId` (sinon l'URL change mais le contenu reste).
+  // Charge la publication de l'identifiant de la page.
   $effect(() => {
     const id = pubId;
     if (!id) return;

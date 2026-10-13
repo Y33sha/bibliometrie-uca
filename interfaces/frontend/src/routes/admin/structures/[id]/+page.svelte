@@ -142,7 +142,7 @@
     newFormCtx = [];
   }
 
-  // Reload detail when navigating between /admin/structures/{id1} et /{id2}
+  // Charge le détail de la structure de l'identifiant de la page.
   $effect(() => {
     if (!isNaN(id)) loadDetail();
   });

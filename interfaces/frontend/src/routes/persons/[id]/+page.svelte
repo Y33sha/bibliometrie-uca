@@ -121,17 +121,7 @@
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
-	let lastLoadedId = $state("");
-
 	async function loadProfile(id: string) {
-		if (id === lastLoadedId) return;
-		lastLoadedId = id;
-		error = false;
-		profile = null;
-		thesesLoaded = false;
-		addrLoaded = false;
-		addresses.page = 1;
-		dashboardLoaded = false;
 		try {
 			const profileData = await apiDetail<ProfileResponse>(`/api/persons/${id}`);
 			profile = profileData.person;
@@ -151,11 +141,6 @@
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		auth.check().then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		if (personId) await loadProfile(personId);
-	});
-
-	// Recharger quand personId change (navigation client-side)
-	$effect(() => {
-		if (personId) loadProfile(personId);
 	});
 
 </script>
