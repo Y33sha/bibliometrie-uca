@@ -34,3 +34,5 @@ class SourcePublication:
     topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
     meta: dict[str, JsonValue] | None
+    # Licence normalisée (valeur de `License`).
+    license: str | None = None

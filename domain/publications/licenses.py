@@ -3,6 +3,8 @@
 import re
 from enum import StrEnum
 
+from domain.publications.doc_types import DocType
+from domain.sources.registry import Source
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -30,6 +32,30 @@ class License(StrEnum):
     ALL_RIGHTS_RESERVED = "all-rights-reserved"
     # Licence déclarée mais non classée : politique de données d'un projet, par exemple.
     OTHER = "other"
+
+
+# Sources de la licence de la version éditeur d'une publication, par priorité.
+PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
+    Source.CROSSREF,
+    Source.OPENALEX,
+    Source.SCANR,
+    Source.DATACITE,
+)
+# Pour un jeu de données ou un logiciel, DataCite passe en tête.
+DATA_LICENSE_SOURCES: tuple[Source, ...] = (
+    Source.DATACITE,
+    Source.CROSSREF,
+    Source.OPENALEX,
+    Source.SCANR,
+)
+DATA_DOC_TYPES: frozenset[str] = frozenset({DocType.DATASET, DocType.SOFTWARE})
+# Source de la licence du fichier déposé.
+DEPOSIT_LICENSE_SOURCE = Source.HAL
+
+
+def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
+    """Sources de la licence de la version éditeur, par priorité, selon le type de document."""
+    return DATA_LICENSE_SOURCES if doc_type in DATA_DOC_TYPES else PUBLISHER_LICENSE_SOURCES
 
 
 # Éléments d'une licence Creative Commons, dans l'ordre de son code.

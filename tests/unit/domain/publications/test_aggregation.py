@@ -225,6 +225,40 @@ class TestStatutOa:
         assert pub.oa_status == "hybrid"
 
 
+class TestLicences:
+    """Licence de la version éditeur par ordre de source, DataCite en tête pour un jeu de données ; licence du dépôt par HAL."""
+
+    _ORDRE = ("hal", "openalex", "scanr", "crossref", "datacite")
+
+    def test_crossref_avant_openalex_pour_un_article(self):
+        sources = [
+            _sp(id=1, source="openalex", doc_type="article", license="cc-by-nc"),
+            _sp(id=2, source="crossref", doc_type="article", license="cc-by"),
+            _sp(id=3, source="hal", doc_type="article", license="repository-distribution"),
+        ]
+        pub = _pub()
+        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
+        assert (pub.license, pub.deposit_license) == ("cc-by", "repository-distribution")
+
+    def test_source_sans_licence_passee(self):
+        sources = [
+            _sp(id=1, source="crossref", doc_type="article", license=None),
+            _sp(id=2, source="scanr", doc_type="article", license="cc-by-sa"),
+        ]
+        pub = _pub()
+        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
+        assert (pub.license, pub.deposit_license) == ("cc-by-sa", None)
+
+    def test_datacite_en_tete_pour_un_jeu_de_donnees(self):
+        sources = [
+            _sp(id=1, source="openalex", doc_type="dataset", license="other-oa"),
+            _sp(id=2, source="datacite", doc_type="dataset", license="public-domain"),
+        ]
+        pub = _pub()
+        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
+        assert pub.license == "public-domain"
+
+
 class TestCollectionDeLaMonographie:
     def test_publication_sans_revue_prend_la_collection_de_sa_monographie(self):
         pub = _pub()
