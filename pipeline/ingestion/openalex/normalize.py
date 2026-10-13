@@ -342,8 +342,9 @@ def insert_openalex_document(  # noqa: C901
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `meta`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
+    publisher_license = None if should_skip_publisher_journal(primary) else raw_license
 
     return queries.upsert_source_publication(
         conn,
@@ -365,7 +366,7 @@ def insert_openalex_document(  # noqa: C901
             keywords=keywords,
             topics=topics_json,
             oa_status=pub_meta.oa_status,
-            license=normalize_license(raw_license),
+            license=normalize_license(publisher_license),
             urls=urls or None,
             impact=extract_impact(work).to_json(),
             is_retracted=is_retracted,

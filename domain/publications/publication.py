@@ -28,6 +28,9 @@ class Publication:
     doc_type: str | None = None
     doi: DOI | None = None
     oa_status: str | None = None
+    # Licence de la version éditeur, et licence du fichier déposé dans HAL (valeurs de `License`).
+    license: str | None = None
+    deposit_license: str | None = None
     journal_id: int | None = None
     monograph_id: int | None = None
     container_title: str | None = None

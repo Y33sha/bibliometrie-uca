@@ -46,6 +46,7 @@ class _SourcePublicationRow(NamedTuple):
     topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
     meta: dict[str, JsonValue] | None
+    license: str | None
 
 
 def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublication:
@@ -71,6 +72,7 @@ def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublicatio
         topics=row.topics,
         biblio=row.biblio,
         meta=row.meta,
+        license=row.license,
     )
 
 
@@ -112,6 +114,8 @@ class PublicationStore:
                        CAST(p.doc_type AS text) AS doc_type,
                        p.pub_year, p.doi,
                        CAST(p.oa_status AS text) AS oa_status,
+                       CAST(p.license AS text) AS license,
+                       CAST(p.deposit_license AS text) AS deposit_license,
                        p.journal_id, p.monograph_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
                        d.topics, d.biblio, p.meta, p.unpaywall_checked_at
@@ -132,6 +136,8 @@ class PublicationStore:
             doc_type=m["doc_type"],
             doi=DOI(m["doi"]) if m["doi"] else None,
             oa_status=m["oa_status"],
+            license=m["license"],
+            deposit_license=m["deposit_license"],
             journal_id=m["journal_id"],
             monograph_id=m["monograph_id"],
             container_title=m["container_title"],
@@ -158,6 +164,8 @@ class PublicationStore:
                     doc_type = CAST(:dt AS doc_type),
                     doi = :doi,
                     oa_status = CAST(:oa AS oa_type),
+                    license = CAST(:license AS license_type),
+                    deposit_license = CAST(:deposit_license AS license_type),
                     journal_id = :jid,
                     monograph_id = :mid,
                     container_title = :ct,
@@ -177,6 +185,8 @@ class PublicationStore:
                 "dt": pub.doc_type,
                 "doi": str(pub.doi) if pub.doi else None,
                 "oa": pub.oa_status,
+                "license": pub.license,
+                "deposit_license": pub.deposit_license,
                 "jid": pub.journal_id,
                 "mid": pub.monograph_id,
                 "ct": pub.container_title,
@@ -242,7 +252,7 @@ class PublicationStore:
                        sp.journal_id, sp.monograph_id, sp.container_title, sp.language,
                        sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
                        sp.countries, sp.urls, sp.keywords,
-                       sp.topics, sp.biblio, sp.meta
+                       sp.topics, sp.biblio, sp.meta, sp.license::text AS license
                 FROM source_publications sp
                 WHERE sp.publication_id = :id
             """),

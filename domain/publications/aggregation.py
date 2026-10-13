@@ -5,6 +5,7 @@ Encapsule les règles d'agrégation : à partir des `source_publications` attach
 Règles d'agrégation par type de champ :
 - **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
 - **`oa_status`** : le statut le plus ouvert toutes sources confondues (cf. `best_oa_status` dans `metadata`). Fallback à `OA_STATUS_UNKNOWN_DEFAULT` si toutes les sources sont silencieuses (la colonne canonique est NOT NULL).
+- **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
 - **JSONB `biblio`, `meta`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
@@ -23,6 +24,7 @@ from domain.normalize import normalize_text
 from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
+from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.metadata import (
     OA_CLOSED_STATUSES,
     OA_STATUS_UNKNOWN_DEFAULT,
@@ -93,6 +95,8 @@ def refresh_from_sources(
         pub.oa_status = (
             best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
         )
+    pub.license = license_by_source(sorted_sources, publisher_license_sources(pub.doc_type))
+    pub.deposit_license = license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
     pub.container_title = as_str(first_non_null(sorted_sources, "container_title"))
     pub.language = as_str(first_non_null(sorted_sources, "language"))
     pub.abstract = as_str(first_non_null(sorted_sources, "abstract"))
@@ -110,6 +114,15 @@ def refresh_from_sources(
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:
     """Valeurs textuelles d'une liste fusionnée : mots-clés et pays sont du texte, le reste ne s'écrit pas."""
     return tuple(texte for v in valeurs or () if (texte := as_str(v)))
+
+
+def license_by_source(sources: list[SourcePublication], order: tuple[Source, ...]) -> str | None:
+    """Première licence des `sources` dans l'ordre de sources `order`, puis dans l'ordre de `sources`."""
+    for source in order:
+        for s in sources:
+            if s.source == source and s.license:
+                return s.license
+    return None
 
 
 def first_non_null(sources: list[SourcePublication], attr: str) -> JsonValue:
