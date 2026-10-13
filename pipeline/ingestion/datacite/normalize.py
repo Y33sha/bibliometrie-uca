@@ -24,6 +24,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi
+from domain.publications.licenses import datacite_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
 from domain.sources.datacite import (
@@ -320,6 +321,7 @@ def process_work(
             abstract=get_abstract(attributes),
             keywords=get_keywords(attributes),
             oa_status=None,
+            license=datacite_license(attributes.get("rightsList")),
             impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
             meta=extract_datacite_meta(attributes),
         ),

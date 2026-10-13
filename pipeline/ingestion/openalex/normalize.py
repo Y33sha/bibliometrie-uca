@@ -14,6 +14,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.signature_name import SignatureName
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
+from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
 from domain.sources.openalex import (
@@ -341,6 +342,9 @@ def insert_openalex_document(  # noqa: C901
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations.
+    raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
+
     return queries.upsert_source_publication(
         conn,
         SourcePublicationUpsert(
@@ -361,9 +365,11 @@ def insert_openalex_document(  # noqa: C901
             keywords=keywords,
             topics=topics_json,
             oa_status=pub_meta.oa_status,
+            license=normalize_license(raw_license),
             urls=urls or None,
             impact=extract_impact(work).to_json(),
             is_retracted=is_retracted,
+            meta={"license": raw_license} if raw_license else None,
         ),
     )
 

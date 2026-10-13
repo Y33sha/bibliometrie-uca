@@ -3,6 +3,8 @@
 import re
 from enum import StrEnum
 
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
+
 
 class License(StrEnum):
     """Licence d'une publication, sans numéro de version."""
@@ -122,13 +124,42 @@ def _from_url(url: str) -> License | None:
     return None
 
 
+def is_access_right(raw: str) -> bool:
+    """Vrai pour un droit d'accès (vocabulaire COAR, `info:eu-repo`), qui n'est pas une licence."""
+    value = re.sub(r"^https?://", "", raw.strip().lower())
+    return value.startswith(("info:eu-repo", "purl.org/coar"))
+
+
 def normalize_license(raw: str | None) -> License | None:
-    """Licence que désigne une forme brute, ou `None` pour une forme vide, non reconnue, ou qui n'est pas une licence (droit d'accès COAR ou `info:eu-repo`, URL d'éditeur)."""
-    if not raw or not raw.strip():
+    """Licence que désigne une forme brute, ou `None` pour une forme vide, non reconnue, ou qui n'est pas une licence (droit d'accès, URL d'éditeur)."""
+    if not raw or not raw.strip() or is_access_right(raw):
         return None
     value = raw.strip()
-    if value.lower().startswith(("info:eu-repo", "purl.org/coar", "http://purl.org/coar")):
-        return None
     if "/" in value:
         return _from_url(value)
     return _from_code(value)
+
+
+def crossref_license(entries: JsonValue) -> License | None:
+    """Licence de la version éditeur d'une notice Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
+    for version in ("vor", "unspecified"):
+        for entry in as_sequence(entries):
+            item = as_mapping(entry)
+            if as_str(item.get("content-version")) == version:
+                if found := normalize_license(as_str(item.get("URL"))):
+                    return found
+    return None
+
+
+def datacite_license(rights: JsonValue) -> License | None:
+    """Licence d'une notice DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
+    declared = False
+    for entry in as_sequence(rights):
+        item = as_mapping(entry)
+        uri = as_str(item.get("rightsUri"))
+        if found := normalize_license(as_str(item.get("rightsIdentifier"))) or normalize_license(
+            uri
+        ):
+            return found
+        declared = declared or bool(uri and uri.strip() and not is_access_right(uri))
+    return License.OTHER if declared else None

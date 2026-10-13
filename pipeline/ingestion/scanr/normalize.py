@@ -14,6 +14,7 @@ from domain.persons.identifiers import (
 from domain.persons.signature_name import SignatureName
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
+from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
 from domain.sources.scanr import (
@@ -215,6 +216,7 @@ def insert_scanr_document(  # noqa: C901
     urls: list[str] = []
     seen: set[str] = set()
     oa_ev = as_mapping(doc.get("oaEvidence"))
+    raw_license = as_str(oa_ev.get("license"))
     adresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
     adresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
     for brut in adresses:
@@ -260,8 +262,10 @@ def insert_scanr_document(  # noqa: C901
             keywords=keywords,
             topics=topics,
             oa_status=pub_meta.oa_status,
+            license=normalize_license(raw_license),
             urls=urls or None,
             impact=Impact(cited_by_count=cited_by_count).to_json(),
+            meta={"license": raw_license} if raw_license else None,
         ),
     )
 
