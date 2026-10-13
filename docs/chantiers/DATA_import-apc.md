@@ -82,7 +82,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [x] DOI normalisé par `clean_doi`, journalisation par `infrastructure/observability/log.py`.
 - [x] Tests : `tests/unit/interfaces/cli/imports/`, `tests/integration/cli/`.
 - [x] Réponse d'un établissement à l'enquête APC : troisième format. Un montant négatif annule un paiement de même valeur, même DOI, même laboratoire. Le payeur est désigné par son ROR.
-- [ ] Import de la réponse de l'Université à l'enquête APC 2025.
+- [x] Import de la réponse de l'Université à l'enquête APC 2025.
 - [ ] Reprise : réimport d'Open APC et des frais hors OA ; suppression des lignes du fichier APC de l'enquête.
 
 ### 4. Structures
