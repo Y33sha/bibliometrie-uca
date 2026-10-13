@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hzPIu8i2Jb6dSVyvM6lKzF1edhqdM5YqG0ywOz9taaDb9hZgnXQHLV4OOwE6OPU
+\restrict 7vkfgkEacADGmV0tRLMFZ8r4mJ3FpP2o7qtDRRc40i63UzDf23C7zP2CcqGkrJD
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -867,6 +867,7 @@ CREATE TABLE sources.source_authorships (
     raw_first_name text,
     CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
+ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
 
 
 --
@@ -1829,7 +1830,7 @@ CREATE TABLE sources.staging (
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text, 'person_identifier'::text])))
 );
 
 
@@ -3593,6 +3594,14 @@ CREATE INDEX idx_structures_type ON structures.structures USING btree (structure
 
 
 --
+-- Name: source_authorships_orphan_perimeter; Type: STATISTICS; Schema: sources; Owner: -
+--
+
+CREATE STATISTICS sources.source_authorships_orphan_perimeter (mcv) ON in_perimeter, person_id FROM sources.source_authorships;
+ALTER STATISTICS sources.source_authorships_orphan_perimeter SET STATISTICS 1000;
+
+
+--
 -- Name: person_identifiers trg_protect_authenticated_identifier; Type: TRIGGER; Schema: persons; Owner: -
 --
 
@@ -4027,5 +4036,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hzPIu8i2Jb6dSVyvM6lKzF1edhqdM5YqG0ywOz9taaDb9hZgnXQHLV4OOwE6OPU
+\unrestrict 7vkfgkEacADGmV0tRLMFZ8r4mJ3FpP2o7qtDRRc40i63UzDf23C7zP2CcqGkrJD
 
