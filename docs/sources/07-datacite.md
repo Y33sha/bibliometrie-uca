@@ -20,7 +20,7 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 ## API utilisée
 
 **DOIs API** — réponse au format JSON:API (les métadonnées sont dans `data.attributes`) :
-- `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnages, `fetch_missing_doi`). Le moissonnage par personne demande 25 notices par page : une notice de grande collaboration compte un millier de créateurs, et une page plus grande dépasse le délai de DataCite ;
+- `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnages, `fetch_missing_doi`) ;
 - `https://api.datacite.org/dois/{doi}` : interrogation unitaire (`fetch_stale`).
 
 Les deux routes rendent un même DOI sous deux formes. Le hash de détection de changement ignore ces différences et les compteurs de consultation.
