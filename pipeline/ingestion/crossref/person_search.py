@@ -7,9 +7,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.ingestion.common.person_search import PersonSearchExtractor, PersonSearchPage
+from pipeline.ingestion.common.person_search import (
+    Identifiers,
+    PersonSearchExtractor,
+    PersonSearchPage,
+)
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.polite_pool import build_user_agent
 from pipeline.runtime.config import get_polite_pool_email
@@ -61,12 +66,13 @@ class CrossrefPersonExtractor(PersonSearchExtractor[CrossrefClient]):
 
     def fetch_page(
         self,
-        identifiers: list[str],
+        identifiers: Identifiers,
         years: tuple[int, int],
         next_token: str | None,
         label: str,
     ) -> PersonSearchPage:
-        return self._client.fetch_page(build_orcid_filter(identifiers, *years), next_token, label)
+        orcids = identifiers[PersonIdentifierType.ORCID]
+        return self._client.fetch_page(build_orcid_filter(orcids, *years), next_token, label)
 
     def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         doi = clean_doi(as_str(record.get("DOI")))

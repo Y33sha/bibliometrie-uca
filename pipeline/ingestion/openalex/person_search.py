@@ -8,9 +8,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import ClassVar
 
+from domain.persons.identifiers import PersonIdentifierType
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
-from pipeline.ingestion.common.person_search import PersonSearchExtractor, PersonSearchPage
+from pipeline.ingestion.common.person_search import (
+    Identifiers,
+    PersonSearchExtractor,
+    PersonSearchPage,
+)
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
 from pipeline.ingestion.openalex.harvest import OpenalexClient
 
@@ -29,13 +34,14 @@ class OpenalexPersonExtractor(PersonSearchExtractor[OpenalexClient]):
 
     def fetch_page(
         self,
-        identifiers: list[str],
+        identifiers: Identifiers,
         years: tuple[int, int],
         next_token: str | None,
         label: str,
     ) -> PersonSearchPage:
+        orcids = identifiers[PersonIdentifierType.ORCID]
         data = self._client.fetch_filtered_page(
-            build_orcid_filter(identifiers, *years), next_token or "*", label
+            build_orcid_filter(orcids, *years), next_token or "*", label
         )
         records = [as_mapping(w) for w in as_sequence(data.get("results"))]
         following = as_str(at_path(data, "meta").get("next_cursor"))
