@@ -534,21 +534,17 @@ class TestBuildOpenalexAuthorRecords:
         assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
         assert [a.text for a in rec.addresses] == ["Univ Clermont"]
 
-    def test_institutions_as_addr_fallback(self):
-        """Sans raw_affiliation_strings, on tombe sur les institutions display_name."""
+    def test_no_addr_without_affiliation_string(self):
+        """Sans texte d'affiliation, la signature n'a pas d'adresse, même avec des institutions."""
         work = {
             "authorships": [
                 {
                     "raw_author_name": "X",
-                    "institutions": [
-                        {"id": "https://openalex.org/I1", "display_name": "Inst One"},
-                        {"id": "https://openalex.org/I2", "display_name": "Inst Two"},
-                    ],
+                    "institutions": [{"id": "https://openalex.org/I1", "display_name": "Inst One"}],
                 }
             ]
         }
-        rec = build_openalex_author_records(work)[0]
-        assert [a.text for a in rec.addresses] == ["Inst One", "Inst Two"]
+        assert build_openalex_author_records(work)[0].addresses == []
 
     def test_no_addr_when_no_affiliation(self):
         work = {"authorships": [{"raw_author_name": "X", "institutions": []}]}

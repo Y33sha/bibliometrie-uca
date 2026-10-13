@@ -406,7 +406,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
     - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
-    - adresses : les `raw_affiliation_strings`, à défaut le nom des institutions ;
+    - adresses : les `raw_affiliation_strings` ;
     - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte (institutions désambiguïsées par OpenAlex, algorithmiques et faillibles), en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
     - ROR des institutions → `ror_ids` ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
@@ -442,19 +442,6 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
             for e in as_sequence(authorship.get("raw_affiliation_strings"))
             if (texte := as_str(e))
         ]
-        if raw_strings:
-            addr_parts = [(texte, countries_by_text.get(texte, set())) for texte in raw_strings]
-        else:
-            addr_parts = [
-                (
-                    nom,
-                    {pays}
-                    if (pays := country_by_institution.get(as_str(i.get("id")) or ""))
-                    else set(),
-                )
-                for i in institutions
-                if (nom := as_str(i.get("display_name")))
-            ]
 
         ids = ids_by_position[position]
         records.append(
@@ -465,8 +452,11 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=[
-                    AddressRecord(text=part, suggested_countries=sorted(countries) or None)
-                    for part, countries in addr_parts
+                    AddressRecord(
+                        text=texte,
+                        suggested_countries=sorted(countries_by_text.get(texte, ())) or None,
+                    )
+                    for texte in raw_strings
                 ],
                 ror_ids=parse_ror_ids(as_str(i.get("ror")) for i in institutions),
             )
