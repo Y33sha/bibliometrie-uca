@@ -55,7 +55,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - [x] Lien ORCID–idHAL : auteurs du laboratoire dont le compte HAL est lié à un ORCID
 - [x] Revues diamant : identification et part des articles du laboratoire
 - [x] Thèses : ouverture sur plusieurs années de soutenance
-- [ ] Montants d'APC : import de l'extraction 2025, montant dans le rapport
+- [x] Montants d'APC : import de l'extraction 2025, montant dans le rapport
 - [x] Licences des jeux de données
 - [ ] Licences des publications (chantier dédié)
 - [x] Serveurs de preprints : les plus utilisés, d'après le préfixe DOI
