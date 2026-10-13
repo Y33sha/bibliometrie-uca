@@ -56,7 +56,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 **Le câblage dépend du gain mesuré.** Tant que la mesure ne montre pas de gain, rien ne change dans le schéma ni dans le pipeline.
 
 **Au câblage :**
-- les candidats du stock viennent des fichiers du script, et aucune colonne existante n'est reprise ;
+- les candidats du stock viennent des fichiers du script, et aucune colonne existante n'est reprise. Le stock n'a donc pas de candidat `manual` : le consensus entre moyens corrige les erreurs de `addresses.countries` ;
 - `addresses.countries` demeure, comme cache dénormalisé lu par la cascade vers les publications et par les facettes de l'interface, dérivé des candidats par la seule fonction de préséance ;
 - `addresses.suggested_countries` disparaît : une suggestion est un candidat dont le moyen n'accède pas seul à l'ensemble retenu ;
 - le marqueur « tentée sans résultat » (`[]`) disparaît avec elle.
@@ -84,7 +84,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 ### 2. Mesure et fonction de préséance
 
-- [ ] Par moyen : taux d'accord, de désaccord et de silence avec les autres moyens et avec `addresses.countries`.
+- [x] Par moyen : taux d'accord, de désaccord et de silence avec les autres moyens et avec `addresses.countries` (`interfaces/cli/oneshot/measure_address_country_agreement.py`, bca44eba5).
 - [ ] Revue à la main d'un échantillon de désaccords, qui sert de référence.
 - [ ] Trancher l'asymétrie OpenAlex / ScanR, et le sort de `similarity`.
 - [ ] Fonction de préséance du domaine, testée. Le script l'applique au stock.
@@ -109,5 +109,4 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
 - **ROR et adresses.** Le ROR est rattaché à la signature, le pays à l'adresse. Pour une signature à plusieurs adresses et plusieurs ROR de pays différents, quelle adresse reçoit quel pays ?
 - **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
-- **Saisies manuelles passées.** Le stock les confond avec les autres moyens dans `addresses.countries`. L'audit garde seulement les saisies unitaires ; une saisie par filtre garde son filtre, pas ses adresses. Le stock a-t-il un candidat `manual` ?
 - **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. 1 262 textes normalisés portent des pays différents selon la ligne.
