@@ -18,6 +18,7 @@ from sqlalchemy import Connection, Row, text
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
+from domain.publications.licenses import License
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
@@ -80,6 +81,34 @@ PREPRINT_SERVERS = {
 PREPRINT_SERVER_NAMES = frozenset(PREPRINT_SERVERS.values()) | {"medRxiv"}
 
 MODEL_LABELS = {"full_oa": "Open access", "subscription": "Abonnement"}
+
+LICENSE_LABELS = {
+    License.CC_BY: "CC BY",
+    License.CC_BY_SA: "CC BY-SA",
+    License.CC_BY_ND: "CC BY-ND",
+    License.CC_BY_NC: "CC BY-NC",
+    License.CC_BY_NC_SA: "CC BY-NC-SA",
+    License.CC_BY_NC_ND: "CC BY-NC-ND",
+    License.PUBLIC_DOMAIN: "Domaine public (CC0, Public Domain Mark)",
+    License.LICENCE_OUVERTE: "Licence Ouverte Etalab",
+    License.OPEN_SOURCE: "Licence de logiciel libre",
+    License.REPOSITORY_DISTRIBUTION: "Autorisation de diffusion (HAL, arXiv)",
+    License.PUBLISHER_OPEN: "Licence ouverte de l'éditeur",
+    License.OTHER_OA: "Autre licence ouverte",
+    License.ALL_RIGHTS_RESERVED: "Droits réservés",
+    License.OTHER: "Autre licence",
+}
+# Licences qui ouvrent la réutilisation.
+OPEN_LICENSES = frozenset(
+    {
+        *(lic.value for lic in License if lic.value.startswith("cc-")),
+        License.PUBLIC_DOMAIN,
+        License.LICENCE_OUVERTE,
+        License.OPEN_SOURCE,
+        License.PUBLISHER_OPEN,
+        License.OTHER_OA,
+    }
+)
 
 # Publications `p` du laboratoire.
 LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}"
@@ -468,15 +497,9 @@ class OpenScienceReport:
         details = self._rows(
             f"""
             SELECT COALESCE(j.title, p.container_title, 'Entrepôt non renseigné') AS repository,
-                   COALESCE(lic.license, 'Aucune') AS license, COUNT(*) AS n
+                   p.license::text AS license, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
             LEFT JOIN publishing.journals j ON j.id = p.journal_id
-            LEFT JOIN LATERAL (
-                SELECT lower(r->>'rightsIdentifier') AS license
-                FROM source_publications sp, jsonb_array_elements(sp.meta->'rights') r
-                WHERE sp.publication_id = p.id AND sp.source = 'datacite' AND r ? 'rightsIdentifier'
-                LIMIT 1
-            ) lic ON TRUE
             WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'dataset'
             GROUP BY 1, 2 ORDER BY 3 DESC, 1, 2
             """,
@@ -494,15 +517,36 @@ class OpenScienceReport:
             + f"\n\nEntrepôts et licences des jeux de données, {period} :\n\n"
             + _table(
                 ["Entrepôt", "Licence", "Jeux de données"],
-                [(r.repository, r.license, r.n) for r in details],
+                [(r.repository, _license_label(r.license), r.n) for r in details],
             )
-            + "\n\nLa licence vient de DataCite."
+        )
+
+    def hal_deposits(self) -> str:
+        rows = self._rows(f"""
+            SELECT p.deposit_license::text AS license, COUNT(*) AS n
+            FROM ({LAB_PUBLICATIONS}) p
+            WHERE p.pub_year = :year AND {HAL_FULL_TEXT}
+            GROUP BY 1 ORDER BY 2 DESC
+        """)
+        total = sum(r.n for r in rows)
+        if not total:
+            return f"## Dépôts dans HAL\n\nAucun texte intégral déposé dans HAL pour {self.year}."
+        closed = sum(r.n for r in rows if r.license not in OPEN_LICENSES)
+        return (
+            "## Dépôts dans HAL\n\n"
+            + _table(
+                ["Licence du fichier déposé", f"Textes intégraux {self.year}"],
+                [(_license_label(r.license), r.n) for r in rows],
+            )
+            + f"\n\n{closed} textes intégraux sur {total} sont déposés sans licence ouverte : "
+            "autorisation de diffusion HAL, droits réservés, ou licence non renseignée. "
+            "Un texte intégral signalé par un lien HAL vers arXiv ou PubMed Central n'a pas de licence HAL."
         )
 
     def preprints(self) -> str:
         rows = self._rows(
             f"""
-            SELECT p.pub_year AS year,
+            SELECT p.pub_year AS year, p.license::text AS license,
                    ARRAY(
                        SELECT DISTINCT split_part(sp.doi, '/', 1) FROM source_publications sp
                        WHERE sp.publication_id = p.id AND sp.doi IS NOT NULL
@@ -529,6 +573,11 @@ class OpenScienceReport:
             + _table(["Année", "Preprints"], sorted(by_year.items()))
             + f"\n\nPlateformes, {period} :\n\n"
             + _table(["Serveur", "Preprints"], by_platform.most_common())
+            + f"\n\nLicences des preprints, {period} :\n\n"
+            + _table(
+                ["Licence", "Preprints"],
+                Counter(_license_label(r.license) for r in rows).most_common(),
+            )
             + "\n\nServeur de preprints : entrepôt doté d'un préfixe DOI propre, qui héberge presque uniquement des preprints. Le serveur se déduit du préfixe DOI. "
             "OpenAlex distingue bioRxiv et medRxiv, qui partagent leurs préfixes. "
             "Une archive qui attribue son propre DOI à la copie d'un preprint (DESY, RWTH) est remplacée par le serveur que désigne OpenAlex."
@@ -610,11 +659,16 @@ class OpenScienceReport:
             self.theses(),
             self.collaborations(),
             self.orcid_section(orcid),
+            self.hal_deposits(),
             self.preprints(),
             self.datasets(),
             self.sources(),
         ]
         return "\n\n".join(sections) + "\n"
+
+
+def _license_label(license: str | None) -> str:  # noqa: A002
+    return LICENSE_LABELS[License(license)] if license else "Aucune licence"
 
 
 def _with_identifier(id_type: str) -> str:
