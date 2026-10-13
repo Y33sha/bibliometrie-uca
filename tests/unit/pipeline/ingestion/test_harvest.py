@@ -126,6 +126,21 @@ class TestExtractionParAnnee:
         assert "années 2023, 2024 sautées" in caplog.text
 
 
+class _DUnTenant(_ParAnnee):
+    """Extracteur d'un seul tenant, dont le bilan nomme le critère de recherche."""
+
+    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
+        return self._extrait_d_un_tenant(
+            2, lambda avancement: PhaseMetrics(new=2), par="ORCID, IdRef"
+        )
+
+
+def test_le_bilan_nomme_le_critere_de_recherche(logger, caplog):
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        _DUnTenant(logger, {}).run(_args())
+    assert "2 documents trouvés par ORCID, IdRef : 2 nouveaux" in caplog.text
+
+
 class TestRun:
     def test_happy_path_calls_pipeline_in_order(self, conn, logger):
         ext = _FakeExtractor(conn, logger)

@@ -196,12 +196,16 @@ class SourceExtractor[ConfigT, ClientT](ABC):
         return metrics
 
     def _extrait_d_un_tenant(
-        self, total: int, extrait: Callable[[Progression], PhaseMetrics]
+        self,
+        total: int,
+        extrait: Callable[[Progression], PhaseMetrics],
+        *,
+        par: str | None = None,
     ) -> PhaseMetrics:
         """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
         with progression(total, self._libelle(), self.logger) as avancement:
             metrics = extrait(avancement)
-        self._ecrit_bilan(metrics)
+        self._ecrit_bilan(metrics, par=par)
         return metrics
 
     def _ecrit_bilan(
@@ -209,18 +213,20 @@ class SourceExtractor[ConfigT, ClientT](ABC):
         metrics: PhaseMetrics,
         *,
         trouves: int | None = None,
+        par: str | None = None,
     ) -> None:
         """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
 
-        `trouves` donne le nombre du bilan quand un filtre retient une partie des documents parcourus.
+        `trouves` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `par` nomme le critère de recherche : « trouvés par ORCID ».
         """
         trouve, nouveau, mis_a_jour, inchange = _FORMES_DU_BILAN[self.FEMININ]
         n = metrics.total if trouves is None else trouves
         self.logger.info(
-            "%s%s %s : %s, %s, %s",
+            "%s%s %s%s : %s, %s, %s",
             SUITE_DE_BRANCHE,
             accord(n, self.DOCUMENT),
             forme(n, *trouve),
+            f" par {par}" if par else "",
             accord(metrics.new, *nouveau),
             accord(metrics.updated, *mis_a_jour),
             accord(metrics.unchanged, *inchange),
