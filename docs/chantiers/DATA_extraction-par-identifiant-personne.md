@@ -42,6 +42,10 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 - Mode d'entrée en staging : `person_identifier`.
 - L'extraction par personne suit la plage d'années des autres extractions.
 - Périmètre : la signature d'une personne RH entre dans le périmètre quand le document paraît entre ses dates de début et de fin de contrat, même sans affiliation au périmètre.
+- Règle appliquée par la phase `affiliations`, avec `in_perimeter` : la signature contient un identifiant fort (ORCID, IdRef, `hal_person_id`) confirmé ou authentifié d'une personne RH. Les filtres de confiance sont ceux de la phase `persons` (identifiant neutralisé, ORCID des seules sources à dépôt auteur), dans un fragment SQL commun.
+- Dates : année de publication comparée aux années de début et de fin de contrat, bornes incluses.
+- Une signature entrée par l'identité n'est rattachée à aucun laboratoire.
+- `in_perimeter` reste booléen.
 
 ## Phasage
 
@@ -53,7 +57,8 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 ### Phase 2 — Modèle
 
 - [x] Entrée en staging : mode d'entrée `person_identifier`
-- [ ] Signature d'une personne trouvée par son identifiant : règle d'entrée dans le périmètre
+- [ ] Fragment SQL commun des signatures qui contiennent l'identifiant fort d'une personne, repris par la phase `persons`
+- [ ] Règle d'entrée dans le périmètre par l'identité : phase `affiliations` et recalcul après édition d'une adresse
 
 ### Phase 3 — Extraction
 
@@ -66,6 +71,6 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ## Questions ouvertes
 
-- Représentation du périmètre d'une signature : booléen `in_perimeter`, ou valeur qui dit pourquoi la signature entre dans le périmètre (affiliation, personne RH dans ses dates).
-- Décision du périmètre par la phase `persons`, d'après le `person_id` de la signature. La phase `persons` rattache seulement les signatures des notices devenues publications. Elle rattacherait aussi, par identifiant fort, celles des notices hors périmètre. Une notice qui entre ainsi dans le périmètre devient publication au run suivant.
+- Raison de l'entrée dans le périmètre (affiliation, personne RH dans ses dates) : enum à ajouter, puis suppression éventuelle du booléen.
+- Laboratoire d'une signature entrée par l'identité, déduit des publications de la personne. Les `department_name` de l'export RH désignent rarement un laboratoire.
 - Suppléments d'articles déposés par les éditeurs sur figshare. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.
