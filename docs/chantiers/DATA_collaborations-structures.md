@@ -41,7 +41,7 @@ ror_relations
 
 **Rafraîchissement du référentiel par le pipeline.** En tête de la phase `affiliations`, le pipeline compare le nom de la dernière archive publiée sur Zenodo au nom de la dernière archive importée. Il télécharge et importe seulement une version plus récente. La table `ror_dump_imports (version, imported_at)` garde une ligne par import.
 
-**ROR des sources par signature.** La phase `normalize` remplit la table de liens `source_authorship_rors (source_authorship_id, ror_id)`. Ces liens entrent dans `content_hash`. `ror_id` est sans clé étrangère vers `ror_organizations` : une source peut citer un ROR plus récent que le dump importé, et l'import remplace tout le référentiel.
+**ROR des sources par signature.** La phase `normalize` remplit la table de liens `source_authorship_rors (source_authorship_id, ror_id, address_id)`. `address_id` désigne l'adresse dont l'affiliation porte le ROR ; il est vide pour un ROR donné sans texte d'affiliation. Ces liens entrent dans `content_hash`. `ror_id` est sans clé étrangère vers `ror_organizations` : une source peut citer un ROR plus récent que le dump importé, et l'import remplace tout le référentiel.
 
 Lecture par source :
 
