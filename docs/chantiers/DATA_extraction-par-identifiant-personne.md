@@ -77,7 +77,7 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ### Phase 4 — Fin de chantier
 
-- [ ] Mise à jour de la documentation
+- [x] Mise à jour de la documentation
 
 ## Questions ouvertes
 
