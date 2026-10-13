@@ -264,23 +264,23 @@ def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
     return SignatureName.from_parts(as_str(author.get("family")), as_str(author.get("given")))
 
 
-def _author_affiliation_strings(author: Mapping[str, JsonValue]) -> list[str]:
-    out: list[str] = []
-    for aff in as_sequence(author.get("affiliation")):
-        name = as_str(as_mapping(aff).get("name"))
-        if name and name.strip():
-            out.append(name.strip())
-    return out
-
-
-def _author_ror_ids(author: Mapping[str, JsonValue]) -> frozenset[RorId]:
-    """ROR des affiliations : identifiants `id` de type `ROR`."""
-    return parse_ror_ids(
-        as_str(ident.get("id"))
-        for aff in as_sequence(author.get("affiliation"))
-        for ident in (as_mapping(i) for i in as_sequence(as_mapping(aff).get("id")))
-        if ident.get("id-type") == "ROR"
-    )
+def _author_affiliations(
+    author: Mapping[str, JsonValue],
+) -> tuple[list[AddressRecord], frozenset[RorId]]:
+    """Adresses des affiliations à nom, chacune avec ses ROR (`id` de type `ROR`), et ROR des affiliations sans nom."""
+    addresses: list[AddressRecord] = []
+    without_name: set[RorId] = set()
+    for aff in (as_mapping(a) for a in as_sequence(author.get("affiliation"))):
+        rors = parse_ror_ids(
+            as_str(ident.get("id"))
+            for ident in (as_mapping(i) for i in as_sequence(aff.get("id")))
+            if ident.get("id-type") == "ROR"
+        )
+        if (name := as_str(aff.get("name"))) and name.strip():
+            addresses.append(AddressRecord(text=name.strip(), ror_ids=rors))
+        else:
+            without_name |= rors
+    return addresses, frozenset(without_name)
 
 
 def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
@@ -289,7 +289,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
     - nom et prénom séparés (`family`, `given`) ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
-    - identifiants ROR des affiliations → `ror_ids` ;
+    - identifiants ROR de chaque affiliation : sur son adresse, sur la signature pour une affiliation sans nom ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
     """
     authors = msg.get("author") or []
@@ -313,14 +313,15 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
             continue
 
         ids = ids_by_position[position]
+        addresses, signature_rors = _author_affiliations(author)
         records.append(
             AuthorRecord(
                 position=position,
                 name=name,
                 roles=["author"],
                 person_identifiers=ids if ids else None,
-                addresses=[AddressRecord(text=aff) for aff in _author_affiliation_strings(author)],
-                ror_ids=_author_ror_ids(author),
+                addresses=addresses,
+                ror_ids=signature_rors,
             )
         )
     return records

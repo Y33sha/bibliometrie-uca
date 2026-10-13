@@ -127,22 +127,22 @@ def _parse_api_authors(
         # Affiliations via addr_no
         addr_nos = name_obj.get("addr_no")
         raw_affiliation = None
-        individual_addresses: list[str] = []
-        author_orgs: list[dict[str, JsonValue]] = []
+        # Chaque adresse de l'auteur, avec les ROR de ses organisations.
+        individual_addresses: list[dict[str, JsonValue]] = []
         if addr_nos:
-            addr_no_list = str(addr_nos).split()
-            affils = [addr_map[a] for a in addr_no_list if a in addr_map]
-            individual_addresses = [a.strip() for a in affils if a.strip()]
+            addr_no_list = [a for a in str(addr_nos).split() if a in addr_map]
+            affils = [addr_map[a] for a in addr_no_list]
             if affils:
                 raw_affiliation = " | ".join(affils)
-            # Collecter les organizations de cet auteur
-            seen_org_names = set()
-            for a_no in addr_no_list:
-                for org in addr_orgs_map.get(a_no, []):
-                    nom = as_str(org["name"])
-                    if nom and nom not in seen_org_names:
-                        author_orgs.append(org)
-                        seen_org_names.add(nom)
+            individual_addresses = [
+                {
+                    "text": addr_map[a].strip(),
+                    "ror_ids": [
+                        ror for org in addr_orgs_map.get(a, []) if (ror := as_str(org["ror_id"]))
+                    ],
+                }
+                for a in addr_no_list
+            ]
 
         roles, is_corresponding_from_role = map_role("wos", wos_role)
         is_corresponding = is_corresponding or is_corresponding_from_role
@@ -158,7 +158,6 @@ def _parse_api_authors(
                 "is_corresponding": is_corresponding,
                 "raw_affiliation": raw_affiliation,
                 "addresses": individual_addresses,
-                "organizations": author_orgs,
                 "roles": roles,
             }
         )
@@ -378,7 +377,7 @@ def _export_authors(raw: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]]:
                 "researcher_id": researcher_ids.get(key),
                 "is_corresponding": normalize_text(short_name) in corresponding,
                 "raw_affiliation": " | ".join(author_addresses) or None,
-                "addresses": author_addresses,
+                "addresses": [{"text": a, "ror_ids": []} for a in author_addresses],
                 "roles": roles,
             }
         )
@@ -583,7 +582,7 @@ def build_wos_author_records(
 ) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes et les ROR des organisations de ses adresses. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
+    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes, chacune avec les ROR de ses organisations. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
     """
     authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     if not authors_kept:
@@ -615,14 +614,12 @@ def build_wos_author_records(
                 or None,
                 person_identifiers=ids if ids else None,
                 addresses=[
-                    AddressRecord(text=adresse)
-                    for e in as_sequence(author.get("addresses"))
-                    if (adresse := as_str(e))
+                    AddressRecord(
+                        text=as_str(a.get("text")) or "",
+                        ror_ids=parse_ror_ids(as_str(r) for r in as_sequence(a.get("ror_ids"))),
+                    )
+                    for a in (as_mapping(e) for e in as_sequence(author.get("addresses")))
                 ],
-                ror_ids=parse_ror_ids(
-                    as_str(as_mapping(o).get("ror_id"))
-                    for o in as_sequence(author.get("organizations"))
-                ),
             )
         )
     # `author_position` lue du payload WoS : dédup (première occurrence gagne).

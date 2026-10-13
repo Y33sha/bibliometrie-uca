@@ -97,7 +97,7 @@ class TestSignatureContent:
         "is_corresponding": False,
         "roles": ["author"],
         "neutralized_identifiers": None,
-        "addresses": [("Université Clermont Auvergne", ["FR"], None)],
+        "addresses": [("Université Clermont Auvergne", ["FR"], None, [])],
     }
 
     def test_stable(self):
@@ -111,7 +111,8 @@ class TestSignatureContent:
             {"is_corresponding": True},
             {"roles": ["supervisor"]},
             {"neutralized_identifiers": {"orcid": "shared"}},
-            {"addresses": [("Université Clermont Auvergne", ["FR"], ["FR"])]},
+            {"addresses": [("Université Clermont Auvergne", ["FR"], ["FR"], [])]},
+            {"addresses": [("Université Clermont Auvergne", ["FR"], None, ["01a8ajp46"])]},
             {"addresses": []},
             {"ror_ids": ["01a8ajp46"]},
         ]
@@ -121,6 +122,12 @@ class TestSignatureContent:
 
     def test_sans_ror_le_contenu_omet_la_cle(self):
         assert "ror_ids" not in signature_content(**self._BASE)
+
+    def test_adresse_sans_ror_garde_le_contenu_sans_ror(self):
+        """Une adresse sans ROR omet la liste de ses ROR."""
+        assert signature_content(**self._BASE)["addresses"] == [
+            ["Université Clermont Auvergne", ["FR"], []]
+        ]
 
     def test_ror_independants_de_l_ordre(self):
         assert signature_content(**self._BASE, ror_ids=["b", "a"]) == signature_content(

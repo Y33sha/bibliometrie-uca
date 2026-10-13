@@ -88,10 +88,11 @@ class AuthorshipAddressItem(TypedDict):
 
 
 class AuthorshipRorItem(TypedDict):
-    """Ligne du batch insert `source_authorship_rors` : ROR attribué par la source à une signature."""
+    """Ligne du batch insert `source_authorship_rors` : ROR attribué par la source à une signature, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
 
     sa_id: int
     ror_id: str
+    addr_id: int | None
 
 
 # Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash` :
@@ -370,12 +371,14 @@ class AuthorshipsBatchQueries:
             return
         conn.execute(
             text("""
-                INSERT INTO source_authorship_rors (source_authorship_id, ror_id)
-                SELECT sa_id, ror_id
-                FROM unnest(:sa_ids ::integer[], :ror_ids ::text[]) AS t(sa_id, ror_id)
+                INSERT INTO source_authorship_rors (source_authorship_id, ror_id, address_id)
+                SELECT sa_id, ror_id, addr_id
+                FROM unnest(:sa_ids ::integer[], :ror_ids ::text[], :addr_ids ::integer[])
+                    AS t(sa_id, ror_id, addr_id)
             """),
             {
                 "sa_ids": [v["sa_id"] for v in values],
                 "ror_ids": [v["ror_id"] for v in values],
+                "addr_ids": [v["addr_id"] for v in values],
             },
         )

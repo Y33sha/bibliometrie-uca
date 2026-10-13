@@ -86,10 +86,10 @@ def signature_content(
     is_corresponding: bool,
     roles: Sequence[str] | None,
     neutralized_identifiers: JsonValue,
-    addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None]],
+    addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None, Sequence[str]]],
     ror_ids: Iterable[str] = (),
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués par la source, présents dans le contenu seulement s'il y en a."""
+    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la signature sans texte d'affiliation. Les ROR sont présents dans le contenu seulement s'il y en a."""
     content: dict[str, JsonValue] = {
         "position": position,
         "name": list(name),
@@ -97,8 +97,8 @@ def signature_content(
         "roles": list(roles) if roles is not None else None,
         "neutralized_identifiers": neutralized_identifiers,
         "addresses": [
-            [text, list(countries or []), list(suggested or [])]
-            for text, countries, suggested in addresses
+            [text, list(countries or []), list(suggested or [])] + ([sorted(rors)] if rors else [])
+            for text, countries, suggested, rors in addresses
         ],
     }
     if rors := sorted(ror_ids):

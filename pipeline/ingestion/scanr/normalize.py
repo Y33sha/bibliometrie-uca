@@ -24,7 +24,7 @@ from domain.sources.scanr import (
     select_leaf_affiliations,
     split_scanr_concepts,
 )
-from domain.structures.identifiers import parse_ror_ids
+from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalize import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
@@ -284,7 +284,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
     - affiliations feuilles → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
-    - ROR de toutes les affiliations, tutelles comprises → `ror_ids`.
+    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse (tutelles écartées, affiliations sans nom).
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
@@ -305,16 +305,23 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         roles, _ = map_role("scanr", as_str(author_data.get("role")))
 
         addresses: list[AddressRecord] = []
+        signature_rors: set[RorId] = set()
         affiliations = [as_mapping(a) for a in as_sequence(author_data.get("affiliations"))]
-        for aff in select_leaf_affiliations(affiliations):
+        leaves = select_leaf_affiliations(affiliations)
+        for aff in affiliations:
+            rors = parse_ror_ids([as_str(aff.get("ror"))])
             name = (as_str(aff.get("name")) or "").strip()
-            if name:
-                countries = {
-                    pays
-                    for p in as_sequence(aff.get("detected_countries"))
-                    if (pays := normalize_country_code(as_str(p)))
-                }
-                addresses.append(AddressRecord(text=name, countries=sorted(countries) or None))
+            if not (name and any(aff is leaf for leaf in leaves)):
+                signature_rors |= rors
+                continue
+            countries = {
+                pays
+                for p in as_sequence(aff.get("detected_countries"))
+                if (pays := normalize_country_code(as_str(p)))
+            }
+            addresses.append(
+                AddressRecord(text=name, countries=sorted(countries) or None, ror_ids=rors)
+            )
 
         records.append(
             AuthorRecord(
@@ -323,7 +330,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 roles=roles or None,
                 person_identifiers=ids if ids else None,
                 addresses=addresses,
-                ror_ids=parse_ror_ids(as_str(aff.get("ror")) for aff in affiliations),
+                ror_ids=frozenset(signature_rors),
             )
         )
     return records

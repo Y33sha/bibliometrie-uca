@@ -796,10 +796,19 @@ source_authorship_rors = Table(
     metadata,
     Column("source_authorship_id", Integer, nullable=False),
     Column("ror_id", Text, nullable=False),
-    PrimaryKeyConstraint("source_authorship_id", "ror_id", name="source_authorship_rors_pkey"),
+    Column("address_id", Integer),
+    UniqueConstraint(
+        "source_authorship_id",
+        "ror_id",
+        "address_id",
+        name="source_authorship_rors_key",
+        postgresql_nulls_not_distinct=True,
+    ),
     comment=(
-        "ROR attribués par la source à une signature. ror_id est sans clé étrangère vers "
-        "ror_organizations : une source peut citer un ROR absent du dump importé."
+        "ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation, "
+        "ou à la seule signature quand l'affiliation est sans texte (address_id vide). ror_id est "
+        "sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump "
+        "importé."
     ),
     schema="sources",
 )

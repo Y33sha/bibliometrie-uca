@@ -40,9 +40,9 @@ _TEI = """<?xml version="1.0" encoding="UTF-8"?>
 
 def test_ror_des_structures_de_chaque_auteur_dans_l_ordre():
     assert parse_tei_author_rors(_TEI) == [
-        ["https://ror.org/03vgfxd91", "https://ror.org/035xkbk20"],
+        [["1", "https://ror.org/03vgfxd91"], ["2", "https://ror.org/035xkbk20"]],
         [],
-        ["https://ror.org/035xkbk20"],
+        [["2", "https://ror.org/035xkbk20"]],
     ]
 
 

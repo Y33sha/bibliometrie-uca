@@ -318,9 +318,9 @@ class TestParseApiAuthors:
         authors = _parse_api_authors(static, {})
         a = authors[0]
         assert a["raw_affiliation"] == "Univ Clermont, France | CNRS, Paris"
-        assert a["addresses"] == ["Univ Clermont, France", "CNRS, Paris"]
+        assert [x["text"] for x in a["addresses"]] == ["Univ Clermont, France", "CNRS, Paris"]
 
-    def test_organizations_collected_via_addr_no_dedup_by_name(self):
+    def test_ror_of_the_organizations_of_each_address(self):
         static = {
             "summary": {"names": {"name": [_make_author_name(addr_no="1 2")]}},
             "fullrecord_metadata": {
@@ -338,8 +338,8 @@ class TestParseApiAuthors:
                             2,
                             "Other",
                             orgs=[
-                                {"content": "ICCF"},  # doublon → dédupliqué
-                                {"content": "CNRS"},
+                                {"content": "ICCF"},
+                                {"content": "CNRS", "ror_id": "ror-2"},
                             ],
                         ),
                     ]
@@ -347,8 +347,7 @@ class TestParseApiAuthors:
             },
         }
         authors = _parse_api_authors(static, {})
-        org_names = [o["name"] for o in authors[0]["organizations"]]
-        assert org_names == ["Univ Clermont Auvergne", "ICCF", "CNRS"]
+        assert [x["ror_ids"] for x in authors[0]["addresses"]] == [["ror-1"], ["ror-2"]]
 
     def test_is_corresponding_from_reprint_Y(self):
         static = {
@@ -780,9 +779,9 @@ class TestExtractFromExport:
         assert [a["full_name"] for a in authors] == ["Doe, Jane", "Martin, Paul", "Durand, Anne"]
         assert [a["position"] for a in authors] == [0, 1, 2]
         assert authors[0]["addresses"] == [
-            "Univ Clermont Auvergne, F-63000 Clermont Ferrand, France"
+            {"text": "Univ Clermont Auvergne, F-63000 Clermont Ferrand, France", "ror_ids": []}
         ]
-        assert authors[2]["addresses"] == ["Univ Lyon, Lyon, France"]
+        assert authors[2]["addresses"] == [{"text": "Univ Lyon, Lyon, France", "ror_ids": []}]
         assert [a["is_corresponding"] for a in authors] == [False, True, False]
         assert authors[2]["researcher_id"] == "A-1234-2020"
         assert authors[0]["last_name"] == "Doe"
@@ -999,8 +998,7 @@ class TestBuildWosAuthorRecords:
                     "orcid": "0000-0001-2345-6789",
                     "researcher_id": "R-1",
                     "is_corresponding": True,
-                    "addresses": ["addr-X"],
-                    "organizations": [{"name": "ICCF"}, {"name": "UCA"}],
+                    "addresses": [{"text": "addr-X", "ror_ids": ["https://ror.org/01a8ajp46"]}],
                     "roles": ["author"],
                 },
             ],
@@ -1023,7 +1021,6 @@ class TestBuildWosAuthorRecords:
                     "full_name": "Jane",
                     "daisng_id": "D-1",
                     "is_corresponding": False,
-                    "organizations": [],
                     "addresses": [],
                 },
             ],
