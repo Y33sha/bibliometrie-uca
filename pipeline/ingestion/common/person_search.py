@@ -118,12 +118,6 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
             raise ExtractionConfigError("aucune personne RH à identifiant confirmé ou authentifié")
         return PersonSearchConfig(persons=persons)
 
-    def setup_logging(self, args: argparse.Namespace, config: PersonSearchConfig) -> None:  # noqa: ARG002
-        labels = ", ".join(
-            PERSON_IDENTIFIER_LABELS[t] for t in PersonIdentifierType if t in self.id_types
-        )
-        self.logger.info("%s, par %s", accord(len(config.persons), "personne"), labels)
-
     def extract_all(self, args: argparse.Namespace, config: PersonSearchConfig) -> PhaseMetrics:
         all_years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
         years = (min(all_years), max(all_years))
@@ -153,7 +147,10 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
                 avancement.avance(len(batch))
             return metrics
 
-        return self._extrait_d_un_tenant(len(persons), extrait)
+        labels = ", ".join(
+            PERSON_IDENTIFIER_LABELS[t] for t in PersonIdentifierType if t in self.id_types
+        )
+        return self._extrait_d_un_tenant(len(persons), extrait, par=labels)
 
     def _extract_batch(
         self,
