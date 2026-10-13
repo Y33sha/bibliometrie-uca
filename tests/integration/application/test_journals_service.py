@@ -24,6 +24,7 @@ from domain.errors import (
 )
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.journals.journal import JournalType, OaModel
+from domain.merge import MergedEntity
 from infrastructure.repositories import (
     journal_repository,
     publisher_repository,
@@ -41,6 +42,7 @@ from tests.integration.helpers.journals import (
     mark_checked_in_sudoc,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_publication
 
 # Revue « Nature » par défaut, sans devise d'APC.
@@ -343,6 +345,7 @@ class TestMergePublishers:
             id=target,
         )
         assert row.publisher_type == expected
+        assert redirect_of(sa_sync_conn, MergedEntity.PUBLISHER, source) == target
 
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, recompute):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
@@ -676,6 +679,7 @@ class TestMergeJournals:
         assert (
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
+        assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, source) == target
 
     def _merge(self, conn, repo, recompute, target, source):
         merge_journals(

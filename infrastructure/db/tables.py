@@ -36,6 +36,7 @@ from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
+from domain.merge import MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
@@ -142,6 +143,24 @@ config = Table(
         name="config_delay_is_positive_integer",
     ),
     schema="ops",
+)
+
+
+merge_redirects = Table(
+    "merge_redirects",
+    metadata,
+    Column(
+        "entity",
+        PgEnum(*MergedEntity, name="merged_entity", create_type=False),
+        primary_key=True,
+    ),
+    Column("absorbed_id", Integer, primary_key=True),
+    Column("kept_id", Integer, nullable=False),
+    Column("merged_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    comment=(
+        "Identifiant d'une entité absorbée par une fusion, et identifiant de l'entité conservée. "
+        "Une redirection en chaîne mène directement à la dernière entité conservée."
+    ),
 )
 
 

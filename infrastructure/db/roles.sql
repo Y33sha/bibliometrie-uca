@@ -128,7 +128,7 @@ GRANT INSERT ON
 TO bibliometrie_app;
 
 GRANT INSERT, UPDATE ON
-    persons.distinct_persons, publications.publications_detail
+    persons.distinct_persons, public.merge_redirects, publications.publications_detail
 TO bibliometrie_app;
 
 GRANT UPDATE ON

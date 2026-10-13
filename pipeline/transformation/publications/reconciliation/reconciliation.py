@@ -4,6 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.merge import MergedEntity
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -11,6 +12,7 @@ from domain.source_publications.keys import (
 )
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_int
+from infrastructure.repositories.merge_steps import record_redirect
 
 
 class ReconcileRow(NamedTuple):
@@ -213,11 +215,12 @@ class PublicationsReconciliationQueries:
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
-        """Re-pointe les paiements APC (`apc_payments`) d'une publication **dissoute** vers son successeur. À appeler avant la suppression de la publication dissoute, qui les détacherait (SET NULL)."""
+        """Re-pointe les paiements APC (`apc_payments`) d'une publication **dissoute** vers son successeur, et enregistre la redirection de son identifiant. À appeler avant la suppression de la publication dissoute, qui détacherait ses paiements (SET NULL)."""
         conn.execute(
             text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
             {"s": from_publication_id, "t": to_publication_id},
         )
+        record_redirect(conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id)
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
         """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""

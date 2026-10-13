@@ -6,11 +6,13 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
+from domain.merge import MergedEntity
 from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher
+from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de titre « Chapitre ».
@@ -93,6 +95,7 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
         text("SELECT count(*) FROM monographs WHERE id = :id"), {"id": source}
     ).scalar_one()
     assert gone == 0
+    assert redirect_of(sa_sync_conn, MergedEntity.MONOGRAPH, source) == target
 
 
 def _journal(conn, title: str, issn: str | None = None) -> int:

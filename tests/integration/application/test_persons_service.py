@@ -28,6 +28,7 @@ from domain.errors import (
     RejectedPairError,
     ValidationError,
 )
+from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories import (
@@ -47,6 +48,7 @@ from tests.integration.helpers.persons import (
     insert_rejected_authorship,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.structures import insert_persons_perimeter
 
@@ -491,6 +493,12 @@ class TestMergePerson:
         p = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             merge_person(p, 999999, repo=repo)
+
+    def test_absorbed_id_redirects_to_kept(self, sa_sync_conn, repo):
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        merge_person(target, source, repo=repo)
+        assert redirect_of(sa_sync_conn, MergedEntity.PERSON, source) == target
 
     def test_absorbed_verdict_kept(self, sa_sync_conn, repo):
         """Le rejet d'une forme de la personne absorbée survit à la fusion."""

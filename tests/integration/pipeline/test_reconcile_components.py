@@ -8,6 +8,7 @@ from functools import partial
 
 from sqlalchemy import bindparam, text
 
+from domain.merge import MergedEntity
 from domain.source_publications.keys import project_confirmation_keys
 from pipeline.transformation.publications.reconciliation.reconcile_components import reconcile, run
 from pipeline.transformation.publications.reconciliation.reconciliation import (
@@ -17,6 +18,7 @@ from pipeline.transformation.publications.reconciliation.reconciliation import (
 
 _Q = PublicationsReconciliationQueries()
 from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 # Notice OpenAlex de 2024, de titre « T », article par défaut.
@@ -143,6 +145,7 @@ class TestEndToEnd:
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
         assert not _pub_exists(conn, absorbed)
+        assert redirect_of(conn, MergedEntity.PUBLICATION, absorbed) == anchor
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
