@@ -9,6 +9,7 @@ Usage :
 
 import argparse
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -60,6 +61,23 @@ DOC_TYPE_LABELS = {
     DocType.ERRATUM: "Erratum",
     DocType.OTHER: "Autre",
 }
+
+# Préfixe DOI propre à un serveur de preprints. bioRxiv et medRxiv partagent les leurs.
+PREPRINT_SERVERS = {
+    "10.48550": "arXiv",
+    "10.1101": "bioRxiv",
+    "10.64898": "bioRxiv",
+    "10.2139": "SSRN",
+    "10.21203": "Research Square",
+    "10.20944": "Preprints.org",
+    "10.22541": "Authorea",
+    "10.31234": "PsyArXiv",
+    "10.31235": "SocArXiv",
+    "10.31219": "OSF Preprints",
+    "10.26434": "ChemRxiv",
+    "10.31223": "EarthArXiv",
+}
+PREPRINT_SERVER_NAMES = frozenset(PREPRINT_SERVERS.values()) | {"medRxiv"}
 
 MODEL_LABELS = {"full_oa": "Open access", "subscription": "Abonnement"}
 
@@ -481,6 +499,41 @@ class OpenScienceReport:
             + "\n\nLa licence vient de DataCite."
         )
 
+    def preprints(self) -> str:
+        rows = self._rows(
+            f"""
+            SELECT p.pub_year AS year,
+                   ARRAY(
+                       SELECT DISTINCT split_part(sp.doi, '/', 1) FROM source_publications sp
+                       WHERE sp.publication_id = p.id AND sp.doi IS NOT NULL
+                   ) AS prefixes,
+                   ARRAY(
+                       SELECT DISTINCT regexp_replace(sp.container_title, '\\s*\\(.*\\)$', '') FROM source_publications sp
+                       WHERE sp.publication_id = p.id AND sp.source = 'openalex' AND sp.container_title IS NOT NULL
+                   ) AS openalex_sources
+            FROM ({LAB_PUBLICATIONS}) p
+            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
+            """,
+            span=EVOLUTION_YEARS,
+        )
+        period = f"{self.year - EVOLUTION_YEARS + 1}–{self.year}"
+        if not rows:
+            return f"## Preprints\n\nAucun preprint sur {period}."
+        by_year = Counter(r.year for r in rows)
+        by_platform = Counter(
+            preprint_server(r.prefixes, r.openalex_sources) or "Autre plateforme ou archive"
+            for r in rows
+        )
+        return (
+            "## Preprints\n\n"
+            + _table(["Année", "Preprints"], sorted(by_year.items()))
+            + f"\n\nPlateformes, {period} :\n\n"
+            + _table(["Serveur", "Preprints"], by_platform.most_common())
+            + "\n\nServeur de preprints : entrepôt doté d'un préfixe DOI propre, qui héberge presque uniquement des preprints. Le serveur se déduit du préfixe DOI. "
+            "OpenAlex distingue bioRxiv et medRxiv, qui partagent leurs préfixes. "
+            "Une archive qui attribue son propre DOI à la copie d'un preprint (DESY, RWTH) est remplacée par le serveur que désigne OpenAlex."
+        )
+
     def sources(self) -> str:
         rows = self._rows(f"""
             SELECT s AS source, COUNT(*) AS n
@@ -557,10 +610,19 @@ class OpenScienceReport:
             self.theses(),
             self.collaborations(),
             self.orcid_section(orcid),
+            self.preprints(),
             self.datasets(),
             self.sources(),
         ]
         return "\n\n".join(sections) + "\n"
+
+
+def preprint_server(prefixes: Sequence[str], openalex_sources: Sequence[str]) -> str | None:
+    """Serveur de preprints d'une publication, d'après les préfixes de ses DOI, à défaut d'après la source de sa notice OpenAlex."""
+    for prefix in sorted(prefixes):
+        if server := PREPRINT_SERVERS.get(prefix):
+            return "medRxiv" if server == "bioRxiv" and "medRxiv" in openalex_sources else server
+    return next((s for s in openalex_sources if s in PREPRINT_SERVER_NAMES), None)
 
 
 def structure_id(conn: Connection, code: str) -> int | None:
