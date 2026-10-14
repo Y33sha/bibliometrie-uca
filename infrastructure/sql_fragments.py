@@ -3,6 +3,7 @@
 Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une signature), et des expressions SQL figées.
 """
 
+from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
@@ -17,6 +18,15 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
     """Fragment `CASE <col> WHEN 'v1' THEN 1 … END` classant `col` par l'ordre de `values`, pour un `ORDER BY` ou un `array_agg(… ORDER BY …)`."""
     whens = " ".join(f"WHEN '{v}' THEN {i + 1}" for i, v in enumerate(values))
     return f"CASE {col} {whens} END"
+
+
+def diamond_journal_sql(journal: str = "j") -> str:
+    """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
+    return (
+        f"({journal}.oa_model = '{OaModel.DIAMOND.value}' OR ({journal}.is_in_doaj"
+        f" AND {journal}.doaj_payload->>'APC' = 'No'"
+        f" AND {journal}.doaj_payload->>'Has other fees' = 'No'))"
+    )
 
 
 def identifier_neutralized(

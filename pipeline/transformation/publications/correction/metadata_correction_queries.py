@@ -20,6 +20,7 @@ from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
 from infrastructure.db.tables import source_publications
+from infrastructure.sql_fragments import diamond_journal_sql
 
 
 class UnaryCorrectionRow(NamedTuple):
@@ -50,6 +51,7 @@ class UnaryCorrectionRow(NamedTuple):
     registrant_publisher_type: str | None
     in_proceedings_volume: bool
     group_title: str | None
+    journal_diamond: bool
 
     def for_correction(self) -> MetadataForCorrection:
         """Projette la ligne vers le contrat d'entrée des règles."""
@@ -68,6 +70,7 @@ class UnaryCorrectionRow(NamedTuple):
             registrant_publisher_type=self.registrant_publisher_type,
             in_proceedings_volume=self.in_proceedings_volume,
             group_title=self.group_title,
+            journal_diamond=self.journal_diamond,
         )
 
 
@@ -141,9 +144,9 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`. Chaque
+# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue. Chaque
 # variante ajoute son `WHERE`.
-_SELECT = """
+_SELECT = f"""
     SELECT sp.id, sp.source::text AS source, sp.source_id,
            sp.title, sp.doc_type, sp.doi,
            sp.journal_id, sp.oa_status, sp.language,
@@ -156,7 +159,8 @@ _SELECT = """
            COALESCE(sp.meta ? 'conference', false) AS declares_conference,
            rp.publisher_type::text AS registrant_publisher_type,
            COALESCE(m.proceedings, false) AS in_proceedings_volume,
-           sp.meta->>'group_title' AS group_title
+           sp.meta->>'group_title' AS group_title,
+           COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
     LEFT JOIN monographs m ON m.id = sp.monograph_id

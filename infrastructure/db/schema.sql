@@ -235,6 +235,7 @@ CREATE TYPE public.merged_entity AS ENUM (
 CREATE TYPE public.oa_model AS ENUM (
     'subscription',
     'full_oa',
+    'diamond',
     'repository'
 );
 

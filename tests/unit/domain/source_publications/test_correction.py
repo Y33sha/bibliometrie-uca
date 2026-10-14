@@ -912,6 +912,38 @@ class TestHybridFullOaRule:
         assert effective_metadata(_view(oa_status="green", oa_model="full_oa")).oa_status is None
 
 
+class TestDiamondJournalRules:
+    """Le diamant suit la revue : un article ouvert d'une revue diamant est diamant, un diamant hors revue diamant est gold."""
+
+    def _corrected(self, **overrides: object):
+        return effective_metadata(_view(**overrides)).oa_status
+
+    def test_gold_in_diamond_journal_becomes_diamond(self):
+        corrected = self._corrected(oa_status="gold", journal_diamond=True)
+        assert corrected is not None
+        assert corrected.value == "diamond"
+        assert corrected.rule == MetadataCorrectionRule.GOLD_DIAMOND_JOURNAL_TO_DIAMOND
+
+    def test_hybrid_in_diamond_full_oa_journal_becomes_diamond(self):
+        # La règle diamant précède `HYBRID_FULL_OA_TO_GOLD`.
+        corrected = self._corrected(oa_status="hybrid", oa_model="full_oa", journal_diamond=True)
+        assert corrected is not None
+        assert corrected.value == "diamond"
+        assert corrected.rule == MetadataCorrectionRule.HYBRID_DIAMOND_JOURNAL_TO_DIAMOND
+
+    def test_diamond_outside_diamond_journal_becomes_gold(self):
+        corrected = self._corrected(oa_status="diamond", oa_model="full_oa", journal_diamond=False)
+        assert corrected is not None
+        assert corrected.value == "gold"
+        assert corrected.rule == MetadataCorrectionRule.DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD
+
+    def test_diamond_in_diamond_journal_untouched(self):
+        assert self._corrected(oa_status="diamond", journal_diamond=True) is None
+
+    def test_green_in_diamond_journal_untouched(self):
+        assert self._corrected(oa_status="green", journal_diamond=True) is None
+
+
 class TestPreprintRelationRule:
     def test_declared_preprint_retyped_even_without_doc_type(self):
         # Crossref n'a pas typé le record (doc_type nul) mais déclare is-preprint-of.

@@ -13,6 +13,7 @@ from __future__ import annotations
 EXPECTED_OA_STATUSES_BY_OA_MODEL: dict[str, frozenset[str]] = {
     "subscription": frozenset({"closed", "green", "hybrid", "bronze"}),
     "full_oa": frozenset({"gold", "diamond", "green"}),
+    "diamond": frozenset({"diamond", "green"}),
     "repository": frozenset({"green"}),
 }
 

@@ -269,6 +269,34 @@ def test_expired_embargo_promoted_to_green(sa_sync_conn):
     }
 
 
+def _oa_status(conn, sp_id: int) -> str:
+    return conn.execute(
+        text("SELECT oa_status::text FROM source_publications WHERE id = :id"), {"id": sp_id}
+    ).scalar_one()
+
+
+def test_diamond_follows_the_journal(sa_sync_conn):
+    conn = sa_sync_conn
+    doaj_free = insert_journal(conn, "Sans frais", oa_model="full_oa", is_in_doaj=True)
+    conn.execute(
+        text("UPDATE journals SET doaj_payload = CAST(:p AS jsonb) WHERE id = :id"),
+        {"p": json.dumps({"APC": "No", "Has other fees": "No"}), "id": doaj_free},
+    )
+    marked = insert_journal(conn, "Marquée", oa_model="diamond")
+    paying = insert_journal(conn, "Payante", oa_model="full_oa")
+    gold_in_doaj = _notice(conn, source_id="W-d1", oa_status="gold", journal_id=doaj_free)
+    gold_in_marked = _notice(conn, source_id="W-d2", oa_status="gold", journal_id=marked)
+    diamond_in_paying = _notice(conn, source_id="W-d3", oa_status="diamond", journal_id=paying)
+    diamond_without_journal = _notice(conn, source_id="W-d4", oa_status="diamond")
+
+    _apply(conn)
+
+    assert _oa_status(conn, gold_in_doaj) == "diamond"
+    assert _oa_status(conn, gold_in_marked) == "diamond"
+    assert _oa_status(conn, diamond_in_paying) == "gold"
+    assert _oa_status(conn, diamond_without_journal) == "gold"
+
+
 def test_active_embargo_not_promoted(sa_sync_conn):
     conn = sa_sync_conn
     # Date de levée future ⇒ `embargo_expired` faux ⇒ pas de promotion.
