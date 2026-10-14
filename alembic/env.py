@@ -6,6 +6,8 @@ permettre `alembic revision --autogenerate`.
 L'URL de connexion est construite depuis `infrastructure.settings`,
 avec driver `postgresql+psycopg` (psycopg3) aligné sur
 `infrastructure/db/engine.py`.
+
+Après toute migration jouée en ligne, les droits des rôles de l'API et du pipeline sont réappliqués (`infrastructure/db/grants.sql`), si ces rôles existent.
 """
 
 from logging.config import fileConfig
@@ -14,6 +16,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from infrastructure.db.engine import db_url
+from infrastructure.db.grants import apply_grants
 from infrastructure.db.tables import metadata
 
 config = context.config
@@ -89,6 +92,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         connect_args=_CONNECT_ARGS,
     )
+    applied: list[object] = []
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
@@ -96,9 +100,13 @@ def run_migrations_online() -> None:
             include_object=_include_object,
             include_schemas=True,
             include_name=_include_name,
+            on_version_apply=lambda **kwargs: applied.append(kwargs["step"]),
         )
         with context.begin_transaction():
             context.run_migrations()
+            # Une migration qui crée ou recrée une table lui laisse les seuls privilèges par défaut : les droits de `grants.sql` sont réalignés dans la même transaction.
+            if applied:
+                apply_grants(connection)
 
 
 if context.is_offline_mode():
