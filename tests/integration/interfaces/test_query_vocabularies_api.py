@@ -34,9 +34,9 @@ class TestValeursAdmises:
             ("/api/publications", {"source_filter": "hal_yes,oa_no"}),
             ("/api/publications", {"is_corresponding": "yes,no"}),
             ("/api/publications", {"in_perimeter": "yes"}),
-            ("/api/publications", {"has_apc": "uca,none"}),
+            ("/api/publications", {"has_apc": "institution,none"}),
             ("/api/publications/export.csv", {"columns": "title,year,journal"}),
-            ("/api/stats/facets", {"has_apc": "non_uca"}),
+            ("/api/stats/facets", {"has_apc": "other"}),
         ],
     )
     def test_passent(self, client, chemin, params):
@@ -48,7 +48,7 @@ class TestOrigineApc:
 
     @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/facets"])
     def test_admise_avec_un_laboratoire(self, client, chemin):
-        r = client.get(chemin, params={"has_apc": "uca,none", "lab_id": "1"})
+        r = client.get(chemin, params={"has_apc": "institution,none", "lab_id": "1"})
         assert r.status_code == 200
 
     def test_origine_inconnue_refusee(self, client):

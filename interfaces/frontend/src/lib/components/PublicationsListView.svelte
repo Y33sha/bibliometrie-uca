@@ -77,7 +77,7 @@
 		publisherId?: number;
 		monographId?: number;
 	}
-	type ApcMode = 'uca' | 'person-uca';
+	type ApcMode = 'institution' | 'person';
 	let {
 		apiKey = 'pub-list',
 		externalFilters,
@@ -88,7 +88,7 @@
 		showCorrespondingColumn = false,
 		showPerimeterFacet = false,
 		showAdminExclude = false,
-		apcMode = 'uca' as ApcMode,
+		apcMode = 'institution' as ApcMode,
 		perPage = 100,
 		restrictToPublications = false,
 		onExcludeAuthorship,
@@ -109,8 +109,8 @@
 		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
-		 *  - 'uca' : paiements sur un budget du périmètre de l'établissement (défaut)
-		 *  - 'person-uca' : 'uca' + classe `apc-other` si !is_corresponding */
+		 *  - 'institution' : paiements sur un budget du périmètre de l'établissement (défaut)
+		 *  - 'person' : 'institution' + classe `apc-other` si !is_corresponding */
 		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
@@ -671,7 +671,7 @@
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
 							{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
-							{@const isPersonNonCorr = apcMode === 'person-uca' && !p.is_corresponding}
+							{@const isPersonNonCorr = apcMode === 'person' &&!p.is_corresponding}
 							{#if ucaApc.length > 0}
 								<span class="apc-tag" class:apc-other={isPersonNonCorr}
 									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>

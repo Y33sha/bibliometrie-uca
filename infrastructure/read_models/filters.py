@@ -349,21 +349,21 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
 def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
     """Filtre des publications par origine du paiement APC.
 
-    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters résolvent et qui tiennent lieu de structures « internes » : une publication APC est classée "uca" quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
+    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters résolvent et qui tiennent lieu de structures « internes » : une publication APC est classée `institution` quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
     """
     if not has_apc:
         return None
     parts: list[str] = []
     needs_root = False
     for v in has_apc:
-        if v == "uca":
+        if v == "institution":
             parts.append(
                 "EXISTS (SELECT 1 FROM apc_payments ap "
                 "WHERE ap.publication_id = p.id "
                 "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[])))"
             )
             needs_root = True
-        elif v in ("other", "non_uca"):
+        elif v == "other":
             parts.append(
                 "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
                 "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "

@@ -246,7 +246,7 @@
 				showPerimeterFacet
 				showAdminExclude={isAdmin}
 				onExcludeAuthorship={excludeAuthorship}
-				apcMode="person-uca"
+				apcMode="person"
 				perPage={50}
 			/>
 		</div>
