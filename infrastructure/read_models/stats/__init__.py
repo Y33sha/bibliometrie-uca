@@ -68,7 +68,9 @@ class PgStatsQueries(StatsQueries):
                 )
                 for d in DIMENSIONS.values()
             ],
-            measures=[PivotMeasureOut(key=m.key, label=m.label) for m in MEASURES.values()],
+            measures=[
+                PivotMeasureOut(key=m.key, label=m.label, unit=m.unit) for m in MEASURES.values()
+            ],
         )
 
     def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:

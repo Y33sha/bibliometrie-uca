@@ -35,9 +35,6 @@ PublicationSort = Literal[
 ]
 
 
-# Vocabulaire du filtre par origine du paiement des frais de publication. `institution` retient les publications qu'une structure du périmètre a payées, `other` celles payées hors du périmètre, `none` celles sans paiement connu.
-APC_ORIGINS: frozenset[str] = frozenset({"institution", "other", "none"})
-
 # Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles
 # paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le
 # titre et les liens paraissent quoi qu'il arrive.
@@ -65,7 +62,7 @@ class PublicationFilters:
 
     Les trois lectures répondent aux mêmes questions sur le même ensemble : leurs décomptes, leurs lignes et leur export ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Tous les champs ont un défaut, ce qui autorise les constructions partielles.
 
-    Les listes valent absence de filtre quand elles sont vides. `lab_none` retient les publications qu'aucun laboratoire ne signe ; `is_corresponding` et `in_perimeter` prennent des valeurs de `yes` / `no` combinées en OR, où cocher les deux ne contraint rien. `has_apc` prend des valeurs d'`APC_ORIGINS` combinées en OR.
+    Les listes valent absence de filtre quand elles sont vides. `lab_none` retient les publications qu'aucun laboratoire ne signe ; `is_corresponding`, `in_perimeter` et `has_apc` prennent des valeurs de `yes` / `no` combinées en OR, où cocher les deux ne contraint rien. `has_apc` retient les publications dont un paiement d'APC est imputé au budget d'une structure du périmètre.
 
     `person_id` définit l'ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui. `author_id` restreint l'ensemble courant aux publications d'un auteur ; les deux se combinent.
     """

@@ -2,7 +2,8 @@
 
 from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.stats.pivot import run_pivot
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.publications import insert_apc_payment, insert_publication
+from tests.integration.helpers.structures import insert_structure
 
 
 def _piv(conn, measure, groups, doc_types=("article", "review")):
@@ -83,3 +84,68 @@ class TestPivotEngine:
         assert restricted.rows == [{"value": 1}]
         unrestricted = _piv(sa_sync_conn, "pub_count", [], doc_types=())
         assert unrestricted.rows == [{"value": 2}]
+
+
+class TestApcAmount:
+    """Montant des APC : paiements imputés au budget d'une structure du périmètre, tous frais confondus."""
+
+    def _seed(self, conn):
+        inside = insert_structure(conn, "pivot_apc_inside", structure_type="universite")
+        outside = insert_structure(conn, "pivot_apc_outside", structure_type="universite")
+        paid = insert_publication(conn, in_perimeter=True, oa_status="gold", pub_year=2024)
+        for amount, budget, oa_fee in (
+            (100, inside, True),
+            (50, inside, False),
+            (1000, outside, True),
+        ):
+            insert_apc_payment(
+                conn,
+                publication_id=paid,
+                amount_eur_ht=amount,
+                budget_structure_id=budget,
+                open_access_fee=oa_fee,
+            )
+        paid_elsewhere = insert_publication(
+            conn, in_perimeter=True, oa_status="gold", pub_year=2024
+        )
+        insert_apc_payment(
+            conn,
+            publication_id=paid_elsewhere,
+            amount_eur_ht=300,
+            budget_structure_id=outside,
+            open_access_fee=True,
+        )
+        insert_publication(conn, in_perimeter=True, oa_status="gold", pub_year=2023)
+        return inside
+
+    def _pivot(self, conn, inside, groups):
+        return run_pivot(
+            conn,
+            measure="apc_amount",
+            groups=list(groups),
+            perimeter_structure_ids=[inside],
+            filters=StatsFilters(),
+        )
+
+    def test_sums_only_institution_payments(self, sa_sync_conn):
+        inside = self._seed(sa_sync_conn)
+
+        assert self._pivot(sa_sync_conn, inside, []).rows == [{"value": 150.0}]
+
+    def test_grouped_by_year(self, sa_sync_conn):
+        inside = self._seed(sa_sync_conn)
+
+        rows = self._pivot(sa_sync_conn, inside, ["year"]).rows
+        assert {r["year"]: r["value"] for r in rows} == {2023: 0.0, 2024: 150.0}
+
+    def test_apc_filter_keeps_institution_paid_publications(self, sa_sync_conn):
+        inside = self._seed(sa_sync_conn)
+
+        res = run_pivot(
+            sa_sync_conn,
+            measure="pub_count",
+            groups=[],
+            perimeter_structure_ids=[inside],
+            filters=StatsFilters(has_apc=["yes"]),
+        )
+        assert res.rows == [{"value": 1}]

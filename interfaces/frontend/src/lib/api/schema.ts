@@ -4401,6 +4401,8 @@ export interface components {
             key: string;
             /** Label */
             label: string;
+            /** Unit */
+            unit: string;
         };
         /**
          * PivotResponse

@@ -61,8 +61,15 @@
 	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
-	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
-	const measure = 'pub_count';
+	// Mesure agrégée par le pivot : nombre de publications, ou montant des APC payées par l'établissement. Le taux d'open access se lit via le découpage par accès.
+	let measure = $state('pub_count');
+	const measureDef = $derived(pivotSchema?.measures.find((m) => m.key === measure));
+	// Valeur affichée d'une barre ou d'un total : entier pour un nombre de publications, montant arrondi à l'euro suivi de l'unité pour une somme.
+	function formatValue(value: number): string {
+		const unit = measureDef?.unit;
+		const text = Math.round(value).toLocaleString('fr-FR');
+		return unit ? `${text} ${unit}` : text;
+	}
 
 	// Entrée spéciale du sélecteur d'indicateur : remplace l'histogramme par la carte des collaborations internationales. Ce n'est pas une dimension du pivot, d'où les gardes dédiées.
 	const COLLAB_VIEW = 'collaborations';
@@ -227,6 +234,7 @@
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			journalId: { type: 'single', urlKey: 'journal_id' },
+			measure: { type: 'single', urlKey: 'measure', defaultValue: 'pub_count' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -245,6 +253,7 @@
 			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
 			journalId: selectedJournalId ?? '',
+			measure,
 			primaryBy,
 			groupBy,
 			chartMode,
@@ -342,7 +351,7 @@
 		const valueMax = Math.max(0, ...allCats.map(catTotal));
 
 		const datasets = series.map((sv, i) => ({
-			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
+			label: stackDim ? dimLabel(stackDim, sv) : (measureDef?.label ?? 'Publications'),
 			data: cats.map((cv) => cell(cv, sv)),
 			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
 			barPercentage: 0.85,
@@ -373,7 +382,7 @@
 									const val = ctx.raw as number;
 									const total = sliceTotal(ctx);
 									const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-									return `${ctx.label} : ${val} (${pct}%)`;
+									return `${ctx.label} : ${formatValue(val)} (${pct}%)`;
 								}
 							}
 						},
@@ -424,11 +433,11 @@
 										const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
 										return part
 											? `${ctx.dataset.label} : ${pct}%`
-											: `${ctx.dataset.label} : ${val} (${pct}%)`;
+											: `${ctx.dataset.label} : ${formatValue(val)} (${pct}%)`;
 									},
 									afterBody: (items) => {
 										const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
-										return part ? [] : `Total : ${total}`;
+										return part ? [] : `Total : ${formatValue(total)}`;
 									}
 								}
 					},
@@ -457,7 +466,7 @@
 					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 30 ? l.slice(0, 30) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
-						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0 } }
+						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
 				}
 			}
 		});
@@ -516,6 +525,7 @@
 			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
 		if (restored.journalId) selectedJournalId = restored.journalId as string;
+		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
@@ -561,6 +571,15 @@
 			</select>
 		</label>
 		{#if !isCollab}
+		<span class="sep" aria-hidden="true"></span>
+		<label class="groupby">
+			Mesure&nbsp;:
+			<select bind:value={measure} onchange={() => { syncUrl(); loadChart(); }}>
+				{#each pivotSchema.measures as m (m.key)}
+					<option value={m.key}>{m.unit ? `${m.label} (${m.unit})` : m.label}</option>
+				{/each}
+			</select>
+		</label>
 		<span class="sep" aria-hidden="true"></span>
 		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
 		{#key primaryBy}

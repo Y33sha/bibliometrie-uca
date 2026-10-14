@@ -34,23 +34,23 @@ class TestValeursAdmises:
             ("/api/publications", {"source_filter": "hal_yes,oa_no"}),
             ("/api/publications", {"is_corresponding": "yes,no"}),
             ("/api/publications", {"in_perimeter": "yes"}),
-            ("/api/publications", {"has_apc": "institution,none"}),
+            ("/api/publications", {"has_apc": "yes,no"}),
             ("/api/publications/export.csv", {"columns": "title,year,journal"}),
-            ("/api/stats/facets", {"has_apc": "other"}),
+            ("/api/stats/facets", {"has_apc": "no"}),
         ],
     )
     def test_passent(self, client, chemin, params):
         assert client.get(chemin, params=params).status_code == 200
 
 
-class TestOrigineApc:
-    """L'origine du paiement se prend dans son vocabulaire, avec ou sans sélection de laboratoires."""
+class TestFiltreApc:
+    """Le filtre APC prend `yes` / `no`, avec ou sans sélection de laboratoires."""
 
     @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/facets"])
-    def test_admise_avec_un_laboratoire(self, client, chemin):
-        r = client.get(chemin, params={"has_apc": "institution,none", "lab_id": "1"})
+    def test_admis_avec_un_laboratoire(self, client, chemin):
+        r = client.get(chemin, params={"has_apc": "yes", "lab_id": "1"})
         assert r.status_code == 200
 
-    def test_origine_inconnue_refusee(self, client):
-        r = client.get("/api/publications", params={"has_apc": "this_lab", "lab_id": "1"})
+    def test_valeur_inconnue_refusee(self, client):
+        r = client.get("/api/publications", params={"has_apc": "institution", "lab_id": "1"})
         assert r.status_code == 422
