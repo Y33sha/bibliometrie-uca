@@ -9,6 +9,8 @@
 
 ### Non commencé
 
+- [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
+- [Appartenance et périmètre](DATA_perimetre.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
@@ -17,7 +19,6 @@
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
-- [Périmètre](DATA_perimetre.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
