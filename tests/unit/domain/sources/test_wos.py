@@ -23,6 +23,10 @@ class TestExportFields:
     def test_adresse_sans_auteur_ignoree(self):
         assert parse_export_addresses("Univ A, Paris, France; Univ B, Lyon, France") == {}
 
+    def test_adresses_sans_auteur_apres_une_adresse_d_auteur(self):
+        c1 = "[Doe, Jane] Univ A, Paris, France; Univ B, Lyon, France; Univ C, Nice, France"
+        assert parse_export_addresses(c1) == {"doe jane": ["Univ A, Paris, France"]}
+
     def test_auteurs_correspondants(self):
         rp = "Tang, KH (corresponding author), Univ A, Singapore.; Chu, H (corresponding author), Univ B, Vienna, Austria."
         assert parse_export_corresponding(rp) == {"tang kh", "chu h"}
