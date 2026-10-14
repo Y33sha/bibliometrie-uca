@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vQZmoqd45AlNKqSS1e3ahg9XRcmc9niIPAZFrAzShOdUL6EU1vARYV3CBRWRuD1
+\restrict pRiwkZoaFhER8BbaWAfe91NwgC8fsFuqhBjNOD9hr0l151YfuUY4h6Fa4jV468b
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -212,6 +212,19 @@ CREATE TYPE public.license_type AS ENUM (
     'other-oa',
     'all-rights-reserved',
     'other'
+);
+
+
+--
+-- Name: merged_entity; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.merged_entity AS ENUM (
+    'person',
+    'journal',
+    'publisher',
+    'monograph',
+    'publication'
 );
 
 
@@ -770,6 +783,25 @@ CREATE TABLE persons.rejected_authorships (
 CREATE TABLE public.alembic_version (
     version_num character varying(32) NOT NULL
 );
+
+
+--
+-- Name: merge_redirects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.merge_redirects (
+    entity public.merged_entity NOT NULL,
+    absorbed_id integer NOT NULL,
+    kept_id integer NOT NULL,
+    merged_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE merge_redirects; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.merge_redirects IS 'Identifiant d''une entité absorbée par une fusion, et identifiant de l''entité conservée. Une redirection en chaîne mène directement à la dernière entité conservée.';
 
 
 --
@@ -1787,7 +1819,8 @@ ALTER SEQUENCE sources.source_authorship_addresses_id_seq OWNED BY sources.sourc
 
 CREATE TABLE sources.source_authorship_rors (
     source_authorship_id integer NOT NULL,
-    ror_id text NOT NULL
+    ror_id text NOT NULL,
+    address_id integer
 );
 
 
@@ -1795,7 +1828,7 @@ CREATE TABLE sources.source_authorship_rors (
 -- Name: TABLE source_authorship_rors; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.source_authorship_rors IS 'ROR attribués par la source à une signature. ror_id est sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump importé.';
+COMMENT ON TABLE sources.source_authorship_rors IS 'ROR attribués par la source à une signature, rattachés à l''adresse de leur affiliation, ou à la seule signature quand l''affiliation est sans texte (address_id vide). ror_id est sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump importé.';
 
 
 --
@@ -2378,6 +2411,14 @@ ALTER TABLE ONLY public.alembic_version
 
 
 --
+-- Name: merge_redirects merge_redirects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.merge_redirects
+    ADD CONSTRAINT merge_redirects_pkey PRIMARY KEY (entity, absorbed_id);
+
+
+--
 -- Name: authorships authorships_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -2682,11 +2723,11 @@ ALTER TABLE ONLY sources.source_authorship_addresses
 
 
 --
--- Name: source_authorship_rors source_authorship_rors_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+-- Name: source_authorship_rors source_authorship_rors_key; Type: CONSTRAINT; Schema: sources; Owner: -
 --
 
 ALTER TABLE ONLY sources.source_authorship_rors
-    ADD CONSTRAINT source_authorship_rors_pkey PRIMARY KEY (source_authorship_id, ror_id);
+    ADD CONSTRAINT source_authorship_rors_key UNIQUE NULLS NOT DISTINCT (source_authorship_id, ror_id, address_id);
 
 
 --
@@ -2937,6 +2978,13 @@ CREATE INDEX idx_pnf_person_id ON persons.person_name_forms USING btree (person_
 --
 
 CREATE INDEX idx_rejected_authorships_person ON persons.rejected_authorships USING btree (person_id);
+
+
+--
+-- Name: idx_merge_redirects_kept; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merge_redirects_kept ON public.merge_redirects USING btree (entity, kept_id);
 
 
 --
@@ -3507,6 +3555,13 @@ CREATE INDEX idx_staging_source ON sources.staging USING btree (source);
 
 
 --
+-- Name: ix_source_authorship_rors_address_id; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX ix_source_authorship_rors_address_id ON sources.source_authorship_rors USING btree (address_id);
+
+
+--
 -- Name: ix_source_authorship_rors_ror_id; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -3930,6 +3985,14 @@ ALTER TABLE ONLY sources.source_authorship_addresses
 
 
 --
+-- Name: source_authorship_rors source_authorship_rors_address_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_authorship_rors
+    ADD CONSTRAINT source_authorship_rors_address_id_fkey FOREIGN KEY (address_id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_authorship_rors source_authorship_rors_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -4061,5 +4124,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vQZmoqd45AlNKqSS1e3ahg9XRcmc9niIPAZFrAzShOdUL6EU1vARYV3CBRWRuD1
+\unrestrict pRiwkZoaFhER8BbaWAfe91NwgC8fsFuqhBjNOD9hr0l151YfuUY4h6Fa4jV468b
 
