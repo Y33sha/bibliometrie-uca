@@ -1,8 +1,10 @@
 """Traduction des fiches ROR en seed d'établissement."""
 
 from interfaces.cli.dev.seed_from_ror import (
+    acronym_collection_accepted,
     build_institution_seed,
     child_structure_type,
+    choose_collection,
     name_forms,
     parse_organization,
 )
@@ -88,3 +90,32 @@ def test_seed_links_children_to_root_and_skips_untyped():
         ("perimeter_extraction", "lorraine")
     ]
     assert seed.skipped == [GARDENS]
+
+
+def test_seed_carries_hal_collections_by_ror():
+    seed = build_institution_seed(
+        ROOT, [LAB], [], "lorraine", {"04vfs2w97": "UNIV-LORRAINE", "02vnf0c38": "LORIA"}
+    )
+
+    assert [row[7] for row in _section(seed, "structures").rows] == ["UNIV-LORRAINE", "LORIA"]
+
+
+class TestChooseCollection:
+    SIZES = {"LAB": 1500, "UNIV": 130_000, "UFR": 11_000}
+
+    def test_closest_collection_wins(self):
+        candidates = [("UNIV", 525), ("LAB", 525), ("UFR", 400)]
+
+        assert choose_collection(525, candidates, self.SIZES.__getitem__) == "LAB"
+
+    def test_collection_covering_half_the_structure_is_required(self):
+        assert choose_collection(1000, [("LAB", 400)], self.SIZES.__getitem__) is None
+
+    def test_collection_much_larger_than_the_structure_is_rejected(self):
+        assert choose_collection(74, [("UFR", 57), ("UNIV", 74)], self.SIZES.__getitem__) is None
+
+
+def test_acronym_collection_needs_institution_majority():
+    assert acronym_collection_accepted(collection_docs=3219, institution_docs=3218)
+    assert not acronym_collection_accepted(collection_docs=1602, institution_docs=87)
+    assert not acronym_collection_accepted(collection_docs=0, institution_docs=0)

@@ -17,6 +17,7 @@ API_BASE_URLS: dict[str, str] = {
     # doi.org : agence d'enregistrement, l'adapter compose `/<préfixe>,<préfixe>,…`.
     "doi_org": "https://doi.org/ra",
     # Endpoints secondaires
+    "hal_structures": "https://api.archives-ouvertes.fr/ref/structure/",
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",
     "openalex_institutions": "https://api.openalex.org/institutions",
