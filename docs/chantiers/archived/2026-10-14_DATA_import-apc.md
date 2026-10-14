@@ -59,6 +59,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - **Page d'un laboratoire** : les APC de ses publications payées par l'établissement, quel que soit le laboratoire payeur.
 - **Filtre APC : oui ou non**, d'après les seuls paiements de l'établissement. Open APC recense seulement les paiements des établissements participants : un décompte des APC payées par d'autres payeurs n'est pas fiable.
 - **Mesure « Montant des APC »** : somme des frais de publication payés par l'établissement, APC et frais hors OA confondus.
+- **La réponse d'un établissement l'emporte sur Open APC.** Open APC reprend les réponses à l'enquête sous une forme variable, que la clé d'unicité ne dédoublonne pas. À chaque import, un frais d'open access Open APC d'un article que la réponse de son payeur décrit déjà est retiré.
 - **Colonnes conservées** :
   - ce qui sert au rattachement et à son contrôle a posteriori : `lab_name`, `budget`, `institution`, `coman_id`, `issn`, `journal_name`, `publisher_name` ;
   - `journal_id` et `publisher_id`, pour des agrégats par revue ou par éditeur ;
@@ -102,8 +103,3 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [x] Page stats : mesure « Montant des APC » (somme de `amount_eur_ht`), à côté du nombre de publications, croisable avec toutes les dimensions (année, laboratoire, éditeur, revue…). La mesure s'ajoute au registre `MEASURES` de `domain/stats.py` et à son agrégat SQL dans `infrastructure/read_models/stats/pivot.py`.
 - [x] `docs/sources/10-imports-manuels.md`, `docs/donnees/04-publishing.md`, `docs/donnees/09-index-des-tables.md`.
 
-## Questions ouvertes
-
-- **Laboratoire d'un frais d'open access**, reporté. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `authorships`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
-
-- **Priorité entre la réponse d'un établissement et Open APC**, reportée. Open APC reprend les réponses à l'enquête, sous une forme variable : il additionne parfois les lignes d'un même article, garde parfois la première seule, ou les garde toutes. La clé d'unicité, qui contient le montant, laisse alors passer un doublon. Proposition : à l'import Open APC, un couple (DOI, établissement) déjà présent depuis la réponse de l'établissement est ignoré. La réponse de l'établissement est plus détaillée : laboratoire, facture ligne à ligne.
