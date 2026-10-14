@@ -87,26 +87,16 @@ def _create_test_db():
 
 
 def _apply_role_grants() -> None:
-    """Crée les rôles de connexion sur la base de test et leur accorde les droits de `roles.sql`.
+    """Crée les rôles de connexion sur la base de test et leur accorde les droits de `grants.sql`.
 
     Les tests se connectent sous ces rôles, comme les processus en production : les tests d'API sous celui de l'API, ceux du pipeline sous le sien. Une écriture hors des droits accordés échoue alors en erreur de permission, nommément, au lieu d'aboutir ici et de casser une fois déployée.
-
-    Les ordres sont extraits du fichier plutôt que recopiés, de sorte que les droits n'existent qu'à un endroit. Le reste du fichier — création des rôles avec des mots de passe passés par psql, gardes sur leur absence — ne s'exécute pas ici.
     """
-    import re
-
     from psycopg import sql
 
-    from infrastructure import PROJECT_ROOT
+    from infrastructure.db.grants import grant_statements
     from infrastructure.settings import settings
 
-    fichier = (PROJECT_ROOT / "infrastructure" / "db" / "roles.sql").read_text(encoding="utf-8")
-    ordres = [
-        o.strip()
-        for o in re.findall(
-            r"^(GRANT[^;]+|REVOKE[^;]+|ALTER DEFAULT PRIVILEGES[^;]+);", fichier, re.M | re.S
-        )
-    ]
+    ordres = grant_statements()
     roles = [
         ("app", settings.db_app_user, settings.db_app_password),
         ("pipeline", settings.db_pipeline_user, settings.db_pipeline_password),

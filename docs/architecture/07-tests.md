@@ -7,7 +7,7 @@
 - **Unitaires** (`tests/unit/`) — sans base. Couvrent `domain/`, les services de `application/` sur mocks, la lecture des formats sources, l'infrastructure sans entrée-sortie, et les interfaces.
 - **Intégration** (`tests/integration/`) — sur une base `bibliometrie_test`, recréée par `alembic upgrade head` au début de la session. Chaque test travaille dans une transaction annulée à sa sortie. Couvrent les routers, les orchestrateurs de phase, les adaptateurs, et le démarrage des programmes en ligne de commande.
 
-Les tests d'intégration se connectent sous les mêmes rôles que les processus en production, et les droits accordés à la base de test sont extraits de `infrastructure/db/roles.sql` plutôt que recopiés. Une écriture hors des droits d'un rôle échoue donc ici, nommément, au lieu d'aboutir et de casser une fois déployée.
+Les tests d'intégration se connectent sous les mêmes rôles que les processus en production, et les droits accordés à la base de test sont lus dans `infrastructure/db/grants.sql`. Une écriture hors des droits d'un rôle échoue donc ici, nommément, au lieu d'aboutir et de casser une fois déployée.
 
 ## Le frontend
 

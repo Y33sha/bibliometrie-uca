@@ -4,7 +4,7 @@
 Usage :
     BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance [--reseed]
 
-Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante encore vide de documents : il applique les migrations, rejoue les rôles, recharge le seed d'établissement et recalcule les structures des périmètres.
+Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante encore vide de documents : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
 """
 
 import argparse
@@ -42,9 +42,9 @@ def instance_seed(instance_env_file: Path | None) -> Path:
 
 
 def instance_scripts(seed: Path, *, reseed: bool) -> list[Path]:
-    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement. Le rechargement rejoue les rôles, dont une migration a pu retirer des droits, et le seul seed d'établissement."""
+    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement, ou le seul seed d'établissement au rechargement."""
     if reseed:
-        return [_DB_DIR / "roles.sql", seed]
+        return [seed]
     return [_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed]
 
 
