@@ -297,7 +297,7 @@ class _PublicationFacetsBuilder:
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
                           AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
-                    )) AS apc_uca,
+                    )) AS apc_institution,
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                     ) AND NOT EXISTS (
@@ -315,7 +315,9 @@ class _PublicationFacetsBuilder:
         ).one()
         return [
             FacetOption(
-                value="uca", label=f"APC — {get_persons_perimeter_name(self.conn)}", count=r.apc_uca
+                value="institution",
+                label=f"APC — {get_persons_perimeter_name(self.conn)}",
+                count=r.apc_institution,
             ),
             FacetOption(value="other", label="APC — autres", count=r.apc_other),
             FacetOption(value="none", label="Sans APC", count=r.apc_none),

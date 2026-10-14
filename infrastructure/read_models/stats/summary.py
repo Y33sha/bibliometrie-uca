@@ -70,14 +70,14 @@ def _facets_sqls(
                 SELECT 1 FROM apc_payments ap
                 WHERE ap.publication_id = p.id
                   AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
-            )) AS apc_uca,
+            )) AS apc_institution,
             COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                 SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
             ) AND NOT EXISTS (
                 SELECT 1 FROM apc_payments ap
                 WHERE ap.publication_id = p.id
                   AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
-            )) AS apc_non_uca,
+            )) AS apc_other,
             COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
                 SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
             )) AS apc_none
@@ -149,10 +149,10 @@ def _build_facets_result(
         oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
         doc_types=[FacetOption(value=r.value, count=r.n) for r in doc_type_rows],
         apc=[
-            FacetOption(value="uca", label=f"APC {institution}", count=apc_row.apc_uca),
             FacetOption(
-                value="non_uca", label=f"APC hors {institution}", count=apc_row.apc_non_uca
+                value="institution", label=f"APC {institution}", count=apc_row.apc_institution
             ),
+            FacetOption(value="other", label=f"APC hors {institution}", count=apc_row.apc_other),
             FacetOption(value="none", label="Sans APC", count=apc_row.apc_none),
         ],
     )
