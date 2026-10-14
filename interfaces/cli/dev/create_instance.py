@@ -4,7 +4,7 @@
 Usage :
     BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance [--reseed]
 
-Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
+Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante encore vide de documents : il applique les migrations, rejoue les rôles, recharge le seed d'établissement et recalcule les structures des périmètres.
 """
 
 import argparse
@@ -14,6 +14,7 @@ from pathlib import Path
 
 from alembic.command import upgrade
 from alembic.config import Config
+from sqlalchemy import text
 
 from infrastructure import INSTANCE_ENV_FILE, PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
@@ -41,10 +42,19 @@ def instance_seed(instance_env_file: Path | None) -> Path:
 
 
 def instance_scripts(seed: Path, *, reseed: bool) -> list[Path]:
-    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement, ou le seul seed d'établissement au rechargement."""
+    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement. Le rechargement rejoue les rôles, dont une migration a pu retirer des droits, et le seul seed d'établissement."""
     if reseed:
-        return [seed]
+        return [_DB_DIR / "roles.sql", seed]
     return [_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed]
+
+
+def _ensure_not_harvested() -> None:
+    """Lève `SystemExit` quand `staging` contient des documents : le seed vide `structures`, et la suppression en cascade emporterait les rattachements calculés par le pipeline."""
+    with get_sync_engine().connect() as conn:
+        if conn.execute(text("SELECT EXISTS (SELECT 1 FROM staging)")).scalar():
+            raise SystemExit(
+                f"La base {settings.db_name} contient des documents moissonnés : rechargement refusé."
+            )
 
 
 def _create_database(name: str) -> None:
@@ -97,7 +107,9 @@ def main() -> None:
     args = parser.parse_args()
 
     seed = instance_seed(INSTANCE_ENV_FILE)
-    if not args.reseed:
+    if args.reseed:
+        _ensure_not_harvested()
+    else:
         log.info("Création de la base %s", settings.db_name)
         _create_database(settings.db_name)
     log.info("Migrations")
