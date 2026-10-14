@@ -103,3 +103,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 - [x] Page stats : mesure « Montant des APC » (somme de `amount_eur_ht`), à côté du nombre de publications, croisable avec toutes les dimensions (année, laboratoire, éditeur, revue…). La mesure s'ajoute au registre `MEASURES` de `domain/stats.py` et à son agrégat SQL dans `infrastructure/read_models/stats/pivot.py`.
 - [x] `docs/sources/10-imports-manuels.md`, `docs/donnees/04-publishing.md`, `docs/donnees/09-index-des-tables.md`.
 
+## Questions ouvertes
+
+- **OpenAPC seul, sans la réponse de l'établissement ?** Le format de la réponse à l'enquête change d'une année à l'autre, et chaque format demande d'adapter le script. Quand OpenAPC publiera les paiements de 2025, comparer la réponse 2025 de l'Université à ce qu'OpenAPC en reprend : part des DOI communs, montants (lignes additionnées ou séparées), éléments absents d'OpenAPC (laboratoire, frais hors open access). En 2024, les DOI communs étaient 98 %. Si la comparaison de 2025 est du même ordre, l'import peut se limiter à OpenAPC, au prix du laboratoire.
+
