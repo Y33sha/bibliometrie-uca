@@ -281,7 +281,7 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
 
 
 def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
-    """« H Chanal » désigne Hervé et Hélène : sa signature est comptée parmi les non identifiées, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
+    """« H Chanal » désigne Hervé et Hélène : sa signature est comptée parmi celles qui peuvent créer une personne, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
     conn = sa_sync_conn
     _seed_signature(conn, pub_id=95040, raw_name="Hervé Chanal", name_norm="herve chanal")
     _seed_signature(conn, pub_id=95041, raw_name="Hélène Chanal", name_norm="helene chanal")
@@ -293,7 +293,8 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run_create(conn)
 
-    assert "  ├─ 2 signatures non identifiées" in caplog.messages
+    assert "  ├─ 2 signatures sans personne pouvant en créer une" in caplog.messages
+    assert "  ├─ 0 signature d'encadrement ou de jury de thèse, sans création" in caplog.messages
     assert "  ├─ 1 indécidable (forme de nom ambiguë, ou candidats tous rejetés)" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
 
