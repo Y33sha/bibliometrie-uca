@@ -72,3 +72,4 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 
 - Types de documents comptés dans le taux d'open access.
 - Source de l'effectif du laboratoire.
+- **Suppléments d'articles sur figshare.** Les éditeurs déposent sur figshare les suppléments de leurs articles. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.
