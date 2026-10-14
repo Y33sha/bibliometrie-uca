@@ -14,7 +14,7 @@ from domain.normalize import normalize_text
 from domain.types import JsonValue
 
 _EXPORT_SEPARATOR = "; "
-_C1_ENTRY = re.compile(r"\[([^\]]*)\]\s*([^\[]*)")
+_C1_ENTRY = re.compile(r"\[([^\]]*)\]\s*([^;\[]*)")
 _RP_NAME = re.compile(r"(?:^|;\s*)([^;]+?) \(corresponding author\)")
 
 
@@ -30,7 +30,7 @@ def parse_export_addresses(c1: str | None) -> dict[str, list[str]]:
     """
     addresses: dict[str, list[str]] = {}
     for names, address in _C1_ENTRY.findall(c1 or ""):
-        address = address.strip().rstrip(";").strip()
+        address = address.strip()
         if not address:
             continue
         for name in split_export_list(names):
