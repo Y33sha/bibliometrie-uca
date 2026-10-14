@@ -125,6 +125,32 @@ def test_payeur_designe_par_son_ror(sa_sync_conn):
     assert second.inserted == 0
 
 
+def test_paiements_de_l_etablissement_hors_de_la_base(sa_sync_conn):
+    """Un paiement à DOI de l'établissement entre sans publication, puis la rejoint quand elle entre dans la base. Le réimport reste sans doublon."""
+    ours = lambda p: p["institution"] == "Université test"  # noqa: E731
+    payments = [
+        _payment("10.9/hors-base-ours", institution="Université test"),
+        _payment("10.9/hors-base-other", institution="CNRS"),
+        _payment(None, institution="Université test"),
+    ]
+
+    first = import_payments(sa_sync_conn, payments, "f.csv", from_institution=ours)
+    second = import_payments(sa_sync_conn, payments, "f.csv", from_institution=ours)
+
+    assert (first.outside_base, first.inserted, second.inserted) == (1, 1, 0)
+    assert sa_sync_conn.execute(text("SELECT doi FROM apc_payments")).scalars().all() == [
+        "10.9/hors-base-ours"
+    ]
+    pub = _publication(sa_sync_conn, "10.9/hors-base-ours")
+    import_payments(sa_sync_conn, [], "f.csv")
+    assert (
+        sa_sync_conn.execute(
+            text("SELECT publication_id FROM apc_payments WHERE doi = '10.9/hors-base-ours'")
+        ).scalar_one()
+        == pub
+    )
+
+
 def test_frais_d_open_access_et_hors_oa_distincts(sa_sync_conn):
     _publication(sa_sync_conn, "10.9/apc-c")
 

@@ -12,6 +12,7 @@ from interfaces.cli.imports.import_apc import (
     FileFormat,
     StructureResolver,
     detect_format,
+    institution_filter,
     institution_survey_payment,
     institution_survey_payments,
     non_oa_fee_payment,
@@ -21,6 +22,34 @@ from interfaces.cli.imports.import_apc import (
     read_payments,
 )
 from pipeline.transformation.structures.address_resolution import StructureNameForm
+
+
+class TestInstitutionFilter:
+    """L'établissement se désigne par son nom (Open APC), son coman_id (frais hors OA) ou son ROR (réponse à l'enquête)."""
+
+    def test_nom_open_apc_sans_casse_ni_accents(self):
+        ours = institution_filter(FileFormat.OPEN_APC, "Université Clermont Auvergne")
+        assert ours({"institution": "Universite clermont auvergne"})
+        assert not ours({"institution": "CNRS"})
+        assert not ours({"institution": None})
+
+    def test_coman_id_des_frais_hors_oa(self):
+        ours = institution_filter(FileFormat.NON_OA_FEES, "200")
+        assert ours({"coman_id": 200})
+        assert not ours({"coman_id": 271})
+
+    def test_ror_de_la_reponse_a_l_enquete(self):
+        ours = institution_filter(FileFormat.INSTITUTION_SURVEY, "https://ror.org/01a8ajp46")
+        assert ours({"payer_ror": "01a8ajp46"})
+        assert not ours({"payer_ror": "02feahw73"})
+
+    @pytest.mark.parametrize(
+        ("file_format", "value"),
+        [(FileFormat.NON_OA_FEES, "Université"), (FileFormat.INSTITUTION_SURVEY, "pas un ROR")],
+    )
+    def test_valeur_illisible_refusee(self, file_format, value):
+        with pytest.raises(ValueError):
+            institution_filter(file_format, value)
 
 
 class TestParseAmount:

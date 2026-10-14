@@ -7,13 +7,13 @@ Trois formats, reconnus aux colonnes du fichier :
 - le fichier « frais hors OA » de l'enquête nationale (autres frais de publication) ;
 - la réponse d'un établissement à l'enquête APC, export CSV de sa feuille de paiements. Ses montants négatifs annulent un paiement.
 
-Sont importés les seuls paiements dont le DOI désigne une publication de la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
+Sont importés les paiements dont le DOI désigne une publication de la base. Avec `--institution`, les paiements à DOI de l'établissement désigné le sont aussi, sans publication ; ils la rejoignent quand elle entre dans la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
 
 Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms des structures, comme les adresses d'affiliation. Le script liste les libellés sans structure.
 
 Usage :
-    python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv
-    python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --dry-run
+    python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv --institution "Université Clermont Auvergne"
+    python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --institution 200 --dry-run
     python -m interfaces.cli.imports.import_apc "data/apc/APC_2025_… .csv"
 """
 
@@ -220,6 +220,30 @@ def cancel_refunds(payments: list[Payment]) -> list[Payment]:
     return kept
 
 
+type PaymentFilter = Callable[[Payment], bool]
+
+
+def institution_filter(file_format: FileFormat, institution: str) -> PaymentFilter:
+    """Reconnaît les paiements de l'établissement désigné par `institution`, selon le format du fichier : son nom pour Open APC, son `coman_id` pour les frais hors OA, son ROR pour la réponse à l'enquête.
+
+    Lève `ValueError` sur une valeur illisible pour le format.
+    """
+    if file_format is FileFormat.OPEN_APC:
+        name = normalize_text(institution)
+        return lambda p: normalize_text(str(p.get("institution") or "")) == name
+    if file_format is FileFormat.NON_OA_FEES:
+        if not institution.strip().isdigit():
+            raise ValueError(
+                f"coman_id attendu pour un fichier des frais hors OA : {institution!r}"
+            )
+        coman_id = int(institution)
+        return lambda p: p.get("coman_id") == coman_id
+    ror = RorId.try_parse(institution)
+    if ror is None:
+        raise ValueError(f"ROR attendu pour une réponse à l'enquête APC : {institution!r}")
+    return lambda p: p.get("payer_ror") == ror.value
+
+
 _MAPPERS: dict[FileFormat, Callable[[Mapping[str, str]], Payment]] = {
     FileFormat.OPEN_APC: open_apc_payment,
     FileFormat.NON_OA_FEES: non_oa_fee_payment,
@@ -329,16 +353,26 @@ def map_structures(conn: Connection, resolver: StructureResolver) -> list[Unreso
 
 @dataclass(frozen=True, slots=True)
 class ImportStats:
-    """Bilan d'un import : lignes lues, lignes à DOI de la base, paiements insérés, libellés sans structure."""
+    """Bilan d'un import : lignes lues, lignes à DOI de la base, lignes à DOI de l'établissement hors de la base, paiements insérés, libellés sans structure."""
 
     read: int
     in_base: int
+    outside_base: int
     inserted: int
     unresolved: list[UnresolvedLabel]
 
 
-def import_payments(conn: Connection, payments: list[Payment], source_file: str) -> ImportStats:
-    """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues, éditeurs et structures."""
+def import_payments(
+    conn: Connection,
+    payments: list[Payment],
+    source_file: str,
+    *,
+    from_institution: PaymentFilter | None = None,
+) -> ImportStats:
+    """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues, éditeurs et structures.
+
+    `from_institution` reconnaît les paiements de l'établissement : ceux qui ont un DOI absent de la base sont insérés sans publication.
+    """
     payments = name_payers(conn, payments)
     publication_by_doi = {
         row.doi: row.id
@@ -351,14 +385,28 @@ def import_payments(conn: Connection, payments: list[Payment], source_file: str)
         for p in payments
         if isinstance(doi := p["doi"], str) and doi in publication_by_doi
     ]
-    inserted = sum(1 for p in in_base if conn.execute(_INSERT, p).first() is not None)
+    outside_base = [
+        {**p, "source_file": source_file, "publication_id": None}
+        for p in payments
+        if from_institution is not None
+        and isinstance(doi := p["doi"], str)
+        and doi not in publication_by_doi
+        and from_institution(p)
+    ]
+    inserted = sum(
+        1 for p in in_base + outside_base if conn.execute(_INSERT, p).first() is not None
+    )
     map_publications(conn)
     map_journals(conn)
     map_publishers(conn)
     resolver = StructureResolver(AddressResolutionQueries().load_name_forms(conn))
     unresolved = map_structures(conn, resolver)
     return ImportStats(
-        read=len(payments), in_base=len(in_base), inserted=inserted, unresolved=unresolved
+        read=len(payments),
+        in_base=len(in_base),
+        outside_base=len(outside_base),
+        inserted=inserted,
+        unresolved=unresolved,
     )
 
 
@@ -430,19 +478,33 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import d'un fichier de frais de publication")
     parser.add_argument("csv_file", type=Path, help="Fichier CSV d'un des trois formats")
     parser.add_argument("--dry-run", action="store_true", help="Compter sans écrire")
+    parser.add_argument(
+        "--institution",
+        help="Établissement dont les paiements à DOI sont importés même hors de la base : "
+        "son nom (Open APC), son coman_id (frais hors OA) ou son ROR (réponse à l'enquête)",
+    )
     args = parser.parse_args()
 
     file_format, payments = read_payments(args.csv_file)
     log.info("%s : format %s, %d lignes", args.csv_file.name, file_format.value, len(payments))
+    try:
+        from_institution = (
+            institution_filter(file_format, args.institution) if args.institution else None
+        )
+    except ValueError as e:
+        parser.error(str(e))
     with get_sync_engine().connect() as conn:
-        stats = import_payments(conn, payments, args.csv_file.name)
+        stats = import_payments(
+            conn, payments, args.csv_file.name, from_institution=from_institution
+        )
         if args.dry_run:
             conn.rollback()
         else:
             conn.commit()
     log.info(
-        "%d lignes à DOI de la base, %d paiements %s",
+        "%d lignes à DOI de la base, %d lignes de l'établissement hors de la base, %d paiements %s",
         stats.in_base,
+        stats.outside_base,
         stats.inserted,
         "à insérer (simulation)" if args.dry_run else "insérés",
     )

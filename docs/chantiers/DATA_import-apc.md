@@ -95,7 +95,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 
 ### 5. Établissement
 
-- [ ] Argument du script : l'établissement dont les paiements sont importés hors de la base.
+- [x] Argument du script : l'établissement dont les paiements à DOI sont importés hors de la base. Un paiement sans DOI reste écarté : la clé d'unicité ne le dédoublonne pas.
 
 ### 6. Lectures et documentation
 
