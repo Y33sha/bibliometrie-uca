@@ -635,7 +635,7 @@ class TestOaModels:
         models = r.json()
         # Source de vérité = domain.journals.journal.OA_MODELS / OA_MODEL_LABELS_FR.
         values = [m["value"] for m in models]
-        assert values == ["subscription", "full_oa", "repository"]
+        assert values == ["subscription", "full_oa", "diamond", "repository"]
         assert all("label_fr" in m and m["label_fr"] for m in models)
 
 

@@ -23,6 +23,7 @@ from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.structures import AUTHOR_SIGNATURE, AUTHORED_PUBLICATION
+from infrastructure.sql_fragments import diamond_journal_sql
 
 EVOLUTION_YEARS = 5
 THESIS_YEARS = 10
@@ -82,7 +83,10 @@ PREPRINT_SERVERS = {
 }
 PREPRINT_SERVER_NAMES = frozenset(PREPRINT_SERVERS.values()) | {"medRxiv"}
 
-MODEL_LABELS = {"full_oa": "Open access", "subscription": "Abonnement"}
+MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscription": "Abonnement"}
+
+# Modèles des revues entièrement en open access.
+OPEN_ACCESS_MODELS = "('full_oa', 'diamond')"
 
 LICENSE_LABELS = {
     License.CC_BY: "CC BY",
@@ -127,8 +131,8 @@ HAL_FULL_TEXT = f"""
 # Publication `p` cosignée hors de France. Le bind `:domestic` liste les codes pays non internationaux.
 INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:domestic))"
 
-# Revue sans APC ni autres frais selon le DOAJ, pour la revue `j`.
-DOAJ_DIAMOND = "(j.doaj_payload->>'APC' = 'No' AND j.doaj_payload->>'Has other fees' = 'No')"
+# Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais.
+DIAMOND_JOURNAL = f"COALESCE({diamond_journal_sql('j')}, false)"
 
 
 def _values(members: Sequence[str]) -> list[str]:
@@ -231,15 +235,14 @@ class OpenScienceReport:
         r = self._one(
             f"""
             SELECT COUNT(*) AS total, COUNT(DISTINCT p.journal_id) AS journals,
-                   COUNT(*) FILTER (WHERE j.oa_model = 'full_oa') AS full_oa,
-                   COUNT(*) FILTER (WHERE j.oa_model = 'full_oa' AND p.oa_status = ANY(:open)) AS full_oa_open,
-                   COUNT(*) FILTER (WHERE j.oa_model = 'full_oa' AND {DOAJ_DIAMOND}) AS doaj_diamond,
-                   COUNT(*) FILTER (WHERE j.oa_model = 'full_oa' AND p.oa_status = 'diamond') AS status_diamond,
+                   COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS}) AS full_oa,
+                   COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND p.oa_status = ANY(:open)) AS full_oa_open,
+                   COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND {DIAMOND_JOURNAL}) AS diamond,
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription') AS subscription,
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription' AND p.oa_status = 'hybrid') AS hybrid,
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription' AND p.oa_status = 'bronze') AS bronze,
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription' AND p.oa_status = 'green') AS green,
-                   COUNT(*) FILTER (WHERE j.oa_model IS NULL OR j.oa_model NOT IN ('full_oa', 'subscription')) AS unknown
+                   COUNT(*) FILTER (WHERE j.oa_model IS NULL OR j.oa_model NOT IN ('full_oa', 'diamond', 'subscription')) AS unknown
             FROM ({LAB_PUBLICATIONS}) p
             LEFT JOIN publishing.journals j ON j.id = p.journal_id
             WHERE p.pub_year = :year AND p.doc_type::text = ANY(:types)
@@ -252,7 +255,7 @@ class OpenScienceReport:
             (
                 "Revue entièrement en open access",
                 r.full_oa,
-                f"{r.full_oa_open}, dont {r.doaj_diamond} en revue diamant",
+                f"{r.full_oa_open}, dont {r.diamond} en revue diamant",
             ),
             (
                 "Revue sur abonnement",
@@ -265,7 +268,7 @@ class OpenScienceReport:
         return (
             f"## Modèles de revues et APC\n\nPérimètre : {r.total} articles, revues de littérature, lettres et éditoriaux de {self.year}, parus dans {r.journals} revues.\n\n"
             + _table(["Modèle de la revue", "Articles", "Dont ouverts"], rows)
-            + f"\n\nRevue diamant : revue du DOAJ sans APC ni autres frais. Le statut d'accès ouvert de {r.status_diamond} articles est « diamant »."
+            + "\n\nRevue diamant : revue marquée diamant, ou revue du DOAJ sans APC ni autres frais."
         )
 
     def apc(self) -> str:
@@ -310,7 +313,7 @@ class OpenScienceReport:
     def journals(self) -> str:
         rows = self._rows(
             f"""
-            SELECT j.title, pb.name AS publisher, j.oa_model, {DOAJ_DIAMOND} AS diamond,
+            SELECT j.title, pb.name AS publisher, j.oa_model, {DIAMOND_JOURNAL} AS diamond,
                    j.apc_amount, j.apc_currency, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.journals j ON j.id = p.journal_id

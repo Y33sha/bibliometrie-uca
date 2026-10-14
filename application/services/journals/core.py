@@ -29,7 +29,7 @@ def update_journal(
     repo: JournalRepository,
     audit_repo: AuditRepository | None = None,
 ) -> bool:
-    """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `journal_type` a effectivement changé — déclencheur de la requalification des publications, orchestrée par le command handler.
+    """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `journal_type` ou le `oa_model` a effectivement changé : le command handler rejoue alors les corrections des publications de la revue.
 
     L'événement d'audit contient seulement les champs soumis.
 
@@ -79,7 +79,7 @@ def update_journal(
         journal.manual_fields |= {ManualField.APC}
     repo.save(journal)
     emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)
-    return journal.journal_type != old_type
+    return journal.journal_type != old_type or journal.oa_model != old_oa_model
 
 
 def merge_journals(

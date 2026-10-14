@@ -59,6 +59,8 @@ class MetadataForCorrection:
     in_proceedings_volume: bool = False
     # Lu dans `meta` : forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
     group_title: str | None = None
+    # Joint à la lecture : la revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
+    journal_diamond: bool = False
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -91,6 +93,9 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_RECENSION_TO_BOOK_REVIEW = "TITLE_RECENSION_TO_BOOK_REVIEW"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
     EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
+    GOLD_DIAMOND_JOURNAL_TO_DIAMOND = "GOLD_DIAMOND_JOURNAL_TO_DIAMOND"
+    HYBRID_DIAMOND_JOURNAL_TO_DIAMOND = "HYBRID_DIAMOND_JOURNAL_TO_DIAMOND"
+    DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD = "DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD"
     HYBRID_FULL_OA_TO_GOLD = "HYBRID_FULL_OA_TO_GOLD"
     SCANR_FROM_HAL_TO_HAL_TYPE = "SCANR_FROM_HAL_TO_HAL_TYPE"
 
@@ -195,6 +200,7 @@ class _AppliesTo(TypedDict, total=False):
     - `registrant_publisher_type` : `str` — équivalence sur `sp.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
     - `in_proceedings_volume` : `bool` — `sp.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
     - `group_title` : `frozenset[str]` — `sp.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
+    - `journal_diamond` : `bool` — `sp.journal_diamond` (joint à la lecture : la revue rattachée est diamant) vaut la valeur attendue.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -215,6 +221,7 @@ class _AppliesTo(TypedDict, total=False):
     registrant_publisher_type: str
     in_proceedings_volume: bool
     group_title: frozenset[str]
+    journal_diamond: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -440,6 +447,21 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
         "applies_correction": {"oa_status": "green"},
     },
+    # Le diamant est une propriété de la revue : marquée `diamond`, ou dans le DOAJ sans APC ni autres frais.
+    # Un article `gold` ou `hybrid` d'une revue diamant est `diamond`. Un `diamond` d'OpenAlex hors revue diamant est `gold`.
+    # Ces règles précèdent `HYBRID_FULL_OA_TO_GOLD` : une revue diamant classée full OA reste diamant.
+    MetadataCorrectionRule.GOLD_DIAMOND_JOURNAL_TO_DIAMOND: {
+        "applies_to": {"oa_status": "gold", "journal_diamond": True},
+        "applies_correction": {"oa_status": "diamond"},
+    },
+    MetadataCorrectionRule.HYBRID_DIAMOND_JOURNAL_TO_DIAMOND: {
+        "applies_to": {"oa_status": "hybrid", "journal_diamond": True},
+        "applies_correction": {"oa_status": "diamond"},
+    },
+    MetadataCorrectionRule.DIAMOND_OUTSIDE_DIAMOND_JOURNAL_TO_GOLD: {
+        "applies_to": {"oa_status": "diamond", "journal_diamond": False},
+        "applies_correction": {"oa_status": "gold"},
+    },
     # Un `hybrid` posé par défaut au normalize (avant l'enrichissement des revues) dans
     # une revue full-OA est en réalité `gold` : `hybrid` sort des statuts attendus pour
     # `oa_model = full_oa`. Champ orthogonal au `doc_type`, aucun chaînage avec les autres règles.
@@ -487,6 +509,7 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         "self_declared_preprint",
         "declares_conference",
         "in_proceedings_volume",
+        "journal_diamond",
     ):
         return bool(getattr(sp, key) == value)
     if key == "group_title":

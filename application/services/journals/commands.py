@@ -21,14 +21,12 @@ def update_journal(
     recompute: JournalRecompute,
     audit_repo: AuditRepository,
 ) -> None:
-    """Met à jour une revue (champs sélectifs). Si `journal_type` change
-    effectivement, requalifie le `doc_type` des publications rattachées dans la
-    même transaction."""
-    type_changed = journals_service.update_journal(
+    """Met à jour une revue (champs sélectifs). Si `journal_type` ou `oa_model` change effectivement, rejoue les corrections des publications rattachées dans la même transaction : leur `doc_type` suit le type de la revue, leur statut diamant son modèle OA."""
+    corrections_changed = journals_service.update_journal(
         journal_id, update=update, repo=repo, audit_repo=audit_repo
     )
 
-    if type_changed:
+    if corrections_changed:
         journals_service.requalify_publications_for_journal(
             journal_id, conn=conn, recompute=recompute, audit_repo=audit_repo
         )
