@@ -37,7 +37,9 @@ def test_creation_plays_roles_common_seed_then_institution_seed(tmp_path):
     assert instance_scripts(seed, reseed=False)[-1] == seed
 
 
-def test_reseed_plays_only_the_institution_seed(tmp_path):
+def test_reseed_plays_roles_then_institution_seed(tmp_path):
     seed = tmp_path / "seed.sql"
 
-    assert instance_scripts(seed, reseed=True) == [seed]
+    scripts = instance_scripts(seed, reseed=True)
+    assert [p.name for p in scripts] == ["roles.sql", "seed.sql"]
+    assert scripts[-1] == seed
