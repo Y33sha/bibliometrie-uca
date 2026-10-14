@@ -72,4 +72,4 @@ Obstacles :
 
 ### Phase 6 — Valeurs de filtre
 
-- [ ] Renommer les valeurs de filtre `uca`, `non_uca` et `other_uca` exposées par l'API.
+- [x] Renommer les valeurs de filtre `uca`, `non_uca` et `other_uca` exposées par l'API.
