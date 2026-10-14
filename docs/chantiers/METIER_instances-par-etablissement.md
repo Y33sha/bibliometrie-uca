@@ -73,3 +73,7 @@ Obstacles :
 ### Phase 6 — Valeurs de filtre
 
 - [x] Renommer les valeurs de filtre `uca`, `non_uca` et `other_uca` exposées par l'API.
+
+### Phase 7 — Fin de chantier
+
+- [ ] Mise à jour de la documentation : collections HAL et périmètre des personnes dans le seed généré, rechargement du seed (`create_instance --reseed`).
