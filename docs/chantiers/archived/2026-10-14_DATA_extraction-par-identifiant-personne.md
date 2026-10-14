@@ -95,8 +95,3 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 ### Phase 4 — Fin de chantier
 
 - [x] Mise à jour de la documentation
-
-## Questions ouvertes
-
-- Laboratoire d'une signature entrée par l'identité, déduit des publications de la personne. Les `department_name` de l'export RH désignent rarement un laboratoire.
-- Suppléments d'articles déposés par les éditeurs sur figshare. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.
