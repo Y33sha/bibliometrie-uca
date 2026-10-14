@@ -102,7 +102,7 @@ def propagate_countries_to_similar(
 ) -> list[int]:
     """Propage les `countries` des adresses `modified_ids` vers leurs jumelles (même `normalized_text`).
 
-    Appelée après un `batch_set_country_by_*` pour propager les modifications fraîches aux adresses similaires. Cible explicitement les sources de propagation pour rester sub-seconde (vs un balayage global O(n²) sur les ~475k adresses sans index btree sur `normalized_text`).
+    Appelée après un `batch_set_country_by_*` pour propager les modifications fraîches aux adresses similaires. Cible explicitement les sources de propagation pour rester sub-seconde.
     """
     return repo.propagate_countries_across_similar_addresses(modified_ids)
 

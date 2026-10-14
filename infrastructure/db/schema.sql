@@ -3573,7 +3573,7 @@ CREATE INDEX idx_addresses_countries_dirty ON structures.addresses USING btree (
 -- Name: idx_addresses_normalized_text; Type: INDEX; Schema: structures; Owner: -
 --
 
-CREATE INDEX idx_addresses_normalized_text ON structures.addresses USING btree (normalized_text);
+CREATE INDEX idx_addresses_normalized_text ON structures.addresses USING hash (normalized_text);
 
 
 --
