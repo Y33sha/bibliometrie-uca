@@ -72,4 +72,5 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 
 - Types de documents comptés dans le taux d'open access.
 - Source de l'effectif du laboratoire.
+- **Laboratoire d'un frais d'open access.** OpenAPC ne nomme pas le laboratoire. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `authorships`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
 - **Suppléments d'articles sur figshare.** Les éditeurs déposent sur figshare les suppléments de leurs articles. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.

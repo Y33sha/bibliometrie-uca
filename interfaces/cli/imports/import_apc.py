@@ -11,6 +11,8 @@ Sont importés les paiements dont le DOI désigne une publication de la base. Av
 
 Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms des structures, comme les adresses d'affiliation. Le script liste les libellés sans structure.
 
+La réponse d'un établissement à l'enquête l'emporte sur OpenAPC : un frais d'open access OpenAPC d'un article que la réponse de son payeur décrit déjà est retiré (`drop_open_apc_superseded_by_institution`).
+
 Usage :
     python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv --institution "Université Clermont Auvergne"
     python -m interfaces.cli.imports.import_apc "data/FPhorsOA … .csv" --institution 200 --dry-run
@@ -353,12 +355,13 @@ def map_structures(conn: Connection, resolver: StructureResolver) -> list[Unreso
 
 @dataclass(frozen=True, slots=True)
 class ImportStats:
-    """Bilan d'un import : lignes lues, lignes à DOI de la base, lignes à DOI de l'établissement hors de la base, paiements insérés, libellés sans structure."""
+    """Bilan d'un import : lignes lues, lignes à DOI de la base, lignes à DOI de l'établissement hors de la base, paiements insérés, paiements OpenAPC retirés au profit d'une réponse d'établissement, libellés sans structure."""
 
     read: int
     in_base: int
     outside_base: int
     inserted: int
+    superseded: int
     unresolved: list[UnresolvedLabel]
 
 
@@ -401,13 +404,37 @@ def import_payments(
     map_publishers(conn)
     resolver = StructureResolver(AddressResolutionQueries().load_name_forms(conn))
     unresolved = map_structures(conn, resolver)
+    superseded = drop_open_apc_superseded_by_institution(conn)
     return ImportStats(
         read=len(payments),
         in_base=len(in_base),
         outside_base=len(outside_base),
         inserted=inserted,
+        superseded=superseded,
         unresolved=unresolved,
     )
+
+
+def drop_open_apc_superseded_by_institution(conn: Connection) -> int:
+    """Retire les frais d'open access OpenAPC d'un article que la réponse de son établissement payeur décrit déjà. Rend le nombre de paiements retirés.
+
+    OpenAPC reprend les réponses à l'enquête sous une forme variable (lignes additionnées, première seule, ou toutes), que la clé d'unicité ne dédoublonne pas. La réponse de l'établissement, facturée ligne à ligne et rattachée au laboratoire, l'emporte. Un frais d'open access sans laboratoire vient d'OpenAPC, qui ne nomme pas le laboratoire ; avec laboratoire, il vient d'une réponse d'établissement. La règle vaut quel que soit l'ordre des imports.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM apc_payments oa
+            WHERE oa.open_access_fee
+              AND oa.lab_name IS NULL
+              AND oa.doi IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM apc_payments r
+                  WHERE r.open_access_fee
+                    AND r.lab_name IS NOT NULL
+                    AND r.doi = oa.doi
+                    AND r.budget_structure_id = oa.budget_structure_id
+              )
+        """)
+    ).rowcount
 
 
 def name_payers(conn: Connection, payments: list[Payment]) -> list[Payment]:
@@ -508,6 +535,11 @@ def main() -> None:
         stats.inserted,
         "à insérer (simulation)" if args.dry_run else "insérés",
     )
+    if stats.superseded:
+        log.info(
+            "%d paiements OpenAPC retirés au profit de la réponse de l'établissement",
+            stats.superseded,
+        )
     for u in stats.unresolved:
         context = f" [{u.context}]" if u.context else ""
         log.info(

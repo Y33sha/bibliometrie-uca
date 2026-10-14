@@ -151,6 +151,31 @@ def test_paiements_de_l_etablissement_hors_de_la_base(sa_sync_conn):
     )
 
 
+def test_reponse_de_l_etablissement_l_emporte_sur_open_apc(sa_sync_conn):
+    """Un frais d'open access OpenAPC d'un article que la réponse de son payeur décrit déjà est retiré, quel que soit l'ordre des imports. Un autre payeur garde le sien."""
+    _publication(sa_sync_conn, "10.9/apc-prio")
+    university = insert_structure(
+        sa_sync_conn, "TEST_APC_PRIO", name="Université prio APC", structure_type="universite"
+    )
+    insert_structure_name_form(sa_sync_conn, university, form_text="universite prio apc")
+    response = {
+        **_payment("10.9/apc-prio", institution="Université prio APC", amount=2390.0),
+        "lab_name": "LPRIO",
+    }
+    open_apc = _payment("10.9/apc-prio", institution="Université prio APC", amount=2445.0)
+    other_payer = _payment("10.9/apc-prio", institution="CNRS", amount=800.0)
+
+    import_payments(sa_sync_conn, [open_apc, other_payer], "apc_de.csv")
+    first = import_payments(sa_sync_conn, [response], "reponse.csv")
+    again = import_payments(sa_sync_conn, [open_apc, other_payer], "apc_de.csv")
+
+    assert (first.superseded, again.superseded) == (1, 1)
+    amounts = sa_sync_conn.execute(
+        text("SELECT amount_eur_ht FROM apc_payments WHERE doi = '10.9/apc-prio' ORDER BY 1")
+    ).scalars()
+    assert [float(a) for a in amounts] == [800.0, 2390.0]
+
+
 def test_frais_d_open_access_et_hors_oa_distincts(sa_sync_conn):
     _publication(sa_sync_conn, "10.9/apc-c")
 

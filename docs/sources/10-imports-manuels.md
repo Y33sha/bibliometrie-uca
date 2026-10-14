@@ -28,7 +28,7 @@ La FK sur la table `persons_rh` permet:
 
 Le script importe les paiements dont le DOI désigne une publication de la base. Avec `--institution`, il importe aussi les paiements à DOI de l'établissement absents de la base, qui rejoignent leur publication quand elle entre dans la base. L'établissement se désigne par son nom (OpenAPC), son `coman_id` (frais hors OA) ou son ROR (réponse à l'enquête). Un réimport ne crée pas de doublon.
 
-La colonne `institution` désigne le payeur. Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms ; le script liste les libellés sans structure.
+La colonne `institution` désigne le payeur. Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms ; le script liste les libellés sans structure. La réponse d'un établissement l'emporte sur OpenAPC, qui reprend les réponses à l'enquête sous une forme variable.
 
 OpenAPC recense seulement les paiements des établissements participants : les paiements d'autres payeurs y sont incomplets. Le filtre APC et la mesure « Montant des APC » retiennent donc les seuls paiements de l'établissement.
 
