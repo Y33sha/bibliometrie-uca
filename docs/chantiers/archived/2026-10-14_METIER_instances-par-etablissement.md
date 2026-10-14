@@ -68,7 +68,7 @@ Obstacles :
 - [x] Compléter le seed avec les collections HAL, absentes de ROR. Sans collection, l'extraction HAL est sautée.
 - [x] Seed Université de Lorraine dans `instances/lorraine/`.
 - [x] Seed Nantes Université dans `instances/`.
-- [ ] Faire tourner le pipeline sur chaque instance et examiner le résultat dans l'interface.
+- [x] Faire tourner le pipeline sur l'instance Lorraine et examiner le résultat dans l'interface.
 
 ### Phase 6 — Valeurs de filtre
 
@@ -76,4 +76,4 @@ Obstacles :
 
 ### Phase 7 — Fin de chantier
 
-- [ ] Mise à jour de la documentation : collections HAL et périmètre des personnes dans le seed généré, rechargement du seed (`create_instance --reseed`).
+- [x] Mise à jour de la documentation : collections HAL et périmètre des personnes dans le seed généré, rechargement du seed (`create_instance --reseed`).

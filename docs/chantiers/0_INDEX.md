@@ -14,7 +14,6 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
-- [Instances par établissement](METIER_instances-par-etablissement.md)
 - [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
@@ -28,6 +27,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-14 — [Instances par établissement](archived/2026-10-14_METIER_instances-par-etablissement.md)
 - 2026-10-14 — [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md)
 - 2026-10-13 — [Redirection des identifiants fusionnés](archived/2026-10-13_CODE_redirection-identifiants-fusionnes.md)
 - 2026-10-12 — [Benchmark des pipelines de publications d'autres établissements](archived/2026-10-12_benchmark-pipelines.md)
