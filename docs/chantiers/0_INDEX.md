@@ -11,7 +11,6 @@
 
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
-- [Extraction par identifiant de personne](DATA_extraction-par-identifiant-personne.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Import des paiements APC sans doublon](DATA_import-apc.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
@@ -29,6 +28,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-14 — [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md)
 - 2026-10-13 — [Redirection des identifiants fusionnés](archived/2026-10-13_CODE_redirection-identifiants-fusionnes.md)
 - 2026-10-12 — [Benchmark des pipelines de publications d'autres établissements](archived/2026-10-12_benchmark-pipelines.md)
 - 2026-10-12 — [Recalculs ciblés et reports au run suivant](archived/2026-10-12_CODE_recalculs-cibles-et-reports.md)
