@@ -74,3 +74,9 @@ def test_dump_inaccessible_laisse_le_referentiel_inchange():
     repo.replace_all.assert_not_called()
     conn.rollback.assert_called_once()
     assert metrics.details["ror"] == {"imported": False, "error": "HTTP 502"}
+
+
+def test_dump_inaccessible_degrade_le_statut_de_la_phase():
+    source, repo = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
+    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

@@ -22,6 +22,7 @@ from pipeline.ingestion.http.dump_download import DumpUnavailableError
 from pipeline.ingestion.ror.dump import ZenodoRorDumpSource, dump_version
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unavailable
 
 _BATCH_SIZE = 5000
 
@@ -128,7 +129,9 @@ def run_refresh_ror(
     except DumpUnavailableError as e:
         conn.rollback()
         logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", DERNIERE_BRANCHE, e)
+        signal_source_unavailable(metrics, "ROR", logger=logger, phase="affiliations")
         metrics.details["ror"] = {"imported": False, "error": str(e)}
+        metrics.resume = "dump ROR inaccessible, import repris au prochain run"
         return metrics
     logger.info(
         "%sVersion %s importée : %d organisations, %d relations",
