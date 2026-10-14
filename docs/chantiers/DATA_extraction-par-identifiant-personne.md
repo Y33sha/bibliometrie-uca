@@ -16,6 +16,23 @@ Mesures du 2026-10-13 sur DataCite.
 - **ScanR.** Les ORCID et IdRef de 1 294 personnes RH désignent 39 101 documents parus de 2017 à 2026, doublons compris.
 - **Grandes collaborations.** Une notice compte jusqu'à un millier d'auteurs : environ 200 Kio dans DataCite, 500 Kio dans Crossref. Une page trop grande dépasse le délai de DataCite (502) ou la taille de réponse de Crossref (100 Mio).
 
+### Apport de l'extraction par personne
+
+Mesures du 2026-10-14 sur les années 2023 à 2026, couvertes par un run complet des cinq nœuds.
+
+| Source | Trouvés | Absents de staging | Rattachés au périmètre | Publication déjà présente | Publication ajoutée |
+| --- | --- | --- | --- | --- | --- |
+| HAL | 8 084 | 404 | 281 | 169 | 112 |
+| OpenAlex | 16 594 | 4 486 | 929 | 691 | 238 |
+| ScanR | 10 549 | 1 879 | 1 341 | 798 | 543 |
+| Crossref | 3 311 | 338 | 258 | 129 | 129 |
+| DataCite | 1 476 | 722 | 615 | 586 | 29 |
+
+- « Trouvés » somme les bilans annuels. « Rattachés au périmètre » compte les documents absents de staging dont la publication est dans le périmètre. « Publication déjà présente » : une autre extraction a déjà amené la publication.
+- Les publications ajoutées sont 731, sources confondues. 370 sont des thèses ScanR où la personne RH fait surtout partie du jury. Les autres sont surtout des articles (101), des chapitres (72), des communications (61) et des preprints (38).
+- 3 556 des 4 486 documents OpenAlex absents de staging restent sans publication.
+- DataCite : les entrepôts principaux sont DESY (289 documents), RWTH Aachen (154), OSF Registries (103) et NAKALA (50). Les types principaux sont article (308), preprint (160), other (137) et dataset (59).
+
 ### Personnes interrogées
 
 Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou authentifié (`person_identifiers.status`).
@@ -57,8 +74,8 @@ Les personnes de l'export RH (`persons_rh`), avec un identifiant confirmé ou au
 
 ### Phase 1 — Mesure
 
-- [ ] Documents trouvés par ORCID dans DataCite : part déjà en base, entrepôts, types
-- [ ] Même mesure pour OpenAlex, Crossref et HAL
+- [x] Documents trouvés par ORCID dans DataCite : part déjà en base, entrepôts, types
+- [x] Même mesure pour OpenAlex, Crossref et HAL
 
 ### Phase 2 — Modèle
 
