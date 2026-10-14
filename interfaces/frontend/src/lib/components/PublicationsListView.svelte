@@ -278,7 +278,7 @@
 			control: 'checkbox',
 			label: 'Corresp.',
 			param: 'is_corresponding',
-			facet: { type: 'boolean', apiKey: 'corresponding', yesLabel: 'Oui', noLabel: 'Non' },
+			facet: { type: 'label_map', apiKey: 'corresponding', labels: { yes: 'Oui', no: 'Non' } },
 			group: 'Auteurs',
 			enabled: () => showCorrespondingColumn,
 			hideWhenEmpty: true,
