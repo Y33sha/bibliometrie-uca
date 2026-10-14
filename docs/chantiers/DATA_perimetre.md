@@ -14,7 +14,7 @@ La table `addresses` reçoit des chaînes de natures différentes :
 
 Les noms de structures et les propriétés du document empruntent l'adresse, seule voie d'entrée avant la règle RH. Ils faussent les mesures faites sur les adresses : pays des adresses, signatures institutionnelles.
 
-Deux marqueurs restent sans voie d'entrée : le ROR d'une signature (`source_authorship_rors`), et la collection HAL d'une notice (`source_publications.hal_collections`), à comparer aux collections des structures du périmètre (`structures.hal_collection`).
+Le ROR d'une signature (`source_authorship_rors`) reste sans voie d'entrée. Une collection HAL agrège automatiquement les notices de ses structures : elle découle de la structure HAL des auteurs. Quand une structure HAL change de nom ou de statut, HAL en crée une nouvelle, qui remplace l'ancienne ; la collection, elle, reste.
 
 Les adresses HAL viennent de `authIdHasStructure_fs`, qui donne chaque structure de l'auteur, tutelles comprises, avec son identifiant. `parse_author_structures` préfère `authIdHasPrimaryStructure_fs`, qui donne les seules structures primaires, mais ce champ est absent de `HAL_FIELDS`, donc des payloads moissonnés. Une tutelle reconnue rattache la signature au périmètre quand le nom de son laboratoire est inconnu de la résolution des affiliations.
 
@@ -37,10 +37,9 @@ Au niveau de la signature :
 - structure HAL de la signature, lue dans HAL et dans les fiches de structure ScanR ;
 - identité : identifiant d'une personne RH, document paru pendant son contrat.
 
-Au niveau du document :
+Au niveau du document : thèse soutenue dans l'établissement, d'après le PPN de l'établissement de soutenance, parmi les `api_ids.theses` du périmètre.
 
-- thèse soutenue dans l'établissement : PPN de l'établissement de soutenance, parmi les `api_ids.theses` du périmètre ;
-- notice HAL rangée dans la collection d'une structure du périmètre.
+La collection HAL n'est pas un indice : elle découle de la structure HAL, qui désigne en plus l'auteur et son laboratoire.
 
 **Deux étages de tables.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. Une table résolue réunit les structures du référentiel interne atteintes par chaque signature. La phase `affiliations` la remplit ; le périmètre et le laboratoire se calculent sur elle.
 
@@ -54,7 +53,15 @@ source_authorship_structures
 
 **Raisons de l'entrée.** Une signature et une publication entrent dans le périmètre par une ou plusieurs raisons : une signature OpenAlex peut entrer à la fois par son adresse, son ROR et l'identité RH. Les raisons rendent mesurable l'apport de chaque voie. Proposition à confirmer : une colonne `perimeter_reasons` (tableau d'une énumération) sur `source_authorships` et sur `publications`, recalculée à chaque run ; un tableau vide vaut hors du périmètre.
 
-**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par une raison propre au document. La collection HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université. L'administration peut écarter une raison en cas d'erreur dans HAL. La décision est durable : la reconstruction la respecte. Elle vise la notice, comme `rejected_authorships`, car les identifiants de publication changent à la fusion et à la scission.
+**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par une raison propre au document. La structure HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université.
+
+**Corrections, indice par indice.** Aucune table de rejet propre au périmètre :
+
+- identité RH : le rejet de la signature (`rejected_authorships`) coupe le lien à la personne ;
+- adresse : le lien adresse → structure s'infirme dans `address_structures`, pour toutes les signatures de cette adresse ;
+- ROR : une règle, à confirmer par la mesure de la phase 2. Un ROR du périmètre sur une adresse hors du périmètre est écarté ;
+- structure HAL : une erreur du dépôt se corrige dans HAL ; une erreur de correspondance entre structure HAL et structure interne se corrige dans le référentiel ;
+- thèse soutenue dans l'établissement : jamais écartée, theses.fr fait autorité.
 
 **Référentiel des structures HAL.** Sur le modèle du ROR : `ref.hal_structures` (identifiant, nom, sigle, type, pays, validité, ROR) et `ref.hal_structure_relations` (parent, enfant). L'API `ref/structure` de HAL donne `country_s`, `type_s`, `valid_s`, `parentDocid_i`, `aliasDocid_i` et `ror_s`. `aliasDocid_i` liste les structures fusionnées dans une structure : le chargement résout un alias vers la structure conservée. HAL ne publie pas de dump. Un nœud en tête de la phase `affiliations` interroge l'API par lots d'identifiants, pour les seules structures citées par les notices et absentes du référentiel. Une structure HAL rejoint une structure interne par son ROR. Le pays d'une structure HAL est un candidat `hal_structure` du chantier des pays des adresses.
 
@@ -68,7 +75,6 @@ source_authorship_structures
 
 - [ ] Raisons de l'entrée, plusieurs par signature et par publication, posées par la phase `affiliations` pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
 - [ ] Table `source_authorship_structures`, remplie depuis les adresses.
-- [ ] Décision durable de l'administration : raison écartée pour une notice.
 
 ### Phase 2 — Référentiels
 
@@ -80,7 +86,6 @@ source_authorship_structures
 ### Phase 3 — Raisons propres au document
 
 - [ ] Thèse soutenue dans l'établissement.
-- [ ] Collection HAL.
 - [ ] Thèses soutenues ailleurs, créées hors du périmètre.
 - [ ] Mesure : publications gagnées et perdues.
 
@@ -97,6 +102,8 @@ source_authorship_structures
 ## Questions ouvertes
 
 - **Booléen `in_perimeter`.** Les raisons le rendent-elles superflu ?
+- **Correspondance des structures HAL renommées.** Une structure interne doit rejoindre toutes les structures HAL qui se sont succédé sous son nom. Le ROR en relie une partie (`ref/structure` rend les structures valides et anciennes d'un même ROR). Les notices de la collection du laboratoire relient les autres.
+- **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation, souvent juste pour un coauteur. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait toutes les raisons de niveau signature pour cette personne sur cette notice. Elle complète l'exclusion d'une personne (`persons.exclusion = 'out_of_perimeter'`), qui vaut pour toutes ses publications, futures comprises. À trancher selon la fréquence du cas dans l'administration.
 - **Structures primaires HAL.** Garder seulement les structures primaires réduit le nombre de structures par signature, mais une signature dont le laboratoire primaire est inconnu sort alors du périmètre. Mesure à faire sur un échantillon de notices, les deux champs demandés à l'API : nombre de signatures dont seule une tutelle est reconnue.
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne. Les `department_name` de l'export RH désignent rarement un laboratoire.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.
