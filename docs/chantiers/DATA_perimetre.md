@@ -52,9 +52,9 @@ source_authorship_structures
   address_id            → addresses, vide hors méthode address
 ```
 
-**Raison de l'entrée.** Une énumération dit pourquoi une signature ou une publication entre dans le périmètre. Elle rend mesurable l'apport de chaque voie.
+**Raisons de l'entrée.** Une signature et une publication entrent dans le périmètre par une ou plusieurs raisons : une signature OpenAlex peut entrer à la fois par son adresse, son ROR et l'identité RH. Les raisons rendent mesurable l'apport de chaque voie. Proposition à confirmer : une colonne `perimeter_reasons` (tableau d'une énumération) sur `source_authorships` et sur `publications`, recalculée à chaque run ; un tableau vide vaut hors du périmètre.
 
-**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par une raison propre au document. La collection HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université. L'administration peut écarter une raison pour une publication, en cas d'erreur dans HAL. La décision est durable : la reconstruction la respecte.
+**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par une raison propre au document. La collection HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université. L'administration peut écarter une raison en cas d'erreur dans HAL. La décision est durable : la reconstruction la respecte. Elle vise la notice, comme `rejected_authorships`, car les identifiants de publication changent à la fusion et à la scission.
 
 **Référentiel des structures HAL.** Sur le modèle du ROR : `ref.hal_structures` (identifiant, nom, sigle, type, pays, validité, ROR) et `ref.hal_structure_relations` (parent, enfant). L'API `ref/structure` de HAL donne `country_s`, `type_s`, `valid_s`, `parentDocid_i`, `aliasDocid_i` et `ror_s`. `aliasDocid_i` liste les structures fusionnées dans une structure : le chargement résout un alias vers la structure conservée. HAL ne publie pas de dump. Un nœud en tête de la phase `affiliations` interroge l'API par lots d'identifiants, pour les seules structures citées par les notices et absentes du référentiel. Une structure HAL rejoint une structure interne par son ROR. Le pays d'une structure HAL est un candidat `hal_structure` du chantier des pays des adresses.
 
@@ -66,9 +66,9 @@ source_authorship_structures
 
 ### Phase 1 — Raisons de l'entrée
 
-- [ ] Énumération des raisons, aux niveaux de la signature et de la publication, posée par la phase `affiliations` pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
+- [ ] Raisons de l'entrée, plusieurs par signature et par publication, posées par la phase `affiliations` pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
 - [ ] Table `source_authorship_structures`, remplie depuis les adresses.
-- [ ] Décision durable de l'administration : raison écartée pour une publication.
+- [ ] Décision durable de l'administration : raison écartée pour une notice.
 
 ### Phase 2 — Référentiels
 
