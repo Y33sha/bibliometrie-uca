@@ -33,7 +33,7 @@ def test_seed_loads_into_schema(sa_sync_conn):
         parse_organization(
             _record("02vnf0c38", ["facility"], [("LORIA", ["acronym"]), ("Loria", ["ror_display"])])
         ),
-        # Nom court : la forme exige une frontière de mot, que la table impose.
+        # Nom d'un seul mot : la forme exige une frontière de mot et le contexte de la racine.
         parse_organization(_record("022r5hc56", ["facility"], [("CRAN", ["ror_display"])])),
     ]
     seed = build_institution_seed(root, children, ["I90183372"], "lorraine")
@@ -48,5 +48,5 @@ def test_seed_loads_into_schema(sa_sync_conn):
     forms = sa_sync_conn.execute(
         text("SELECT form_text, is_word_boundary, requires_context_of FROM structure_name_forms")
     ).all()
-    assert ("cran", True, None) in forms
+    assert ("cran", True, [1]) in forms
     assert ("loria", True, [1]) in forms

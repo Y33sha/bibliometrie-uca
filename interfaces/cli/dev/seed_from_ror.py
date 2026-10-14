@@ -4,10 +4,11 @@
 Usage :
     python -m interfaces.cli.dev.seed_from_ror 04vfs2w97 --code lorraine --output instances/lorraine/seed.sql
 
-La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Les formes de noms viennent des libellés, alias et acronymes ROR. Un acronyme exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des notices HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
+La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Le nom d'une structure est le nom affiché par ROR, ou son premier libellé de plusieurs mots quand le nom affiché tient en un mot. Les formes de noms viennent des libellés, alias et acronymes ROR. Une forme d'un seul mot exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des notices HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
 """
 
 import argparse
+import re
 import time
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
@@ -40,6 +41,9 @@ _CHILD_TYPES = {
 
 # Une forme de deux caractères (« UL ») désigne trop de choses pour identifier une structure dans une adresse.
 MIN_FORM_LENGTH = 3
+
+# Code d'unité de recherche (« UMR 7039 », « EA4432 »), écarté comme nom de structure.
+_UNIT_CODE = re.compile(r"^(?:UMR|UMRS|UR|EA|UPR|FRE|UMS|USR|UAR|IRL)(?:\s|\d)", re.IGNORECASE)
 
 # Collection HAL d'une structure : part minimale de ses notices que la collection contient, et indice de Jaccard minimal entre les notices de la structure et celles de la collection.
 MIN_COLLECTION_COVERAGE = 0.5
@@ -79,7 +83,10 @@ class InstitutionSeed:
 
 
 def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
-    """Fiche ROR (API v2) réduite à son identifiant, ses noms, ses types et ses filles."""
+    """Fiche ROR (API v2) réduite à son identifiant, ses noms, ses types et ses filles.
+
+    Quand le nom affiché tient en un mot (« CRAN »), le nom est le premier libellé de plusieurs mots, et le nom affiché sert d'acronyme.
+    """
     names = [as_mapping(n) for n in as_sequence(record.get("names"))]
 
     def values(kind: str) -> tuple[str, ...]:
@@ -89,14 +96,19 @@ def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
             if kind in as_sequence(n.get("types")) and (value := as_str(n.get("value")))
         )
 
-    display = values("ror_display")
+    display = values("ror_display")[0] if values("ror_display") else ""
+    labels = values("ror_display") + values("label") + values("alias")
+    full_name = None
+    if " " not in display.strip():
+        full_name = next((n for n in labels if " " in n and not _UNIT_CODE.match(n)), None)
+    acronyms = values("acronym") or ((display,) if full_name else ())
     relationships = [as_mapping(r) for r in as_sequence(record.get("relationships"))]
     return RorOrganization(
         ror_id=_ror_short_id(as_str(record.get("id")) or ""),
-        name=display[0] if display else "",
+        name=full_name or display,
         types=tuple(t for t in as_sequence(record.get("types")) if isinstance(t, str)),
-        acronyms=values("acronym"),
-        labels=values("ror_display") + values("label") + values("alias"),
+        acronyms=acronyms,
+        labels=labels,
         child_ids=tuple(
             _ror_short_id(as_str(r.get("id")) or "")
             for r in relationships
@@ -119,17 +131,18 @@ def name_forms(
 ) -> dict[str, tuple[bool, list[int] | None]]:
     """Formes de noms normalisées d'une structure : `{forme: (frontière de mot, contexte requis)}`.
 
-    Un acronyme exige une frontière de mot, et la présence de `context_id` dans l'adresse quand il est fourni.
+    Une forme d'un seul mot exige une frontière de mot. Sans chiffre (acronyme, « Silva », « DynAMic »), elle exige aussi la présence de `context_id` dans l'adresse quand il est fourni. Un code d'unité (« umr7503 ») désigne une seule unité et se passe de contexte.
     """
+    context = [context_id] if context_id is not None else None
     forms: dict[str, tuple[bool, list[int] | None]] = {}
-    for label in org.labels:
-        form = normalize_text(label)
-        if len(form) >= MIN_FORM_LENGTH:
-            forms.setdefault(form, (is_short_form(form), None))
-    for acronym in org.acronyms:
-        form = normalize_text(acronym)
-        if len(form) >= MIN_FORM_LENGTH:
-            forms[form] = (True, [context_id] if context_id is not None else None)
+    for text in (*org.labels, *org.acronyms):
+        form = normalize_text(text)
+        if len(form) < MIN_FORM_LENGTH:
+            continue
+        if " " in form:
+            forms[form] = (is_short_form(form), None)
+        else:
+            forms[form] = (True, None if any(c.isdigit() for c in form) else context)
     return forms
 
 

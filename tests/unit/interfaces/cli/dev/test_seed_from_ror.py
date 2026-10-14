@@ -63,12 +63,52 @@ def test_child_type_follows_ror_type():
     assert child_structure_type(GARDENS) is None
 
 
-def test_acronyms_require_word_boundary_and_context():
+def test_single_word_forms_require_word_boundary_and_context():
     forms = name_forms(LAB, context_id=1)
 
     assert forms["loria"] == (True, [1])
     assert forms["laboratoire lorrain de recherche en informatique"] == (False, None)
-    assert forms["umr7503"] == (False, None)
+    assert forms["umr7503"] == (True, None)
+
+
+def test_single_word_alias_requires_context():
+    dynamic = parse_organization(
+        _record(
+            "01gbppd30",
+            ["facility"],
+            [
+                ("DynAMic", ["alias"]),
+                ("Dynamique des Génomes et Adaptation Microbienne", ["ror_display", "label"]),
+            ],
+        )
+    )
+
+    assert name_forms(dynamic, context_id=1)["dynamic"] == (True, [1])
+
+
+def test_single_word_display_name_becomes_acronym():
+    cran = parse_organization(
+        _record(
+            "022r5hc56",
+            ["facility"],
+            [
+                ("CRAN", ["label", "ror_display"]),
+                ("Centre de Recherche en Automatique de Nancy", ["alias"]),
+                ("UMR 7039", ["alias"]),
+            ],
+        )
+    )
+
+    assert cran.name == "Centre de Recherche en Automatique de Nancy"
+    assert cran.acronym == "CRAN"
+
+
+def test_unit_code_is_not_a_name():
+    silva = parse_organization(
+        _record("01d5v2p67", ["facility"], [("Silva", ["ror_display"]), ("UMR Silva", ["alias"])])
+    )
+
+    assert silva.name == "Silva"
 
 
 def test_two_letter_acronym_is_dropped():
