@@ -27,7 +27,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 
 - **Montants d'APC.** Les paiements recensés sont rares et tardifs. Une extraction de l'enquête APC couvre l'année 2025. Le prix catalogue est en devise d'origine. Il ignore les accords transformants.
 - **Lien ORCID–idHAL.** Déductible de `author_identifying_keys` : un `hal_person_id` associé à un ORCID (40 631 clés sur 55 559 clés HAL).
-- **Revues diamant.** `journals.oa_model` ne distingue pas le diamant. Le payload DOAJ (`journals.doaj_payload`) indique les APC (`APC`) et les autres frais (`Has other fees`) : 835 revues sont sans APC ni autres frais.
+- **Revues diamant.** Une revue est diamant quand `journals.oa_model` vaut `diamond`, ou quand le payload DOAJ (`journals.doaj_payload`) n'indique ni APC (`APC`) ni autres frais (`Has other fees`).
 - **Thèses.** L'ouverture d'une thèse se mesure sur plusieurs années : les thèses récentes sont en traitement ou sous embargo.
 - **Licences.** Chantier [Licences](DATA_licences.md) : `publications.license` (version éditeur) et `publications.deposit_license` (fichier déposé dans HAL).
 - **Serveurs de preprints.** `journals.journal_type = preprint_server` et `publication_relations` (`is_preprint_of`) donnent une partie de l'information.
