@@ -57,6 +57,8 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
   - Payeur (`budget_structure_id`) : le libellé `institution`, parmi les universités, écoles, organismes et CHU.
   - Laboratoire (`lab_structure_id`) d'un frais hors OA : le libellé `lab_name`, lu avec le payeur pour contexte, parmi les laboratoires.
 - **Page d'un laboratoire** : les APC de ses publications payées par l'établissement, quel que soit le laboratoire payeur.
+- **Filtre APC : oui ou non**, d'après les seuls paiements de l'établissement. Open APC recense seulement les paiements des établissements participants : un décompte des APC payées par d'autres payeurs n'est pas fiable.
+- **Mesure « Montant des APC »** : somme des frais de publication payés par l'établissement, APC et frais hors OA confondus.
 - **Colonnes conservées** :
   - ce qui sert au rattachement et à son contrôle a posteriori : `lab_name`, `budget`, `institution`, `coman_id`, `issn`, `journal_name`, `publisher_name` ;
   - `journal_id` et `publisher_id`, pour des agrégats par revue ou par éditeur ;
@@ -97,7 +99,7 @@ Les 1 452 lignes APC sans DOI n'ont aucun titre identique à une publication de 
 
 ### 6. Lectures et documentation
 
-- [ ] Page stats : mesure « Montant des APC » (somme de `amount_eur_ht`), à côté du nombre de publications, croisable avec toutes les dimensions (année, laboratoire, éditeur, revue…). La mesure s'ajoute au registre `MEASURES` de `domain/stats.py` et à son agrégat SQL dans `infrastructure/read_models/stats/pivot.py`.
+- [x] Page stats : mesure « Montant des APC » (somme de `amount_eur_ht`), à côté du nombre de publications, croisable avec toutes les dimensions (année, laboratoire, éditeur, revue…). La mesure s'ajoute au registre `MEASURES` de `domain/stats.py` et à son agrégat SQL dans `infrastructure/read_models/stats/pivot.py`.
 - [ ] `docs/sources/10-imports-manuels.md`, `docs/donnees/04-publishing.md`, `docs/donnees/09-index-des-tables.md`.
 
 ## Questions ouvertes

@@ -7,7 +7,7 @@ Propriétés d'une dimension :
 - **ordinal** — axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
 - **groupable / comparable / filterable** — rôles : catégorie de ventilation, axe de comparaison (abscisse), facette. Un axe comparable est toujours groupable.
 
-La grandeur est toujours un compte de publications (`COUNT(DISTINCT publication_id)`) ; le taux d'accès ouvert relève de la présentation, pas d'une mesure à part.
+Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC que l'établissement a payées pour elles. Le taux d'open access relève de la présentation.
 
 Pur, sans I/O. Ajouter une dimension ou une mesure = une entrée ici (et sa liaison SQL côté infrastructure si elle est groupable).
 """
@@ -40,10 +40,11 @@ class Dimension:
 
 @dataclass(frozen=True, slots=True)
 class Measure:
-    """Une grandeur agrégée. Le registre n'en porte qu'une : le compte des publications. Le taux d'accès ouvert relève de la présentation (part à 100 %) ou d'une colonne de classement."""
+    """Une grandeur agrégée sur les publications distinctes d'un groupe. `unit` est l'unité affichée, vide pour un nombre de publications."""
 
     key: str
     label: str
+    unit: str = ""
 
 
 DIMENSIONS: dict[str, Dimension] = {
@@ -119,6 +120,8 @@ assert all(d.groupable for d in DIMENSIONS.values() if d.comparable), (
 
 MEASURES: dict[str, Measure] = {
     "pub_count": Measure("pub_count", "Nombre de publications"),
+    # Tous les frais de publication imputés au budget d'une structure du périmètre : APC et frais hors open access.
+    "apc_amount": Measure("apc_amount", "Montant des APC", unit="€ HT"),
 }
 
 

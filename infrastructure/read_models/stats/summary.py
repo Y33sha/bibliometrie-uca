@@ -7,7 +7,11 @@ from sqlalchemy import Connection, Row, text
 from application.ports.read_models._common import FacetOption
 from application.ports.read_models.stats_queries import StatsFacetsResponse, StatsFilters
 from domain.structures.structure import StructureType
-from infrastructure.read_models.filters import WhereClause, assemble_where
+from infrastructure.read_models.filters import (
+    WhereClause,
+    assemble_where,
+    institution_apc_payment_sql,
+)
 from infrastructure.read_models.perimeters import get_persons_perimeter_name
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 
@@ -64,23 +68,11 @@ def _facets_sqls(
     """
 
     apc_where, apc_binds = assemble_where(_clauses("apc"))
+    paid = institution_apc_payment_sql("apc_root_ids")
     apc_sql = f"""
         SELECT
-            COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
-                SELECT 1 FROM apc_payments ap
-                WHERE ap.publication_id = p.id
-                  AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
-            )) AS apc_institution,
-            COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
-                SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-            ) AND NOT EXISTS (
-                SELECT 1 FROM apc_payments ap
-                WHERE ap.publication_id = p.id
-                  AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
-            )) AS apc_other,
-            COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
-                SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-            )) AS apc_none
+            COUNT(DISTINCT p.id) FILTER (WHERE {paid}) AS apc_yes,
+            COUNT(DISTINCT p.id) FILTER (WHERE NOT {paid}) AS apc_no
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {STATS_BASE} AND {apc_where}
@@ -149,10 +141,7 @@ def _build_facets_result(
         oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
         doc_types=[FacetOption(value=r.value, count=r.n) for r in doc_type_rows],
         apc=[
-            FacetOption(
-                value="institution", label=f"APC {institution}", count=apc_row.apc_institution
-            ),
-            FacetOption(value="other", label=f"APC hors {institution}", count=apc_row.apc_other),
-            FacetOption(value="none", label="Sans APC", count=apc_row.apc_none),
+            FacetOption(value="yes", label=f"APC {institution}", count=apc_row.apc_yes),
+            FacetOption(value="no", label="Sans APC", count=apc_row.apc_no),
         ],
     )

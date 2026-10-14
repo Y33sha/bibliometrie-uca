@@ -15,7 +15,7 @@ from application.ports.read_models._common import EntityFacetResponse, EntityKin
 class StatsFilters:
     """Filtres des tableaux de bord, partagés par les facettes, les collaborations et le pivot.
 
-    Les quatre lectures interrogent le même ensemble de publications : leurs décomptes ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Une liste vide vaut absence de filtre. `has_apc` prend des valeurs d'`APC_ORIGINS` combinées en OR.
+    Les quatre lectures interrogent le même ensemble de publications : leurs décomptes ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Une liste vide vaut absence de filtre. `has_apc` prend des valeurs de `yes` / `no` combinées en OR, comme dans la liste des publications.
     """
 
     lab_ids: list[int] = field(default_factory=list)
@@ -50,6 +50,7 @@ class PivotDimensionOut(BaseModel):
 class PivotMeasureOut(BaseModel):
     key: str
     label: str
+    unit: str
 
 
 class PivotSchemaResponse(BaseModel):

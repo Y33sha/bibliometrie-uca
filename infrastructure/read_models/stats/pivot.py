@@ -2,7 +2,7 @@
 
 Liaison SQL du registre `domain.stats` + constructeur de requête sur **liste blanche** : la composition `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` n'utilise que des expressions connues, indexées par les clés validées du registre. Aucun SQL libre, aucune injection : le vocabulaire est borné côté domaine, l'infrastructure n'y associe que des fragments SQL.
 
-Le grain est tenu par les mesures : toutes comptent les publications de façon distincte (`COUNT(DISTINCT p.id)`), si bien qu'une dimension qui démultiplie (`lab`) ne les surcompte pas.
+Le grain est tenu par une sous-requête qui rend chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui démultiplie les lignes (`lab`) ne fait donc compter ni sommer deux fois la même publication.
 """
 
 from sqlalchemy import Connection, text
@@ -56,8 +56,18 @@ _DIM_JOIN: dict[str, str] = {
     "publisher": "JOIN publishers pub ON pub.id = j.publisher_id",
     "journal": "JOIN journals jt ON jt.id = p.journal_id",
 }
+# Agrégat de chaque mesure sur les publications distinctes `g`, et jointure éventuelle.
 _MEASURE_AGG: dict[str, str] = {
-    "pub_count": "COUNT(DISTINCT p.id)",
+    "pub_count": "COUNT(*)",
+    "apc_amount": "COALESCE(SUM(apc.amount), 0)::float8",
+}
+_MEASURE_JOIN: dict[str, str] = {
+    "apc_amount": (
+        "LEFT JOIN (SELECT ap.publication_id, SUM(ap.amount_eur_ht) AS amount "
+        "FROM apc_payments ap "
+        "WHERE ap.budget_structure_id = ANY(CAST(:measure_apc_root_ids AS int[])) "
+        "GROUP BY ap.publication_id) apc ON apc.publication_id = g.publication_id"
+    ),
 }
 
 # Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et réciproquement ; idem pour les mesures. Les dimensions filtrables-seules (APC, labo) n'ont pas de groupement — leur filtrage vit dans `filters.py`.
@@ -68,7 +78,7 @@ assert set(_MEASURE_AGG) == set(MEASURES), "liaison SQL des mesures désynchroni
 
 def _order_by(dims: list[Dimension]) -> str:
     """Dimensions ordinales d'abord (ASC, lecture chronologique), puis par la mesure décroissante."""
-    parts = [_DIM_EXPR[d.key] for d in dims if d.ordinal]
+    parts = [d.key for d in dims if d.ordinal]
     parts.append("value DESC NULLS LAST")
     return ", ".join(parts)
 
@@ -90,20 +100,22 @@ def run_pivot(
         )
     )
     joins = " ".join(dict.fromkeys(_DIM_JOIN[d.key] for d in dims if d.key in _DIM_JOIN))
-    select = ", ".join(
-        [*[f"{_DIM_EXPR[d.key]} AS {d.key}" for d in dims], f"{_MEASURE_AGG[m.key]} AS value"]
+    inner_select = ", ".join(
+        [*[f"{_DIM_EXPR[d.key]} AS {d.key}" for d in dims], "p.id AS publication_id"]
     )
-    sql = (
-        f"SELECT {select} FROM publications p "
+    inner = (
+        f"SELECT DISTINCT {inner_select} FROM publications p "
         f"LEFT JOIN journals j ON j.id = p.journal_id {joins} "
         f"WHERE {STATS_BASE} AND {where}"
     )
+    keys = [d.key for d in dims]
+    select = ", ".join([*keys, f"{_MEASURE_AGG[m.key]} AS value"])
+    sql = f"SELECT {select} FROM ({inner}) g {_MEASURE_JOIN.get(m.key, '')}"
     if dims:
-        group_by = ", ".join(_DIM_EXPR[d.key] for d in dims)
-        sql += f" GROUP BY {group_by} ORDER BY {_order_by(dims)}"
+        sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
 
     conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(text(sql), binds).all()
+    rows = conn.execute(text(sql), {**binds, "measure_apc_root_ids": perimeter_structure_ids}).all()
     return PivotResponse(
         measure=m.key,
         groups=[d.key for d in dims],

@@ -42,6 +42,7 @@ from infrastructure.read_models.filters import (
     hal_status_clause,
     hal_status_expression,
     in_perimeter_person_clause,
+    institution_apc_payment_sql,
     journal_id_clause,
     lab_clause,
     language_clause,
@@ -288,26 +289,14 @@ class _PublicationFacetsBuilder:
         }
 
     def _facet_apc(self) -> list[FacetOption]:
-        """APC : payées par le périmètre, payées hors périmètre, sans paiement connu."""
+        """APC payées par le périmètre : oui ou non."""
         where, binds = self._clauses_skipping("apc")
+        paid = institution_apc_payment_sql("apc_facet_root_ids")
         r = self.conn.execute(
             text(f"""
                 SELECT
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
-                    )) AS apc_institution,
-                    COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-                    ) AND NOT EXISTS (
-                        SELECT 1 FROM apc_payments ap
-                        WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
-                    )) AS apc_other,
-                    COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
-                    )) AS apc_none
+                    COUNT(*) FILTER (WHERE {paid}) AS apc_yes,
+                    COUNT(*) FILTER (WHERE NOT {paid}) AS apc_no
                 FROM publications p
                 WHERE {where}
             """),
@@ -315,12 +304,11 @@ class _PublicationFacetsBuilder:
         ).one()
         return [
             FacetOption(
-                value="institution",
+                value="yes",
                 label=f"APC — {get_persons_perimeter_name(self.conn)}",
-                count=r.apc_institution,
+                count=r.apc_yes,
             ),
-            FacetOption(value="other", label="APC — autres", count=r.apc_other),
-            FacetOption(value="none", label="Sans APC", count=r.apc_none),
+            FacetOption(value="no", label="Sans APC", count=r.apc_no),
         ]
 
     def _facet_countries(self) -> list[FacetOption]:

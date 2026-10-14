@@ -272,10 +272,10 @@ def author_clause(author_id: int | None) -> WhereClause | None:
     return _authored_by(author_id, "flt_author_id")
 
 
-def _person_toggle_clause(
+def _toggle_clause(
     values: list[str], exists_sql: str, binds: dict[str, object]
 ) -> WhereClause | None:
-    """Facette binaire `yes`/`no` sur un prédicat EXISTS lié à une personne.
+    """Facette binaire `yes`/`no` sur un prédicat EXISTS.
 
     `values` est une liste `yes`/`no` (multi-sélection côté front) : `yes` retient
     les publications vérifiant `exists_sql`, `no` les autres, combinés en OR. Cocher
@@ -295,7 +295,7 @@ def _person_toggle_clause(
 def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause | None:
     if not corr_filter or not person_id:
         return None
-    return _person_toggle_clause(
+    return _toggle_clause(
         corr_filter,
         """EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
@@ -346,41 +346,21 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
     )
 
 
-def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
-    """Filtre des publications par origine du paiement APC.
+def institution_apc_payment_sql(root_ids_param: str) -> str:
+    """Condition SQL vraie quand la publication `p` a un paiement d'APC imputé au budget d'une structure du périmètre. Le paramètre nommé `root_ids_param` contient les identifiants de ces structures."""
+    return (
+        "EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id "
+        f"AND ap.budget_structure_id = ANY(CAST(:{root_ids_param} AS int[])))"
+    )
 
-    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters résolvent et qui tiennent lieu de structures « internes » : une publication APC est classée `institution` quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
-    """
-    if not has_apc:
-        return None
-    parts: list[str] = []
-    needs_root = False
-    for v in has_apc:
-        if v == "institution":
-            parts.append(
-                "EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id "
-                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[])))"
-            )
-            needs_root = True
-        elif v == "other":
-            parts.append(
-                "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
-                "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id "
-                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[]))))"
-            )
-            needs_root = True
-        elif v == "none":
-            parts.append(
-                "NOT EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id)"
-            )
-    if not parts:
-        return None
-    binds: dict[str, object] = {"flt_apc_root_ids": perimeter_structure_ids} if needs_root else {}
-    if len(parts) == 1:
-        return WhereClause(parts[0], binds)
-    return WhereClause("(" + " OR ".join(parts) + ")", binds)
+
+def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
+    """Filtre `yes` / `no` des publications dont un paiement d'APC est imputé au budget d'une structure du périmètre `persons` (`perimeter_structure_ids`, que les adapters résolvent)."""
+    return _toggle_clause(
+        has_apc,
+        institution_apc_payment_sql("flt_apc_root_ids"),
+        {"flt_apc_root_ids": perimeter_structure_ids},
+    )
 
 
 def in_perimeter_person_clause(
@@ -388,7 +368,7 @@ def in_perimeter_person_clause(
 ) -> WhereClause | None:
     if not in_perimeter or not person_id:
         return None
-    return _person_toggle_clause(
+    return _toggle_clause(
         in_perimeter,
         """EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person

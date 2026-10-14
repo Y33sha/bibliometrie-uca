@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Depends, Query
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
-from application.ports.read_models.publications_queries import APC_ORIGINS
 from application.ports.read_models.stats_queries import (
     CollaborationsResponse,
     PivotResponse,
@@ -16,7 +15,7 @@ from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
-from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv
+from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
@@ -41,7 +40,7 @@ def stats_filters(
         publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
         journal_ids=parse_int_csv(journal_id, param="journal_id"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
-        has_apc=parse_vocabulary_csv(has_apc, allowed=APC_ORIGINS, param="has_apc"),
+        has_apc=parse_vocabulary_csv(has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
     )
 
