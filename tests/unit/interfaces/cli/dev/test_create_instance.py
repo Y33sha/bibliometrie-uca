@@ -1,8 +1,8 @@
-"""Préconditions de `create_instance` : une instance désignée, et son seed d'établissement."""
+"""Préconditions de `create_instance` : une instance désignée, et son seed d'établissement. Scripts joués à la création et au rechargement."""
 
 import pytest
 
-from interfaces.cli.dev.create_instance import instance_seed
+from interfaces.cli.dev.create_instance import instance_scripts, instance_seed
 
 
 def test_requires_an_instance():
@@ -24,3 +24,20 @@ def test_returns_the_seed_next_to_instance_env(tmp_path):
     (tmp_path / "seed.sql").touch()
 
     assert instance_seed(env_file) == tmp_path / "seed.sql"
+
+
+def test_creation_plays_roles_common_seed_then_institution_seed(tmp_path):
+    seed = tmp_path / "seed.sql"
+
+    assert [p.name for p in instance_scripts(seed, reseed=False)] == [
+        "roles.sql",
+        "seed.sql",
+        "seed.sql",
+    ]
+    assert instance_scripts(seed, reseed=False)[-1] == seed
+
+
+def test_reseed_plays_only_the_institution_seed(tmp_path):
+    seed = tmp_path / "seed.sql"
+
+    assert instance_scripts(seed, reseed=True) == [seed]

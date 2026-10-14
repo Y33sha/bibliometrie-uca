@@ -87,7 +87,8 @@ def test_seed_links_children_to_root_and_skips_untyped():
     assert _section(seed, "structure_tutelles").rows == [(1, 1, 2)]
     assert _section(seed, "perimeters").rows == [(1, "lorraine", "UL", [1])]
     assert [row[:2] for row in _section(seed, "config").rows] == [
-        ("perimeter_extraction", "lorraine")
+        ("perimeter_extraction", "lorraine"),
+        ("perimeter_persons", "lorraine"),
     ]
     assert seed.skipped == [GARDENS]
 

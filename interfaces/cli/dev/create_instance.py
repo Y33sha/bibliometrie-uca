@@ -2,11 +2,12 @@
 """Crée la base de l'instance désignée par `BIBLIO_INSTANCE` : base, migrations, rôles de connexion, seed commun, seed d'établissement.
 
 Usage :
-    BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance
+    BIBLIO_INSTANCE=lorraine python -m interfaces.cli.dev.create_instance [--reseed]
 
-Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà.
+Le seed d'établissement est `instances/<nom>/seed.sql`, à côté de `instance.env`. Le script s'arrête si la base existe déjà. `--reseed` vise une base existante : il applique les migrations, recharge le seed d'établissement et recalcule les structures des périmètres.
 """
 
+import argparse
 import os
 import subprocess
 from pathlib import Path
@@ -37,6 +38,13 @@ def instance_seed(instance_env_file: Path | None) -> Path:
     if not seed.is_file():
         raise SystemExit(f"Seed d'établissement absent : {seed}")
     return seed
+
+
+def instance_scripts(seed: Path, *, reseed: bool) -> list[Path]:
+    """Scripts SQL joués après les migrations : rôles, seed commun et seed d'établissement, ou le seul seed d'établissement au rechargement."""
+    if reseed:
+        return [seed]
+    return [_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed]
 
 
 def _create_database(name: str) -> None:
@@ -80,17 +88,26 @@ def _run_psql(script: Path) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Crée la base d'une instance")
+    parser.add_argument(
+        "--reseed",
+        action="store_true",
+        help="Base existante : applique les migrations et recharge le seed d'établissement",
+    )
+    args = parser.parse_args()
+
     seed = instance_seed(INSTANCE_ENV_FILE)
-    log.info("Création de la base %s", settings.db_name)
-    _create_database(settings.db_name)
+    if not args.reseed:
+        log.info("Création de la base %s", settings.db_name)
+        _create_database(settings.db_name)
     log.info("Migrations")
     _migrate()
-    for script in (_DB_DIR / "roles.sql", _DB_DIR / "seed.sql", seed):
+    for script in instance_scripts(seed, reseed=args.reseed):
         _run_psql(script)
     # Les lectures de l'API passent par la clôture matérialisée des périmètres du seed.
     with get_sync_engine().begin() as conn:
         refresh_perimeter_structures(conn)
-    log.info("Instance %s créée sur la base %s", seed.parent.name, settings.db_name)
+    log.info("Instance %s chargée sur la base %s", seed.parent.name, settings.db_name)
 
 
 if __name__ == "__main__":
