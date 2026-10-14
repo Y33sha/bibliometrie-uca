@@ -13,6 +13,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from domain.config import PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY
 from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
 from domain.structures.name_forms import is_short_form
@@ -46,9 +47,11 @@ MIN_COLLECTION_JACCARD = 0.15
 # Collections examinées : les plus fréquentes parmi les notices de la structure.
 HAL_COLLECTION_CANDIDATES = 25
 
-_EXTRACTION_DESCRIPTION = (
-    "Périmètre pour déterminer les structures à interroger lors de l'extraction"
-)
+# Le périmètre de l'établissement sert à l'extraction et à la création des personnes.
+_PERIMETER_DESCRIPTIONS = {
+    PERIMETER_EXTRACTION_KEY: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
+    PERIMETER_PERSONS_KEY: "Périmètre pour la création des personnes",
+}
 
 
 @dataclass(frozen=True)
@@ -217,11 +220,8 @@ def build_institution_seed(
         }
     ]
     config: list[dict[str, JsonValue]] = [
-        {
-            "key": "perimeter_extraction",
-            "value": perimeter_code,
-            "description": _EXTRACTION_DESCRIPTION,
-        }
+        {"key": key, "value": perimeter_code, "description": description}
+        for key, description in _PERIMETER_DESCRIPTIONS.items()
     ]
 
     rows_by_table = {
