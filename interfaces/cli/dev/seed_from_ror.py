@@ -4,11 +4,12 @@
 Usage :
     python -m interfaces.cli.dev.seed_from_ror 04vfs2w97 --code lorraine --output instances/lorraine/seed.sql
 
-La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Les formes de noms viennent des libellés, alias et acronymes ROR. Un acronyme exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. Les collections HAL, les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
+La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Les formes de noms viennent des libellés, alias et acronymes ROR. Un acronyme exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des notices HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
 """
 
 import argparse
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
 from domain.structures.name_forms import is_short_form
 from domain.structures.structure import StructureType
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
 from infrastructure.db import tables
 from interfaces.cli.dev.generate_seed import (
     INSTITUTION_SEED,
@@ -24,7 +25,7 @@ from interfaces.cli.dev.generate_seed import (
     exported_columns,
     write_seed,
 )
-from pipeline.ingestion.http.api_params import API_BASE_URLS
+from pipeline.ingestion.http.api_params import API_BASE_URLS, HAL_DELAY
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.runtime.config import get_openalex_api_key, get_polite_pool_email_optional
 
@@ -38,6 +39,12 @@ _CHILD_TYPES = {
 
 # Une forme de deux caractères (« UL ») désigne trop de choses pour identifier une structure dans une adresse.
 MIN_FORM_LENGTH = 3
+
+# Collection HAL d'une structure : part minimale de ses notices que la collection contient, et indice de Jaccard minimal entre les notices de la structure et celles de la collection.
+MIN_COLLECTION_COVERAGE = 0.5
+MIN_COLLECTION_JACCARD = 0.15
+# Collections examinées : les plus fréquentes parmi les notices de la structure.
+HAL_COLLECTION_CANDIDATES = 25
 
 _EXTRACTION_DESCRIPTION = (
     "Périmètre pour déterminer les structures à interroger lors de l'extraction"
@@ -143,8 +150,13 @@ def build_institution_seed(
     children: list[RorOrganization],
     openalex_ids: list[str],
     perimeter_code: str,
+    hal_collections: Mapping[str, str] | None = None,
 ) -> InstitutionSeed:
-    """Structures, tutelles, périmètre, formes de noms et configuration du seed d'un établissement."""
+    """Structures, tutelles, périmètre, formes de noms et configuration du seed d'un établissement.
+
+    `hal_collections` : collection HAL par identifiant ROR.
+    """
+    hal_collections = hal_collections or {}
     taken: set[str] = set()
     structures: list[dict[str, JsonValue]] = []
     tutelles: list[dict[str, JsonValue]] = []
@@ -164,7 +176,7 @@ def build_institution_seed(
                 "structure_type": structure_type.value,
                 "ror_id": org.ror_id,
                 "rnsr_id": None,
-                "hal_collection": None,
+                "hal_collection": hal_collections.get(org.ror_id),
                 "api_ids": api_ids,
             }
         )
@@ -255,6 +267,119 @@ def fetch_openalex_ids(ror_id: str) -> list[str]:
     return [openalex_url.rsplit("/", 1)[-1]] if openalex_url else []
 
 
+def choose_collection(
+    structure_docs: int, candidates: Sequence[tuple[str, int]], size_of: Callable[[str], int]
+) -> str | None:
+    """Collection HAL dont les notices sont les plus proches de celles d'une structure, au sens de l'indice de Jaccard.
+
+    `candidates` : `(code, notices de la structure dans la collection)`. `size_of` : nombre de notices d'une collection, appelé pour les seules collections qui couvrent assez la structure.
+    """
+    best: tuple[float, str] | None = None
+    for code, shared in candidates:
+        if shared < MIN_COLLECTION_COVERAGE * structure_docs:
+            continue
+        jaccard = shared / (structure_docs + size_of(code) - shared)
+        if jaccard >= MIN_COLLECTION_JACCARD and (best is None or jaccard > best[0]):
+            best = (jaccard, code)
+    return best[1] if best else None
+
+
+def acronym_collection_accepted(collection_docs: int, institution_docs: int) -> bool:
+    """Vrai quand la collection existe et que la plupart de ses notices appartiennent à l'établissement."""
+    return collection_docs > 0 and institution_docs >= MIN_COLLECTION_COVERAGE * collection_docs
+
+
+def _hal_get(url: str, params: Mapping[str, str | int], label: str) -> Mapping[str, JsonValue]:
+    time.sleep(HAL_DELAY)
+    return as_mapping(
+        http_request_with_retry("GET", url, params={**params, "wt": "json"}, label=label)
+    )
+
+
+def _hal_count(query: str) -> int:
+    data = _hal_get(API_BASE_URLS["hal"], {"q": query, "rows": 0}, f"HAL {query}")
+    return as_int(as_mapping(data.get("response")).get("numFound")) or 0
+
+
+def fetch_hal_structure_ids(ror_id: str) -> list[str]:
+    """Structures du référentiel HAL, valides ou anciennes, désignées par `ror_id`. Le référentiel écrit le ROR en URL ou en identifiant seul."""
+    data = _hal_get(
+        API_BASE_URLS["hal_structures"],
+        {"q": f'ror_s:("https://ror.org/{ror_id}" OR "{ror_id}")', "fl": "docid", "rows": 100},
+        f"HAL structures ror:{ror_id}",
+    )
+    docs = as_sequence(as_mapping(data.get("response")).get("docs"))
+    return [str(as_mapping(d).get("docid")) for d in docs]
+
+
+def structures_query(structure_ids: Collection[str]) -> str:
+    """Requête HAL des notices signées par une des structures `structure_ids`."""
+    return f"structId_i:({' OR '.join(structure_ids)})"
+
+
+def collection_of_structures(structure_ids: Collection[str]) -> str | None:
+    """Collection HAL choisie par `choose_collection` parmi les plus fréquentes des notices des structures HAL `structure_ids`."""
+    query = structures_query(structure_ids)
+    data = _hal_get(
+        API_BASE_URLS["hal"],
+        {
+            "q": query,
+            "rows": 0,
+            "facet": "true",
+            "facet.field": "collCode_s",
+            "facet.limit": HAL_COLLECTION_CANDIDATES,
+            "facet.mincount": 1,
+        },
+        f"HAL collections de {query}",
+    )
+    structure_docs = as_int(as_mapping(data.get("response")).get("numFound")) or 0
+    facets = as_sequence(
+        as_mapping(as_mapping(data.get("facet_counts")).get("facet_fields")).get("collCode_s")
+    )
+    candidates = [
+        (str(code), as_int(count) or 0)
+        for code, count in zip(facets[::2], facets[1::2], strict=True)
+    ]
+    return choose_collection(
+        structure_docs, candidates, lambda code: _hal_count(f'collCode_s:"{code}"')
+    )
+
+
+def fetch_hal_collection(org: RorOrganization, institution_query: str | None) -> str | None:
+    """Collection HAL d'une fille de l'établissement.
+
+    Les notices des structures HAL de même ROR désignent la collection (`collection_of_structures`). Sans structure HAL de ce ROR, le sigle de `org` sert de code de collection, à condition que `acronym_collection_accepted` le valide d'après les notices de l'établissement (`institution_query`).
+    """
+    structure_ids = fetch_hal_structure_ids(org.ror_id)
+    if structure_ids:
+        return collection_of_structures(structure_ids)
+    if institution_query is None or org.acronym is None:
+        return None
+    code = org.acronym.upper()
+    collection_docs = _hal_count(f'collCode_s:"{code}"')
+    if collection_docs == 0:
+        return None
+    institution_docs = _hal_count(f'collCode_s:"{code}" AND {institution_query}')
+    return code if acronym_collection_accepted(collection_docs, institution_docs) else None
+
+
+def fetch_hal_collections(root: RorOrganization, children: list[RorOrganization]) -> dict[str, str]:
+    """Collection HAL par identifiant ROR, pour l'établissement et celles de ses filles qui ont un type de structure."""
+    collections: dict[str, str] = {}
+    root_structure_ids = fetch_hal_structure_ids(root.ror_id)
+    institution_query = None
+    if root_structure_ids:
+        institution_query = structures_query(root_structure_ids)
+        if code := collection_of_structures(root_structure_ids):
+            collections[root.ror_id] = code
+    for child in children:
+        if child_structure_type(child) is None:
+            continue
+        if code := fetch_hal_collection(child, institution_query):
+            collections[child.ror_id] = code
+    return collections
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Génère le seed d'un établissement depuis ROR")
     parser.add_argument("ror_id", help="Identifiant ROR de l'établissement (ex. 04vfs2w97)")
@@ -267,12 +392,18 @@ def main() -> None:
         raise SystemExit(f"Identifiant ROR invalide : {args.ror_id}")
     root = fetch_ror(ror_id)
     children = [fetch_ror(child_id) for child_id in root.child_ids]
-    seed = build_institution_seed(root, children, fetch_openalex_ids(ror_id), args.code)
+    hal_collections = fetch_hal_collections(root, children)
+    seed = build_institution_seed(
+        root, children, fetch_openalex_ids(ror_id), args.code, hal_collections
+    )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     write_seed(INSTITUTION_SEED.description, args.output, seed.sections)
     for org in seed.skipped:
         print(f"  fille écartée : {org.name} ({org.ror_id}, types {', '.join(org.types)})")
+    for org in [root, *children]:
+        if org not in seed.skipped and org.ror_id not in hal_collections:
+            print(f"  sans collection HAL : {org.name} ({org.ror_id})")
 
 
 if __name__ == "__main__":
