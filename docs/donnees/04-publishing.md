@@ -14,7 +14,7 @@ Revues, monographies, éditeurs et frais de publication.
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.
-- **`apc_payments`** : données de paiement d'APC, reliées aux publications concernées, provenant d'un import CSV, voir [doc sources](../sources/10-imports-manuels.md#données-apc). Deux colonnes les rattachent aux structures : `lab_structure_id` pour le laboratoire, `budget_structure_id` pour le financeur — c'est ce dernier qui décide du classement « interne » d'un paiement. Aucun script du dépôt ne les renseigne : les imports chargent seulement du texte, et les rattachements viennent de chargements conduits hors du dépôt. Sur une base reconstruite depuis le seed, elles restent vides et les filtres APC par structure ne rendent rien.
+- **`apc_payments`** : paiements de frais de publication, importés de fichiers CSV, voir [doc sources](../sources/10-imports-manuels.md#données-apc). `open_access_fee` distingue les APC des autres frais. `lab_structure_id` et `budget_structure_id` rattachent le paiement à son laboratoire et à son payeur. Un payeur du périmètre fait du paiement un paiement de l'établissement, seul retenu par les lectures.
 
 ## Propriété des tables
 
