@@ -223,4 +223,4 @@ def _refresh_authorship_from_sources(
         person_id,
         SOURCE_PRIORITY,
     )
-    authorship_repo.recompute_authorship_in_perimeter(publication_id, person_id)
+    authorship_repo.recompute_authorship_perimeter(publication_id, person_id)

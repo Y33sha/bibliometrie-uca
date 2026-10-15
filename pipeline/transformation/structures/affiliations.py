@@ -4,7 +4,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 
 1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
-3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose `in_perimeter` sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH (`rh_identity_signatures`).
+3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH.
 """
 
 from __future__ import annotations
@@ -17,8 +17,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import rh_identity_signatures
+from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, signature_perimeter_evidence
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
@@ -89,81 +88,78 @@ class AffiliationsPhase:
 
 
 class InPerimeterSyncCounts(NamedTuple):
-    """Nombre de `source_authorships` dont `in_perimeter` a changé lors d'un alignement."""
+    """Nombre de `source_authorships` entrées dans le périmètre et sorties du périmètre lors d'une synchronisation."""
 
-    added: int  # passées à TRUE (entrées dans le périmètre)
-    removed: int  # passées à FALSE (sorties du périmètre)
+    added: int
+    removed: int
 
 
-# Ensembles d'ids des deux UPDATE de `sync_in_perimeter` : `should` (signatures du périmètre, par la matview ou par l'identité d'une personne RH) et `currently` (à TRUE, via l'index partiel). Delta par EXCEPT ; un run stable produit un delta vide.
-_DELTA_CTE = f"""
-    WITH should AS (
-        SELECT source_authorship_id AS id
-        FROM source_authorship_structures
-        WHERE structure_id = ANY(:perimeter_ids)
-        UNION
-        {rh_identity_signatures()}
-    ),
-    currently AS (
-        SELECT id FROM source_authorships WHERE in_perimeter
-    )
-"""
+def _sync_sql(scoped: bool) -> str:
+    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux signatures `:signature_ids` quand `scoped` est vrai.
 
-# Un enregistrement sans publication qui entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
-_ADD_SQL = text(
-    _DELTA_CTE
-    + """
-    , entrees AS (
-        UPDATE source_authorships
-        SET in_perimeter = TRUE
-        WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
-        RETURNING source_publication_id
-    ), marquees AS (
-        UPDATE source_publications
-        SET keys_dirty = TRUE
-        WHERE id IN (SELECT source_publication_id FROM entrees)
-          AND publication_id IS NULL AND NOT keys_dirty
-        RETURNING 1
-    )
-    SELECT count(*) FROM entrees
+    Seules les signatures dont les indices changent sont écrites. Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
     """
-)
-
-_REMOVE_SQL = text(
-    _DELTA_CTE
-    + """
-    UPDATE source_authorships
-    SET in_perimeter = FALSE
-    WHERE id IN (SELECT id FROM currently EXCEPT SELECT id FROM should)
+    scope = "AND sa.id = ANY(:signature_ids)" if scoped else ""
+    return f"""
+        WITH computed AS (
+            {signature_perimeter_evidence("signature_ids" if scoped else None)}
+        ), target AS (
+            SELECT id, evidence FROM computed
+            UNION ALL
+            SELECT sa.id, {NO_PERIMETER_EVIDENCE}
+            FROM source_authorships sa
+            LEFT JOIN computed c ON c.id = sa.id
+            WHERE sa.in_perimeter AND c.id IS NULL {scope}
+        ), changed AS (
+            UPDATE source_authorships sa
+            SET perimeter_evidence = t.evidence
+            FROM target t
+            WHERE sa.id = t.id AND sa.perimeter_evidence IS DISTINCT FROM t.evidence
+            RETURNING sa.source_publication_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
+        ), marked AS (
+            UPDATE source_publications
+            SET keys_dirty = TRUE
+            WHERE id IN (SELECT source_publication_id FROM changed WHERE is_in AND NOT was_in)
+              AND publication_id IS NULL AND NOT keys_dirty
+            RETURNING 1
+        )
+        SELECT count(*) FILTER (WHERE is_in AND NOT was_in) AS added,
+               count(*) FILTER (WHERE was_in AND NOT is_in) AS removed
+        FROM changed
     """
-)
+
+
+_SYNC_ALL = text(_sync_sql(scoped=False))
+_SYNC_SCOPED = text(_sync_sql(scoped=True))
 
 
 def refresh_source_authorship_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `source_authorship_structures`, qui alimente `sync_in_perimeter`.
+    """Rafraîchit la matview `source_authorship_structures`, qui alimente `sync_perimeter_evidence`.
 
     À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le rafraîchissement de `authorship_structures`, qui en dérive.
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
 
-def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> InPerimeterSyncCounts:
-    """Aligne `in_perimeter` sur les structures `perimeter_ids`, lues depuis la matview, et sur l'identité des personnes RH, en écrivant seulement les changements.
-
-    Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty`.
-    """
-    params = {"perimeter_ids": perimeter_ids}
-    added = scalar_int(conn.execute(_ADD_SQL, params))
-    removed = conn.execute(_REMOVE_SQL, params).rowcount
-    return InPerimeterSyncCounts(added=added, removed=removed)
+def sync_perimeter_evidence(
+    conn: Connection, *, perimeter_ids: list[int], signature_ids: list[int] | None = None
+) -> InPerimeterSyncCounts:
+    """Aligne `source_authorships.perimeter_evidence` sur les indices calculés (`signature_perimeter_evidence`), pour toutes les signatures ou pour `signature_ids`."""
+    if signature_ids is None:
+        row = conn.execute(_SYNC_ALL, {"perimeter_ids": perimeter_ids}).one()
+    else:
+        row = conn.execute(
+            _SYNC_SCOPED, {"perimeter_ids": perimeter_ids, "signature_ids": signature_ids}
+        ).one()
+    return InPerimeterSyncCounts(added=row.added, removed=row.removed)
 
 
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
-    """Pose `in_perimeter` sur les `source_authorships` : rafraîchit la matview `source_authorship_structures`, puis aligne `in_perimeter` sur elle. Le commit est à la charge de l'appelant."""
+    """Pose les indices de l'entrée dans le périmètre sur les `source_authorships` : rafraîchit la matview `source_authorship_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}rattachement en cours", logger) as ligne:
         refresh_source_authorship_structures(conn)
-        sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
+        sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
 

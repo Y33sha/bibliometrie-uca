@@ -11,7 +11,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipRepository,
 )
 from infrastructure.sql_fragments import (
-    AUTHORSHIP_IN_PERIMETER_EXPR,
+    AUTHORSHIP_PERIMETER_EVIDENCE_EXPR,
     REJECTED_PAIRS,
     case_priority,
     publication_rejected_for,
@@ -109,12 +109,12 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def recompute_authorship_in_perimeter(self, publication_id: int, person_id: int) -> None:
+    def recompute_authorship_perimeter(self, publication_id: int, person_id: int) -> None:
         """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
         self._conn.execute(
             text(f"""
                 UPDATE authorships a
-                SET in_perimeter = {AUTHORSHIP_IN_PERIMETER_EXPR}
+                SET perimeter_evidence = {AUTHORSHIP_PERIMETER_EVIDENCE_EXPR}
                 WHERE a.publication_id = :pub AND a.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},

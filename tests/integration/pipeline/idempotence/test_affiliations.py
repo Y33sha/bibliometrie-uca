@@ -276,8 +276,6 @@ class TestEntreeDansLePerimetre:
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)
 
-        InPerimeterRecompute().recompute_in_perimeter_on_source_authorships(
-            sa_sync_conn, [80002], [80000, 80001]
-        )
+        InPerimeterRecompute().recompute_perimeter(sa_sync_conn, [80002], [80000, 80001])
 
         assert _keys_dirty(sa_sync_conn, 80002) is True

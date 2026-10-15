@@ -9,8 +9,8 @@ from sqlalchemy import Connection
 
 
 class PublicationPerimeterRecompute(Protocol):
-    """Recalcul ciblé de `publications.in_perimeter`."""
+    """Recalcul ciblé de `publications.perimeter_evidence`."""
 
     def refresh_publications_of_person(self, conn: Connection, person_id: int) -> int:
-        """Recalcule `publications.in_perimeter` pour les publications de la personne. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
         ...

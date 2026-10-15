@@ -60,9 +60,8 @@ def publication_in_perimeter(alias: str = "p") -> str:
     """Filtre SQL : la publication (table `publications` aliasée `alias`) est dans
     le périmètre.
 
-    Lit le flag matérialisé `publications.in_perimeter` (= au moins un authorship
-    in-perimeter d'une personne non exclue), maintenu en phase `authorships`
-    (`refresh_publications_in_perimeter`) et à l'exclusion d'une personne.
+    Lit `publications.in_perimeter`, colonne générée vraie quand la publication a
+    des indices de l'entrée dans le périmètre (`perimeter_evidence`).
     Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
     par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
     quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""

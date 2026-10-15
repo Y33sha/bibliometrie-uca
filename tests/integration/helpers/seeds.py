@@ -8,6 +8,7 @@ import uuid
 
 from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.rows import perimeter_evidence
 
 
 def uniq(prefix: str, sep: str = "_") -> str:
@@ -263,8 +264,9 @@ def seed_publication(
     """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
     return _insert(
         "INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, "
-        "journal_id, monograph_id, in_perimeter) "
-        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, %s) "
+        "journal_id, monograph_id, perimeter_evidence) "
+        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, "
+        "CAST(%s AS perimeter_evidence[])) "
         "RETURNING id",
         (
             title,
@@ -274,7 +276,7 @@ def seed_publication(
             oa_status,
             journal_id,
             monograph_id,
-            in_perimeter,
+            perimeter_evidence(in_perimeter) or [],
         ),
     )
 
@@ -288,9 +290,9 @@ def seed_authorship(
 ) -> int:
     """Authorship de `publication_id` et `person_id`. Les valeurs par défaut sont celles du schéma."""
     return _insert(
-        "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (publication_id, person_id, in_perimeter, roles),
+        "INSERT INTO authorships (publication_id, person_id, perimeter_evidence, roles) "
+        "VALUES (%s, %s, CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
+        (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
     )
 
 
@@ -308,10 +310,11 @@ def seed_in_perimeter_authorships(journal_id: int) -> None:
             )
             seed_authorship(pid, person_id=person_id, in_perimeter=True, roles=["author"])
         cur.execute(
-            "UPDATE publications p SET in_perimeter = EXISTS ("
-            "SELECT 1 FROM authorships a JOIN persons pe "
+            "UPDATE publications p SET perimeter_evidence = coalesce(("
+            "SELECT array_agg(DISTINCT e ORDER BY e) FROM authorships a JOIN persons pe "
             "ON pe.id = a.person_id AND pe.exclusion IS NULL "
-            "WHERE a.publication_id = p.id AND a.in_perimeter = TRUE) "
+            "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
+            "WHERE a.publication_id = p.id), '{}') "
             "WHERE p.journal_id = %s",
             (journal_id,),
         )
@@ -376,14 +379,14 @@ def seed_source_authorship(
         iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, identity_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            "person_id, perimeter_evidence, raw_author_name, identity_id) "
+            "VALUES (%s, %s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
             (
                 source,
                 sp,
                 author_position,
                 person_id,
-                in_perimeter,
+                perimeter_evidence(in_perimeter) or [],
                 raw_author_name,
                 iid,
             ),

@@ -47,6 +47,7 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
 from domain.sources.staging import StagingEntryMode
+from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
 from infrastructure.db.jsonb import Jsonb
@@ -538,6 +539,8 @@ oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
+perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
+
 resolution_mode_enum = PgEnum(
     *ResolutionMode,
     name="resolution_mode",
@@ -617,7 +620,19 @@ authorships = Table(
     Column("publication_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
-    Column("in_perimeter", Boolean, server_default="false"),
+    # Indices de l'entrée dans le périmètre ; `in_perimeter` en découle.
+    Column(
+        "perimeter_evidence",
+        ARRAY(perimeter_evidence_enum),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "in_perimeter",
+        Boolean,
+        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
+        nullable=False,
+    ),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
@@ -718,7 +733,19 @@ source_authorships = Table(
     Column("source", source_type_enum, nullable=False),
     Column("source_publication_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
-    Column("in_perimeter", Boolean, server_default="false"),
+    # Indices de l'entrée dans le périmètre ; `in_perimeter` en découle.
+    Column(
+        "perimeter_evidence",
+        ARRAY(perimeter_evidence_enum),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "in_perimeter",
+        Boolean,
+        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
+        nullable=False,
+    ),
     # Refresh pays incrémental : True = les pays dérivés (source_publications,
     # publications) sont à recalculer depuis les adresses de ce source_authorship.
     # Posé par normalize (nouveaux source_authorships) et la détection (adresse
@@ -923,11 +950,19 @@ publications = Table(
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
     # `publications` étroite (scans listes/facettes).
-    # Flag périmètre matérialisé (rollup de authorships.in_perimeter, hors personnes
-    # rejetées), maintenu en phase authorships + à l'action de rejet. Lu par le filtre
-    # de périmètre des listes (cf. publication_in_perimeter) ; le scope doc_type reste
-    # un filtre inline (domain/publications/scope), séparé du périmètre.
-    Column("in_perimeter", Boolean, nullable=False, server_default="false"),
+    # Indices des authorships de personnes non exclues, maintenus par la phase `authorships` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
+    Column(
+        "perimeter_evidence",
+        ARRAY(perimeter_evidence_enum),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "in_perimeter",
+        Boolean,
+        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
+        nullable=False,
+    ),
     # Staleness de l'enrichissement OA : date de la dernière interrogation d'Unpaywall
     # (NULL = jamais), qu'elle ait trouvé la publication ou non. La phase `oa_status`
     # re-vérifie les jamais-interrogées, puis les plus périmées.

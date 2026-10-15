@@ -23,7 +23,7 @@ class _FakeBuildQueries:
     def count_authorships_in_perimeter(self, conn) -> int:
         return 9
 
-    def refresh_publications_in_perimeter(self, conn) -> None:
+    def refresh_publications_perimeter_evidence(self, conn) -> None:
         self.appels.append("publications_in_perimeter")
 
     def refresh_authorship_structures(self, conn) -> None:

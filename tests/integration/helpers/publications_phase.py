@@ -60,13 +60,13 @@ def create_all_publications(conn: Connection) -> None:
 
     Ces tests ne jouent pas la phase affiliations : aucun `source_authorship`
     n'est in_perimeter, or l'assignation ne *crée* une publication que pour un
-    orphelin in_perimeter. On sème donc le périmètre à la main (`in_perimeter = TRUE`)
+    orphelin in_perimeter. On sème donc le périmètre à la main (indice `address`)
     — équivalent de ce que pose la phase affiliations en prod.
 
     `reconcile` ne commit pas (à la charge du caller), ce qui préserve l'isolation
     transactionnelle du fixture `sa_sync_conn`.
     """
-    conn.execute(text("UPDATE source_authorships SET in_perimeter = TRUE"))
+    conn.execute(text("UPDATE source_authorships SET perimeter_evidence = '{address}'"))
 
     apply_metadata_corrections(conn)
 

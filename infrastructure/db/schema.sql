@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pRiwkZoaFhER8BbaWAfe91NwgC8fsFuqhBjNOD9hr0l151YfuUY4h6Fa4jV468b
+\restrict GddEpm1bXcBtiwaxDWuZKvHt0fHAvFmmMdg2Gdd5fsJwxZkZxcFdBfw7vx731fl
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -253,6 +253,16 @@ CREATE TYPE public.oa_type AS ENUM (
     'unknown',
     'diamond',
     'embargoed'
+);
+
+
+--
+-- Name: perimeter_evidence; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.perimeter_evidence AS ENUM (
+    'address',
+    'rh_identity'
 );
 
 
@@ -826,10 +836,11 @@ CREATE TABLE publications.authorships (
     publication_id integer NOT NULL,
     person_id integer NOT NULL,
     author_position smallint,
-    in_perimeter boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     is_corresponding boolean,
-    roles text[]
+    roles text[],
+    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL
 );
 
 
@@ -886,7 +897,8 @@ CREATE TABLE structures.perimeters (
 
 CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
  SELECT DISTINCT saa.source_authorship_id,
-    ps.structure_id
+    ps.structure_id,
+    'address'::public.perimeter_evidence AS evidence
    FROM ((sources.source_authorship_addresses saa
      JOIN structures.address_structures ast ON ((ast.address_id = saa.address_id)))
      JOIN structures.perimeter_structures ps ON ((ps.structure_id = ast.structure_id)))
@@ -907,7 +919,6 @@ CREATE TABLE sources.source_authorships (
     source public.source_type NOT NULL,
     source_publication_id integer NOT NULL,
     author_position smallint,
-    in_perimeter boolean DEFAULT false,
     person_id integer,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
@@ -920,6 +931,8 @@ CREATE TABLE sources.source_authorships (
     content_hash text,
     raw_last_name text,
     raw_first_name text,
+    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
     CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
 ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
@@ -1102,12 +1115,13 @@ CREATE TABLE publications.publications (
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
-    in_perimeter boolean DEFAULT false NOT NULL,
     unpaywall_checked_at timestamp with time zone,
     subjects_ingested_at timestamp with time zone,
     monograph_id integer,
     license public.license_type,
-    deposit_license public.license_type
+    deposit_license public.license_type,
+    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL
 );
 
 
@@ -3573,7 +3587,7 @@ CREATE INDEX ix_source_authorship_rors_ror_id ON sources.source_authorship_rors 
 -- Name: source_authorship_structures_pkey; Type: INDEX; Schema: sources; Owner: -
 --
 
-CREATE UNIQUE INDEX source_authorship_structures_pkey ON sources.source_authorship_structures USING btree (source_authorship_id, structure_id);
+CREATE UNIQUE INDEX source_authorship_structures_pkey ON sources.source_authorship_structures USING btree (source_authorship_id, structure_id, evidence);
 
 
 --
@@ -3678,7 +3692,7 @@ CREATE INDEX idx_structures_type ON structures.structures USING btree (structure
 -- Name: source_authorships_orphan_perimeter; Type: STATISTICS; Schema: sources; Owner: -
 --
 
-CREATE STATISTICS sources.source_authorships_orphan_perimeter (mcv) ON in_perimeter, person_id FROM sources.source_authorships;
+CREATE STATISTICS sources.source_authorships_orphan_perimeter (mcv) ON person_id, in_perimeter FROM sources.source_authorships;
 ALTER STATISTICS sources.source_authorships_orphan_perimeter SET STATISTICS 1000;
 
 
@@ -4125,5 +4139,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pRiwkZoaFhER8BbaWAfe91NwgC8fsFuqhBjNOD9hr0l151YfuUY4h6Fa4jV468b
+\unrestrict GddEpm1bXcBtiwaxDWuZKvHt0fHAvFmmMdg2Gdd5fsJwxZkZxcFdBfw7vx731fl
 

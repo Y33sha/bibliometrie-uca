@@ -127,7 +127,8 @@ class TestSearch:
             pid = insert_publication(sa_sync_conn, title=title)
             _attach(sa_sync_conn, pid, lab)
             sa_sync_conn.execute(
-                text("UPDATE publications SET in_perimeter = TRUE WHERE id = :id"), {"id": pid}
+                text("UPDATE publications SET perimeter_evidence = '{address}' WHERE id = :id"),
+                {"id": pid},
             )
 
         def years_total(search: str) -> int:

@@ -47,7 +47,8 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 - Type `perimeter_evidence` : `address`, `rh_identity`, puis `ror`, `hal_structure` et `thesis_institution` avec leur phase. La colonne `evidence` de `source_authorship_structures` prend ses valeurs de structure.
 - Colonne `perimeter_evidence` (tableau) sur `source_authorships`, `authorships` et `publications`, recalculée à chaque run. `authorships` réunit les indices de ses signatures. `publications` réunit ceux des signatures de personnes non exclues, et les indices propres au document.
-- Une seule expression SQL calcule les indices d'une signature, pour le calcul complet de la phase `affiliations` et pour le recalcul ciblé après une modification d'adresse dans l'administration.
+- `in_perimeter` est une colonne générée, vraie quand `perimeter_evidence` est non vide.
+- Une seule requête SQL calcule les indices d'une signature, sur la vue `source_authorship_structures`. Elle sert au calcul complet de la phase `affiliations` et au recalcul après une correction d'adresse dans l'administration. Ce recalcul s'exécute en tâche de fond : il rafraîchit la vue, puis recalcule les signatures, les authorships et les publications touchées.
 
 **Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par un indice propre au document. La structure HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université.
 
@@ -69,9 +70,9 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 ### Phase 1 — Indices de l'entrée
 
-- [ ] Expression SQL unique des indices d'une signature, pour le calcul complet et le recalcul ciblé.
-- [ ] Colonne `evidence` de `source_authorship_structures`, valeur `address` pour la branche existante.
-- [ ] Indices de l'entrée sur les signatures, les authorships et les publications, pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
+- [x] Requête SQL unique des indices d'une signature, pour le calcul complet et le recalcul après une correction d'adresse.
+- [x] Colonne `evidence` de `source_authorship_structures`, valeur `address` pour la branche existante.
+- [x] Indices de l'entrée sur les signatures, les authorships et les publications, pour les voies existantes (adresse, identité). Sur la base de production, le remplissage de la migration redonne exactement le périmètre en place.
 
 ### Phase 2 — Référentiels
 
@@ -98,7 +99,6 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 ## Questions ouvertes
 
-- **Booléen `in_perimeter`.** Proposition : colonne générée, `cardinality(perimeter_evidence) > 0`. Les lectures et les index partiels restent valables, et le pipeline écrit seulement les indices.
 - **Correspondance des structures HAL renommées.** Une structure interne doit rejoindre toutes les structures HAL qui se sont succédé sous son nom. Le ROR en relie une partie (`ref/structure` rend les structures valides et anciennes d'un même ROR). Les notices de la collection du laboratoire relient les autres.
 - **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation, souvent juste pour un coauteur. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait tous les indices de niveau signature pour cette personne sur cette notice. Elle complète l'exclusion d'une personne (`persons.exclusion = 'out_of_perimeter'`), qui vaut pour toutes ses publications, futures comprises. À trancher selon la fréquence du cas dans l'administration.
 - **Structures primaires HAL.** Garder seulement les structures primaires réduit le nombre de structures par signature, mais une signature dont le laboratoire primaire est inconnu sort alors du périmètre. Mesure à faire sur un échantillon de notices, les deux champs demandés à l'API : nombre de signatures dont seule une tutelle est reconnue.

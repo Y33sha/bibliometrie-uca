@@ -372,7 +372,10 @@ class TestSetExclusion:
         ):
             insert_authorship(sa_sync_conn, pub, person_id=pid, in_perimeter=True)
         sa_sync_conn.execute(
-            text("UPDATE publications SET in_perimeter = (id <> :u) WHERE id IN (:a, :s, :u)"),
+            text(
+                "UPDATE publications SET perimeter_evidence = CASE WHEN id <> :u"
+                " THEN '{address}'::perimeter_evidence[] ELSE '{}' END WHERE id IN (:a, :s, :u)"
+            ),
             {"a": alone, "s": shared, "u": unrelated},
         )
 

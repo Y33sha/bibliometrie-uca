@@ -81,9 +81,9 @@ def propagate_in_perimeter_for_addresses(
     perimeter_queries: PerimeterStructuresQueries,
     affiliations_queries: AffiliationsQueries,
 ) -> None:
-    """Recalcule `in_perimeter` sur les `source_authorships` et les `authorships` canoniques liés aux adresses données.
+    """Recalcule le périmètre des signatures liées aux adresses données, de leurs authorships et de leurs publications.
 
-    Appelé après chaque review/assign/unassign d'adresse, pour une propagation en temps réel.
+    Appelé en tâche de fond après chaque review/assign/unassign d'adresse.
     """
     if not address_ids:
         return
@@ -96,16 +96,7 @@ def propagate_in_perimeter_for_addresses(
     if not affected_sa_ids:
         return
 
-    affiliations_queries.recompute_in_perimeter_on_source_authorships(
-        conn, affected_sa_ids, perimeter_ids
-    )
-    affiliations_queries.propagate_in_perimeter_to_authorships(conn, affected_sa_ids)
-    # `in_perimeter` ci-dessus est recalculé en direct depuis les tables de base
-    # (`address_structures`, modifiée par la review) — synchrone et correct. Les
-    # matviews `source_authorship_structures` / `authorship_structures`, qui ne
-    # portent que l'agrégation des structure_ids dérivées, ne sont PAS rafraîchies
-    # ici : maintenues uniquement par le pipeline (staleness bornée à un run,
-    # acceptable pour ces dérivées).
+    affiliations_queries.recompute_perimeter(conn, affected_sa_ids, perimeter_ids)
 
 
 def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:

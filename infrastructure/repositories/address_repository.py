@@ -112,7 +112,7 @@ class PgAddressRepository(AddressRepository):
     ) -> set[int]:
         """Cf. docstring du port.
 
-        Condition miroir de la clause WHERE de `recompute_in_perimeter_on_source_authorships`, à garder synchronisée.
+        Condition miroir du lien adresse → structure de la matview `source_authorship_structures`, à garder synchronisée.
         """
         if not address_ids:
             return set()

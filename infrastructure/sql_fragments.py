@@ -7,6 +7,7 @@ from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
+from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
 def in_clause(values: tuple[str, ...]) -> str:
@@ -134,17 +135,44 @@ def publication_rejected_for(publication_id: str, person_id: str) -> str:
     )
 
 
-# Vrai dès qu'une signature de la paire (publication, personne) de `authorships` est
-# elle-même in-perimeter. Suppose la table `authorships` aliasée `a` dans la requête hôte.
-AUTHORSHIP_IN_PERIMETER_EXPR = """
-    EXISTS (
-        SELECT 1
+# Tableau d'indices vide : hors du périmètre.
+NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
+
+
+def signature_perimeter_evidence(signature_ids: str | None = None) -> str:
+    """Requête des indices de l'entrée dans le périmètre de chaque signature qui en a : colonnes `id` et `evidence`, tableau trié.
+
+    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_authorship_structures`. `signature_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les signatures.
+    """
+    by_structure = "sas.structure_id = ANY(:perimeter_ids)"
+    by_identity = ""
+    if signature_ids:
+        by_structure += f" AND sas.source_authorship_id = ANY(:{signature_ids})"
+        by_identity = f"sa_auth.id = ANY(:{signature_ids})"
+    return f"""
+        SELECT id, array_agg(evidence ORDER BY evidence) AS evidence
+        FROM (
+            SELECT sas.source_authorship_id AS id, sas.evidence
+            FROM source_authorship_structures sas
+            WHERE {by_structure}
+            UNION
+            SELECT rh.id, '{PerimeterEvidence.RH_IDENTITY}'::perimeter_evidence
+            FROM ({rh_identity_signatures(by_identity)}) rh
+        ) e
+        GROUP BY id
+    """
+
+
+# Indices de l'authorship aliasée `a` : union des indices de ses signatures.
+AUTHORSHIP_PERIMETER_EVIDENCE_EXPR = f"""
+    coalesce((
+        SELECT array_agg(DISTINCT e ORDER BY e)
         FROM source_authorships sa
         JOIN source_publications sd ON sd.id = sa.source_publication_id
+        CROSS JOIN LATERAL unnest(sa.perimeter_evidence) e
         WHERE sd.publication_id = a.publication_id
           AND sa.person_id = a.person_id
-          AND sa.in_perimeter = TRUE
-    )
+    ), {NO_PERIMETER_EVIDENCE})
 """
 
 
