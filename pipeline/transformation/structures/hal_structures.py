@@ -17,6 +17,7 @@ from pipeline.ingestion.hal.structures import HAL_STRUCTURES_BATCH
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import Progression, progression
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
 STALE_AFTER_DAYS = 30
@@ -157,12 +158,20 @@ def _parsed(docs: Iterable[Mapping[str, JsonValue]]) -> list[HalStructure]:
 
 
 def fetch_hal_structures(
-    ids: Collection[int], *, source: HalStructuresSource, queries: HalStructuresQueries
+    ids: Collection[int],
+    *,
+    source: HalStructuresSource,
+    queries: HalStructuresQueries,
+    avancement: Progression | None = None,
 ) -> HalStructuresLoad:
-    """Lit `ids` dans `ref/structure`, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine."""
+    """Lit `ids` dans `ref/structure`, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. `avancement` compte les identifiants lus ; son total croît avec les parents à lire."""
     load = HalStructuresLoad()
     pending = set(ids)
+    requested = 0
     while pending:
+        requested += len(pending)
+        if avancement is not None:
+            avancement.fixer_total(requested)
         for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH):
             found = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
             load.structures.update(found)
@@ -173,6 +182,8 @@ def fetch_hal_structures(
                     for alias in missing & set(kept.alias_ids):
                         load.aliases[alias] = kept.hal_structure_id
                 load.not_found |= missing - load.aliases.keys()
+            if avancement is not None:
+                avancement.avance(len(chunk))
         parents = {p for s in load.structures.values() for p in s.parent_ids}
         pending = parents - load.structures.keys() - load.not_found
         pending -= queries.known_ids(pending)
@@ -201,7 +212,8 @@ def run_refresh_hal_structures(
         logger.info("%sAucune structure à charger", DERNIERE_BRANCHE)
         return metrics
     try:
-        load = fetch_hal_structures(ids, source=source, queries=queries)
+        with progression(len(ids), f"{DERNIERE_BRANCHE}HAL", logger) as avancement:
+            load = fetch_hal_structures(ids, source=source, queries=queries, avancement=avancement)
     except SourceUnavailableError:
         conn.rollback()
         signal_source_unavailable(metrics, "hal", logger=logger, phase="affiliations")
