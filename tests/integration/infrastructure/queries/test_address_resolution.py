@@ -102,6 +102,18 @@ class TestDeleteObsoleteDetectionsBulk:
         count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
         assert count == 0  # lien manuel non supprimé
 
+    def test_deletes_unconfirmed_link_whose_form_was_deleted(self, sa_sync_conn):
+        """La suppression d'une forme vide `matched_form_id` : le lien, non confirmé et plus détecté, est supprimé."""
+        s = insert_structure(sa_sync_conn, name="X")
+        f = _uca_form(sa_sync_conn, s)
+        addr = insert_address(sa_sync_conn, normalized_text="X")
+        insert_address_structure(sa_sync_conn, addr, structure_id=s, matched_form_id=f)
+        sa_sync_conn.execute(text("DELETE FROM structure_name_forms WHERE id = :f"), {"f": f})
+
+        count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
+
+        assert count == 1
+
     def test_pair_scoped_not_structure_scoped(self, sa_sync_conn):
         """Une même structure gardée pour une adresse n'épargne pas une autre adresse."""
         s = insert_structure(sa_sync_conn, name="X")

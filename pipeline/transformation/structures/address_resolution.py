@@ -52,12 +52,10 @@ class DetectedStructure(NamedTuple):
 
 # ─── SQL ─────────────────────────────────────────────────────────
 
-# Détections auto (`matched_form_id` posé) d'une adresse de `addr_ids` dont le couple
-# (address_id, structure_id) est absent de `kept_pairs` (les couples encore détectés).
-# Alias de table : `a`.
-_OBSOLETE_AUTO_WHERE = """
+# Liens d'une adresse de `addr_ids` dont le couple (address_id, structure_id) est absent de
+# `kept_pairs` (les couples encore détectés). Alias de table : `a`.
+_OBSOLETE_WHERE = """
     a.address_id = ANY(:addr_ids)
-    AND a.matched_form_id IS NOT NULL
     AND NOT EXISTS (
         SELECT 1
         FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
@@ -125,7 +123,7 @@ class AddressResolutionQueries:
         return conn.execute(
             text(
                 "DELETE FROM address_structures a WHERE "
-                + _OBSOLETE_AUTO_WHERE
+                + _OBSOLETE_WHERE
                 + " AND a.is_confirmed IS NULL"
             ),
             {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
@@ -140,8 +138,8 @@ class AddressResolutionQueries:
         conn.execute(
             text(
                 "UPDATE address_structures a SET matched_form_id = NULL WHERE "
-                + _OBSOLETE_AUTO_WHERE
-                + " AND a.is_confirmed IS NOT NULL"
+                + _OBSOLETE_WHERE
+                + " AND a.matched_form_id IS NOT NULL AND a.is_confirmed IS NOT NULL"
             ),
             {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
         )
