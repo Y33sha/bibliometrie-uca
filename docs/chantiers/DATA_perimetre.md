@@ -42,7 +42,7 @@ La collection HAL n'est pas un indice : elle double la structure HAL.
 - `in_perimeter` est une colonne générée, vraie quand `perimeter_evidence` est non vide.
 - Une seule requête SQL calcule les indices d'une signature. Elle sert à la phase `affiliations` et au recalcul en tâche de fond après une correction d'adresse dans l'administration.
 
-**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par un indice propre au document. La structure HAL suffit.
+**Publication.** Une publication est dans le périmètre par les indices de ses auteurs, ou par un indice propre au document. Les autres rôles (direction de thèse, jury, édition, traduction) comptent pour la personne seulement. La structure HAL suffit. Une publication appartient à une structure par ses auteurs (`publication_structures`).
 
 **Corrections, indice par indice.** Aucune table de rejet propre au périmètre :
 
@@ -66,7 +66,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 **Table `addresses` réservée aux textes d'affiliation.** Les noms de structures HAL et ScanR et les noms des thèses quittent `addresses`, une fois leurs voies d'entrée en place et mesurées.
 
-**Thèses soutenues ailleurs.** Une thèse entrée par un membre du jury est créée hors du périmètre. Elle figure dans l'onglet Thèses de la page de la personne. Elle est absente des listes de publications et des onglets Thèses de l'université et des laboratoires.
+**Thèses soutenues ailleurs.** Une thèse entrée par un membre du jury ou un directeur est créée hors du périmètre. Elle figure dans l'onglet Thèses de la page de la personne. Elle est absente des listes de publications et des onglets Thèses de l'université et des laboratoires.
 
 ## Phasage
 
@@ -87,9 +87,9 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 ### Phase 3 — Indices propres au document
 
-- [ ] Thèse soutenue dans l'établissement.
-- [ ] Thèses soutenues ailleurs, créées hors du périmètre.
-- [ ] Mesure : publications gagnées et perdues.
+- [x] Thèse soutenue dans l'établissement : PPN de l'établissement de soutenance dans `meta` de la notice theses.fr, indice `thesis_institution` (2 597 publications).
+- [x] Thèses soutenues ailleurs, créées hors du périmètre : les indices d'une publication viennent de ses seuls auteurs. L'onglet Thèses de la page d'une personne liste les thèses par leur type, quelle que soit leur source.
+- [x] Mesure : 75 219 publications du périmètre avant, 73 511 après. Sortent 1 580 thèses soutenues ailleurs (rapporteur, jury, présidence ou direction à l'UCA), 56 ouvrages dirigés et 73 documents sans auteur de l'UCA. Aucune thèse soutenue à l'UCA ne sort.
 
 ### Phase 4 — Adresses au sens strict
 
