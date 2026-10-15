@@ -14,7 +14,6 @@
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des signatures : candidats et résolution](DATA_pays-des-signatures.md)
