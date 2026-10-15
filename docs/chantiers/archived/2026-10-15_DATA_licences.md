@@ -113,3 +113,9 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
 - [x] Mise à jour de la documentation : interface (`docs/guide-utilisateur/01-pages-publiques.md`)
 
 ## Questions ouvertes
+
+- **Sans licence : licences que les sources ne donnent pas.** Un article fermé d'une revue sur abonnement relève de droits réservés, mais `publications.license` reste vide quand aucune source ne le dit. Mesure du 2026-10-15, articles et revues de littérature du périmètre parus de 2020 à 2025, sans licence :
+  - 4 403 fermés. Crossref donne une licence pour 2 136 d'entre eux, mais surtout de fouille de texte (`tdm`, `stm-asf`), écartée par la normalisation. Sur la version éditeur (`vor`), il donne aussi des conditions d'éditeur sans valeur normalisée (Springer Nature, Wiley) : pistes pour `all-rights-reserved` ;
+  - 2 577 bronze et 3 225 green, dont la version éditeur est sans licence ouverte par définition ;
+  - 216 gold, hybrid ou diamond.
+- **Licences d'Unpaywall.** La phase `oa_status` garde seulement le statut de la réponse d'Unpaywall. Unpaywall donne une licence par location ouverte (`oa_locations[].license`, avec `host_type` et `version`). Il comblerait au mieux les 216 articles gold, hybrid ou diamond sans licence, et rien pour les articles fermés. La licence d'une location d'archive autre que HAL compléterait celle du dépôt.
