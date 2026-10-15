@@ -176,6 +176,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/licenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Licenses
+         * @description Licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`.
+         */
+        get: operations["list_licenses_api_publications_licenses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/facets": {
         parameters: {
             query?: never;
@@ -3918,7 +3938,7 @@ export interface components {
          * @description Modèle OA d'un journal — les membres portent les libellés de l'enum PostgreSQL `oa_model`.
          * @enum {string}
          */
-        OaModel: "subscription" | "full_oa" | "repository";
+        OaModel: "subscription" | "full_oa" | "diamond" | "repository";
         /**
          * OkResponse
          * @description Réponse minimale d'acquittement (pas de données).
@@ -4479,6 +4499,10 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
+            /** License */
+            license: string | null;
+            /** Deposit License */
+            deposit_license: string | null;
             /** Language */
             language: string | null;
             /** Container Title */
@@ -4557,6 +4581,8 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
+            /** License */
+            license: string | null;
             /** Journal */
             journal: string | null;
             /** Journal Id */
@@ -4636,6 +4662,8 @@ export interface components {
             access: components["schemas"]["FacetOption"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["FacetOption"][];
+            /** Licenses */
+            licenses: components["schemas"]["FacetOption"][];
             /** Corresponding */
             corresponding: components["schemas"]["FacetOption"][];
             /** Source Counts */
@@ -5764,6 +5792,26 @@ export interface operations {
             };
         };
     };
+    list_licenses_api_publications_licenses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnumOption"][];
+                };
+            };
+        };
+    };
     publications_facets_api_publications_facets_get: {
         parameters: {
             query?: {
@@ -5778,6 +5826,7 @@ export interface operations {
                 subject_id?: string;
                 access?: string;
                 oa_status?: string;
+                license?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -5830,6 +5879,7 @@ export interface operations {
                 subject_id?: string;
                 access?: string;
                 oa_status?: string;
+                license?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -5882,6 +5932,7 @@ export interface operations {
                 subject_id?: string;
                 access?: string;
                 oa_status?: string;
+                license?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6034,6 +6085,7 @@ export interface operations {
                 subject_id?: string;
                 access?: string;
                 oa_status?: string;
+                license?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
