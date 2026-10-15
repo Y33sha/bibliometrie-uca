@@ -8,16 +8,14 @@ from interfaces.cli.dev import migrate_all
 
 
 @pytest.fixture
-def calls(monkeypatch):
-    """Commandes Alembic lancées, avec l'instance que désigne leur environnement. Une migration de `nantes` échoue."""
-    recorded: list[tuple[str | None, list[str]]] = []
+def upgraded(monkeypatch):
+    """Instances migrées, d'après l'environnement de chaque processus Alembic. La migration de `nantes` échoue."""
+    recorded: list[str | None] = []
 
     def run(args, *, env, **_kwargs):
         instance = env.get("BIBLIO_INSTANCE")
-        command = args[3:]
-        recorded.append((instance, command))
-        failed = instance == "nantes" and command[0] == "upgrade"
-        return subprocess.CompletedProcess(args, 1 if failed else 0, stdout="rev (head)", stderr="")
+        recorded.append(instance)
+        return subprocess.CompletedProcess(args, 1 if instance == "nantes" else 0)
 
     monkeypatch.setenv("BIBLIO_INSTANCE", "lorraine")
     monkeypatch.setattr(migrate_all, "instance_names", lambda: ["lorraine", "nantes", "zurich"])
@@ -25,9 +23,8 @@ def calls(monkeypatch):
     return recorded
 
 
-def test_migre_la_base_par_defaut_puis_les_instances_et_s_arrete_au_premier_echec(calls):
+def test_migre_la_base_par_defaut_puis_les_instances_et_s_arrete_au_premier_echec(upgraded):
     with pytest.raises(SystemExit):
         migrate_all.main()
 
-    upgraded = [instance for instance, command in calls if command[0] == "upgrade"]
     assert upgraded == [None, "lorraine", "nantes"]
