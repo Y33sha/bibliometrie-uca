@@ -15,7 +15,6 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Jeu de données commun aux tests du pipeline](CODE_jeu-de-donnees-commun.md)
-- [Licences des publications](DATA_licences.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
@@ -27,6 +26,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-15 — [Licences des publications](archived/2026-10-15_DATA_licences.md)
 - 2026-10-14 — [Import des paiements APC sans doublon](archived/2026-10-14_DATA_import-apc.md)
 - 2026-10-14 — [Instances par établissement](archived/2026-10-14_METIER_instances-par-etablissement.md)
 - 2026-10-14 — [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md)

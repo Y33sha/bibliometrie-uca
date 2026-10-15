@@ -102,14 +102,14 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
 
 ### Phase 3 — Interface
 
-- [ ] Libellés des licences dans le domaine, servis par `GET /api/publications/licenses`
-- [ ] Fiche d'une publication : licence de la version éditeur et du fichier déposé dans HAL
-- [ ] Liste des publications : facette « Licence » (version éditeur), colonne optionnelle, colonne de l'export CSV
-- [ ] Statistiques : dimension « Licence », filtrable et groupable
+- [x] Libellés des licences dans le domaine, servis par `GET /api/publications/licenses`
+- [x] Fiche d'une publication : licence de la version éditeur et du fichier déposé dans HAL
+- [x] Liste des publications : facette « Licence » (version éditeur), colonne optionnelle, colonne de l'export CSV
+- [x] Statistiques : dimension « Licence », filtrable et groupable
 
 ### Phase 4 — Fin de chantier
 
 - [x] Mise à jour de la documentation : `docs/pipeline`, `docs/sources`
-- [ ] Mise à jour de la documentation : interface
+- [x] Mise à jour de la documentation : interface (`docs/guide-utilisateur/01-pages-publiques.md`)
 
 ## Questions ouvertes

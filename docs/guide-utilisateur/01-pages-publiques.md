@@ -11,10 +11,13 @@ Tableaux de bord :
 - répartition par éditeur (liste);
 - répartition par revue (liste).
 
+Mesure : nombre de publications, ou montant des APC payées par l'établissement.
+
 Filtrable par:
 - année de publication,
 - laboratoire,
 - voie *open access*,
+- licence de la version éditeur,
 - paiement d'APC.
 
 Restreint aux publications de type article et *review*.<!--TODO: glossaire? et voir si d'autres types sont pertinents--> Quels que soient les filtres en place, un bouton "Voir les publications" donne accès à la liste complète des publications concernées.
@@ -33,6 +36,7 @@ Liste des publications filtrable par :
 - laboratoires,
 - accès (ouvert/fermé),
 - [voie *open access*](../glossaire.md#voies-open-access),
+- licence de la version éditeur,
 - paiement d'[APC](../glossaire.md#apc),
 - pays des co-auteurs,
 - sources.
@@ -47,7 +51,7 @@ Certaines colonnes+facettes sont masquées par défaut: un bouton permet de choi
 
 ### Détails `/publications/{id}`
 
-Vue détaillée : métadonnées, auteurs, sources contributrices.
+Vue détaillée : métadonnées, licences de la version éditeur et du dépôt HAL, auteurs, sources contributrices.
 
 Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.<!--TODO: à supprimer de l'UI publique, à réserver à une future page admin.-->
 
