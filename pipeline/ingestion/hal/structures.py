@@ -20,7 +20,7 @@ class HalStructuresClient:
         self._throttle = Throttle(HAL_DELAY)
 
     def _docs(self, field: str, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
-        params = {
+        params: dict[str, str | int] = {
             "q": f"{field}:({' OR '.join(str(i) for i in sorted(ids))})",
             "fl": ",".join(HAL_STRUCTURE_FIELDS),
             "rows": len(ids) * 2,

@@ -207,10 +207,10 @@ class _PublicationFacetsBuilder:
         where_sql, binds = self._clauses_skipping("license")
         rows = self.conn.execute(
             text(f"""
-                SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(*) AS count
+                SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(*) AS n
                 FROM publications p
                 WHERE {where_sql}
-                GROUP BY 1 ORDER BY count DESC
+                GROUP BY 1 ORDER BY n DESC
             """),
             binds,
         )
@@ -218,7 +218,7 @@ class _PublicationFacetsBuilder:
             FacetOption(
                 value=r.value,
                 label=license_label(None if r.value == NO_LICENSE else r.value),
-                count=r.count,
+                count=r.n,
             )
             for r in rows
         ]
