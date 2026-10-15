@@ -35,6 +35,7 @@
 	let selectedLabs: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
+	let selectedLicenses: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
 	// Facettes à forte cardinalité (recherche serveur) : une entité sélectionnée (id + libellé).
 	// Facettes éditeur / revue : seul l'id (état canonique) ; le libellé de la pastille est résolu par EntityFilter.
@@ -124,6 +125,8 @@
 		if (dim === 'oa_voie') return oaLabelsMap[value] ?? value;
 		if (dim === 'doc_type_grouped')
 			return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
+		// Libellés servis par la facette, y compris celui des publications sans licence.
+		if (dim === 'license') return facets.options.licenses.find((o) => o.value === value)?.text ?? value;
 		return value;
 	}
 	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
@@ -188,6 +191,7 @@
 		// Comparer/grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
 		let cleared = false;
 		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
+		if (dim === 'license' && selectedLicenses.length > 0) { selectedLicenses = []; cleared = true; }
 		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
 		if (dim === 'publisher' && selectedPublisherId) { selectedPublisherId = null; cleared = true; }
 		if (dim === 'journal' && selectedJournalId) { selectedJournalId = null; cleared = true; }
@@ -202,6 +206,7 @@
 		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedLicenses.length) p.set('license', selectedLicenses.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
@@ -210,7 +215,7 @@
 	}
 
 	// --- Composable: facets ---
-	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc' | 'docTypes'>({
+	const facets = useFacets<'years' | 'labs' | 'oa' | 'licenses' | 'apc' | 'docTypes'>({
 		endpoint: '/api/stats/facets',
 		apiKey: 'stats-facets',
 		buildParams: chartParams,
@@ -218,6 +223,7 @@
 			years: { type: 'simple', apiKey: 'years' },
 			labs: { type: 'labeled', apiKey: 'labs' },
 			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
+			licenses: { type: 'labeled', apiKey: 'licenses' },
 			apc: { type: 'labeled', apiKey: 'apc' },
 			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 		},
@@ -231,6 +237,7 @@
 			selectedLabs: { type: 'string_array', urlKey: 'lab_id' },
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
+			selectedLicenses: { type: 'string_array', urlKey: 'license' },
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			journalId: { type: 'single', urlKey: 'journal_id' },
@@ -250,6 +257,7 @@
 			selectedLabs,
 			selectedOa,
 			selectedApc,
+			selectedLicenses,
 			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
 			journalId: selectedJournalId ?? '',
@@ -270,6 +278,7 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
+		if (selectedLicenses.length) p.set('license', selectedLicenses.join(','));
 		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
 		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
@@ -521,6 +530,7 @@
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
+		if (restored.selectedLicenses) selectedLicenses = restored.selectedLicenses as string[];
 		if (restored.selectedDocTypes != null)
 			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
@@ -641,6 +651,9 @@
 	{/if}
 	{#if facetKeys.has('publisher')}
 		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
+	{/if}
+	{#if facetKeys.has('license')}
+		<FacetDropdown label="Licence" options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />
 	{/if}
 	{#if facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />

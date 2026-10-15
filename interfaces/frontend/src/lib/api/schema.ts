@@ -5094,6 +5094,8 @@ export interface components {
             labs: components["schemas"]["FacetOption"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["FacetOption"][];
+            /** Licenses */
+            licenses: components["schemas"]["FacetOption"][];
             /** Apc */
             apc: components["schemas"]["FacetOption"][];
             /** Doc Types */
@@ -5627,6 +5629,7 @@ export interface operations {
                 publisher_id?: string;
                 journal_id?: string;
                 oa_status?: string;
+                license?: string;
                 has_apc?: string;
                 doc_type?: string;
             };
@@ -5666,6 +5669,7 @@ export interface operations {
                 publisher_id?: string;
                 journal_id?: string;
                 oa_status?: string;
+                license?: string;
                 has_apc?: string;
                 doc_type?: string;
             };
@@ -5703,6 +5707,7 @@ export interface operations {
                 publisher_id?: string;
                 journal_id?: string;
                 oa_status?: string;
+                license?: string;
                 has_apc?: string;
                 doc_type?: string;
             };
@@ -5763,6 +5768,7 @@ export interface operations {
                 publisher_id?: string;
                 journal_id?: string;
                 oa_status?: string;
+                license?: string;
                 has_apc?: string;
                 doc_type?: string;
             };

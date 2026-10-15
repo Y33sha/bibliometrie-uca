@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
+from application.ports.read_models.publications_queries import LICENSE_FILTER_VALUES
 from application.ports.read_models.stats_queries import (
     CollaborationsResponse,
     PivotResponse,
@@ -27,12 +28,13 @@ def stats_filters(
     publisher_id: str = Query(""),
     journal_id: str = Query(""),
     oa_status: str = Query(""),
+    license_: str = Query("", alias="license"),
     has_apc: str = Query(""),
     doc_type: str = Query(""),
 ) -> StatsFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en listes séparées par des virgules.
 
-    `oa_status`, `has_apc` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422.
+    `oa_status`, `license`, `has_apc` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422.
     """
     return StatsFilters(
         lab_ids=parse_int_csv(lab_id, param="lab_id"),
@@ -40,6 +42,7 @@ def stats_filters(
         publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
         journal_ids=parse_int_csv(journal_id, param="journal_id"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
+        license=parse_vocabulary_csv(license_, allowed=LICENSE_FILTER_VALUES, param="license"),
         has_apc=parse_vocabulary_csv(has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
     )

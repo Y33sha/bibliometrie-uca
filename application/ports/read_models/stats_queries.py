@@ -23,6 +23,7 @@ class StatsFilters:
     publisher_ids: list[int] = field(default_factory=list)
     journal_ids: list[int] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
+    license: list[str] = field(default_factory=list)
     has_apc: list[str] = field(default_factory=list)
     doc_types: list[str] = field(default_factory=list)
 
@@ -31,6 +32,7 @@ class StatsFacetsResponse(BaseModel):
     years: list[FacetOption]
     labs: list[FacetOption]
     oa_statuses: list[FacetOption]
+    licenses: list[FacetOption]
     apc: list[FacetOption]
     doc_types: list[FacetOption]
 
