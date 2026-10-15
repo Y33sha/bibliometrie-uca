@@ -5,8 +5,8 @@ import datetime
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.structures.affiliations import sync_perimeter_evidence
 from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
+from pipeline.transformation.structures.perimeter_evidence import sync_perimeter_evidence
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
