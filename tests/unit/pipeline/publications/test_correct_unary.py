@@ -94,6 +94,7 @@ def _sp(**overrides: object) -> UnaryCorrectionRow:
         "registrant_publisher_type": None,
         "in_proceedings_volume": False,
         "group_title": None,
+        "journal_diamond": False,
     }
     base.update(overrides)
     return UnaryCorrectionRow(**base)  # type: ignore[arg-type]
@@ -301,7 +302,7 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
     queries.fetch_language_forms.return_value = _FORMS
     with caplog.at_level(logging.INFO, logger="test"):
         run(MagicMock(), queries, logging.getLogger("test"))
-    assert "  ├─ 1 document corrigé" in caplog.messages
+    assert "  ├─ 1 document à corriger" in caplog.messages
 
 
 def test_language_already_mapped_is_idempotent_noop():
