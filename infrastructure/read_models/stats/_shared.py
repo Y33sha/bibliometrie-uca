@@ -7,6 +7,7 @@ from infrastructure.read_models.filters import (
     apc_clause,
     doc_type_clause,
     lab_clause,
+    license_clause,
     oa_clause,
     year_clause,
 )
@@ -23,9 +24,9 @@ def stats_filter_clauses(
     filters: StatsFilters,
     skip: str = "",
 ) -> list[WhereClause | None]:
-    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur, revue). À assembler avec `assemble_where`.
+    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, licence, APC, types, éditeur, revue). À assembler avec `assemble_where`.
 
-    `skip` omet une dimension (`year` / `lab` / `oa` / `apc` / `doc_type`) pour les facettes croisées, qui écartent leur propre filtre. Les filtres éditeur et revue s'appliquent toujours (la barre ne les facette jamais — ils passent par la recherche serveur).
+    `skip` omet une dimension (`year` / `lab` / `oa` / `license` / `apc` / `doc_type`) pour les facettes croisées, qui écartent leur propre filtre. Les filtres éditeur et revue s'appliquent toujours (la barre ne les facette jamais — ils passent par la recherche serveur).
     """
     out: list[WhereClause | None] = []
     if skip != "year":
@@ -34,6 +35,8 @@ def stats_filter_clauses(
         out.append(lab_clause(filters.lab_ids))
     if skip != "oa":
         out.append(oa_clause(filters.oa_status))
+    if skip != "license":
+        out.append(license_clause(filters.license))
     if skip != "apc":
         out.append(apc_clause(filters.has_apc, perimeter_structure_ids))
     if skip != "doc_type":

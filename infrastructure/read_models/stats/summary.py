@@ -5,7 +5,9 @@ from collections.abc import Sequence
 from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models._common import FacetOption
+from application.ports.read_models.publications_queries import NO_LICENSE
 from application.ports.read_models.stats_queries import StatsFacetsResponse, StatsFilters
+from domain.publications.licenses import license_label
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     WhereClause,
@@ -88,10 +90,21 @@ def _facets_sqls(
         ORDER BY n DESC
     """
 
+    license_where, license_binds = assemble_where(_clauses("license"))
+    license_sql = f"""
+        SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(DISTINCT p.id) AS n
+        FROM publications p
+        LEFT JOIN journals j ON j.id = p.journal_id
+        WHERE {STATS_BASE} AND {license_where}
+        GROUP BY 1
+        ORDER BY n DESC
+    """
+
     return {
         "year": (year_sql, year_binds),
         "lab": (lab_sql, lab_binds),
         "oa": (oa_sql, oa_binds),
+        "license": (license_sql, license_binds),
         "apc": (apc_sql, {**apc_binds, "apc_root_ids": perimeter_structure_ids}),
         "doc_type": (doc_type_sql, dt_binds),
     }
@@ -115,6 +128,7 @@ def stats_facets(
     oa_rows = conn.execute(text(sqls["oa"][0]), sqls["oa"][1]).all()
     apc_row = conn.execute(text(sqls["apc"][0]), sqls["apc"][1]).one()
     doc_type_rows = conn.execute(text(sqls["doc_type"][0]), sqls["doc_type"][1]).all()
+    license_rows = conn.execute(text(sqls["license"][0]), sqls["license"][1]).all()
 
     return _build_facets_result(
         year_rows,
@@ -122,6 +136,7 @@ def stats_facets(
         oa_rows,
         apc_row,
         doc_type_rows,
+        license_rows=license_rows,
         institution=get_persons_perimeter_name(conn),
     )
 
@@ -134,11 +149,20 @@ def _build_facets_result(
     doc_type_rows: Sequence[Row[tuple[object, ...]]],
     *,
     institution: str,
+    license_rows: Sequence[Row[tuple[object, ...]]] = (),
 ) -> StatsFacetsResponse:
     return StatsFacetsResponse(
         years=[FacetOption(value=str(r.pub_year), count=r.n) for r in year_rows],
         labs=[FacetOption(value=str(r.id), label=r.label, count=r.n) for r in lab_rows],
         oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
+        licenses=[
+            FacetOption(
+                value=r.value,
+                label=license_label(None if r.value == NO_LICENSE else r.value),
+                count=r.n,
+            )
+            for r in license_rows
+        ],
         doc_types=[FacetOption(value=r.value, count=r.n) for r in doc_type_rows],
         apc=[
             FacetOption(value="yes", label=f"APC {institution}", count=apc_row.apc_yes),

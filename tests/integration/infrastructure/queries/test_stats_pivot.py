@@ -1,5 +1,7 @@
 """Tests d'intégration du moteur de pivot (`infrastructure.read_models.stats.pivot`)."""
 
+from sqlalchemy import text
+
 from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.stats.pivot import run_pivot
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
@@ -84,6 +86,27 @@ class TestPivotEngine:
         assert restricted.rows == [{"value": 1}]
         unrestricted = _piv(sa_sync_conn, "pub_count", [], doc_types=())
         assert unrestricted.rows == [{"value": 2}]
+
+
+class TestLicense:
+    def test_group_and_filter_by_license(self, sa_sync_conn):
+        licensed = insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold")
+        insert_publication(sa_sync_conn, in_perimeter=True, oa_status="closed")
+        sa_sync_conn.execute(
+            text("UPDATE publications SET license = 'cc-by' WHERE id = :id"), {"id": licensed}
+        )
+
+        res = _piv(sa_sync_conn, "pub_count", ["license"], doc_types=())
+        assert {r["license"]: r["value"] for r in res.rows} == {"cc-by": 1, "none": 1}
+
+        filtered = run_pivot(
+            sa_sync_conn,
+            measure="pub_count",
+            groups=[],
+            perimeter_structure_ids=[],
+            filters=StatsFilters(license=["none"]),
+        )
+        assert filtered.rows == [{"value": 1}]
 
 
 class TestApcAmount:

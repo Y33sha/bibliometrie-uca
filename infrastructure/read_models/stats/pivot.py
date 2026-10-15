@@ -7,6 +7,7 @@ Le grain est tenu par une sous-requête qui rend chaque publication une fois par
 
 from sqlalchemy import Connection, text
 
+from application.ports.read_models.publications_queries import NO_LICENSE
 from application.ports.read_models.stats_queries import PivotResponse, StatsFilters
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
@@ -44,6 +45,7 @@ _DIM_EXPR: dict[str, str] = {
     "lab": "COALESCE(ls.acronym, ls.name)",
     "publisher": "pub.name",
     "journal": "jt.title",
+    "license": f"COALESCE(p.license::text, '{NO_LICENSE}')",
 }
 # Jointures par dimension hors `publications`. Le laboratoire passe par les rattachements (une publication compte dans chacun de ses labos). Alias dédiés (`la`/`las`/`ls`), distincts de la sous-requête de `lab_clause`.
 _DIM_JOIN: dict[str, str] = {

@@ -111,6 +111,15 @@ DIMENSIONS: dict[str, Dimension] = {
     "apc": Dimension(
         "apc", "APC", "low", ordinal=False, groupable=False, comparable=False, filterable=True
     ),
+    "license": Dimension(
+        "license",
+        "Licence",
+        "low",
+        ordinal=False,
+        groupable=True,
+        comparable=False,
+        filterable=True,
+    ),  # licence de la version éditeur
 }
 
 # Un axe de comparaison est toujours groupable : le moteur ventile par lui (groups).
