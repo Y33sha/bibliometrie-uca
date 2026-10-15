@@ -213,7 +213,7 @@ def run(
     hal_rows = {row.source_id: row for row in rows if row.source == "hal"}
     updates = compute_updates(rows, hal_rows, language_forms)
     corrected, rule_counts = tally_corrections(updates)
-    logger.info("%s%s %s", BRANCHE, accord(corrected, "document"), forme(corrected, "corrigé"))
+    logger.info("%s%s à corriger", BRANCHE, accord(corrected, "document"))
 
     persist_in_batches(conn, updates, queries.persist_corrections)
     logger.info("%sTerminé en %.1fs", DERNIERE_BRANCHE, time.perf_counter() - t0)
