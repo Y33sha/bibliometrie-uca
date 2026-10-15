@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, get_container_facts, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers (get_title, get_container_facts, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
 Pattern : `FakeSourcePublicationQueries` + `FakeAuthorshipsBatchQueries` + `MagicMock`, pas de DB.
 """
@@ -17,6 +17,7 @@ import pytest
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
 from domain.sources.hal import hal_text_field
+from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
 from pipeline.ingestion.hal.normalize import (
@@ -29,7 +30,6 @@ from pipeline.ingestion.hal.normalize import (
     get_container_facts,
     get_title,
     insert_hal_document,
-    parse_author_structures,
     parse_tei_isbns,
     process_work,
     upsert_containers,
@@ -445,53 +445,6 @@ class TestInsertHalDocument:
 # `tests/unit/application/test_parse_tei_author_identifiers.py` — pas de duplication ici.
 
 
-# ── parse_author_structures ──────────────────────────────────────
-
-
-class TestParseAuthorStructures:
-    def test_no_entries(self):
-        assert parse_author_structures({}) == {}
-
-    def test_basic_parse(self):
-        doc = {
-            "authIdHasPrimaryStructure_fs": [
-                "49236-749496_FacetSep_Dupont, Marie_JoinSep_300012_FacetSep_LIMOS"
-            ]
-        }
-        struct_names: dict[str, str] = {}
-        result = parse_author_structures(doc, struct_name_by_hal_id=struct_names)
-        assert result == {49236: {"300012"}}
-        assert struct_names == {"300012": "LIMOS"}
-
-    def test_fallback_to_authIdHasStructure(self):
-        doc = {"authIdHasStructure_fs": ["100-200_FacetSep_X_JoinSep_999_FacetSep_Y"]}
-        result = parse_author_structures(doc)
-        assert result == {100: {"999"}}
-
-    def test_skip_malformed(self):
-        doc = {
-            "authIdHasPrimaryStructure_fs": [
-                "no_join_sep",  # pas de _JoinSep_
-                "noformid_FacetSep_Nom_JoinSep_str_FacetSep_Name",  # form_id non int
-                "_FacetSep__JoinSep_str_FacetSep_Name",  # form_person vide
-                "abc-def_FacetSep_X_JoinSep_999_FacetSep_Y",  # form_id pas un int
-                "1-2_FacetSep_X_JoinSep__FacetSep_Y",  # struct_id vide
-            ]
-        }
-        result = parse_author_structures(doc)
-        assert result == {}
-
-    def test_multiple_structs_for_same_form(self):
-        doc = {
-            "authIdHasPrimaryStructure_fs": [
-                "100-200_FacetSep_X_JoinSep_111_FacetSep_A",
-                "100-200_FacetSep_X_JoinSep_222_FacetSep_B",
-            ]
-        }
-        result = parse_author_structures(doc)
-        assert result == {100: {"111", "222"}}
-
-
 # ── build_hal_author_records (parsing pur) ───────────────────────
 
 
@@ -601,15 +554,17 @@ class TestBuildHalAuthorRecords:
         assert records[1].person_identifiers == {"hal_person_id": 749496, "idref": "111111111"}
         assert records[2].person_identifiers == {"hal_person_id": 555}
 
-    def test_form_struct_map_resolves_addr_parts(self):
-        doc = {
+    def test_structures_from_tei_without_address(self):
+        """Les structures HAL et leurs ROR, lus dans le TEI, vont sur la signature ; la signature est sans adresse."""
+        block = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],
-            "authIdHasPrimaryStructure_fs": [
-                "49236-749496_FacetSep_X_JoinSep_300012_FacetSep_LIMOS"
-            ],
+            "tei_author_rors": [["https://ror.org/03vgfxd91"]],
+            "tei_author_structures": [[300012]],
         }
-        record = build_hal_author_records(doc)[0]
-        assert [a.text for a in record.addresses] == ["LIMOS"]
+        record = build_hal_author_records(block)[0]
+        assert record.addresses == []
+        assert record.hal_structure_ids == {300012}
+        assert record.ror_ids == {RorId("03vgfxd91")}
 
     def test_quality_maps_to_roles(self):
         """`authQuality_s = 'dir'` est mappé en rôle via `map_role('hal', ...)` (cf. domain.publications.authorship_roles)."""

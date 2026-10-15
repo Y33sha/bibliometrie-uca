@@ -21,11 +21,11 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 - **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` de la notice TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
 - **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
-- **Affiliations** : structures HAL rattachées à chaque auteur via `authIdHasStructure_fs` (pas d'adresses textuelles)
+- **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les signatures HAL sont sans adresse.
 
 ## Exemple de payload
 
-Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subTitle_s` et `label_s` tronqués, `authIdHasStructure_fs` réduit à quelques entrées avec acronymes (les vraies entrées portent le nom complet de la structure), `label_xml` élidé (extrait formaté plus bas).
+Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subTitle_s` et `label_s` tronqués, `label_xml` élidé (extrait formaté plus bas).
 
 ```json
 {
@@ -34,13 +34,6 @@ Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subT
     "Céline Frigau Manning_FacetSep_2688470-752404_FacetSep_celine-frigau-manning",
     "Hélène Tysman_FacetSep_3340220-0_FacetSep_",
     "David Christoffel_FacetSep_1340141-1275740_FacetSep_dcdb"
-  ],
-  "authIdHasStructure_fs": [
-    "2688470-752404_FacetSep_Céline Frigau Manning_JoinSep_1063691_FacetSep_IHRIM",
-    "2688470-752404_FacetSep_Céline Frigau Manning_JoinSep_6818_FacetSep_ENS de Lyon",
-    "2688470-752404_FacetSep_Céline Frigau Manning_JoinSep_441569_FacetSep_CNRS",
-    "1340141-1275740_FacetSep_David Christoffel_JoinSep_557826_FacetSep_UPCité",
-    "... 12 autres entrées (Céline 13× + David 2×)"
   ],
   "authQuality_s": ["aut", "aut", "aut"],
   "collCode_s": [
@@ -102,7 +95,7 @@ HAL expose aussi des listes d'identifiants Solr par auteur (`authIdHal_s`, `auth
 
 ### Composite Solr des identifiants
 
-`authFullNameFormIDPersonIDIDHal_fs` : champ par position qui combine 4 identifiants : `Nom_FacetSep_formId-personId_FacetSep_idhal`. C'est le champ central côté auteurs HAL — le nom est dérivé de son 1er segment, et c'est aussi la seule source de `form_id` et `hal_person_id`.
+`authFullNameFormIDPersonIDIDHal_fs` : champ par position qui combine 4 identifiants : `Nom_FacetSep_formId-personId_FacetSep_idhal`. C'est le champ central côté auteurs HAL — le nom est dérivé de son 1er segment, et c'est aussi la seule source de `hal_person_id`.
 
 Quand l'idHAL manque, le 3e segment reste vide (cas d'Hélène Tysman : `Hélène Tysman_FacetSep_3340220-0_FacetSep_` — `personId=0` est aussi la valeur sentinelle HAL pour « pas de person »).
 
@@ -111,3 +104,5 @@ Une absence complète de ce champ dans le payload est traitée comme une erreur 
 ### TEI `label_xml`
 
 Seul champ où ORCID, IdRef et idHAL sont attachés à chaque auteur via les `<idno type="ORCID|IDREF|idhal">` à l'intérieur de chaque `<author>`. Voir l'extrait XML ci-dessus.
+
+Chaque `<author>` désigne aussi ses structures directes par `<affiliation ref="#struct-<identifiant>"/>`. Le `listOrg` du TEI donne le ROR de chaque structure. Les structures vont dans `source_authorship_hal_structures`, leurs ROR dans `source_authorship_rors`.

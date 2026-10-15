@@ -16,7 +16,6 @@ HAL_FIELDS = [
     "subTitle_s",
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
-    "authIdHasStructure_fs",
     # label_xml (TEI) : seul champ qui attache ORCID/IdRef à chaque auteur
     # par position. Les listes `authORCIDIdExt_s` / `authIdRefIdExt_s`
     # sont compactées (valeurs non-null seulement, pas d'alignement) et

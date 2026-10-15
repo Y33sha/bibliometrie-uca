@@ -283,9 +283,9 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
-    - affiliations feuilles → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
-    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse (tutelles écartées, affiliations sans nom) ;
-    - structures HAL des affiliations feuilles (`structId`).
+    - affiliations feuilles sans `structId` → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
+    - affiliations feuilles avec `structId` → structures HAL de la signature. Leur nom est celui d'une fiche du référentiel HAL : il n'est pas une adresse ;
+    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
@@ -317,7 +317,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         for aff in affiliations:
             rors = parse_ror_ids([as_str(aff.get("ror"))])
             name = (as_str(aff.get("name")) or "").strip()
-            if not (name and any(aff is leaf for leaf in leaves)):
+            is_address = name and not aff.get("structId") and any(aff is leaf for leaf in leaves)
+            if not is_address:
                 signature_rors |= rors
                 continue
             countries = {

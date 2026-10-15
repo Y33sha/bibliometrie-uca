@@ -101,7 +101,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 ### Phase 4 — Adresses au sens strict
 
 - [x] Signal de remplacement des adresses de thèse : branches de thèse de `source_authorship_structures`, par le PPN de l'établissement et des laboratoires partenaires. Simulation sur 2 642 thèses : 2 508 gardent les mêmes laboratoires, 67 en gagnent, 67 en perdent faute de PPN du partenaire.
-- [ ] Normalisation : noms de structures HAL et ScanR et noms des thèses hors de `addresses`.
+- [x] Normalisation : noms de structures HAL et ScanR et noms des thèses hors de `addresses`. Les structures HAL et leurs ROR sont lus dans le TEI. Une affiliation ScanR avec `structId` est une fiche de structure HAL : elle donne une structure HAL et son ROR à la signature, sans adresse.
 - [ ] Reprise du stock : réhydratation de `staging` depuis le raw store, `normalize` complet.
 
 ### Phase 5 — Fin de chantier
@@ -115,4 +115,5 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.
 - **Membres d'un laboratoire multisite sur un autre site.** Une forme de nom sans contexte rattache au laboratoire les adresses de ses autres sites. Mesure du 2026-10-15, signatures dont l'adresse cite un autre site sans citer Clermont ni l'UCA : IHRIM 4 223 sur 16 593 (Lyon, ENS de Lyon), LIMOS 452 (Mines Saint-Étienne), LMV 235 (Saint-Étienne, Lyon), GEOLAB 226 (Limoges). Piste : formes de noms des autres sites sur ces quatre laboratoires, et marque `other_site` sur le lien adresse → laboratoire, avant de décider d'exclure.
+- **Correction des correspondances HAL.** Une erreur de correspondance d'une structure HAL se corrige dans `ref.hal_structures.structure_id`, sans interface d'administration. A construire si les cas apparaissent dans l'administration.
 - **Partenaires de thèse sans PPN.** theses.fr ne donne pas le PPN de 301 mentions de partenaires (85 noms), surtout dans les thèses en cours : la thèse reste sans laboratoire jusqu'à ce que la notice le donne. Piste : les reconnaître aussi par leur nom, sans décision durable de l'administration faute de PPN pour clé.
