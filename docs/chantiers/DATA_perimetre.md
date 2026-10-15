@@ -60,7 +60,19 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 - structure HAL : une erreur du dépôt se corrige dans HAL ; une erreur de correspondance entre structure HAL et structure interne se corrige dans le référentiel ;
 - thèse soutenue dans l'établissement : jamais écartée, theses.fr fait autorité.
 
-**Référentiel des structures HAL.** Sur le modèle du ROR : `ref.hal_structures` (identifiant, nom, sigle, type, pays, validité, ROR) et `ref.hal_structure_relations` (parent, enfant). L'API `ref/structure` de HAL donne `country_s`, `type_s`, `valid_s`, `parentDocid_i`, `aliasDocid_i` et `ror_s`. `aliasDocid_i` liste les structures fusionnées dans une structure : le chargement résout un alias vers la structure conservée. HAL ne publie pas de dump. Un nœud en tête de la phase `affiliations` interroge l'API par lots d'identifiants, pour les seules structures citées par les notices et absentes du référentiel. Une structure HAL rejoint une structure interne par son ROR. Le pays d'une structure HAL est un candidat `hal_structure` du chantier des pays des adresses.
+**Référentiel des structures HAL.** Sur le modèle du ROR :
+
+- `ref.hal_structures` : identifiant, nom, sigle, type, pays, statut (`VALID`, `OLD`, `INCOMING`), ROR ;
+- `ref.hal_structure_relations` : parent, enfant, d'après `parentDocid_i` ;
+- `ref.hal_structure_aliases` : alias, structure conservée, d'après `aliasDocid_i`. Un alias est une fiche en double, fondue dans la structure conservée et absente de l'API.
+
+HAL ne publie pas de dump. Un nœud en tête de la phase `affiliations` interroge l'API `ref/structure` par lots d'identifiants : les structures citées par les notices et absentes du référentiel, puis leurs parents. En mode `full`, il relit tout le référentiel. Le pays d'une structure HAL est un candidat `hal_structure` du chantier des pays des adresses.
+
+**Structure HAL d'une signature.** `source_authorship_hal_structures` garde les structures directes de la signature : la référence `affiliation/@ref` de l'auteur dans le TEI de HAL, le `structId` d'une affiliation ScanR. Les tutelles se lisent dans le référentiel.
+
+**Correspondance avec les structures internes.** Une structure HAL rejoint une structure interne par son ROR, ou par la liste de `structId` de `structures.api_ids->'hal'`. Sans correspondance, la branche `hal_structure` de la vue remonte les parents HAL jusqu'à la première structure qui en a une.
+
+HAL ne relie pas les structures successives d'un laboratoire. Chaque période a sa fiche, avec ses dates ; l'ancienne passe à `OLD`. Le ROR partagé relie une partie des fiches ; la liste de `api_ids` relie les autres.
 
 **Table `addresses` réservée aux textes d'affiliation.** Les noms de structures HAL et ScanR et les noms des thèses quittent `addresses`, une fois leurs voies d'entrée en place et mesurées.
 
@@ -99,8 +111,7 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 ## Questions ouvertes
 
-- **Correspondance des structures HAL renommées.** Une structure interne doit rejoindre toutes les structures HAL qui se sont succédé sous son nom. Le ROR en relie une partie (`ref/structure` rend les structures valides et anciennes d'un même ROR). Les notices de la collection du laboratoire relient les autres.
+- **Scission d'un laboratoire.** L'ancienne fiche HAL peut figurer dans les `api_ids` des deux structures issues de la scission : ses signatures atteignent les deux laboratoires, et le décompte par laboratoire compte double. Sans correspondance, la remontée des parents rattache ses signatures à l'université seule. À trancher cas par cas.
 - **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation, souvent juste pour un coauteur. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait tous les indices de niveau signature pour cette personne sur cette notice. Elle complète l'exclusion d'une personne (`persons.exclusion = 'out_of_perimeter'`), qui vaut pour toutes ses publications, futures comprises. À trancher selon la fréquence du cas dans l'administration.
-- **Structures primaires HAL.** Garder seulement les structures primaires réduit le nombre de structures par signature, mais une signature dont le laboratoire primaire est inconnu sort alors du périmètre. Mesure à faire sur un échantillon de notices, les deux champs demandés à l'API : nombre de signatures dont seule une tutelle est reconnue.
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne. Les `department_name` de l'export RH désignent rarement un laboratoire.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.
