@@ -3,7 +3,7 @@
 Source unique de vérité pour les modes : quelles sources interroger, quelle stratégie d'années, et les bascules de coût (vacuum, rafraîchissement des documents périmés, retry des suggestions de pays vides).
 
 Deux modes :
-- `daily` : HAL seul, notices modifiées depuis la dernière extraction quotidienne réussie, sans `fetch_stale` ;
+- `daily` : HAL seul, notices modifiées depuis la dernière extraction quotidienne réussie, sans `fetch_stale` ni `extract_by_person` ;
 - `full` : toutes les sources sauf WoS, plage d'années (depuis une ancre fixe).
 
 WoS est opt-in (`--include-wos`) : crédit API contractuel limité, donc exclue par défaut pour ne pas multiplier les 429.
@@ -26,6 +26,8 @@ class ModePolicy:
     vacuum_full: bool
     # True (mode full) : `fetch_stale` refetche un par un les documents que l'extraction bulk n'a pas revus. False : la phase est sautée ; les runs full rafraîchissent le stock en bulk.
     fetch_stale: bool
+    # True (mode full) : la phase `extract_by_person` moissonne les sources par l'identifiant des personnes RH. False : la phase est sautée.
+    extract_by_person: bool
     # True (mode full) : la passe suggest réessaie aussi les suggestions de pays vides (échecs précédents `= []`), au cas où le pool aurait grossi — sans recalculer les positives. False : nouvelles adresses seulement.
     retry_empty_country_suggestions: bool
 
@@ -36,6 +38,7 @@ MODES: dict[str, ModePolicy] = {
         year_selection="since_last",
         vacuum_full=False,
         fetch_stale=False,
+        extract_by_person=False,
         retry_empty_country_suggestions=False,
     ),
     "full": ModePolicy(
@@ -44,6 +47,7 @@ MODES: dict[str, ModePolicy] = {
         year_selection="full",
         vacuum_full=True,
         fetch_stale=True,
+        extract_by_person=True,
         retry_empty_country_suggestions=True,
     ),
 }
