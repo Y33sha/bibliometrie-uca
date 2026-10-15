@@ -138,7 +138,6 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.WOS,
     Source.SCANR,
     Source.THESES,
-    Source.HAL,
     Source.DATACITE,
 )
 STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)

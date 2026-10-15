@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`), par les structures internes (`structures.api_ids->'hal'`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
@@ -41,11 +41,6 @@ class HalStructuresQueries:
             self._conn.execute(
                 text("""
                     SELECT hal_structure_id FROM source_authorship_hal_structures
-                    UNION
-                    SELECT h.value::int
-                    FROM structures s
-                    CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> 'hal') h(value)
-                    WHERE s.api_ids ? 'hal' AND h.value ~ '^[0-9]+$'
                     UNION
                     SELECT unnest(parent_ids) FROM hal_structures
                     EXCEPT

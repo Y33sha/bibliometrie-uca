@@ -113,3 +113,17 @@ def test_ror_de_la_signature_et_ror_d_une_adresse_hors_perimetre(sa_sync_conn):
 
     assert (seul, lab, "ror") in reached
     assert not any(signature == hors for signature, _, _ in reached)
+
+
+def test_structure_hal_rattachee_explicitement(sa_sync_conn):
+    _, lab = _perimeter(sa_sync_conn)
+    # Une fiche hors de la hiérarchie, sans ROR, rattachée au laboratoire par `structure_id`.
+    HalStructuresQueries(sa_sync_conn).save([_hal(5)], {})
+    sa_sync_conn.execute(
+        text("UPDATE hal_structures SET structure_id = :lab WHERE hal_structure_id = 5"),
+        {"lab": lab},
+    )
+    record = insert_source_publication(sa_sync_conn)
+    ancienne = _signature(sa_sync_conn, record, 0, hal_structures=[5])
+
+    assert _reached(sa_sync_conn) == {(ancienne, lab, "hal_structure")}

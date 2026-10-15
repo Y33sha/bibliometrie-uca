@@ -1,17 +1,17 @@
 # STATUS: oneshot (2026-10-15)
-"""Ajoute à `structures.api_ids->'hal'` les structures HAL que la résolution des adresses rattache par leur nom à une structure du périmètre d'extraction.
+"""Rattache à une structure interne (`ref.hal_structures.structure_id`) les structures HAL que la résolution des adresses rattache par leur nom à une structure du périmètre d'extraction.
 
 Une structure HAL est candidate quand :
 
 - une signature la cite ;
 - son statut est `VALID` ou `OLD` ;
-- aucune structure interne n'a son ROR ;
+- aucune structure interne n'a son ROR, et elle n'a pas déjà de structure interne ;
 - une adresse de même texte que son nom est rattachée à une seule structure du périmètre, par un lien non infirmé, détecté par une forme de nom ou confirmé.
 
-Une structure HAL rattachée à plusieurs structures internes est signalée et laissée de côté. `--dry-run` écrit les candidates dans `data/measures/hal_api_ids.csv` sans modifier la base.
+Une structure HAL rattachée à plusieurs structures internes est signalée et laissée de côté. `--dry-run` écrit les candidates dans `data/measures/hal_structure_matches.csv` sans modifier la base.
 
 Usage :
-    python -m interfaces.cli.oneshot.fill_hal_api_ids [--dry-run]
+    python -m interfaces.cli.oneshot.match_hal_structures [--dry-run]
 """
 
 import argparse
@@ -25,9 +25,9 @@ from sqlalchemy import text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger("fill_hal_api_ids", os.path.dirname(__file__))
+log = setup_logger("match_hal_structures", os.path.dirname(__file__))
 
-_OUTPUT = Path("data/measures/hal_api_ids.csv")
+_OUTPUT = Path("data/measures/hal_structure_matches.csv")
 
 _CANDIDATES = text("""
     WITH cited AS (
@@ -51,27 +51,20 @@ _CANDIDATES = text("""
     JOIN structures s ON s.id = ast.structure_id
     WHERE h.status IN ('VALID', 'OLD')
       AND NOT EXISTS (SELECT 1 FROM structures r WHERE r.ror_id = h.ror_id)
+      AND h.structure_id IS NULL
       AND ast.is_confirmed IS DISTINCT FROM false
       AND (ast.matched_form_id IS NOT NULL OR ast.is_confirmed)
       AND s.id IN (SELECT structure_id FROM perimeter)
     ORDER BY s.code, c.signatures DESC
 """)
 
-_ADD = text("""
-    UPDATE structures
-    SET api_ids = coalesce(api_ids, '{}'::jsonb) || jsonb_build_object(
-        'hal',
-        (
-            SELECT jsonb_agg(DISTINCT v ORDER BY v)
-            FROM jsonb_array_elements_text(coalesce(api_ids -> 'hal', '[]'::jsonb) || to_jsonb(CAST(:ids AS text[]))) v
-        )
-    )
-    WHERE id = :structure_id
-""")
+_SET = text(
+    "UPDATE hal_structures SET structure_id = :structure_id WHERE hal_structure_id = ANY(:ids)"
+)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Structures HAL dans structures.api_ids")
+    parser = argparse.ArgumentParser(description="Structure interne des structures HAL")
     parser.add_argument(
         "--dry-run", action="store_true", help="Écrit les candidates sans modifier la base"
     )
@@ -113,10 +106,9 @@ def main() -> None:
             return
         for structure_id, rs in by_structure.items():
             conn.execute(
-                _ADD,
-                {"structure_id": structure_id, "ids": [str(r["hal_structure_id"]) for r in rs]},
+                _SET, {"structure_id": structure_id, "ids": [r["hal_structure_id"] for r in rs]}
             )
-        log.info("api_ids->'hal' mis à jour pour %d structures", len(by_structure))
+        log.info("structure_id posé pour %d structures HAL", len(kept))
 
 
 if __name__ == "__main__":

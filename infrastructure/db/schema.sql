@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ScUawVXhOnlKMaKFONMK9VRgB0cXlB72veepxwZ6yWIi7lUoT0GnxYH3OVf42e1
+\restrict pEfMUPtltGey78pk5S1Bqewqkyzv3R8UnpOucUwgHPgkx64y3u3f1ks1eTzA9Zd
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -907,7 +907,8 @@ CREATE TABLE ref.hal_structures (
     start_date date,
     end_date date,
     fetched_at timestamp with time zone DEFAULT now() NOT NULL,
-    parent_ids integer[] DEFAULT '{}'::integer[] NOT NULL
+    parent_ids integer[] DEFAULT '{}'::integer[] NOT NULL,
+    structure_id integer
 );
 
 
@@ -915,7 +916,7 @@ CREATE TABLE ref.hal_structures (
 -- Name: TABLE hal_structures; Type: COMMENT; Schema: ref; Owner: -
 --
 
-COMMENT ON TABLE ref.hal_structures IS 'Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou structures.api_ids->''hal'', le relie au référentiel interne.';
+COMMENT ON TABLE ref.hal_structures IS 'Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou structure_id, le relie au référentiel interne.';
 
 
 --
@@ -1030,11 +1031,10 @@ CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
            FROM (ref.hal_structures hs
              JOIN structures.structures s ON ((s.ror_id = hs.ror_id)))
         UNION
-         SELECT (h.value)::integer AS value,
-            s.id
-           FROM (structures.structures s
-             CROSS JOIN LATERAL jsonb_array_elements_text((s.api_ids -> 'hal'::text)) h(value))
-          WHERE ((s.api_ids ? 'hal'::text) AND (h.value ~ '^[0-9]+$'::text))
+         SELECT hal_structures.hal_structure_id,
+            hal_structures.structure_id
+           FROM ref.hal_structures
+          WHERE (hal_structures.structure_id IS NOT NULL)
         ), hal_ancestors AS (
          SELECT hal_structure_relations.child_id,
             hal_structure_relations.parent_id AS ancestor_id,
@@ -1053,20 +1053,21 @@ CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
            FROM (sources.source_authorship_hal_structures sah
              LEFT JOIN ref.hal_structure_aliases al ON ((al.alias_id = sah.hal_structure_id)))
         ), hal_lowest AS (
+         SELECT hal_direct.source_authorship_id,
+            hal_direct.hal_structure_id
+           FROM hal_direct
+        EXCEPT
          SELECT d.source_authorship_id,
-            d.hal_structure_id
-           FROM hal_direct d
-          WHERE (NOT (EXISTS ( SELECT 1
-                   FROM (hal_direct other
-                     JOIN hal_ancestors a ON ((a.child_id = other.hal_structure_id)))
-                  WHERE ((other.source_authorship_id = d.source_authorship_id) AND (a.ancestor_id = d.hal_structure_id)))))
+            a.ancestor_id
+           FROM (hal_direct d
+             JOIN hal_ancestors a ON ((a.child_id = d.hal_structure_id)))
         ), hal_walk AS (
-         SELECT hal_lowest.source_authorship_id,
-            hal_lowest.hal_structure_id,
+         SELECT hal_structures.hal_structure_id AS origin_id,
+            hal_structures.hal_structure_id,
             0 AS depth
-           FROM hal_lowest
+           FROM ref.hal_structures
         UNION
-         SELECT w.source_authorship_id,
+         SELECT w.origin_id,
             r.parent_id,
             (w.depth + 1)
            FROM (hal_walk w
@@ -1074,6 +1075,13 @@ CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
           WHERE ((w.depth < 10) AND (NOT (EXISTS ( SELECT 1
                    FROM hal_match m
                   WHERE (m.hal_structure_id = w.hal_structure_id)))))
+        ), hal_reach AS (
+         SELECT DISTINCT w.origin_id,
+            m.structure_id
+           FROM (hal_walk w
+             JOIN hal_match m ON ((m.hal_structure_id = w.hal_structure_id)))
+          WHERE (m.structure_id IN ( SELECT perimeter.structure_id
+                   FROM perimeter))
         )
  SELECT saa.source_authorship_id,
     ast.structure_id,
@@ -1094,13 +1102,11 @@ UNION
           WHERE ((ast.address_id = sar.address_id) AND (ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
                    FROM perimeter)))))))
 UNION
- SELECT w.source_authorship_id,
-    m.structure_id,
+ SELECT l.source_authorship_id,
+    r.structure_id,
     'hal_structure'::public.perimeter_evidence AS evidence
-   FROM (hal_walk w
-     JOIN hal_match m ON ((m.hal_structure_id = w.hal_structure_id)))
-  WHERE (m.structure_id IN ( SELECT perimeter.structure_id
-           FROM perimeter))
+   FROM (hal_lowest l
+     JOIN hal_reach r ON ((r.origin_id = l.hal_structure_id)))
   WITH NO DATA;
 
 
@@ -3585,6 +3591,13 @@ CREATE INDEX ix_hal_structures_ror_id ON ref.hal_structures USING btree (ror_id)
 
 
 --
+-- Name: ix_hal_structures_structure_id; Type: INDEX; Schema: ref; Owner: -
+--
+
+CREATE INDEX ix_hal_structures_structure_id ON ref.hal_structures USING btree (structure_id);
+
+
+--
 -- Name: ix_ror_relations_child_ror_id; Type: INDEX; Schema: ref; Owner: -
 --
 
@@ -4202,6 +4215,14 @@ ALTER TABLE ONLY ref.hal_structure_relations
 
 
 --
+-- Name: hal_structures hal_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structures
+    ADD CONSTRAINT hal_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES structures.structures(id) ON DELETE SET NULL;
+
+
+--
 -- Name: language_forms language_forms_language_code_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -4389,5 +4410,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ScUawVXhOnlKMaKFONMK9VRgB0cXlB72veepxwZ6yWIi7lUoT0GnxYH3OVf42e1
+\unrestrict pEfMUPtltGey78pk5S1Bqewqkyzv3R8UnpOucUwgHPgkx64y3u3f1ks1eTzA9Zd
 
