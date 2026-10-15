@@ -417,9 +417,10 @@ def run_cascade(
 
     etape(logger, "Création de nouvelles personnes")
     logger.info(
-        "%s%s sans personne pouvant en créer une",
+        "%s%s %s",
         BRANCHE,
         accord(len(non_identifiees), "signature"),
+        forme(len(non_identifiees), "non identifiée"),
     )
     logger.info(
         "%s%s (forme de nom ambiguë, ou candidats tous rejetés)",
