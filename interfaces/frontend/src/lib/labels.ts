@@ -111,9 +111,9 @@ export function docTypeFilterFromToken(raw: string): string[] {
 	return raw === DOC_TYPE_FILTER_ALL ? [] : raw.split(',');
 }
 
-/** Couleur de chaque licence, dans l'ordre d'affichage : du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). `none` désigne une publication sans licence connue. */
+/** Couleur de chaque licence, dans l'ordre d'affichage : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). `none` désigne une publication sans licence connue. */
 export const licenseColors: Record<string, string> = {
-	'public-domain': '#1b6e35',
+	'public-domain': '#2e669e',
 	'cc-by': '#2e9e4a',
 	'licence-ouverte': '#43ad5c',
 	'open-source': '#5bb873',
