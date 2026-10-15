@@ -364,39 +364,3 @@ class TestLicense:
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
-
-
-class TestGeneralPerimeter:
-    """Périmètre d'une liste générale : par défaut les publications du périmètre, sur demande aussi les autres."""
-
-    def _seed(self, conn):
-        inside = insert_publication(conn, "Zzthese ici", doc_type="thesis", in_perimeter=True)
-        outside = insert_publication(conn, "Zzthese ailleurs", doc_type="thesis")
-        return inside, outside
-
-    def _ids(self, conn, in_perimeter):
-        res = list_publications(
-            conn,
-            filters=PublicationFilters(search="zzthese", in_perimeter=in_perimeter),
-            perimeter_structure_ids=[],
-            page=1,
-            per_page=50,
-            sort="year_desc",
-        )
-        return {p.id for p in res.publications}
-
-    def test_filter(self, sa_sync_conn):
-        inside, outside = self._seed(sa_sync_conn)
-
-        assert self._ids(sa_sync_conn, []) == {inside}
-        assert self._ids(sa_sync_conn, ["no"]) == {outside}
-        assert self._ids(sa_sync_conn, ["yes", "no"]) == {inside, outside}
-
-    def test_facet_counts(self, sa_sync_conn):
-        self._seed(sa_sync_conn)
-
-        builder = _PublicationFacetsBuilder(sa_sync_conn, PublicationFilters(search="zzthese"), [])
-        assert {(o.value, o.count) for o in builder._facet_in_perimeter()} == {
-            ("yes", 1),
-            ("no", 1),
-        }

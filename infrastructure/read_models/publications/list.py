@@ -21,6 +21,7 @@ from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_STATUSES,
+    PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     access_clause,
     apc_clause,
@@ -41,7 +42,6 @@ from infrastructure.read_models.filters import (
     no_lab_clause,
     oa_clause,
     person_clause,
-    publication_perimeter_clause,
     publisher_id_clause,
     search_clause,
     source_clause,
@@ -83,7 +83,7 @@ def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
         return [person_clause(filters.person_id)]
     if filters.lab_ids:
         return []
-    return [publication_perimeter_clause(filters.in_perimeter)]
+    return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
 
 
 def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
