@@ -11,6 +11,16 @@ chemin SQL, ces tests le révèlent par un 500 (via raise_server_exceptions).
 
 import pytest
 
+from domain.publications.licenses import LICENSE_LABELS
+
+
+def test_licenses_follow_the_domain_enum(client):
+    r = client.get("/api/publications/licenses")
+    assert r.status_code == 200
+    assert [(o["value"], o["label_fr"]) for o in r.json()] == [
+        (lic.value, label) for lic, label in LICENSE_LABELS.items()
+    ]
+
 
 class TestPublicationsList:
     """Exerce le SQL de GET /api/publications avec toutes les combinaisons

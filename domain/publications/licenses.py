@@ -34,6 +34,32 @@ class License(StrEnum):
     OTHER = "other"
 
 
+LICENSE_LABELS: dict[License, str] = {
+    License.CC_BY: "CC BY",
+    License.CC_BY_SA: "CC BY-SA",
+    License.CC_BY_ND: "CC BY-ND",
+    License.CC_BY_NC: "CC BY-NC",
+    License.CC_BY_NC_SA: "CC BY-NC-SA",
+    License.CC_BY_NC_ND: "CC BY-NC-ND",
+    License.PUBLIC_DOMAIN: "Domaine public (CC0, Public Domain Mark)",
+    License.LICENCE_OUVERTE: "Licence Ouverte Etalab",
+    License.OPEN_SOURCE: "Licence de logiciel libre",
+    License.REPOSITORY_DISTRIBUTION: "Autorisation de diffusion (HAL, arXiv)",
+    License.PUBLISHER_OPEN: "Licence ouverte de l'éditeur",
+    License.OTHER_OA: "Autre licence ouverte",
+    License.ALL_RIGHTS_RESERVED: "Droits réservés",
+    License.OTHER: "Autre licence",
+}
+"""Libellé français de chaque licence, dans l'ordre de l'enum."""
+
+NO_LICENSE_LABEL = "Aucune licence"
+
+
+def license_label(value: str | None) -> str:
+    """Libellé français d'une licence, `NO_LICENSE_LABEL` sans licence."""
+    return LICENSE_LABELS[License(value)] if value else NO_LICENSE_LABEL
+
+
 # Sources de la licence de la version éditeur d'une publication, par priorité.
 PUBLISHER_LICENSE_SOURCES: tuple[Source, ...] = (
     Source.CROSSREF,

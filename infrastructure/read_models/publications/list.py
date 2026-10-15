@@ -15,6 +15,7 @@ from application.ports.read_models.publications_queries import (
     PublicationListResponse,
 )
 from domain.normalize import normalize_text, to_plain_text
+from domain.publications.licenses import license_label
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
@@ -36,6 +37,7 @@ from infrastructure.read_models.filters import (
     journal_id_clause,
     lab_clause,
     language_clause,
+    license_clause,
     monograph_id_clause,
     no_lab_clause,
     oa_clause,
@@ -91,6 +93,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         search_clause(filters.search),
         year_clause(filters.years),
         doc_type_clause(filters.doc_types),
+        license_clause(filters.license),
         publisher_id_clause(filters.publisher_id),
         journal_id_clause(filters.journal_id),
         monograph_id_clause(filters.monograph_id),
@@ -203,6 +206,7 @@ def list_publications(
             SELECT
                 p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
+                p.license::text AS license,
                 j.id AS journal_id,
                 j.title AS journal_title,
                 pub.id AS publisher_id,
@@ -290,6 +294,7 @@ def list_publications(
             doi=r.doi,
             doc_type=r.doc_type,
             oa_status=r.oa_status,
+            license=r.license,
             journal_id=r.journal_id,
             journal=r.journal_title,
             publisher_id=r.publisher_id,
@@ -459,6 +464,7 @@ def export_publications_csv(
             SELECT
                 p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
+                p.license::text AS license,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
                 {hal_status.sql} AS hal_status,
@@ -517,6 +523,7 @@ def export_publications_csv(
         ("apc", "APC (€)"),
         ("oa", "Accès"),
         ("oa_status", "Voie OA"),
+        ("license", "Licence"),
         ("hal_status", "Statut HAL"),
         ("links", "DOI"),
         ("links", "Sources"),
@@ -554,6 +561,7 @@ def _publication_lines(
             "APC (€)": round(row.apc_total) if row.apc_total else "",
             "Accès": "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé",
             "Voie OA": row.oa_status or "",
+            "Licence": license_label(row.license) if row.license else "",
             "Statut HAL": HAL_DEPOSIT_STATUS_LABELS.get(row.hal_status or "", ""),
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",

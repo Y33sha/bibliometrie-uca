@@ -6,6 +6,7 @@ Chaque `*_clause(...)` retourne un `WhereClause | None`, composable via `assembl
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from application.ports.read_models.publications_queries import NO_LICENSE
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
@@ -142,6 +143,18 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
         )""",
         {"flt_lab_ids": lab_ids},
     )
+
+
+def license_clause(values: list[str]) -> WhereClause | None:
+    """Filtre par licence de la version éditeur. `NO_LICENSE` retient les publications sans licence connue ; les valeurs se combinent en OR."""
+    if not values:
+        return None
+    named = [v for v in values if v != NO_LICENSE]
+    parts = ["p.license::text = ANY(:flt_license)"] if named else []
+    if NO_LICENSE in values:
+        parts.append("p.license IS NULL")
+    sql = parts[0] if len(parts) == 1 else "(" + " OR ".join(parts) + ")"
+    return WhereClause(sql, {"flt_license": named} if named else {})
 
 
 def oa_clause(oa_status: list[str]) -> WhereClause | None:

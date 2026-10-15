@@ -17,10 +17,12 @@ from application.ports.read_models._common import (
     YesNoCount,
 )
 from application.ports.read_models.publications_queries import (
+    NO_LICENSE,
     PublicationFilters,
     PublicationsFacetsResponse,
 )
 from domain.countries import NO_COUNTRY_CODE
+from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.structures.structure import StructureType
@@ -46,6 +48,7 @@ from infrastructure.read_models.filters import (
     journal_id_clause,
     lab_clause,
     language_clause,
+    license_clause,
     monograph_id_clause,
     no_lab_clause,
     oa_clause,
@@ -113,6 +116,8 @@ class _PublicationFacetsBuilder:
             clauses.append(access_clause(f.access))
         if skip != "oa_status":
             clauses.append(oa_clause(f.oa_status))
+        if skip != "license":
+            clauses.append(license_clause(f.license))
         if skip != "source":
             clauses.append(source_clause(f.source_values))
         if skip != "apc":
@@ -196,6 +201,27 @@ class _PublicationFacetsBuilder:
             binds,
         )
         return rows_as(FacetOption, rows)
+
+    def _facet_licenses(self) -> list[FacetOption]:
+        """Licence de la version éditeur, `NO_LICENSE` pour les publications sans licence connue."""
+        where_sql, binds = self._clauses_skipping("license")
+        rows = self.conn.execute(
+            text(f"""
+                SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(*) AS count
+                FROM publications p
+                WHERE {where_sql}
+                GROUP BY 1 ORDER BY count DESC
+            """),
+            binds,
+        )
+        return [
+            FacetOption(
+                value=r.value,
+                label=license_label(None if r.value == NO_LICENSE else r.value),
+                count=r.count,
+            )
+            for r in rows
+        ]
 
     def _facet_access(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("access")
@@ -426,6 +452,7 @@ def publications_facets(
         "doc_types": "_facet_doc_types",
         "access": "_facet_access",
         "oa_statuses": "_facet_oa_statuses",
+        "licenses": "_facet_licenses",
         "corresponding": "_facet_corresponding",
         "source_counts": "_facet_source_counts",
         "apc": "_facet_apc",
@@ -452,6 +479,7 @@ def publications_facets(
         doc_types=results["doc_types"],
         access=results["access"],
         oa_statuses=results["oa_statuses"],
+        licenses=results["licenses"],
         corresponding=results["corresponding"],
         source_counts=results["source_counts"],
         apc=results["apc"],

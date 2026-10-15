@@ -141,6 +141,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
         text(f"""
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                    p.oa_status::text AS oa_status,
+                   p.license::text AS license, p.deposit_license::text AS deposit_license,
                    p.language, p.container_title, d.abstract, d.keywords,
                    j.id AS journal_id, j.title AS journal_title,
                    CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS journal_issns,
@@ -318,6 +319,8 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             doi_ra=pub_row.doi_ra,
             doc_type=pub_row.doc_type,
             oa_status=pub_row.oa_status,
+            license=pub_row.license,
+            deposit_license=pub_row.deposit_license,
             language=pub_row.language,
             container_title=pub_row.container_title,
             abstract=pub_row.abstract,

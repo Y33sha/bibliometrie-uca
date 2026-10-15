@@ -321,3 +321,45 @@ class TestExportsRunTheirQueryBeforeStreaming:
                 columns=[],
             )
         assert "Titre" in "".join(chunks)
+
+
+class TestLicense:
+    """Filtre et facette de la licence de la version éditeur ; `none` désigne une publication sans licence."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        cc_by = insert_publication(conn, "Licensed", in_perimeter=True)
+        unlicensed = insert_publication(conn, "Unlicensed", in_perimeter=True)
+        conn.execute(
+            text("UPDATE publications SET license = 'cc-by' WHERE id = :id"), {"id": cc_by}
+        )
+        for pub in (cc_by, unlicensed):
+            _attach(conn, pub, lab)
+        return lab, cc_by, unlicensed
+
+    def _ids(self, conn, lab, license):  # noqa: A002
+        res = list_publications(
+            conn,
+            filters=PublicationFilters(lab_ids=[lab], license=license),
+            perimeter_structure_ids=[],
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        return {p.id: p.license for p in res.publications}
+
+    def test_filter(self, sa_sync_conn):
+        lab, cc_by, unlicensed = self._seed(sa_sync_conn)
+
+        assert self._ids(sa_sync_conn, lab, ["cc-by"]) == {cc_by: "cc-by"}
+        assert self._ids(sa_sync_conn, lab, ["none"]) == {unlicensed: None}
+        assert self._ids(sa_sync_conn, lab, ["cc-by", "none"]).keys() == {cc_by, unlicensed}
+
+    def test_facet_counts_and_labels(self, sa_sync_conn):
+        lab, _, _ = self._seed(sa_sync_conn)
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, PublicationFilters(lab_ids=[lab], license=["cc-by"]), []
+        )
+        facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
+        assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
