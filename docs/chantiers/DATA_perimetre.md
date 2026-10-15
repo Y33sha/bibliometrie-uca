@@ -100,7 +100,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 ### Phase 4 — Adresses au sens strict
 
-- [ ] Signal de remplacement des adresses de thèse pour le matching des personnes.
+- [x] Signal de remplacement des adresses de thèse : branches de thèse de `source_authorship_structures`, par le PPN de l'établissement et des laboratoires partenaires. Simulation sur 2 642 thèses : 2 508 gardent les mêmes laboratoires, 67 en gagnent, 67 en perdent faute de PPN du partenaire.
 - [ ] Normalisation : noms de structures HAL et ScanR et noms des thèses hors de `addresses`.
 - [ ] Reprise du stock : réhydratation de `staging` depuis le raw store, `normalize` complet.
 
@@ -114,3 +114,4 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 - **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait les indices de niveau signature pour cette personne sur cette notice. À trancher selon la fréquence du cas dans l'administration.
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.
+- **Partenaires de thèse sans PPN.** theses.fr ne donne pas le PPN de 301 mentions de partenaires (85 noms), surtout dans les thèses en cours : la thèse reste sans laboratoire jusqu'à ce que la notice le donne. Piste : les reconnaître aussi par leur nom, sans décision durable de l'administration faute de PPN pour clé.
