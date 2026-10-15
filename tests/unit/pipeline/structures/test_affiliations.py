@@ -53,6 +53,7 @@ def _run(contexte, *, processed=7, in_perimeter=3):
             perimeter,
             refresh_ror=PhaseMetrics,
             refresh_hal_structures=lambda _: PhaseMetrics(),
+            resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
     return metrics, perimeter, vus
 
@@ -69,7 +70,7 @@ def test_assemble_les_metriques_de_la_resolution(contexte):
 def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
     _run(contexte)
 
-    assert open_tx.transactions == 3
+    assert open_tx.transactions == 4
 
 
 def test_les_deux_noeuds_lisent_le_perimetre_des_personnes(contexte):
@@ -89,6 +90,7 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
             _FakePerimeterQueries(extraction_structures=0),
             refresh_ror=PhaseMetrics,
             refresh_hal_structures=lambda _: PhaseMetrics(),
+            resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
 
     resolution.assert_not_called()
@@ -110,6 +112,7 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
             _FakePerimeterQueries(),
             refresh_ror=lambda: ror,
             refresh_hal_structures=lambda _: PhaseMetrics(),
+            resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
 
     assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

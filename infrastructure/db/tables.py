@@ -661,6 +661,22 @@ address_structures = Table(
 )
 
 
+idref_structures = Table(
+    "idref_structures",
+    metadata,
+    Column("idref_ppn", Text, nullable=False),
+    Column("structure_id", Integer, nullable=False),
+    Column("matched_form_id", Integer),
+    Column("is_confirmed", Boolean),
+    PrimaryKeyConstraint("idref_ppn", "structure_id", name="idref_structures_pkey"),
+    comment=(
+        "Structure interne d'un PPN IdRef de laboratoire partenaire de thèse : détectée par une "
+        "forme de nom (matched_form_id), confirmée ou infirmée par l'administration (is_confirmed)."
+    ),
+    schema="structures",
+)
+
+
 # ── Authorships (table consolidée + sources) ────────────────────────────────
 
 

@@ -111,7 +111,7 @@ class TestBuildSourceMeta:
             "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
             "ecolesDoctorale": [{"nom": "EDSPI", "ppn": "1234"}, {"nom": "EDMS"}],
             "partenairesDeRecherche": [
-                {"nom": "LIMOS", "type": "labo"},
+                {"nom": "LIMOS", "type": "labo", "ppn": "035163569"},
                 {"nom": "LRL"},
             ],
         }
@@ -126,8 +126,8 @@ class TestBuildSourceMeta:
             {"nom": "EDMS", "ppn": None},
         ]
         assert meta["partenaires"] == [
-            {"nom": "LIMOS", "type": "labo"},
-            {"nom": "LRL", "type": None},
+            {"nom": "LIMOS", "type": "labo", "ppn": "035163569"},
+            {"nom": "LRL", "type": None, "ppn": None},
         ]
 
     def test_filters_ecoles_without_nom(self):
@@ -136,7 +136,7 @@ class TestBuildSourceMeta:
 
     def test_filters_partenaires_without_nom(self):
         meta = _build_source_meta({"partenairesDeRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
-        assert meta == {"partenaires": [{"nom": "LIMOS", "type": None}]}
+        assert meta == {"partenaires": [{"nom": "LIMOS", "type": None, "ppn": None}]}
 
 
 # ── insert_source_document ───────────────────────────────────────
@@ -252,19 +252,13 @@ class TestBuildThesesAuthorRecords:
             (None, ["thesis_director"], None),
         ]
 
-    def test_adresses_du_document_pour_chaque_signature(self):
-        """Partenaires et établissement de soutenance : l'établissement rattache la thèse au périmètre."""
+    def test_aucune_adresse(self):
+        """Partenaires et établissement de soutenance restent dans `meta` : aucune signature ne reçoit d'adresse."""
         these = _these(
-            partenairesDeRecherche=[{"nom": "LIMOS"}, {}],
+            partenairesDeRecherche=[{"nom": "LIMOS"}],
             etabSoutenanceN="Université Clermont Auvergne (2021-...)",
         )
         records = build_theses_author_records(extract_theses_author_block(these))
-        assert {tuple(a.text for a in r.addresses) for r in records} == {
-            ("LIMOS", "Université Clermont Auvergne (2021-...)")
-        }
-
-    def test_sans_partenaire_ni_etablissement_aucune_adresse(self):
-        records = build_theses_author_records(extract_theses_author_block(_these()))
         assert all(r.addresses == [] for r in records)
 
 

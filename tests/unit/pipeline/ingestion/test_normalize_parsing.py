@@ -550,8 +550,8 @@ class TestThesesBuildSourceMeta:
             "discipline": "Informatique",
             "ecoles_doctorales": [{"nom": "SPI", "ppn": "028"}],
             "partenaires": [
-                {"nom": "LIMOS", "type": "lab"},
-                {"nom": "CNRS", "type": "org"},
+                {"nom": "LIMOS", "type": "lab", "ppn": None},
+                {"nom": "CNRS", "type": "org", "ppn": None},
             ],
         }
 
