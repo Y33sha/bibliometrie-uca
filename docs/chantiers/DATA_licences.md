@@ -84,24 +84,32 @@ Mesure du 2026-10-13, après le rejeu de la normalisation depuis le raw store. H
 - [x] Champs de licence de chaque source, dont Unpaywall et Web of Science
 - [x] Vocabulaire de chaque source : URL, codes, libellés
 - [x] Cohérence entre sources sur les publications communes
-- [ ] Licence par version du texte : publiée, acceptée, preprint
+- [x] Licence par version du texte : version éditeur (`publications.license`) et fichier déposé dans HAL (`publications.deposit_license`)
 
 ### Phase 2 — Modèle
 
 - [x] Extraction de `licence_s` dans HAL
 - [x] Inventaire des formes de OpenAlex, scanR, Crossref et DataCite
-- [ ] Inventaire des formes de HAL, après un moissonnage complet. Échantillon de 1 223 notices : 10 formes, toutes reconnues.
+- [x] Inventaire des formes de HAL : 10 formes sur 20 668 notices, toutes reconnues.
 - [x] Enum du domaine et règle de normalisation, testée sur les formes de l'inventaire : `domain/publications/licenses.py`
 - [x] Emplacement du stockage : migration
 - [x] Licence normalisée de chaque notice source, calculée par les normaliseurs
 - [x] Stock OpenAlex, Crossref et DataCite rejoué depuis le raw store
-- [ ] Stock scanR rejoué depuis le raw store, avec la licence des seules localisations d'éditeur
-- [ ] Stock HAL : moissonnage complet
+- [x] Stock scanR rejoué depuis le raw store, avec la licence des seules localisations d'éditeur
+- [x] Stock HAL rejoué depuis le raw store. Restent sans licence 744 notices HAL et 212 notices scanR, absentes du raw store et non revues par le moissonnage : presque toutes paraissent avant 2017, hors de la plage moissonnée.
 - [x] Règle d'arbitrage entre sources, dans la phase `publications`
-- [ ] Licences des publications calculées par la phase `publications`
+- [x] Licences des publications calculées par la phase `publications`
 
-### Phase 3 — Fin de chantier
+### Phase 3 — Interface
+
+- [ ] Libellés des licences dans le domaine, servis par `GET /api/publications/licenses`
+- [ ] Fiche d'une publication : licence de la version éditeur et du fichier déposé dans HAL
+- [ ] Liste des publications : facette « Licence » (version éditeur), colonne optionnelle, colonne de l'export CSV
+- [ ] Statistiques : dimension « Licence », filtrable et groupable
+
+### Phase 4 — Fin de chantier
 
 - [x] Mise à jour de la documentation : `docs/pipeline`, `docs/sources`
+- [ ] Mise à jour de la documentation : interface
 
 ## Questions ouvertes
