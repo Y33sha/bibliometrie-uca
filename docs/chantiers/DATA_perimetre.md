@@ -88,7 +88,7 @@ HAL ne relie pas les structures successives d'un laboratoire. Chaque période a 
 
 ### Phase 2 — Référentiels
 
-- [ ] Référentiel `ref.hal_structures` et nœud de chargement.
+- [x] Référentiel `ref.hal_structures` et nœud de chargement.
 - [ ] Table `source_authorship_hal_structures`, lue dans HAL et dans les fiches de structure ScanR.
 - [ ] Branches `hal_structure` et `ror` de `source_authorship_structures`.
 - [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement.

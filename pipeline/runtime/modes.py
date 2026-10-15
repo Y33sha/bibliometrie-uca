@@ -28,6 +28,8 @@ class ModePolicy:
     fetch_stale: bool
     # True (mode full) : la phase `extract_by_person` moissonne les sources par l'identifiant des personnes RH. False : la phase est sautée.
     extract_by_person: bool
+    # True (mode full) : le référentiel des structures HAL relit aussi ses structures anciennes. False : seules les structures absentes sont chargées.
+    refresh_hal_structures: bool
     # True (mode full) : la passe suggest réessaie aussi les suggestions de pays vides (échecs précédents `= []`), au cas où le pool aurait grossi — sans recalculer les positives. False : nouvelles adresses seulement.
     retry_empty_country_suggestions: bool
 
@@ -39,6 +41,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         fetch_stale=False,
         extract_by_person=False,
+        refresh_hal_structures=False,
         retry_empty_country_suggestions=False,
     ),
     "full": ModePolicy(
@@ -48,6 +51,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=True,
         fetch_stale=True,
         extract_by_person=True,
+        refresh_hal_structures=True,
         retry_empty_country_suggestions=True,
     ),
 }

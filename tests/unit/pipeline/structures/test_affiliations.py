@@ -48,9 +48,12 @@ def _run(contexte, *, processed=7, in_perimeter=3):
             side_effect=lambda conn, logger, ids: vus.__setitem__("populate", ids),
         ),
     ):
-        metrics = phase.AffiliationsPhase(object(), perimeter, refresh_ror=PhaseMetrics).run(
-            contexte()
-        )
+        metrics = phase.AffiliationsPhase(
+            object(),
+            perimeter,
+            refresh_ror=PhaseMetrics,
+            refresh_hal_structures=lambda _: PhaseMetrics(),
+        ).run(contexte())
     return metrics, perimeter, vus
 
 
@@ -85,6 +88,7 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
             object(),
             _FakePerimeterQueries(extraction_structures=0),
             refresh_ror=PhaseMetrics,
+            refresh_hal_structures=lambda _: PhaseMetrics(),
         ).run(contexte())
 
     resolution.assert_not_called()
@@ -102,7 +106,10 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
         patch.object(phase, "populate"),
     ):
         metrics = phase.AffiliationsPhase(
-            object(), _FakePerimeterQueries(), refresh_ror=lambda: ror
+            object(),
+            _FakePerimeterQueries(),
+            refresh_ror=lambda: ror,
+            refresh_hal_structures=lambda _: PhaseMetrics(),
         ).run(contexte())
 
     assert metrics.details["ror"] == {"version": "v2.14", "imported": True}

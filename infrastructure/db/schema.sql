@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GddEpm1bXcBtiwaxDWuZKvHt0fHAvFmmMdg2Gdd5fsJwxZkZxcFdBfw7vx731fl
+\restrict 3tlpOeUmFa8GxzvenZUNF6MQZ9Mz4dpnM2DlEEp10D4khf7UEaefQpR24Bflrqc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -127,6 +127,17 @@ CREATE TYPE public.doc_type AS ENUM (
     'data_paper',
     'proceedings',
     'media'
+);
+
+
+--
+-- Name: hal_structure_status; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.hal_structure_status AS ENUM (
+    'VALID',
+    'OLD',
+    'INCOMING'
 );
 
 
@@ -262,7 +273,9 @@ CREATE TYPE public.oa_type AS ENUM (
 
 CREATE TYPE public.perimeter_evidence AS ENUM (
     'address',
-    'rh_identity'
+    'rh_identity',
+    'hal_structure',
+    'ror'
 );
 
 
@@ -1595,6 +1608,66 @@ CREATE TABLE ref.countries (
 
 
 --
+-- Name: hal_structure_aliases; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structure_aliases (
+    alias_id integer NOT NULL,
+    hal_structure_id integer NOT NULL
+);
+
+
+--
+-- Name: TABLE hal_structure_aliases; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structure_aliases IS 'Fiches en double du référentiel HAL, fondues dans une structure conservée.';
+
+
+--
+-- Name: hal_structure_relations; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structure_relations (
+    parent_id integer NOT NULL,
+    child_id integer NOT NULL,
+    CONSTRAINT hal_structure_relations_no_self_reference CHECK ((parent_id <> child_id))
+);
+
+
+--
+-- Name: TABLE hal_structure_relations; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structure_relations IS 'Relations parent/enfant entre structures du référentiel HAL.';
+
+
+--
+-- Name: hal_structures; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structures (
+    hal_structure_id integer NOT NULL,
+    name text NOT NULL,
+    acronym text,
+    structure_type text NOT NULL,
+    country_code character(2),
+    status public.hal_structure_status NOT NULL,
+    ror_id text,
+    start_date date,
+    end_date date,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE hal_structures; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structures IS 'Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou structures.api_ids->''hal'', le relie au référentiel interne.';
+
+
+--
 -- Name: language_forms; Type: TABLE; Schema: ref; Owner: -
 --
 
@@ -1826,6 +1899,16 @@ CREATE SEQUENCE sources.source_authorship_addresses_id_seq
 --
 
 ALTER SEQUENCE sources.source_authorship_addresses_id_seq OWNED BY sources.source_authorship_addresses.id;
+
+
+--
+-- Name: source_authorship_hal_structures; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_authorship_hal_structures (
+    source_authorship_id integer NOT NULL,
+    hal_structure_id integer NOT NULL
+);
 
 
 --
@@ -2642,6 +2725,30 @@ ALTER TABLE ONLY ref.countries
 
 
 --
+-- Name: hal_structure_aliases hal_structure_aliases_pkey; Type: CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structure_aliases
+    ADD CONSTRAINT hal_structure_aliases_pkey PRIMARY KEY (alias_id);
+
+
+--
+-- Name: hal_structure_relations hal_structure_relations_pkey; Type: CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structure_relations
+    ADD CONSTRAINT hal_structure_relations_pkey PRIMARY KEY (parent_id, child_id);
+
+
+--
+-- Name: hal_structures hal_structures_pkey; Type: CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structures
+    ADD CONSTRAINT hal_structures_pkey PRIMARY KEY (hal_structure_id);
+
+
+--
 -- Name: language_forms language_forms_pkey; Type: CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -2735,6 +2842,14 @@ ALTER TABLE ONLY sources.source_authorship_addresses
 
 ALTER TABLE ONLY sources.source_authorship_addresses
     ADD CONSTRAINT source_authorship_addresses_source_authorship_id_address_id_key UNIQUE (source_authorship_id, address_id);
+
+
+--
+-- Name: source_authorship_hal_structures source_authorship_hal_structures_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_authorship_hal_structures
+    ADD CONSTRAINT source_authorship_hal_structures_pkey PRIMARY KEY (source_authorship_id, hal_structure_id);
 
 
 --
@@ -3374,6 +3489,27 @@ CREATE INDEX idx_pnf_iso ON ref.place_name_forms USING btree (iso_code);
 
 
 --
+-- Name: ix_hal_structure_aliases_hal_structure_id; Type: INDEX; Schema: ref; Owner: -
+--
+
+CREATE INDEX ix_hal_structure_aliases_hal_structure_id ON ref.hal_structure_aliases USING btree (hal_structure_id);
+
+
+--
+-- Name: ix_hal_structure_relations_child_id; Type: INDEX; Schema: ref; Owner: -
+--
+
+CREATE INDEX ix_hal_structure_relations_child_id ON ref.hal_structure_relations USING btree (child_id);
+
+
+--
+-- Name: ix_hal_structures_ror_id; Type: INDEX; Schema: ref; Owner: -
+--
+
+CREATE INDEX ix_hal_structures_ror_id ON ref.hal_structures USING btree (ror_id);
+
+
+--
 -- Name: ix_ror_relations_child_ror_id; Type: INDEX; Schema: ref; Owner: -
 --
 
@@ -3567,6 +3703,13 @@ CREATE INDEX idx_staging_processed ON sources.staging USING btree (processed) WH
 --
 
 CREATE INDEX idx_staging_source ON sources.staging USING btree (source);
+
+
+--
+-- Name: ix_source_authorship_hal_structures_hal_structure_id; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX ix_source_authorship_hal_structures_hal_structure_id ON sources.source_authorship_hal_structures USING btree (hal_structure_id);
 
 
 --
@@ -3960,6 +4103,30 @@ ALTER TABLE ONLY publishing.publisher_name_forms
 
 
 --
+-- Name: hal_structure_aliases hal_structure_aliases_hal_structure_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structure_aliases
+    ADD CONSTRAINT hal_structure_aliases_hal_structure_id_fkey FOREIGN KEY (hal_structure_id) REFERENCES ref.hal_structures(hal_structure_id) ON DELETE CASCADE;
+
+
+--
+-- Name: hal_structure_relations hal_structure_relations_child_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structure_relations
+    ADD CONSTRAINT hal_structure_relations_child_id_fkey FOREIGN KEY (child_id) REFERENCES ref.hal_structures(hal_structure_id) ON DELETE CASCADE;
+
+
+--
+-- Name: hal_structure_relations hal_structure_relations_parent_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.hal_structure_relations
+    ADD CONSTRAINT hal_structure_relations_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES ref.hal_structures(hal_structure_id) ON DELETE CASCADE;
+
+
+--
 -- Name: language_forms language_forms_language_code_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -3997,6 +4164,14 @@ ALTER TABLE ONLY sources.source_authorship_addresses
 
 ALTER TABLE ONLY sources.source_authorship_addresses
     ADD CONSTRAINT source_authorship_addresses_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES sources.source_authorships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_authorship_hal_structures source_authorship_hal_structures_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_authorship_hal_structures
+    ADD CONSTRAINT source_authorship_hal_structures_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES sources.source_authorships(id) ON DELETE CASCADE;
 
 
 --
@@ -4139,5 +4314,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GddEpm1bXcBtiwaxDWuZKvHt0fHAvFmmMdg2Gdd5fsJwxZkZxcFdBfw7vx731fl
+\unrestrict 3tlpOeUmFa8GxzvenZUNF6MQZ9Mz4dpnM2DlEEp10D4khf7UEaefQpR24Bflrqc
 
