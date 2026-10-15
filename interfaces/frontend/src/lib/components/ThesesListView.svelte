@@ -40,6 +40,8 @@
 	let selectedStatus: string[] = $state([]);
 	let selectedAccess: string[] = $state([]);
 	let sourceStates: Record<string, 'all' | 'yes' | 'no'> = $state({});
+	// Thèses hors périmètre : soutenues ailleurs, liées à l'établissement par la direction ou le jury.
+	let includeOutside = $state(false);
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
@@ -51,6 +53,7 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 		if (selectedAccess.length) params.set('access', selectedAccess.join(','));
+		if (!hasFixedLab && includeOutside) params.set('in_perimeter', 'yes,no');
 		const sf = Object.entries(sourceStates)
 			.filter(([, v]) => v === 'yes' || v === 'no')
 			.map(([k, v]) => `${k}_${v}`)
@@ -78,6 +81,7 @@
 			years: { type: 'simple', apiKey: 'years' },
 			labs: { type: 'labeled', apiKey: 'labs' },
 			access: { type: 'labeled', apiKey: 'access' },
+			perimeter: { type: 'labeled', apiKey: 'in_perimeter' },
 			status: {
 				type: 'label_map',
 				apiKey: 'doc_types',
@@ -95,6 +99,8 @@
 		}
 	});
 
+	const outsideCount = $derived(facets.options.perimeter?.find((o) => o.value === 'no')?.count ?? 0);
+
 	const url = useUrlFilters({
 		basePath: () => basePath,
 		filters: {
@@ -103,6 +109,7 @@
 			selectedStatus: { type: 'string_array', urlKey: 'status' },
 			selectedAccess: { type: 'string_array', urlKey: 'access' },
 			sourceStates: { type: 'source_states', urlKey: 'source_filter' },
+			includeOutside: { type: 'single', urlKey: 'hors_perimetre' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'soutenance_desc' },
 			currentPage: { type: 'page', urlKey: 'page' }
@@ -117,6 +124,7 @@
 			selectedStatus,
 			selectedAccess,
 			sourceStates,
+			includeOutside: includeOutside ? '1' : '',
 			search,
 			currentSort,
 			currentPage: pubs.page
@@ -165,6 +173,7 @@
 			if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
 			if (restored.sourceStates)
 				sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
+			if (restored.includeOutside) includeOutside = restored.includeOutside === '1';
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as PublicationSort;
 			if (restored.currentPage) pubs.page = restored.currentPage as number;
@@ -198,6 +207,12 @@
 	{/if}
 	<FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
 	<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
+	{#if !hasFixedLab}
+		<label class="outside-toggle">
+			<input type="checkbox" bind:checked={includeOutside} onchange={() => onFilterChange()} />
+			Inclure les thèses hors périmètre ({outsideCount})
+		</label>
+	{/if}
 	<PresenceFilterToggle
 		label="Sources"
 		items={[
@@ -228,5 +243,11 @@
 <style>
 	.toolbar input[type='search'] {
 		width: 280px;
+	}
+	.outside-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		white-space: nowrap;
 	}
 </style>

@@ -374,6 +374,11 @@ def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereC
     )
 
 
+def publication_perimeter_clause(in_perimeter: list[str]) -> WhereClause | None:
+    """Périmètre d'une liste générale : `yes` retient les publications du périmètre, `no` les autres, les deux toutes. Une sélection vide vaut `yes`."""
+    return _toggle_clause(in_perimeter or ["yes"], PUBLICATION_IS_IN_PERIMETER, {})
+
+
 def in_perimeter_person_clause(
     in_perimeter: list[str], person_id: int | None
 ) -> WhereClause | None:
