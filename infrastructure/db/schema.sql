@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nyWysq9wv77WJm4sNl5wnRR6y9JxN3Z8OVNO2pXNylFUduji3jiznQ0YXf3Koy5
+\restrict SYIUJkmOiCPcbqMR03NRLq7E8jLD1emeEPpENodmeBHtk45UJwGnoJIt3RTykh0
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -276,7 +276,8 @@ CREATE TYPE public.perimeter_evidence AS ENUM (
     'rh_identity',
     'hal_structure',
     'ror',
-    'thesis_institution'
+    'thesis_institution',
+    'thesis_partner'
 );
 
 
@@ -960,6 +961,99 @@ COMMENT ON TABLE sources.source_authorship_rors IS 'ROR attribués par la source
 
 
 --
+-- Name: source_authorships; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_authorships (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_publication_id integer NOT NULL,
+    author_position smallint,
+    person_id integer,
+    is_corresponding boolean DEFAULT false,
+    roles text[] DEFAULT ARRAY['author'::text],
+    raw_author_name text,
+    created_at timestamp with time zone DEFAULT now(),
+    countries_dirty boolean DEFAULT true NOT NULL,
+    identity_id integer NOT NULL,
+    resolution_mode public.resolution_mode,
+    neutralized_identifiers jsonb,
+    content_hash text,
+    raw_last_name text,
+    raw_first_name text,
+    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
+);
+ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
+
+
+--
+-- Name: COLUMN source_authorships.neutralized_identifiers; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_authorships.neutralized_identifiers IS 'Identifiants de l''identité que la résolution des personnes ignore pour cette signature, avec leur motif : {"orcid": "shared"}.';
+
+
+--
+-- Name: COLUMN source_authorships.content_hash; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_authorships.content_hash IS 'Empreinte des champs écrits par la normalisation, adresses comprises.';
+
+
+--
+-- Name: source_publications; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_publications (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    title text NOT NULL,
+    pub_year smallint,
+    doc_type text,
+    publication_id integer,
+    staging_id integer,
+    created_at timestamp with time zone DEFAULT now(),
+    countries text[],
+    hal_collections text[],
+    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
+    urls text[],
+    journal_id integer,
+    oa_status text,
+    language text,
+    container_title text,
+    is_retracted boolean,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb,
+    meta jsonb,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    title_normalized text,
+    keys_dirty boolean DEFAULT true NOT NULL,
+    embargo_until date,
+    monograph_id integer,
+    authors_hash text,
+    impact jsonb,
+    license public.license_type,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
+    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+);
+
+
+--
+-- Name: COLUMN source_publications.authors_hash; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
+
+
+--
 -- Name: address_structures; Type: TABLE; Schema: structures; Owner: -
 --
 
@@ -970,6 +1064,25 @@ CREATE TABLE structures.address_structures (
     matched_form_id integer,
     is_confirmed boolean
 );
+
+
+--
+-- Name: idref_structures; Type: TABLE; Schema: structures; Owner: -
+--
+
+CREATE TABLE structures.idref_structures (
+    idref_ppn text NOT NULL,
+    structure_id integer NOT NULL,
+    matched_form_id integer,
+    is_confirmed boolean
+);
+
+
+--
+-- Name: TABLE idref_structures; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON TABLE structures.idref_structures IS 'Structure interne d''un PPN IdRef de laboratoire partenaire de thèse : détectée par une forme de nom (matched_form_id), confirmée ou infirmée par l''administration (is_confirmed).';
 
 
 --
@@ -1108,100 +1221,26 @@ UNION
     'hal_structure'::public.perimeter_evidence AS evidence
    FROM (hal_lowest l
      JOIN hal_reach r ON ((r.origin_id = l.hal_structure_id)))
+UNION
+ SELECT sa.id AS source_authorship_id,
+    s.id AS structure_id,
+    'thesis_institution'::public.perimeter_evidence AS evidence
+   FROM ((sources.source_publications sp
+     JOIN sources.source_authorships sa ON ((sa.source_publication_id = sp.id)))
+     JOIN structures.structures s ON (((s.api_ids -> 'theses'::text) ? (sp.meta ->> 'etablissement_ppn'::text))))
+  WHERE ((sp.source = 'theses'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
+           FROM perimeter)))
+UNION
+ SELECT sa.id AS source_authorship_id,
+    ist.structure_id,
+    'thesis_partner'::public.perimeter_evidence AS evidence
+   FROM (((sources.source_publications sp
+     CROSS JOIN LATERAL jsonb_array_elements((sp.meta -> 'partenaires'::text)) partner(value))
+     JOIN structures.idref_structures ist ON ((ist.idref_ppn = (partner.value ->> 'ppn'::text))))
+     JOIN sources.source_authorships sa ON (((sa.source_publication_id = sp.id) AND (sa.roles && ARRAY['author'::text]))))
+  WHERE ((sp.source = 'theses'::public.source_type) AND (ist.is_confirmed IS DISTINCT FROM false) AND ((ist.matched_form_id IS NOT NULL) OR ist.is_confirmed) AND (ist.structure_id IN ( SELECT perimeter.structure_id
+           FROM perimeter)))
   WITH NO DATA;
-
-
---
--- Name: source_authorships; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.source_authorships (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_publication_id integer NOT NULL,
-    author_position smallint,
-    person_id integer,
-    is_corresponding boolean DEFAULT false,
-    roles text[] DEFAULT ARRAY['author'::text],
-    raw_author_name text,
-    created_at timestamp with time zone DEFAULT now(),
-    countries_dirty boolean DEFAULT true NOT NULL,
-    identity_id integer NOT NULL,
-    resolution_mode public.resolution_mode,
-    neutralized_identifiers jsonb,
-    content_hash text,
-    raw_last_name text,
-    raw_first_name text,
-    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
-    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
-    CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
-);
-ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
-
-
---
--- Name: COLUMN source_authorships.neutralized_identifiers; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.source_authorships.neutralized_identifiers IS 'Identifiants de l''identité que la résolution des personnes ignore pour cette signature, avec leur motif : {"orcid": "shared"}.';
-
-
---
--- Name: COLUMN source_authorships.content_hash; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.source_authorships.content_hash IS 'Empreinte des champs écrits par la normalisation, adresses comprises.';
-
-
---
--- Name: source_publications; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.source_publications (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    title text NOT NULL,
-    pub_year smallint,
-    doc_type text,
-    publication_id integer,
-    staging_id integer,
-    created_at timestamp with time zone DEFAULT now(),
-    countries text[],
-    hal_collections text[],
-    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
-    urls text[],
-    journal_id integer,
-    oa_status text,
-    language text,
-    container_title text,
-    is_retracted boolean,
-    abstract text,
-    keywords text[],
-    topics jsonb,
-    biblio jsonb,
-    meta jsonb,
-    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    title_normalized text,
-    keys_dirty boolean DEFAULT true NOT NULL,
-    embargo_until date,
-    monograph_id integer,
-    authors_hash text,
-    impact jsonb,
-    license public.license_type,
-    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
-    CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
-    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
-);
-
-
---
--- Name: COLUMN source_publications.authors_hash; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON COLUMN sources.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
 
 
 --
@@ -3016,6 +3055,14 @@ ALTER TABLE ONLY structures.addresses
 
 
 --
+-- Name: idref_structures idref_structures_pkey; Type: CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.idref_structures
+    ADD CONSTRAINT idref_structures_pkey PRIMARY KEY (idref_ppn, structure_id);
+
+
+--
 -- Name: perimeter_structures perimeter_structures_pkey; Type: CONSTRAINT; Schema: structures; Owner: -
 --
 
@@ -3922,6 +3969,13 @@ CREATE INDEX idx_structures_type ON structures.structures USING btree (structure
 
 
 --
+-- Name: ix_idref_structures_structure_id; Type: INDEX; Schema: structures; Owner: -
+--
+
+CREATE INDEX ix_idref_structures_structure_id ON structures.idref_structures USING btree (structure_id);
+
+
+--
 -- Name: source_authorships_orphan_perimeter; Type: STATISTICS; Schema: sources; Owner: -
 --
 
@@ -4369,6 +4423,22 @@ ALTER TABLE ONLY structures.address_structures
 
 
 --
+-- Name: idref_structures idref_structures_matched_form_id_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.idref_structures
+    ADD CONSTRAINT idref_structures_matched_form_id_fkey FOREIGN KEY (matched_form_id) REFERENCES structures.structure_name_forms(id) ON DELETE SET NULL;
+
+
+--
+-- Name: idref_structures idref_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.idref_structures
+    ADD CONSTRAINT idref_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES structures.structures(id) ON DELETE CASCADE;
+
+
+--
 -- Name: perimeter_structures perimeter_structures_perimeter_id_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
 --
 
@@ -4412,5 +4482,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nyWysq9wv77WJm4sNl5wnRR6y9JxN3Z8OVNO2pXNylFUduji3jiznQ0YXf3Koy5
+\unrestrict SYIUJkmOiCPcbqMR03NRLq7E8jLD1emeEPpENodmeBHtk45UJwGnoJIt3RTykh0
 

@@ -4,7 +4,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 
 1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Référentiel des structures HAL** (nœud `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
-3. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
+3. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (nœud `affiliations.resolve_thesis_partners`).
 4. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH.
 """
 
@@ -28,6 +28,7 @@ from pipeline.transformation.structures.address_resolution import (
     AddressResolutionQueries,
     run_resolution,
 )
+from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import (
     EmptyExtractionPerimeterError,
     PerimeterQueries,
@@ -44,6 +45,7 @@ class AffiliationsPhase:
     perimeter_queries: PerimeterQueries
     refresh_ror: Callable[[], PhaseMetrics]
     refresh_hal_structures: Callable[[bool], PhaseMetrics]
+    resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Contrôle le périmètre d'extraction, exécute ses nœuds et assemble les métriques de la phase."""
@@ -64,6 +66,7 @@ class AffiliationsPhase:
                     self._resolve_addresses,
                     section="Identification des structures dans les adresses institutionnelles",
                 ),
+                "affiliations.resolve_thesis_partners": NodeStep(self._resolve_thesis_partners),
                 "affiliations.populate": NodeStep(
                     self._populate, section="Rattachement des structures aux auteurs des documents"
                 ),
@@ -87,6 +90,12 @@ class AffiliationsPhase:
             "in_perimeter": stats.in_perimeter,
         }
         return metrics
+
+    def _resolve_thesis_partners(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            self.resolve_thesis_partners(conn, ctx.logger)
+            conn.commit()
+        return PhaseMetrics()
 
     def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
@@ -122,6 +131,7 @@ def build() -> Phase:
         PerimeterQueries(),
         refresh_ror=_run_refresh_ror,
         refresh_hal_structures=_run_refresh_hal_structures,
+        resolve_thesis_partners=resolve_thesis_partners,
     )
 
 

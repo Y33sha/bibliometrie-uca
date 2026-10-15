@@ -1,9 +1,13 @@
-"""Branches `ror` et `hal_structure` de la vue `source_authorship_structures`."""
+"""Branches `ror`, `hal_structure` et thèse de la vue `source_authorship_structures`."""
+
+import json
+import logging
 
 from sqlalchemy import text
 
 from domain.structures.hal_structures import parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructuresQueries
+from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.config import set_config
@@ -11,6 +15,7 @@ from tests.integration.helpers.sources import insert_signature, insert_source_pu
 from tests.integration.helpers.structures import (
     insert_persons_perimeter,
     insert_structure,
+    insert_structure_name_form,
     insert_tutelle,
 )
 
@@ -127,3 +132,40 @@ def test_structure_hal_rattachee_explicitement(sa_sync_conn):
     ancienne = _signature(sa_sync_conn, record, 0, hal_structures=[5])
 
     assert _reached(sa_sync_conn) == {(ancienne, lab, "hal_structure")}
+
+
+def test_structures_d_une_these(sa_sync_conn):
+    """L'établissement de soutenance rattache toutes les signatures ; le laboratoire partenaire, reconnu par son PPN et son nom, le seul doctorant."""
+    univ, lab = _perimeter(sa_sync_conn)
+    sa_sync_conn.execute(
+        text("UPDATE structures SET api_ids = CAST(:ids AS jsonb) WHERE id = :id"),
+        {"ids": json.dumps({"theses": ["196200032"]}), "id": univ},
+    )
+    insert_structure_name_form(sa_sync_conn, lab, form_text="laboratoire de test")
+    record = insert_source_publication(sa_sync_conn, source="theses", source_id="2021CLFAC001")
+    sa_sync_conn.execute(
+        text("UPDATE source_publications SET meta = CAST(:meta AS jsonb) WHERE id = :id"),
+        {
+            "meta": json.dumps(
+                {
+                    "etablissement_ppn": "196200032",
+                    "partenaires": [{"nom": "Laboratoire de test", "ppn": "123456789"}],
+                }
+            ),
+            "id": record,
+        },
+    )
+    doctorant = insert_signature(
+        sa_sync_conn, record, source="theses", author_position=0, roles=["author"]
+    )
+    jury = insert_signature(
+        sa_sync_conn, record, source="theses", author_position=None, roles=["jury_member"]
+    )
+
+    resolve_thesis_partners(sa_sync_conn, logging.getLogger("test"))
+
+    assert _reached(sa_sync_conn) == {
+        (doctorant, univ, "thesis_institution"),
+        (jury, univ, "thesis_institution"),
+        (doctorant, lab, "thesis_partner"),
+    }

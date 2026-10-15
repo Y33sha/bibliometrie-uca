@@ -16,3 +16,5 @@ class PerimeterEvidence(StrEnum):
     ROR = "ror"
     # Indice d'une publication : la thèse est soutenue dans un établissement du périmètre (PPN de l'établissement de soutenance parmi les `api_ids.theses`).
     THESIS_INSTITUTION = "thesis_institution"
+    # Un laboratoire partenaire de la thèse, reconnu par son PPN IdRef, est une structure du périmètre. Rattache la signature du doctorant.
+    THESIS_PARTNER = "thesis_partner"

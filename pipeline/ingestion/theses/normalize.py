@@ -25,7 +25,6 @@ from pipeline.ingestion.common.normalize import SourceNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (
-    AddressRecord,
     AuthorBlock,
     AuthorRecord,
     SignatureSyncSettings,
@@ -101,7 +100,7 @@ def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] |
 
     partenaires = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
     partenaires_clean = [
-        {"nom": nom, "type": as_str(p.get("type"))}
+        {"nom": nom, "type": as_str(p.get("type")), "ppn": as_str(p.get("ppn")) or None}
         for p in partenaires
         if (nom := as_str(p.get("nom")))
     ]
@@ -186,19 +185,14 @@ def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
     """Une signature par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
-    Toutes les signatures reçoivent les adresses du document : laboratoires partenaires et établissement de soutenance. Ce dernier rattache la thèse au périmètre — theses.fr ne donne pas d'adresses par personne, et les laboratoires partenaires ne sont pas toujours des structures du périmètre.
+    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les signatures à leurs structures (vue `source_authorship_structures`).
     """
-    partenaires = as_sequence(block.get("partenairesDeRecherche"))
-    addr_parts = [nom for p in partenaires if (nom := as_str(as_mapping(p).get("nom")))]
-    if etablissement := as_str(block.get("etabSoutenanceN")):
-        addr_parts.append(etablissement)
     return [
         AuthorRecord(
             position=a.author_position,
             name=a.name,
             roles=a.roles,
             person_identifiers=dict(a.person_identifiers) if a.person_identifiers else None,
-            addresses=[AddressRecord(text=t) for t in addr_parts],
         )
         for a in aggregate_thesis_persons(block)
     ]

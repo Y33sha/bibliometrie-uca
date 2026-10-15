@@ -352,6 +352,18 @@ NODES: tuple[Node, ...] = (
         previous_run=("addresses",),
     ),
     _node(
+        "affiliations.resolve_thesis_partners",
+        "affiliations",
+        reads=(
+            "structure_name_forms",
+            "structures",
+            "source_publications.meta",
+            "idref_structures",
+        ),
+        writes=("idref_structures",),
+        previous_run=("idref_structures",),
+    ),
+    _node(
         "affiliations.populate",
         "affiliations",
         reads=(
@@ -359,6 +371,17 @@ NODES: tuple[Node, ...] = (
             "perimeter_structures",
             "config",
             "source_authorship_addresses",
+            # Branches ROR, structure HAL et thèse de `source_authorship_structures`.
+            "source_authorship_rors",
+            "source_authorship_hal_structures",
+            "hal_structures",
+            "hal_structure_relations",
+            "hal_structure_aliases",
+            "structures.ror_id",
+            "structures.api_ids",
+            "source_publications.meta",
+            "source_authorships.roles",
+            "idref_structures",
             "source_authorships.source_publication_id",
             "source_publications.publication_id",
             # Identité des personnes RH : `rh_identity_signatures`.
