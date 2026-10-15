@@ -34,6 +34,19 @@ Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur
 - Deux signatures à la même position ont parfois deux valeurs différentes d'un même type d'identifiant avec des noms compatibles : environ 800 cas par tranche jusqu'à 50 auteurs. Ce sont des identifiants faux ou multiples pour une même personne.
 - Par paire de sources, la position s'accorde le mieux avec scanR (93 à 97 %), dont les listes s'arrêtent à 51 auteurs, et le moins avec WoS et DataCite.
 - Désaccords relevés dans les listes courtes : ordre différent entre sources, collectif d'auteurs inséré dans la liste, prénom différent à la même position (« Maxime » / « Martine Tisserant »), faute de deux lettres (« Pereira » / « Peirrera »), listes sans rapport, signe d'une fusion de publications erronée.
+- Une notice scanR à identifiant `hal…` ou une notice OpenAlex dont la location principale est HAL recopie le dépôt HAL. Sans ces paires, l'accord de la position varie d'un point au plus par tranche.
+- Une signature décalée trouve plusieurs noms compatibles dans 1 à 4 % des cas, et dans 8 % des cas entre 51 et 100 auteurs.
+
+| Source | Positions en désaccord | Source qui s'écarte |
+|---|---|---|
+| HAL | 5 507 | 37,9 % |
+| Crossref | 5 585 | 26,4 % |
+| WoS | 2 955 | 15,8 % |
+| DataCite | 3 225 | 12,7 % |
+| OpenAlex | 6 094 | 2,0 % |
+| scanR | 646 | 1,5 % |
+
+Le tableau compte les positions communes à trois sources indépendantes ou plus, au même nom de famille, dont les prénoms sont incompatibles. La source qui s'écarte a un prénom incompatible avec tous les autres, eux compatibles entre eux. 1 529 positions sont sans source unique qui s'écarte. HAL s'écarte le plus souvent, Crossref ensuite. scanR et OpenAlex partagent une partie de leurs données, donc le vote peut les favoriser.
 
 ## Décisions
 
@@ -49,9 +62,10 @@ Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur
 - [x] Accord de la position : part des signatures dont le nom est compatible avec celui de la même position dans une autre notice, selon le nombre d'auteurs.
 - [x] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
 - [ ] Échantillon de désaccords relu à la main : `data/measures/author_alignment_disagreements.csv`, 5 000 lignes.
-- [ ] Prénom incompatible à la même position : source qui s'écarte de la majorité, sur les publications à trois notices ou plus. Hypothèse : HAL, qui rattache automatiquement une signature à un mauvais compte.
-- [ ] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
-- [ ] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
+- [x] Prénom incompatible à la même position : source qui s'écarte de la majorité, sur les publications à trois notices ou plus.
+- [ ] Échantillon des positions où HAL s'écarte, relu à la main. Hypothèse : HAL rattache automatiquement une signature à un mauvais compte.
+- [x] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
+- [x] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
 
 ### Phase 2 — Méthode et modèle
 
