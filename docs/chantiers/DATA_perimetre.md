@@ -37,7 +37,7 @@ La collection HAL n'est pas un indice : elle double la structure HAL.
 
 **Indices de l'entrée.**
 
-- Type `perimeter_evidence` : `address`, `rh_identity`, `ror`, `hal_structure`, puis `thesis_institution` en phase 3.
+- Type `perimeter_evidence` : `address`, `rh_identity`, `ror`, `hal_structure`, `thesis_institution`, `thesis_partner`.
 - Colonne `perimeter_evidence` (tableau) sur `source_authorships`, `authorships` et `publications`. `authorships` réunit les indices de ses signatures. `publications` réunit ceux des signatures de personnes non exclues, et les indices propres au document.
 - `in_perimeter` est une colonne générée, vraie quand `perimeter_evidence` est non vide.
 - Une seule requête SQL calcule les indices d'une signature. Elle sert à la phase `affiliations` et au recalcul en tâche de fond après une correction d'adresse dans l'administration.
@@ -65,6 +65,13 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 **Correspondance avec les structures internes.** Une structure HAL rejoint une structure interne par son ROR, ou par sa colonne `structure_id`, clé étrangère vers `structures`. Sans correspondance, la branche `hal_structure` de la vue remonte les parents HAL jusqu'à la première structure qui en a une. HAL ne relie pas les fiches successives d'un laboratoire : le ROR partagé en relie une partie, `structure_id` relie les autres.
 
 **Table `addresses` réservée aux textes d'affiliation.** Les noms de structures HAL et ScanR et les noms des thèses quittent `addresses`, une fois leurs voies d'entrée en place et mesurées.
+
+**Structures d'une thèse.** La notice theses.fr garde le PPN IdRef de l'établissement de soutenance et de chaque laboratoire partenaire. La vue `source_authorship_structures` a deux branches de thèse :
+
+- l'établissement de soutenance, reconnu par son PPN dans `api_ids.theses`, rattache toutes les signatures de la thèse (indice `thesis_institution`) ;
+- un laboratoire partenaire, reconnu par son PPN dans `idref_structures`, rattache la signature du doctorant (indice `thesis_partner`).
+
+`idref_structures` (PPN, structure, forme de nom, confirmation) suit le modèle de `address_structures`. La phase `affiliations` résout par les formes de noms le nom de chaque partenaire. L'administration confirme ou infirme un rattachement, une fois par PPN. `api_ids.theses` reste la liste des établissements que le moissonnage interroge.
 
 **Thèses soutenues ailleurs.** Une thèse entrée par un membre du jury ou un directeur est créée hors du périmètre. Elle figure dans l'onglet Thèses de la page de la personne. Elle est absente des listes de publications et des onglets Thèses de l'université et des laboratoires.
 
