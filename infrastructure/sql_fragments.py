@@ -30,6 +30,11 @@ def diamond_journal_sql(journal: str = "j") -> str:
     )
 
 
+def has_author_role(signature: str = "sa") -> str:
+    """Condition vraie quand la signature ou l'authorship aliasée `signature` tient le rôle d'auteur."""
+    return f"{signature}.roles && ARRAY['author']::text[]"
+
+
 def identifier_neutralized(
     id_type: str, signature: str = "sa", *, reason: str | None = None
 ) -> str:

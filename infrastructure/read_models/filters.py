@@ -18,7 +18,7 @@ from domain.publications.metadata import (
 )
 from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
-from infrastructure.read_models.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role
 
 
 def _sql_list(values: Iterable[str]) -> str:

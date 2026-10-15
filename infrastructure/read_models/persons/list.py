@@ -27,8 +27,8 @@ from infrastructure.read_models.filters import (
     persons_sort_clause,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
-from infrastructure.read_models.sql_fragments import has_author_role, other_name_form_holders
-from infrastructure.sql_fragments import in_clause
+from infrastructure.read_models.sql_fragments import other_name_form_holders
+from infrastructure.sql_fragments import has_author_role, in_clause
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux signatures de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_SIGNATURES = (
