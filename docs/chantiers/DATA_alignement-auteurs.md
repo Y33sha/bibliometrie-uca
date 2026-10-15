@@ -49,6 +49,9 @@ Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur
 - [x] Accord de la position : part des signatures dont le nom est compatible avec celui de la même position dans une autre notice, selon le nombre d'auteurs.
 - [x] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
 - [ ] Échantillon de désaccords relu à la main : `data/measures/author_alignment_disagreements.csv`, 5 000 lignes.
+- [ ] Prénom incompatible à la même position : source qui s'écarte de la majorité, sur les publications à trois notices ou plus. Hypothèse : HAL, qui rattache automatiquement une signature à un mauvais compte.
+- [ ] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
+- [ ] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
 
 ### Phase 2 — Méthode et modèle
 
