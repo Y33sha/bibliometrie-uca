@@ -29,7 +29,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - **Lien ORCID–idHAL.** Déductible de `author_identifying_keys` : un `hal_person_id` associé à un ORCID (40 631 clés sur 55 559 clés HAL).
 - **Revues diamant.** Une revue est diamant quand `journals.oa_model` vaut `diamond`, ou quand le payload DOAJ (`journals.doaj_payload`) n'indique ni APC (`APC`) ni autres frais (`Has other fees`).
 - **Thèses.** L'ouverture d'une thèse se mesure sur plusieurs années : les thèses récentes sont en traitement ou sous embargo.
-- **Licences.** Chantier [Licences](DATA_licences.md) : `publications.license` (version éditeur) et `publications.deposit_license` (fichier déposé dans HAL).
+- **Licences.** Chantier [Licences](archived/2026-10-15_DATA_licences.md) : `publications.license` (version éditeur) et `publications.deposit_license` (fichier déposé dans HAL).
 - **Serveurs de preprints.** `journals.journal_type = preprint_server` et `publication_relations` (`is_preprint_of`) donnent une partie de l'information.
 - **Entrepôts de jeux de données.** Chantier [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md). Le moissonnage de DataCite par ORCID ajoute 49 jeux de données au périmètre, dont ceux de quatre entrepôts absents jusque-là : EarthChem Library, ICOS Carbon Portal, Build Environment Data_Experiments, DANDI Archive.
 - **Affiliations des coauteurs.** Seul le pays est résolu pour les adresses hors périmètre. Les institutions partenaires demandent une résolution des adresses vers un référentiel (ROR).
