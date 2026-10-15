@@ -332,9 +332,11 @@ hal_structures = Table(
     Column("end_date", Date),
     Column("parent_ids", ARRAY(Integer), nullable=False, server_default="{}"),
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Structure interne, quand le ROR ne relie pas la structure HAL au référentiel interne.
+    Column("structure_id", Integer),
     comment=(
         "Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou "
-        "structures.api_ids->'hal', le relie au référentiel interne."
+        "structure_id, le relie au référentiel interne."
     ),
     schema="ref",
 )

@@ -4,12 +4,12 @@ La vue associe une signature aux structures du périmètre d'extraction qu'elle 
 
 - `address` : une adresse de la signature est rattachée à la structure, lien non infirmé ;
 - `ror` : un ROR de la signature est celui de la structure. Un ROR posé sur une adresse sans structure du périmètre est écarté ;
-- `hal_structure` : une structure HAL de la signature correspond à la structure, par son ROR ou par `structures.api_ids->'hal'`. Un alias se ramène à sa structure conservée. Parmi les structures HAL d'une signature, seules comptent les plus basses de la hiérarchie. Une structure sans correspondance remonte à ses parents HAL, jusqu'à la première qui en a une.
+- `hal_structure` : une structure HAL de la signature correspond à la structure, par son ROR ou par `ref.hal_structures.structure_id`. Un alias se ramène à sa structure conservée. Parmi les structures HAL d'une signature, seules comptent les plus basses de la hiérarchie. Une structure sans correspondance remonte à ses parents HAL, jusqu'à la première qui en a une.
 
 `authorship_structures` et `publication_structures`, qui en dépendent, sont recréées à l'identique.
 
 Revision ID: c8e2a4f6d391
-Revises: b5d9f3a7c128
+Revises: e1a6c3b8f472
 Create Date: 2026-10-15 18:00:00.000000
 """
 
@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c8e2a4f6d391"
-down_revision: str | Sequence[str] | None = "b5d9f3a7c128"
+down_revision: str | Sequence[str] | None = "e1a6c3b8f472"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -53,16 +53,13 @@ _ADDRESS_BRANCH = """
 _SOURCE_AUTHORSHIP_STRUCTURES = f"""
     CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
     WITH RECURSIVE {_PERIMETER},
-    -- Structures internes de chaque structure HAL : par le ROR, par la liste de api_ids.
+    -- Structures internes de chaque structure HAL : par le ROR, par la correspondance explicite.
     hal_match AS (
         SELECT hs.hal_structure_id, s.id AS structure_id
         FROM ref.hal_structures hs
         JOIN structures.structures s ON s.ror_id = hs.ror_id
         UNION
-        SELECT h.value::int, s.id
-        FROM structures.structures s
-        CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> 'hal') h(value)
-        WHERE s.api_ids ? 'hal' AND h.value ~ '^[0-9]+$'
+        SELECT hal_structure_id, structure_id FROM ref.hal_structures WHERE structure_id IS NOT NULL
     ),
     hal_ancestors AS (
         SELECT child_id, parent_id AS ancestor_id, 1 AS depth FROM ref.hal_structure_relations

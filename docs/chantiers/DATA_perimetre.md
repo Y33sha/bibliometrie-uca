@@ -49,7 +49,7 @@ La collection HAL n'est pas un indice : elle double la structure HAL.
 - identité RH : le rejet de la signature (`rejected_authorships`) coupe le lien à la personne ;
 - adresse : le lien adresse → structure s'infirme dans `address_structures`, pour toutes les signatures de cette adresse ;
 - ROR : un ROR du périmètre posé sur une adresse sans structure du périmètre est écarté ;
-- structure HAL : une erreur du dépôt se corrige dans HAL ; une erreur de correspondance se corrige dans `structures.api_ids->'hal'` ;
+- structure HAL : une erreur du dépôt se corrige dans HAL ; une erreur de correspondance se corrige dans `ref.hal_structures.structure_id` ;
 - thèse soutenue dans l'établissement : jamais écartée, theses.fr fait autorité.
 
 **Référentiel des structures HAL.**
@@ -62,7 +62,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 **Structure HAL d'une signature.** `source_authorship_hal_structures` garde les structures directes de la signature : `affiliation/@ref` de l'auteur dans le TEI de HAL, `structId` d'une affiliation ScanR.
 
-**Correspondance avec les structures internes.** Une structure HAL rejoint une structure interne par son ROR, ou par la liste de `structId` de `structures.api_ids->'hal'`. Sans correspondance, la branche `hal_structure` de la vue remonte les parents HAL jusqu'à la première structure qui en a une. HAL ne relie pas les fiches successives d'un laboratoire : le ROR partagé en relie une partie, la liste de `api_ids` relie les autres.
+**Correspondance avec les structures internes.** Une structure HAL rejoint une structure interne par son ROR, ou par sa colonne `structure_id`, clé étrangère vers `structures`. Sans correspondance, la branche `hal_structure` de la vue remonte les parents HAL jusqu'à la première structure qui en a une. HAL ne relie pas les fiches successives d'un laboratoire : le ROR partagé en relie une partie, `structure_id` relie les autres.
 
 **Table `addresses` réservée aux textes d'affiliation.** Les noms de structures HAL et ScanR et les noms des thèses quittent `addresses`, une fois leurs voies d'entrée en place et mesurées.
 
@@ -81,8 +81,8 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 - [x] Référentiel `ref.hal_structures` et nœud de chargement.
 - [x] Table `source_authorship_hal_structures`, lue dans HAL et dans les fiches de structure ScanR. Quand aucune affiliation ScanR n'est marquée laboratoire, les `structId` comprennent les tutelles : la branche `hal_structure` garde les structures les plus basses de la hiérarchie.
 - [x] Branches `hal_structure` et `ror` de `source_authorship_structures`.
-- [x] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement. ROR, mesure du 2026-10-15 sur le périmètre des personnes : 3 725 signatures entrent par le ROR seul. La règle de l'adresse écarte 18 132 ROR du périmètre, à 90 % d'OpenAlex : des ROR erronés (« Laboratoire de Mathématiques de Versailles » avec le ROR du LMBP), et des adresses trop courtes pour la résolution (« Territoires », « Unité de Nutrition Humaine »). Structure HAL : aucune signature n'entre par la structure HAL seule, car l'adresse HAL est le nom de la même structure. 5 671 signatures HAL entrent par l'adresse et pas par la structure HAL : leurs fiches HAL d'avant 2017, sans ROR (UBP, SIGMA Clermont, anciennes fiches des laboratoires), sont absentes de `api_ids->'hal'`.
-- [x] `api_ids->'hal'` des fiches HAL sans ROR connu, d'après les noms que la résolution des adresses rattache déjà aux structures internes : 214 fiches pour 37 structures (`interfaces/cli/oneshot/fill_hal_api_ids.py`). Restent 1 359 signatures HAL qui entrent par l'adresse et pas par la structure HAL, dont 1 261 sans structure HAL dans le TEI.
+- [x] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement. ROR, mesure du 2026-10-15 sur le périmètre des personnes : 3 725 signatures entrent par le ROR seul. La règle de l'adresse écarte 18 132 ROR du périmètre, à 90 % d'OpenAlex : des ROR erronés (« Laboratoire de Mathématiques de Versailles » avec le ROR du LMBP), et des adresses trop courtes pour la résolution (« Territoires », « Unité de Nutrition Humaine »). Structure HAL : aucune signature n'entre par la structure HAL seule, car l'adresse HAL est le nom de la même structure. 5 671 signatures HAL entrent par l'adresse et pas par la structure HAL : leurs fiches HAL d'avant 2017, sans ROR (UBP, SIGMA Clermont, anciennes fiches des laboratoires), sont sans correspondance interne.
+- [x] Structure interne (`structure_id`) des fiches HAL sans ROR connu, d'après les noms que la résolution des adresses rattache déjà aux structures internes : 214 fiches pour 37 structures (`interfaces/cli/oneshot/match_hal_structures.py`). Restent 1 359 signatures HAL qui entrent par l'adresse et pas par la structure HAL, dont 1 261 sans structure HAL dans le TEI.
 - [ ] Migration des branches de la vue appliquée, phase `affiliations` relancée.
 
 ### Phase 3 — Indices propres au document
@@ -103,7 +103,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 ## Questions ouvertes
 
-- **Scission d'un laboratoire.** L'ancienne fiche HAL peut figurer dans les `api_ids` des deux laboratoires issus de la scission : ses signatures atteignent les deux, et le décompte par laboratoire compte double. Sans correspondance, ses signatures remontent à l'université seule.
+- **Scission d'un laboratoire.** L'ancienne fiche HAL se rattache à un seul des laboratoires issus de la scission, ou à aucun : ses signatures remontent alors à l'université seule.
 - **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait les indices de niveau signature pour cette personne sur cette notice. À trancher selon la fréquence du cas dans l'administration.
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.

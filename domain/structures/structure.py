@@ -1,6 +1,6 @@
 """Aggregate root `Structure` — entité métier d'une structure de recherche / d'enseignement (laboratoire, école doctorale, université, hôpital, …).
 
-Identité = `id` (clé surrogate) ; identifiant naturel : `code` (unique). Une structure agrège ses formes de noms (`name_forms`), ses identifiants externes (`RorId`, `HalCollection`) et un dict `api_ids` JSONB pour les identifiants de sources sans VO dédié (clés : `openalex`, `wos`, `scanr`, `theses`, `hal`).
+Identité = `id` (clé surrogate) ; identifiant naturel : `code` (unique). Une structure agrège ses formes de noms (`name_forms`), ses identifiants externes (`RorId`, `HalCollection`) et un dict `api_ids` JSONB pour les identifiants de sources sans VO dédié (clés : `openalex`, `wos`, `scanr`, `theses`, `datacite`).
 
 Les règles métier des structures (matching des formes de nom, hiérarchie `structure_tutelles`) vivent dans les modules voisins du package `domain/structures/`.
 """

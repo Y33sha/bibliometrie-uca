@@ -333,7 +333,7 @@ NODES: tuple[Node, ...] = (
     _node(
         "affiliations.refresh_hal_structures",
         "affiliations",
-        reads=("source_authorship_hal_structures", "structures.api_ids"),
+        reads=("source_authorship_hal_structures",),
         writes=("hal_structures", "hal_structure_relations", "hal_structure_aliases"),
         previous_run=("hal_structures", "hal_structure_aliases"),
         network="hal",
