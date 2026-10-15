@@ -63,6 +63,17 @@ def test_ne_relit_pas_un_parent_deja_dans_le_referentiel():
     assert source.requested == [{3}]
 
 
+def test_un_parent_cite_par_son_alias_est_lu_une_fois():
+    source = _Source()
+    source.docs[4] = _doc(4, parents=[9])
+
+    load = fetch_hal_structures({4}, source=source, queries=_Queries())
+
+    assert set(load.structures) == {1, 2, 4}
+    assert load.aliases == {9: 2}
+    assert source.requested == [{4}, {9}, {1}]
+
+
 def test_source_indisponible_laisse_le_referentiel_en_l_etat():
     queries = MagicMock()
     queries.ids_to_fetch.return_value = {3}

@@ -167,11 +167,11 @@ def fetch_hal_structures(
     """Lit `ids` dans `ref/structure`, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. `avancement` compte les identifiants lus ; son total croît avec les parents à lire."""
     load = HalStructuresLoad()
     pending = set(ids)
-    requested = 0
+    requested: set[int] = set()
     while pending:
-        requested += len(pending)
+        requested |= pending
         if avancement is not None:
-            avancement.fixer_total(requested)
+            avancement.fixer_total(len(requested))
         for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH):
             found = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
             load.structures.update(found)
@@ -185,7 +185,7 @@ def fetch_hal_structures(
             if avancement is not None:
                 avancement.avance(len(chunk))
         parents = {p for s in load.structures.values() for p in s.parent_ids}
-        pending = parents - load.structures.keys() - load.not_found
+        pending = parents - load.structures.keys() - requested
         pending -= queries.known_ids(pending)
     for s in load.structures.values():
         for alias in s.alias_ids:
