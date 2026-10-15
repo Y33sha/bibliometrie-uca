@@ -41,11 +41,15 @@ Au niveau du document : thèse soutenue dans l'établissement, d'après le PPN d
 
 La collection HAL n'est pas un indice : elle découle de la structure HAL, qui désigne en plus l'auteur et son laboratoire.
 
-**Indices bruts et structures atteintes.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. La vue matérialisée `source_authorship_structures` associe chaque signature aux structures du périmètre qu'elle atteint. Elle gagne une colonne `method` (`address`, `ror`, `hal_structure`), et une branche de requête par méthode. Les corrections vivent dans les tables sources, donc la vue reste une vue matérialisée. Son index unique, qu'exige le rafraîchissement concurrent, inclut `method`. Le périmètre et le laboratoire se calculent sur elle.
+**Indices bruts et structures atteintes.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. La vue matérialisée `source_authorship_structures` associe chaque signature aux structures du périmètre qu'elle atteint. Elle gagne une colonne `evidence` (`address`, `ror`, `hal_structure`), et une branche de requête par indice. Les corrections vivent dans les tables sources, donc la vue reste une vue matérialisée. Son index unique, qu'exige le rafraîchissement concurrent, inclut `evidence`. Le périmètre et le laboratoire se calculent sur elle.
 
-**Raisons de l'entrée.** Une signature et une publication entrent dans le périmètre par une ou plusieurs raisons : une signature OpenAlex peut entrer à la fois par son adresse, son ROR et l'identité RH. Les raisons rendent mesurable l'apport de chaque voie. Proposition à confirmer : une colonne `perimeter_reasons` (tableau d'une énumération) sur `source_authorships` et sur `publications`, recalculée à chaque run ; un tableau vide vaut hors du périmètre.
+**Indices de l'entrée.** Une signature et une publication entrent dans le périmètre par un ou plusieurs indices : une signature OpenAlex peut entrer à la fois par son adresse, son ROR et l'identité RH. Les indices enregistrés rendent mesurable l'apport de chaque voie.
 
-**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par une raison propre au document. La structure HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université.
+- Type `perimeter_evidence` : `address`, `rh_identity`, puis `ror`, `hal_structure` et `thesis_institution` avec leur phase. La colonne `evidence` de `source_authorship_structures` prend ses valeurs de structure.
+- Colonne `perimeter_evidence` (tableau) sur `source_authorships`, `authorships` et `publications`, recalculée à chaque run. `authorships` réunit les indices de ses signatures. `publications` réunit ceux des signatures de personnes non exclues, et les indices propres au document.
+- Une seule expression SQL calcule les indices d'une signature, pour le calcul complet de la phase `affiliations` et pour le recalcul ciblé après une modification d'adresse dans l'administration.
+
+**Publication.** Une publication est dans le périmètre si une de ses signatures l'est, ou par un indice propre au document. La structure HAL suffit : elle couvre les années antérieures au premier export RH, les documents présents seulement dans HAL, et les adresses qui citent un CHU sans l'université.
 
 **Corrections, indice par indice.** Aucune table de rejet propre au périmètre :
 
@@ -63,10 +67,11 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 ## Phasage
 
-### Phase 1 — Raisons de l'entrée
+### Phase 1 — Indices de l'entrée
 
-- [ ] Raisons de l'entrée, plusieurs par signature et par publication, posées par la phase `affiliations` pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
-- [ ] Colonne `method` de `source_authorship_structures`, valeur `address` pour la branche existante.
+- [ ] Expression SQL unique des indices d'une signature, pour le calcul complet et le recalcul ciblé.
+- [ ] Colonne `evidence` de `source_authorship_structures`, valeur `address` pour la branche existante.
+- [ ] Indices de l'entrée sur les signatures, les authorships et les publications, pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
 
 ### Phase 2 — Référentiels
 
@@ -93,9 +98,9 @@ La collection HAL n'est pas un indice : elle découle de la structure HAL, qui d
 
 ## Questions ouvertes
 
-- **Booléen `in_perimeter`.** Les raisons le rendent-elles superflu ?
+- **Booléen `in_perimeter`.** Proposition : colonne générée, `cardinality(perimeter_evidence) > 0`. Les lectures et les index partiels restent valables, et le pipeline écrit seulement les indices.
 - **Correspondance des structures HAL renommées.** Une structure interne doit rejoindre toutes les structures HAL qui se sont succédé sous son nom. Le ROR en relie une partie (`ref/structure` rend les structures valides et anciennes d'un même ROR). Les notices de la collection du laboratoire relient les autres.
-- **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation, souvent juste pour un coauteur. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait toutes les raisons de niveau signature pour cette personne sur cette notice. Elle complète l'exclusion d'une personne (`persons.exclusion = 'out_of_perimeter'`), qui vaut pour toutes ses publications, futures comprises. À trancher selon la fréquence du cas dans l'administration.
+- **Signature hors périmètre.** La personne est bien attribuée, mais une source lui prête une fausse affiliation, souvent juste pour un coauteur. Une décision durable (notice, personne), sur le modèle de `rejected_authorships`, écarterait tous les indices de niveau signature pour cette personne sur cette notice. Elle complète l'exclusion d'une personne (`persons.exclusion = 'out_of_perimeter'`), qui vaut pour toutes ses publications, futures comprises. À trancher selon la fréquence du cas dans l'administration.
 - **Structures primaires HAL.** Garder seulement les structures primaires réduit le nombre de structures par signature, mais une signature dont le laboratoire primaire est inconnu sort alors du périmètre. Mesure à faire sur un échantillon de notices, les deux champs demandés à l'API : nombre de signatures dont seule une tutelle est reconnue.
 - **Laboratoire d'une signature entrée par l'identité.** Une signature entrée dans le périmètre par l'identifiant d'une personne RH reste sans laboratoire. Piste : le déduire des publications de la personne. Les `department_name` de l'export RH désignent rarement un laboratoire.
 - **Consolidation.** Par paire (publication, personne), comme `authorships`, ou par auteur aligné (`DATA_alignement-auteurs.md`). La seconde rend le périmètre d'une publication indépendant du matching des personnes.
