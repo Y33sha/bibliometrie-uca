@@ -9,6 +9,7 @@ from domain.journals.expected import (
     is_doc_type_expected,
     is_oa_status_expected,
 )
+from domain.journals.journal import OA_MODELS
 
 
 class TestIsOaStatusExpected:
@@ -113,12 +114,8 @@ class TestMappingCoverage:
     aux mappings."""
 
     def test_oa_model_keys_documented(self):
-        # Les 3 oa_model en base à date.
-        assert set(EXPECTED_OA_STATUSES_BY_OA_MODEL) == {
-            "subscription",
-            "full_oa",
-            "repository",
-        }
+        # Chaque modèle OA du domaine a ses statuts attendus.
+        assert set(EXPECTED_OA_STATUSES_BY_OA_MODEL) == {m.value for m in OA_MODELS}
 
     def test_journal_type_keys_documented(self):
         # Les 7 valeurs de l'enum journal_type.
