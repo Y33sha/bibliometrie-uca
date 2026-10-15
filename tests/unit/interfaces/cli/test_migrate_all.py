@@ -1,4 +1,4 @@
-"""`migrate_all` migre la base par défaut puis chaque instance, et s'arrête au premier échec."""
+"""`migrate_all` migre la base par défaut puis chaque instance dont la base existe, et s'arrête au premier échec."""
 
 import subprocess
 
@@ -18,12 +18,16 @@ def upgraded(monkeypatch):
         return subprocess.CompletedProcess(args, 1 if instance == "nantes" else 0)
 
     monkeypatch.setenv("BIBLIO_INSTANCE", "lorraine")
-    monkeypatch.setattr(migrate_all, "instance_names", lambda: ["lorraine", "nantes", "zurich"])
+    monkeypatch.setattr(
+        migrate_all, "instance_names", lambda: ["absente", "lorraine", "nantes", "zurich"]
+    )
     monkeypatch.setattr(migrate_all.subprocess, "run", run)
+    monkeypatch.setattr(migrate_all, "_database", lambda instance: f"bibliometrie_{instance}")
+    monkeypatch.setattr(migrate_all, "_exists", lambda database: database != "bibliometrie_absente")
     return recorded
 
 
-def test_migre_la_base_par_defaut_puis_les_instances_et_s_arrete_au_premier_echec(upgraded):
+def test_saute_les_bases_absentes_et_s_arrete_au_premier_echec(upgraded):
     with pytest.raises(SystemExit):
         migrate_all.main()
 

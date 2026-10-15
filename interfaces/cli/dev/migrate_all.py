@@ -4,19 +4,39 @@
 Usage :
     migrate_all
 
-Chaque base se migre dans un processus `alembic upgrade head` à part, avec `BIBLIO_INSTANCE` posée sur l'instance : les réglages de la base se lisent au chargement du processus. Alembic écrit son journal dans le terminal. La commande s'arrête au premier échec.
+Chaque base se migre dans un processus `alembic upgrade head` à part, avec `BIBLIO_INSTANCE` posée sur l'instance : les réglages de la base se lisent au chargement du processus. Alembic écrit son journal dans le terminal. Une instance dont la base n'existe pas est sautée. La commande s'arrête au premier échec.
 """
 
 import os
 import subprocess
 import sys
 
+from dotenv import dotenv_values
+from sqlalchemy import text
+
 from infrastructure import PROJECT_ROOT
+from infrastructure.db.engine import get_sync_engine
 
 
 def instance_names() -> list[str]:
     """Instances de `instances/` qui ont un `instance.env`, par ordre alphabétique."""
     return sorted(p.parent.name for p in (PROJECT_ROOT / "instances").glob("*/instance.env"))
+
+
+def _database(instance: str) -> str | None:
+    """Base de l'instance, d'après son `instance.env`."""
+    return dotenv_values(PROJECT_ROOT / "instances" / instance / "instance.env").get("DB_NAME")
+
+
+def _exists(database: str | None) -> bool:
+    """Vrai quand la base `database` existe sur le serveur."""
+    with get_sync_engine().connect() as conn:
+        return bool(
+            conn.execute(
+                text("SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = :name)"),
+                {"name": database},
+            ).scalar()
+        )
 
 
 def _upgrade(instance: str | None) -> int:
@@ -35,6 +55,11 @@ def _upgrade(instance: str | None) -> int:
 def main() -> None:
     for instance in [None, *instance_names()]:
         print(f"── Base {instance or 'par défaut'}", flush=True)
+        if instance and not _exists(database := _database(instance)):
+            print(
+                f"Base {database} absente : instance sautée (create_instance la crée).", flush=True
+            )
+            continue
         returncode = _upgrade(instance)
         if returncode != 0:
             sys.exit(returncode)
