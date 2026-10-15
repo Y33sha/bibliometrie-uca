@@ -1,6 +1,6 @@
-"""Tests du parseur TEI HAL (ROR des structures d'affiliation par auteur)."""
+"""Tests du parseur TEI HAL : ROR et identifiants des structures d'affiliation, par auteur."""
 
-from pipeline.ingestion.hal.normalize import parse_tei_author_rors
+from pipeline.ingestion.hal.normalize import parse_tei_author_rors, parse_tei_author_structures
 
 _TEI = """<?xml version="1.0" encoding="UTF-8"?>
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
@@ -49,3 +49,11 @@ def test_ror_des_structures_de_chaque_auteur_dans_l_ordre():
 def test_tei_absent_ou_mal_forme():
     assert parse_tei_author_rors(None) == []
     assert parse_tei_author_rors("<not-xml>") == []
+
+
+def test_structures_directes_de_chaque_auteur_dans_l_ordre():
+    assert parse_tei_author_structures(_TEI) == [[1, 2, 3], [], [2]]
+
+
+def test_structures_tei_absent():
+    assert parse_tei_author_structures(None) == []

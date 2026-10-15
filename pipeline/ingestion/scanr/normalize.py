@@ -284,7 +284,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
     - affiliations feuilles → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
-    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse (tutelles écartées, affiliations sans nom).
+    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse (tutelles écartées, affiliations sans nom) ;
+    - structures HAL des affiliations feuilles (`structId`).
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
@@ -308,6 +309,11 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         signature_rors: set[RorId] = set()
         affiliations = [as_mapping(a) for a in as_sequence(author_data.get("affiliations"))]
         leaves = select_leaf_affiliations(affiliations)
+        hal_structure_ids = frozenset(
+            int(struct_id)
+            for leaf in leaves
+            if (struct_id := as_str(leaf.get("structId")) or "").isdigit()
+        )
         for aff in affiliations:
             rors = parse_ror_ids([as_str(aff.get("ror"))])
             name = (as_str(aff.get("name")) or "").strip()
@@ -331,6 +337,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 person_identifiers=ids if ids else None,
                 addresses=addresses,
                 ror_ids=frozenset(signature_rors),
+                hal_structure_ids=hal_structure_ids,
             )
         )
     return records

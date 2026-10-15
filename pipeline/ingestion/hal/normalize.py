@@ -455,6 +455,23 @@ def parse_tei_author_rors(label_xml: str | None) -> list[list[list[str]]]:
     ]
 
 
+def parse_tei_author_structures(label_xml: str | None) -> list[list[int]]:
+    """Structures HAL directes de chaque auteur du TEI HAL, dans l'ordre des auteurs : identifiants de `affiliation/@ref` (`#struct-<identifiant>`)."""
+    root = _tei_root(label_xml)
+    if root is None:
+        return []
+    return [
+        sorted(
+            {
+                int(ref)
+                for aff in author.findall("tei:affiliation", _TEI_NS)
+                if (ref := (aff.get("ref") or "").removeprefix("#struct-")).isdigit()
+            }
+        )
+        for author in _title_authors(root)
+    ]
+
+
 # =============================================================
 # HAL AUTHORSHIPS
 # =============================================================
@@ -529,6 +546,7 @@ def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
     block["tei_author_identifiers"] = cast("JsonValue", parse_tei_author_identifiers(label_xml))
     block["tei_author_names"] = cast("JsonValue", parse_tei_author_names(label_xml))
     block["tei_author_rors"] = cast("JsonValue", parse_tei_author_rors(label_xml))
+    block["tei_author_structures"] = cast("JsonValue", parse_tei_author_structures(label_xml))
     return block
 
 
@@ -537,7 +555,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents), `addresses` (noms de structures, chacun avec le ROR de sa structure dans le TEI) et `ror_ids` (ROR des structures du TEI sans adresse).
+    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents), `addresses` (noms de structures, chacun avec le ROR de sa structure dans le TEI), `ror_ids` (ROR des structures du TEI sans adresse) et `hal_structure_ids` (structures directes de l'auteur dans le TEI).
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
@@ -555,6 +573,11 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
             if struct_id and ror:
                 by_struct[struct_id].add(ror)
         tei_rors.append(by_struct)
+    # Structures HAL directes, par auteur.
+    tei_structures = [
+        frozenset(int(i) for i in as_sequence(e) if isinstance(i, int))
+        for e in as_sequence(doc.get("tei_author_structures"))
+    ]
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
@@ -653,6 +676,9 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                     for hid in address_structs
                 ],
                 ror_ids=signature_rors,
+                hal_structure_ids=(
+                    tei_structures[position] if position < len(tei_structures) else frozenset()
+                ),
             )
         )
 

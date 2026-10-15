@@ -88,8 +88,9 @@ def signature_content(
     neutralized_identifiers: JsonValue,
     addresses: Sequence[tuple[str, Sequence[str] | None, Sequence[str] | None, Sequence[str]]],
     ror_ids: Iterable[str] = (),
+    hal_structure_ids: Iterable[int] = (),
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la signature sans texte d'affiliation. Les ROR sont présents dans le contenu seulement s'il y en a."""
+    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, pays suggérés, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la signature sans texte d'affiliation. `hal_structure_ids` : structures HAL directes de la signature. Les ROR et les structures HAL sont présents dans le contenu seulement s'il y en a."""
     content: dict[str, JsonValue] = {
         "position": position,
         "name": list(name),
@@ -103,4 +104,6 @@ def signature_content(
     }
     if rors := sorted(ror_ids):
         content["ror_ids"] = list(rors)
+    if structures := sorted(hal_structure_ids):
+        content["hal_structure_ids"] = list(structures)
     return content

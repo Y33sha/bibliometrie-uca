@@ -296,6 +296,16 @@ class AuthorshipsBatchQueries:
                 {"ids": ids},
             )
 
+    def delete_source_authorship_hal_structures(self, conn: Connection, ids: list[int]) -> None:
+        if ids:
+            conn.execute(
+                text(
+                    "DELETE FROM source_authorship_hal_structures"
+                    " WHERE source_authorship_id = ANY(:ids)"
+                ),
+                {"ids": ids},
+            )
+
     def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None:
         if not values:
             return
@@ -360,6 +370,24 @@ class AuthorshipsBatchQueries:
             {
                 "sa_ids": [v["sa_id"] for v in values],
                 "addr_ids": [v["addr_id"] for v in values],
+            },
+        )
+
+    def insert_source_authorship_hal_structures_batch(
+        self, conn: Connection, values: list[tuple[int, int]]
+    ) -> None:
+        """Écrit les couples (signature, structure HAL). Le writer supprime d'abord ceux d'une signature réécrite."""
+        if not values:
+            return
+        conn.execute(
+            text("""
+                INSERT INTO source_authorship_hal_structures (source_authorship_id, hal_structure_id)
+                SELECT sa_id, hal_structure_id
+                FROM unnest(:sa_ids ::integer[], :hal_structure_ids ::integer[]) AS t(sa_id, hal_structure_id)
+            """),
+            {
+                "sa_ids": [sa_id for sa_id, _ in values],
+                "hal_structure_ids": [hal_id for _, hal_id in values],
             },
         )
 

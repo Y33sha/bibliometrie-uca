@@ -202,6 +202,33 @@ def test_ror_ecrits_a_l_insertion_et_reecrits_si_modifies(sa_sync_conn):
     assert _rors(conn, sa_id) == ["03vgfxd91"]
 
 
+def _hal_structures(conn, sa_id: int) -> list[int]:
+    return (
+        conn.execute(
+            text(
+                "SELECT hal_structure_id FROM source_authorship_hal_structures"
+                " WHERE source_authorship_id = :i ORDER BY hal_structure_id"
+            ),
+            {"i": sa_id},
+        )
+        .scalars()
+        .all()
+    )
+
+
+def test_structures_hal_ecrites_a_l_insertion_et_reecrites_si_modifiees(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _notice(conn)
+    _write(conn, sp, [_rec(0, "Dupont, Jean", hal_structure_ids=frozenset({483019, 1063727}))])
+    sa_id = _signatures(conn, sp)[0][0]
+    assert _hal_structures(conn, sa_id) == [483019, 1063727]
+
+    _write(conn, sp, [_rec(0, "Dupont, Jean", hal_structure_ids=frozenset({1063727}))])
+
+    assert _signatures(conn, sp)[0][0] == sa_id
+    assert _hal_structures(conn, sa_id) == [1063727]
+
+
 def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
     """Un ROR d'affiliation pointe sur son adresse ; un ROR sans texte d'affiliation sur la seule signature."""
     conn = sa_sync_conn
