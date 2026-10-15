@@ -15,6 +15,26 @@ Un niveau « auteur de la publication », indépendant de l'identification des p
 - la détection des erreurs d'affiliation : un même auteur rattaché au périmètre par une source et ailleurs par une autre ;
 - la consolidation du périmètre par auteur (`DATA_perimetre.md`).
 
+### Mesure
+
+Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur les publications à notices d'au moins deux sources, hors theses.fr : toutes jusqu'à 500 auteurs, 150 tirées au hasard au-delà. Chaque paire de notices de sources différentes compare la liste la plus courte à la plus longue. Une signature est « décalée » quand un nom compatible (`names_compatible`) figure à une autre position, « absente » quand aucun ne figure.
+
+| Auteurs | Longueurs égales | Même position | Décalée | Absente | Identifiant partagé à la même position |
+|---|---|---|---|---|---|
+| 1-5 | 99,4 % | 99,5 % | 0,4 % | 0,1 % | 98,9 % |
+| 6-10 | 95,4 % | 98,3 % | 1,2 % | 0,5 % | 98,9 % |
+| 11-20 | 94,8 % | 98,6 % | 1,2 % | 0,3 % | 98,8 % |
+| 21-50 | 86,8 % | 95,9 % | 3,8 % | 0,3 % | 96,7 % |
+| 51-100 | 38,1 % | 87,1 % | 12,1 % | 0,8 % | 95,9 % |
+| 101-500 | 32,2 % | 75,9 % | 23,8 % | 0,3 % | 87,4 % |
+| plus de 500 | 22,2 % | 38,1 % | 60,7 % | 1,2 % | 60,2 % |
+
+- Le nom retrouve presque toujours l'auteur ailleurs dans l'autre liste : au-delà de 50 auteurs, l'écart est un ordre différent, rarement un auteur manquant.
+- Deux signatures qui partagent un identifiant fort ont toujours des noms compatibles (100 % dans chaque tranche).
+- Deux signatures à la même position ont parfois deux valeurs différentes d'un même type d'identifiant avec des noms compatibles : environ 800 cas par tranche jusqu'à 50 auteurs. Ce sont des identifiants faux ou multiples pour une même personne.
+- Par paire de sources, la position s'accorde le mieux avec scanR (93 à 97 %), dont les listes s'arrêtent à 51 auteurs, et le moins avec WoS et DataCite.
+- Désaccords relevés dans les listes courtes : ordre différent entre sources, collectif d'auteurs inséré dans la liste, prénom différent à la même position (« Maxime » / « Martine Tisserant »), faute de deux lettres (« Pereira » / « Peirrera »), listes sans rapport, signe d'une fusion de publications erronée.
+
 ## Décisions
 
 - L'alignement se fait par publication, avant la phase `persons`.
@@ -25,10 +45,10 @@ Un niveau « auteur de la publication », indépendant de l'identification des p
 
 ### Phase 1 — Mesure
 
-- [ ] Publications à plusieurs notices : nombre de signatures par notice, écarts de longueur entre listes.
-- [ ] Accord de la position : part des signatures dont le nom est compatible avec celui de la même position dans une autre notice, selon le nombre d'auteurs.
-- [ ] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
-- [ ] Échantillon de désaccords relu à la main.
+- [x] Publications à plusieurs notices : nombre de signatures par notice, écarts de longueur entre listes.
+- [x] Accord de la position : part des signatures dont le nom est compatible avec celui de la même position dans une autre notice, selon le nombre d'auteurs.
+- [x] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
+- [ ] Échantillon de désaccords relu à la main : `data/measures/author_alignment_disagreements.csv`, 5 000 lignes.
 
 ### Phase 2 — Méthode et modèle
 
