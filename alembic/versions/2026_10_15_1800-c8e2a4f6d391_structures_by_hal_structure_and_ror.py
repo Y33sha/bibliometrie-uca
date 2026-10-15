@@ -77,25 +77,29 @@ _SOURCE_AUTHORSHIP_STRUCTURES = f"""
         FROM sources.source_authorship_hal_structures sah
         LEFT JOIN ref.hal_structure_aliases al ON al.alias_id = sah.hal_structure_id
     ),
+    -- Structures les plus basses d'une signature : ses structures HAL, moins les ancêtres de ses autres structures.
     hal_lowest AS (
-        SELECT d.source_authorship_id, d.hal_structure_id
+        SELECT source_authorship_id, hal_structure_id FROM hal_direct
+        EXCEPT
+        SELECT d.source_authorship_id, a.ancestor_id
         FROM hal_direct d
-        WHERE NOT EXISTS (
-            SELECT 1 FROM hal_direct other
-            JOIN hal_ancestors a ON a.child_id = other.hal_structure_id
-            WHERE other.source_authorship_id = d.source_authorship_id
-              AND a.ancestor_id = d.hal_structure_id
-        )
+        JOIN hal_ancestors a ON a.child_id = d.hal_structure_id
     ),
-    -- Remontée des parents HAL tant que la structure est sans correspondance interne.
+    -- Remontée des parents HAL de chaque structure, tant qu'elle est sans correspondance interne.
     hal_walk AS (
-        SELECT source_authorship_id, hal_structure_id, 0 AS depth FROM hal_lowest
+        SELECT hal_structure_id AS origin_id, hal_structure_id, 0 AS depth FROM ref.hal_structures
         UNION
-        SELECT w.source_authorship_id, r.parent_id, w.depth + 1
+        SELECT w.origin_id, r.parent_id, w.depth + 1
         FROM hal_walk w
         JOIN ref.hal_structure_relations r ON r.child_id = w.hal_structure_id
         WHERE w.depth < 10
           AND NOT EXISTS (SELECT 1 FROM hal_match m WHERE m.hal_structure_id = w.hal_structure_id)
+    ),
+    hal_reach AS (
+        SELECT DISTINCT w.origin_id, m.structure_id
+        FROM hal_walk w
+        JOIN hal_match m ON m.hal_structure_id = w.hal_structure_id
+        WHERE m.structure_id IN (SELECT structure_id FROM perimeter)
     )
     {_ADDRESS_BRANCH}
     UNION
@@ -113,10 +117,9 @@ _SOURCE_AUTHORSHIP_STRUCTURES = f"""
           )
       )
     UNION
-    SELECT w.source_authorship_id, m.structure_id, 'hal_structure'::public.perimeter_evidence
-    FROM hal_walk w
-    JOIN hal_match m ON m.hal_structure_id = w.hal_structure_id
-    WHERE m.structure_id IN (SELECT structure_id FROM perimeter)
+    SELECT l.source_authorship_id, r.structure_id, 'hal_structure'::public.perimeter_evidence
+    FROM hal_lowest l
+    JOIN hal_reach r ON r.origin_id = l.hal_structure_id
     WITH DATA;
 
     CREATE UNIQUE INDEX source_authorship_structures_pkey
