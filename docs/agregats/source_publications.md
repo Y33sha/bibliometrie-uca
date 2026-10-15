@@ -14,7 +14,7 @@ Un enregistrement source est l'image d'un document dans **une** source — HAL, 
 | `source_authorships` | Signature d'auteur pour cette source | `source_publication_id`, `identity_id`, `person_id`, `author_position`, `roles`, `in_perimeter`, `resolution_mode` |
 | `author_identifying_keys` | Identité d'auteur dédoublonnée | `author_name_normalized`, `person_identifiers`, `key_hash` |
 | `source_authorship_addresses` | Lien entre une signature et ses adresses | `source_authorship_id`, `address_id` |
-| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre | dérivée des adresses, de leurs rattachements et du périmètre |
+| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
 
 En amont se trouve `staging.raw_data`, qui conserve les données moissonnées et leur empreinte. En aval, `publications` reçoit le résultat de la fusion. Les signatures ont leur propre fiche, [source_authorships](source_authorships.md), et leur consolidation relève d'[authorships](authorships.md).
 

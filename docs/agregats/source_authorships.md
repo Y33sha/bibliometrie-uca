@@ -10,10 +10,10 @@ Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce q
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `source_authorships` | La signature | `source`, `source_publication_id`, `identity_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries_dirty`, `neutralized_identifiers` |
+| `source_authorships` | La signature | `source`, `source_publication_id`, `identity_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `perimeter_evidence`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries_dirty`, `neutralized_identifiers` |
 | `author_identifying_keys` | Identité d'auteur dédoublonnée | `author_name_normalized`, `person_identifiers`, `key_hash` (calculé, unique) |
 | `source_authorship_addresses` | Lien entre une signature et ses adresses | `source_authorship_id`, `address_id` |
-| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre | dérivée des adresses, de leurs rattachements et du périmètre |
+| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
 | `confirmed_authorships` | Signature épinglée par une décision humaine | `(source_authorship_id, person_id)` |
 
 L'enregistrement source parent est décrit dans [source_publications](source_publications.md), l'authorship consolidée en aval dans [authorships](authorships.md), qui porte aussi `rejected_authorships`.
@@ -22,8 +22,8 @@ L'enregistrement source parent est décrit dans [source_publications](source_pub
 
 ## Écriture par le pipeline
 
-1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par plusieurs signatures du même enregistrement reste sur l'identité, et chacune de ces signatures l'inscrit dans `neutralized_identifiers` avec le motif `shared` : la résolution l'ignore pour elles.
-2. **`affiliations` — appartenance au périmètre.** `in_perimeter` devient vrai lorsqu'une adresse de la signature se résout en une structure du périmètre, le rattachement n'étant pas rejeté. La vue matérialisée `source_authorship_structures` est rafraîchie.
+1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature, comme ses ROR et ses structures HAL. Un identifiant porté par plusieurs signatures du même enregistrement reste sur l'identité, et chacune de ces signatures l'inscrit dans `neutralized_identifiers` avec le motif `shared` : la résolution l'ignore pour elles.
+2. **`affiliations` — appartenance au périmètre.** La vue matérialisée `source_authorship_structures` est rafraîchie. `perimeter_evidence` reçoit les indices de l'entrée de la signature dans le périmètre : structures atteintes dans la vue, identité d'une personne RH. `in_perimeter` est vrai quand la signature a au moins un indice.
 3. **`persons` — attribution d'une personne.** La cascade de résolution pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées à la main sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
 4. **`countries` — pays.** `countries_dirty` déclenche le recalcul des pays de la signature depuis ses adresses.
 
