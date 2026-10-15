@@ -30,6 +30,7 @@
 	} from '$lib/filterRegistry';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { oaLabelsMap } from '$lib/labels';
+	import { licenseLabels } from '$lib/licenses';
 	import {
 		docTypeSingular,
 		docTypePlural,
@@ -156,11 +157,14 @@
 		{ key: 'apc',        label: 'APC' },
 		{ key: 'oa',         label: 'OA' },
 		{ key: 'oa_status',    label: 'Voie OA' },
+		{ key: 'license',    label: 'Licence' },
 		// svelte-ignore state_referenced_locally
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'links',      label: 'Liens',      fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_status', 'publisher'];
+	const initialHidden = ['apc', 'oa_status', 'license', 'publisher'];
+	// Libellés de la colonne Licence, servis par l'API.
+	let licenseNames = $state<Record<string, string>>({});
 	// svelte-ignore state_referenced_locally
 	if (showHalStatusColumn) initialHidden.push('hal_status');
 	const cv = useColumnVisibility(columnDefs, initialHidden);
@@ -266,6 +270,16 @@
 			showColumns: ['oa', 'oa_status'],
 		},
 		{
+			key: 'license',
+			control: 'checkbox',
+			label: 'Licence',
+			param: 'license',
+			facet: { type: 'labeled', apiKey: 'licenses' },
+			group: 'Revue et éditeur',
+			tooltip: 'Licence de la version éditeur',
+			showColumns: ['license'],
+		},
+		{
 			key: 'author',
 			control: 'entity',
 			label: 'Auteur',
@@ -360,6 +374,7 @@
 		if (checkbox.years.length) p.set('year', checkbox.years.join(','));
 		p.set('doc_type', docTypeFilterToken(checkbox.docTypes));
 		if (checkbox.oa.length) p.set('oa_status', checkbox.oa.join(','));
+		if (checkbox.license.length) p.set('license', checkbox.license.join(','));
 		if (checkbox.apc.length) p.set('has_apc', checkbox.apc.join(','));
 		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
 		const labId =
@@ -526,6 +541,9 @@
 	}
 
 	onMount(async () => {
+		licenseLabels()
+			.then((labels) => (licenseNames = labels))
+			.catch(() => {});
 		if (urlSync) {
 			const restored = url.restoreFromUrl($page.url.searchParams);
 			restoreValues(FILTERS, restored, values);
@@ -617,6 +635,7 @@
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
+			{#if col('license')}<th style="width:90px">Licence</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			<th style="width:80px" class="col-menu-th">
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
@@ -707,6 +726,7 @@
 							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 						{/if}
 					</td>{/if}
+					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}
 					{#if showHalStatusColumn && col('hal_status')}
 						{@const hs = computeHalStatus(p)}
 						{@const meta = HAL_STATUS_META[hs]}
@@ -763,6 +783,9 @@
 <Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => { pubs.goToPage(p); syncUrl(); }} />
 
 <style>
+	.license-cell {
+		font-size: 0.8rem;
+	}
 	.filter-banner {
 		background: var(--accent-light);
 		border: 1px solid #c4d8ed;

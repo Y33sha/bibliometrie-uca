@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import SourceTag from "$lib/components/SourceTag.svelte";
   import { accessTag } from "$lib/labels";
+  import { licenseLabels } from "$lib/licenses";
   import { sourceExternalUrl, sourceLabel, SOURCE_ORDER } from "$lib/sources";
   import type { ExternalId, PubDetail, Source } from "./types";
 
@@ -37,6 +38,11 @@
   const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
   const access = $derived(accessTag(pub.oa_status));
+
+  let labels = $state<Record<string, string>>({});
+  $effect(() => {
+    if (pub.license || pub.deposit_license) licenseLabels().then((l) => (labels = l)).catch(() => {});
+  });
 
   // Lien d'accès, dérivé (pas de champ URL unique en base) :
   //   closed / embargoed → aucun lien ; green → dépôt HAL ; sinon → DOI.
@@ -81,6 +87,22 @@
     <div class="sidebar-block">
       <div class="detail-sublabel">DOI</div>
       <a class="doi-link" href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a>
+    </div>
+  {/if}
+
+  {#if pub.license || pub.deposit_license}
+    <div class="sidebar-block">
+      <div class="detail-sublabel">Licence</div>
+      <dl class="licenses">
+        {#if pub.license}
+          <dt>Version éditeur</dt>
+          <dd>{labels[pub.license] ?? pub.license}</dd>
+        {/if}
+        {#if pub.deposit_license}
+          <dt>Dépôt HAL</dt>
+          <dd>{labels[pub.deposit_license] ?? pub.deposit_license}</dd>
+        {/if}
+      </dl>
     </div>
   {/if}
 
@@ -189,6 +211,17 @@
   .doi-link {
     font-size: 0.85rem;
     word-break: break-all;
+  }
+  .licenses {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+  .licenses dt {
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .licenses dd {
+    margin: 0 0 4px;
   }
   .sidebar-sources {
     display: flex;
