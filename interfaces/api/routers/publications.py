@@ -2,7 +2,7 @@
 
 Les lectures passent par le port `PublicationsQueries`.
 
-Les chemins littéraux — `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from collections.abc import Iterator
@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
     EXPORT_COLUMNS,
+    LICENSE_FILTER_VALUES,
     PublicationDetailResponse,
     PublicationFilters,
     PublicationListResponse,
@@ -25,6 +26,7 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPES
+from domain.publications.licenses import LICENSE_LABELS, License
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
@@ -37,6 +39,7 @@ from interfaces.api.filters import (
     parse_str_csv,
     parse_vocabulary_csv,
 )
+from interfaces.api.models import EnumOption
 from interfaces.api.params import SearchTerm
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
 
@@ -65,6 +68,7 @@ class PublicationFilterParams:
     subject_id: Annotated[str, Query()] = ""
     access: Annotated[str, Query()] = ""
     oa_status: Annotated[str, Query()] = ""
+    license: Annotated[str, Query()] = ""
     source_filter: Annotated[str, Query()] = ""
     doc_type: Annotated[str, Query()] = ""
     excluded_doc_type: Annotated[str, Query()] = ""
@@ -91,6 +95,9 @@ class PublicationFilterParams:
             subject_ids=parse_int_csv(self.subject_id, param="subject_id"),
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
             oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
+            license=parse_vocabulary_csv(
+                self.license, allowed=LICENSE_FILTER_VALUES, param="license"
+            ),
             source_values=parse_vocabulary_csv(
                 self.source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
             ),
@@ -114,6 +121,12 @@ class PublicationFilterParams:
 
 
 Filters = Annotated[PublicationFilterParams, Depends()]
+
+
+@router.get("/licenses", response_model=list[EnumOption])
+def list_licenses() -> list[EnumOption]:
+    """Licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`."""
+    return [EnumOption(value=v, label_fr=LICENSE_LABELS[v]) for v in License]
 
 
 @router.get("/facets", response_model=PublicationsFacetsResponse)

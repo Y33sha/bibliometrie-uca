@@ -19,6 +19,7 @@ from application.ports.read_models._common import (
     YesNoCount,
 )
 from application.ports.read_models.subjects_queries import SubjectOut
+from domain.publications.licenses import License
 
 # Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.
 PublicationSort = Literal[
@@ -50,10 +51,16 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "apc",
         "oa",
         "oa_status",
+        "license",
         "hal_status",
         "links",
     }
 )
+
+
+# Vocabulaire du filtre par licence de la version éditeur : les licences du domaine, et `none` pour une publication sans licence connue.
+NO_LICENSE = "none"
+LICENSE_FILTER_VALUES: frozenset[str] = frozenset({*License, NO_LICENSE})
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +83,7 @@ class PublicationFilters:
     monograph_id: int | None = None
     access: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
+    license: list[str] = field(default_factory=list)
     source_values: list[str] = field(default_factory=list)
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
@@ -121,6 +129,7 @@ class PublicationListItem(BaseModel):
     doi: str | None
     doc_type: str
     oa_status: str
+    license: str | None  # licence de la version éditeur
     journal: str | None
     journal_id: int | None
     publisher: str | None
@@ -162,6 +171,7 @@ class PublicationsFacetsResponse(BaseModel):
     doc_types: list[FacetOption]
     access: list[FacetOption]
     oa_statuses: list[FacetOption]
+    licenses: list[FacetOption]
     corresponding: list[FacetOption]
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
@@ -186,6 +196,8 @@ class PublicationDetailCore(BaseModel):
     doi_ra: str | None  # registration agency du préfixe DOI (Crossref / DataCite), via doi_prefixes
     doc_type: str
     oa_status: str
+    license: str | None  # licence de la version éditeur
+    deposit_license: str | None  # licence du fichier déposé dans HAL
     language: str | None
     container_title: str | None
     abstract: str | None

@@ -18,7 +18,7 @@ from sqlalchemy import Connection, Row, text
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
-from domain.publications.licenses import License
+from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
@@ -88,22 +88,6 @@ MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscriptio
 # Modèles des revues entièrement en open access.
 OPEN_ACCESS_MODELS = "('full_oa', 'diamond')"
 
-LICENSE_LABELS = {
-    License.CC_BY: "CC BY",
-    License.CC_BY_SA: "CC BY-SA",
-    License.CC_BY_ND: "CC BY-ND",
-    License.CC_BY_NC: "CC BY-NC",
-    License.CC_BY_NC_SA: "CC BY-NC-SA",
-    License.CC_BY_NC_ND: "CC BY-NC-ND",
-    License.PUBLIC_DOMAIN: "Domaine public (CC0, Public Domain Mark)",
-    License.LICENCE_OUVERTE: "Licence Ouverte Etalab",
-    License.OPEN_SOURCE: "Licence de logiciel libre",
-    License.REPOSITORY_DISTRIBUTION: "Autorisation de diffusion (HAL, arXiv)",
-    License.PUBLISHER_OPEN: "Licence ouverte de l'éditeur",
-    License.OTHER_OA: "Autre licence ouverte",
-    License.ALL_RIGHTS_RESERVED: "Droits réservés",
-    License.OTHER: "Autre licence",
-}
 # Licences qui ouvrent la réutilisation.
 OPEN_LICENSES = frozenset(
     {
@@ -507,7 +491,7 @@ class OpenScienceReport:
             + f"\n\nEntrepôts et licences des jeux de données, {period} :\n\n"
             + _table(
                 ["Entrepôt", "Licence", "Jeux de données"],
-                [(r.repository, _license_label(r.license), r.n) for r in details],
+                [(r.repository, license_label(r.license), r.n) for r in details],
             )
         )
 
@@ -526,7 +510,7 @@ class OpenScienceReport:
             "## Dépôts dans HAL\n\n"
             + _table(
                 ["Licence du fichier déposé", f"Textes intégraux {self.year}"],
-                [(_license_label(r.license), r.n) for r in rows],
+                [(license_label(r.license), r.n) for r in rows],
             )
             + f"\n\n{closed} textes intégraux sur {total} sont déposés sans licence ouverte : "
             "autorisation de diffusion HAL, droits réservés, ou licence non renseignée."
@@ -565,7 +549,7 @@ class OpenScienceReport:
             + f"\n\nLicences des preprints, {period} :\n\n"
             + _table(
                 ["Licence", "Preprints"],
-                Counter(_license_label(r.license) for r in rows).most_common(),
+                Counter(license_label(r.license) for r in rows).most_common(),
             )
         )
 
@@ -650,10 +634,6 @@ class OpenScienceReport:
             self.sources(),
         ]
         return "\n\n".join(sections) + "\n"
-
-
-def _license_label(license: str | None) -> str:  # noqa: A002
-    return LICENSE_LABELS[License(license)] if license else "Aucune licence"
 
 
 def _with_identifier(id_type: str) -> str:
