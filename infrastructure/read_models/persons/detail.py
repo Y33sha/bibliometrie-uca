@@ -21,12 +21,12 @@ from application.ports.read_models.persons_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.dates import today
+from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
-from infrastructure.read_models.sql_fragments import authorship_has_signature_from
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role, in_clause
 
 
 def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | None:
@@ -87,9 +87,9 @@ _THESIS_ROLE_LABELS = {
 
 
 def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
-    """Thèses liées à cette personne avec un rôle non-auteur.
+    """Thèses et HDR liées à cette personne avec un rôle non-auteur (direction, jury, rapport), soutenues dans l'établissement ou ailleurs.
 
-    Les rôles proviennent de la table `authorships` canonique. Le périmètre se limite aux thèses (`source = 'theses'`, via `EXISTS`) : les autres sources portent des rôles non-auteur étrangers à cette page.
+    Les rôles proviennent de la table `authorships` canonique.
     """
     rows = conn.execute(
         text(f"""
@@ -117,7 +117,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
             ) author ON TRUE
             WHERE a.person_id = :pid
               AND NOT ({has_author_role("a")})
-              AND {authorship_has_signature_from(Source.THESES.value)}
+              AND p.doc_type::text IN {in_clause(DOC_TYPE_FAMILIES["theses"])}
             ORDER BY p.pub_year DESC NULLS LAST, p.title
         """),
         {"pid": person_id},

@@ -2,32 +2,19 @@
 
 from functools import partial
 
-from sqlalchemy import text
-
 from infrastructure.read_models.persons.detail import person_theses
 from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 # Authorship du périmètre.
 _in_perimeter_authorship = partial(insert_authorship, in_perimeter=True)
 
 
-def _link_theses_source(conn, authorship_id):
-    """source_authorship `source = 'theses'` qui atteste l'authorship (même publication, même personne), pour l'EXISTS de `person_theses`."""
-    publication_id, person_id = conn.execute(
-        text("SELECT publication_id, person_id FROM authorships WHERE id = :id"),
-        {"id": authorship_id},
-    ).one()
-    source_pub = insert_source_publication(
-        conn,
-        publication_id,
-        source="theses",
-        source_id=f"theses-{authorship_id}",
-        title="These",
-    )
-    insert_signature(conn, source_pub, source="theses", author_position=None, person_id=person_id)
+def _theses(conn, person_id):
+    return [
+        thesis for section in person_theses(conn, person_id).sections for thesis in section.theses
+    ]
 
 
 class TestPersonTheses:
@@ -37,17 +24,26 @@ class TestPersonTheses:
         jury = insert_person(sa_sync_conn, "Jury", first_name="Jean")
         alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
         bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")
-        pub = insert_publication(sa_sync_conn)
-        jury_auth = _in_perimeter_authorship(
-            sa_sync_conn, pub, person_id=jury, roles=["jury_member"]
-        )
+        pub = insert_publication(sa_sync_conn, doc_type="thesis")
+        _in_perimeter_authorship(sa_sync_conn, pub, person_id=jury, roles=["jury_member"])
         _in_perimeter_authorship(sa_sync_conn, pub, person_id=alice, roles=["author"])
         _in_perimeter_authorship(sa_sync_conn, pub, person_id=bruno, roles=["author"])
-        _link_theses_source(sa_sync_conn, jury_auth)
 
-        res = person_theses(sa_sync_conn, jury)
-        theses = [thesis for section in res.sections for thesis in section.theses]
+        theses = _theses(sa_sync_conn, jury)
+
         assert len(theses) == 1
         thesis = theses[0]
         expected = {alice: "Alice Doctorant", bruno: "Bruno Doctorant"}
         assert thesis.author_name == expected[thesis.author_person_id]
+
+    def test_these_soutenue_ailleurs_et_ouvrage_dirige(self, sa_sync_conn):
+        """Une thèse sans notice theses.fr figure parmi les thèses de son rapporteur ; un ouvrage dont la personne est éditrice n'y figure pas."""
+        person = insert_person(sa_sync_conn, "Rapporteur")
+        these = insert_publication(sa_sync_conn, "Thèse soutenue ailleurs", doc_type="thesis")
+        ouvrage = insert_publication(sa_sync_conn, "Ouvrage dirigé", doc_type="book")
+        insert_authorship(sa_sync_conn, these, person_id=person, roles=["rapporteur"])
+        insert_authorship(sa_sync_conn, ouvrage, person_id=person, roles=["editor"])
+
+        assert [thesis.title for thesis in _theses(sa_sync_conn, person)] == [
+            "Thèse soutenue ailleurs"
+        ]
