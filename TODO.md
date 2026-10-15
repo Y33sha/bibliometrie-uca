@@ -4,6 +4,7 @@
 ## Extraction
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
+* [ ] colonne next_retry de failed_lookups: remplacer par valeur paramétrable
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
