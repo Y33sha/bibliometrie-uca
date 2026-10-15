@@ -92,8 +92,16 @@ class TestBuildSourceMeta:
         assert meta == {"date_soutenance": "2024-03-15"}
 
     def test_etablissement(self):
-        meta = _build_source_meta({"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"})
-        assert meta == {"etablissement": "Université Clermont Auvergne (2021-...)"}
+        meta = _build_source_meta(
+            {
+                "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
+                "etabSoutenancePpn": "252404955",
+            }
+        )
+        assert meta == {
+            "etablissement": "Université Clermont Auvergne (2021-...)",
+            "etablissement_ppn": "252404955",
+        }
 
     def test_full(self):
         these = {

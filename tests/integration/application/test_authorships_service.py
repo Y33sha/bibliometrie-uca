@@ -486,7 +486,9 @@ class TestPropagateUcaForAddresses:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
-        authorship_id = insert_authorship(sa_sync_conn, pub_id, person_id=person_id)
+        authorship_id = insert_authorship(
+            sa_sync_conn, pub_id, person_id=person_id, roles=["author"]
+        )
         sa_id = insert_signature(sa_sync_conn, sp_id, person_id=person_id)
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=True)

@@ -47,12 +47,11 @@ _DIM_EXPR: dict[str, str] = {
     "journal": "jt.title",
     "license": f"COALESCE(p.license::text, '{NO_LICENSE}')",
 }
-# Jointures par dimension hors `publications`. Le laboratoire passe par les rattachements (une publication compte dans chacun de ses labos). Alias dédiés (`la`/`las`/`ls`), distincts de la sous-requête de `lab_clause`.
+# Jointures par dimension hors `publications`. Le laboratoire passe par `publication_structures` (une publication compte dans chacun des labos de ses auteurs). Alias dédiés (`lps`/`ls`), distincts de la sous-requête de `lab_clause`.
 _DIM_JOIN: dict[str, str] = {
     "lab": (
-        "JOIN authorships la ON la.publication_id = p.id "
-        "JOIN authorship_structures las ON las.authorship_id = la.id "
-        f"JOIN structures ls ON ls.id = las.structure_id AND ls.structure_type = '{StructureType.LABO.value}'"
+        "JOIN publication_structures lps ON lps.publication_id = p.id "
+        f"JOIN structures ls ON ls.id = lps.structure_id AND ls.structure_type = '{StructureType.LABO.value}'"
     ),
     # Éditeur / revue : jointures internes (excluent les publications sans revue / sans éditeur).
     "publisher": "JOIN publishers pub ON pub.id = j.publisher_id",
