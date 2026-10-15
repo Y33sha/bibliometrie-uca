@@ -116,8 +116,15 @@ def without_decision_sql(
 
 
 def record_redirect(conn: Connection, entity: MergedEntity, target_id: int, source_id: int) -> None:
-    """Enregistre que l'identifiant absorbé `source_id` mène à `target_id`. Les identifiants qui menaient à `source_id` mènent ensuite à `target_id`."""
+    """Enregistre que l'identifiant absorbé `source_id` mène à `target_id`. Les identifiants qui menaient à `source_id` mènent ensuite à `target_id`. `target_id`, conservé, ne mène nulle part."""
     params = {"entity": entity.value, "t": target_id, "s": source_id}
+    conn.execute(
+        text("""
+            DELETE FROM merge_redirects
+            WHERE entity = CAST(:entity AS merged_entity) AND absorbed_id = :t
+        """),
+        params,
+    )
     conn.execute(
         text("""
             UPDATE merge_redirects SET kept_id = :t

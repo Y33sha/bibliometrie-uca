@@ -52,6 +52,18 @@ class TestMerge:
         assert _groups(plan) == {10: (1, 2)}
         assert plan.dissolved == (DissolvedPublication(20, 10),)
 
+    def test_pub_with_sources_outside_neighborhood_is_not_dissolved(self):
+        """Seule une SP de la pub 20 est dans le voisinage : la pub garde ses autres SP, elle n'est pas dissoute."""
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, tokens=[("hal_id", "hal-1")]),
+                _m(2, 20, tokens=[("hal_id", "hal-1")]),
+            ],
+            publication_sizes={10: 1, 20: 3},
+        )
+        assert _groups(plan) == {10: (1, 2)}
+        assert plan.dissolved == ()
+
     def test_no_doi_component_merges_by_min_sp(self):
         """Composante sans DOI (reliée par hal_id), deux pubs → ancre = pub du plus petit SP."""
         plan = plan_reconciliation(

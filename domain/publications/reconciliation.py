@@ -16,7 +16,8 @@
 Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invariant *dirty* garantit que toute arête susceptible d'imposer une assignation/merge/split a une extrémité dirty, donc l'autre est son voisin direct. `connected_components` sur l'union des 1-hop voit toutes les arêtes neuves. Une arête **retirée**, elle, ne laisse aucune trace dans les clés d'après : c'est l'appartenance déjà matérialisée qui la porte, d'où la propagation de `keys_dirty` aux source_publications co-rattachées à une publication avec une SP dirty, en amont de la constitution du voisinage. Sur un full rerun (tout dirty), l'univers = tout le stock → la passe dégénère en cluster-then-materialize global.
 """
 
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from domain.entity_resolution import connected_components
@@ -153,7 +154,10 @@ def _can_found_publication(member: ReconcileMember) -> bool:
 
 
 def plan_reconciliation(
-    members: Iterable[ReconcileMember], *, existing_pub_by_doi: dict[str, int] | None = None
+    members: Iterable[ReconcileMember],
+    *,
+    existing_pub_by_doi: dict[str, int] | None = None,
+    publication_sizes: Mapping[int, int] | None = None,
 ) -> ReconcilePlan:
     """Calcule les assignations SP → publication sur le voisinage `members` (pur, sans I/O).
 
@@ -167,6 +171,8 @@ def plan_reconciliation(
     `existing_pub_by_doi` (map `lower(doi) → id`) sert d'ancre de repli pour une partition dont le
     DOI est porté par une publication existante qu'aucun membre du voisinage ne représente (pub
     orpheline, ou dérive). Vide par défaut (aucun porteur hors voisinage connu).
+
+    `publication_sizes` (map `publication_id → nombre total de SP`) signale les publications qui gardent des SP hors du voisinage : elles ne sont pas dissoutes. Sans entrée, une publication a les seules SP du voisinage.
     """
     members = list(members)
     by_doi = existing_pub_by_doi or {}
@@ -205,6 +211,10 @@ def plan_reconciliation(
         for m in members
         if m.source_publication_id not in assigned and m.publication_id is not None
     }
+    # Une publication qui garde des SP hors du voisinage survit à ses SP réassignées.
+    members_per_pub = Counter(m.publication_id for m in members if m.publication_id is not None)
+    sizes = publication_sizes or {}
+    residual_pub_ids |= {p for p, n in members_per_pub.items() if sizes.get(p, n) > n}
     dissolved: list[DissolvedPublication] = []
     for pub_id in sorted(universe_pub_ids - awarded - residual_pub_ids):
         anchor_sp = min(

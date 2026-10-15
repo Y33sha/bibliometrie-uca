@@ -149,6 +149,31 @@ class TestEndToEnd:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
+    def test_pub_keeping_sources_outside_neighborhood_survives_without_redirect(
+        self, sa_sync_conn, monkeypatch
+    ):
+        """La SP voisine rejoint l'ancre ; sa publication garde une autre SP, hors du voisinage. Elle survit, sans redirection."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
+        sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
+        sp_other = _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
+
+        run(
+            conn,
+            PublicationsReconciliationQueries(),
+            logger,
+            publication_repo=PublicationStore(conn),
+        )
+
+        assert _sp_state(conn, sp_a)[0] == pub_a
+        assert _sp_state(conn, sp_b)[0] == pub_a
+        assert _sp_state(conn, sp_other)[0] == pub_b
+        assert _pub_exists(conn, pub_b)
+        assert redirect_of(conn, MergedEntity.PUBLICATION, pub_b) is None
+
     def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(
         self, sa_sync_conn, monkeypatch, caplog
     ):
