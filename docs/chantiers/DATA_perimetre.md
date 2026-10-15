@@ -31,7 +31,7 @@ Au niveau de la signature :
 
 Au niveau du document : thèse soutenue dans l'établissement, d'après le PPN de l'établissement de soutenance, parmi les `api_ids.theses` du périmètre.
 
-La collection HAL n'est pas un indice.
+La collection HAL n'est pas un indice : elle double la structure HAL.
 
 **Structures atteintes.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. La vue matérialisée `source_authorship_structures` associe chaque signature aux structures du périmètre qu'elle atteint, avec l'indice (`evidence`). Le périmètre et le laboratoire se calculent sur elle.
 
