@@ -48,7 +48,7 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
-from infrastructure.read_models.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}

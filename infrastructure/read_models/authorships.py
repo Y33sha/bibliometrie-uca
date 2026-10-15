@@ -16,8 +16,8 @@ from domain.persons.signature_name import SignatureName
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
-from infrastructure.read_models.sql_fragments import has_author_role, signature_display_name
-from infrastructure.sql_fragments import in_clause
+from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.sql_fragments import has_author_role, in_clause
 
 # Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""

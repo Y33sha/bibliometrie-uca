@@ -11,11 +11,6 @@ def signature_display_name(signature: str = "sa") -> str:
     )
 
 
-def has_author_role(signature: str = "sa") -> str:
-    """Condition vraie quand la signature aliasée `signature` tient le rôle d'auteur."""
-    return f"{signature}.roles && ARRAY['author']::text[]"
-
-
 def authorship_has_signature_from(source: str, authorship: str = "a") -> str:
     """Condition vraie quand l'authorship aliasée `authorship` est attestée par une signature de `source` : même publication par sa notice, même personne."""
     return (
