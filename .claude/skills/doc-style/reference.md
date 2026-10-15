@@ -172,6 +172,16 @@ APRÈS :
     - **Licence** : licence de la localisation principale (`primary_location`)
 
 
+## Décision énoncée sans sa raison
+
+Une décision négative nue en dit trop ou trop peu : le lecteur se demande pourquoi. Donner la raison en une proposition, ou supprimer la phrase.
+
+AVANT :
+    La collection HAL n'est pas un indice.
+
+APRÈS :
+    La collection HAL n'est pas un indice : elle double la structure HAL.
+
 ## Doc qui explique ce qu'on ne fait pas, sans dire ce qu'il faut faire
 
 AVANT :
