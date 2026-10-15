@@ -53,6 +53,7 @@ from infrastructure.read_models.filters import (
     no_lab_clause,
     oa_clause,
     person_clause,
+    publication_perimeter_clause,
     publisher_id_clause,
     search_clause,
     source_clause,
@@ -84,12 +85,12 @@ class _PublicationFacetsBuilder:
         self.lab_hal_col = lab_hal_collection(self.conn, self.filters.lab_ids)
 
     def _base_clauses(self) -> list[WhereClause | None]:
-        """Conditions de base : publications UCA ou par personne."""
+        """Conditions de base : publications d'une personne, d'un laboratoire du périmètre, ou toutes (le périmètre d'une liste générale est un filtre)."""
         f = self.filters
         out: list[WhereClause | None] = []
         if f.person_id:
             out.append(person_clause(f.person_id))
-        else:
+        elif f.lab_ids:
             out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
         out.append(excluded_doc_type_clause(f.excluded_types))
         out.append(monograph_id_clause(f.monograph_id))
@@ -133,7 +134,10 @@ class _PublicationFacetsBuilder:
         if skip != "hal_status":
             clauses.append(hal_status_clause(f.hal_status_values, self.lab_hal_col))
         if skip != "in_perimeter":
-            clauses.append(in_perimeter_person_clause(f.in_perimeter, f.person_id))
+            if f.person_id:
+                clauses.append(in_perimeter_person_clause(f.in_perimeter, f.person_id))
+            elif not f.lab_ids:
+                clauses.append(publication_perimeter_clause(f.in_perimeter))
         if skip != "subject":
             clauses.append(subject_clause(f.subject_ids))
         if skip != "person":
@@ -395,8 +399,10 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_in_perimeter(self) -> list[FacetOption]:
-        if not self.filters.person_id:
+        if self.filters.lab_ids and not self.filters.person_id:
             return []
+        if not self.filters.person_id:
+            return self._facet_publication_perimeter()
         where_sql, binds = self._clauses_skipping("in_perimeter")
         r = self.conn.execute(
             text(f"""
@@ -415,6 +421,23 @@ class _PublicationFacetsBuilder:
                 WHERE {where_sql}
             """),
             {**binds, "inp_pid": self.filters.person_id},
+        ).one()
+        return [
+            FacetOption(value="yes", label=get_persons_perimeter_name(self.conn), count=r.yes),
+            FacetOption(value="no", label="Hors périmètre", count=r.no),
+        ]
+
+    def _facet_publication_perimeter(self) -> list[FacetOption]:
+        """Publications du périmètre et hors du périmètre, pour une liste générale."""
+        where_sql, binds = self._clauses_skipping("in_perimeter")
+        r = self.conn.execute(
+            text(f"""
+                SELECT COUNT(*) FILTER (WHERE p.in_perimeter) AS yes,
+                       COUNT(*) FILTER (WHERE NOT p.in_perimeter) AS no
+                FROM publications p
+                WHERE {where_sql}
+            """),
+            binds,
         ).one()
         return [
             FacetOption(value="yes", label=get_persons_perimeter_name(self.conn), count=r.yes),
