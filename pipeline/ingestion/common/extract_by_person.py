@@ -1,6 +1,6 @@
 """Phase `extract_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
 
-Un nœud par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode quotidien saute la phase. `--sources` restreint les sources.
+Un nœud par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
 
 Les identifiants de personne que chaque source accepte sont dans `domain/sources/person_search.py`.
 """
@@ -24,11 +24,14 @@ from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import open_tx
 from pipeline.runtime.modes import MODES
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
+
+_SECTION = "Moissonnage par personne"
 
 SearchOne = Callable[[str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics]
 
@@ -41,8 +44,11 @@ class ExtractByPersonPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute en parallèle le nœud de chaque source retenue et assemble les métriques."""
         options = ctx.options
-        policy = MODES[options.mode]
-        effective = set(PERSON_SEARCHED_SOURCES) if policy.year_selection == "full" else set()
+        if not MODES[options.mode].extract_by_person:
+            etape(ctx.logger, _SECTION)
+            ctx.logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
+            return PhaseMetrics()
+        effective = set(PERSON_SEARCHED_SOURCES)
         if options.sources:
             effective &= options.sources
 
@@ -68,7 +74,7 @@ class ExtractByPersonPhase:
             {
                 f"extract_by_person.{source}": NodeStep(
                     node(source),
-                    section="Moissonnage par personne",
+                    section=_SECTION,
                     threshold=5,
                     when=retenue(source),
                 )
