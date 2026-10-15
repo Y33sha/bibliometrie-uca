@@ -52,6 +52,7 @@ def _perimeter(conn) -> tuple[int, int]:
         ],
         {9: 2},
     )
+    HalStructuresQueries(conn).rebuild_relations()
     return univ, lab
 
 

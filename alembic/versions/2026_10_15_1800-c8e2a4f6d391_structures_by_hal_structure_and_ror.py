@@ -9,7 +9,7 @@ La vue associe une signature aux structures du périmètre d'extraction qu'elle 
 `authorship_structures` et `publication_structures`, qui en dépendent, sont recréées à l'identique.
 
 Revision ID: c8e2a4f6d391
-Revises: a3c7e1f9b264
+Revises: b5d9f3a7c128
 Create Date: 2026-10-15 18:00:00.000000
 """
 
@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c8e2a4f6d391"
-down_revision: str | Sequence[str] | None = "a3c7e1f9b264"
+down_revision: str | Sequence[str] | None = "b5d9f3a7c128"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

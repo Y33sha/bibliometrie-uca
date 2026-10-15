@@ -1,4 +1,4 @@
-"""Chargement du référentiel des structures HAL : alias, remontée des parents, source indisponible."""
+"""Chargement du référentiel des structures HAL : alias, remontée des parents, enregistrement par lot, source indisponible."""
 
 import logging
 from unittest.mock import MagicMock
@@ -38,43 +38,69 @@ class _Source:
         return [d for d in self.docs.values() if set(d["aliasDocid_i"]) & set(ids)]
 
 
-class _Queries:
+class _Referential:
+    """Référentiel enregistré : structures et alias écrits lot par lot."""
+
     def __init__(self, known=()):
-        self.known = set(known)
+        self.structures: set[int] = set(known)
+        self.aliases: dict[int, int] = {}
+        self.batches = 0
+
+    def save_batch(self, structures, aliases):
+        self.structures |= {s.hal_structure_id for s in structures}
+        self.aliases |= aliases
+        self.batches += 1
 
     def known_ids(self, ids):
-        return set(ids) & self.known
+        return set(ids) & (self.structures | self.aliases.keys())
+
+
+def _fetch(ids, source, referential):
+    return fetch_hal_structures(
+        ids, source=source, queries=referential, save_batch=referential.save_batch
+    )
 
 
 def test_remonte_les_parents_et_resout_les_alias():
-    load = fetch_hal_structures({3, 9, 7}, source=_Source(), queries=_Queries())
+    referential = _Referential()
 
-    assert set(load.structures) == {1, 2, 3}
-    assert load.aliases == {9: 2}
+    load = _fetch({3, 9, 7}, _Source(), referential)
+
+    assert referential.structures == {1, 2, 3}
+    assert referential.aliases == {9: 2}
     assert load.not_found == {7}
+
+
+def test_enregistre_chaque_lot_des_sa_lecture():
+    referential = _Referential()
+
+    _fetch({3}, _Source(), referential)
+
+    # Un lot par tour : l'équipe, son laboratoire, l'université.
+    assert referential.batches == 3
 
 
 def test_ne_relit_pas_un_parent_deja_dans_le_referentiel():
     source = _Source()
 
-    load = fetch_hal_structures({3}, source=source, queries=_Queries(known={2}))
+    _fetch({3}, source, _Referential(known={2}))
 
-    assert set(load.structures) == {3}
     assert source.requested == [{3}]
 
 
 def test_un_parent_cite_par_son_alias_est_lu_une_fois():
     source = _Source()
     source.docs[4] = _doc(4, parents=[9])
+    referential = _Referential()
 
-    load = fetch_hal_structures({4}, source=source, queries=_Queries())
+    _fetch({4}, source, referential)
 
-    assert set(load.structures) == {1, 2, 4}
-    assert load.aliases == {9: 2}
+    assert referential.structures == {1, 2, 4}
+    assert referential.aliases == {9: 2}
     assert source.requested == [{4}, {9}, {1}]
 
 
-def test_source_indisponible_laisse_le_referentiel_en_l_etat():
+def test_source_indisponible_garde_les_lots_enregistres():
     queries = MagicMock()
     queries.ids_to_fetch.return_value = {3}
     source = MagicMock()
@@ -86,5 +112,5 @@ def test_source_indisponible_laisse_le_referentiel_en_l_etat():
     )
 
     conn.rollback.assert_called_once()
-    queries.save.assert_not_called()
+    queries.rebuild_relations.assert_called_once()
     assert metrics.resume

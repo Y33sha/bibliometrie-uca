@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hrVoO0QsbnSqcuG7m7QLkLQTwDeGiiZnpJa7sboNk3FFfCfOP10IVldjVTNfeEd
+\restrict ScUawVXhOnlKMaKFONMK9VRgB0cXlB72veepxwZ6yWIi7lUoT0GnxYH3OVf42e1
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -906,7 +906,8 @@ CREATE TABLE ref.hal_structures (
     ror_id text,
     start_date date,
     end_date date,
-    fetched_at timestamp with time zone DEFAULT now() NOT NULL
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    parent_ids integer[] DEFAULT '{}'::integer[] NOT NULL
 );
 
 
@@ -4388,5 +4389,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hrVoO0QsbnSqcuG7m7QLkLQTwDeGiiZnpJa7sboNk3FFfCfOP10IVldjVTNfeEd
+\unrestrict ScUawVXhOnlKMaKFONMK9VRgB0cXlB72veepxwZ6yWIi7lUoT0GnxYH3OVf42e1
 
