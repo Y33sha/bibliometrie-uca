@@ -37,7 +37,7 @@ Les liens vers les dépôts sont en fin de document.
 
 - Où : [`test/`](https://github.com/sul-dlss/rialto-airflow/tree/main/test), dossier `data/`.
 - Les tests lisent des notices d'exemple figées dans le dépôt.
-- **Verdict : adopté**, par le jeu de données commun aux tests du pipeline : quelques notices réelles par source, avec les réponses des API enregistrées.
+- **Verdict : écarté.** Les défauts du pipeline viennent de règles métier révélées par la diversité des données réelles, hors de portée d'un petit jeu figé. L'idempotence du run entier se vérifie par deux runs successifs sur la base réelle.
 
 ### Les réglages hors du code (CRISalid)
 
