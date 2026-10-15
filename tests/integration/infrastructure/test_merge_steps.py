@@ -65,3 +65,13 @@ def test_chained_redirect_leads_to_last_kept(sa_sync_conn):
     assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, a) == c
     assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, b) == c
     assert redirect_of(sa_sync_conn, MergedEntity.PUBLISHER, a) == b
+
+
+def test_kept_entity_loses_its_own_redirect(sa_sync_conn):
+    """A absorbé par B, puis B absorbé par A : A, conservé, ne mène nulle part ; B mène à A."""
+    a, b = 900011, 900012
+    record_redirect(sa_sync_conn, MergedEntity.JOURNAL, b, a)
+    record_redirect(sa_sync_conn, MergedEntity.JOURNAL, a, b)
+
+    assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, a) is None
+    assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, b) == a

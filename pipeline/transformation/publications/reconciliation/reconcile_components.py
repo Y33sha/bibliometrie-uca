@@ -130,8 +130,13 @@ def reconcile(
         rows = queries.fetch_reconciliation_universe(conn)
         rows_by_sp = {row.id: row for row in rows}
         existing_pub_by_doi = queries.fetch_publication_ids_by_doi(conn)
+        publication_sizes = queries.fetch_publication_sizes(
+            conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
+        )
         plan = plan_reconciliation(
-            (_member(row) for row in rows), existing_pub_by_doi=existing_pub_by_doi
+            (_member(row) for row in rows),
+            existing_pub_by_doi=existing_pub_by_doi,
+            publication_sizes=publication_sizes,
         )
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
         a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)

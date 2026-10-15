@@ -190,6 +190,19 @@ class PublicationsReconciliationQueries:
         ).all()
         return {row.doi: row.id for row in rows}
 
+    def fetch_publication_sizes(
+        self, conn: Connection, publication_ids: list[int]
+    ) -> dict[int, int]:
+        """Nombre de `source_publications` rattachées à chacune des publications `publication_ids`."""
+        rows = conn.execute(
+            text("""
+                SELECT publication_id, count(*) AS n FROM source_publications
+                WHERE publication_id = ANY(:ids) GROUP BY publication_id
+            """),
+            {"ids": publication_ids},
+        ).all()
+        return {row.publication_id: row.n for row in rows}
+
     def repoint_source_publications(
         self, conn: Connection, source_publication_ids: list[int], publication_id: int
     ) -> None:
