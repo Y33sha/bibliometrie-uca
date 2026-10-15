@@ -6,7 +6,7 @@ from infrastructure.sql_fragments import AUTHORSHIP_PERIMETER_EVIDENCE_EXPR
 from pipeline.transformation.publications.reconciliation.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
-from pipeline.transformation.structures.affiliations import (
+from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_authorship_structures,
     sync_perimeter_evidence,
 )
