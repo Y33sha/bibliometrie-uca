@@ -330,6 +330,7 @@ hal_structures = Table(
     Column("ror_id", Text),
     Column("start_date", Date),
     Column("end_date", Date),
+    Column("parent_ids", ARRAY(Integer), nullable=False, server_default="{}"),
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     comment=(
         "Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou "

@@ -1,10 +1,10 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`) ou par les structures internes (`structures.api_ids->'hal'`) et absentes du référentiel, puis leurs parents, jusqu'à la racine. Un identifiant absent de `ref/structure` se cherche parmi les alias. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`), par les structures internes (`structures.api_ids->'hal'`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import batched
 from typing import Protocol
@@ -46,6 +46,8 @@ class HalStructuresQueries:
                     FROM structures s
                     CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> 'hal') h(value)
                     WHERE s.api_ids ? 'hal' AND h.value ~ '^[0-9]+$'
+                    UNION
+                    SELECT unnest(parent_ids) FROM hal_structures
                     EXCEPT
                     SELECT hal_structure_id FROM hal_structures
                     EXCEPT
@@ -79,20 +81,21 @@ class HalStructuresQueries:
         )
 
     def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
-        """Écrit les structures, les alias, puis les relations des structures écrites vers leurs parents présents dans le référentiel, un parent alias étant ramené à sa structure conservée. Les relations d'une structure écrite sont celles de sa dernière lecture."""
+        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté."""
         if structures:
             self._conn.execute(
                 text("""
                     INSERT INTO hal_structures (hal_structure_id, name, acronym, structure_type, country_code,
-                                                status, ror_id, start_date, end_date, fetched_at)
+                                                status, ror_id, start_date, end_date, parent_ids, fetched_at)
                     VALUES (:hal_structure_id, :name, :acronym, :structure_type, :country_code,
-                            CAST(:status AS hal_structure_status), :ror_id, :start_date, :end_date, now())
+                            CAST(:status AS hal_structure_status), :ror_id, :start_date, :end_date,
+                            :parent_ids, now())
                     ON CONFLICT (hal_structure_id) DO UPDATE SET
                         name = excluded.name, acronym = excluded.acronym,
                         structure_type = excluded.structure_type, country_code = excluded.country_code,
                         status = excluded.status, ror_id = excluded.ror_id,
                         start_date = excluded.start_date, end_date = excluded.end_date,
-                        fetched_at = excluded.fetched_at
+                        parent_ids = excluded.parent_ids, fetched_at = excluded.fetched_at
                 """),
                 [
                     {
@@ -105,6 +108,7 @@ class HalStructuresQueries:
                         "ror_id": s.ror_id.value if s.ror_id else None,
                         "start_date": s.start_date,
                         "end_date": s.end_date,
+                        "parent_ids": list(s.parent_ids),
                     }
                     for s in structures
                 ],
@@ -113,44 +117,40 @@ class HalStructuresQueries:
             self._conn.execute(
                 text("""
                     INSERT INTO hal_structure_aliases (alias_id, hal_structure_id)
-                    VALUES (:alias_id, :hal_structure_id)
+                    SELECT :alias_id, :hal_structure_id
+                    WHERE NOT EXISTS (SELECT 1 FROM hal_structures WHERE hal_structure_id = :alias_id)
                     ON CONFLICT (alias_id) DO UPDATE SET hal_structure_id = excluded.hal_structure_id
                 """),
                 [{"alias_id": a, "hal_structure_id": s} for a, s in aliases.items()],
             )
-        if structures:
-            self._conn.execute(
-                text("DELETE FROM hal_structure_relations WHERE child_id = ANY(:ids)"),
-                {"ids": [s.hal_structure_id for s in structures]},
-            )
-            relations = [
-                {"parent_id": parent, "child_id": s.hal_structure_id}
-                for s in structures
-                for parent in s.parent_ids
-            ]
-            if relations:
-                self._conn.execute(
-                    text("""
-                        INSERT INTO hal_structure_relations (parent_id, child_id)
-                        SELECT h.hal_structure_id, :child_id
-                        FROM hal_structures h
-                        WHERE h.hal_structure_id = coalesce(
-                            (SELECT hal_structure_id FROM hal_structure_aliases WHERE alias_id = :parent_id),
-                            :parent_id
-                        ) AND h.hal_structure_id <> :child_id
-                        ON CONFLICT DO NOTHING
-                    """),
-                    relations,
-                )
+
+    def rebuild_relations(self) -> None:
+        """Reconstruit les relations parent/enfant depuis `parent_ids`, vers les parents présents dans le référentiel. Un parent alias est ramené à sa structure conservée."""
+        self._conn.execute(
+            text("""
+                DELETE FROM hal_structure_relations;
+                INSERT INTO hal_structure_relations (parent_id, child_id)
+                SELECT DISTINCT p.hal_structure_id, h.hal_structure_id
+                FROM hal_structures h
+                CROSS JOIN LATERAL unnest(h.parent_ids) cited(parent_id)
+                LEFT JOIN hal_structure_aliases al ON al.alias_id = cited.parent_id
+                JOIN hal_structures p ON p.hal_structure_id = coalesce(al.hal_structure_id, cited.parent_id)
+                WHERE p.hal_structure_id <> h.hal_structure_id;
+            """)
+        )
 
 
 @dataclass
 class HalStructuresLoad:
-    """Structures et alias lus dans `ref/structure`, et identifiants introuvables."""
+    """Nombre de structures et d'alias lus dans `ref/structure`, et identifiants introuvables."""
 
-    structures: dict[int, HalStructure] = field(default_factory=dict)
-    aliases: dict[int, int] = field(default_factory=dict)
+    structures: int = 0
+    aliases: int = 0
     not_found: set[int] = field(default_factory=set)
+
+
+SaveBatch = Callable[[list[HalStructure], dict[int, int]], None]
+"""Enregistre les structures et les alias `{alias: structure conservée}` d'un lot."""
 
 
 def _parsed(docs: Iterable[Mapping[str, JsonValue]]) -> list[HalStructure]:
@@ -162,9 +162,10 @@ def fetch_hal_structures(
     *,
     source: HalStructuresSource,
     queries: HalStructuresQueries,
+    save_batch: SaveBatch,
     avancement: Progression | None = None,
 ) -> HalStructuresLoad:
-    """Lit `ids` dans `ref/structure`, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. `avancement` compte les identifiants lus ; son total croît avec les parents à lire."""
+    """Lit `ids` dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `avancement` compte les identifiants lus ; son total croît avec les parents à lire."""
     load = HalStructuresLoad()
     pending = set(ids)
     requested: set[int] = set()
@@ -172,27 +173,28 @@ def fetch_hal_structures(
         requested |= pending
         if avancement is not None:
             avancement.fixer_total(len(requested))
+        parents: set[int] = set()
         for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH):
-            found = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
-            load.structures.update(found)
-            missing = set(chunk) - found.keys()
+            structures = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
+            missing = set(chunk) - structures.keys()
+            aliases: dict[int, int] = {}
             if missing:
                 for kept in _parsed(source.by_aliases(missing)):
-                    load.structures[kept.hal_structure_id] = kept
+                    structures[kept.hal_structure_id] = kept
                     for alias in missing & set(kept.alias_ids):
-                        load.aliases[alias] = kept.hal_structure_id
-                load.not_found |= missing - load.aliases.keys()
+                        aliases[alias] = kept.hal_structure_id
+                load.not_found |= missing - aliases.keys()
+            for s in structures.values():
+                for alias in s.alias_ids:
+                    aliases.setdefault(alias, s.hal_structure_id)
+                parents |= set(s.parent_ids)
+            save_batch(list(structures.values()), aliases)
+            load.structures += len(structures)
+            load.aliases += len(aliases)
             if avancement is not None:
                 avancement.avance(len(chunk))
-        parents = {p for s in load.structures.values() for p in s.parent_ids}
-        pending = parents - load.structures.keys() - requested
+        pending = parents - requested
         pending -= queries.known_ids(pending)
-    for s in load.structures.values():
-        for alias in s.alias_ids:
-            load.aliases.setdefault(alias, s.hal_structure_id)
-    for alias in list(load.aliases):
-        if alias in load.structures:
-            del load.aliases[alias]
     return load
 
 
@@ -204,35 +206,44 @@ def run_refresh_hal_structures(
     logger: logging.Logger,
     refresh_stale: bool,
 ) -> PhaseMetrics:
-    """Charge les structures HAL citées et absentes du référentiel, et relit les anciennes quand `refresh_stale` est vrai."""
+    """Charge les structures HAL citées et absentes du référentiel, relit les anciennes quand `refresh_stale` est vrai, puis reconstruit les relations. Chaque lot est validé dès son écriture."""
     metrics = PhaseMetrics()
     etape(logger, "Référentiel des structures HAL")
     ids = queries.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
         logger.info("%sAucune structure à charger", DERNIERE_BRANCHE)
         return metrics
+
+    def save_batch(structures: list[HalStructure], aliases: dict[int, int]) -> None:
+        queries.save(structures, aliases)
+        conn.commit()
+
     try:
         with progression(len(ids), f"{DERNIERE_BRANCHE}HAL", logger) as avancement:
-            load = fetch_hal_structures(ids, source=source, queries=queries, avancement=avancement)
+            load = fetch_hal_structures(
+                ids, source=source, queries=queries, save_batch=save_batch, avancement=avancement
+            )
     except SourceUnavailableError:
         conn.rollback()
+        queries.rebuild_relations()
+        conn.commit()
         signal_source_unavailable(metrics, "hal", logger=logger, phase="affiliations")
         metrics.resume = "référentiel HAL inaccessible, chargement repris au prochain run"
         return metrics
-    queries.save(list(load.structures.values()), load.aliases)
+    queries.rebuild_relations()
     conn.commit()
-    metrics.add(total=len(ids), updated=len(load.structures))
+    metrics.add(total=len(ids), updated=load.structures)
     metrics.details["hal_structures"] = {
         "requested": len(ids),
-        "loaded": len(load.structures),
-        "aliases": len(load.aliases),
+        "loaded": load.structures,
+        "aliases": load.aliases,
         "not_found": len(load.not_found),
     }
     logger.info(
         "%s%d structures chargées, %d alias, %d introuvables",
         DERNIERE_BRANCHE,
-        len(load.structures),
-        len(load.aliases),
+        load.structures,
+        load.aliases,
         len(load.not_found),
     )
     return metrics
