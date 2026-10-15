@@ -90,8 +90,8 @@ HAL ne relie pas les structures successives d'un laboratoire. Chaque période a 
 
 - [x] Référentiel `ref.hal_structures` et nœud de chargement.
 - [x] Table `source_authorship_hal_structures`, lue dans HAL et dans les fiches de structure ScanR. Quand aucune affiliation ScanR n'est marquée laboratoire, les `structId` comprennent les tutelles : la branche `hal_structure` garde les structures les plus basses de la hiérarchie.
-- [ ] Branches `hal_structure` et `ror` de `source_authorship_structures`.
-- [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement.
+- [x] Branches `hal_structure` et `ror` de `source_authorship_structures`.
+- [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement. ROR, mesure du 2026-10-15 sur le périmètre des personnes : 3 725 signatures entrent par le ROR seul. La règle de l'adresse écarte 18 132 ROR du périmètre, à 90 % d'OpenAlex : des ROR erronés (« Laboratoire de Mathématiques de Versailles » avec le ROR du LMBP), et des adresses trop courtes pour la résolution (« Territoires », « Unité de Nutrition Humaine »).
 
 ### Phase 3 — Raisons propres au document
 
