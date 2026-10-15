@@ -294,7 +294,6 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
         _run_create(conn)
 
     assert "  ├─ 2 signatures sans personne pouvant en créer une" in caplog.messages
-    assert "  ├─ 0 signature d'encadrement ou de jury de thèse, sans création" in caplog.messages
     assert "  ├─ 1 indécidable (forme de nom ambiguë, ou candidats tous rejetés)" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
 

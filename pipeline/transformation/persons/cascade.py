@@ -422,11 +422,6 @@ def run_cascade(
         accord(len(non_identifiees), "signature"),
     )
     logger.info(
-        "%s%s d'encadrement ou de jury de thèse, sans création",
-        BRANCHE,
-        accord(len(sans_personne) - len(non_identifiees), "signature"),
-    )
-    logger.info(
         "%s%s (forme de nom ambiguë, ou candidats tous rejetés)",
         BRANCHE,
         accord(len(indecidables), "indécidable"),
