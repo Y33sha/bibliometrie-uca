@@ -66,7 +66,7 @@ def _isolate_raw_store(tmp_path_factory):
 def http_mock() -> Iterator[HttpMock]:
     """Sert les requêtes HTTP sortantes du test depuis les routes qu'il déclare.
 
-    Le transport simulé est posé par défaut sur les clients httpx2 construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien. La fonction `httpx2.request`, qu'emploie `http_request_with_retry`, passe par un client simulé.
+    Le transport simulé est posé par défaut sur les clients httpx2 construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien. Les fonctions de module (`httpx2.request`, `httpx2.get`, `httpx2.stream`…) construisent leur client dans `httpx2._api`, qui garde sa propre référence à `Client` : elle est remplacée aussi.
     """
     router = HttpMock()
     real_client, real_async_client = httpx2.Client, httpx2.AsyncClient
@@ -79,14 +79,10 @@ def http_mock() -> Iterator[HttpMock]:
         kwargs.setdefault("transport", router.transport)
         return real_async_client(*args, **kwargs)
 
-    def request(method, url, *, timeout=None, follow_redirects=False, **kwargs):
-        with client(timeout=timeout, follow_redirects=follow_redirects) as c:
-            return c.request(method, url, **kwargs)
-
     with (
         patch.object(httpx2, "Client", client),
         patch.object(httpx2, "AsyncClient", async_client),
-        patch.object(httpx2, "request", request),
+        patch.object(httpx2._api, "Client", client),
     ):
         yield router
 
