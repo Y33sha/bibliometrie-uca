@@ -16,6 +16,8 @@
 		docTypePlural,
 		docTypeFamilies,
 		docTypeGroupedColors,
+		licenseColors,
+		licenseOrder,
 		publicationsDocTypes,
 		docTypeFilterToken,
 		docTypeFilterFromToken,
@@ -133,6 +135,7 @@
 		if (dim === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
 		if (dim === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
 		if (dim === 'doc_type_grouped') return docTypeGroupedColors[value] ?? PALETTE[idx % PALETTE.length];
+		if (dim === 'license') return licenseColors[value] ?? PALETTE[idx % PALETTE.length];
 		return PALETTE[idx % PALETTE.length];
 	}
 	function orderedValues(dim: string, rows: Record<string, unknown>[]): string[] {
@@ -140,6 +143,7 @@
 		if (dim === 'year') return [...new Set(present)].sort((a, b) => Number(a) - Number(b));
 		if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
 		if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
+		if (dim === 'license') return licenseOrder.filter((v) => present.includes(v));
 		if (dim === 'doc_type_grouped') {
 			// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
 			const order = docTypeFamilies.flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));

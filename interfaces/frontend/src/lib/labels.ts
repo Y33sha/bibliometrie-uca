@@ -111,6 +111,26 @@ export function docTypeFilterFromToken(raw: string): string[] {
 	return raw === DOC_TYPE_FILTER_ALL ? [] : raw.split(',');
 }
 
+/** Couleur de chaque licence, dans l'ordre d'affichage : du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). `none` désigne une publication sans licence connue. */
+export const licenseColors: Record<string, string> = {
+	'public-domain': '#1b6e35',
+	'cc-by': '#2e9e4a',
+	'licence-ouverte': '#43ad5c',
+	'open-source': '#5bb873',
+	'cc-by-sa': '#7cc36b',
+	'cc-by-nd': '#a7d35c',
+	'cc-by-nc': '#c8d84d',
+	'cc-by-nc-sa': '#e1cf45',
+	'cc-by-nc-nd': '#efb93e',
+	'publisher-open': '#ee9f3a',
+	'other-oa': '#f3c98d',
+	'repository-distribution': '#9db4c4',
+	other: '#bdbdbd',
+	'all-rights-reserved': '#7a7a7a',
+	none: '#3c3c3c',
+};
+export const licenseOrder = Object.keys(licenseColors);
+
 export const docTypeGroupedColors: Record<string, string> = {
 	article: '#2f7ed8',
 	review: '#1f5c9e',
