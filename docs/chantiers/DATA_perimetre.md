@@ -81,7 +81,8 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 - [x] Référentiel `ref.hal_structures` et nœud de chargement.
 - [x] Table `source_authorship_hal_structures`, lue dans HAL et dans les fiches de structure ScanR. Quand aucune affiliation ScanR n'est marquée laboratoire, les `structId` comprennent les tutelles : la branche `hal_structure` garde les structures les plus basses de la hiérarchie.
 - [x] Branches `hal_structure` et `ror` de `source_authorship_structures`.
-- [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement. ROR, mesure du 2026-10-15 sur le périmètre des personnes : 3 725 signatures entrent par le ROR seul. La règle de l'adresse écarte 18 132 ROR du périmètre, à 90 % d'OpenAlex : des ROR erronés (« Laboratoire de Mathématiques de Versailles » avec le ROR du LMBP), et des adresses trop courtes pour la résolution (« Territoires », « Unité de Nutrition Humaine »).
+- [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement. ROR, mesure du 2026-10-15 sur le périmètre des personnes : 3 725 signatures entrent par le ROR seul. La règle de l'adresse écarte 18 132 ROR du périmètre, à 90 % d'OpenAlex : des ROR erronés (« Laboratoire de Mathématiques de Versailles » avec le ROR du LMBP), et des adresses trop courtes pour la résolution (« Territoires », « Unité de Nutrition Humaine »). Structure HAL : aucune signature n'entre par la structure HAL seule, car l'adresse HAL est le nom de la même structure. 5 671 signatures HAL entrent par l'adresse et pas par la structure HAL : leurs fiches HAL d'avant 2017, sans ROR (UBP, SIGMA Clermont, anciennes fiches des laboratoires), sont absentes de `api_ids->'hal'`.
+- [ ] `api_ids->'hal'` des anciennes fiches HAL, d'après les noms que la résolution des adresses rattache déjà aux structures internes.
 
 ### Phase 3 — Indices propres au document
 
