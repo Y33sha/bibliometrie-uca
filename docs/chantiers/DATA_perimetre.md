@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Une publication est dans le périmètre quand une de ses signatures l'est.
+Une signature entre dans le périmètre quand `source_authorships.in_perimeter` est vrai. La phase `affiliations` le pose par deux voies : une adresse de la signature est rattachée à une structure du périmètre (`address_structures`), ou la signature contient l'identifiant d'une personne RH et le document paraît pendant son contrat (`rh_identity_signatures`). Une publication est dans le périmètre quand une de ses signatures l'est.
 
 La table `addresses` reçoit des chaînes de natures différentes :
 
