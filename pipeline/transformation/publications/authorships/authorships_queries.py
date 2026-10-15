@@ -7,9 +7,13 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import case_priority, publication_rejected_for
+from infrastructure.sql_fragments import (
+    NO_PERIMETER_EVIDENCE,
+    case_priority,
+    publication_rejected_for,
+)
 from pipeline.transformation.publications.reconciliation.publication_perimeter import (
-    refresh_publications_in_perimeter,
+    refresh_publications_perimeter_evidence,
 )
 
 
@@ -70,7 +74,7 @@ class AuthorshipsBuild:
             text(f"""
                 WITH linked AS (
                     SELECT a.id AS aid, sa.source, sa.author_position, sa.is_corresponding,
-                           sa.in_perimeter, sa.roles
+                           sa.perimeter_evidence, sa.roles
                     FROM source_authorships sa
                     JOIN source_publications sp ON sp.id = sa.source_publication_id
                     JOIN authorships a ON a.publication_id = sp.publication_id
@@ -81,9 +85,13 @@ class AuthorshipsBuild:
                            (array_agg(l.author_position ORDER BY
                                {case_priority(SOURCE_PRIORITY, "l.source")})
                                FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
-                           bool_or(l.is_corresponding)              AS is_corr,
-                           COALESCE(bool_or(l.in_perimeter), FALSE) AS in_perim
+                           bool_or(l.is_corresponding) AS is_corr
                     FROM linked l
+                    GROUP BY l.aid
+                ),
+                ev AS (
+                    SELECT l.aid, array_agg(DISTINCT e ORDER BY e) AS evidence
+                    FROM linked l, LATERAL unnest(l.perimeter_evidence) AS e
                     GROUP BY l.aid
                 ),
                 rol AS (
@@ -94,12 +102,13 @@ class AuthorshipsBuild:
                 UPDATE authorships a
                 SET author_position = scal.pos,
                     is_corresponding = scal.is_corr,
-                    in_perimeter     = scal.in_perim,
+                    perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
                     roles            = rol.roles
-                FROM scal LEFT JOIN rol ON rol.aid = scal.aid
+                FROM scal LEFT JOIN rol ON rol.aid = scal.aid LEFT JOIN ev ON ev.aid = scal.aid
                 WHERE a.id = scal.aid
-                  AND (a.author_position, a.is_corresponding, a.in_perimeter, a.roles)
-                      IS DISTINCT FROM (scal.pos, scal.is_corr, scal.in_perim, rol.roles)
+                  AND (a.author_position, a.is_corresponding, a.perimeter_evidence, a.roles)
+                      IS DISTINCT FROM (scal.pos, scal.is_corr,
+                                        coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
             """)
         ).rowcount
 
@@ -114,8 +123,8 @@ class AuthorshipsBuild:
             conn.execute(text("SELECT COUNT(*) AS n FROM authorships WHERE in_perimeter = TRUE"))
         )
 
-    def refresh_publications_in_perimeter(self, conn: Connection) -> int:
-        return refresh_publications_in_perimeter(conn)
+    def refresh_publications_perimeter_evidence(self, conn: Connection) -> int:
+        return refresh_publications_perimeter_evidence(conn)
 
     # ── Variantes par lot pour l'attribution admin d'orphelines ────
 
@@ -150,7 +159,7 @@ class AuthorshipsBuild:
                 CREATE TEMP TABLE _chosen_sa AS
                 SELECT DISTINCT ON (sd.publication_id)
                     sd.publication_id, sa.id AS sa_id,
-                    sa.author_position, sa.in_perimeter, sa.is_corresponding
+                    sa.author_position, sa.perimeter_evidence, sa.is_corresponding
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
@@ -161,8 +170,8 @@ class AuthorshipsBuild:
         conn.execute(
             text(f"""
                 INSERT INTO authorships (publication_id, person_id,
-                    author_position, in_perimeter, is_corresponding)
-                SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter,
+                    author_position, perimeter_evidence, is_corresponding)
+                SELECT cs.publication_id, :pid, cs.author_position, cs.perimeter_evidence,
                        cs.is_corresponding
                 FROM _chosen_sa cs
                 WHERE NOT {publication_rejected_for("cs.publication_id", ":pid")}

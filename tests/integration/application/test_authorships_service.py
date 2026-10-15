@@ -422,7 +422,7 @@ class TestPropagateAuthorshipAttributes:
         # Réimport : la source retire corresponding, le périmètre et le rôle editor.
         sa_sync_conn.execute(
             text(
-                "UPDATE source_authorships SET is_corresponding = FALSE, in_perimeter = FALSE, "
+                "UPDATE source_authorships SET is_corresponding = FALSE, perimeter_evidence = '{}', "
                 "roles = ARRAY['author'] WHERE id = :id"
             ),
             {"id": sa_id},
@@ -441,15 +441,9 @@ class TestPropagateAuthorshipAttributes:
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_in_perimeter_for_addresses recalcule `in_perimeter` (synchrone,
-    depuis les tables de base) sur les source_authorships puis le propage vers
-    l'authorship vérité, après une modification sur address_structures.
+    """propagate_in_perimeter_for_addresses rafraîchit `source_authorship_structures`, puis recalcule les indices du périmètre des signatures, de leurs authorships et de leurs publications, après une modification de address_structures.
 
-    L'appartenance aux structures n'est plus une colonne : elle vit dans les
-    matviews `*_structures` (une row `(…, structure_id)` par structure), désormais
-    maintenues uniquement par le pipeline — la propagation ne les rafraîchit plus.
-    Les tests qui agrègent ces rows (`array_agg(structure_id)`) rafraîchissent donc
-    explicitement les matviews via `refresh_structure_matviews`."""
+    `authorship_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
         """Monte un périmètre UCA minimal + config perimeter_persons/extraction.
@@ -505,8 +499,6 @@ class TestPropagateUcaForAddresses:
             perimeter_queries=perimeter_queries,
             affiliations_queries=_AFFILIATIONS,
         )
-        # `in_perimeter` est synchrone ; `structure_ids` vient des matviews que la
-        # propagation ne rafraîchit plus (cf. docstring) → refresh explicite.
         refresh_structure_matviews(sa_sync_conn)
 
         sa = sa_sync_conn.execute(
@@ -534,6 +526,10 @@ class TestPropagateUcaForAddresses:
         ).one()
         assert a.in_perimeter is True
         assert a.structure_ids == [uca_id]
+        assert sa_sync_conn.execute(
+            text("SELECT perimeter_evidence::text[] FROM publications WHERE id = :id"),
+            {"id": pub_id},
+        ).scalar_one() == ["address"]
 
     def test_unsets_in_perimeter_when_address_rejected(self, sa_sync_conn, repo, perimeter_queries):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""

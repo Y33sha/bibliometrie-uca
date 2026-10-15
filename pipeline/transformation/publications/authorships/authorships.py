@@ -3,7 +3,7 @@
 Nœuds (`pipeline.graph`), chacun dans sa transaction :
 
 1. **build** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne). Sa maintenance `ANALYZE authorships` précède la propagation.
-2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des authorships (`in_perimeter` consolidé compris), le périmètre des publications et les matviews `authorship_structures`, `publication_structures`.
+2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des authorships (indices de l'entrée dans le périmètre compris), le périmètre des publications et les matviews `authorship_structures`, `publication_structures`.
 3. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 5. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
@@ -70,7 +70,7 @@ class AuthorshipsPhase:
         def publications_in_perimeter(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
-                queries.refresh_publications_in_perimeter(conn)
+                queries.refresh_publications_perimeter_evidence(conn)
             return _chronometre(t0)
 
         def structures(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

@@ -3,7 +3,7 @@
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
-from tests.integration.helpers.rows import insert_row
+from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
 def insert_publication(
@@ -42,9 +42,14 @@ def insert_publication(
             "journal_id": journal_id,
             "countries": countries,
             "sources": sources,
-            "in_perimeter": in_perimeter,
+            "perimeter_evidence": perimeter_evidence(in_perimeter),
         },
-        {"doc_type": "doc_type", "oa_status": "oa_type", "sources": "source_type[]"},
+        {
+            "doc_type": "doc_type",
+            "oa_status": "oa_type",
+            "sources": "source_type[]",
+            "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
+        },
     )
 
 

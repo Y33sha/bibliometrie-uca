@@ -6,7 +6,7 @@ import json
 from sqlalchemy import Connection
 
 from tests.integration.helpers.authorships import upsert_identity
-from tests.integration.helpers.rows import insert_row
+from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
 def _jsonb(value: object) -> str | None:
@@ -123,14 +123,18 @@ def insert_signature(
             "raw_last_name": raw_last_name,
             "raw_first_name": raw_first_name,
             "person_id": person_id,
-            "in_perimeter": in_perimeter,
+            "perimeter_evidence": perimeter_evidence(in_perimeter),
             "roles": roles,
             "resolution_mode": resolution_mode,
             "neutralized_identifiers": (
                 json.dumps(neutralized_identifiers) if neutralized_identifiers else None
             ),
         },
-        {"resolution_mode": "resolution_mode", "neutralized_identifiers": "jsonb"},
+        {
+            "resolution_mode": "resolution_mode",
+            "neutralized_identifiers": "jsonb",
+            "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
+        },
     )
 
 

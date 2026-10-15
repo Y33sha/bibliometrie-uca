@@ -11,7 +11,7 @@ import json
 
 from sqlalchemy import Connection
 
-from tests.integration.helpers.rows import insert_row
+from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 # Paramètres au format psycopg (`%(nom)s`), que SQLAlchemy accepte via `exec_driver_sql`.
 _INSERT_SQL = (
@@ -70,7 +70,7 @@ def insert_authorship(
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
 ) -> int:
-    """Insère une authorship et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
+    """Insère une authorship et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
     return insert_row(
         conn,
         "authorships",
@@ -78,9 +78,10 @@ def insert_authorship(
             "publication_id": publication_id,
             "person_id": person_id,
             "author_position": author_position,
-            "in_perimeter": in_perimeter,
+            "perimeter_evidence": perimeter_evidence(in_perimeter),
             "roles": roles,
         },
+        {"perimeter_evidence": PERIMETER_EVIDENCE_CAST},
     )
 
 
