@@ -28,6 +28,8 @@ dependencies = [
 [project.scripts]
 # Orchestrateur du pipeline, installé comme commande : `run_pipeline --mode daily`.
 run_pipeline = "pipeline.run:main"
+# Migrations de la base par défaut et de chaque instance de `instances/`.
+migrate_all = "interfaces.cli.dev.migrate_all:main"
 
 # Outils de développement et de test. `uv sync` les installe par défaut ; `--no-dev` les écarte.
 [dependency-groups]
