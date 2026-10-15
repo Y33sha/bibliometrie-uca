@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3tlpOeUmFa8GxzvenZUNF6MQZ9Mz4dpnM2DlEEp10D4khf7UEaefQpR24Bflrqc
+\restrict hrVoO0QsbnSqcuG7m7QLkLQTwDeGiiZnpJa7sboNk3FFfCfOP10IVldjVTNfeEd
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -858,6 +858,66 @@ CREATE TABLE publications.authorships (
 
 
 --
+-- Name: hal_structure_aliases; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structure_aliases (
+    alias_id integer NOT NULL,
+    hal_structure_id integer NOT NULL
+);
+
+
+--
+-- Name: TABLE hal_structure_aliases; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structure_aliases IS 'Fiches en double du référentiel HAL, fondues dans une structure conservée.';
+
+
+--
+-- Name: hal_structure_relations; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structure_relations (
+    parent_id integer NOT NULL,
+    child_id integer NOT NULL,
+    CONSTRAINT hal_structure_relations_no_self_reference CHECK ((parent_id <> child_id))
+);
+
+
+--
+-- Name: TABLE hal_structure_relations; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structure_relations IS 'Relations parent/enfant entre structures du référentiel HAL.';
+
+
+--
+-- Name: hal_structures; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.hal_structures (
+    hal_structure_id integer NOT NULL,
+    name text NOT NULL,
+    acronym text,
+    structure_type text NOT NULL,
+    country_code character(2),
+    status public.hal_structure_status NOT NULL,
+    ror_id text,
+    start_date date,
+    end_date date,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE hal_structures; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.hal_structures IS 'Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou structures.api_ids->''hal'', le relie au référentiel interne.';
+
+
+--
 -- Name: source_authorship_addresses; Type: TABLE; Schema: sources; Owner: -
 --
 
@@ -866,6 +926,34 @@ CREATE TABLE sources.source_authorship_addresses (
     source_authorship_id integer NOT NULL,
     address_id integer NOT NULL
 );
+
+
+--
+-- Name: source_authorship_hal_structures; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_authorship_hal_structures (
+    source_authorship_id integer NOT NULL,
+    hal_structure_id integer NOT NULL
+);
+
+
+--
+-- Name: source_authorship_rors; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_authorship_rors (
+    source_authorship_id integer NOT NULL,
+    ror_id text NOT NULL,
+    address_id integer
+);
+
+
+--
+-- Name: TABLE source_authorship_rors; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.source_authorship_rors IS 'ROR attribués par la source à une signature, rattachés à l''adresse de leur affiliation, ou à la seule signature quand l''affiliation est sans texte (address_id vide). ror_id est sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump importé.';
 
 
 --
@@ -905,21 +993,113 @@ CREATE TABLE structures.perimeters (
 
 
 --
+-- Name: structures; Type: TABLE; Schema: structures; Owner: -
+--
+
+CREATE TABLE structures.structures (
+    id integer NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    acronym text,
+    structure_type public.structure_type CONSTRAINT structures_type_not_null NOT NULL,
+    ror_id text,
+    rnsr_id text,
+    hal_collection text,
+    created_at timestamp with time zone DEFAULT now(),
+    api_ids jsonb
+);
+
+
+--
 -- Name: source_authorship_structures; Type: MATERIALIZED VIEW; Schema: sources; Owner: -
 --
 
 CREATE MATERIALIZED VIEW sources.source_authorship_structures AS
- SELECT DISTINCT saa.source_authorship_id,
-    ps.structure_id,
+ WITH RECURSIVE perimeter AS (
+         SELECT ps.structure_id
+           FROM structures.perimeter_structures ps
+          WHERE (ps.perimeter_id = ( SELECT perimeters.id
+                   FROM structures.perimeters
+                  WHERE (perimeters.code = ( SELECT (config.value #>> '{}'::text[])
+                           FROM ops.config
+                          WHERE (config.key = 'perimeter_extraction'::text)))))
+        ), hal_match AS (
+         SELECT hs.hal_structure_id,
+            s.id AS structure_id
+           FROM (ref.hal_structures hs
+             JOIN structures.structures s ON ((s.ror_id = hs.ror_id)))
+        UNION
+         SELECT (h.value)::integer AS value,
+            s.id
+           FROM (structures.structures s
+             CROSS JOIN LATERAL jsonb_array_elements_text((s.api_ids -> 'hal'::text)) h(value))
+          WHERE ((s.api_ids ? 'hal'::text) AND (h.value ~ '^[0-9]+$'::text))
+        ), hal_ancestors AS (
+         SELECT hal_structure_relations.child_id,
+            hal_structure_relations.parent_id AS ancestor_id,
+            1 AS depth
+           FROM ref.hal_structure_relations
+        UNION
+         SELECT a.child_id,
+            r.parent_id,
+            (a.depth + 1)
+           FROM (hal_ancestors a
+             JOIN ref.hal_structure_relations r ON ((r.child_id = a.ancestor_id)))
+          WHERE (a.depth < 10)
+        ), hal_direct AS (
+         SELECT DISTINCT sah.source_authorship_id,
+            COALESCE(al.hal_structure_id, sah.hal_structure_id) AS hal_structure_id
+           FROM (sources.source_authorship_hal_structures sah
+             LEFT JOIN ref.hal_structure_aliases al ON ((al.alias_id = sah.hal_structure_id)))
+        ), hal_lowest AS (
+         SELECT d.source_authorship_id,
+            d.hal_structure_id
+           FROM hal_direct d
+          WHERE (NOT (EXISTS ( SELECT 1
+                   FROM (hal_direct other
+                     JOIN hal_ancestors a ON ((a.child_id = other.hal_structure_id)))
+                  WHERE ((other.source_authorship_id = d.source_authorship_id) AND (a.ancestor_id = d.hal_structure_id)))))
+        ), hal_walk AS (
+         SELECT hal_lowest.source_authorship_id,
+            hal_lowest.hal_structure_id,
+            0 AS depth
+           FROM hal_lowest
+        UNION
+         SELECT w.source_authorship_id,
+            r.parent_id,
+            (w.depth + 1)
+           FROM (hal_walk w
+             JOIN ref.hal_structure_relations r ON ((r.child_id = w.hal_structure_id)))
+          WHERE ((w.depth < 10) AND (NOT (EXISTS ( SELECT 1
+                   FROM hal_match m
+                  WHERE (m.hal_structure_id = w.hal_structure_id)))))
+        )
+ SELECT saa.source_authorship_id,
+    ast.structure_id,
     'address'::public.perimeter_evidence AS evidence
-   FROM ((sources.source_authorship_addresses saa
+   FROM (sources.source_authorship_addresses saa
      JOIN structures.address_structures ast ON ((ast.address_id = saa.address_id)))
-     JOIN structures.perimeter_structures ps ON ((ps.structure_id = ast.structure_id)))
-  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ps.perimeter_id = ( SELECT perimeters.id
-           FROM structures.perimeters
-          WHERE (perimeters.code = ( SELECT (config.value #>> '{}'::text[])
-                   FROM ops.config
-                  WHERE (config.key = 'perimeter_extraction'::text))))))
+  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
+           FROM perimeter)))
+UNION
+ SELECT sar.source_authorship_id,
+    s.id AS structure_id,
+    'ror'::public.perimeter_evidence AS evidence
+   FROM (sources.source_authorship_rors sar
+     JOIN structures.structures s ON ((s.ror_id = sar.ror_id)))
+  WHERE ((s.id IN ( SELECT perimeter.structure_id
+           FROM perimeter)) AND ((sar.address_id IS NULL) OR (EXISTS ( SELECT 1
+           FROM structures.address_structures ast
+          WHERE ((ast.address_id = sar.address_id) AND (ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
+                   FROM perimeter)))))))
+UNION
+ SELECT w.source_authorship_id,
+    m.structure_id,
+    'hal_structure'::public.perimeter_evidence AS evidence
+   FROM (hal_walk w
+     JOIN hal_match m ON ((m.hal_structure_id = w.hal_structure_id)))
+  WHERE (m.structure_id IN ( SELECT perimeter.structure_id
+           FROM perimeter))
   WITH NO DATA;
 
 
@@ -1608,66 +1788,6 @@ CREATE TABLE ref.countries (
 
 
 --
--- Name: hal_structure_aliases; Type: TABLE; Schema: ref; Owner: -
---
-
-CREATE TABLE ref.hal_structure_aliases (
-    alias_id integer NOT NULL,
-    hal_structure_id integer NOT NULL
-);
-
-
---
--- Name: TABLE hal_structure_aliases; Type: COMMENT; Schema: ref; Owner: -
---
-
-COMMENT ON TABLE ref.hal_structure_aliases IS 'Fiches en double du référentiel HAL, fondues dans une structure conservée.';
-
-
---
--- Name: hal_structure_relations; Type: TABLE; Schema: ref; Owner: -
---
-
-CREATE TABLE ref.hal_structure_relations (
-    parent_id integer NOT NULL,
-    child_id integer NOT NULL,
-    CONSTRAINT hal_structure_relations_no_self_reference CHECK ((parent_id <> child_id))
-);
-
-
---
--- Name: TABLE hal_structure_relations; Type: COMMENT; Schema: ref; Owner: -
---
-
-COMMENT ON TABLE ref.hal_structure_relations IS 'Relations parent/enfant entre structures du référentiel HAL.';
-
-
---
--- Name: hal_structures; Type: TABLE; Schema: ref; Owner: -
---
-
-CREATE TABLE ref.hal_structures (
-    hal_structure_id integer NOT NULL,
-    name text NOT NULL,
-    acronym text,
-    structure_type text NOT NULL,
-    country_code character(2),
-    status public.hal_structure_status NOT NULL,
-    ror_id text,
-    start_date date,
-    end_date date,
-    fetched_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: TABLE hal_structures; Type: COMMENT; Schema: ref; Owner: -
---
-
-COMMENT ON TABLE ref.hal_structures IS 'Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou structures.api_ids->''hal'', le relie au référentiel interne.';
-
-
---
 -- Name: language_forms; Type: TABLE; Schema: ref; Owner: -
 --
 
@@ -1899,34 +2019,6 @@ CREATE SEQUENCE sources.source_authorship_addresses_id_seq
 --
 
 ALTER SEQUENCE sources.source_authorship_addresses_id_seq OWNED BY sources.source_authorship_addresses.id;
-
-
---
--- Name: source_authorship_hal_structures; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.source_authorship_hal_structures (
-    source_authorship_id integer NOT NULL,
-    hal_structure_id integer NOT NULL
-);
-
-
---
--- Name: source_authorship_rors; Type: TABLE; Schema: sources; Owner: -
---
-
-CREATE TABLE sources.source_authorship_rors (
-    source_authorship_id integer NOT NULL,
-    ror_id text NOT NULL,
-    address_id integer
-);
-
-
---
--- Name: TABLE source_authorship_rors; Type: COMMENT; Schema: sources; Owner: -
---
-
-COMMENT ON TABLE sources.source_authorship_rors IS 'ROR attribués par la source à une signature, rattachés à l''adresse de leur affiliation, ou à la seule signature quand l''affiliation est sans texte (address_id vide). ror_id est sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump importé.';
 
 
 --
@@ -2167,24 +2259,6 @@ CREATE SEQUENCE structures.structure_tutelles_id_seq
 --
 
 ALTER SEQUENCE structures.structure_tutelles_id_seq OWNED BY structures.structure_tutelles.id;
-
-
---
--- Name: structures; Type: TABLE; Schema: structures; Owner: -
---
-
-CREATE TABLE structures.structures (
-    id integer NOT NULL,
-    code text NOT NULL,
-    name text NOT NULL,
-    acronym text,
-    structure_type public.structure_type CONSTRAINT structures_type_not_null NOT NULL,
-    ror_id text,
-    rnsr_id text,
-    hal_collection text,
-    created_at timestamp with time zone DEFAULT now(),
-    api_ids jsonb
-);
 
 
 --
@@ -4314,5 +4388,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3tlpOeUmFa8GxzvenZUNF6MQZ9Mz4dpnM2DlEEp10D4khf7UEaefQpR24Bflrqc
+\unrestrict hrVoO0QsbnSqcuG7m7QLkLQTwDeGiiZnpJa7sboNk3FFfCfOP10IVldjVTNfeEd
 
