@@ -272,6 +272,7 @@ NODES: tuple[Node, ...] = (
                 "source_authorships",
                 "source_authorship_addresses",
                 "source_authorship_rors",
+                "source_authorship_hal_structures",
                 "author_identifying_keys",
                 "addresses.id",
                 "addresses.countries",
@@ -299,13 +300,14 @@ NODES: tuple[Node, ...] = (
             "source_publications.staging_id",
             "source_publications.publication_id",
         ),
-        # La suppression d'une notice emporte ses signatures, leurs adresses et ROR, et les décisions qui les visent.
+        # La suppression d'une notice emporte ses signatures, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_publications.id",
             "source_publications.keys_dirty",
             "source_authorships.id",
             "source_authorship_addresses",
             "source_authorship_rors",
+            "source_authorship_hal_structures",
             "confirmed_authorships",
             "rejected_authorships",
         ),

@@ -112,6 +112,21 @@ def test_scanr_ror_de_chaque_affiliation_et_des_tutelles_ecartees():
     }
 
 
+def test_scanr_structures_hal_des_affiliations_feuilles():
+    doc = {
+        "authors": [
+            {
+                "fullName": "Jane Doe",
+                "affiliations": [
+                    {"name": "LMV", "id_name_author_labo": "x", "structId": "483019"},
+                    {"name": "Université Clermont Auvergne", "structId": "422708"},
+                ],
+            }
+        ]
+    }
+    assert build_scanr_author_records(doc)[0].hal_structure_ids == {483019}
+
+
 def test_hal_ror_de_la_structure_de_chaque_adresse():
     block = {
         "authFullNameFormIDPersonIDIDHal_fs": ["Jane Doe_FacetSep_1-0_FacetSep_"],

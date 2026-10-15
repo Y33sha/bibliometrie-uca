@@ -60,7 +60,7 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont portés par son `AddressRecord`.
+    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont portés par son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la signature (`structId`).
     """
 
     position: int | None
@@ -70,6 +70,7 @@ class AuthorRecord:
     person_identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
     ror_ids: frozenset[RorId] = frozenset()
+    hal_structure_ids: frozenset[int] = frozenset()
 
 
 AuthorBlock = Mapping[str, JsonValue]
@@ -153,6 +154,7 @@ def write_source_authorships(
                             for a in rec.addresses
                         ],
                         ror_ids=[r.value for r in rec.ror_ids],
+                        hal_structure_ids=rec.hal_structure_ids,
                     )
                 ),
             }
@@ -178,6 +180,7 @@ def write_source_authorships(
     )
     queries.delete_source_authorship_addresses(conn, [sa_id for sa_id, _ in plan.updates])
     queries.delete_source_authorship_rors(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.delete_source_authorship_hal_structures(conn, [sa_id for sa_id, _ in plan.updates])
     queries.upsert_source_authorships_batch(conn, [items[key] for key in plan.inserts])
 
     sa_id_by_key = {key: sa_id for sa_id, key in plan.updates}
@@ -206,6 +209,14 @@ def write_source_authorships(
                     sa_id=sa_id, ror_id=ror_id.value, addr_id=addr_id
                 )
     queries.insert_source_authorship_rors_batch(conn, list(ror_items.values()))
+    queries.insert_source_authorship_hal_structures_batch(
+        conn,
+        [
+            (sa_id, hal_structure_id)
+            for key, sa_id in sorted(sa_id_by_key.items())
+            for hal_structure_id in sorted(records[key].hal_structure_ids)
+        ],
+    )
 
 
 def _inserted_ids(
