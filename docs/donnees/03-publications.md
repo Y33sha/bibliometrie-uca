@@ -45,7 +45,7 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 
 Colonnes notables :
 
-- `in_perimeter` : TRUE si l'auteur signe cette publication depuis une structure du périmètre
+- `in_perimeter` : TRUE si une signature de la personne sur cette publication entre dans le périmètre (`perimeter_evidence` non vide)
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
 `authorship_structures (authorship_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures qui attestent l'authorship (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `authorships`.

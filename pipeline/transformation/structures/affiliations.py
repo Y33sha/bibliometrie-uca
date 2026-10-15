@@ -1,11 +1,11 @@
-"""Phase `affiliations` : rattachement des signatures aux structures du périmètre, par leurs adresses.
+"""Phase `affiliations` : rattachement des signatures aux structures du périmètre.
 
 La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent quatre nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
 1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Référentiel des structures HAL** (nœud `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
 3. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (nœud `affiliations.resolve_thesis_partners`).
-4. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH.
+4. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les structures qu'elles atteignent (vue `source_authorship_structures`) et l'identité des personnes RH.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
 
 
 def build() -> Phase:
-    """Rattachement des signatures aux structures du périmètre, par leurs adresses."""
+    """Rattachement des signatures aux structures du périmètre."""
     from pipeline.transformation.structures.address_resolution import (
         AddressResolutionQueries,
     )

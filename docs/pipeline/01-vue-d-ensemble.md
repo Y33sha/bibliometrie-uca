@@ -18,7 +18,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des structures
 
-- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources, par la structure de l'adresse ou par l'identité d'une personne RH.
+- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources, par les structures qu'elles atteignent (adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse) ou par l'identité d'une personne RH.
 
 ## Résolution des publications
 

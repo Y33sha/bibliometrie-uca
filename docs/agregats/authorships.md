@@ -27,7 +27,7 @@ La construction (`build_authorships.py`) se rejoue sans dommage et converge vers
 
 1. **Insertion et suppression.** Insère les couples attestés par au moins une signature portant une personne, en écartant ceux qu'une ligne de `rejected_authorships` interdit. Supprime les authorships qu'aucune source n'atteste plus.
 2. **Recomposition des attributs**, depuis les signatures qui attestent chaque authorship : même publication par leur notice, même personne. `author_position` vient de la source la mieux classée ; `is_corresponding` et `in_perimeter` sont vrais dès qu'une source l'affirme ; `roles` est l'union triée des rôles relevés. La comparaison porte sur la différence, sans garde d'absence : un attribut qu'aucune source n'atteste plus **retombe** — un rôle disparu est retiré, un périmètre perdu repasse à faux.
-3. **Report sur la publication.** `publications.in_perimeter` devient vrai si la publication porte au moins une authorship dans le périmètre, rattachée à une personne non écartée. C'est exactement le prédicat qu'emploie le filtre de périmètre.
+3. **Report sur la publication.** `publications.in_perimeter` devient vrai si la publication porte au moins une authorship d'auteur dans le périmètre, rattachée à une personne non écartée, ou si c'est une thèse soutenue dans un établissement du périmètre. C'est exactement le prédicat qu'emploie le filtre de périmètre.
 4. **Rafraîchissement** des deux vues matérialisées, sans bloquer les lectures.
 
 `run_pipeline --rebuild-authorships` vide d'abord la table : c'est la reconstruction de récupération, pas le mode courant.

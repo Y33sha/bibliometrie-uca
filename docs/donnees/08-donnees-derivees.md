@@ -10,7 +10,7 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
-| `source_authorship_structures` | `source_authorship_addresses` ⋈ `address_structures` non rejetés ⋈ `perimeter_structures` | phase `affiliations` |
+| `source_authorship_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des signatures ⋈ `perimeter_structures` | phase `affiliations` |
 | `authorship_structures` | `source_authorship_structures` ⋈ `source_authorships` | phase `authorships` |
 | `publication_structures` | `authorships` ⋈ `authorship_structures` | phase `authorships` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
@@ -26,8 +26,8 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 
 | Colonne | Tables | Rafraîchie par |
 |---|---|---|
-| `in_perimeter` | `source_authorships` | phase `affiliations` |
-| `in_perimeter` | `authorships`, `publications` | phase `authorships` |
+| `perimeter_evidence`, d'où `in_perimeter` | `source_authorships` | phase `affiliations` |
+| `perimeter_evidence`, d'où `in_perimeter` | `authorships`, `publications` | phase `authorships` |
 | `countries[]` | `source_publications`, `publications` | phase `countries` |
 | `pub_count` | `journals`, `publishers` | phase `authorships` |
 | `pub_count` | `addresses` | phase `publications` |

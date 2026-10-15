@@ -106,7 +106,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 ### Phase 5 — Fin de chantier
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
