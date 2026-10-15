@@ -104,7 +104,6 @@ from domain.sources.hal import hal_text_field
 from pipeline.ingestion.hal.normalize import (
     build_hal_external_ids,
     get_title,
-    parse_author_structures,
 )
 
 
@@ -165,78 +164,6 @@ class TestHALGetTitle:
 
     def test_empty(self):
         assert get_title({}) == ""
-
-
-class TestHALParseAuthorStructures:
-    def test_standard_entry(self):
-        doc = {
-            "authIdHasStructure_fs": [
-                "49236-749496_FacetSep_Dupont Jean_JoinSep_1234_FacetSep_LIMOS"
-            ]
-        }
-        result = parse_author_structures(doc)
-        assert result == {49236: {"1234"}}
-
-    def test_multiple_structures(self):
-        doc = {
-            "authIdHasStructure_fs": [
-                "100-200_FacetSep_Nom_JoinSep_1_FacetSep_Lab1",
-                "100-200_FacetSep_Nom_JoinSep_2_FacetSep_Lab2",
-            ]
-        }
-        result = parse_author_structures(doc)
-        assert result == {100: {"1", "2"}}
-
-    def test_multiple_authors(self):
-        doc = {
-            "authIdHasStructure_fs": [
-                "100-200_FacetSep_Alice_JoinSep_1_FacetSep_Lab1",
-                "300-400_FacetSep_Bob_JoinSep_2_FacetSep_Lab2",
-            ]
-        }
-        result = parse_author_structures(doc)
-        assert result == {100: {"1"}, 300: {"2"}}
-
-    def test_empty(self):
-        assert parse_author_structures({}) == {}
-        assert parse_author_structures({"authIdHasStructure_fs": []}) == {}
-
-    def test_malformed_entry(self):
-        doc = {"authIdHasStructure_fs": ["garbage_data"]}
-        assert parse_author_structures(doc) == {}
-
-    def test_non_numeric_form_id(self):
-        # form_id reste numérique (clé de groupement par auteur HAL),
-        # mais struct_id est accepté tel quel (text natif HAL).
-        doc = {"authIdHasStructure_fs": ["abc-def_FacetSep_Nom_JoinSep_xyz_FacetSep_Lab"]}
-        assert parse_author_structures(doc) == {}
-
-    def test_prefers_primary_structure(self):
-        """authIdHasPrimaryStructure_fs (labos feuilles) prime sur
-        authIdHasStructure_fs (arbre tutelles aplati). Évite de gonfler la
-        table addresses avec les tutelles parentes."""
-        doc = {
-            "authIdHasPrimaryStructure_fs": [
-                "100-200_FacetSep_Mouchet_JoinSep_1063691_FacetSep_IHRIM",
-            ],
-            "authIdHasStructure_fs": [
-                "100-200_FacetSep_Mouchet_JoinSep_1063691_FacetSep_IHRIM",
-                "100-200_FacetSep_Mouchet_JoinSep_6818_FacetSep_ENS Lyon",
-                "100-200_FacetSep_Mouchet_JoinSep_441569_FacetSep_CNRS",
-            ],
-        }
-        assert parse_author_structures(doc) == {100: {"1063691"}}
-
-    def test_falls_back_to_all_structures_when_primary_empty(self):
-        """Si Primary est vide (ancien doc HAL), fallback sur l'arbre complet
-        plutôt que de perdre l'info d'affiliation."""
-        doc = {
-            "authIdHasPrimaryStructure_fs": [],
-            "authIdHasStructure_fs": [
-                "100-200_FacetSep_Nom_JoinSep_1_FacetSep_Lab",
-            ],
-        }
-        assert parse_author_structures(doc) == {100: {"1"}}
 
 
 class TestHALDocTypeMap:

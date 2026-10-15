@@ -1,7 +1,6 @@
 """Normalisation des données HAL : staging → tables structurées."""
 
 import logging
-from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date
 from functools import lru_cache
@@ -38,7 +37,6 @@ from pipeline.ingestion.common.normalize import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (
-    AddressRecord,
     AuthorBlock,
     AuthorRecord,
     SignatureSyncSettings,
@@ -431,8 +429,8 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
 _XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
 
 
-def parse_tei_author_rors(label_xml: str | None) -> list[list[list[str]]]:
-    """ROR des structures d'affiliation de chaque auteur du TEI HAL, dans l'ordre des auteurs : couples `[identifiant de structure HAL, ROR]`.
+def parse_tei_author_rors(label_xml: str | None) -> list[list[str]]:
+    """ROR des structures d'affiliation de chaque auteur du TEI HAL, dans l'ordre des auteurs.
 
     Un auteur désigne ses structures par `affiliation/@ref` (`#struct-<identifiant>`) ; le ROR d'une structure est son `idno` de type `ROR` dans `listOrg`.
     """
@@ -447,7 +445,7 @@ def parse_tei_author_rors(label_xml: str | None) -> list[list[list[str]]]:
                 ror_by_struct[struct] = (idno.text or "").strip()
     return [
         [
-            [ref.removeprefix("struct-"), ror_by_struct[ref]]
+            ror_by_struct[ref]
             for aff in author.findall("tei:affiliation", _TEI_NS)
             if (ref := (aff.get("ref") or "").removeprefix("#")) in ror_by_struct
         ]
@@ -477,70 +475,14 @@ def parse_tei_author_structures(label_xml: str | None) -> list[list[int]]:
 # =============================================================
 
 
-def parse_author_structures(
-    doc: Mapping[str, JsonValue],
-    struct_name_by_hal_id: dict[str, str] | None = None,
-) -> dict[int, set[str]]:
-    """Parse les structures d'affiliation pour extraire le mapping `form_id → {halId_s natifs (text)}`.
-
-    Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
-
-    Préfère `authIdHasPrimaryStructure_fs` (uniquement la/les structure(s) primaire(s), c'est-à-dire les laboratoires feuilles), avec fallback sur `authIdHasStructure_fs` qui aplatit aussi l'arbre des tutelles. Évite de polluer la table `addresses` avec une entrée par tutelle parente alors que la résolution structure→tutelle se fait déjà via `structures_parents`.
-
-    Si `struct_name_by_hal_id` est fourni, est rempli avec le mapping `halId_s → nom_structure` parsé depuis le document (utile pour construire les adresses).
-    """
-    entries = as_sequence(
-        doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs")
-    )
-    form_structs: dict[int, set[str]] = {}
-
-    for entree in entries:
-        entry = hal_text_field(entree)
-        if entry is None:
-            continue
-        parts = entry.split("_JoinSep_")
-        if len(parts) != 2:
-            continue
-
-        # Gauche : "formId-personId_FacetSep_Nom"
-        left_parts = parts[0].split("_FacetSep_")
-        if not left_parts:
-            continue
-        form_person = left_parts[0]  # "49236-749496"
-        dash_parts = form_person.rsplit("-", 1)
-        if len(dash_parts) != 2:
-            continue
-        try:
-            form_id = int(dash_parts[0])
-        except ValueError:
-            continue
-
-        # Droite : "structId_FacetSep_StructNom"
-        right_parts = parts[1].split("_FacetSep_")
-        if not right_parts:
-            continue
-        struct_id_str = right_parts[0].strip()
-        if not struct_id_str:
-            continue
-        struct_name = right_parts[1].strip() if len(right_parts) > 1 else ""
-
-        form_structs.setdefault(form_id, set()).add(struct_id_str)
-        if struct_name_by_hal_id is not None and struct_name:
-            struct_name_by_hal_id.setdefault(struct_id_str, struct_name)
-
-    return form_structs
-
-
 _HAL_AUTHOR_FIELDS = (
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
-    "authIdHasPrimaryStructure_fs",
-    "authIdHasStructure_fs",
 )
 
 
 def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants, noms et ROR par auteur extraits du TEI (`tei_author_identifiers`, `tei_author_names`, `tei_author_rors`)."""
+    """Bloc auteurs d'un document HAL : les champs Solr des auteurs, et les identifiants, noms, ROR et structures par auteur extraits du TEI (`tei_author_identifiers`, `tei_author_names`, `tei_author_rors`, `tei_author_structures`)."""
     label_xml = hal_text_field(doc.get("label_xml"))
     block: dict[str, JsonValue] = {field: doc.get(field) for field in _HAL_AUTHOR_FIELDS}
     block["tei_author_identifiers"] = cast("JsonValue", parse_tei_author_identifiers(label_xml))
@@ -553,9 +495,7 @@ def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
 
-    - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
-    - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents), `addresses` (noms de structures, chacun avec le ROR de sa structure dans le TEI), `ror_ids` (ROR des structures du TEI sans adresse) et `hal_structure_ids` (structures directes de l'auteur dans le TEI).
+    Les champs Solr alignés donnent le nom, le rôle et le `hal_person_id` de chaque auteur. Le TEI donne ses identifiants (ORCID, IdRef, idHAL), ses nom et prénom, ses structures directes (`hal_structure_ids`) et leurs ROR (`ror_ids`). HAL donne des structures de son référentiel, sans texte d'affiliation : les signatures sont sans adresse.
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
@@ -564,15 +504,11 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     tei_names = [
         [as_str(p) for p in as_sequence(e)] for e in as_sequence(doc.get("tei_author_names"))
     ]
-    # ROR de chaque structure d'affiliation, par auteur : {identifiant de structure HAL: ROR}.
-    tei_rors: list[dict[str, set[str]]] = []
-    for e in as_sequence(doc.get("tei_author_rors")):
-        by_struct: dict[str, set[str]] = defaultdict(set)
-        for pair in as_sequence(e):
-            struct_id, ror = (as_str(x) for x in as_sequence(pair))
-            if struct_id and ror:
-                by_struct[struct_id].add(ror)
-        tei_rors.append(by_struct)
+    # ROR des structures d'affiliation, par auteur.
+    tei_rors = [
+        parse_ror_ids(as_str(r) for r in as_sequence(e))
+        for e in as_sequence(doc.get("tei_author_rors"))
+    ]
     # Structures HAL directes, par auteur.
     tei_structures = [
         frozenset(int(i) for i in as_sequence(e) if isinstance(i, int))
@@ -581,7 +517,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
-    # Présence validée par le caller ; on en extrait nom, form_id, person_id.
+    # Présence validée par le caller ; on en extrait nom et person_id.
     # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de slug, HAL y recopie le person_id numérique, ce qui injecterait de faux idhal numériques (== hal_person_id).
     # L'idhal vient du seul TEI (`parse_tei_author_identifiers`, qui ne garde que notation="string").
     composite = [
@@ -590,7 +526,6 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
         if (entry := hal_text_field(e))
     ]
     names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
-    form_id_by_pos: dict[int, int | None] = {}
     hal_person_id_by_pos: dict[int, int | None] = {}
 
     for pos, entry in enumerate(composite):
@@ -600,19 +535,11 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
             dash_parts = parts[1].rsplit("-", 1)
             if len(dash_parts) == 2:
                 try:
-                    form_id_by_pos[pos] = int(dash_parts[0])
-                except ValueError:
-                    pass
-                try:
                     pid = int(dash_parts[1])
                     if pid > 0:  # 0 = personne non identifiée par HAL
                         hal_person_id_by_pos[pos] = pid
                 except ValueError:
                     pass
-
-    # authIdHasPrimaryStructure_fs → {form_id: ensemble de halId_s natifs (text)} + mapping {halId_s: nom} local au document (pour construire les adresses).
-    struct_name_by_hal_id: dict[str, str] = {}
-    form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
     ids_by_position = [
         compact_identifiers(
@@ -626,8 +553,6 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     records: list[AuthorRecord] = []
     for position, name in enumerate(names):
-        form_id = form_id_by_pos.get(position)
-
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
         roles, is_corresponding_from_role = map_role("hal", quality)
@@ -647,20 +572,6 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
         identifiers = ids_by_position[position]
 
-        # Noms des structures affiliées à cet auteur (par form_id), utilisés comme adresses brutes, chacun avec le ROR de sa structure.
-        rors_by_struct = tei_rors[position] if position < len(tei_rors) else {}
-        address_structs = [
-            hid
-            for hid in sorted(form_struct_map.get(form_id, ()) if form_id else ())
-            if hid in struct_name_by_hal_id and struct_name_by_hal_id[hid].strip()
-        ]
-        signature_rors = parse_ror_ids(
-            ror
-            for hid, rors in rors_by_struct.items()
-            if hid not in address_structs
-            for ror in rors
-        )
-
         records.append(
             AuthorRecord(
                 position=position,
@@ -668,14 +579,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                 is_corresponding=is_corresponding,
                 roles=roles or None,
                 person_identifiers=identifiers,
-                addresses=[
-                    AddressRecord(
-                        text=struct_name_by_hal_id[hid],
-                        ror_ids=parse_ror_ids(rors_by_struct.get(hid, ())),
-                    )
-                    for hid in address_structs
-                ],
-                ror_ids=signature_rors,
+                ror_ids=tei_rors[position] if position < len(tei_rors) else frozenset(),
                 hal_structure_ids=(
                     tei_structures[position] if position < len(tei_structures) else frozenset()
                 ),

@@ -127,18 +127,39 @@ def test_scanr_structures_hal_des_affiliations_feuilles():
     assert build_scanr_author_records(doc)[0].hal_structure_ids == {483019}
 
 
-def test_hal_ror_de_la_structure_de_chaque_adresse():
+def test_scanr_fiche_de_structure_hal_sans_adresse():
+    """Le nom d'une affiliation à `structId` est celui d'une fiche HAL : son ROR va sur la signature."""
+    doc = {
+        "authors": [
+            {
+                "fullName": "Jane Doe",
+                "affiliations": [
+                    {
+                        "name": "Laboratoire Magmas et Volcans, UMR6524, LMV",
+                        "id_name_author_labo": "x",
+                        "structId": "483019",
+                        "ror": "https://ror.org/03vgfxd91",
+                    },
+                    {
+                        "name": "Laboratoire Magmas et Volcans, Clermont-Ferrand, France",
+                        "id_name_author_labo": "y",
+                    },
+                ],
+            }
+        ]
+    }
+    assert _placement(build_scanr_author_records(doc)[0]) == {
+        "Laboratoire Magmas et Volcans, Clermont-Ferrand, France": set(),
+        None: {LABO},
+    }
+
+
+def test_hal_ror_des_structures_sur_la_signature():
     block = {
         "authFullNameFormIDPersonIDIDHal_fs": ["Jane Doe_FacetSep_1-0_FacetSep_"],
-        "authIdHasStructure_fs": ["1-0_FacetSep_Jane Doe_JoinSep_472222_FacetSep_Institut Pascal"],
-        "tei_author_rors": [
-            [["472222", "https://ror.org/03vgfxd91"], ["81173", "https://ror.org/01a8ajp46"]]
-        ],
+        "tei_author_rors": [["https://ror.org/03vgfxd91", "https://ror.org/01a8ajp46"]],
     }
-    assert _placement(build_hal_author_records(block)[0]) == {
-        "Institut Pascal": {LABO},
-        None: {UNIV},
-    }
+    assert _placement(build_hal_author_records(block)[0]) == {None: {LABO, UNIV}}
 
 
 def test_datacite_affiliation_identifier_de_schema_ror():

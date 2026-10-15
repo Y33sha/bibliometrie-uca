@@ -29,7 +29,6 @@ HAL_DOC_CLOSED = {
     "docType_s": "THESE",
     "openAccess_bool": False,
     "language_s": ["fr"],
-    "authIdHasStructure_fs": [],
     "authFullNameFormIDPersonIDIDHal_fs": ["Alice Dupont_FacetSep_0-0_FacetSep_"],
 }
 

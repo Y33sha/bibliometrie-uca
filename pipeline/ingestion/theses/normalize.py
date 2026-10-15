@@ -173,13 +173,9 @@ def insert_source_document(
 # =============================================================
 
 
-# Champs du payload dont dépendent les signatures : les personnes, par rôle, et les adresses du document.
-_AUTHOR_BLOCK_FIELDS = (*THESES_FIELD_ROLES, "partenairesDeRecherche", "etabSoutenanceN")
-
-
 def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
-    """Bloc auteurs d'une thèse : les personnes de chaque rôle, et les adresses du document."""
-    return {field: these.get(field) for field in _AUTHOR_BLOCK_FIELDS}
+    """Bloc auteurs d'une thèse : les personnes de chaque rôle."""
+    return {field: these.get(field) for field in THESES_FIELD_ROLES}
 
 
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:

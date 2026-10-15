@@ -19,7 +19,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 - **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
 - **Journal/éditeur** : titre, ISSN, eISSN, éditeur
-- **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents
+- **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents. Une affiliation avec `structId` est une fiche du référentiel HAL : elle donne une structure HAL à la signature. Une affiliation sans `structId` est un texte d'affiliation : elle donne une adresse.
 
 ## Exemple de payload
 

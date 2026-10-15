@@ -112,7 +112,7 @@ Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exp
 
 ### Affiliations partagées au document
 
-`partenairesDeRecherche` (= laboratoires d'accueil) sont des affiliations du document, pas par-personne. Le pipeline les lie à tous les `source_authorships` de la thèse via l'`AddressLinker`. C'est cohérent avec la réalité — une thèse est rattachée à un (parfois plusieurs) laboratoire, et toutes les personnes du jury et de l'encadrement opèrent dans ce contexte.
+L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `meta` avec leur PPN IdRef, et les signatures de la thèse sont sans adresse. La vue `source_authorship_structures` rattache toutes les signatures à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la signature du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
 
 ### OA = `closed` par défaut côté source
 
