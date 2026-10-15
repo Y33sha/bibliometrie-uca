@@ -47,6 +47,7 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
 from domain.sources.staging import StagingEntryMode
+from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.ror import RorStatus, RorType
 from domain.structures.structure import StructureType
@@ -309,6 +310,53 @@ ror_relations = Table(
     PrimaryKeyConstraint("parent_ror_id", "child_ror_id", name="ror_relations_pkey"),
     CheckConstraint("parent_ror_id <> child_ror_id", name="ror_relations_no_self_reference"),
     comment="Relations parent/enfant entre organisations du Research Organization Registry.",
+    schema="ref",
+)
+
+
+hal_structure_status_enum = PgEnum(
+    *(s.value for s in HalStructureStatus), name="hal_structure_status", create_type=False
+)
+
+hal_structures = Table(
+    "hal_structures",
+    metadata,
+    Column("hal_structure_id", Integer, primary_key=True, autoincrement=False),
+    Column("name", Text, nullable=False),
+    Column("acronym", Text),
+    Column("structure_type", Text, nullable=False),
+    Column("country_code", CHAR(2)),
+    Column("status", hal_structure_status_enum, nullable=False),
+    Column("ror_id", Text),
+    Column("start_date", Date),
+    Column("end_date", Date),
+    Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    comment=(
+        "Structures du référentiel HAL (ref/structure). Référentiel externe : son ROR, ou "
+        "structures.api_ids->'hal', le relie au référentiel interne."
+    ),
+    schema="ref",
+)
+
+
+hal_structure_relations = Table(
+    "hal_structure_relations",
+    metadata,
+    Column("parent_id", Integer, nullable=False),
+    Column("child_id", Integer, nullable=False),
+    PrimaryKeyConstraint("parent_id", "child_id", name="hal_structure_relations_pkey"),
+    CheckConstraint("parent_id <> child_id", name="hal_structure_relations_no_self_reference"),
+    comment="Relations parent/enfant entre structures du référentiel HAL.",
+    schema="ref",
+)
+
+
+hal_structure_aliases = Table(
+    "hal_structure_aliases",
+    metadata,
+    Column("alias_id", Integer, primary_key=True, autoincrement=False),
+    Column("hal_structure_id", Integer, nullable=False),
+    comment="Fiches en double du référentiel HAL, fondues dans une structure conservée.",
     schema="ref",
 )
 
@@ -813,6 +861,18 @@ source_authorship_addresses = Table(
         "source_authorship_id",
         "address_id",
         name="source_authorship_addresses_source_authorship_id_address_id_key",
+    ),
+    schema="sources",
+)
+
+
+source_authorship_hal_structures = Table(
+    "source_authorship_hal_structures",
+    metadata,
+    Column("source_authorship_id", Integer, nullable=False),
+    Column("hal_structure_id", Integer, nullable=False),
+    PrimaryKeyConstraint(
+        "source_authorship_id", "hal_structure_id", name="source_authorship_hal_structures_pkey"
     ),
     schema="sources",
 )

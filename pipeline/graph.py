@@ -329,6 +329,14 @@ NODES: tuple[Node, ...] = (
         network="zenodo",
     ),
     _node(
+        "affiliations.refresh_hal_structures",
+        "affiliations",
+        reads=("source_authorship_hal_structures", "structures.api_ids"),
+        writes=("hal_structures", "hal_structure_relations", "hal_structure_aliases"),
+        previous_run=("hal_structures", "hal_structure_aliases"),
+        network="hal",
+    ),
+    _node(
         "affiliations.resolve_addresses",
         "affiliations",
         reads=(

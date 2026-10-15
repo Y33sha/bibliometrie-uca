@@ -1,10 +1,11 @@
 """Phase `affiliations` : rattachement des signatures aux structures du périmètre, par leurs adresses.
 
-La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent trois nœuds (`pipeline.graph`), chacun dans sa propre transaction :
+La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent quatre nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
 1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
-2. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
-3. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH.
+2. **Référentiel des structures HAL** (nœud `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
+3. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots).
+4. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les adresses résolues et l'identité des personnes RH.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, signature_perime
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
+from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
@@ -39,9 +41,10 @@ class AffiliationsPhase:
     address_queries: AddressResolutionQueries
     perimeter_queries: PerimeterQueries
     refresh_ror: Callable[[], PhaseMetrics]
+    refresh_hal_structures: Callable[[bool], PhaseMetrics]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Contrôle le périmètre d'extraction, exécute les trois nœuds et assemble les métriques de la phase."""
+        """Contrôle le périmètre d'extraction, exécute ses nœuds et assemble les métriques de la phase."""
         with ctx.open_tx() as conn:
             if self.perimeter_queries.count_extraction_structures(conn) == 0:
                 raise EmptyExtractionPerimeterError()
@@ -50,6 +53,11 @@ class AffiliationsPhase:
             "affiliations",
             {
                 "affiliations.refresh_ror": NodeStep(lambda _ctx, _breaker: self.refresh_ror()),
+                "affiliations.refresh_hal_structures": NodeStep(
+                    lambda ctx, _breaker: self.refresh_hal_structures(
+                        MODES[ctx.options.mode].refresh_hal_structures
+                    )
+                ),
                 "affiliations.resolve_addresses": NodeStep(
                     self._resolve_addresses,
                     section="Identification des structures dans les adresses institutionnelles",
@@ -62,6 +70,7 @@ class AffiliationsPhase:
         )
         metrics = by_node["affiliations.resolve_addresses"]
         metrics.details.update(by_node["affiliations.refresh_ror"].details)
+        metrics.details.update(by_node["affiliations.refresh_hal_structures"].details)
         metrics.resume = ""
         return metrics
 
@@ -177,7 +186,26 @@ def build() -> Phase:
         AddressResolutionQueries(),
         PerimeterQueries(),
         refresh_ror=_run_refresh_ror,
+        refresh_hal_structures=_run_refresh_hal_structures,
     )
+
+
+def _run_refresh_hal_structures(refresh_stale: bool) -> PhaseMetrics:
+    """Chargement du référentiel des structures HAL, sur sa propre connexion."""
+    from pipeline.ingestion.hal.structures import HalStructuresClient
+    from pipeline.transformation.structures.hal_structures import (
+        HalStructuresQueries,
+        run_refresh_hal_structures,
+    )
+
+    with open_tx() as conn:
+        return run_refresh_hal_structures(
+            conn,
+            source=HalStructuresClient(),
+            queries=HalStructuresQueries(conn),
+            logger=log,
+            refresh_stale=refresh_stale,
+        )
 
 
 def _run_refresh_ror() -> PhaseMetrics:
