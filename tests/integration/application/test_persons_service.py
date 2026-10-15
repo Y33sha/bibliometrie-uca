@@ -370,7 +370,7 @@ class TestSetExclusion:
             (shared, other),
             (unrelated, other),
         ):
-            insert_authorship(sa_sync_conn, pub, person_id=pid, in_perimeter=True)
+            insert_authorship(sa_sync_conn, pub, person_id=pid, in_perimeter=True, roles=["author"])
         sa_sync_conn.execute(
             text(
                 "UPDATE publications SET perimeter_evidence = CASE WHEN id <> :u"

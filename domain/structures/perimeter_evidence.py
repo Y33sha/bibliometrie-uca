@@ -4,7 +4,7 @@ from enum import StrEnum
 
 
 class PerimeterEvidence(StrEnum):
-    """Indice qui fait entrer une signature dans le périmètre. Reflet du type PostgreSQL `perimeter_evidence`."""
+    """Indice qui fait entrer une signature ou une publication dans le périmètre. Reflet du type PostgreSQL `perimeter_evidence`."""
 
     # Une adresse de la signature est rattachée à une structure du périmètre.
     ADDRESS = "address"
@@ -14,3 +14,5 @@ class PerimeterEvidence(StrEnum):
     HAL_STRUCTURE = "hal_structure"
     # Un ROR de la signature est celui d'une structure du périmètre.
     ROR = "ror"
+    # Indice d'une publication : la thèse est soutenue dans un établissement du périmètre (PPN de l'établissement de soutenance parmi les `api_ids.theses`).
+    THESIS_INSTITUTION = "thesis_institution"

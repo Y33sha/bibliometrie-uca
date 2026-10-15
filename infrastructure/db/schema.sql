@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pEfMUPtltGey78pk5S1Bqewqkyzv3R8UnpOucUwgHPgkx64y3u3f1ks1eTzA9Zd
+\restrict nyWysq9wv77WJm4sNl5wnRR6y9JxN3Z8OVNO2pXNylFUduji3jiznQ0YXf3Koy5
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -275,7 +275,8 @@ CREATE TYPE public.perimeter_evidence AS ENUM (
     'address',
     'rh_identity',
     'hal_structure',
-    'ror'
+    'ror',
+    'thesis_institution'
 );
 
 
@@ -1278,6 +1279,7 @@ CREATE MATERIALIZED VIEW publications.publication_structures AS
     aus.structure_id
    FROM (publications.authorships a
      JOIN publications.authorship_structures aus ON ((aus.authorship_id = a.id)))
+  WHERE (a.roles && ARRAY['author'::text])
   WITH NO DATA;
 
 
@@ -4410,5 +4412,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pEfMUPtltGey78pk5S1Bqewqkyzv3R8UnpOucUwgHPgkx64y3u3f1ks1eTzA9Zd
+\unrestrict nyWysq9wv77WJm4sNl5wnRR6y9JxN3Z8OVNO2pXNylFUduji3jiznQ0YXf3Koy5
 

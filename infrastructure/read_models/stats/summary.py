@@ -46,12 +46,11 @@ def _facets_sqls(
     lab_where, lab_binds = assemble_where(_clauses("lab"))
     lab_sql = f"""
         SELECT s.id, COALESCE(s.acronym, s.name) AS label,
-               COUNT(DISTINCT a.publication_id) AS n
-        FROM authorships a
-        JOIN publications p ON p.id = a.publication_id
+               COUNT(DISTINCT p.id) AS n
+        FROM publication_structures ps
+        JOIN publications p ON p.id = ps.publication_id
         LEFT JOIN journals j ON j.id = p.journal_id
-        JOIN authorship_structures aus ON aus.authorship_id = a.id
-        JOIN structures s ON s.id = aus.structure_id
+        JOIN structures s ON s.id = ps.structure_id
         WHERE {STATS_BASE} AND {lab_where}
           AND s.structure_type = '{StructureType.LABO.value}'
         GROUP BY s.id, s.acronym, s.name

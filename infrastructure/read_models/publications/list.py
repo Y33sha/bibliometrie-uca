@@ -243,6 +243,7 @@ def list_publications(
                     JOIN authorship_structures aus4 ON aus4.authorship_id = a4.id
                     JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                     WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
+                      AND {has_author_role("a4")}
                       {person_lab_filter_a4}
                  ) sub
                 ) AS lab_items,
@@ -481,6 +482,7 @@ def export_publications_csv(
                  JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+                      AND {has_author_role("a3")}
                    {person_lab_filter_a3}
                 ) AS labs
             FROM publications p
@@ -614,6 +616,7 @@ def export_theses_csv(
                  JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+                      AND {has_author_role("a3")}
                 ) AS labs
             FROM publications p
             LEFT JOIN LATERAL (

@@ -89,6 +89,8 @@ def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] |
 
     if etablissement := these.get("etabSoutenanceN"):
         meta["etablissement"] = etablissement
+    if etablissement_ppn := as_str(these.get("etabSoutenancePpn")):
+        meta["etablissement_ppn"] = etablissement_ppn
 
     ecoles = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
     ecoles_clean = [

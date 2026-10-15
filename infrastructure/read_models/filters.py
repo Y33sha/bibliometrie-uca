@@ -135,10 +135,9 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
         return None
     return WhereClause(
         """EXISTS (
-            SELECT 1 FROM authorships a
-            JOIN authorship_structures aus ON aus.authorship_id = a.id
-            WHERE a.publication_id = p.id
-              AND aus.structure_id = ANY(:flt_lab_ids)
+            SELECT 1 FROM publication_structures ps
+            WHERE ps.publication_id = p.id
+              AND ps.structure_id = ANY(:flt_lab_ids)
         )""",
         {"flt_lab_ids": lab_ids},
     )
@@ -392,10 +391,9 @@ def in_perimeter_person_clause(
 def no_lab_clause() -> WhereClause:
     return WhereClause(
         f"""NOT EXISTS (
-            SELECT 1 FROM authorships a
-            JOIN authorship_structures aus ON aus.authorship_id = a.id
-            JOIN structures s ON s.id = aus.structure_id
-            WHERE a.publication_id = p.id
+            SELECT 1 FROM publication_structures ps
+            JOIN structures s ON s.id = ps.structure_id
+            WHERE ps.publication_id = p.id
               AND s.structure_type = '{StructureType.LABO.value}'
         )""",
         {},

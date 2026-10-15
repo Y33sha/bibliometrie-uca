@@ -1,20 +1,34 @@
-"""Recalcul de `publications.perimeter_evidence` depuis les authorships, par la phase `authorships`, après l'exclusion d'une personne et après une correction d'adresse."""
+"""Recalcul de `publications.perimeter_evidence`, par la phase `authorships`, après l'exclusion d'une personne et après une correction d'adresse.
+
+Une publication réunit les indices de ses authorships d'auteurs, de personnes non exclues : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
+"""
 
 from sqlalchemy import Connection, text
 
-from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE
+from domain.structures.perimeter_evidence import PerimeterEvidence
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role
 
 
 def _refresh_sql(scope: str) -> str:
-    """Indices de chaque publication de `scope` : union des indices de ses authorships de personnes non exclues. `scope` : condition sur l'id de publication."""
+    """Indices de chaque publication de `scope`. `scope` : condition sur l'id de publication. `:thesis_ppns` : PPN des établissements de soutenance du périmètre."""
     return f"""
         WITH computed AS (
-            SELECT a.publication_id AS id, array_agg(DISTINCT e ORDER BY e) AS evidence
-            FROM authorships a
-            JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
-            CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
-            WHERE a.publication_id {scope}
-            GROUP BY a.publication_id
+            SELECT id, array_agg(DISTINCT e ORDER BY e) AS evidence
+            FROM (
+                SELECT a.publication_id AS id, e
+                FROM authorships a
+                JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
+                CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
+                WHERE a.publication_id {scope} AND {has_author_role("a")}
+                UNION
+                SELECT sp.publication_id, '{PerimeterEvidence.THESIS_INSTITUTION}'::perimeter_evidence
+                FROM source_publications sp
+                WHERE sp.publication_id {scope}
+                  AND sp.source = 'theses'
+                  AND sp.meta ->> 'etablissement_ppn' = ANY(:thesis_ppns)
+            ) by_publication
+            GROUP BY id
         ), target AS (
             SELECT p.id, coalesce(c.evidence, {NO_PERIMETER_EVIDENCE}) AS evidence
             FROM publications p
@@ -35,15 +49,33 @@ _OF_PERSON = text(
 _OF_PUBLICATIONS = text(_refresh_sql("= ANY(:publication_ids)"))
 
 
+def _thesis_ppns(conn: Connection) -> list[str]:
+    """PPN des établissements de soutenance du périmètre des personnes (`api_ids.theses`)."""
+    return list(
+        conn.execute(
+            text("""
+                SELECT DISTINCT t.value
+                FROM structures s
+                CROSS JOIN LATERAL jsonb_array_elements_text(s.api_ids -> 'theses') t(value)
+                WHERE s.id = ANY(:ids) AND s.api_ids ? 'theses'
+            """),
+            {"ids": get_persons_structure_ids_list(conn)},
+        ).scalars()
+    )
+
+
 def refresh_publications_perimeter_evidence(
     conn: Connection, person_id: int | None = None, publication_ids: list[int] | None = None
 ) -> int:
     """Matérialise `publications.perimeter_evidence`, pour toutes les publications, celles de la personne `person_id`, ou `publication_ids`. Rend le nombre de publications changées. Idempotent."""
+    params: dict[str, object] = {"thesis_ppns": _thesis_ppns(conn)}
     if person_id is not None:
-        return conn.execute(_OF_PERSON, {"pid": person_id}).rowcount
+        return conn.execute(_OF_PERSON, {**params, "pid": person_id}).rowcount
     if publication_ids is not None:
-        return conn.execute(_OF_PUBLICATIONS, {"publication_ids": publication_ids}).rowcount
-    return conn.execute(_ALL).rowcount
+        return conn.execute(
+            _OF_PUBLICATIONS, {**params, "publication_ids": publication_ids}
+        ).rowcount
+    return conn.execute(_ALL, params).rowcount
 
 
 class PublicationPerimeterRecompute:
