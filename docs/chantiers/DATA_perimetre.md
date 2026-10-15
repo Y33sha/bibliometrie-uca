@@ -41,15 +41,7 @@ Au niveau du document : thèse soutenue dans l'établissement, d'après le PPN d
 
 La collection HAL n'est pas un indice : elle découle de la structure HAL, qui désigne en plus l'auteur et son laboratoire.
 
-**Deux étages de tables.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. Une table résolue réunit les structures du référentiel interne atteintes par chaque signature. La phase `affiliations` la remplit ; le périmètre et le laboratoire se calculent sur elle.
-
-```
-source_authorship_structures
-  source_authorship_id  → source_authorships
-  structure_id          → structures
-  method                address | ror | hal_structure
-  address_id            → addresses, vide hors méthode address
-```
+**Indices bruts et structures atteintes.** Les indices bruts gardent une table par référentiel : `source_authorship_addresses`, `source_authorship_rors`, `source_authorship_hal_structures`. La vue matérialisée `source_authorship_structures` associe chaque signature aux structures du périmètre qu'elle atteint. Elle gagne une colonne `method` (`address`, `ror`, `hal_structure`), et une branche de requête par méthode. Les corrections vivent dans les tables sources, donc la vue reste une vue matérialisée. Son index unique, qu'exige le rafraîchissement concurrent, inclut `method`. Le périmètre et le laboratoire se calculent sur elle.
 
 **Raisons de l'entrée.** Une signature et une publication entrent dans le périmètre par une ou plusieurs raisons : une signature OpenAlex peut entrer à la fois par son adresse, son ROR et l'identité RH. Les raisons rendent mesurable l'apport de chaque voie. Proposition à confirmer : une colonne `perimeter_reasons` (tableau d'une énumération) sur `source_authorships` et sur `publications`, recalculée à chaque run ; un tableau vide vaut hors du périmètre.
 
@@ -74,13 +66,13 @@ source_authorship_structures
 ### Phase 1 — Raisons de l'entrée
 
 - [ ] Raisons de l'entrée, plusieurs par signature et par publication, posées par la phase `affiliations` pour les voies existantes (adresse, identité). Le périmètre reste inchangé.
-- [ ] Table `source_authorship_structures`, remplie depuis les adresses.
+- [ ] Colonne `method` de `source_authorship_structures`, valeur `address` pour la branche existante.
 
 ### Phase 2 — Référentiels
 
 - [ ] Référentiel `ref.hal_structures` et nœud de chargement.
 - [ ] Table `source_authorship_hal_structures`, lue dans HAL et dans les fiches de structure ScanR.
-- [ ] Méthodes `hal_structure` et `ror` dans `source_authorship_structures`.
+- [ ] Branches `hal_structure` et `ror` de `source_authorship_structures`.
 - [ ] Mesure : signatures qui entrent par une structure HAL ou un ROR et pas par une adresse, et réciproquement.
 
 ### Phase 3 — Raisons propres au document
