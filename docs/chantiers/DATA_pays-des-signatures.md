@@ -134,13 +134,13 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Étape de résolution (`countries.resolve`) : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
 - [x] Migration : colonne `source_authorships.countries` (`82940fac13cc`). Étape signature en tête de la cascade vers les publications. La page publication lit la colonne (2ac8b81b3).
 - [x] Un changement de pays dans les référentiels ROR et HAL marque les signatures et les adresses qui citent l'organisation ou la structure (aa9d737b7).
-- [ ] Application : migrations, chargement des candidats des sources (`load_address_country_candidates`), pays des signatures du stock (`fill_signature_countries`), `run_pipeline --only countries`.
+- [x] Application : migrations, chargement des candidats des sources (`load_address_country_candidates`), pays des signatures du stock (`fill_signature_countries`), `run_pipeline --only countries`, 2026-10-16.
 
 ### 5. Édition manuelle et retrait de la seconde colonne
 
-- [ ] La page d'administration des pays lit les candidats et leur moyen, au lieu de `suggested_countries`.
+- [x] La page d'administration des pays lit les candidats et leur moyen. Elle propose les pays trouvés et non retenus (cba846b4e).
 - [x] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé, et l'adresse est résolue aussitôt. Une saisie vide rend l'adresse aux moyens automatiques.
-- [ ] Migration : suppression de `addresses.suggested_countries` et des points d'entrée qui la servent.
+- [x] Migration : suppression de `addresses.suggested_countries` et du nœud `countries.suggest` (`c3a1f0d27b94`, f9c0acf6c).
 
 ## Questions ouvertes
 
