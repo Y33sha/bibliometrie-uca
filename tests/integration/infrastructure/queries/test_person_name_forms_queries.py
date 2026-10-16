@@ -42,23 +42,18 @@ class TestFetchPersonsNames:
 
 class TestSyncFromRawForms:
     def test_inserts_form_from_raw_forms_with_persons_source(self, sa_sync_conn):
-        """Une forme `'persons'` poussée en `_raw_forms` apparaît en base
-        après sync, avec `sources = ['persons']` et normalisée par SQL."""
+        """Une forme `'persons'` poussée en `_raw_forms` apparaît en base après sync, avec `sources = ['persons']`."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
 
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         _Q.insert_raw_forms_batch(
             sa_sync_conn,
-            [{"raw_text": "  DUPOND J  ", "person_id": pid, "source": "persons"}],
+            [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
         )
         inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
         _Q.drop_temp_raw_forms_table(sa_sync_conn)
 
-        rows = _fetch_pnf_for(sa_sync_conn, pid)
-        assert len(rows) == 1
-        nf, sources = rows[0]
-        assert "dupond" in nf
-        assert sources == ["persons"]
+        assert _fetch_pnf_for(sa_sync_conn, pid) == [("dupond j", ["persons"])]
         assert inserted == 1 and updated == 0 and deleted == 0
 
     def test_aggregates_sources_across_authorships_and_persons(self, sa_sync_conn):
@@ -73,7 +68,7 @@ class TestSyncFromRawForms:
         _Q.create_temp_raw_forms_table(sa_sync_conn)
         _Q.insert_raw_forms_batch(
             sa_sync_conn,
-            [{"raw_text": "dupond j", "person_id": pid, "source": "persons"}],
+            [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
         )
         _Q.sync_from_raw_forms(sa_sync_conn)
         _Q.drop_temp_raw_forms_table(sa_sync_conn)

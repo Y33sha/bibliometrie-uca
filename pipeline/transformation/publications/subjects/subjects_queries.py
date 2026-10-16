@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import normalize_label
+from domain.normalize import normalize_label, normalize_text
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
@@ -27,8 +27,8 @@ class PublicationSubjectLink(NamedTuple):
 
 _UPSERT_SUBJECT_SQL = text(
     """
-    INSERT INTO subjects (label, language)
-    VALUES (:label, :language)
+    INSERT INTO subjects (label, label_normalized, language)
+    VALUES (:label, :label_normalized, :language)
     ON CONFLICT (lower(label)) DO UPDATE SET
         language = COALESCE(subjects.language, EXCLUDED.language)
     RETURNING id
@@ -49,10 +49,15 @@ class SubjectsIngestionQueries:
         """UPSERT d'un sujet (clé d'unicité = lower(label)). Retourne l'id.
 
         Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
+        label = normalize_label(label)
         return scalar_int(
             conn.execute(
                 _UPSERT_SUBJECT_SQL,
-                {"label": normalize_label(label), "language": language},
+                {
+                    "label": label,
+                    "label_normalized": normalize_text(label),
+                    "language": language,
+                },
             )
         )
 

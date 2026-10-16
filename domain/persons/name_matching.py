@@ -120,7 +120,7 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
 def _name_words(*parts: str) -> list[str]:
     """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 
-    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux signatures de type SUDOC (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve [a-z0-9] pour les identifiants.
+    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux signatures de type SUDOC (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
     """
     text = re.sub(r"\d+", " ", normalize_name(" ".join(part for part in parts if part)))
     return text.split()

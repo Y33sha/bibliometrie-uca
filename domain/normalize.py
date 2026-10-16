@@ -1,22 +1,16 @@
 """Fonctions de normalisation centralisées.
 
 Toutes les normalisations textuelles du projet passent par ce module afin d'éviter la duplication et les incohérences.
-
-La normalisation Python est la référence ; la fonction SQL normalize_name_form() est alignée dessus (filet de non-régression : tests/integration/test_normalize_alignment_python_sql.py). Pipeline : minuscules → lettres latines autonomes → NFKD → retrait des diacritiques → tout sauf [a-z0-9] → espaces → collapse.
 """
 
 import html
 import re
 import unicodedata
 
-# Lettres latines autonomes que NFKD ne décompose pas (ce ne sont pas des
-# base+diacritique mais des lettres à part entière) alors que PostgreSQL
-# unaccent les translittère. Sans cette table elles seraient supprimées par
-# le passage [^a-z0-9] et colleraient leurs voisins ("Meyerhofstrasse"
-# perdrait son ss). Les valeurs reproduisent unaccent. Appliquée après
-# lower(), donc les majuscules sont déjà repliées sur leur minuscule.
-_LATIN_LETTERS = str.maketrans(
+# Lettres que NFKD ne décompose pas, ramenées à leur forme sans diacritique : « Meyerhofstraße » et « Meyerhofstrasse » ont la même forme normalisée. Appliquée après lower().
+_TRANSLITERATIONS = str.maketrans(
     {
+        "ё": "е",  # CYRILLIC SMALL LETTER IO → IE (ё → е)
         "\u00df": "ss",  # LATIN SMALL LETTER SHARP S
         "\u00f8": "o",  # LATIN SMALL LETTER O WITH STROKE
         "\u0142": "l",  # LATIN SMALL LETTER L WITH STROKE
@@ -162,28 +156,36 @@ def sanitize_optional_text(text: str | None) -> str | None:
     return sanitize_raw_text(text or "") or None
 
 
-def normalize_text(text: str) -> str:
-    """Normalise un texte pour comparaison / dédoublonnage / matching.
+_ASCII_SEPARATORS_RE = re.compile(r"[^a-z0-9]+")
 
-    Pipeline :
-      1. retirer les balises (MathML/HTML) `<...>` entièrement (`strip_markup`)
-      2. minuscules + strip
-      3. translittérer les lettres latines autonomes (ß, ø, ł...)
-      4. NFKD (décompose les caractères accentués et de compatibilité)
-      5. retirer les seules combining marks (diacritiques)
-      6. tout sauf [a-z0-9] → espaces (les symboles restants n'avalent donc pas leurs voisins)
-      7. collapse espaces multiples
+
+def _drops_marks(base: str) -> bool:
+    """Vrai quand les diacritiques qui suivent `base` se retirent : derrière une lettre latine ou grecque, ou derrière un caractère qui n'est pas une lettre. Ailleurs, ils distinguent des lettres (й, が)."""
+    return not base.isalpha() or unicodedata.name(base, "").startswith(("LATIN", "GREEK"))
+
+
+def normalize_text(text: str) -> str:
+    """Forme de comparaison d'un texte, pour le dédoublonnage et le matching.
+
+    Balises retirées (`strip_markup`), minuscules, décompositions de compatibilité (NFKD : ﬁ → fi, ² → 2), diacritiques retirés des lettres latines et grecques. Les lettres et chiffres de toutes les écritures restent. Tout autre caractère devient un espace.
     """
     if not text:
         return ""
-    # Retrait des balises avant tout, sinon `mml`/`i`/`sub`… subsisteraient comme texte après l'étape [^a-z0-9] et pollueraient le dédoublonnage.
-    text = strip_markup(text)
-    text = text.lower().strip()
-    text = text.translate(_LATIN_LETTERS)
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    text = re.sub(r"[^a-z0-9]+", " ", text)
-    return text.strip()
+    text = strip_markup(text).lower()
+    if text.isascii():
+        return " ".join(_ASCII_SEPARATORS_RE.sub(" ", text).split())
+    # La décomposition produit des majuscules (№ → No) : seconde mise en minuscules.
+    text = unicodedata.normalize("NFKD", text.translate(_TRANSLITERATIONS)).lower()
+    out: list[str] = []
+    base = " "
+    for ch in text:
+        if unicodedata.category(ch).startswith("M"):
+            if not _drops_marks(base):
+                out.append(ch)
+            continue
+        base = ch
+        out.append(ch if ch.isalnum() else " ")
+    return " ".join(unicodedata.normalize("NFC", "".join(out)).split())
 
 
 def normalize_label(label: str) -> str:
@@ -197,9 +199,6 @@ def normalize_label(label: str) -> str:
 # Alias — normalize_name est identique à normalize_text.
 # Les deux noms sont conservés pour la lisibilité du code appelant.
 normalize_name = normalize_text
-
-# Équivalent Python de la fonction SQL normalize_name_form()
-normalize_name_form = normalize_text
 
 
 _DIGITS_RE = re.compile(r"\d+")

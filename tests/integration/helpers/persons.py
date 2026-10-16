@@ -1,12 +1,26 @@
 """Semis de personnes, de leurs identifiants, formes de nom, fiches RH et rejets, pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
 import datetime
+from collections.abc import Callable
 
 from sqlalchemy import Connection, text
 
+from domain.normalize import normalize_text
 from tests.integration.helpers.rows import insert_row
 
-_NORMALIZERS = ("normalize_name_form", "lower")
+NORMALIZERS: dict[str, Callable[[str], str]] = {
+    "normalize_text": normalize_text,
+    "lower": str.lower,
+}
+
+
+def _normalized(
+    value: str | None, imposed: str | None, normalize: Callable[[str], str]
+) -> str | None:
+    """`imposed` s'il est fourni, sinon `value` normalisée ; `None` pour une valeur absente."""
+    if imposed is not None:
+        return imposed
+    return None if value is None else normalize(value)
 
 
 def insert_person(
@@ -15,28 +29,27 @@ def insert_person(
     *,
     first_name: str = "Z",
     exclusion: str | None = None,
-    normalizer: str = "normalize_name_form",
+    normalizer: str = "normalize_text",
     last_name_normalized: str | None = None,
     first_name_normalized: str | None = None,
 ) -> int:
     """Insère une personne et renvoie son `id`.
 
-    Nom et prénom sont normalisés par la fonction SQL `normalizer` : `normalize_name_form`, comme dans le pipeline, ou `lower`. `last_name_normalized` et `first_name_normalized` imposent une valeur.
+    Nom et prénom sont normalisés par `normalizer` : `normalize_text`, comme dans le pipeline, ou `lower`. `last_name_normalized` et `first_name_normalized` imposent une valeur.
     """
-    assert normalizer in _NORMALIZERS, normalizer
+    normalize = NORMALIZERS[normalizer]
     return conn.execute(
         text(
             "INSERT INTO persons "
             "(last_name, first_name, last_name_normalized, first_name_normalized, exclusion) "
-            f"VALUES (:last, :first, COALESCE(:last_normalized, {normalizer}(:last)), "
-            f"COALESCE(:first_normalized, {normalizer}(:first)), "
+            "VALUES (:last, :first, :last_normalized, :first_normalized, "
             "CAST(:exclusion AS person_exclusion)) RETURNING id"
         ),
         {
             "last": last_name,
             "first": first_name,
-            "last_normalized": last_name_normalized,
-            "first_normalized": first_name_normalized,
+            "last_normalized": _normalized(last_name, last_name_normalized, normalize),
+            "first_normalized": _normalized(first_name, first_name_normalized, normalize),
             "exclusion": exclusion,
         },
     ).scalar_one()
