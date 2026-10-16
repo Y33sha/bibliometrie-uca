@@ -45,14 +45,14 @@ Colonnes stockées issues de cette normalisation :
 ### 2. Valeurs stockées
 
 - [x] Inventaire des sites d'écriture de chaque colonne, et script de recalcul (`interfaces/cli/oneshot/recompute_normalized_texts.py`). Les formes de noms des structures, des lieux et des langues sont saisies sans texte source et restent en l'état.
-- [ ] Recalcul des lignes qui contiennent une écriture non latine. Identités d'auteur : clé recalculée, identités en collision fusionnées.
+- [ ] Recalcul des formes stockées (`recompute_normalized_texts`). Identités d'auteur : clé recalculée, identités en collision fusionnées.
 - [ ] Mesure : titres, noms et adresses dont la forme normalisée change ; publications et personnes dont le matching change.
 
 ### 3. Unicité des adresses
 
-- [ ] Fusion des jumelles : signatures, ROR et liens aux structures rattachés à l'adresse conservée.
-- [ ] Contrainte d'unicité sur la forme normalisée. Écriture des adresses par cette clé.
-- [ ] Formes normalisées vides écartées à la normalisation.
+- [x] Fusion des jumelles (`interfaces/cli/oneshot/merge_address_twins.py`) : l'adresse la plus citée réunit les signatures, ROR, liens aux structures et pays de ses jumelles ; des décisions opposées redeviennent à examiner ; les formes vides sont supprimées. Le script refuse de tourner sur des formes périmées.
+- [x] Contrainte d'unicité sur la forme normalisée, forme vide refusée (migration `3458e6b6593b`). Écriture des adresses par cette clé, formes vides écartées. La recopie des pays vers les jumelles disparaît.
+- [ ] Application, run de normalisation terminé : `recompute_normalized_texts`, `merge_address_twins`, migration `3458e6b6593b`, puis `run_pipeline --from affiliations`.
 
 ### 4. Fin de chantier
 
@@ -60,6 +60,4 @@ Colonnes stockées issues de cette normalisation :
 
 ## Questions ouvertes
 
-- **Pays des jumelles divergents.** La fonction de préséance du chantier `DATA_pays-des-signatures.md` les départage. La fusion peut attendre cette fonction, ou garder provisoirement l'union des pays.
-- **Texte brut conservé à la fusion.** Les signatures affichent le texte brut de l'adresse conservée : la première insérée, ou la plus fréquente.
-- **Décision contradictoire.** Le groupe de jumelles aux décisions opposées se tranche à la main.
+- **Pays des jumelles.** La fusion réunit leurs pays. Le câblage du chantier `DATA_pays-des-signatures.md` les recalcule par la fonction de préséance.
