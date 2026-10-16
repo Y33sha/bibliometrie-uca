@@ -132,7 +132,8 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Chargement des candidats des sources du stock depuis le fichier du script (`interfaces/cli/oneshot/load_address_country_candidates.py`). Les autres moyens se recalculent à la phase `countries`, la migration marquant toutes les adresses.
 - [x] Chaque moyen du pipeline écrit son candidat : `normalize` pour les sources, les nœuds `countries.ror` et `countries.detect` pour les autres ; `pipeline/graph.py` déclare la table.
 - [x] Étape de résolution (`countries.resolve`) : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
-- [x] Migration : colonne `source_authorships.countries` (`82940fac13cc`). Étape signature en tête de la cascade vers les publications. Les signatures liées à un ROR sans adresse ou à une structure HAL sont recalculées à chaque run, ce qui couvre les changements de pays des référentiels ROR et HAL. La page publication lit la colonne (2ac8b81b3).
+- [x] Migration : colonne `source_authorships.countries` (`82940fac13cc`). Étape signature en tête de la cascade vers les publications. La page publication lit la colonne (2ac8b81b3).
+- [x] Un changement de pays dans les référentiels ROR et HAL marque les signatures et les adresses qui citent l'organisation ou la structure (aa9d737b7).
 - [ ] Application : migrations, chargement des candidats des sources (`load_address_country_candidates`), pays des signatures du stock (`fill_signature_countries`), `run_pipeline --only countries`.
 
 ### 5. Édition manuelle et retrait de la seconde colonne
