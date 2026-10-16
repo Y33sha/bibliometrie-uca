@@ -422,10 +422,10 @@ def _rors(institutions: Iterable[Mapping[str, JsonValue]]) -> frozenset[RorId]:
 def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
 
-    - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
+    - nom brut : `raw_author_name`, le nom tel qu'imprimé, `author.display_name` étant celui de l'auteur désambiguïsé ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
-    - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte (institutions désambiguïsées par OpenAlex, algorithmiques et faillibles), en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
+    - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte ;
     - ROR des institutions : sur l'adresse dont le texte les désigne, sur la signature pour les autres ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
@@ -471,7 +471,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 addresses=[
                     AddressRecord(
                         text=texte,
-                        suggested_countries=_countries(
+                        countries=_countries(
                             institutions[i] for i in institutions_by_text.get(texte, ())
                         ),
                         ror_ids=_rors(institutions[i] for i in institutions_by_text.get(texte, ())),

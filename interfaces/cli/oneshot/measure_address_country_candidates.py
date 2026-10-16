@@ -147,7 +147,7 @@ def source_candidates(
     source: str,
     build_records: Callable[[dict], list[AuthorRecord]],
 ) -> Iterator[Candidate]:
-    """Pays que la source rattache à chaque auteur, posés sur chaque adresse de l'auteur : `countries` pour ScanR, `suggested_countries` pour OpenAlex."""
+    """Pays que la source rattache à chaque affiliation, posés sur l'adresse de son texte."""
     id_by_raw_text = {a.raw_text: a.id for a in addresses}
     staged = set(
         conn.execute(
@@ -173,7 +173,7 @@ def source_candidates(
                 address_id = id_by_raw_text.get(address.text)
                 if address_id is None:
                     continue
-                for code in _codes((address.countries or []) + (address.suggested_countries or [])):
+                for code in _codes(address.countries or []):
                     yield address_id, code
     log.info("%s : %d payloads lus, %d illisibles", source, read, unreadable)
 

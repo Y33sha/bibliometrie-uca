@@ -11,8 +11,10 @@ from typing import NamedTuple, TypedDict
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 
 
 class SignatureNameFields(TypedDict):
@@ -71,13 +73,6 @@ class AddressBatchItem(TypedDict):
 
     raw: str
     norm: str
-
-
-class AddressCountryItem(TypedDict):
-    """Propagation de pays sur une `addresses` : `{addr_id, countries}`."""
-
-    addr_id: int
-    countries: list[str]
 
 
 class AuthorshipAddressItem(TypedDict):
@@ -349,29 +344,14 @@ class AuthorshipsBatchQueries:
         ).all()
         return {r.normalized_text: r.id for r in rows}
 
-    def apply_address_countries_batch(
-        self, conn: Connection, values: list[AddressCountryItem]
+    def insert_address_country_candidates(
+        self,
+        conn: Connection,
+        method: CountryDetectionMethod,
+        rows: list[tuple[int, list[str]]],
     ) -> None:
-        if not values:
-            return
-        stmt = text("""
-            UPDATE addresses a SET countries = t.countries::character(2)[]
-            FROM jsonb_to_recordset(:payload) AS t(addr_id integer, countries text[])
-            WHERE a.id = t.addr_id AND a.countries IS NULL
-        """).bindparams(bindparam("payload", type_=Jsonb))
-        conn.execute(stmt, {"payload": list(values)})
-
-    def apply_address_suggested_countries_batch(
-        self, conn: Connection, values: list[AddressCountryItem]
-    ) -> None:
-        if not values:
-            return
-        stmt = text("""
-            UPDATE addresses a SET suggested_countries = t.countries::character(2)[]
-            FROM jsonb_to_recordset(:payload) AS t(addr_id integer, countries text[])
-            WHERE a.id = t.addr_id AND a.countries IS NULL AND a.suggested_countries IS NULL
-        """).bindparams(bindparam("payload", type_=Jsonb))
-        conn.execute(stmt, {"payload": list(values)})
+        """Ajoute les pays candidats `(adresse, pays)` du moyen `method` (`CountryQueries.insert_candidates`)."""
+        CountryQueries().insert_candidates(conn, method, rows)
 
     def insert_source_authorship_addresses_batch(
         self, conn: Connection, values: list[AuthorshipAddressItem]

@@ -1,4 +1,4 @@
-"""Port : recalcul, par le pipeline, des pays des notices et des publications d'un lot d'adresses, après une modification manuelle de leurs pays.
+"""Port : résolution, par le pipeline, des pays d'un lot d'adresses, puis recalcul des pays de leurs notices et publications, après une saisie manuelle.
 
 Implémenté par `pipeline.transformation.structures.countries.countries_queries.CountryQueries`.
 """
@@ -9,7 +9,13 @@ from sqlalchemy import Connection
 
 
 class CountryRecompute(Protocol):
-    """Recalcul ciblé des caches de pays à partir de `addresses.countries`."""
+    """Résolution des pays d'adresses, et recalcul ciblé des caches de pays à partir de `addresses.countries`."""
+
+    def resolve_address_countries(
+        self, conn: Connection, address_ids: list[int] | None = None
+    ) -> int:
+        """Compose `addresses.countries` des `address_ids` à partir de leurs candidats, par la préséance du domaine. Retourne le nombre d'adresses dont le pays change."""
+        ...
 
     def refresh_source_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]

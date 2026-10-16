@@ -110,7 +110,7 @@ def run(
 
             suggestions = CountrySuggester(targets).suggest(pool)
             rows = [(addr_id, suggestions.get(addr_id, [])) for addr_id, _ in targets]
-            queries.write_countries(conn, rows, target_column="suggested_countries")
+            queries.write_suggested_countries(conn, rows)
             conn.commit()
 
             processed += len(targets)

@@ -1,6 +1,6 @@
 """Port AddressRepository — contrat d'accès au cluster de tables des adresses.
 
-L'adresse n'a pas d'objet de domaine : « agrégat » désigne ici le cluster que ce repository possède, sans racine d'entité côté `domain/`. Les invariants (autorité de `countries` sur `suggested_countries`, états d'un rattachement) sont portés par le SQL et les services.
+L'adresse n'a pas d'objet de domaine : « agrégat » désigne ici le cluster que ce repository possède, sans racine d'entité côté `domain/`. Le domaine, le SQL et les services garantissent les invariants : préséance des pays candidats, états d'un rattachement.
 """
 
 from dataclasses import dataclass
@@ -78,26 +78,19 @@ class AddressRepository(Protocol):
     # ── Pays ───────────────────────────────────────────────────────
 
     def country_exists(self, code: str) -> bool:
-        """Le code figure-t-il au référentiel `countries` ?
-
-        `addresses.countries` est un tableau : aucune clé étrangère ne peut en garder les éléments, et les écritures de pays s'appuient sur cette lecture.
-        """
+        """Le code figure-t-il au référentiel `countries` ? Les saisies de pays s'appuient sur cette lecture pour refuser un code inconnu."""
         ...
 
-    def set_countries(
-        self,
-        address_id: int,
-        countries: list[str] | None,
-    ) -> None:
-        """Écrit les `countries` d'une adresse. Liste vide ou `None` : la colonne repasse à NULL. Lève `NotFoundError` si l'adresse est introuvable."""
+    def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
+        """Fait de `countries` les pays saisis à la main (candidats `manual`) de l'adresse, et la marque `candidates_dirty`. Liste vide ou `None` : l'adresse est rendue aux moyens automatiques. Lève `NotFoundError` si l'adresse est introuvable."""
         ...
 
-    def batch_add_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Ajoute `country_code` aux `countries` des adresses données, sans doublon ni écrasement des codes déjà posés. Retourne les ids atteints."""
+    def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
+        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la marque `candidates_dirty`. Retourne les ids atteints."""
         ...
 
-    def batch_add_country_by_filter(
+    def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
-        """Comme `batch_add_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids modifiés ; critères tous vides : aucune écriture, `[]`."""
+        """Comme `add_manual_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids atteints ; critères tous vides : aucune écriture, `[]`."""
         ...

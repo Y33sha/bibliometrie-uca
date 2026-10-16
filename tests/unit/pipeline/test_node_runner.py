@@ -15,7 +15,9 @@ def test_des_etapes_qui_ne_couvrent_pas_les_noeuds_de_la_phase_sont_refusees(con
 def test_l_executeur_mesure_la_duree_des_seuls_noeuds_executes(contexte):
     """Un nœud exécuté reçoit sa durée. Un nœud écarté par sa condition garde `duration_s` à `None`."""
     steps = {
+        "countries.ror": NodeStep(lambda _ctx, _b: PhaseMetrics()),
         "countries.detect": NodeStep(lambda _ctx, _b: PhaseMetrics()),
+        "countries.resolve": NodeStep(lambda _ctx, _b: PhaseMetrics()),
         "countries.suggest": NodeStep(lambda _ctx, _b: PhaseMetrics(), when=lambda _ctx: False),
         "countries.refresh_publication_countries": NodeStep(lambda _ctx, _b: PhaseMetrics()),
     }

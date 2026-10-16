@@ -338,6 +338,11 @@ def pub_count_recompute() -> PubCountRecomputePort:
 _country_recompute_singleton: CountryRecompute = CountryQueries()
 
 
+def country_recompute() -> CountryRecompute:
+    """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
+    return _country_recompute_singleton
+
+
 # `AuthorshipsBuild` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
 _authorships_build_queries_singleton: AuthorshipsBuildQueries = AuthorshipsBuild()
 

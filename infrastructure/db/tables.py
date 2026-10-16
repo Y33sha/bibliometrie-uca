@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
 from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
+from domain.country_detection import CountryDetectionMethod
 from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.merge import MergedEntity
@@ -619,8 +620,25 @@ addresses = Table(
     # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
     # fin de cascade.
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
-    # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
+    # Adresse à traiter par la phase `countries` : détection par le texte, puis résolution des candidats.
+    Column("candidates_dirty", Boolean, nullable=False, server_default="true"),
+    # Index UNIQUE sur expression md5(normalized_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
+    schema="structures",
+)
+
+
+country_detection_method_enum = PgEnum(
+    *CountryDetectionMethod, name="country_detection_method", create_type=False
+)
+
+address_country_candidates = Table(
+    "address_country_candidates",
+    metadata,
+    Column("address_id", Integer, primary_key=True),
+    Column("country_code", CHAR(2), primary_key=True),
+    Column("method", country_detection_method_enum, primary_key=True),
+    Column("detected_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     schema="structures",
 )
 

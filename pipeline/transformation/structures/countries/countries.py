@@ -1,11 +1,12 @@
-"""Orchestrateur de la phase `countries` : détection du pays des adresses et recalcul en cascade.
+"""Orchestrateur de la phase `countries` : pays candidats des adresses, résolution, et recalcul en cascade.
 
-Trois nœuds (`pipeline.graph`) et quatre sous-étapes, chacune dans sa propre transaction :
+Cinq nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
-1. **detect_by_country_name** (nœud `countries.detect`) — pays déduit du nom de pays qui termine l'adresse.
-2. **detect_by_place_name** (nœud `countries.detect`) — pays déduit d'un nom de lieu (institution, ville).
-3. **suggest_address_countries** (nœud `countries.suggest`) — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
-4. **refresh_publication_countries** (nœud `countries.refresh_publication_countries`) — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
+1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
+2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
+3. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
+4. `countries.suggest` — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
+5. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
 
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.modes import MODES
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.structures.countries import (
     detect_by_country_name,
@@ -45,6 +47,15 @@ class CountriesPhase:
         open_tx, queries = ctx.open_tx, self.queries
         initial = _etat_des_adresses(open_tx, queries)
 
+        def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            etape(ctx.logger, "Pays candidats des organisations ROR")
+            with ctx.open_tx() as conn:
+                added = queries.insert_ror_candidates(conn)
+            ctx.logger.info(
+                "%s%s", DERNIERE_BRANCHE, accord(added, "candidat ajouté", "candidats ajoutés")
+            )
+            return PhaseMetrics(new=added)
+
         def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             metrics = PhaseMetrics()
             with ctx.open_tx() as conn:
@@ -52,6 +63,15 @@ class CountriesPhase:
             with ctx.open_tx() as conn:
                 metrics.merge(detect_by_place_name.run(conn, queries, ctx.logger))
             return metrics
+
+        def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            etape(ctx.logger, "Pays retenus des adresses")
+            with ctx.open_tx() as conn:
+                changed = queries.resolve_address_countries(conn)
+            ctx.logger.info(
+                "%s%s", DERNIERE_BRANCHE, accord(changed, "adresse changée", "adresses changées")
+            )
+            return PhaseMetrics(updated=changed)
 
         def suggest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             retry_empty = MODES[ctx.options.mode].retry_empty_country_suggestions
@@ -66,7 +86,9 @@ class CountriesPhase:
         by_node = run_nodes(
             "countries",
             {
+                "countries.ror": NodeStep(ror),
                 "countries.detect": NodeStep(detect),
+                "countries.resolve": NodeStep(resolve),
                 "countries.suggest": NodeStep(suggest),
                 "countries.refresh_publication_countries": NodeStep(refresh),
             },

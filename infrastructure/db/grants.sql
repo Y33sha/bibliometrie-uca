@@ -52,8 +52,9 @@ GRANT INSERT, UPDATE ON
     persons.person_identifiers
 TO bibliometrie_app;
 
+-- Un pays saisi à la main s'ajoute en candidat `manual`, et se retire.
 GRANT INSERT, DELETE ON
-    structures.perimeter_structures, structures.structure_tutelles
+    structures.address_country_candidates, structures.perimeter_structures, structures.structure_tutelles
 TO bibliometrie_app;
 
 -- `INSERT … ON CONFLICT DO UPDATE` exige le droit de mise à jour, que la ligne entre en

@@ -20,6 +20,12 @@ class CountryDetectionMethod(StrEnum):
     SOURCE_SCANR = "source_scanr"
 
 
+# Moyen des pays qu'une source donne pour une affiliation, par nom de source.
+SOURCE_COUNTRY_METHODS: dict[str, CountryDetectionMethod] = {
+    "scanr": CountryDetectionMethod.SOURCE_SCANR,
+    "openalex": CountryDetectionMethod.SOURCE_OPENALEX,
+}
+
 # Moyens par rang de préséance, d'après une revue à la main des désaccords. Un groupe compte pour un seul moyen : le pays OpenAlex dérive en général du ROR.
 _PRECEDENCE: tuple[frozenset[CountryDetectionMethod], ...] = (
     frozenset({CountryDetectionMethod.MANUAL}),

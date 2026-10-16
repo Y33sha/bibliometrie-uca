@@ -1,6 +1,6 @@
-"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays des adresses (attribution unitaire ou par lot, recopie vers les adresses jumelles).
+"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays saisis à la main (candidats `manual`, unitairement ou par lot).
 
-Le recalcul des pays des notices et des publications appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque écriture de pays marque l'adresse `countries_dirty` : le run suivant reprend la propagation si le recalcul ciblé a échoué.
+La résolution des pays d'une adresse et le recalcul des pays des notices et des publications appartiennent au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque saisie marque l'adresse `candidates_dirty` : le run suivant résout l'adresse si la résolution immédiate a échoué.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
@@ -10,18 +10,14 @@ from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
+from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError
-from infrastructure.db.tables import address_structures, addresses, countries
-
-# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
-_ADD_COUNTRY_SET_CLAUSE = """
-    SET countries = CASE
-        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
-        WHEN :cc = ANY(countries) THEN countries
-        ELSE array_append(countries, CAST(:cc AS char(2)))
-    END,
-    countries_dirty = true
-"""
+from infrastructure.db.tables import (
+    address_country_candidates,
+    address_structures,
+    addresses,
+    countries,
+)
 
 
 class PgAddressRepository(AddressRepository):
@@ -132,38 +128,61 @@ class PgAddressRepository(AddressRepository):
         ).one_or_none()
         return row is not None
 
-    def set_countries(
-        self,
-        address_id: int,
-        countries: list[str] | None,
-    ) -> None:
+    def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
         result = self._conn.execute(
-            update(addresses)
-            .where(addresses.c.id == address_id)
-            .values(countries=countries if countries else None, countries_dirty=True)
+            update(addresses).where(addresses.c.id == address_id).values(candidates_dirty=True)
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Adresse {address_id} introuvable")
+        self._conn.execute(
+            delete(address_country_candidates).where(
+                address_country_candidates.c.address_id == address_id,
+                address_country_candidates.c.method == CountryDetectionMethod.MANUAL,
+            )
+        )
+        if countries:
+            self._conn.execute(
+                pg_insert(address_country_candidates).values(
+                    [
+                        {
+                            "address_id": address_id,
+                            "country_code": code,
+                            "method": CountryDetectionMethod.MANUAL,
+                        }
+                        for code in dict.fromkeys(countries)
+                    ]
+                )
+            )
 
-    def batch_add_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
+    def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
         if not address_ids:
             return []
         result = self._conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE id = ANY(:ids)
-                RETURNING id
+            text("""
+                WITH target AS (
+                    UPDATE addresses SET candidates_dirty = true
+                    WHERE id = ANY(:ids)
+                    RETURNING id, countries
+                ), added AS (
+                    INSERT INTO address_country_candidates (address_id, country_code, method)
+                    SELECT DISTINCT t.id, code, 'manual'::country_detection_method
+                    FROM target t
+                    CROSS JOIN LATERAL unnest(
+                        coalesce(t.countries, '{}') || ARRAY[CAST(:cc AS char(2))]
+                    ) code
+                    ON CONFLICT DO NOTHING
+                )
+                SELECT id FROM target
             """),
             {"cc": country_code, "ids": address_ids},
         )
         return [row.id for row in result]
 
-    def batch_add_country_by_filter(
+    def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
         conditions: list[str] = []
-        params: dict[str, object] = {"cc": country_code}
+        params: dict[str, object] = {}
         if criteria.search:
             conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
             params["search"] = f"%{criteria.search}%"
@@ -182,13 +201,9 @@ class PgAddressRepository(AddressRepository):
             return []
 
         where_clause = " AND ".join(conditions)
-        result = self._conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE {where_clause}
-                RETURNING id
-            """),
-            params,
+        ids = list(
+            self._conn.execute(
+                text(f"SELECT id FROM addresses WHERE {where_clause}"), params
+            ).scalars()
         )
-        return [row.id for row in result]
+        return self.add_manual_country_by_ids(country_code, ids)

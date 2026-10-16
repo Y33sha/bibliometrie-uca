@@ -261,8 +261,7 @@ NODES: tuple[Node, ...] = (
                 "source_authorships.content_hash",
                 "author_identifying_keys",
                 "addresses.id",
-                "addresses.countries",
-                "addresses.suggested_countries",
+                "countries",
                 *_containers(source),
             ),
             writes=(
@@ -275,8 +274,8 @@ NODES: tuple[Node, ...] = (
                 "source_authorship_hal_structures",
                 "author_identifying_keys",
                 "addresses.id",
-                "addresses.countries",
-                "addresses.suggested_countries",
+                "addresses.candidates_dirty",
+                "address_country_candidates",
                 *_containers(source),
             ),
             # Ses propres lignes de `staging`, notices et signatures, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
@@ -1004,15 +1003,39 @@ NODES: tuple[Node, ...] = (
         previous_run=("subjects",),
     ),
     _node(
+        "countries.ror",
+        "countries",
+        reads=("source_authorship_rors", "ror_organizations", "countries", "addresses.id"),
+        writes=("address_country_candidates", "addresses.candidates_dirty"),
+    ),
+    _node(
         "countries.detect",
         "countries",
         reads=(
             "place_name_forms",
+            "countries",
             "addresses.id",
             "addresses.normalized_text",
-            "addresses.countries",
+            "addresses.candidates_dirty",
         ),
-        writes=("addresses.countries", "addresses.countries_dirty"),
+        writes=("address_country_candidates", "addresses.candidates_dirty"),
+        # Adresses marquées depuis la dernière résolution, que `countries.resolve` efface.
+        previous_run=("addresses.candidates_dirty",),
+    ),
+    _node(
+        "countries.resolve",
+        "countries",
+        reads=(
+            "address_country_candidates",
+            "addresses.id",
+            "addresses.countries",
+            "addresses.candidates_dirty",
+        ),
+        writes=(
+            "addresses.countries",
+            "addresses.countries_dirty",
+            "addresses.candidates_dirty",
+        ),
     ),
     _node(
         "countries.suggest",

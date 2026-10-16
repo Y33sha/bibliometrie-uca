@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `countries` : enchaînement des sous-étapes et entonnoir du bilan.
 
-La phase encadre quatre sous-étapes de deux bilans, et en tire un résumé : combien d'adresses manquaient de pays au départ, combien la passe en a rattaché, ce qui reste. Ce résumé est le propos de la phase — les sous-étapes, elles, ont leurs propres tests.
+La phase encadre ses sous-étapes de deux bilans, et en tire un résumé : combien d'adresses manquaient de pays au départ, combien la passe en a rattaché, ce qui reste. Ce résumé est le propos de la phase — les sous-étapes, elles, ont leurs propres tests.
 
 Le mode complet fait repasser la suggestion sur les adresses déjà tentées sans résultat.
 """
@@ -24,6 +24,12 @@ class _FakeCountryQueries:
     def count_address_country_status(self, conn) -> AddressCountryStatus:
         self.bilans_demandes += 1
         return self._bilans.pop(0)
+
+    def insert_ror_candidates(self, conn) -> int:
+        return 2
+
+    def resolve_address_countries(self, conn, address_ids=None) -> int:
+        return 3
 
 
 def _bilan(total: int, with_country: int, with_suggestion: int = 0) -> AddressCountryStatus:
@@ -78,7 +84,8 @@ def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes):
 
     metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
-    assert metrics.new == 11  # 4 (nom de pays) + 6 (nom de lieu) + 1 (suggestion)
+    assert metrics.new == 13  # 2 (ROR) + 4 (nom de pays) + 6 (nom de lieu) + 1 (suggestion)
+    assert metrics.updated == 3  # adresses dont la résolution change le pays
     assert sous_etapes["refresh"] is True
 
 
@@ -106,4 +113,4 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes):
 
     phase.CountriesPhase(queries).run(contexte(mode="daily"))
 
-    assert open_tx.transactions == 6  # deux bilans + quatre sous-étapes
+    assert open_tx.transactions == 8  # deux bilans + six sous-étapes

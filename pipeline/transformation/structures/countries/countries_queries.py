@@ -1,6 +1,6 @@
 """SQL de la phase `countries` : résoudre les pays d'une adresse, puis les recopier dans les caches dénormalisés.
 
-**Résolution** — pose `addresses.countries` (seule source de vérité) par détection et suggestion. Détection : les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) confrontées aux adresses sans pays (`fetch_addresses_missing_country_normalized`), écriture via `write_countries`. Suggestion : les adresses déjà résolues forment un pool (`load_country_pool`) rapproché des cibles restantes (`fetch_suggest_targets_chunk`) pour alimenter `addresses.suggested_countries`. `count_address_country_status` et `count_suggest_eligible` en donnent le bilan.
+**Candidats et résolution** — chaque moyen de détection ajoute ses pays candidats à `address_country_candidates` (`insert_candidates`, `insert_ror_candidates`) et marque l'adresse `candidates_dirty`. La détection par le texte confronte les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) aux adresses marquées (`fetch_dirty_addresses_normalized`). `resolve_address_countries` compose ensuite `addresses.countries` par la préséance du domaine. Suggestion : les adresses déjà résolues forment un pool (`load_country_pool`) rapproché des cibles restantes (`fetch_suggest_targets_chunk`) pour alimenter `addresses.suggested_countries`. `count_address_country_status` et `count_suggest_eligible` en donnent le bilan.
 
 **Recopie** — recalcule deux caches depuis `addresses.countries` :
 
@@ -11,11 +11,13 @@ Deux portées partagent l'agrégation (`_SP_COUNTRIES_FROM_SCOPE` / `_PUB_COUNTR
 """
 
 import json
+from collections import defaultdict
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
 from domain.countries import PlaceNameKind
+from domain.country_detection import CountryDetectionMethod, retained_countries
 
 
 class SuggestEligibleCounts(NamedTuple):
@@ -90,6 +92,19 @@ _PUB_COUNTRIES_FROM_SCOPE = """,
     WHERE p.id = spp.pub_id
       AND p.countries IS DISTINCT FROM agg.new_countries
 """
+
+
+# Fin partagée des insertions de candidats : attend une CTE `added(address_id)` des candidats ajoutés, marque leurs adresses à traiter et compte les candidats.
+_MARK_DIRTY = """,
+    marked AS (
+        UPDATE addresses SET candidates_dirty = true
+        WHERE id IN (SELECT address_id FROM added) AND NOT candidates_dirty
+    )
+    SELECT count(*) FROM added
+"""
+
+# Adresses résolues par lot : chaque lot charge ses candidats en mémoire.
+_RESOLVE_BATCH = 50_000
 
 
 class CountryQueries:
@@ -167,22 +182,120 @@ class CountryQueries:
         ).all()
         return {r.form_normalized: r.iso_code for r in rows}
 
-    def load_place_forms(self, conn: Connection) -> dict[str, str]:
-        """Formes normalisées des noms d'institutions et de villes, chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
+    def load_place_forms(self, conn: Connection, kind: PlaceNameKind) -> dict[str, str]:
+        """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
         rows = conn.execute(
-            text(
-                f"SELECT form_normalized, iso_code FROM place_name_forms "
-                f"WHERE kind IN ('{PlaceNameKind.INSTITUTION.value}', '{PlaceNameKind.CITY.value}')"
-            )
+            text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = :kind"),
+            {"kind": kind.value},
         ).all()
         return {r.form_normalized: r.iso_code for r in rows}
 
-    def fetch_addresses_missing_country_normalized(self, conn: Connection) -> list[tuple[int, str]]:
-        """`(id, normalized_text)` des adresses sans pays, pour les détections par nom (pays en fin d'adresse, ou lieu)."""
+    def fetch_dirty_addresses_normalized(self, conn: Connection) -> list[tuple[int, str]]:
+        """`(id, normalized_text)` des adresses à traiter (`candidates_dirty`), pour la détection par le texte."""
         rows = conn.execute(
-            text("SELECT id, normalized_text FROM addresses WHERE countries IS NULL")
+            text("SELECT id, normalized_text FROM addresses WHERE candidates_dirty")
         ).all()
         return [(r.id, r.normalized_text) for r in rows]
+
+    def insert_candidates(
+        self,
+        conn: Connection,
+        method: CountryDetectionMethod,
+        rows: list[tuple[int, list[str]]],
+    ) -> int:
+        """Ajoute les candidats `(adresse, pays)` de `rows` pour le moyen `method`, et marque `candidates_dirty` les adresses qui en reçoivent un. Un candidat déjà présent, ou un code absent du référentiel des pays, est ignoré. Retourne le nombre de candidats ajoutés."""
+        if not rows:
+            return 0
+        payload = json.dumps([{"id": addr_id, "c": codes} for addr_id, codes in rows])
+        return conn.execute(
+            text(
+                """
+                WITH proposed AS (
+                    SELECT DISTINCT (e->>'id')::int AS address_id, code.value AS country_code
+                    FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
+                    CROSS JOIN LATERAL jsonb_array_elements_text(e->'c') code
+                    JOIN countries c ON c.code = code.value
+                ), added AS (
+                    INSERT INTO address_country_candidates (address_id, country_code, method)
+                    SELECT address_id, country_code, CAST(:method AS country_detection_method)
+                    FROM proposed
+                    ON CONFLICT DO NOTHING
+                    RETURNING address_id
+                )"""
+                + _MARK_DIRTY
+            ),
+            {"payload": payload, "method": method.value},
+        ).scalar_one()
+
+    def insert_ror_candidates(self, conn: Connection) -> int:
+        """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque `candidates_dirty` les adresses qui en reçoivent un. Retourne le nombre de candidats ajoutés."""
+        return conn.execute(
+            text(
+                """
+                WITH added AS (
+                    INSERT INTO address_country_candidates (address_id, country_code, method)
+                    SELECT DISTINCT sar.address_id, ro.country_code, 'ror'::country_detection_method
+                    FROM source_authorship_rors sar
+                    JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
+                    JOIN countries c ON c.code = ro.country_code
+                    WHERE sar.address_id IS NOT NULL
+                    ON CONFLICT DO NOTHING
+                    RETURNING address_id
+                )"""
+                + _MARK_DIRTY
+            )
+        ).scalar_one()
+
+    def resolve_address_countries(
+        self, conn: Connection, address_ids: list[int] | None = None
+    ) -> int:
+        """Compose `addresses.countries` à partir des candidats par la préséance du domaine (`retained_countries`), pour `address_ids`, ou pour les adresses `candidates_dirty` quand `address_ids` vaut `None`. Une adresse sans candidat perd son pays. Pose `countries_dirty` là où le pays change, efface `candidates_dirty`. Retourne le nombre d'adresses dont le pays change."""
+        if address_ids is None:
+            address_ids = list(
+                conn.execute(text("SELECT id FROM addresses WHERE candidates_dirty")).scalars()
+            )
+        changed = 0
+        for start in range(0, len(address_ids), _RESOLVE_BATCH):
+            ids = address_ids[start : start + _RESOLVE_BATCH]
+            candidates: defaultdict[int, defaultdict[CountryDetectionMethod, list[str]]] = (
+                defaultdict(lambda: defaultdict(list))
+            )
+            for r in conn.execute(
+                text(
+                    "SELECT address_id, country_code, method::text AS method"
+                    " FROM address_country_candidates WHERE address_id = ANY(:ids)"
+                ),
+                {"ids": ids},
+            ):
+                candidates[r.address_id][CountryDetectionMethod(r.method)].append(r.country_code)
+            payload = json.dumps(
+                [
+                    {"id": addr_id, "c": sorted(retained_countries(candidates.get(addr_id, {})))}
+                    for addr_id in ids
+                ]
+            )
+            changed += conn.execute(
+                text("""
+                    UPDATE addresses a
+                    SET countries = d.cty, countries_dirty = true
+                    FROM (
+                        SELECT (e->>'id')::int AS id,
+                               nullif(ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[],
+                                      '{}'::char(2)[]) AS cty
+                        FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
+                    ) d
+                    WHERE a.id = d.id AND a.countries IS DISTINCT FROM d.cty
+                """),
+                {"payload": payload},
+            ).rowcount
+            conn.execute(
+                text(
+                    "UPDATE addresses SET candidates_dirty = false"
+                    " WHERE id = ANY(:ids) AND candidates_dirty"
+                ),
+                {"ids": ids},
+            )
+        return changed
 
     def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
         """Compte les adresses sans pays selon ce que la passe de suggestion en fait : à traiter, déjà suggérées, déjà tentées sans match. Les trois ensembles partitionnent les adresses sans pays."""
@@ -230,35 +343,24 @@ class CountryQueries:
         ).all()
         return [(r.normalized_text, r.countries) for r in rows]
 
-    def write_countries(
-        self,
-        conn: Connection,
-        rows: list[tuple[int, list[str]]],
-        *,
-        target_column: str = "suggested_countries",
+    def write_suggested_countries(
+        self, conn: Connection, rows: list[tuple[int, list[str]]]
     ) -> None:
-        """Écrit en bloc les `(address_id, codes ISO)` de `rows` dans la colonne `target_column` d'`addresses` : `countries` (pays retenus) ou `suggested_countries` (suggestions, `[]` = tentée sans match). Idempotent.
-
-        Écrire `countries` pose aussi `countries_dirty` sur les lignes touchées : le refresh des caches en dérive les documents à recalculer.
-        """
-        # Bulk via `jsonb_array_elements`, idempotent (`IS DISTINCT FROM`). Écrire `countries` pose aussi `countries_dirty` sur les lignes touchées (déjà réécrites → gratuit) ; `suggested_countries` ne touche pas la cascade.
-        if target_column not in ("suggested_countries", "countries"):
-            raise ValueError(f"target_column invalide : {target_column!r}")
+        """Écrit en bloc les `(address_id, codes ISO)` de `rows` dans `addresses.suggested_countries` (`[]` = tentée sans match). Idempotent."""
         if not rows:
             return
-        dirty_set = ", countries_dirty = true" if target_column == "countries" else ""
         payload = json.dumps([{"id": addr_id, "c": countries} for addr_id, countries in rows])
         conn.execute(
-            text(f"""
+            text("""
                 UPDATE addresses a
-                SET {target_column} = d.cty{dirty_set}
+                SET suggested_countries = d.cty
                 FROM (
                     SELECT (e->>'id')::int AS id,
                            ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[] AS cty
                     FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
                 ) d
                 WHERE a.id = d.id
-                  AND a.{target_column} IS DISTINCT FROM d.cty
+                  AND a.suggested_countries IS DISTINCT FROM d.cty
             """),
             {"payload": payload},
         )

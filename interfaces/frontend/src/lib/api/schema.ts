@@ -525,7 +525,7 @@ export interface paths {
         put?: never;
         /**
          * Set Address Country
-         * @description Attribue des pays à une adresse.
+         * @description Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
          *
          *     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
          */

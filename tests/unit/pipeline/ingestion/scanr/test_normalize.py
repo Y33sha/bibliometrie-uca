@@ -230,7 +230,6 @@ class TestBuildScanrAuthorRecords:
 
         assert [a.text for a in rec.addresses] == ["Lab A"]
         assert rec.addresses[0].countries == ["be"]
-        assert rec.addresses[0].suggested_countries is None
 
     def test_chaque_adresse_garde_les_pays_de_son_affiliation(self):
         doc = {

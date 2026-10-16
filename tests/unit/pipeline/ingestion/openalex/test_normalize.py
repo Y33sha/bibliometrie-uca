@@ -550,8 +550,8 @@ class TestBuildOpenalexAuthorRecords:
         work = {"authorships": [{"raw_author_name": "X", "institutions": []}]}
         assert build_openalex_author_records(work)[0].addresses == []
 
-    def test_country_code_to_suggested(self):
-        """`country_code` des institutions de l'affiliation → `suggested_countries` de son adresse, jamais `countries`. Union dédupliquée et en minuscules (code canonique = `countries.code`)."""
+    def test_country_code_des_institutions_de_l_affiliation(self):
+        """`country_code` des institutions de l'affiliation → pays de son adresse. Union dédupliquée et en minuscules, comme `countries.code`."""
         work = {
             "authorships": [
                 {
@@ -581,9 +581,7 @@ class TestBuildOpenalexAuthorRecords:
                 }
             ]
         }
-        addr = build_openalex_author_records(work)[0].addresses[0]
-        assert addr.suggested_countries == ["fr", "us"]
-        assert addr.countries is None
+        assert build_openalex_author_records(work)[0].addresses[0].countries == ["fr", "us"]
 
     def test_each_address_gets_the_countries_of_its_own_affiliation(self):
         work = {
@@ -617,12 +615,12 @@ class TestBuildOpenalexAuthorRecords:
             ]
         }
         addresses = build_openalex_author_records(work)[0].addresses
-        assert [(a.text, a.suggested_countries) for a in addresses] == [
+        assert [(a.text, a.countries) for a in addresses] == [
             ("Lab Paris", ["fr"]),
             ("Lab Boston", ["us"]),
         ]
 
-    def test_no_country_code_no_suggestion(self):
+    def test_no_country_code_no_country(self):
         work = {
             "authorships": [
                 {
@@ -632,7 +630,7 @@ class TestBuildOpenalexAuthorRecords:
                 }
             ]
         }
-        assert build_openalex_author_records(work)[0].addresses[0].suggested_countries is None
+        assert build_openalex_author_records(work)[0].addresses[0].countries is None
 
 
 # ── process_work (orchestrateur) ─────────────────────────────────

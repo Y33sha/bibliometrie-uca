@@ -121,7 +121,7 @@ class _FakeCountryQueries:
         self._counts = counts or SuggestEligibleCounts(
             eligible=sum(len(t) for t in tranches), empty_attempted=0
         )
-        self.ecritures: list[tuple[list, str]] = []
+        self.ecritures: list[list] = []
         self.pool_charge = 0
         self.retry_demande: list[bool] = []
         self.apres_id: list[int] = []
@@ -138,8 +138,8 @@ class _FakeCountryQueries:
         self.apres_id.append(after_id)
         return self._tranches.pop(0) if self._tranches else []
 
-    def write_countries(self, conn, rows, *, target_column="suggested_countries") -> None:
-        self.ecritures.append((rows, target_column))
+    def write_suggested_countries(self, conn, rows) -> None:
+        self.ecritures.append(rows)
 
 
 class TestRun:
@@ -173,9 +173,7 @@ class TestRun:
 
         run(_FakeConnection(), queries, _LOG)
 
-        rows, colonne = queries.ecritures[0]
-        assert rows == [(1, ["FR"]), (2, [])]
-        assert colonne == "suggested_countries"
+        assert queries.ecritures[0] == [(1, ["FR"]), (2, [])]
 
     def test_retry_empty_elargit_le_compte_et_la_demande(self):
         queries = _FakeCountryQueries(

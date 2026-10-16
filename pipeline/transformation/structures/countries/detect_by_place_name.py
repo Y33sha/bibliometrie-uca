@@ -1,6 +1,6 @@
-"""Détection du pays d'une adresse par **nom de lieu** (institution, ville).
+"""Détection du pays d'une adresse par **nom de lieu** : candidats `institution` et `city`.
 
-Pour les adresses restées sans pays après la détection par nom de pays, cherche dans tout le texte normalisé — pas seulement le dernier segment — les noms d'institutions et de villes connus (`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`). Le pays n'est écrit (`addresses.countries`, autoritaire) que si les lieux trouvés désignent un pays unique ; un conflit (pays multiples) est laissé à la suggestion.
+Cherche dans tout le texte normalisé des adresses à traiter (`candidates_dirty`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats.
 
 Ne dépend que du port `CountryQueries` et du domaine ; le commit est laissé au caller.
 """
@@ -9,39 +9,40 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from domain.countries import PlaceNameKind
+from domain.country_detection import CountryDetectionMethod
+from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 from pipeline.transformation.structures.countries.place_name_detector import PlaceNameDetector
 
+_METHODS = {
+    PlaceNameKind.INSTITUTION: CountryDetectionMethod.INSTITUTION,
+    PlaceNameKind.CITY: CountryDetectionMethod.CITY,
+}
+
 
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
-    """Détecte le pays des adresses sans pays via les noms de lieux.
+    """Ajoute les candidats `institution` et `city` des adresses à traiter.
 
-    `seen` = adresses examinées, `new` = adresses résolues (pays unique),
-    `extras["conflicts"]` = adresses à pays multiples ignorées.
+    `seen` = adresses examinées, `new` = candidats ajoutés.
     """
-    etape(logger, "Détermination du pays par noms de villes ou d'institutions")
-    forms = queries.load_place_forms(conn)
-    if not forms:
-        logger.info("%saucun nom de lieu au référentiel", DERNIERE_BRANCHE)
-        return PhaseMetrics()
-    detector = PlaceNameDetector(forms)
-
-    rows = queries.fetch_addresses_missing_country_normalized(conn)
-    logger.info("%s%s sans pays", BRANCHE, accord(len(rows), "adresse"))
-
-    matched: list[tuple[int, list[str]]] = []
-    conflicts = 0
-    for addr_id, normalized_text in rows:
-        isos = detector.detect(normalized_text)
-        if len(isos) == 1:
-            matched.append((addr_id, [next(iter(isos))]))
-        elif len(isos) > 1:
-            conflicts += 1
-
-    logger.info(
-        "%s%s %s", DERNIERE_BRANCHE, accord(len(matched), "adresse"), forme(len(matched), "résolue")
-    )
-    queries.write_countries(conn, matched, target_column="countries")
-    return PhaseMetrics(seen=len(rows), new=len(matched), extras={"conflicts": conflicts})
+    etape(logger, "Pays candidats des noms de villes et d'institutions")
+    rows = queries.fetch_dirty_addresses_normalized(conn)
+    added = 0
+    for kind, method in _METHODS.items():
+        detector = PlaceNameDetector(queries.load_place_forms(conn, kind))
+        proposals = [
+            (addr_id, sorted(isos))
+            for addr_id, normalized_text in rows
+            if (isos := detector.detect(normalized_text))
+        ]
+        n = queries.insert_candidates(conn, method, proposals)
+        logger.info(
+            "%s%s : %s",
+            BRANCHE if method is CountryDetectionMethod.INSTITUTION else DERNIERE_BRANCHE,
+            method.value,
+            accord(n, "candidat ajouté", "candidats ajoutés"),
+        )
+        added += n
+    return PhaseMetrics(seen=len(rows), new=added)

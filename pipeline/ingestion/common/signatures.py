@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
 
+from domain.country_detection import SOURCE_COUNTRY_METHODS
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
@@ -27,7 +28,6 @@ from domain.structures.identifiers import RorId
 from domain.types import JsonValue
 from pipeline.ingestion.common.fingerprint import Fingerprinter
 from pipeline.ingestion.common.signature_queries import (
-    AddressCountryItem,
     AuthorshipAddressItem,
     AuthorshipRorItem,
     AuthorshipsBatchQueries,
@@ -42,14 +42,12 @@ class AddressRecord:
     """Une affiliation textuelle d'un auteur, avec pays optionnels.
 
     `text` : texte de l'affiliation, assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas.
-    `countries` : codes pays d'autorité (ScanR, détectés dans le texte).
-    `suggested_countries` : suggestion à valider (OpenAlex, `country_code` de structure désambiguïsée — faillible). Tous deux propagés sur la row `addresses` partagée, jamais écrasés.
+    `countries` : codes pays que la source donne pour cette affiliation. Ils deviennent des candidats du moyen de la source (`SOURCE_COUNTRY_METHODS`).
     `ror_ids` : ROR que la source attribue à cette affiliation.
     """
 
     text: str
     countries: list[str] | None = None
-    suggested_countries: list[str] | None = None
     ror_ids: frozenset[RorId] = frozenset()
 
     def __post_init__(self) -> None:
@@ -145,12 +143,7 @@ def write_source_authorships(
                         roles=rec.roles,
                         neutralized_identifiers=neutralized,
                         addresses=[
-                            (
-                                a.text,
-                                a.countries,
-                                a.suggested_countries,
-                                [r.value for r in a.ror_ids],
-                            )
+                            (a.text, a.countries, [r.value for r in a.ror_ids])
                             for a in rec.addresses
                         ],
                         ror_ids=[r.value for r in rec.ror_ids],
@@ -193,6 +186,7 @@ def write_source_authorships(
     addr_id_by_text = write_addresses(
         conn,
         queries,
+        source,
         [(sa_id_by_key[key], records[key].addresses) for key in sorted(sa_id_by_key)],
     )
     ror_items: dict[tuple[int, str, int | None], AuthorshipRorItem] = {}
@@ -269,23 +263,22 @@ def _item_identity(item: SourceAuthorshipItem) -> Hashable:
 def write_addresses(
     conn: Connection,
     queries: AuthorshipsBatchQueries,
+    source: str,
     sa_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
-    """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`, et rend l'identifiant de chaque adresse par son texte.
+    """Écrit les `addresses` d'un document, leurs pays candidats et leurs liens `source_authorship_addresses`, et rend l'identifiant de chaque adresse par son texte.
 
-    `sa_addresses` : les couples `(sa_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe, les pays propagés sur la ligne `addresses`, et les liens insérés en une requête. Un `sa_id` None est ignoré.
+    `sa_addresses` : les couples `(sa_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe. Les pays que la source donne deviennent des candidats du moyen de `source`. Les liens sont insérés en une requête. Un `sa_id` None est ignoré.
     """
     norm_by_text: dict[str, str] = {}
-    addr_countries: dict[str, list[str] | None] = {}
-    addr_suggested: dict[str, list[str] | None] = {}
+    addr_countries: dict[str, set[str]] = {}
     for _sa_id, addresses in sa_addresses:
         for addr in addresses:
-            if not addr.text or addr.text in norm_by_text:
+            if not addr.text:
                 continue
-            norm = norm_by_text[addr.text] = normalize_text(addr.text)
-            if norm and norm not in addr_countries:
-                addr_countries[norm] = addr.countries
-                addr_suggested[norm] = addr.suggested_countries
+            norm = norm_by_text.setdefault(addr.text, normalize_text(addr.text))
+            if norm:
+                addr_countries.setdefault(norm, set()).update(addr.countries or ())
 
     if not addr_countries:
         return {}
@@ -302,15 +295,16 @@ def write_addresses(
         raw: addr_id_by_norm[norm] for raw, norm in norm_by_text.items() if norm in addr_id_by_norm
     }
 
-    country_items: list[AddressCountryItem] = []
-    suggested_items: list[AddressCountryItem] = []
-    for norm, aid in addr_id_by_norm.items():
-        if countries := addr_countries.get(norm):
-            country_items.append({"addr_id": aid, "countries": countries})
-        if suggested := addr_suggested.get(norm):
-            suggested_items.append({"addr_id": aid, "countries": suggested})
-    queries.apply_address_countries_batch(conn, country_items)
-    queries.apply_address_suggested_countries_batch(conn, suggested_items)
+    if method := SOURCE_COUNTRY_METHODS.get(source):
+        queries.insert_address_country_candidates(
+            conn,
+            method,
+            [
+                (aid, sorted(countries))
+                for norm, aid in addr_id_by_norm.items()
+                if (countries := addr_countries.get(norm))
+            ],
+        )
 
     link_values: list[AuthorshipAddressItem] = []
     for sa_id, addresses in sa_addresses:
