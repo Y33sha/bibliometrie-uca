@@ -64,7 +64,6 @@ Lecture par source :
 - [x] Script de chargement du dump ROR : `interfaces/cli/imports/import_ror_dump.py`.
 - [x] Rapport de cohérence entre `structure_tutelles` et `ror_relations` : `interfaces/cli/maintenance/report_ror_coherence.py`.
 - [x] Contrainte d'unicité sur `structures.ror_id`.
-- [ ] Écarts actuels reportés dans `structures` et `structure_tutelles`.
 
 ### 2. ROR des sources
 
@@ -73,15 +72,24 @@ Lecture par source :
 - [x] Writer partagé : ROR des signatures, dans `content_hash`.
 - [x] Normalisation OpenAlex, WoS, Crossref, ScanR, HAL et DataCite : lecture des ROR.
 - [x] Rafraîchissement du référentiel ROR en tête de la phase `affiliations`.
-- [ ] Reprise de l'existant : réextraction DataCite, réhydratation de `staging` depuis le raw store, `normalize` complet.
-- [ ] Mesure de la couverture par source.
+- [x] Reprise de l'existant : réextraction DataCite, réhydratation de `staging` depuis le raw store, `normalize` complet.
+- [x] Couverture par source, 2026-10-16 : part des signatures avec au moins un ROR. WoS 46 %, OpenAlex 40 %, ScanR 20 %, Crossref 13 %, HAL 9 %, DataCite 0,2 %.
 
 ### 3. Vue consolidée
+
+La consolidation par auteur dépend du chantier `DATA_alignement-auteurs.md` : 97 % des signatures hors périmètre n'ont pas de personne.
 
 - [ ] Vue matérialisée des ROR par signature consolidée, rafraîchie par le pipeline.
 - [ ] Tests : ROR du périmètre exclus des ROR des sources ; ROR des structures résolues par `affiliations` inclus.
 
-### 4. Mise à jour de la documentation
+### 4. Interface
+
+- [ ] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
+- [ ] Facette « Organisation partenaire » dans la recherche de publications.
+- [ ] Dimension « partenaire » dans le pivot des statistiques.
+- [ ] Export du réseau (CSV, GEXF) pour Gephi ou VOSviewer.
+
+### 5. Mise à jour de la documentation
 
 - [ ] `docs/` : référentiel ROR, table de liens, vue consolidée.
 
@@ -89,4 +97,3 @@ Lecture par source :
 
 - Agrégation des nœuds : ROR cités, ou établissements obtenus par `ror_relations`.
 - Faux positifs des sources hors périmètre : accord de deux sources ; vérification par un service externe (ISTEX…) dans un chantier distinct.
-- Exposition : API, interface, export.
