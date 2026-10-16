@@ -116,6 +116,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 | `source_scanr` | 39 | 0 | 20 | 206 |
 
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
+- [x] Formes d'institutions, 2026-10-16 : 29 % sont un nom ROR, 50 % un nom ou sigle de structure HAL. Les formes d'un seul mot et les noms ROR sont fiables (moins de 1 % de désaccord avec les moyens forts) et donnent seuls le pays de 1 400 adresses : ils restent. Sur les 167 formes en conflit avec le pays retenu sur au moins la moitié de leurs adresses, 147 sont retirées (intitulés génériques, noms ambigus, entreprises), 8 changent de pays (`data/measures/institution_forms_decisions.csv`).
 - [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
 - [x] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`, sur le stock réhydraté, 2026-10-16. Identiques 453 799 (96,8 %), pays gagné 8 929 (1,9 %), pays perdu 1 136 (0,2 %), pays changé 4 956 (1,1 %). Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat.
 
@@ -135,6 +136,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Migration : colonne `source_authorships.countries` (`82940fac13cc`). Étape signature en tête de la cascade vers les publications. La page publication lit la colonne (2ac8b81b3).
 - [x] Un changement de pays dans les référentiels ROR et HAL marque les signatures et les adresses qui citent l'organisation ou la structure (aa9d737b7).
 - [x] Application : migrations, chargement des candidats des sources (`load_address_country_candidates`), pays des signatures du stock (`fill_signature_countries`), `run_pipeline --only countries`, 2026-10-16.
+- [x] La détection par le texte recalcule les candidats des adresses marquées. `redetect_address_countries` marque tout le stock après une modification de `place_name_forms` (dc3c951d0).
 
 ### 5. Édition manuelle et retrait de la seconde colonne
 
@@ -146,7 +148,6 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 - **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
 - **Villes.** `place_name_forms` compte 192 villes, cherchées dans tout le texte de l'adresse. Piste : les villes de GeoNames (`cities15000`, licence CC BY 4.0), sans les noms de villes présents dans plusieurs pays (Cambridge, Valencia), et sans ceux qui sont déjà une forme de pays ou d'institution. Mesure avant chargement, contre les verdicts de la revue à la main.
-- **Formes d'institutions.** `place_name_forms` compte 36 361 institutions. Le ROR et le référentiel HAL donnent le pays des organisations. Une partie des formes est bruitée : adresses complètes, parfois multiples, pays erronés (« goma volcano observatory » rangé en `cg`). Piste : retirer les institutions, après mesure de ce que le moyen `institution` apporte en plus du ROR et des structures HAL.
 - **Blocs d'adresses.** Une adresse contient parfois plusieurs affiliations, séparées par « ; » ou par les numéros d'affiliation des sites d'éditeurs. Parmi les 3 371 adresses à plusieurs pays retenus, au 2026-10-16 : 154 blocs à « ; » (OpenAlex 111, ScanR 45), 135 blocs numérotés (ScanR 131). Piste : découper ces blocs à la normalisation des sources concernées.
 - **Structures ScanR mal attribuées.** ScanR attribue parfois à un auteur les structures d'un coauteur. Le pays de la publication reste juste, le pays de la signature est faux.
 - **Structures HAL au pays faux.** Quelques structures du référentiel HAL ont un pays faux (ILRI en `fr`) ou désignent une absence d'affiliation (« Sans affiliation » en `aq`, « AUTRES »).
