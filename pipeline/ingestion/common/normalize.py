@@ -4,7 +4,8 @@ La phase enchaîne ses nœuds (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
-3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence). Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
+3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
+4. le nettoyage des adresses orphelines, pour la même raison. Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
 
 Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron porte la boucle : chargement des lignes à traiter, un SAVEPOINT par notice (une erreur isolée ne perd pas le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_publications` et les signatures sont injectées à la construction.
 """
@@ -264,9 +265,10 @@ class NormalizePhase:
     normalize_one: NormalizeOne
     prune_disappeared: Callable[[], int]
     cleanup_orphan_identities: Callable[[], int]
+    cleanup_orphan_addresses: Callable[[], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Normalise les sources retenues, retire les documents disparus, nettoie les identités orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
+        """Normalise les sources retenues, retire les documents disparus, nettoie les identités et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
             f"normalize.{source}": NodeStep(
@@ -277,6 +279,9 @@ class NormalizePhase:
         steps["normalize.prune_disappeared"] = NodeStep(self._prune, section="Normalisation")
         steps["normalize.cleanup_orphan_identities"] = NodeStep(
             self._cleanup, section="Maintenance des tables", libelle="Identités d'auteur orphelines"
+        )
+        steps["normalize.cleanup_orphan_addresses"] = NodeStep(
+            self._cleanup_addresses, section="Maintenance des tables", libelle="Adresses orphelines"
         )
         by_node = run_nodes("normalize", steps, ctx)
 
@@ -334,6 +339,13 @@ class NormalizePhase:
             metrics.resume = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
         return metrics
 
+    def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        supprimees = self.cleanup_orphan_addresses()
+        metrics = PhaseMetrics()
+        if supprimees:
+            metrics.resume = f"{accord(supprimees, 'adresse supprimée', 'adresses supprimées')}"
+        return metrics
+
 
 # ── Câblage ───────────────────────────────────────────────────
 
@@ -364,6 +376,7 @@ class _NormalizeSelonOptions:
             normalize_one=normalize_one,
             prune_disappeared=_run_prune_disappeared,
             cleanup_orphan_identities=_run_cleanup_orphan_identities,
+            cleanup_orphan_addresses=_run_cleanup_orphan_addresses,
         ).run(ctx)
 
 
@@ -379,6 +392,13 @@ def _run_cleanup_orphan_identities() -> int:
 
     with open_tx() as conn:
         return delete_orphan_identities(conn)
+
+
+def _run_cleanup_orphan_addresses() -> int:
+    from pipeline.ingestion.common.signature_queries import delete_orphan_addresses
+
+    with open_tx() as conn:
+        return delete_orphan_addresses(conn)
 
 
 def _normalize_builders(

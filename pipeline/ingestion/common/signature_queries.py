@@ -132,6 +132,21 @@ def delete_orphan_identities(conn: Connection) -> int:
     ).rowcount
 
 
+def delete_orphan_addresses(conn: Connection) -> int:
+    """Supprime les adresses que plus aucune signature ne référence, avec leurs liens aux structures.
+
+    Une adresse devient orpheline quand la dernière signature qui la référençait est réécrite sans elle ou supprimée avec sa notice. Retourne le nombre d'adresses supprimées.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM addresses a
+            WHERE NOT EXISTS (
+                SELECT 1 FROM source_authorship_addresses saa WHERE saa.address_id = a.id
+            )
+        """)
+    ).rowcount
+
+
 class AuthorshipsBatchQueries:
     """Opérations SQL par lot pour l'écriture des signatures."""
 
