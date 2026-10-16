@@ -65,5 +65,6 @@ Légende :
 | `structure_name_forms` | admin | `application/services/structures/core.py` |
 | `perimeters` | admin | `application/services/perimeters/core.py` |
 | `perimeter_structures` | pipeline | `refresh_perimeter_structures`, jamais saisie |
-| `addresses` | mixte | créées par le pipeline (`pipeline/transformation/structures/address_resolution.py`) ; colonne `countries` éditable en admin (`addresses/commands.py`) |
+| `addresses` | pipeline | créées par `normalize` (`pipeline/ingestion/common/signatures.py`) ; `countries` composé par la phase `countries` |
+| `address_country_candidates` | mixte | pays trouvés par le pipeline (phases `normalize` et `countries`) ; candidats `manual` saisis en admin (`addresses/commands.py`) |
 | `address_structures` | mixte | liens posés par le pipeline (`pipeline/transformation/structures/address_resolution.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |

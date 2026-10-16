@@ -28,7 +28,7 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 |---|---|---|
 | `perimeter_evidence`, d'où `in_perimeter` | `source_authorships` | phase `affiliations` |
 | `perimeter_evidence`, d'où `in_perimeter` | `authorships`, `publications` | phase `authorships` |
-| `countries[]` | `source_publications`, `publications` | phase `countries` |
+| `countries[]` | `addresses`, `source_authorships`, `source_publications`, `publications` | phase `countries` |
 | `pub_count` | `journals`, `publishers` | phase `authorships` |
 | `pub_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
@@ -36,6 +36,6 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 
 ## Incrémental ou recalcul complet
 
-Les phases coûteuses ne retraitent que ce qui a changé depuis la dernière exécution, repéré par des **flags `dirty`** posés à l'écriture amont : `keys_dirty` sur `source_publications` (clés de résolution modifiées → regroupement des publications à refaire), `countries_dirty` sur `source_authorships` (pays à re-détecter). Le traitement traite les lignes marquées puis efface le flag.
+Les phases coûteuses ne retraitent que ce qui a changé depuis la dernière exécution, repéré par des **flags `dirty`** posés à l'écriture amont : `keys_dirty` sur `source_publications` (clés de résolution modifiées → regroupement des publications à refaire), `candidates_dirty` sur `addresses` (pays à détecter et à résoudre), `countries_dirty` sur `addresses` et `source_authorships` (pays à recalculer). Le traitement traite les lignes marquées puis efface le flag.
 
 Le mode incrémental fait l'hypothèse que l'état antérieur est correct. Une évolution des règles en amont peut donc laisser un **drift** : des dérivés figés sur l'ancienne logique, jamais re-marqués. Plusieurs traitements offrent pour cela un recalcul complet de récupération — par exemple `run_pipeline --only publications --rebuild-publications` (re-marque tout le stock `dirty` avant de le traiter) ou `run_pipeline --only authorships --rebuild-authorships` (purge complète + reconstruction). À lancer après un changement de règles, pour matérialiser ce que le mode incrémental ne verrait pas.

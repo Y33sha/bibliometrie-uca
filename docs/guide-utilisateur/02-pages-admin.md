@@ -97,5 +97,5 @@ Les ajouts/suppressions de formes de noms seront prises en compte à la prochain
 
 `/admin/countries`
 
-Attribution et correction des pays liés aux adresses.
+Attribution et correction des pays liés aux adresses. Chaque adresse affiche ses pays retenus et les moyens qui les ont trouvés. Les pays trouvés et non retenus sont proposés en pointillés ; un clic ajoute le pays. La facette « Pays proposé » liste les adresses où un pays est trouvé sans être retenu.
 Les corrections se propagent automatiquement aux publications liées, sans besoin de relancer le pipeline.

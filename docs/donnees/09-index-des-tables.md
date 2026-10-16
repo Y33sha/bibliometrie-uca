@@ -61,6 +61,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 
 | Objet | Description | Schéma |
 |---|---|---|
+| `address_country_candidates` | pays proposés pour une adresse par chaque moyen de détection | [structures](06-structures.md) |
 | `address_structures` | liaison adresse ↔ structure (avec confirmation) | [structures](06-structures.md) |
 | `addresses` | adresses normalisées issues des signatures | [structures](06-structures.md) |
 | `alembic_version` | révision de schéma appliquée — technique | `public` |

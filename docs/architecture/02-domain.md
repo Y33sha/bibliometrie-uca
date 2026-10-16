@@ -34,6 +34,7 @@ Immuables, identité par contenu.
 - `sources/` — référentiel des 7 sources et des règles qui leur sont propres
 - `normalize.py`, `dates.py` — normalisation des textes et des dates
 - `countries.py` — règles sur les pays des publications
+- `country_detection.py` — préséance des moyens de détection du pays d'une adresse
 - `stats.py` — vocabulaire du pivot : ce qu'on peut grouper, ventiler et mesurer sur le corpus, indépendamment de toute requête
 - `urls.py` — reconnaître le service qu'une URL désigne pour interpréter ce qu'elle porte : une adresse sur `doi.org` est un DOI, un `schemeUri` sur `orcid.org` annonce un ORCID
 - `config.py` — quels réglages d'exploitation une page publique peut lire
