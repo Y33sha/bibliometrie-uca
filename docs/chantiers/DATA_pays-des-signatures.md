@@ -118,7 +118,6 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
 - [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
 - [x] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`, sur le stock réhydraté, 2026-10-16. Identiques 453 799 (96,8 %), pays gagné 8 929 (1,9 %), pays perdu 1 136 (0,2 %), pays changé 4 956 (1,1 %). Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat.
-- [x] Décision de câblage : oui, 2026-10-16.
 
 ### 3. Pays des signatures
 
