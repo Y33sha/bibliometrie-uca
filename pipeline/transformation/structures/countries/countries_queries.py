@@ -2,12 +2,13 @@
 
 **Candidats et résolution** — chaque moyen de détection ajoute ses pays candidats à `address_country_candidates` (`insert_candidates`, `insert_ror_candidates`) et marque l'adresse `candidates_dirty`. La détection par le texte confronte les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) aux adresses marquées (`fetch_dirty_addresses_normalized`). `resolve_address_countries` compose ensuite `addresses.countries` par la préséance du domaine. Suggestion : les adresses déjà résolues forment un pool (`load_country_pool`) rapproché des cibles restantes (`fetch_suggest_targets_chunk`) pour alimenter `addresses.suggested_countries`. `count_address_country_status` et `count_suggest_eligible` en donnent le bilan.
 
-**Recopie** — recalcule deux caches depuis `addresses.countries` :
+**Recopie** — recalcule trois caches en cascade :
 
-1. `source_publications.countries` ← union des pays des adresses des `source_authorships` du document.
-2. `publications.countries` ← union des `source_publications.countries` de même `publication_id`.
+1. `source_authorships.countries` ← pays retenus des adresses de la signature, pays de ses organisations ROR sans adresse, pays de ses structures HAL.
+2. `source_publications.countries` ← union des `source_authorships.countries` du document.
+3. `publications.countries` ← union des `source_publications.countries` de même `publication_id`.
 
-Deux portées partagent l'agrégation (`_SP_COUNTRIES_FROM_SCOPE` / `_PUB_COUNTRIES_FROM_SCOPE`) : bornée aux `countries_dirty` (`refresh_address_source_countries` / `refresh_publication_countries`, cf. `_DIRTY_SA`), ou bornée à des adresses (`refresh_source_publications_countries_for_addresses` / `refresh_publications_countries_for_addresses`). La seconde sert l'API après une modification manuelle (port `CountryRecompute`).
+Deux portées partagent l'agrégation (`_SA_COUNTRIES_FROM_SCOPE` / `_SP_COUNTRIES_FROM_SCOPE` / `_PUB_COUNTRIES_FROM_SCOPE`) : bornée aux `countries_dirty` (`refresh_signature_countries` / `refresh_address_source_countries` / `refresh_publication_countries`, cf. `_DIRTY_SA`), ou bornée à des adresses (`refresh_source_publications_countries_for_addresses` / `refresh_publications_countries_for_addresses`). La seconde sert l'API après une modification manuelle (port `CountryRecompute`).
 """
 
 import json
@@ -48,20 +49,55 @@ _DIRTY_SA = """
     )
 """
 
-# Tail partagé du recalcul `source_publications.countries` : attend une CTE
-# amont `scoped_sp(sp_id)` (les documents à recalculer). Recalcule la valeur
-# pleine — union des pays de toutes les adresses des signatures du document —
-# et n'écrit que les lignes qui changent (LEFT JOIN → NULL si aucune adresse).
+# Recalcul de `source_authorships.countries` sur la CTE amont `scoped_sa(id)` ; marque `countries_dirty` les signatures modifiées.
+_SA_COUNTRIES_FROM_SCOPE = """,
+    contributions AS (
+        SELECT saa.source_authorship_id AS sa_id, c::text AS code
+        FROM scoped_sa s
+        JOIN source_authorship_addresses saa ON saa.source_authorship_id = s.id
+        JOIN addresses a ON a.id = saa.address_id
+        CROSS JOIN LATERAL unnest(a.countries) AS c
+        UNION
+        SELECT sar.source_authorship_id, ro.country_code::text
+        FROM scoped_sa s
+        JOIN source_authorship_rors sar ON sar.source_authorship_id = s.id
+        JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
+        WHERE sar.address_id IS NULL
+        UNION
+        SELECT h.source_authorship_id, hs.country_code::text
+        FROM scoped_sa s
+        JOIN source_authorship_hal_structures h ON h.source_authorship_id = s.id
+        JOIN hal_structures hs ON hs.hal_structure_id = h.hal_structure_id
+        WHERE hs.country_code IS NOT NULL
+    ),
+    agg AS (
+        SELECT sa_id, array_agg(code ORDER BY code) AS new_countries
+        FROM contributions
+        GROUP BY sa_id
+    )
+    UPDATE source_authorships sa
+    SET countries = agg.new_countries, countries_dirty = true
+    FROM scoped_sa s
+    LEFT JOIN agg ON agg.sa_id = s.id
+    WHERE sa.id = s.id
+      AND sa.countries IS DISTINCT FROM agg.new_countries
+"""
+
+# Signatures à organisation ROR sans adresse ou à structure HAL : leur pays suit les référentiels.
+_REFERENTIAL_SA = """
+    SELECT source_authorship_id FROM source_authorship_rors WHERE address_id IS NULL
+    UNION
+    SELECT source_authorship_id FROM source_authorship_hal_structures
+"""
+
+# Recalcul de `source_publications.countries` sur la CTE amont `scoped_sp(sp_id)` : union des pays des signatures.
 _SP_COUNTRIES_FROM_SCOPE = """,
     agg AS (
         SELECT sa.source_publication_id AS sp_id,
-               array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
+               array_agg(DISTINCT c ORDER BY c) AS new_countries
         FROM source_authorships sa
         JOIN scoped_sp ss ON ss.sp_id = sa.source_publication_id
-        JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
-        JOIN addresses a ON a.id = saa.address_id
-        CROSS JOIN LATERAL unnest(a.countries) AS c
-        WHERE a.countries IS NOT NULL
+        CROSS JOIN LATERAL unnest(sa.countries) AS c
         GROUP BY sa.source_publication_id
     )
     UPDATE source_publications sp
@@ -130,8 +166,24 @@ class CountryQueries:
         ).one()
         return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
 
+    def refresh_signature_countries(self, conn: Connection, *, full: bool = False) -> int:
+        """Recalcule `source_authorships.countries` des signatures `countries_dirty` ou liées à une adresse marquée, et des signatures à organisation ROR sans adresse ou à structure HAL. `full` recalcule toutes les signatures qui ont une adresse, un ROR sans adresse ou une structure HAL. Retourne le nombre de signatures modifiées."""
+        if full:
+            scope = f"""
+                WITH scoped_sa AS (
+                    SELECT DISTINCT source_authorship_id AS id FROM source_authorship_addresses
+                    UNION {_REFERENTIAL_SA}
+                )"""
+        else:
+            scope = (
+                _DIRTY_SA
+                + f""",
+                scoped_sa AS (SELECT id FROM dirty_sa UNION {_REFERENTIAL_SA})"""
+            )
+        return conn.execute(text(scope + _SA_COUNTRIES_FROM_SCOPE)).rowcount
+
     def refresh_address_source_countries(self, conn: Connection) -> int:
-        """Recalcule `source_publications.countries` — union des pays des adresses des `source_authorships` du document — sur les documents qu'un flag `countries_dirty` signale. Retourne le nombre de lignes modifiées."""
+        """Recalcule `source_publications.countries` — union des `source_authorships.countries` du document — sur les documents qu'un flag `countries_dirty` signale. Retourne le nombre de lignes modifiées."""
         return conn.execute(
             text(
                 _DIRTY_SA
@@ -368,9 +420,21 @@ class CountryQueries:
     def refresh_source_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
-        """Recalcule `source_publications.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
+        """Recalcule `source_authorships.countries` des signatures liées à l'une des `address_ids`, puis `source_publications.countries` de leurs documents. Idempotent. Retourne le nombre de documents mis à jour."""
         if not address_ids:
             return 0
+        conn.execute(
+            text(
+                """
+                WITH scoped_sa AS (
+                    SELECT DISTINCT source_authorship_id AS id
+                    FROM source_authorship_addresses
+                    WHERE address_id = ANY(:ids)
+                )"""
+                + _SA_COUNTRIES_FROM_SCOPE
+            ),
+            {"ids": address_ids},
+        )
         return conn.execute(
             text(
                 """

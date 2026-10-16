@@ -87,7 +87,7 @@ def _fetch_biblio_source_authorships(
 
     Quand plusieurs `source_publications` de la même source pointent sur la même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on affiche les auteurs de l'**import le plus récent** (`created_at DESC`). Les liens vers les sources, eux, sont multiples côté header — cf `PublicationHeader.svelte`.
 
-    `raw_affiliation` concatène les `addresses.raw_text` liées via `source_authorship_addresses`. `countries` est dérivé à la volée de ces mêmes adresses (union de leurs pays).
+    `raw_affiliation` concatène les `addresses.raw_text` liées via `source_authorship_addresses`. `countries` est le pays de la signature (`source_authorships.countries`).
     """
     rows = conn.execute(
         text(f"""
@@ -100,12 +100,7 @@ def _fetch_biblio_source_authorships(
                     FROM source_authorship_addresses saa2
                     JOIN addresses addr ON addr.id = saa2.address_id
                     WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
-                   (SELECT array_agg(DISTINCT c ORDER BY c)
-                    FROM source_authorship_addresses saa3
-                    JOIN addresses addr3 ON addr3.id = saa3.address_id
-                    CROSS JOIN LATERAL unnest(addr3.countries) AS c
-                    WHERE saa3.source_authorship_id = sa.id
-                      AND addr3.countries IS NOT NULL) AS countries
+                   sa.countries
             FROM source_authorships sa
             WHERE sa.source_publication_id = (
                 SELECT id FROM source_publications

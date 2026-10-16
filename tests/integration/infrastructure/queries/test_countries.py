@@ -110,6 +110,7 @@ class TestRefreshAddressSourceCountries:
         )
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
+        _Q.refresh_signature_countries(sa_sync_conn)
         updated = _Q.refresh_address_source_countries(sa_sync_conn)
         assert updated == 1
 
@@ -224,6 +225,7 @@ class TestDirtyDrivenSourceCountries:
             ),
         )
 
+        _Q.refresh_signature_countries(sa_sync_conn)
         _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, dirty_sd) == ["FR"]
         assert _sp_countries(sa_sync_conn, clean_sd) is None  # aucun sa dirty → pas recalculé
@@ -257,8 +259,29 @@ class TestDirtyDrivenSourceCountries:
         # La résolution pose addresses.countries_dirty sur la ligne changée.
         _resolve(sa_sync_conn, addr, ["FR"])
         assert _addr_dirty(sa_sync_conn, addr) is True
+        _Q.refresh_signature_countries(sa_sync_conn)
         _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) == ["FR"]  # recalculé via l'adresse dirty
+
+    def test_le_pays_d_une_signature_sans_adresse_vient_de_sa_structure_hal(self, sa_sync_conn):
+        """Régression : une signature HAL sans adresse donnait une notice sans pays."""
+        pub = insert_publication(sa_sync_conn)
+        sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-s")
+        sa = insert_signature(sa_sync_conn, sd, source="hal")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO hal_structures (hal_structure_id, name, structure_type, country_code, status)"
+                " VALUES (1, 'Laboratoire de Météorologie Physique', 'laboratory', 'fr', 'VALID')"
+            )
+        )
+        sa_sync_conn.execute(
+            text("INSERT INTO source_authorship_hal_structures VALUES (:sa, 1)"), {"sa": sa}
+        )
+
+        _Q.refresh_signature_countries(sa_sync_conn)
+        _Q.refresh_address_source_countries(sa_sync_conn)
+
+        assert _sp_countries(sa_sync_conn, sd) == ["fr"]
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)

@@ -1055,7 +1055,12 @@ NODES: tuple[Node, ...] = (
         reads=(
             "source_authorships.countries_dirty",
             "source_authorships.source_publication_id",
+            "source_authorships.countries",
             "source_authorship_addresses",
+            "source_authorship_rors",
+            "source_authorship_hal_structures",
+            "ror_organizations",
+            "hal_structures",
             "addresses.countries",
             "addresses.countries_dirty",
             "source_publications.publication_id",
@@ -1063,6 +1068,7 @@ NODES: tuple[Node, ...] = (
             "publications.id",
         ),
         writes=(
+            "source_authorships.countries",
             "source_publications.countries",
             "publications.countries",
             "source_authorships.countries_dirty",

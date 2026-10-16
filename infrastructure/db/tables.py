@@ -836,6 +836,8 @@ source_authorships = Table(
     # Posé par normalize (nouveaux source_authorships) et la détection (adresse
     # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
+    # Pays de la signature : adresses, organisations ROR sans adresse, structures HAL.
+    Column("countries", ARRAY(Text)),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
     # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des
