@@ -304,6 +304,19 @@ class TestAddressesCountries:
         # La facette countries doit être présente
         assert res.country_facets is not None
 
+    def test_le_compte_sans_pays_ignore_le_filtre_de_pays(self, sa_sync_conn):
+        ensure_country(sa_sync_conn, "fr")
+        insert_address(sa_sync_conn, "Lab ZKWQ un", countries=["fr"])
+        insert_address(sa_sync_conn, "Lab ZKWQ deux", countries=None)
+        insert_address(sa_sync_conn, "Lab ZKWQ trois", countries=None)
+
+        res = _q(sa_sync_conn).addresses_countries(
+            filters=AddressCountryFilter(search="ZKWQ", country_code="fr"), page=1, per_page=50
+        )
+
+        assert res.total == 1
+        assert res.without_country == 2
+
     def test_chaque_adresse_expose_ses_pays_trouves_et_leurs_moyens(self, sa_sync_conn):
         ensure_country(sa_sync_conn, "fr")
         ensure_country(sa_sync_conn, "it")

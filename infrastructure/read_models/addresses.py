@@ -262,7 +262,9 @@ class PgAddressesQueries(AddressesQueries):
             for r in rows
         ]
 
-        cf_where, cf_binds = _countries_where(replace(filters, country_code=None))
+        # La facette pays couvre la présence d'un pays et le pays retenu : elle écarte ces deux critères.
+        facet_filters = replace(filters, country_code=None, has_country=None)
+        cf_where, cf_binds = _countries_where(facet_filters)
         cf_rows = self._conn.execute(
             text(f"""
                 SELECT c AS code, COUNT(*) AS cnt
@@ -273,6 +275,10 @@ class PgAddressesQueries(AddressesQueries):
             cf_binds,
         ).all()
         country_facets = [FacetOption(value=r.code, count=r.cnt) for r in cf_rows]
+        nc_where, nc_binds = _countries_where(replace(facet_filters, has_country=False))
+        without_country = self._conn.execute(
+            text(f"SELECT COUNT(*) FROM addresses a {nc_where}"), nc_binds
+        ).scalar_one()
 
         return AddressesCountriesResponse(
             total=total,
@@ -280,6 +286,7 @@ class PgAddressesQueries(AddressesQueries):
             per_page=per_page,
             addresses=addresses,
             country_facets=country_facets,
+            without_country=without_country,
         )
 
     def address_stats(self, structure_id: int) -> AddressStatsResponse:

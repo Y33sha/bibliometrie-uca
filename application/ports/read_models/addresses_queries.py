@@ -121,8 +121,11 @@ class AddressForCountryAttribution(BaseModel):
 
 
 class AddressesCountriesResponse(PaginatedResponse):
+    """`without_country` : nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
+
     addresses: list[AddressForCountryAttribution]
     country_facets: list[FacetOption]
+    without_country: int
 
 
 class AddressStatsResponse(BaseModel):

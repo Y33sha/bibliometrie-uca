@@ -14,7 +14,7 @@
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
 	type Facet = { value: string; count: number };
-	type AddressesResponse = { country_facets?: Facet[] };
+	type AddressesResponse = { country_facets?: Facet[]; without_country?: number };
 
 	const METHOD_LABELS: Record<Method, string> = {
 		manual: 'saisie',
@@ -39,16 +39,18 @@
 		buildParams() {
 			const params = new URLSearchParams();
 			if (search.trim()) params.set('search', search.trim());
-			if (selectedHasCountry.length === 1) params.set('has_country', selectedHasCountry[0]);
-			if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
+			if (withoutCountry) params.set('has_country', 'false');
+			else if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
 			return params;
 		},
 	});
 	const addresses = $derived(list.items);
 
 	let search = $state('');
-	let selectedHasCountry: string[] = $state([]);
 	let selectedCountry: string[] = $state([]);
+	// Option « Aucun » de la facette Pays : adresses sans pays retenu.
+	const NONE = 'none';
+	const withoutCountry = $derived(selectedCountry.length === 1 && selectedCountry[0] === NONE);
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	// Batch
@@ -56,25 +58,26 @@
 	let batchCountry = $state('');
 	const allSelected = $derived(addresses.length > 0 && addresses.every(a => selectedIds.has(a.id)));
 
-	const hasCountryOptions: FacetOption[] = [
-		{ value: 'yes', text: 'Avec pays' },
-		{ value: 'no', text: 'Sans pays' },
-	];
-	// Code du référentiel marquant l'absence de pays : la facette l'ouvre, c'est l'arbitrage le plus fréquent et le seul qui ne se cherche pas par son nom.
+	// Code du référentiel marquant l'absence de pays : la facette le place juste après « Aucun », c'est l'arbitrage le plus fréquent et le seul qui ne se cherche pas par son nom.
 	const NO_COUNTRY_CODE = 'xx';
 	let countryFacets: { value: string; count: number }[] = $state([]);
-	const countryOptions = $derived.by(() => {
+	let withoutCountryCount: number | undefined = $state(undefined);
+	const countryOptions = $derived.by((): FacetOption[] => {
+		const none: FacetOption = { value: NONE, text: 'Aucun', count: withoutCountryCount };
 		if (countryFacets.length > 0) {
 			const noCountry = countryFacets.find(f => f.value === NO_COUNTRY_CODE);
 			const rest = countryFacets.filter(f => f.value !== NO_COUNTRY_CODE);
 			const sorted = [...(noCountry ? [noCountry] : []), ...rest];
-			return sorted.map(f => ({
-				value: f.value,
-				text: `${countryMap[f.value] || f.value.toUpperCase()} (${f.value.toUpperCase()})`,
-				count: f.count
-			}));
+			return [
+				none,
+				...sorted.map(f => ({
+					value: f.value,
+					text: `${countryMap[f.value] || f.value.toUpperCase()} (${f.value.toUpperCase()})`,
+					count: f.count,
+				})),
+			];
 		}
-		return countries.map(c => ({ value: c.code, text: `${c.name} (${c.code.toUpperCase()})` }));
+		return [none, ...countries.map(c => ({ value: c.code, text: `${c.name} (${c.code.toUpperCase()})` }))];
 	});
 
 	async function loadCountries() {
@@ -86,6 +89,7 @@
 	$effect(() => {
 		const data = list.data;
 		if (data?.country_facets) countryFacets = data.country_facets;
+		if (data?.without_country != null) withoutCountryCount = data.without_country;
 	});
 
 	function syncUrl() {
@@ -93,7 +97,6 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
-		if (selectedHasCountry.length === 1) p.set('has_country', selectedHasCountry[0]);
 		const qs = p.toString();
 		replaceState(`${base}/admin/countries` + (qs ? '?' + qs : ''), {});
 	}
@@ -119,7 +122,7 @@
 		if (!addr || !code) return;
 		const newList = [...new Set([...(addr.countries || []), code])].sort();
 		await addressesApi.setCountry(addrId, { countries: newList });
-		if (selectedHasCountry.includes('no')) {
+		if (withoutCountry) {
 			list.load();
 		} else {
 			addr.countries = newList;
@@ -151,9 +154,7 @@
 
 	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (422), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
 	const hasActiveFilter = $derived(
-		search.trim() !== '' ||
-			selectedHasCountry.length === 1 ||
-			selectedCountry.length === 1,
+		search.trim() !== '' || selectedCountry.length === 1,
 	);
 
 	async function batchAddCountry(applyToAll = false) {
@@ -163,8 +164,8 @@
 		const body: Record<string, unknown> = { country_code: batchCountry };
 		if (applyToAll) {
 			if (search.trim()) body.search = search.trim();
-			if (selectedHasCountry.length === 1) body.has_country = selectedHasCountry[0];
-			if (selectedCountry.length === 1) body.country_code_filter = selectedCountry[0];
+			if (withoutCountry) body.has_country = false;
+			else if (selectedCountry.length === 1) body.country_code_filter = selectedCountry[0];
 		} else {
 			body.address_ids = [...selectedIds];
 		}
@@ -187,7 +188,6 @@
 		if (params.get('page')) list.page = parseInt(params.get('page')!) || 1;
 		if (params.get('search')) search = params.get('search')!;
 		if (params.get('country')) selectedCountry = [params.get('country')!];
-		if (params.get('has_country')) selectedHasCountry = [params.get('has_country')!];
 		loadCountries();
 		list.load();
 	});
@@ -201,8 +201,8 @@
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
-	<FacetDropdown label="Pays retenu" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />	<span class="toolbar-spacer"></span>
+	<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
+	<span class="toolbar-spacer"></span>
 	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>
 </div>
 

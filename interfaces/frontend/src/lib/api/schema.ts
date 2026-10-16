@@ -2684,7 +2684,10 @@ export interface components {
             /** Is Detected */
             is_detected: boolean;
         };
-        /** AddressesCountriesResponse */
+        /**
+         * AddressesCountriesResponse
+         * @description `without_country` : nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`.
+         */
         AddressesCountriesResponse: {
             /** Total */
             total: number;
@@ -2696,6 +2699,8 @@ export interface components {
             addresses: components["schemas"]["AddressForCountryAttribution"][];
             /** Country Facets */
             country_facets: components["schemas"]["FacetOption"][];
+            /** Without Country */
+            without_country: number;
             /** Pages */
             readonly pages: number;
         };
