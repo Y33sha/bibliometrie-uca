@@ -15,6 +15,7 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Monographies](DATA_monographies.md)
+- [Normalisation des textes : écritures non latines et unicité des adresses](DATA_normalisation-des-textes.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des signatures : candidats et résolution](DATA_pays-des-signatures.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
