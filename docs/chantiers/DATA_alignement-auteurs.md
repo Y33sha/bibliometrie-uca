@@ -48,11 +48,49 @@ Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur
 
 Le tableau compte les positions communes à trois sources indépendantes ou plus, au même nom de famille, dont les prénoms sont incompatibles. La source qui s'écarte a un prénom incompatible avec tous les autres, eux compatibles entre eux. 1 529 positions sont sans source unique qui s'écarte. HAL s'écarte le plus souvent, Crossref ensuite. scanR et OpenAlex partagent une partie de leurs données, donc le vote peut les favoriser.
 
+### Doubles rattachements
+
+Mesure du 2026-10-16. Dans 2 931 notices, une même personne est rattachée à deux signatures d'auteur ou plus : 4 273 cas, 260 personnes. Exemple : dans la notice OpenAlex W4411690674, « k ma » et « k maj », deux co-auteurs aux ORCID distincts, sont rattachés à la même personne.
+
+| Source | Mode de résolution | Signatures |
+|---|---|---|
+| Crossref | `identifier` | 1 926 |
+| OpenAlex | `identifier` | 1 742 |
+| HAL | `cross_source` | 1 323 |
+| WoS | `cross_source` | 672 |
+| OpenAlex | `name` | 525 |
+| HAL | `name` | 464 |
+
+Un ORCID décalé dans Crossref rattache une signature à la personne d'un co-auteur, qui reçoit alors deux ORCID. Les signatures portant l'un ou l'autre s'y rattachent par identifiant, d'autres par forme de nom. OpenAlex reproduit Crossref. HAL est contaminé ensuite par le rattachement `cross_source`.
+
+### Identifiants contradictoires
+
+Mesure du 2026-10-16 : couples (publication, personne) dont les signatures portent deux valeurs d'un même identifiant fort non neutralisé, sur 398 405 couples.
+
+| Type | Dans une même notice | Cas | Personnes |
+|---|---|---|---|
+| ORCID | oui | 1 073 | 18 |
+| ORCID | non | 583 | 127 |
+| IdRef | non | 368 | 58 |
+| IdRef | oui | 2 | 2 |
+| idHAL | non | 5 | 4 |
+
+- Dans une même notice, la contradiction est un double rattachement.
+- Entre sources, une partie est légitime : une personne a deux IdRef (Antoine Vacavant, Céline Guillot : un IdRef dans HAL, un autre dans scanR) ou deux comptes ORCID (Marie-Ange Mouret-Reynier). Une autre partie réunit deux personnes : « Ana Raquel Marques » et « Ana Luisa Marques ».
+
+### Synchronisation des signatures
+
+La renormalisation d'une notice rapproche ses signatures de celles en base par identité : nom normalisé et identifiants. Une signature dont les identifiants changent est supprimée, puis insérée sans personne, et la résolution la reprend.
+
 ## Décisions
 
 - L'alignement se fait par publication, avant la phase `persons`.
-- Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux signatures qui le partagent. Deux valeurs différentes du même type séparent deux signatures.
+- Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux signatures qui le partagent.
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
+- Une table des auteurs alignés relie les signatures d'un même auteur et porte `person_id`, retiré des `source_authorships`.
+- Un auteur aligné réunit au plus une signature par notice. Une personne correspond au plus à un auteur aligné par publication. Les doubles rattachements relèvent de ce chantier.
+- Les verdicts (formes de nom rejetées, signatures détachées) restent ancrés sur les `source_authorships` : l'identifiant d'un auteur aligné change à chaque recalcul de l'alignement.
+- Une signature dont les identifiants changent marque son auteur aligné à recalculer, et la résolution des personnes le reprend.
 
 ## Phasage
 
@@ -66,15 +104,20 @@ Le tableau compte les positions communes à trois sources indépendantes ou plus
 - [ ] Échantillon des positions où HAL s'écarte, relu à la main. Hypothèse : HAL rattache automatiquement une signature à un mauvais compte.
 - [x] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
 - [x] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
+- [x] Doubles rattachements : signatures d'une même notice rattachées à la même personne.
+- [x] Identifiants contradictoires au sein d'un couple (publication, personne).
+- [ ] Échantillon des identifiants contradictoires entre sources, relu à la main : part des doublons d'identifiant légitimes.
 
 ### Phase 2 — Méthode et modèle
 
 - [ ] Méthode d'alignement, choisie d'après la mesure.
-- [ ] Modèle : auteurs alignés d'une publication, et lien de chaque signature à son auteur.
+- [ ] Modèle : table des auteurs alignés portant `person_id`, lien de chaque signature à son auteur, contraintes d'unicité.
+- [ ] Marquage à recalculer d'un auteur aligné dont une signature change d'identifiants.
 
 ### Phase 3 — Usages
 
 - [ ] Identification des personnes par auteur aligné.
+- [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
 
@@ -85,6 +128,8 @@ Le tableau compte les positions communes à trois sources indépendantes ou plus
 ## Questions ouvertes
 
 - **Méthode.** Affectation par similarité de noms sous les contraintes des identifiants. Rôle de la position : indice faible, ou critère pour les seules listes courtes.
+- **Identifiants différents entre sources.** Deux valeurs différentes d'un même type, à des signatures de sources différentes, séparent-elles deux signatures ? Une personne peut avoir deux IdRef ou deux comptes ORCID.
+- **Ancrage des verdicts.** Une signature dont les identifiants changent reçoit un nouvel identifiant à la synchronisation : les verdicts ancrés sur elle se perdent-ils ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **Auteurs collectifs** : noms de consortium dans la liste des auteurs.
 - **Rapport avec `authorships`** : l'auteur aligné remplace-t-il la consolidation par paire (publication, personne) ?
