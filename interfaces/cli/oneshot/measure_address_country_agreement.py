@@ -26,6 +26,7 @@ import gzip
 import os
 import random
 from collections import defaultdict
+from collections.abc import Iterable
 from itertools import combinations
 from pathlib import Path
 
@@ -137,15 +138,17 @@ def pairwise_table(candidates: dict[str, CountrySets]) -> str:
     return "\n".join(lines)
 
 
-def precedence_table(candidates: dict[str, CountrySets], retained: CountrySets) -> str:
-    """Pays composés par `retained_countries`, comparés à `addresses.countries` sur toutes les adresses qui ont l'un ou l'autre."""
+def precedence_table(
+    candidates: dict[str, CountrySets], retained: CountrySets, address_ids: Iterable[int]
+) -> str:
+    """Pays composés par `retained_countries`, comparés à `addresses.countries` sur les adresses `address_ids`. Les candidats d'une adresse supprimée depuis leur calcul sont ignorés."""
     methods = {m: CountryDetectionMethod(m) for m in candidates if m in CountryDetectionMethod}
     by_address: defaultdict[int, dict[CountryDetectionMethod, frozenset[str]]] = defaultdict(dict)
     for name, method in methods.items():
         for address_id, codes in candidates[name].items():
             by_address[address_id][method] = codes
     counts = dict.fromkeys(("identical", "gained", "lost", "changed"), 0)
-    for address_id in by_address.keys() | retained.keys():
+    for address_id in address_ids:
         composed = retained_countries(by_address.get(address_id, {}))
         before = retained.get(address_id, frozenset())
         if composed == before:
@@ -202,9 +205,13 @@ def main() -> None:
     parser.add_argument("--sample", type=int, default=40, help="désaccords tirés par moyen")
     args = parser.parse_args()
 
-    candidates = load_candidates(args.candidates)
     with get_sync_engine().connect() as conn:
         retained, raw_text = load_retained(conn)
+    # Une adresse supprimée depuis le calcul des candidats sort de la mesure.
+    candidates = {
+        method: {a: codes for a, codes in sets.items() if a in raw_text}
+        for method, sets in load_candidates(args.candidates).items()
+    }
     total = len(raw_text)
     log.info("%d adresses, %d avec pays retenu", total, len(retained))
 
@@ -218,7 +225,7 @@ def main() -> None:
         + "\n\n## Entre moyens\n\n"
         + pairwise_table(candidates)
         + "\n\n## Préséance (`retained_countries`) contre `addresses.countries`\n\n"
-        + precedence_table(candidates, retained)
+        + precedence_table(candidates, retained, raw_text.keys())
         + "\n",
         encoding="utf-8",
     )
