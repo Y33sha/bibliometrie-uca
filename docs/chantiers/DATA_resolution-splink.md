@@ -16,6 +16,8 @@ La résolution des personnes est une cascade de règles : elle rattache chaque s
 
 La table des paires est du dérivé recalculable. C'est la sortie d'un modèle probabiliste comme de règles déterministes.
 
+**Dépendance.** Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) regroupe par publication les signatures des différentes sources qui désignent le même auteur. La résolution des personnes compare alors des auteurs alignés : le volume à comparer diminue, et chaque auteur aligné réunit les identifiants de ses signatures.
+
 ## Décisions
 
 ## Phasage
@@ -31,7 +33,6 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 - Splink ne prévoit pas les liens imposés ou interdits : les décisions humaines s'appliquent à l'étape 2.
 - Les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
 - Les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de signatures. Comment les traduire en contraintes sur les signatures ?
-- Un regroupement préalable des signatures par publication, comme chez CRISalid : les signatures des différentes sources d'une même publication forment un groupe, et Splink compare des groupes plutôt que des signatures. Le volume à comparer diminue, et chaque groupe réunit les identifiants de ses signatures.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres signatures.
-- La précision et le rappel de la cascade, mesurés contre les décisions humaines (rattachements rejetés, rattachements manuels qu'elle avait manqués) : base de comparaison avec Splink.
+- La précision et le rappel de la cascade après l'alignement des auteurs, mesurés contre les décisions humaines (rattachements rejetés, rattachements manuels qu'elle avait manqués) : base de comparaison avec Splink.
 - `publications.reconcile`, aujourd'hui un seul nœud du graphe : le scinder selon les étapes de la forme par paires, si elle est retenue.
