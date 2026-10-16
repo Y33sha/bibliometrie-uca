@@ -1,8 +1,9 @@
-"""Fragments SQL partagés entre l'API et le pipeline.
+"""Fragments SQL partagés entre plusieurs adaptateurs de l'API ou du pipeline.
 
 Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une signature), et des expressions SQL figées.
 """
 
+from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
@@ -187,6 +188,35 @@ def active_issns(journal: str) -> str:
         SELECT array_agg(i.issn ORDER BY i.id) FROM journal_issns i
         WHERE i.journal_id = {journal} AND i.status = 'active'
     ), ARRAY[]::text[])"""
+
+
+# Condition vraie quand le candidat aliasé `acc` est absent des pays retenus de l'adresse aliasée `a`.
+NOT_RETAINED = "NOT (acc.country_code = ANY(coalesce(a.countries, '{}')))"
+
+
+def address_country_conditions(
+    criteria: AddressCountryFilter,
+) -> tuple[list[str], dict[str, object]]:
+    """Conditions SQL de `criteria` sur l'adresse aliasée `a`, et leurs paramètres."""
+    conditions: list[str] = []
+    params: dict[str, object] = {}
+    if criteria.search:
+        conditions.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
+        params["search"] = f"%{criteria.search}%"
+    if criteria.has_country is not None:
+        conditions.append(
+            "a.countries IS NOT NULL" if criteria.has_country else "a.countries IS NULL"
+        )
+    if criteria.country_code:
+        conditions.append(":country_code = ANY(a.countries)")
+        params["country_code"] = criteria.country_code
+    if criteria.proposed_country:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM address_country_candidates acc WHERE acc.address_id = a.id"
+            f" AND acc.country_code = :proposed_country AND {NOT_RETAINED})"
+        )
+        params["proposed_country"] = criteria.proposed_country
+    return conditions, params
 
 
 def has_active_issn(journal: str) -> str:

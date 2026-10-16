@@ -9,14 +9,14 @@ from typing import Protocol
 
 @dataclass(frozen=True, slots=True)
 class AddressCountryFilter:
-    """Critères de sélection d'adresses pour une attribution de pays en masse.
+    """Critères de sélection d'adresses par leur pays, pour la liste d'attribution et l'attribution en masse.
 
-    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` / `suggested_country` : code présent dans la colonne correspondante."""
+    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` : pays retenu. `proposed_country` : pays trouvé par un moyen de détection et non retenu."""
 
     search: str | None = None
     has_country: bool | None = None
     country_code: str | None = None
-    suggested_country: str | None = None
+    proposed_country: str | None = None
 
     @property
     def is_empty(self) -> bool:
@@ -25,7 +25,7 @@ class AddressCountryFilter:
             self.search
             or self.has_country is not None
             or self.country_code
-            or self.suggested_country
+            or self.proposed_country
         )
 
 

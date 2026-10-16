@@ -2552,7 +2552,7 @@ export interface components {
         };
         /**
          * AddressForCountryAttribution
-         * @description Ligne de `/api/addresses/countries`.
+         * @description Ligne de `/api/addresses/countries`. `countries` : pays retenus. `found_countries` : tous les pays trouvés, retenus ou non.
          */
         AddressForCountryAttribution: {
             /** Id */
@@ -2561,8 +2561,8 @@ export interface components {
             raw_text: string;
             /** Countries */
             countries: string[] | null;
-            /** Suggested Countries */
-            suggested_countries: string[];
+            /** Found Countries */
+            found_countries: components["schemas"]["FoundCountry"][];
             /** Pub Count */
             pub_count: number;
         };
@@ -2684,7 +2684,10 @@ export interface components {
             /** Is Detected */
             is_detected: boolean;
         };
-        /** AddressesCountriesResponse */
+        /**
+         * AddressesCountriesResponse
+         * @description `proposal_facets` : pays trouvés et non retenus, avec leur nombre d'adresses.
+         */
         AddressesCountriesResponse: {
             /** Total */
             total: number;
@@ -2694,8 +2697,8 @@ export interface components {
             per_page: number;
             /** Addresses */
             addresses: components["schemas"]["AddressForCountryAttribution"][];
-            /** Suggestion Facets */
-            suggestion_facets?: components["schemas"]["FacetOption"][] | null;
+            /** Proposal Facets */
+            proposal_facets: components["schemas"]["FacetOption"][];
             /** Country Facets */
             country_facets: components["schemas"]["FacetOption"][];
             /** Pages */
@@ -2833,10 +2836,10 @@ export interface components {
              */
             country_code_filter: string;
             /**
-             * Suggested Country
+             * Proposed Country
              * @default
              */
-            suggested_country: string;
+            proposed_country: string;
         };
         /**
          * BatchUpdatedResponse
@@ -2936,6 +2939,12 @@ export interface components {
             /** Value */
             value: number;
         };
+        /**
+         * CountryDetectionMethod
+         * @description Moyen qui propose un pays pour une adresse.
+         * @enum {string}
+         */
+        CountryDetectionMethod: "manual" | "country_name" | "ror" | "source_openalex" | "institution" | "city" | "source_scanr";
         /**
          * CountryOut
          * @description Pays du référentiel : code ISO à deux lettres et libellé.
@@ -3205,6 +3214,16 @@ export interface components {
             concordant_valid: number;
             /** Pending */
             pending: number;
+        };
+        /**
+         * FoundCountry
+         * @description Pays trouvé pour une adresse, et les moyens de détection qui le trouvent.
+         */
+        FoundCountry: {
+            /** Country Code */
+            country_code: string;
+            /** Methods */
+            methods: components["schemas"]["CountryDetectionMethod"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -6333,8 +6352,7 @@ export interface operations {
                 search?: string;
                 has_country?: boolean | null;
                 country_code?: string;
-                suggested_country?: string;
-                suggest?: boolean;
+                proposed_country?: string;
                 page?: number;
                 per_page?: number;
             };

@@ -109,7 +109,7 @@ def batch_set_country(
     search: str,
     has_country: bool | None,
     country_code_filter: str,
-    suggested_country: str,
+    proposed_country: str,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
     audit_repo: AuditRepository | None = None,
@@ -129,7 +129,7 @@ def batch_set_country(
             search=search,
             has_country=has_country,
             country_code_filter=country_code_filter,
-            suggested_country=suggested_country,
+            proposed_country=proposed_country,
             repo=repo,
             country_recompute=country_recompute,
         )
@@ -143,7 +143,7 @@ def batch_set_country(
             "search": search,
             "has_country": has_country,
             "country_code_filter": country_code_filter,
-            "suggested_country": suggested_country,
+            "proposed_country": proposed_country,
         }
     emit_event(
         audit_repo,

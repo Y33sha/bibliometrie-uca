@@ -2,12 +2,15 @@
 
 from functools import partial
 
+from sqlalchemy import text
+
 from application.ports.read_models.addresses_queries import (
-    AddressCountriesFilters,
     AddressListFilters,
     StructurePredicate,
     TextPredicate,
 )
+from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.country_detection import CountryDetectionMethod
 from infrastructure.read_models.addresses import PgAddressesQueries
 from tests.integration.helpers.addresses import (
     ensure_country,
@@ -282,7 +285,7 @@ class TestAddressesCountries:
         insert_address(sa_sync_conn, "B", countries=None)
 
         res = _q(sa_sync_conn).addresses_countries(
-            filters=AddressCountriesFilters(has_country="yes"), page=1, per_page=50
+            filters=AddressCountryFilter(has_country=True), page=1, per_page=50
         )
         assert res.total >= 1
         assert all(a.countries is not None for a in res.addresses)
@@ -294,17 +297,32 @@ class TestAddressesCountries:
         insert_address(sa_sync_conn, "A-us", countries=["US"])
 
         res = _q(sa_sync_conn).addresses_countries(
-            filters=AddressCountriesFilters(country_code="FR"), page=1, per_page=50
+            filters=AddressCountryFilter(country_code="FR"), page=1, per_page=50
         )
         ids = [a.id for a in res.addresses]
         assert a_fr in ids
         # La facette countries doit être présente
         assert res.country_facets is not None
 
-    def test_suggest_mode_returns_facets(self, sa_sync_conn):
-        ensure_country(sa_sync_conn, "FR")
-        insert_address(sa_sync_conn, "sug", countries=None, suggested_countries=["FR"])
-        res = _q(sa_sync_conn).addresses_countries(
-            filters=AddressCountriesFilters(suggest=True), page=1, per_page=50
+    def test_les_pays_trouves_et_non_retenus_sont_proposes(self, sa_sync_conn):
+        ensure_country(sa_sync_conn, "fr")
+        ensure_country(sa_sync_conn, "it")
+        addr = insert_address(sa_sync_conn, "École française de Rome", countries=["fr"])
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO address_country_candidates (address_id, country_code, method)"
+                " VALUES (:a, 'fr', 'country_name'), (:a, 'fr', 'ror'), (:a, 'it', 'city')"
+            ),
+            {"a": addr},
         )
-        assert res.suggestion_facets is not None
+
+        res = _q(sa_sync_conn).addresses_countries(
+            filters=AddressCountryFilter(proposed_country="it"), page=1, per_page=50
+        )
+
+        assert [a.id for a in res.addresses] == [addr]
+        assert [(f.country_code, f.methods) for f in res.addresses[0].found_countries] == [
+            ("fr", [CountryDetectionMethod.COUNTRY_NAME, CountryDetectionMethod.ROR]),
+            ("it", [CountryDetectionMethod.CITY]),
+        ]
+        assert [(f.value, f.count) for f in res.proposal_facets] == [("it", 1)]

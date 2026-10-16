@@ -12,8 +12,23 @@
 	import type { components } from '$lib/api/schema';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
+	type Method = components['schemas']['CountryDetectionMethod'];
 	type Facet = { value: string; count: number };
-	type AddressesResponse = { suggestion_facets?: Facet[]; country_facets?: Facet[] };
+	type AddressesResponse = { proposal_facets?: Facet[]; country_facets?: Facet[] };
+
+	const METHOD_LABELS: Record<Method, string> = {
+		manual: 'saisie',
+		country_name: 'nom de pays',
+		ror: 'ROR',
+		source_openalex: 'OpenAlex',
+		institution: 'institution',
+		city: 'ville',
+		source_scanr: 'ScanR',
+	};
+
+	function methodsLabel(methods: Method[]): string {
+		return methods.map(m => METHOD_LABELS[m]).join(', ');
+	}
 
 	let countries: Country[] = $state([]);
 	let countryMap: Record<string, string> = $state({});
@@ -26,8 +41,7 @@
 			if (search.trim()) params.set('search', search.trim());
 			if (selectedHasCountry.length === 1) params.set('has_country', selectedHasCountry[0]);
 			if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
-			if (suggestMode) params.set('suggest', 'true');
-			if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
+			if (selectedProposed.length === 1) params.set('proposed_country', selectedProposed[0]);
 			return params;
 		},
 	});
@@ -73,8 +87,8 @@
 	$effect(() => {
 		const data = list.data;
 		if (data?.country_facets) countryFacets = data.country_facets;
-		if (data?.suggestion_facets) {
-			sugFacetOptions = data.suggestion_facets.map(f => ({
+		if (data?.proposal_facets) {
+			proposedOptions = data.proposal_facets.map(f => ({
 				value: f.value,
 				text: countryLabel(f.value),
 				count: f.count,
@@ -88,7 +102,7 @@
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
 		if (selectedHasCountry.length === 1) p.set('has_country', selectedHasCountry[0]);
-		if (selectedSugCountry.length === 1) p.set('sug_country', selectedSugCountry[0]);
+		if (selectedProposed.length === 1) p.set('proposed', selectedProposed[0]);
 		const qs = p.toString();
 		replaceState(`${base}/admin/countries` + (qs ? '?' + qs : ''), {});
 	}
@@ -96,9 +110,9 @@
 	function onFilterChange() {
 		list.page = 1;
 		selectedIds = new Set();
-		// Synchroniser le select pays avec la facette pays suggéré
-		if (selectedSugCountry.length === 1) {
-			batchCountry = selectedSugCountry[0];
+		// Le pays proposé filtré devient le pays à ajouter.
+		if (selectedProposed.length === 1) {
+			batchCountry = selectedProposed[0];
 		}
 		syncUrl();
 		list.load();
@@ -118,7 +132,7 @@
 		if (!addr || !code) return;
 		const newList = [...new Set([...(addr.countries || []), code])].sort();
 		await addressesApi.setCountry(addrId, { countries: newList });
-		if (selectedHasCountry.includes('no') || suggestMode) {
+		if (selectedHasCountry.includes('no') || selectedProposed.length > 0) {
 			list.load();
 		} else {
 			addr.countries = newList;
@@ -148,36 +162,17 @@
 	let batchApplying = $state(false);
 	let batchResult = $state('');
 
-	// Suggestions
-	let suggestMode = $state(false);
-	let sugFacetOptions: FacetOption[] = $state([]);
-	let selectedSugCountry: string[] = $state([]);
+	// Pays trouvés par un moyen de détection et non retenus.
+	let proposedOptions: FacetOption[] = $state([]);
+	let selectedProposed: string[] = $state([]);
 
 	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (422), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
 	const hasActiveFilter = $derived(
 		search.trim() !== '' ||
 			selectedHasCountry.length === 1 ||
 			selectedCountry.length === 1 ||
-			selectedSugCountry.length === 1,
+			selectedProposed.length === 1,
 	);
-
-	function toggleSuggest() {
-		suggestMode = !suggestMode;
-		selectedSugCountry = [];
-		sugFacetOptions = [];
-		if (suggestMode) {
-			selectedHasCountry = ['no'];
-			selectedCountry = [];
-		} else {
-			selectedHasCountry = [];
-		}
-		list.page = 1;
-		list.load();
-	}
-
-	async function acceptSuggestion(addrId: number, code: string) {
-		await addCountry(addrId, code);
-	}
 
 	async function batchAddCountry(applyToAll = false) {
 		if (!batchCountry) return;
@@ -187,8 +182,8 @@
 		if (applyToAll) {
 			if (search.trim()) body.search = search.trim();
 			if (selectedHasCountry.length === 1) body.has_country = selectedHasCountry[0];
-			if (selectedCountry.length === 1) body.country_code = selectedCountry[0];
-			if (selectedSugCountry.length === 1) body.suggested_country = selectedSugCountry[0];
+			if (selectedCountry.length === 1) body.country_code_filter = selectedCountry[0];
+			if (selectedProposed.length === 1) body.proposed_country = selectedProposed[0];
 		} else {
 			body.address_ids = [...selectedIds];
 		}
@@ -212,7 +207,7 @@
 		if (params.get('search')) search = params.get('search')!;
 		if (params.get('country')) selectedCountry = [params.get('country')!];
 		if (params.get('has_country')) selectedHasCountry = [params.get('has_country')!];
-		if (params.get('sug_country')) selectedSugCountry = [params.get('sug_country')!];
+		if (params.get('proposed')) selectedProposed = [params.get('proposed')!];
 		loadCountries();
 		list.load();
 	});
@@ -226,15 +221,9 @@
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	<button class="btn btn-suggest" class:active={suggestMode} onclick={toggleSuggest}>
-		{suggestMode ? 'Suggestions actives' : 'Activer suggestions'}
-	</button>
-	{#if !suggestMode}
-		<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
-		<FacetDropdown label="Filtrer pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
-	{:else if sugFacetOptions.length > 0}
-		<FacetDropdown label="Pays suggéré" options={sugFacetOptions} bind:selected={selectedSugCountry} onchange={onFilterChange} />
-	{/if}
+	<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
+	<FacetDropdown label="Pays retenu" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
+	<FacetDropdown label="Pays proposé" options={proposedOptions} searchable bind:selected={selectedProposed} onchange={onFilterChange} />
 	<span class="toolbar-spacer"></span>
 	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>
 </div>
@@ -278,20 +267,19 @@
 				<td class="num-cell">{a.pub_count}</td>
 				<td>
 					<div class="country-cell">
-					{#if a.countries}
-						{#each a.countries as c}
-							<span class="country-tag">
-								{countryLabel(c)}
-								<button class="tag-remove" onclick={() => removeCountry(a.id, c)}>×</button>
-							</span>
-						{/each}
-					{:else if suggestMode && a.suggested_countries && a.suggested_countries.length > 0}
-						{#each a.suggested_countries as s}
-							<button class="sug-tag" onclick={() => acceptSuggestion(a.id, s)}>
-								{countryLabel(s)} ?
-							</button>
-						{/each}
-					{/if}
+					{#each a.countries ?? [] as c}
+						{@const found = a.found_countries.find(f => f.country_code === c)}
+						<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+							{countryLabel(c)}
+							<button class="tag-remove" onclick={() => removeCountry(a.id, c)}>×</button>
+						</span>
+					{/each}
+					{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
+						<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+							{countryLabel(p.country_code)} ?
+							<span class="proposal-methods">{methodsLabel(p.methods)}</span>
+						</button>
+					{/each}
 					<select class="add-country" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
 						<option value="">+</option>
 						{#each countries as c}
@@ -317,18 +305,14 @@
 	}
 	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
-	/* Toggle "suggestions" : base .btn globale + état actif ambre. */
-	.btn-suggest { font-weight: 500; }
-	.btn-suggest.active {
-		background: var(--warning-light); border-color: var(--warning); color: var(--text);
-	}
-	.sug-tag {
-		display: inline-flex; align-items: center; gap: 2px;
+	.proposal-tag {
+		display: inline-flex; align-items: center; gap: 4px;
 		padding: 2px 8px; background: #fff8e1; color: #856404;
 		border: 1px dashed #f5a623; border-radius: 3px; cursor: pointer;
 		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
 	}
-	.sug-tag:hover { background: #ffecb3; }
+	.proposal-tag:hover { background: #ffecb3; }
+	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table {
 		width: 100%; border-collapse: collapse; table-layout: fixed;
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;

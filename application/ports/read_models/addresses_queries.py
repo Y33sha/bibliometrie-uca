@@ -9,6 +9,8 @@ from typing import Literal, Protocol
 from pydantic import BaseModel
 
 from application.ports.read_models._common import FacetOption, PaginatedResponse
+from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.country_detection import CountryDetectionMethod
 
 # État de détection d'un rattachement adresse-structure, et état de son arbitrage manuel.
 AddressDetected = Literal["all", "yes", "no"]
@@ -44,15 +46,6 @@ class AddressListFilters:
     validation: AddressValidation = "pending"
     text_predicates: tuple[TextPredicate, ...] = ()
     structure_predicates: tuple[StructurePredicate, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class AddressCountriesFilters:
-    search: str = ""
-    has_country: bool | None = None
-    country_code: str = ""
-    suggested_country: str = ""
-    suggest: bool = False
 
 
 # ----- DTOs de retour -----
@@ -110,19 +103,28 @@ class AddressPublicationItem(BaseModel):
     source_id: str | None
 
 
+class FoundCountry(BaseModel):
+    """Pays trouvé pour une adresse, et les moyens de détection qui le trouvent."""
+
+    country_code: str
+    methods: list[CountryDetectionMethod]
+
+
 class AddressForCountryAttribution(BaseModel):
-    """Ligne de `/api/addresses/countries`."""
+    """Ligne de `/api/addresses/countries`. `countries` : pays retenus. `found_countries` : tous les pays trouvés, retenus ou non."""
 
     id: int
     raw_text: str
     countries: list[str] | None
-    suggested_countries: list[str]
+    found_countries: list[FoundCountry]
     pub_count: int
 
 
 class AddressesCountriesResponse(PaginatedResponse):
+    """`proposal_facets` : pays trouvés et non retenus, avec leur nombre d'adresses."""
+
     addresses: list[AddressForCountryAttribution]
-    suggestion_facets: list[FacetOption] | None = None
+    proposal_facets: list[FacetOption]
     country_facets: list[FacetOption]
 
 
@@ -166,7 +168,7 @@ class AddressesQueries(Protocol):
     def get_structure_link(self, addr_id: int, structure_id: int) -> StructureLinkState | None: ...
 
     def addresses_countries(
-        self, *, filters: AddressCountriesFilters, page: int, per_page: int
+        self, *, filters: AddressCountryFilter, page: int, per_page: int
     ) -> AddressesCountriesResponse: ...
 
     def address_stats(self, structure_id: int) -> AddressStatsResponse: ...

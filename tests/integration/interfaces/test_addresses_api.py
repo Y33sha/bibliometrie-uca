@@ -252,18 +252,14 @@ class TestCountries:
         r = client.get("/api/addresses/countries", params={"has_country": "no"})
         assert r.status_code == 200
 
-    def test_addresses_countries_suggest_mode(self, client):
-        r = client.get("/api/addresses/countries", params={"suggest": True})
-        assert r.status_code == 200
-        assert "suggestion_facets" in r.json()
-
     def test_addresses_countries_filter_by_country(self, client):
         r = client.get("/api/addresses/countries", params={"country_code": "FR"})
         assert r.status_code == 200
 
-    def test_addresses_countries_filter_by_suggested(self, client):
-        r = client.get("/api/addresses/countries", params={"suggested_country": "FR"})
+    def test_addresses_countries_filter_by_proposed(self, client):
+        r = client.get("/api/addresses/countries", params={"proposed_country": "fr"})
         assert r.status_code == 200
+        assert "proposal_facets" in r.json()
 
 
 # ── GET /api/addresses/suggest-countries ─────────────────────────
@@ -298,7 +294,7 @@ class TestSetAddressCountry:
         r2 = auth_client.get("/api/addresses/countries", params={"search": "QWXZ"})
         assert r2.status_code == 200
         rows = [a for a in r2.json()["addresses"] if a["id"] == addr]
-        assert rows and rows[0]["countries"] == ["fr"]
+        assert rows and rows[0]["countries"] == ["FR"]
 
 
 # ── POST /api/addresses/batch-country ────────────────────────────

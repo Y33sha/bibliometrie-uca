@@ -18,6 +18,7 @@ from infrastructure.db.tables import (
     addresses,
     countries,
 )
+from infrastructure.sql_fragments import address_country_conditions
 
 
 class PgAddressRepository(AddressRepository):
@@ -181,29 +182,13 @@ class PgAddressRepository(AddressRepository):
     def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
-        conditions: list[str] = []
-        params: dict[str, object] = {}
-        if criteria.search:
-            conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
-            params["search"] = f"%{criteria.search}%"
-        if criteria.has_country is True:
-            conditions.append("countries IS NOT NULL")
-        elif criteria.has_country is False:
-            conditions.append("countries IS NULL")
-        if criteria.country_code:
-            conditions.append(":country_code = ANY(countries)")
-            params["country_code"] = criteria.country_code
-        if criteria.suggested_country:
-            conditions.append(":suggested_country = ANY(suggested_countries)")
-            params["suggested_country"] = criteria.suggested_country
-
+        conditions, params = address_country_conditions(criteria)
         if not conditions:
             return []
 
-        where_clause = " AND ".join(conditions)
         ids = list(
             self._conn.execute(
-                text(f"SELECT id FROM addresses WHERE {where_clause}"), params
+                text(f"SELECT a.id FROM addresses a WHERE {' AND '.join(conditions)}"), params
             ).scalars()
         )
         return self.add_manual_country_by_ids(country_code, ids)

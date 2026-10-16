@@ -1,10 +1,11 @@
 """Query services pour `/api/addresses/*`."""
 
+from dataclasses import replace
+
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import FacetOption
 from application.ports.read_models.addresses_queries import (
-    AddressCountriesFilters,
     AddressesCountriesResponse,
     AddressesQueries,
     AddressForCountryAttribution,
@@ -14,10 +15,13 @@ from application.ports.read_models.addresses_queries import (
     AddressPublicationItem,
     AddressStatsResponse,
     AddressStructureSummary,
+    FoundCountry,
     StructureLinkState,
 )
+from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.types import JsonValue
 from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.sql_fragments import NOT_RETAINED, address_country_conditions
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (
@@ -25,35 +29,10 @@ _RECOGNIZED_LINK = (
 )
 
 
-def _countries_where(
-    filters: AddressCountriesFilters, *, with_country_code: bool, extra: str | None = None
-) -> tuple[str, dict[str, object]]:
-    """Clause WHERE partagée par la liste des adresses à attribuer et ses deux facettes.
-
-    `with_country_code=False` retire le filtre pays de la clause : c'est la dimension que la facette pays écarte pour compter ses options (comptes exclusifs, comme les autres facettes). `extra` ajoute une condition finale de présence (`a.countries` ou `a.suggested_countries` selon la requête).
-    """
-    parts: list[str] = []
-    binds: dict[str, object] = {}
-    if filters.search:
-        parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
-        binds["search"] = f"%{filters.search}%"
-    if filters.has_country is not None:
-        parts.append("a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL")
-    # Match insensible à la casse : les codes sont canoniquement en minuscules (`countries.code`), mais les arrays peuvent porter des variantes majuscules (codes ISO OpenAlex).
-    if with_country_code and filters.country_code:
-        parts.append(
-            "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"
-        )
-        binds["country_code"] = filters.country_code
-    if filters.suggested_country:
-        parts.append(
-            "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
-            "WHERE lower(x) = lower(:suggested_country))"
-        )
-        binds["suggested_country"] = filters.suggested_country
-    if extra:
-        parts.append(extra)
-    where = "WHERE " + " AND ".join(parts) if parts else ""
+def _countries_where(filters: AddressCountryFilter) -> tuple[str, dict[str, object]]:
+    """Clause WHERE de la liste des adresses à attribuer et de ses facettes. Une facette retire de `filters` sa propre dimension : ses comptes sont exclusifs."""
+    conditions, binds = address_country_conditions(filters)
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
     return where, binds
 
 
@@ -244,10 +223,10 @@ class PgAddressesQueries(AddressesQueries):
         return StructureLinkState.model_validate(row._mapping) if row else None
 
     def addresses_countries(
-        self, *, filters: AddressCountriesFilters, page: int, per_page: int
+        self, *, filters: AddressCountryFilter, page: int, per_page: int
     ) -> AddressesCountriesResponse:
         offset = (page - 1) * per_page
-        where, binds = _countries_where(filters, with_country_code=True)
+        where, binds = _countries_where(filters)
 
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM addresses a {where}"), binds
@@ -256,7 +235,14 @@ class PgAddressesQueries(AddressesQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
+                SELECT a.id, a.raw_text, a.countries, a.pub_count,
+                       (SELECT json_agg(json_build_object(
+                                   'country_code', f.country_code, 'methods', f.methods
+                               ) ORDER BY f.country_code)
+                        FROM (SELECT acc.country_code, array_agg(acc.method ORDER BY acc.method) AS methods
+                              FROM address_country_candidates acc
+                              WHERE acc.address_id = a.id
+                              GROUP BY acc.country_code) f) AS found_countries
                 FROM addresses a
                 {where}
                 ORDER BY a.pub_count DESC, a.raw_text
@@ -265,53 +251,39 @@ class PgAddressesQueries(AddressesQueries):
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
 
-        addresses: list[AddressForCountryAttribution] = []
-        for r in rows:
-            sc = r.suggested_countries
-            # Dédup + normalisation casse (un code peut apparaître en 'FR' et 'fr').
-            suggestions = (
-                sorted({c.strip().lower() for c in sc if c.strip()})
-                if filters.suggest and not r.countries and sc
-                else []
+        addresses = [
+            AddressForCountryAttribution(
+                id=r.id,
+                raw_text=r.raw_text,
+                countries=sorted(r.countries) if r.countries else None,
+                found_countries=[FoundCountry.model_validate(f) for f in r.found_countries or []],
+                pub_count=r.pub_count,
             )
-            addresses.append(
-                AddressForCountryAttribution(
-                    id=r.id,
-                    raw_text=r.raw_text,
-                    countries=(
-                        sorted({c.strip().lower() for c in r.countries}) if r.countries else None
-                    ),
-                    suggested_countries=suggestions,
-                    pub_count=r.pub_count,
-                )
-            )
+            for r in rows
+        ]
 
-        suggestion_facets: list[FacetOption] | None = None
-        if filters.suggest and not filters.suggested_country:
-            sug_where, sug_binds = _countries_where(
-                filters, with_country_code=True, extra="a.suggested_countries IS NOT NULL"
-            )
-            sug_rows = self._conn.execute(
-                text(f"""
-                    SELECT lower(c) AS code, COUNT(*) AS cnt
-                    FROM addresses a, unnest(a.suggested_countries) AS c
-                    {sug_where}
-                    GROUP BY lower(c) ORDER BY cnt DESC LIMIT 20
-                """),
-                sug_binds,
-            ).all()
-            suggestion_facets = [FacetOption(value=r.code, count=r.cnt) for r in sug_rows]
-
-        # Facette pays : écarte sa propre dimension (country_code), garde le reste, exige un pays.
-        cf_where, cf_binds = _countries_where(
-            filters, with_country_code=False, extra="a.countries IS NOT NULL"
+        pf_conditions, pf_binds = address_country_conditions(
+            replace(filters, proposed_country=None)
         )
+        pf_rows = self._conn.execute(
+            text(f"""
+                SELECT acc.country_code AS code, COUNT(DISTINCT a.id) AS cnt
+                FROM address_country_candidates acc
+                JOIN addresses a ON a.id = acc.address_id
+                WHERE {" AND ".join([NOT_RETAINED, *pf_conditions])}
+                GROUP BY acc.country_code ORDER BY cnt DESC
+            """),
+            pf_binds,
+        ).all()
+        proposal_facets = [FacetOption(value=r.code, count=r.cnt) for r in pf_rows]
+
+        cf_where, cf_binds = _countries_where(replace(filters, country_code=None))
         cf_rows = self._conn.execute(
             text(f"""
-                SELECT lower(c) AS code, COUNT(*) AS cnt
+                SELECT c AS code, COUNT(*) AS cnt
                 FROM addresses a, unnest(a.countries) AS c
                 {cf_where}
-                GROUP BY lower(c) ORDER BY cnt DESC
+                GROUP BY c ORDER BY cnt DESC
             """),
             cf_binds,
         ).all()
@@ -322,7 +294,7 @@ class PgAddressesQueries(AddressesQueries):
             page=page,
             per_page=per_page,
             addresses=addresses,
-            suggestion_facets=suggestion_facets,
+            proposal_facets=proposal_facets,
             country_facets=country_facets,
         )
 
