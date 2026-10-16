@@ -13,7 +13,7 @@ Un niveau « auteur de la publication », indépendant de l'identification des p
 - l'identification des personnes : les identifiants de toutes les sources se réunissent avant toute décision, et la décision se prend une fois par auteur ;
 - le contrôle de la déduplication des publications : des notices dont les listes d'auteurs ne s'alignent pas signalent une fusion suspecte (onglet « Recouvrement d'auteurs » de `METIER_gestion-admin-des-publications.md`) ;
 - la détection des erreurs d'affiliation : un même auteur rattaché au périmètre par une source et ailleurs par une autre ;
-- la consolidation du périmètre par auteur (`DATA_perimetre.md`).
+- la consolidation du périmètre par auteur (`archived/2026-10-16_DATA_perimetre.md`).
 
 ### Mesure
 
