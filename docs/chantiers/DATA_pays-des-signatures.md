@@ -85,17 +85,17 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Moyens `source_scanr`, `source_openalex` : pays lus dans les payloads du raw store, rattachés aux adresses par leur texte.
 - [x] Moyen `ror` : pays des organisations ROR de la signature, pour chaque adresse de la signature.
 - [x] Volume, sur 508 057 adresses de la base de test : 1 576 622 candidats. Les sources donnent le pays de chaque affiliation (6c7dec11d).
-- [ ] Passe du script sur le stock réhydraté, sans les noms de structures HAL et ScanR.
+- [x] Passe du script sur le stock réhydraté, sans les noms de structures HAL et ScanR, une adresse par forme normalisée : 468 820 adresses, 2026-10-16. Le ROR rattaché à son affiliation couvre 66,6 % des adresses. `ror` et `source_openalex` donnent le même pays sur 99,9 % de leurs adresses communes.
 
-| Moyen | Candidats | Adresses couvertes |
-|---|---|---|
-| `country_name` | 401 908 | 79,1 % |
-| `institution` | 362 450 | 70,0 % |
-| `city` | 236 942 | 46,4 % |
-| `source_openalex` | 280 539 | 54,2 % |
-| `ror` | 130 161 | 18,4 % |
-| `similarity` | 108 005 | 20,5 % |
-| `source_scanr` | 56 617 | 11,1 % |
+| Moyen | Adresses couvertes |
+|---|---|
+| `country_name` | 385 346 (82,2 %) |
+| `ror` | 312 413 (66,6 %) |
+| `institution` | 296 331 (63,2 %) |
+| `source_openalex` | 263 310 (56,2 %) |
+| `city` | 216 411 (46,2 %) |
+| `similarity` | 75 368 (16,1 %) |
+| `source_scanr` | 33 366 (7,1 %) |
 
 ### 2. Mesure et fonction de préséance des adresses
 
@@ -116,7 +116,8 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
 - [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
-- [ ] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`. Décision de câblage. Bilan provisoire du 2026-10-16 : identiques 557 689 (96,9 %), pays gagné 10 307 (1,8 %), pays perdu 1 285 (0,2 %), pays changé 6 095 (1,1 %). Les candidats datent d'avant la reprise du stock du chantier périmètre et le retrait des formes fausses. Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat, dont 454 tenaient leur pays du seul `similarity`. Le bilan se refait après la passe du script sur le stock réhydraté, et après la fusion des adresses de même forme normalisée (`DATA_normalisation-des-textes.md`).
+- [x] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`, sur le stock réhydraté, 2026-10-16. Identiques 453 799 (96,8 %), pays gagné 8 929 (1,9 %), pays perdu 1 136 (0,2 %), pays changé 4 956 (1,1 %). Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat.
+- [ ] Décision de câblage.
 
 ### 3. Pays des signatures
 
