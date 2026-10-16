@@ -266,6 +266,29 @@ class CountryQueries:
             {"payload": payload, "method": method.value},
         ).scalar_one()
 
+    def replace_candidates_of_dirty_addresses(
+        self,
+        conn: Connection,
+        method: CountryDetectionMethod,
+        rows: list[tuple[int, list[str]]],
+    ) -> int:
+        """Efface les candidats du moyen `method` des adresses `candidates_dirty`, puis écrit ceux de `rows`, qui concernent ces seules adresses. Retourne le nombre d'adresses qui reçoivent un candidat."""
+        conn.execute(
+            text("""
+                DELETE FROM address_country_candidates
+                WHERE method = CAST(:method AS country_detection_method)
+                  AND address_id IN (SELECT id FROM addresses WHERE candidates_dirty)
+            """),
+            {"method": method.value},
+        )
+        return self.insert_candidates(conn, method, rows)
+
+    def mark_all_addresses_for_detection(self, conn: Connection) -> int:
+        """Marque `candidates_dirty` toutes les adresses : le run suivant refait la détection par le texte et la résolution sur tout le stock. Retourne le nombre d'adresses marquées."""
+        return conn.execute(
+            text("UPDATE addresses SET candidates_dirty = true WHERE NOT candidates_dirty")
+        ).rowcount
+
     def insert_ror_candidates(self, conn: Connection) -> int:
         """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque `candidates_dirty` les adresses qui en reçoivent un. Retourne le nombre d'adresses qui reçoivent un candidat."""
         return conn.execute(

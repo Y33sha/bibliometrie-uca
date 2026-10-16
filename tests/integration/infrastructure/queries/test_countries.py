@@ -58,6 +58,30 @@ class TestCandidatesAndResolution:
         assert _candidates(sa_sync_conn, addr) == {("fr", "country_name")}
         assert _field(sa_sync_conn, addr, "candidates_dirty") is True
 
+    def test_la_detection_efface_les_pays_que_le_moyen_ne_trouve_pas(self, sa_sync_conn):
+        """Régression : un candidat issu d'une forme retirée de `place_name_forms` restait en place."""
+        for code in ("fr", "us"):
+            ensure_country(sa_sync_conn, code)
+        dirty = insert_address(sa_sync_conn, "Gilead Sciences, La Défense")
+        clean = insert_address(sa_sync_conn, "Gilead, Foster City")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO address_country_candidates (address_id, country_code, method) VALUES"
+                " (:d, 'fr', 'institution'), (:d, 'fr', 'city'), (:c, 'us', 'institution')"
+            ),
+            {"d": dirty, "c": clean},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE addresses SET candidates_dirty = (id = :d)"), {"d": dirty}
+        )
+
+        _Q.replace_candidates_of_dirty_addresses(
+            sa_sync_conn, CountryDetectionMethod.INSTITUTION, []
+        )
+
+        assert _candidates(sa_sync_conn, dirty) == {("fr", "city")}
+        assert _candidates(sa_sync_conn, clean) == {("us", "institution")}
+
     def test_la_resolution_applique_la_preseance(self, sa_sync_conn):
         for code in ("ca", "ma"):
             ensure_country(sa_sync_conn, code)

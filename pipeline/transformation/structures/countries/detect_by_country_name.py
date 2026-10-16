@@ -1,6 +1,6 @@
 """Détection du pays d'une adresse par **nom de pays** en fin d'adresse : candidat `country_name`.
 
-Confronte les derniers tokens du `normalized_text` de chaque adresse à traiter (`candidates_dirty`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Un nom de pays clôt typiquement l'adresse, avec ou sans virgule ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu.
+Confronte les derniers tokens du `normalized_text` de chaque adresse à traiter (`candidates_dirty`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Un nom de pays clôt typiquement l'adresse, avec ou sans virgule ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu. Le candidat `country_name` est recalculé en entier pour chaque adresse traitée.
 
 Ne dépend que du port `CountryQueries` ; le commit est laissé au caller.
 """
@@ -46,6 +46,8 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
         if iso := _match_trailing_country(normalized_text, country_forms, max_tokens):
             matched.append((addr_id, [iso]))
 
-    added = queries.insert_candidates(conn, CountryDetectionMethod.COUNTRY_NAME, matched)
+    added = queries.replace_candidates_of_dirty_addresses(
+        conn, CountryDetectionMethod.COUNTRY_NAME, matched
+    )
     logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
     return PhaseMetrics(seen=len(rows), new=added, extras={"unmatched": len(rows) - len(matched)})

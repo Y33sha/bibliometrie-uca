@@ -1,6 +1,6 @@
 """Détection du pays d'une adresse par **nom de lieu** : candidats `institution` et `city`.
 
-Cherche dans tout le texte normalisé des adresses à traiter (`candidates_dirty`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats.
+Cherche dans tout le texte normalisé des adresses à traiter (`candidates_dirty`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée.
 
 Ne dépend que du port `CountryQueries` et du domaine ; le commit est laissé au caller.
 """
@@ -38,7 +38,7 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
             for addr_id, normalized_text in rows
             if (isos := detector.detect(normalized_text))
         ]
-        n = queries.insert_candidates(conn, method, proposals)
+        n = queries.replace_candidates_of_dirty_addresses(conn, method, proposals)
         logger.info(
             "%s%s : pays trouvé pour %s",
             BRANCHE if method is CountryDetectionMethod.INSTITUTION else DERNIERE_BRANCHE,
