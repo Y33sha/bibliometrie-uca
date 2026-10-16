@@ -101,7 +101,3 @@ class AddressRepository(Protocol):
     ) -> list[int]:
         """Comme `batch_add_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids modifiés ; critères tous vides : aucune écriture, `[]`."""
         ...
-
-    def propagate_countries_across_similar_addresses(self, source_ids: list[int]) -> list[int]:
-        """Recopie `countries` depuis les adresses `source_ids` vers celles qui partagent leur `normalized_text` et portent un `countries` différent (ou NULL). Retourne les ids recopiés ; `source_ids` vide : `[]`. La source doit avoir un `countries` non NULL."""
-        ...

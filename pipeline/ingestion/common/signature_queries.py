@@ -67,7 +67,7 @@ class StoredSourceAuthorship(NamedTuple):
 
 
 class AddressBatchItem(TypedDict):
-    """Ligne du batch upsert `addresses` : texte brut + forme normalisée."""
+    """Ligne du batch upsert `addresses` : forme normalisée, et texte brut d'une adresse nouvelle."""
 
     raw: str
     norm: str
@@ -328,22 +328,26 @@ class AuthorshipsBatchQueries:
             INSERT INTO addresses (raw_text, normalized_text)
             SELECT t.raw, t.norm
             FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
-            ON CONFLICT (md5(raw_text)) DO NOTHING
+            ON CONFLICT (md5(normalized_text)) DO NOTHING
         """).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(stmt, {"payload": list(values)})
 
-    def fetch_address_ids_by_raw_text(
-        self, conn: Connection, raw_texts: list[str]
+    def fetch_address_ids_by_normalized_text(
+        self, conn: Connection, normalized_texts: list[str]
     ) -> dict[str, int]:
-        """Filtre sur `md5(raw_text)` pour exploiter l'index unique fonctionnel `addresses_raw_text_key (md5(raw_text))` — celui-là même qui sert le `ON CONFLICT` de `upsert_addresses_batch`. Un `WHERE raw_text = ANY(...)` déclencherait un seq scan de toute la table `addresses` à chaque document (coût fixe ~0,5 s par publication, indépendant du nombre d'auteurs). `md5()` PostgreSQL et `hashlib.md5` sur l'UTF-8 coïncident."""
-        if not raw_texts:
+        """Identifiant de l'adresse de chaque forme normalisée. Le filtre sur `md5(normalized_text)` passe par l'index unique `addresses_normalized_text_key`, qui sert aussi le `ON CONFLICT` de `upsert_addresses_batch`. `md5()` PostgreSQL et `hashlib.md5` sur l'UTF-8 coïncident."""
+        if not normalized_texts:
             return {}
-        md5s = [hashlib.md5(t.encode(), usedforsecurity=False).hexdigest() for t in raw_texts]
+        md5s = [
+            hashlib.md5(t.encode(), usedforsecurity=False).hexdigest() for t in normalized_texts
+        ]
         rows = conn.execute(
-            text("SELECT raw_text, id FROM addresses WHERE md5(raw_text) = ANY(:md5s)"),
+            text(
+                "SELECT normalized_text, id FROM addresses WHERE md5(normalized_text) = ANY(:md5s)"
+            ),
             {"md5s": md5s},
         ).all()
-        return {r.raw_text: r.id for r in rows}
+        return {r.normalized_text: r.id for r in rows}
 
     def apply_address_countries_batch(
         self, conn: Connection, values: list[AddressCountryItem]

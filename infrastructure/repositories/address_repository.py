@@ -192,22 +192,3 @@ class PgAddressRepository(AddressRepository):
             params,
         )
         return [row.id for row in result]
-
-    def propagate_countries_across_similar_addresses(self, source_ids: list[int]) -> list[int]:
-        if not source_ids:
-            return []
-        result = self._conn.execute(
-            text("""
-                UPDATE addresses a2
-                SET countries = a1.countries, countries_dirty = true
-                FROM addresses a1
-                WHERE a1.id = ANY(:source_ids)
-                  AND a1.countries IS NOT NULL
-                  AND a2.normalized_text = a1.normalized_text
-                  AND a2.countries IS DISTINCT FROM a1.countries
-                  AND a2.id <> a1.id
-                RETURNING a2.id
-            """),
-            {"source_ids": source_ids},
-        )
-        return [row.id for row in result]

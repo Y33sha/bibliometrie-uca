@@ -1,4 +1,4 @@
-"""Pays des adresses — attribution manuelle, propagation horizontale (adresses jumelles) et verticale (vers `source_publications` / `publications`).
+"""Pays des adresses — attribution manuelle, propagation vers `source_publications` et `publications`.
 
 Les écritures des pays des adresses passent par `AddressRepository`. Le recalcul des pays des notices et des publications appartient au pipeline, qui l'expose par `CountryRecompute`.
 """
@@ -31,19 +31,13 @@ def set_country(
     *,
     repo: AddressRepository,
 ) -> list[int]:
-    """Attribue une liste de pays à une adresse.
+    """Attribue une liste de pays à une adresse. `countries=None` ou `[]` remet la colonne à NULL.
 
-    - `countries=None` ou `[]` → remet la colonne à NULL.
-    - Propage la même valeur aux adresses partageant le même normalized_text.
-
-    Retourne la liste des IDs affectés (y compris address_id). Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
+    Retourne `[address_id]`. Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
     """
     _require_known_countries(countries or [], repo=repo)
     repo.set_countries(address_id, countries)
-    affected = [address_id]
-    if countries:
-        affected.extend(repo.propagate_countries_across_similar_addresses([address_id]))
-    return affected
+    return [address_id]
 
 
 def batch_set_country_by_ids(
@@ -95,16 +89,6 @@ def batch_set_country_by_filter(
             "refus d'appliquer un pays à toutes les adresses."
         )
     return repo.batch_add_country_by_filter(country_code, criteria)
-
-
-def propagate_countries_to_similar(
-    *, modified_ids: list[int], repo: AddressRepository
-) -> list[int]:
-    """Propage les `countries` des adresses `modified_ids` vers leurs jumelles (même `normalized_text`).
-
-    Appelée après un `batch_set_country_by_*` pour propager les modifications fraîches aux adresses similaires. Cible explicitement les sources de propagation pour rester sub-seconde.
-    """
-    return repo.propagate_countries_across_similar_addresses(modified_ids)
 
 
 def propagate_countries_to_publications(

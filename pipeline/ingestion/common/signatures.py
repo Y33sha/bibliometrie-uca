@@ -273,32 +273,41 @@ def write_addresses(
 ) -> dict[str, int]:
     """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`, et rend l'identifiant de chaque adresse par son texte.
 
-    `sa_addresses` : les couples `(sa_id, adresses)` du document. Les textes uniques sont upsertés puis leurs ids récupérés en une passe, les pays propagés sur la ligne `addresses`, et les liens insérés en une requête. Un `sa_id` None est ignoré.
+    `sa_addresses` : les couples `(sa_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe, les pays propagés sur la ligne `addresses`, et les liens insérés en une requête. Un `sa_id` None est ignoré.
     """
+    norm_by_text: dict[str, str] = {}
     addr_countries: dict[str, list[str] | None] = {}
     addr_suggested: dict[str, list[str] | None] = {}
     for _sa_id, addresses in sa_addresses:
         for addr in addresses:
-            if not addr.text or addr.text in addr_countries:
+            if not addr.text or addr.text in norm_by_text:
                 continue
-            addr_countries[addr.text] = addr.countries
-            addr_suggested[addr.text] = addr.suggested_countries
+            norm = norm_by_text[addr.text] = normalize_text(addr.text)
+            if norm and norm not in addr_countries:
+                addr_countries[norm] = addr.countries
+                addr_suggested[norm] = addr.suggested_countries
 
     if not addr_countries:
         return {}
 
-    addr_texts = list(addr_countries)
+    first_text_by_norm: dict[str, str] = {}
+    for raw, norm in norm_by_text.items():
+        if norm:
+            first_text_by_norm.setdefault(norm, raw)
     queries.upsert_addresses_batch(
-        conn, [{"raw": t, "norm": normalize_text(t)} for t in addr_texts]
+        conn, [{"raw": raw, "norm": norm} for norm, raw in first_text_by_norm.items()]
     )
-    addr_id_by_text = queries.fetch_address_ids_by_raw_text(conn, addr_texts)
+    addr_id_by_norm = queries.fetch_address_ids_by_normalized_text(conn, list(addr_countries))
+    addr_id_by_text = {
+        raw: addr_id_by_norm[norm] for raw, norm in norm_by_text.items() if norm in addr_id_by_norm
+    }
 
     country_items: list[AddressCountryItem] = []
     suggested_items: list[AddressCountryItem] = []
-    for cleaned, aid in addr_id_by_text.items():
-        if countries := addr_countries.get(cleaned):
+    for norm, aid in addr_id_by_norm.items():
+        if countries := addr_countries.get(norm):
             country_items.append({"addr_id": aid, "countries": countries})
-        if suggested := addr_suggested.get(cleaned):
+        if suggested := addr_suggested.get(norm):
             suggested_items.append({"addr_id": aid, "countries": suggested})
     queries.apply_address_countries_batch(conn, country_items)
     queries.apply_address_suggested_countries_batch(conn, suggested_items)

@@ -83,15 +83,15 @@ def set_country(
     repo: AddressRepository,
     audit_repo: AuditRepository | None = None,
 ) -> list[int]:
-    """Attribue des pays à une adresse. Retourne les adresses affectées (l'adresse
-    et ses jumelles), à propager vers les publications en tâche de fond."""
+    """Attribue des pays à une adresse. Retourne les adresses affectées, à propager vers les
+    publications en tâche de fond."""
     affected = countries_service.set_country(conn, address_id, countries, repo=repo)
     emit_event(
         audit_repo,
         "address.country_set",
         "address",
         address_id,
-        {"countries": countries or [], "propagated": len(affected)},
+        {"countries": countries or []},
     )
     conn.commit()
     return affected
@@ -108,12 +108,10 @@ def batch_set_country(
     suggested_country: str,
     repo: AddressRepository,
     audit_repo: AuditRepository | None = None,
-) -> tuple[int, int, list[int]]:
-    """Ajoute un pays à des adresses (par identifiants ou par filtre), puis le
-    propage aux adresses jumelles, en une seule transaction.
+) -> list[int]:
+    """Ajoute un pays à des adresses (par identifiants ou par filtre), en une seule transaction.
 
-    Retourne `(adresses modifiées, adresses propagées, tous les identifiants
-    concernés)` ; le dernier est à propager vers les publications en tâche de fond.
+    Retourne les identifiants des adresses modifiées, à propager vers les publications en tâche de fond.
     """
     if address_ids:
         modified_ids = countries_service.batch_set_country_by_ids(
@@ -129,9 +127,6 @@ def batch_set_country(
             suggested_country=suggested_country,
             repo=repo,
         )
-    propagated_ids = countries_service.propagate_countries_to_similar(
-        modified_ids=modified_ids, repo=repo
-    )
     # Une sélection par filtre peut couvrir toute la table : c'est le critère qui porte la
     # décision, non la liste qu'il rend. L'appel par identifiants, lui, les consigne.
     decision: dict[str, JsonValue] = {"country_code": country_code}
@@ -149,7 +144,7 @@ def batch_set_country(
         "address.batch_country_set",
         "address",
         None,
-        {**decision, "updated": len(modified_ids), "propagated": len(propagated_ids)},
+        {**decision, "updated": len(modified_ids)},
     )
     conn.commit()
-    return len(modified_ids), len(propagated_ids), modified_ids + propagated_ids
+    return modified_ids
