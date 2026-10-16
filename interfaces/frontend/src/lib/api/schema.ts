@@ -2684,10 +2684,7 @@ export interface components {
             /** Is Detected */
             is_detected: boolean;
         };
-        /**
-         * AddressesCountriesResponse
-         * @description `proposal_facets` : pays trouvés et non retenus, avec leur nombre d'adresses.
-         */
+        /** AddressesCountriesResponse */
         AddressesCountriesResponse: {
             /** Total */
             total: number;
@@ -2697,8 +2694,6 @@ export interface components {
             per_page: number;
             /** Addresses */
             addresses: components["schemas"]["AddressForCountryAttribution"][];
-            /** Proposal Facets */
-            proposal_facets: components["schemas"]["FacetOption"][];
             /** Country Facets */
             country_facets: components["schemas"]["FacetOption"][];
             /** Pages */
@@ -2835,11 +2830,6 @@ export interface components {
              * @default
              */
             country_code_filter: string;
-            /**
-             * Proposed Country
-             * @default
-             */
-            proposed_country: string;
         };
         /**
          * BatchUpdatedResponse
@@ -6352,7 +6342,6 @@ export interface operations {
                 search?: string;
                 has_country?: boolean | null;
                 country_code?: string;
-                proposed_country?: string;
                 page?: number;
                 per_page?: number;
             };

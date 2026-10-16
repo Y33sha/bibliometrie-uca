@@ -14,7 +14,7 @@
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
 	type Facet = { value: string; count: number };
-	type AddressesResponse = { proposal_facets?: Facet[]; country_facets?: Facet[] };
+	type AddressesResponse = { country_facets?: Facet[] };
 
 	const METHOD_LABELS: Record<Method, string> = {
 		manual: 'saisie',
@@ -41,7 +41,6 @@
 			if (search.trim()) params.set('search', search.trim());
 			if (selectedHasCountry.length === 1) params.set('has_country', selectedHasCountry[0]);
 			if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
-			if (selectedProposed.length === 1) params.set('proposed_country', selectedProposed[0]);
 			return params;
 		},
 	});
@@ -87,13 +86,6 @@
 	$effect(() => {
 		const data = list.data;
 		if (data?.country_facets) countryFacets = data.country_facets;
-		if (data?.proposal_facets) {
-			proposedOptions = data.proposal_facets.map(f => ({
-				value: f.value,
-				text: countryLabel(f.value),
-				count: f.count,
-			}));
-		}
 	});
 
 	function syncUrl() {
@@ -102,7 +94,6 @@
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
 		if (selectedHasCountry.length === 1) p.set('has_country', selectedHasCountry[0]);
-		if (selectedProposed.length === 1) p.set('proposed', selectedProposed[0]);
 		const qs = p.toString();
 		replaceState(`${base}/admin/countries` + (qs ? '?' + qs : ''), {});
 	}
@@ -110,10 +101,6 @@
 	function onFilterChange() {
 		list.page = 1;
 		selectedIds = new Set();
-		// Le pays proposé filtré devient le pays à ajouter.
-		if (selectedProposed.length === 1) {
-			batchCountry = selectedProposed[0];
-		}
 		syncUrl();
 		list.load();
 	}
@@ -132,7 +119,7 @@
 		if (!addr || !code) return;
 		const newList = [...new Set([...(addr.countries || []), code])].sort();
 		await addressesApi.setCountry(addrId, { countries: newList });
-		if (selectedHasCountry.includes('no') || selectedProposed.length > 0) {
+		if (selectedHasCountry.includes('no')) {
 			list.load();
 		} else {
 			addr.countries = newList;
@@ -162,16 +149,11 @@
 	let batchApplying = $state(false);
 	let batchResult = $state('');
 
-	// Pays trouvés par un moyen de détection et non retenus.
-	let proposedOptions: FacetOption[] = $state([]);
-	let selectedProposed: string[] = $state([]);
-
 	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (422), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
 	const hasActiveFilter = $derived(
 		search.trim() !== '' ||
 			selectedHasCountry.length === 1 ||
-			selectedCountry.length === 1 ||
-			selectedProposed.length === 1,
+			selectedCountry.length === 1,
 	);
 
 	async function batchAddCountry(applyToAll = false) {
@@ -183,7 +165,6 @@
 			if (search.trim()) body.search = search.trim();
 			if (selectedHasCountry.length === 1) body.has_country = selectedHasCountry[0];
 			if (selectedCountry.length === 1) body.country_code_filter = selectedCountry[0];
-			if (selectedProposed.length === 1) body.proposed_country = selectedProposed[0];
 		} else {
 			body.address_ids = [...selectedIds];
 		}
@@ -207,7 +188,6 @@
 		if (params.get('search')) search = params.get('search')!;
 		if (params.get('country')) selectedCountry = [params.get('country')!];
 		if (params.get('has_country')) selectedHasCountry = [params.get('has_country')!];
-		if (params.get('proposed')) selectedProposed = [params.get('proposed')!];
 		loadCountries();
 		list.load();
 	});
@@ -222,9 +202,7 @@
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<FacetDropdown label="Pays" options={hasCountryOptions} bind:selected={selectedHasCountry} onchange={onFilterChange} />
-	<FacetDropdown label="Pays retenu" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
-	<FacetDropdown label="Pays proposé" options={proposedOptions} searchable bind:selected={selectedProposed} onchange={onFilterChange} />
-	<span class="toolbar-spacer"></span>
+	<FacetDropdown label="Pays retenu" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />	<span class="toolbar-spacer"></span>
 	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>
 </div>
 
@@ -274,18 +252,20 @@
 							<button class="tag-remove" onclick={() => removeCountry(a.id, c)}>×</button>
 						</span>
 					{/each}
-					{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-						<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
-							{countryLabel(p.country_code)} ?
-							<span class="proposal-methods">{methodsLabel(p.methods)}</span>
-						</button>
-					{/each}
-					<select class="add-country" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
-						<option value="">+</option>
-						{#each countries as c}
-							<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
+					<span class="country-actions">
+						{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
+							<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+								{countryLabel(p.country_code)} ?
+								<span class="proposal-methods">{methodsLabel(p.methods)}</span>
+							</button>
 						{/each}
-					</select>
+						<select class="add-country" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
+							<option value="">+</option>
+							{#each countries as c}
+								<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
+							{/each}
+						</select>
+					</span>
 					</div>
 				</td>
 			</tr>
@@ -328,6 +308,7 @@
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+	.country-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; margin-left: auto; }
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: var(--success-light);

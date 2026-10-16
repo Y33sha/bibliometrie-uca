@@ -190,10 +190,6 @@ def active_issns(journal: str) -> str:
     ), ARRAY[]::text[])"""
 
 
-# Condition vraie quand le candidat aliasé `acc` est absent des pays retenus de l'adresse aliasée `a`.
-NOT_RETAINED = "NOT (acc.country_code = ANY(coalesce(a.countries, '{}')))"
-
-
 def address_country_conditions(
     criteria: AddressCountryFilter,
 ) -> tuple[list[str], dict[str, object]]:
@@ -210,12 +206,6 @@ def address_country_conditions(
     if criteria.country_code:
         conditions.append(":country_code = ANY(a.countries)")
         params["country_code"] = criteria.country_code
-    if criteria.proposed_country:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM address_country_candidates acc WHERE acc.address_id = a.id"
-            f" AND acc.country_code = :proposed_country AND {NOT_RETAINED})"
-        )
-        params["proposed_country"] = criteria.proposed_country
     return conditions, params
 
 

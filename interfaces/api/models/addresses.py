@@ -33,7 +33,6 @@ class BatchSetCountry(BaseModel):
     search: str = ""
     has_country: bool | None = None
     country_code_filter: str = ""
-    proposed_country: str = ""
 
 
 # ----- Réponses composées par le router -----

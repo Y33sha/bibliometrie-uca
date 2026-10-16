@@ -11,22 +11,16 @@ from typing import Protocol
 class AddressCountryFilter:
     """Critères de sélection d'adresses par leur pays, pour la liste d'attribution et l'attribution en masse.
 
-    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` : pays retenu. `proposed_country` : pays trouvé par un moyen de détection et non retenu."""
+    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` : pays retenu."""
 
     search: str | None = None
     has_country: bool | None = None
     country_code: str | None = None
-    proposed_country: str | None = None
 
     @property
     def is_empty(self) -> bool:
         """Vrai si aucun critère n'est renseigné."""
-        return not (
-            self.search
-            or self.has_country is not None
-            or self.country_code
-            or self.proposed_country
-        )
+        return not (self.search or self.has_country is not None or self.country_code)
 
 
 class AddressRepository(Protocol):

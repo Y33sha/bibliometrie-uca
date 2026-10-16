@@ -121,10 +121,7 @@ class AddressForCountryAttribution(BaseModel):
 
 
 class AddressesCountriesResponse(PaginatedResponse):
-    """`proposal_facets` : pays trouvés et non retenus, avec leur nombre d'adresses."""
-
     addresses: list[AddressForCountryAttribution]
-    proposal_facets: list[FacetOption]
     country_facets: list[FacetOption]
 
 

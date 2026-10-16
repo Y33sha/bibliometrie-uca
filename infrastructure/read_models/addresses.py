@@ -21,7 +21,7 @@ from application.ports.read_models.addresses_queries import (
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.types import JsonValue
 from infrastructure.read_models.sql_fragments import signature_display_name
-from infrastructure.sql_fragments import NOT_RETAINED, address_country_conditions
+from infrastructure.sql_fragments import address_country_conditions
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (
@@ -262,21 +262,6 @@ class PgAddressesQueries(AddressesQueries):
             for r in rows
         ]
 
-        pf_conditions, pf_binds = address_country_conditions(
-            replace(filters, proposed_country=None)
-        )
-        pf_rows = self._conn.execute(
-            text(f"""
-                SELECT acc.country_code AS code, COUNT(DISTINCT a.id) AS cnt
-                FROM address_country_candidates acc
-                JOIN addresses a ON a.id = acc.address_id
-                WHERE {" AND ".join([NOT_RETAINED, *pf_conditions])}
-                GROUP BY acc.country_code ORDER BY cnt DESC
-            """),
-            pf_binds,
-        ).all()
-        proposal_facets = [FacetOption(value=r.code, count=r.cnt) for r in pf_rows]
-
         cf_where, cf_binds = _countries_where(replace(filters, country_code=None))
         cf_rows = self._conn.execute(
             text(f"""
@@ -294,7 +279,6 @@ class PgAddressesQueries(AddressesQueries):
             page=page,
             per_page=per_page,
             addresses=addresses,
-            proposal_facets=proposal_facets,
             country_facets=country_facets,
         )
 

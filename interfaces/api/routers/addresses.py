@@ -219,7 +219,6 @@ def list_addresses_countries(
     search: SearchTerm = "",
     has_country: bool | None = Query(None),
     country_code: str = Query(""),
-    proposed_country: str = Query(""),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: AddressesQueries = Depends(addresses_queries),
@@ -229,7 +228,6 @@ def list_addresses_countries(
         search=search,
         has_country=has_country,
         country_code=country_code,
-        proposed_country=proposed_country,
     )
     return queries.addresses_countries(filters=filters, page=page, per_page=per_page)
 
@@ -254,7 +252,6 @@ def batch_set_country(
         search=body.search,
         has_country=body.has_country,
         country_code_filter=body.country_code_filter,
-        proposed_country=body.proposed_country,
         repo=addr_repo,
         country_recompute=recompute,
         audit_repo=audit,

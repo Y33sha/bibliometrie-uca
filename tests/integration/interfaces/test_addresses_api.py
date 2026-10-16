@@ -256,11 +256,6 @@ class TestCountries:
         r = client.get("/api/addresses/countries", params={"country_code": "FR"})
         assert r.status_code == 200
 
-    def test_addresses_countries_filter_by_proposed(self, client):
-        r = client.get("/api/addresses/countries", params={"proposed_country": "fr"})
-        assert r.status_code == 200
-        assert "proposal_facets" in r.json()
-
 
 # ── POST /api/addresses/{addr_id}/country ────────────────────────
 

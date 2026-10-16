@@ -304,10 +304,10 @@ class TestAddressesCountries:
         # La facette countries doit être présente
         assert res.country_facets is not None
 
-    def test_les_pays_trouves_et_non_retenus_sont_proposes(self, sa_sync_conn):
+    def test_chaque_adresse_expose_ses_pays_trouves_et_leurs_moyens(self, sa_sync_conn):
         ensure_country(sa_sync_conn, "fr")
         ensure_country(sa_sync_conn, "it")
-        addr = insert_address(sa_sync_conn, "École française de Rome", countries=["fr"])
+        addr = insert_address(sa_sync_conn, "École française de Rome QXPL", countries=["fr"])
         sa_sync_conn.execute(
             text(
                 "INSERT INTO address_country_candidates (address_id, country_code, method)"
@@ -317,7 +317,7 @@ class TestAddressesCountries:
         )
 
         res = _q(sa_sync_conn).addresses_countries(
-            filters=AddressCountryFilter(proposed_country="it"), page=1, per_page=50
+            filters=AddressCountryFilter(search="QXPL"), page=1, per_page=50
         )
 
         assert [a.id for a in res.addresses] == [addr]
@@ -325,4 +325,3 @@ class TestAddressesCountries:
             ("fr", [CountryDetectionMethod.COUNTRY_NAME, CountryDetectionMethod.ROR]),
             ("it", [CountryDetectionMethod.CITY]),
         ]
-        assert [(f.value, f.count) for f in res.proposal_facets] == [("it", 1)]

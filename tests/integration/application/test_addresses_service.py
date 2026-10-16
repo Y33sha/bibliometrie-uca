@@ -315,25 +315,6 @@ class TestBatchSetCountryByFilter:
         assert addr_no in modified
         assert addr_yes not in modified
 
-    def test_filter_proposed_country(self, sa_sync_conn, repo):
-        ensure_country(sa_sync_conn, "fr")
-        ensure_country(sa_sync_conn, "it")
-        proposed = insert_address(sa_sync_conn, "Rome", countries=["fr"])
-        retained = insert_address(sa_sync_conn, "Milan", countries=["it"])
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO address_country_candidates (address_id, country_code, method)"
-                " VALUES (:p, 'fr', 'country_name'), (:p, 'it', 'city'), (:r, 'it', 'city')"
-            ),
-            {"p": proposed, "r": retained},
-        )
-
-        modified = batch_set_country_by_filter(
-            sa_sync_conn, "it", proposed_country="it", repo=repo, country_recompute=_GATEWAY
-        )
-
-        assert modified == [proposed]
-
     def test_empty_filter_raises(self, sa_sync_conn, repo):
         """Aucun filtre → refus (garde-fou : ne pas viser toutes les adresses)."""
         with pytest.raises(ValidationError):

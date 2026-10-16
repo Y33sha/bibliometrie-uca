@@ -67,7 +67,6 @@ def batch_set_country_by_filter(
     search: str | None = None,
     has_country: bool | None = None,
     country_code_filter: str | None = None,
-    proposed_country: str | None = None,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
 ) -> list[int]:
@@ -82,12 +81,11 @@ def batch_set_country_by_filter(
         search=search,
         has_country=has_country,
         country_code=country_code_filter,
-        proposed_country=proposed_country,
     )
     if criteria.is_empty:
         raise ValidationError(
             "batch_set_country_by_filter exige au moins un filtre "
-            "(search / has_country / country_code_filter / proposed_country) : "
+            "(search / has_country / country_code_filter) : "
             "refus d'appliquer un pays à toutes les adresses."
         )
     ids = repo.add_manual_country_by_filter(country_code, criteria)

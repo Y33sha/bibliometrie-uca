@@ -73,7 +73,7 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 |---|---|
 | `GET /api/addresses` | Liste de révision pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
 | `GET /api/addresses/{id}/publications` | Texte brut de l'adresse et publications qui la citent ; chaque rattachement expose son état de validation et s'il vient d'une détection |
-| `GET /api/addresses/countries` | Liste d'attribution des pays : pays retenus, pays trouvés par chaque moyen, facettes des pays retenus et des pays proposés (trouvés et non retenus) |
+| `GET /api/addresses/countries` | Liste d'attribution des pays : pays retenus, pays trouvés par chaque moyen, facette des pays retenus |
 | `GET /api/addresses/stats` | Comptes par état de rattachement pour une structure |
 
 Le filtre des adresses par pays est un seul fragment SQL (`address_country_conditions`, dans `infrastructure/sql_fragments.py`), partagé par la liste d'attribution et l'ajout de pays par lot.
