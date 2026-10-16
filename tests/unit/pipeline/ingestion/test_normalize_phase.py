@@ -1,6 +1,6 @@
 """Séquence de la phase `normalize`, exécutée nœud par nœud.
 
-Le retrait des documents disparus précède le nettoyage des identités : il en libère, que le nettoyage ramasse dans la foulée. L'exécuteur lance ensuite le `VACUUM` du staging, maintenance du nœud de nettoyage.
+Le retrait des documents disparus précède le nettoyage des identités et des adresses : il en libère, que le nettoyage ramasse dans la foulée. L'exécuteur lance ensuite le `VACUUM` du staging, maintenance du nœud de nettoyage.
 """
 
 import dataclasses
@@ -24,13 +24,14 @@ def _run(
         normalize_one=lambda source: (appels.append(f"normalize:{source}"), bilan)[1],
         prune_disappeared=lambda: (appels.append("prune"), disparues)[1],
         cleanup_orphan_identities=lambda: (appels.append("cleanup"), 0)[1],
+        cleanup_orphan_addresses=lambda: (appels.append("cleanup_addresses"), 0)[1],
     ).run(ctx)
 
 
-def test_le_retrait_precede_le_nettoyage_des_identites(contexte):
+def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(contexte):
     appels: list[str] = []
     _run(contexte, appels)
-    assert appels == ["normalize:hal", "prune", "cleanup", "VACUUM staging"]
+    assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
 
 
 def test_sans_restriction_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
@@ -59,7 +60,7 @@ def test_sans_document_la_maintenance_tourne_quand_meme(contexte, caplog):
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, appels, bilan=NormalizeStats(0, 0, 0))
-    assert appels == ["normalize:hal", "prune", "cleanup", "VACUUM staging"]
+    assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
     assert "aucun document disparu de sa source" in caplog.text
     assert "▶ Maintenance des tables" in caplog.text
 

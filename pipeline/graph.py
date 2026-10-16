@@ -319,6 +319,13 @@ NODES: tuple[Node, ...] = (
         reads=("source_authorships.identity_id", "author_identifying_keys.id"),
         writes=("author_identifying_keys.id",),
         previous_run=("source_authorships",),
+    ),
+    _node(
+        "normalize.cleanup_orphan_addresses",
+        "normalize",
+        reads=("source_authorship_addresses", "addresses.id"),
+        # La suppression d'une adresse emporte ses liens aux structures.
+        writes=("addresses.id", "address_structures"),
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
     ),
