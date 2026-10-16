@@ -62,9 +62,9 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 **`similarity` écarté.** Sur la revue à la main, il se trompe une fois sur deux.
 
-**Pays d'une signature, affiliation par affiliation.** Une adresse donne son pays retenu, ou à défaut le pays des ROR de son affiliation. Un ROR sans adresse et une structure HAL donnent leur pays. Le pays de la signature réunit ces pays. La règle est conditionnée à la mesure des contradictions.
+**Pays d'une signature, affiliation par affiliation.** Une adresse donne son pays retenu. Un ROR sans adresse et une structure HAL donnent leur pays. Le pays de la signature réunit ces pays.
 
-**Colonne `source_authorships.countries`.** Elle porte le pays de la signature, calculé par la seule règle ci-dessus. La cascade vers `source_publications` et la page publication la lisent. Elle est conditionnée à la même mesure.
+**Colonne `source_authorships.countries`.** Elle contient le pays de la signature, calculé par la seule règle ci-dessus. La cascade vers `source_publications` et la page publication la lisent.
 
 **La mesure se fait hors pipeline.** Un script lit le stock entier et exécute chaque moyen sur chaque adresse, indépendamment des autres moyens. Les pays des sources viennent des payloads du raw store, lus directement : `staging` reste intact. Le script écrit les candidats dans des fichiers, et la base reste intacte. Il applique ensuite la fonction de préséance et compare son résultat à `addresses.countries`. Le pipeline ne réévalue jamais tout le stock : il traite les adresses nouvelles.
 
@@ -121,9 +121,10 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 ### 3. Pays des signatures
 
-- [ ] Mesure par source, sur le stock réhydraté : pays d'une adresse contre pays des ROR de la même affiliation ; ROR d'une même adresse entre eux ; ROR sans adresse contre adresses de la même signature. Revue à la main d'un échantillon de chaque cas.
-- [ ] Moyen `hal_structure` : couverture et accord avec les ROR de la signature.
-- [ ] Bilan : publications gagnées, perdues et changées par rapport à `publications.countries`. Décision sur la règle et la colonne.
+- [x] Mesure par source, sur le stock réhydraté, 2026-10-16 (`interfaces/cli/oneshot/measure_signature_countries.py`, 9c492dcd1 ; `data/measures/signature_countries.md`). Sur ScanR, adresse et ROR de la signature donnent le même pays sur 94 % des signatures communes.
+- [x] Revue à la main de 80 désaccords (`data/measures/signature_country_disagreements.csv`). Environ 55 viennent de ScanR, qui attribue à un auteur les structures d'un coauteur. Les autres : doubles affiliations au CERN, DOM-TOM, pays faux de structures HAL, quelques adresses mal résolues. Au niveau de la publication, l'union donne le bon pays.
+- [x] Moyen `hal_structure` : seule source de pays pour 576 644 signatures HAL sans adresse. Il donne le même pays que les ROR sur 98,9 % des signatures HAL et 98,5 % des signatures ScanR.
+- [x] Bilan, publications du périmètre, contre `publications.countries` : identiques 59 216, pays gagné 4 236, pays perdu 48, pays changé 10 126. Règle de l'union et colonne retenues.
 
 ### 4. Câblage
 
@@ -131,8 +132,8 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Chargement des candidats des sources du stock depuis le fichier du script (`interfaces/cli/oneshot/load_address_country_candidates.py`). Les autres moyens se recalculent à la phase `countries`, la migration marquant toutes les adresses.
 - [x] Chaque moyen du pipeline écrit son candidat : `normalize` pour les sources, les nœuds `countries.ror` et `countries.detect` pour les autres ; `pipeline/graph.py` déclare la table.
 - [x] Étape de résolution (`countries.resolve`) : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
-- [ ] Application : migration, chargement des candidats des sources, `run_pipeline --only countries`.
-- [ ] Migration : colonne `source_authorships.countries`. Étape signature dans la cascade vers les publications. Un changement de pays dans les référentiels ROR et HAL marque les signatures concernées. La page publication lit la colonne.
+- [x] Migration : colonne `source_authorships.countries` (`82940fac13cc`). Étape signature en tête de la cascade vers les publications. Les signatures liées à un ROR sans adresse ou à une structure HAL sont recalculées à chaque run, ce qui couvre les changements de pays des référentiels ROR et HAL. La page publication lit la colonne (2ac8b81b3).
+- [ ] Application : migrations, chargement des candidats des sources (`load_address_country_candidates`), pays des signatures du stock (`fill_signature_countries`), `run_pipeline --only countries`.
 
 ### 5. Édition manuelle et retrait de la seconde colonne
 
@@ -146,4 +147,5 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - **Villes.** `place_name_forms` compte 192 villes, cherchées dans tout le texte de l'adresse. Piste : les villes de GeoNames (`cities15000`, licence CC BY 4.0), sans les noms de villes présents dans plusieurs pays (Cambridge, Valencia), et sans ceux qui sont déjà une forme de pays ou d'institution. Mesure avant chargement, contre les verdicts de la revue à la main.
 - **Formes d'institutions.** `place_name_forms` compte 36 361 institutions. Le ROR et le référentiel HAL donnent le pays des organisations. Une partie des formes est bruitée : adresses complètes, parfois multiples, pays erronés (« goma volcano observatory » rangé en `cg`). Piste : retirer les institutions, après mesure de ce que le moyen `institution` apporte en plus du ROR et des structures HAL.
 - **Blocs d'adresses.** Une adresse contient parfois plusieurs affiliations, séparées par « ; » ou par les numéros d'affiliation des sites d'éditeurs. Parmi les 3 371 adresses à plusieurs pays retenus, au 2026-10-16 : 154 blocs à « ; » (OpenAlex 111, ScanR 45), 135 blocs numérotés (ScanR 131). Piste : découper ces blocs à la normalisation des sources concernées.
-- **Tutelles ScanR écartées.** Leurs ROR restent sur la signature sans adresse. Elles ont en général le pays du laboratoire ; la mesure des ROR sans adresse le vérifie.
+- **Structures ScanR mal attribuées.** ScanR attribue parfois à un auteur les structures d'un coauteur. Le pays de la publication reste juste, le pays de la signature est faux.
+- **Structures HAL au pays faux.** Quelques structures du référentiel HAL ont un pays faux (ILRI en `fr`) ou désignent une absence d'affiliation (« Sans affiliation » en `aq`, « AUTRES »).
