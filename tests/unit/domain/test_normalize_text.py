@@ -69,6 +69,10 @@ class TestNormalizeText:
             # Diacritiques retirés derrière une lettre grecque, ё → е
             ("Ελληνικά Άθήνα", "ελληνικα αθηνα"),
             ("Ёлка", "елка"),
+            # Lettres modificatives d'espacement : séparateurs
+            ("Centre de Calcul de lʼIN2P3", "centre de calcul de l in2p3"),
+            ("Maˇsek", "ma sek"),
+            ("Hawaiʻi", "hawai i"),
             # Ailleurs, le diacritique distingue une lettre
             ("Йошкар-Ола", "йошкар ола"),
             ("がっこう", "がっこう"),

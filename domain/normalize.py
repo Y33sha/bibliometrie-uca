@@ -164,6 +164,11 @@ def _drops_marks(base: str) -> bool:
     return not base.isalpha() or unicodedata.name(base, "").startswith(("LATIN", "GREEK"))
 
 
+def _is_word_character(ch: str) -> bool:
+    """Lettre ou chiffre, hors lettres modificatives d'espacement (U+02B0–U+02FF) : apostrophe `ʼ`, okina `ʻ`, caron `ˇ` isolé d'une extraction PDF (« Maˇsek »)."""
+    return ch.isalnum() and not "ʰ" <= ch <= "˿"
+
+
 def normalize_text(text: str) -> str:
     """Forme de comparaison d'un texte, pour le dédoublonnage et le matching.
 
@@ -184,7 +189,7 @@ def normalize_text(text: str) -> str:
                 out.append(ch)
             continue
         base = ch
-        out.append(ch if ch.isalnum() else " ")
+        out.append(ch if _is_word_character(ch) else " ")
     return " ".join(unicodedata.normalize("NFC", "".join(out)).split())
 
 
