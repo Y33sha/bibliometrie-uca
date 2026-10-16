@@ -182,8 +182,9 @@ _REPOINT_SQL = text(
 def _repoint_signatures(conn: Connection, *, apply: bool) -> int:
     """Rattache chaque signature dont le nom normalisé change à l'identité de ce nom. Retourne leur nombre."""
     payload = []
-    result = conn.execution_options(yield_per=_STREAM).execute(
-        _SIGNATURES_SQL, {"pattern": _NON_ASCII}
+    # Curseur serveur pour cette seule lecture : posé sur la connexion, il s'étendrait aux écritures qui suivent.
+    result = conn.execute(
+        _SIGNATURES_SQL.execution_options(yield_per=_STREAM), {"pattern": _NON_ASCII}
     )
     for row in result:
         name = SignatureName.from_columns(
