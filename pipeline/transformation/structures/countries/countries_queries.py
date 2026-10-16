@@ -166,21 +166,34 @@ class CountryQueries:
         ).one()
         return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
 
-    def refresh_signature_countries(self, conn: Connection, *, full: bool = False) -> int:
-        """Recalcule `source_authorships.countries` des signatures `countries_dirty` ou liées à une adresse marquée, et des signatures à organisation ROR sans adresse ou à structure HAL. `full` recalcule toutes les signatures qui ont une adresse, un ROR sans adresse ou une structure HAL. Retourne le nombre de signatures modifiées."""
-        if full:
-            scope = f"""
-                WITH scoped_sa AS (
-                    SELECT DISTINCT source_authorship_id AS id FROM source_authorship_addresses
-                    UNION {_REFERENTIAL_SA}
-                )"""
-        else:
+    def refresh_signature_countries(
+        self, conn: Connection, *, id_range: tuple[int, int] | None = None
+    ) -> int:
+        """Recalcule `source_authorships.countries` des signatures `countries_dirty` ou liées à une adresse marquée, et des signatures à organisation ROR sans adresse ou à structure HAL. Retourne le nombre de signatures modifiées.
+
+        `id_range` (bornes incluses) recalcule toutes les signatures de l'intervalle qui ont une adresse, un ROR sans adresse ou une structure HAL.
+        """
+        if id_range is None:
             scope = (
                 _DIRTY_SA
                 + f""",
                 scoped_sa AS (SELECT id FROM dirty_sa UNION {_REFERENTIAL_SA})"""
             )
-        return conn.execute(text(scope + _SA_COUNTRIES_FROM_SCOPE)).rowcount
+            params = {}
+        else:
+            scope = """
+                WITH scoped_sa AS (
+                    SELECT source_authorship_id AS id FROM source_authorship_addresses
+                    WHERE source_authorship_id BETWEEN :lo AND :hi
+                    UNION
+                    SELECT source_authorship_id FROM source_authorship_rors
+                    WHERE source_authorship_id BETWEEN :lo AND :hi AND address_id IS NULL
+                    UNION
+                    SELECT source_authorship_id FROM source_authorship_hal_structures
+                    WHERE source_authorship_id BETWEEN :lo AND :hi
+                )"""
+            params = {"lo": id_range[0], "hi": id_range[1]}
+        return conn.execute(text(scope + _SA_COUNTRIES_FROM_SCOPE), params).rowcount
 
     def refresh_address_source_countries(self, conn: Connection) -> int:
         """Recalcule `source_publications.countries` — union des `source_authorships.countries` du document — sur les documents qu'un flag `countries_dirty` signale. Retourne le nombre de lignes modifiées."""

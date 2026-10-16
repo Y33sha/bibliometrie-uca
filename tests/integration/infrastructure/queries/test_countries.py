@@ -283,6 +283,31 @@ class TestDirtyDrivenSourceCountries:
 
         assert _sp_countries(sa_sync_conn, sd) == ["fr"]
 
+    def test_un_intervalle_d_identifiants_borne_le_recalcul_des_signatures(self, sa_sync_conn):
+        pub = insert_publication(sa_sync_conn)
+        sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-r")
+        first = insert_signature(sa_sync_conn, sd, source="hal")
+        second = insert_signature(sa_sync_conn, sd, source="hal", author_position=1)
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO hal_structures (hal_structure_id, name, structure_type, country_code, status)"
+                " VALUES (1, 'Laboratoire de Météorologie Physique', 'laboratory', 'fr', 'VALID')"
+            )
+        )
+        sa_sync_conn.execute(
+            text("INSERT INTO source_authorship_hal_structures VALUES (:a, 1), (:b, 1)"),
+            {"a": first, "b": second},
+        )
+
+        changed = _Q.refresh_signature_countries(sa_sync_conn, id_range=(first, first))
+
+        assert changed == 1
+        countries = sa_sync_conn.execute(
+            text("SELECT id, countries FROM source_authorships WHERE id IN (:a, :b)"),
+            {"a": first, "b": second},
+        ).all()
+        assert dict(countries) == {first: ["fr"], second: None}
+
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
         sd = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="oa-c")
