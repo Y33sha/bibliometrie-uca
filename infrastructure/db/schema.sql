@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict K05ajmMVzK33Re6qarMiJyyHm0ITJOepfZvEep5rkQqfmgJKC4gQeVlGlYIiuir
+\restrict a3vLqTrKEXKrBSS0ssnbwHIxB3lrOank5AaPUH40aLfPf61yv6WwIJTGZgTik3e
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -94,6 +94,21 @@ CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA public;
 --
 
 COMMENT ON EXTENSION unaccent IS 'text search dictionary that removes accents';
+
+
+--
+-- Name: country_detection_method; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.country_detection_method AS ENUM (
+    'manual',
+    'country_name',
+    'ror',
+    'source_openalex',
+    'institution',
+    'city',
+    'source_scanr'
+);
 
 
 --
@@ -918,6 +933,7 @@ CREATE TABLE sources.source_authorships (
     raw_first_name text,
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    countries text[],
     CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
 ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
@@ -935,6 +951,13 @@ COMMENT ON COLUMN sources.source_authorships.neutralized_identifiers IS 'Identif
 --
 
 COMMENT ON COLUMN sources.source_authorships.content_hash IS 'Empreinte des champs écrits par la normalisation, adresses comprises.';
+
+
+--
+-- Name: COLUMN source_authorships.countries; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_authorships.countries IS 'Pays de la signature : pays retenus de ses adresses, de ses organisations ROR sans adresse et de ses structures HAL.';
 
 
 --
@@ -2108,6 +2131,25 @@ ALTER SEQUENCE sources.staging_id_seq OWNED BY sources.staging.id;
 
 
 --
+-- Name: address_country_candidates; Type: TABLE; Schema: structures; Owner: -
+--
+
+CREATE TABLE structures.address_country_candidates (
+    address_id integer NOT NULL,
+    country_code character(2) NOT NULL,
+    method public.country_detection_method NOT NULL,
+    detected_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE address_country_candidates; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON TABLE structures.address_country_candidates IS 'Pays proposé pour une adresse par un moyen de détection. addresses.countries en dérive par la préséance du domaine.';
+
+
+--
 -- Name: address_structures_id_seq; Type: SEQUENCE; Schema: structures; Owner: -
 --
 
@@ -2138,9 +2180,17 @@ CREATE TABLE structures.addresses (
     created_at timestamp with time zone DEFAULT now(),
     pub_count integer DEFAULT 0,
     countries character(2)[],
-    suggested_countries character(2)[],
-    countries_dirty boolean DEFAULT false NOT NULL
+    countries_dirty boolean DEFAULT false NOT NULL,
+    candidates_dirty boolean DEFAULT true NOT NULL,
+    CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
 );
+
+
+--
+-- Name: COLUMN addresses.candidates_dirty; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.candidates_dirty IS 'Adresse à traiter : détection du pays par le texte, puis résolution des candidats.';
 
 
 --
@@ -2971,6 +3021,14 @@ ALTER TABLE ONLY sources.staging
 
 ALTER TABLE ONLY sources.staging
     ADD CONSTRAINT staging_source_source_id_key UNIQUE (source, source_id);
+
+
+--
+-- Name: address_country_candidates address_country_candidates_pkey; Type: CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.address_country_candidates
+    ADD CONSTRAINT address_country_candidates_pkey PRIMARY KEY (address_id, country_code, method);
 
 
 --
@@ -3814,10 +3872,10 @@ CREATE UNIQUE INDEX source_authorship_structures_pkey ON sources.source_authorsh
 
 
 --
--- Name: addresses_raw_text_key; Type: INDEX; Schema: structures; Owner: -
+-- Name: addresses_normalized_text_key; Type: INDEX; Schema: structures; Owner: -
 --
 
-CREATE UNIQUE INDEX addresses_raw_text_key ON structures.addresses USING btree (md5(raw_text));
+CREATE UNIQUE INDEX addresses_normalized_text_key ON structures.addresses USING btree (md5(normalized_text));
 
 
 --
@@ -3842,10 +3900,10 @@ CREATE INDEX idx_addr_struct_structure ON structures.address_structures USING bt
 
 
 --
--- Name: idx_addr_sug_countries; Type: INDEX; Schema: structures; Owner: -
+-- Name: idx_addresses_candidates_dirty; Type: INDEX; Schema: structures; Owner: -
 --
 
-CREATE INDEX idx_addr_sug_countries ON structures.addresses USING gin (suggested_countries) WHERE (suggested_countries IS NOT NULL);
+CREATE INDEX idx_addresses_candidates_dirty ON structures.addresses USING btree (id) WHERE candidates_dirty;
 
 
 --
@@ -4342,6 +4400,22 @@ ALTER TABLE ONLY sources.source_publications
 
 
 --
+-- Name: address_country_candidates address_country_candidates_address_id_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.address_country_candidates
+    ADD CONSTRAINT address_country_candidates_address_id_fkey FOREIGN KEY (address_id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
+
+
+--
+-- Name: address_country_candidates address_country_candidates_country_code_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
+--
+
+ALTER TABLE ONLY structures.address_country_candidates
+    ADD CONSTRAINT address_country_candidates_country_code_fkey FOREIGN KEY (country_code) REFERENCES ref.countries(code);
+
+
+--
 -- Name: address_structures address_structures_address_id_fkey; Type: FK CONSTRAINT; Schema: structures; Owner: -
 --
 
@@ -4425,5 +4499,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict K05ajmMVzK33Re6qarMiJyyHm0ITJOepfZvEep5rkQqfmgJKC4gQeVlGlYIiuir
+\unrestrict a3vLqTrKEXKrBSS0ssnbwHIxB3lrOank5AaPUH40aLfPf61yv6WwIJTGZgTik3e
 
