@@ -46,10 +46,11 @@ address_country_candidates
   address_id    → addresses(id)
   country_code  → countries(code)
   method        énumération fermée
-  score         nullable
   detected_at
   PRIMARY KEY (address_id, country_code, method)
 ```
+
+`addresses.candidates_dirty` marque une adresse à traiter : sa création, ou un candidat ajouté. La phase `countries` y fait tourner la détection par le texte, puis la résolution.
 
 Les moyens deviennent les valeurs de `method` (`CountryDetectionMethod`) : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `ror` (organisations ROR de l'affiliation), `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres.
 
@@ -117,7 +118,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
 - [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
 - [x] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`, sur le stock réhydraté, 2026-10-16. Identiques 453 799 (96,8 %), pays gagné 8 929 (1,9 %), pays perdu 1 136 (0,2 %), pays changé 4 956 (1,1 %). Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat.
-- [ ] Décision de câblage.
+- [x] Décision de câblage : oui, 2026-10-16.
 
 ### 3. Pays des signatures
 
@@ -127,16 +128,17 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 ### 4. Câblage
 
-- [ ] Migration : table `address_country_candidates`, énumération `country_detection_method`, index sur `address_id`.
-- [ ] Chargement des candidats du stock depuis les fichiers du script.
-- [ ] Chaque moyen du pipeline écrit son candidat pour les adresses nouvelles ; `pipeline/graph.py` déclare la table.
-- [ ] Étape de résolution : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
+- [x] Migration : table `address_country_candidates`, énumération `country_detection_method`, colonne `addresses.candidates_dirty` (`8ea28dc97edf`).
+- [x] Chargement des candidats des sources du stock depuis le fichier du script (`interfaces/cli/oneshot/load_address_country_candidates.py`). Les autres moyens se recalculent à la phase `countries`, la migration marquant toutes les adresses.
+- [x] Chaque moyen du pipeline écrit son candidat : `normalize` pour les sources, les nœuds `countries.ror` et `countries.detect` pour les autres ; `pipeline/graph.py` déclare la table.
+- [x] Étape de résolution (`countries.resolve`) : la fonction de préséance écrit `addresses.countries` et pose `countries_dirty`. Les moyens cessent d'écrire `addresses.countries`.
+- [ ] Application : migration, chargement des candidats des sources, `run_pipeline --only countries`.
 - [ ] Migration : colonne `source_authorships.countries`. Étape signature dans la cascade vers les publications. Un changement de pays dans les référentiels ROR et HAL marque les signatures concernées. La page publication lit la colonne.
 
 ### 5. Édition manuelle et retrait de la seconde colonne
 
 - [ ] La page d'administration des pays lit les candidats et leur moyen, au lieu de `suggested_countries`.
-- [ ] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé.
+- [x] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé, et l'adresse est résolue aussitôt. Une saisie vide rend l'adresse aux moyens automatiques.
 - [ ] Migration : suppression de `addresses.suggested_countries` et des points d'entrée qui la servent.
 
 ## Questions ouvertes
