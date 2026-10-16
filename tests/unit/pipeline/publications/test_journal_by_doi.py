@@ -1,8 +1,10 @@
-"""Tests de `compute_updates` : rattachement de la revue manquante par l'espace de noms du DOI."""
+"""Tests du rattachement de la revue manquante par l'espace de noms du DOI."""
+
+import logging
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_publications.raw_metadata import stash_entry
-from pipeline.transformation.publications.correction.journal_by_doi import compute_updates
+from pipeline.transformation.publications.correction.journal_by_doi import compute_updates, run
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
@@ -93,3 +95,34 @@ def test_chapitre_rattache_a_tort_retrouve_sa_revue_brute():
         raw_metadata={"journal_id": _STASH},
     )
     assert compute_updates([row], _NAMESPACES) == [JournalCorrectionUpdate(1, None, {})]
+
+
+class _Queries:
+    def __init__(self, rows: list[JournalCorrectionRow]) -> None:
+        self._rows = rows
+
+    def fetch_journal_doi_namespaces(self, conn):
+        return _NAMESPACES
+
+    def fetch_journal_by_doi_candidates(self, conn):
+        return self._rows
+
+    def persist_journal_corrections(self, conn, updates):
+        return len(updates)
+
+
+class _Conn:
+    def commit(self) -> None: ...
+
+
+def test_le_bilan_compte_les_revues_distinctes(caplog):
+    """Régression : le bilan annonçait autant de revues que de notices rattachées."""
+    rows = [
+        _row(id=1, doi="10.64628/aak.1"),
+        _row(id=2, doi="10.64628/aak.2"),
+        _row(id=3, doi="10.5194/acp-3"),
+        _row(id=4, doi="10.1/x", journal_id=7, raw_metadata={"journal_id": _STASH}),
+    ]
+    with caplog.at_level(logging.INFO, logger="test"):
+        run(_Conn(), _Queries(rows), logging.getLogger("test"))  # type: ignore[arg-type]
+    assert "3 notices rattachées à 2 revues, 1 rattachement retiré" in caplog.text
