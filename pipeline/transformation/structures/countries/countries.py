@@ -69,7 +69,7 @@ class CountriesPhase:
             ctx.logger.info(
                 "%s%s",
                 DERNIERE_BRANCHE,
-                accord(changed, "adresse change de pays", "adresses changent de pays"),
+                accord(changed, "adresse mise à jour", "adresses mises à jour"),
             )
             return PhaseMetrics(updated=changed)
 
