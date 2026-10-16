@@ -6,6 +6,8 @@ Compare l'ensemble des pays de chaque moyen, adresse par adresse :
 - à `addresses.countries` : identique, sur-ensemble (pays en trop), sous-ensemble (pays manquants), recouvrement, disjoint ; et le nombre d'adresses sans pays retenu où le moyen propose un pays ;
 - à chaque autre moyen, sur les adresses que les deux couvrent.
 
+Compare aussi à `addresses.countries` les pays que compose la préséance du domaine (`retained_countries`) : pays identique, gagné, perdu ou changé. Les moyens écartés de la préséance (`similarity`) n'y entrent pas.
+
 `addresses.countries` est lui-même produit par une partie des moyens (ScanR, nom de pays, nom de lieu) : leur accord avec lui est surestimé. L'accord entre moyens deux à deux reste la mesure indépendante.
 
 Le code `xx` (adresse arbitrée sans pays) est retiré des ensembles comparés.
@@ -30,6 +32,7 @@ from pathlib import Path
 from sqlalchemy import Connection, text
 
 from domain.countries import NO_COUNTRY_CODE, normalize_country_code
+from domain.country_detection import CountryDetectionMethod, retained_countries
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
@@ -134,6 +137,33 @@ def pairwise_table(candidates: dict[str, CountrySets]) -> str:
     return "\n".join(lines)
 
 
+def precedence_table(candidates: dict[str, CountrySets], retained: CountrySets) -> str:
+    """Pays composés par `retained_countries`, comparés à `addresses.countries` sur toutes les adresses qui ont l'un ou l'autre."""
+    methods = {m: CountryDetectionMethod(m) for m in candidates if m in CountryDetectionMethod}
+    by_address: defaultdict[int, dict[CountryDetectionMethod, frozenset[str]]] = defaultdict(dict)
+    for name, method in methods.items():
+        for address_id, codes in candidates[name].items():
+            by_address[address_id][method] = codes
+    counts = dict.fromkeys(("identical", "gained", "lost", "changed"), 0)
+    for address_id in by_address.keys() | retained.keys():
+        composed = retained_countries(by_address.get(address_id, {}))
+        before = retained.get(address_id, frozenset())
+        if composed == before:
+            counts["identical"] += 1
+        elif not before:
+            counts["gained"] += 1
+        elif not composed:
+            counts["lost"] += 1
+        else:
+            counts["changed"] += 1
+    total = sum(counts.values())
+    return (
+        "| Identique | Pays gagné | Pays perdu | Pays changé |\n|---|---|---|---|\n| "
+        + " | ".join(f"{_number(counts[k])} ({_percent(counts[k], total)})" for k in counts)
+        + " |"
+    )
+
+
 def write_disagreements(
     path: Path,
     candidates: dict[str, CountrySets],
@@ -187,6 +217,8 @@ def main() -> None:
         + retained_table(candidates, retained, total)
         + "\n\n## Entre moyens\n\n"
         + pairwise_table(candidates)
+        + "\n\n## Préséance (`retained_countries`) contre `addresses.countries`\n\n"
+        + precedence_table(candidates, retained)
         + "\n",
         encoding="utf-8",
     )
