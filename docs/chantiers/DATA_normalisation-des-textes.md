@@ -44,7 +44,7 @@ Colonnes stockées issues de cette normalisation :
 
 ### 2. Valeurs stockées
 
-- [ ] Inventaire des sites d'écriture de chaque colonne, pour recalculer chaque valeur avec la fonction du pipeline.
+- [x] Inventaire des sites d'écriture de chaque colonne, et script de recalcul (`interfaces/cli/oneshot/recompute_normalized_texts.py`). Les formes de noms des structures, des lieux et des langues sont saisies sans texte source et restent en l'état.
 - [ ] Recalcul des lignes qui contiennent une écriture non latine. Identités d'auteur : clé recalculée, identités en collision fusionnées.
 - [ ] Mesure : titres, noms et adresses dont la forme normalisée change ; publications et personnes dont le matching change.
 
