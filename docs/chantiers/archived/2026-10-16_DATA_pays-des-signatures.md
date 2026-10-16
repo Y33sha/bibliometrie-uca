@@ -116,7 +116,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 | `source_scanr` | 39 | 0 | 20 | 206 |
 
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
-- [x] Formes d'institutions, 2026-10-16 : 29 % sont un nom ROR, 50 % un nom ou sigle de structure HAL. Les formes d'un seul mot et les noms ROR sont fiables (moins de 1 % de désaccord avec les moyens forts) et donnent seuls le pays de 1 400 adresses : ils restent. Sur les 167 formes en conflit avec le pays retenu sur au moins la moitié de leurs adresses, 147 sont retirées (intitulés génériques, noms ambigus, entreprises), 8 changent de pays (`data/measures/institution_forms_decisions.csv`).
+- [x] Formes d'institutions, 2026-10-16 : 29 % sont un nom ROR, 50 % un nom ou sigle de structure HAL. Les formes d'un seul mot et les noms ROR sont fiables (moins de 1 % de désaccord avec les moyens forts) et donnent seuls le pays de 1 400 adresses : ils restent. Sur les 167 formes en conflit avec le pays retenu sur au moins la moitié de leurs adresses, 147 sont retirées (intitulés génériques, noms ambigus, entreprises), 8 changent de pays (`data/measures/institution_forms_decisions.csv`). Les formes d'institutions restent hors du seed.
 - [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
 - [x] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`, sur le stock réhydraté, 2026-10-16. Identiques 453 799 (96,8 %), pays gagné 8 929 (1,9 %), pays perdu 1 136 (0,2 %), pays changé 4 956 (1,1 %). Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat.
 
@@ -143,6 +143,11 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 - [x] La page d'administration des pays lit les candidats et leur moyen. Elle propose les pays trouvés et non retenus (cba846b4e).
 - [x] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé, et l'adresse est résolue aussitôt. Une saisie vide rend l'adresse aux moyens automatiques.
 - [x] Migration : suppression de `addresses.suggested_countries` et du nœud `countries.suggest` (`c3a1f0d27b94`, f9c0acf6c).
+
+### 6. Fin de chantier
+
+- [x] Mise à jour de la documentation (7e757a35f, 0a91fe363).
+- [x] `schema.sql` et seeds régénérés (8e73039d9, 79bb7f427).
 
 ## Questions ouvertes
 
