@@ -13,7 +13,7 @@ Six moyens écrivent l'un ou l'autre :
 | nom de pays en fin d'adresse | `pipeline/transformation/structures/countries/detect_by_country_name.py` | `countries` |
 | nom d'institution ou de ville, via `ref.place_name_forms` | `pipeline/transformation/structures/countries/detect_by_place_name.py` | `countries` |
 | emprunt du pays d'une adresse qui contient celle-ci | `pipeline/transformation/structures/countries/suggest_countries.py` | `suggested_countries` |
-| saisie à la main, recopiée sur les adresses de même `normalized_text` | `application/services/addresses/countries.py` | `countries` |
+| saisie à la main | `application/services/addresses/countries.py` | `countries` |
 
 Les sources écrivent seulement sur une adresse sans pays : la première notice normalisée l'emporte. Les détections du pipeline traitent seulement les adresses sans pays. Une suggestion vide (`[]`) marque une adresse tentée sans résultat.
 
@@ -51,7 +51,7 @@ address_country_candidates
   PRIMARY KEY (address_id, country_code, method)
 ```
 
-Les moyens tirés du texte deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres. La copie d'une saisie manuelle vers les adresses de même `normalized_text` est un candidat `manual`.
+Les moyens deviennent les valeurs de `method` (`CountryDetectionMethod`) : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `ror` (organisations ROR de l'affiliation), `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres.
 
 Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
 
@@ -115,8 +115,8 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 | `source_scanr` | 39 | 0 | 20 | 206 |
 
 - [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
-- [ ] Fonction de préséance du domaine, testée. Le script l'applique au stock.
-- [ ] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`. Décision de câblage.
+- [x] Fonction de préséance du domaine, testée (`domain/country_detection.py`, 67409655f). Le script d'accord l'applique au stock (36e527c71).
+- [ ] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`. Décision de câblage. Bilan provisoire du 2026-10-16 : identiques 557 689 (96,9 %), pays gagné 10 307 (1,8 %), pays perdu 1 285 (0,2 %), pays changé 6 095 (1,1 %). Les candidats datent d'avant la reprise du stock du chantier périmètre et le retrait des formes fausses. Les pays changés retirent surtout les pays en trop de l'union par auteur (5e5a6c4b9). Les pays perdus concernent des adresses sans aucun candidat, dont 454 tenaient leur pays du seul `similarity`. Le bilan se refait après la passe du script sur le stock réhydraté, et après la fusion des adresses de même forme normalisée (`DATA_normalisation-des-textes.md`).
 
 ### 3. Pays des signatures
 
