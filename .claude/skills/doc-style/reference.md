@@ -63,6 +63,26 @@ AVANT :
 APRÈS :
     L'hydratation sert là où le traitement porte sur une entité à la fois : les commandes de curation, qui chargent, modifient et enregistrent l'entité éditée, et `refresh_from_sources`, qui recalcule les métadonnées canoniques d'une publication depuis ses sources.
 
+## Phrases d'annonce
+
+Dire les choses, ne pas les annoncer. Une phrase qui compte ou annonce ce qui suit (« cinq phases font x », « ce module se compose de trois parties ») se supprime.
+
+AVANT :
+    Quatre phases écrivent ces tables, dans l'ordre où le pipeline les enchaîne.
+
+    | Phase | Ce qu'elle écrit |
+
+APRÈS :
+    | Phase | Ce qu'elle écrit |
+
+AVANT :
+    Deux chaînes propagent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_authorships.perimeter_evidence`, et `addresses.countries` → `source_publications.countries` → `publications.countries`.
+
+    **Appartenance au périmètre.** Dernière étape d'`affiliations` […]
+
+APRÈS :
+    **Appartenance au périmètre** : `address_structures` → vue matérialisée → `source_authorships.perimeter_evidence`. Dernière étape d'`affiliations` […]
+
 ## Pronoms « y » et « en » à antécédent lointain
 
 N'employer « y » ou « en » que si l'antécédent est le groupe nominal qui précède immédiatement, dans la même phrase. Sinon, répéter le nom.
