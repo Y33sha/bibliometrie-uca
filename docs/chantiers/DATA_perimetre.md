@@ -102,7 +102,7 @@ Un nœud en tête de la phase `affiliations` charge depuis l'API `ref/structure`
 
 - [x] Signal de remplacement des adresses de thèse : branches de thèse de `source_authorship_structures`, par le PPN de l'établissement et des laboratoires partenaires. Simulation sur 2 642 thèses : 2 508 gardent les mêmes laboratoires, 67 en gagnent, 67 en perdent faute de PPN du partenaire.
 - [x] Normalisation : noms de structures HAL et ScanR et noms des thèses hors de `addresses`. Les structures HAL et leurs ROR sont lus dans le TEI. Une affiliation ScanR avec `structId` est une fiche de structure HAL : elle donne une structure HAL et son ROR à la signature, sans adresse.
-- [ ] Reprise du stock : réhydratation de `staging` depuis le raw store, `normalize` complet.
+- [x] Reprise du stock : réhydratation de `staging` depuis le raw store, `normalize` complet, WoS excepté. Mesure du 2026-10-16 (`interfaces/cli/oneshot/snapshot_perimeter.py`) : publications du périmètre 73 534 → 73 675 (205 entrées, 56 sorties, 8 supprimées), signatures 499 170 → 501 228. 173 142 signatures HAL et ScanR passent de l'indice `address` à `hal_structure`. 20 des 56 sorties citent la fiche HAL « Clermont Université, ISIT-CaVITI », sans parent ni correspondance interne. Les autres sont surtout des faux positifs : « UCA » de l'Université Côte d'Azur. 13 159 publications perdent le lien direct à un établissement (UCA, INP, Sigma Clermont, MSH) : la branche `hal_structure` garde la structure la plus basse de la hiérarchie. Le périmètre n'en dépend pas.
 
 ### Phase 5 — Fin de chantier
 
