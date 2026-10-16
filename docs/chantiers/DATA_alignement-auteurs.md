@@ -82,6 +82,11 @@ Mesure du 2026-10-16 : couples (publication, personne) dont les signatures porte
 
 La renormalisation d'une notice rapproche ses signatures de celles en base par identité : nom normalisé et identifiants. Une signature dont les identifiants changent est supprimée, puis insérée sans personne, et la résolution la reprend.
 
+Les verdicts manuels sur les signatures ont deux ancrages :
+
+- le détachement (`rejected_authorships`) vise un couple (notice, personne) et s'applique à toute la publication : il résiste à la resynchronisation des signatures ;
+- le rattachement manuel d'une signature orpheline (`confirmed_authorships`) vise l'identifiant de la signature, en `ON DELETE CASCADE` : il disparaît quand les identifiants de la signature changent.
+
 ## Décisions
 
 - L'alignement se fait par publication, avant la phase `persons`.
@@ -89,7 +94,7 @@ La renormalisation d'une notice rapproche ses signatures de celles en base par i
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
 - Une table des auteurs alignés relie les signatures d'un même auteur et porte `person_id`, retiré des `source_authorships`.
 - Un auteur aligné réunit au plus une signature par notice. Une personne correspond au plus à un auteur aligné par publication. Les doubles rattachements relèvent de ce chantier.
-- Les verdicts (formes de nom rejetées, signatures détachées) restent ancrés sur les `source_authorships` : l'identifiant d'un auteur aligné change à chaque recalcul de l'alignement.
+- Les verdicts restent ancrés sur les données sources, pas sur les auteurs alignés : l'identifiant d'un auteur aligné change à chaque recalcul de l'alignement.
 - Une signature dont les identifiants changent marque son auteur aligné à recalculer, et la résolution des personnes le reprend.
 
 ## Phasage
@@ -129,7 +134,7 @@ La renormalisation d'une notice rapproche ses signatures de celles en base par i
 
 - **Méthode.** Affectation par similarité de noms sous les contraintes des identifiants. Rôle de la position : indice faible, ou critère pour les seules listes courtes.
 - **Identifiants différents entre sources.** Deux valeurs différentes d'un même type, à des signatures de sources différentes, séparent-elles deux signatures ? Une personne peut avoir deux IdRef ou deux comptes ORCID.
-- **Ancrage des verdicts.** Une signature dont les identifiants changent reçoit un nouvel identifiant à la synchronisation : les verdicts ancrés sur elle se perdent-ils ?
+- **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **Auteurs collectifs** : noms de consortium dans la liste des auteurs.
 - **Rapport avec `authorships`** : l'auteur aligné remplace-t-il la consolidation par paire (publication, personne) ?
