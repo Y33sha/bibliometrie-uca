@@ -32,9 +32,9 @@ def _match_trailing_country(
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
     """Ajoute le candidat `country_name` des adresses à traiter qui se terminent par un nom de pays.
 
-    `seen` = adresses examinées, `new` = candidats ajoutés, `extras["unmatched"]` = adresses sans nom de pays final.
+    `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat, `extras["unmatched"]` = adresses sans nom de pays final.
     """
-    etape(logger, "Pays candidats des noms de pays en fin d'adresse")
+    etape(logger, "Pays des adresses d'après le nom de pays qui les termine")
     country_forms = queries.load_country_forms(conn)
     max_tokens = max((form.count(" ") + 1 for form in country_forms), default=1)
 
@@ -47,5 +47,5 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
             matched.append((addr_id, [iso]))
 
     added = queries.insert_candidates(conn, CountryDetectionMethod.COUNTRY_NAME, matched)
-    logger.info("%s%s", DERNIERE_BRANCHE, accord(added, "candidat ajouté", "candidats ajoutés"))
+    logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
     return PhaseMetrics(seen=len(rows), new=added, extras={"unmatched": len(rows) - len(matched)})

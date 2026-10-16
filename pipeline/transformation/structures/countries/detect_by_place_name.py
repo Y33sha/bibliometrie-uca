@@ -20,14 +20,15 @@ _METHODS = {
     PlaceNameKind.INSTITUTION: CountryDetectionMethod.INSTITUTION,
     PlaceNameKind.CITY: CountryDetectionMethod.CITY,
 }
+_LABELS = {PlaceNameKind.INSTITUTION: "institutions", PlaceNameKind.CITY: "villes"}
 
 
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
     """Ajoute les candidats `institution` et `city` des adresses à traiter.
 
-    `seen` = adresses examinées, `new` = candidats ajoutés.
+    `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat.
     """
-    etape(logger, "Pays candidats des noms de villes et d'institutions")
+    etape(logger, "Pays des adresses d'après les noms de villes et d'institutions")
     rows = queries.fetch_dirty_addresses_normalized(conn)
     added = 0
     for kind, method in _METHODS.items():
@@ -39,10 +40,10 @@ def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> Ph
         ]
         n = queries.insert_candidates(conn, method, proposals)
         logger.info(
-            "%s%s : %s",
+            "%s%s : pays trouvé pour %s",
             BRANCHE if method is CountryDetectionMethod.INSTITUTION else DERNIERE_BRANCHE,
-            method.value,
-            accord(n, "candidat ajouté", "candidats ajoutés"),
+            _LABELS[kind],
+            accord(n, "adresse"),
         )
         added += n
     return PhaseMetrics(seen=len(rows), new=added)

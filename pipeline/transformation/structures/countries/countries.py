@@ -48,12 +48,10 @@ class CountriesPhase:
         initial = _etat_des_adresses(open_tx, queries)
 
         def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            etape(ctx.logger, "Pays candidats des organisations ROR")
+            etape(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
             with ctx.open_tx() as conn:
                 added = queries.insert_ror_candidates(conn)
-            ctx.logger.info(
-                "%s%s", DERNIERE_BRANCHE, accord(added, "candidat ajouté", "candidats ajoutés")
-            )
+            ctx.logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
             return PhaseMetrics(new=added)
 
         def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -65,11 +63,13 @@ class CountriesPhase:
             return metrics
 
         def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            etape(ctx.logger, "Pays retenus des adresses")
+            etape(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
             with ctx.open_tx() as conn:
                 changed = queries.resolve_address_countries(conn)
             ctx.logger.info(
-                "%s%s", DERNIERE_BRANCHE, accord(changed, "adresse changée", "adresses changées")
+                "%s%s",
+                DERNIERE_BRANCHE,
+                accord(changed, "adresse change de pays", "adresses changent de pays"),
             )
             return PhaseMetrics(updated=changed)
 

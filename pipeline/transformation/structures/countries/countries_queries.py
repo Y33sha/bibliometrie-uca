@@ -124,13 +124,13 @@ _PUB_COUNTRIES_FROM_SCOPE = """,
 """
 
 
-# Fin partagée des insertions de candidats : attend une CTE `added(address_id)` des candidats ajoutés, marque leurs adresses à traiter et compte les candidats.
+# Fin partagée des insertions de candidats : attend une CTE `added(address_id)` des candidats ajoutés, marque leurs adresses à traiter et compte ces adresses.
 _MARK_DIRTY = """,
     marked AS (
         UPDATE addresses SET candidates_dirty = true
         WHERE id IN (SELECT address_id FROM added) AND NOT candidates_dirty
     )
-    SELECT count(*) FROM added
+    SELECT count(DISTINCT address_id) FROM added
 """
 
 # Adresses résolues par lot : chaque lot charge ses candidats en mémoire.
@@ -258,7 +258,7 @@ class CountryQueries:
         method: CountryDetectionMethod,
         rows: list[tuple[int, list[str]]],
     ) -> int:
-        """Ajoute les candidats `(adresse, pays)` de `rows` pour le moyen `method`, et marque `candidates_dirty` les adresses qui en reçoivent un. Un candidat déjà présent, ou un code absent du référentiel des pays, est ignoré. Retourne le nombre de candidats ajoutés."""
+        """Ajoute les candidats `(adresse, pays)` de `rows` pour le moyen `method`, et marque `candidates_dirty` les adresses qui en reçoivent un. Un candidat déjà présent, ou un code absent du référentiel des pays, est ignoré. Retourne le nombre d'adresses qui reçoivent un candidat."""
         if not rows:
             return 0
         payload = json.dumps([{"id": addr_id, "c": codes} for addr_id, codes in rows])
@@ -283,7 +283,7 @@ class CountryQueries:
         ).scalar_one()
 
     def insert_ror_candidates(self, conn: Connection) -> int:
-        """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque `candidates_dirty` les adresses qui en reçoivent un. Retourne le nombre de candidats ajoutés."""
+        """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque `candidates_dirty` les adresses qui en reçoivent un. Retourne le nombre d'adresses qui reçoivent un candidat."""
         return conn.execute(
             text(
                 """
