@@ -10,7 +10,6 @@
 ### Non commencé
 
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
-- [Appartenance et périmètre](DATA_perimetre.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
@@ -26,6 +25,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-16 — [Appartenance et périmètre](archived/2026-10-16_DATA_perimetre.md)
 - 2026-10-15 — [Licences des publications](archived/2026-10-15_DATA_licences.md)
 - 2026-10-14 — [Import des paiements APC sans doublon](archived/2026-10-14_DATA_import-apc.md)
 - 2026-10-14 — [Instances par établissement](archived/2026-10-14_METIER_instances-par-etablissement.md)

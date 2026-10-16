@@ -17,7 +17,7 @@ Six moyens écrivent l'un ou l'autre :
 
 Les sources écrivent seulement sur une adresse sans pays : la première notice normalisée l'emporte. Les détections du pipeline traitent seulement les adresses sans pays. Une suggestion vide (`[]`) marque une adresse tentée sans résultat.
 
-Couverture obtenue, sur 507 902 adresses de la base de test : 483 838 ont un pays faisant autorité (95,3 %), 19 154 n'ont qu'une suggestion (3,8 %), 4 910 n'ont rien (1,0 %). La base de test vaut la base de prod pour les adresses et les pays. Ce stock contient les noms de structures HAL et ScanR, qui quittent `addresses` à la reprise du stock du chantier `DATA_perimetre.md` : 20 660 adresses sont portées par les seules signatures HAL.
+Couverture obtenue, sur 507 902 adresses de la base de test : 483 838 ont un pays faisant autorité (95,3 %), 19 154 n'ont qu'une suggestion (3,8 %), 4 910 n'ont rien (1,0 %). La base de test vaut la base de prod pour les adresses et les pays.
 
 Le dispositif fonctionne. Ce sont les conséquences de la modélisation en deux colonnes qui motivent ce chantier.
 
