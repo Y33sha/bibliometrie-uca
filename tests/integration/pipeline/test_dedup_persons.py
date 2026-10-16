@@ -22,6 +22,7 @@ from functools import partial
 from sqlalchemy import text
 
 from application.services.persons.core import add_name_form, create_person
+from domain.normalize import normalize_text
 from infrastructure.repositories import person_repository
 from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
@@ -51,9 +52,9 @@ def _set_name_form_status(conn, person_id, raw_name, status):
     conn.execute(
         text("""
             UPDATE person_name_forms SET status = CAST(:st AS identifier_status)
-            WHERE person_id = :pid AND name_form = normalize_name_form(:raw)
+            WHERE person_id = :pid AND name_form = :name_form
         """),
-        {"pid": person_id, "raw": raw_name, "st": status},
+        {"pid": person_id, "name_form": normalize_text(raw_name), "st": status},
     )
 
 
@@ -74,9 +75,7 @@ def _insert_authorship(
     (`author_identifying_keys.person_identifiers`, JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
     """
-    normalized = conn.execute(
-        text("SELECT normalize_name_form(:raw)"), {"raw": raw_author_name}
-    ).scalar_one()
+    normalized = normalize_text(raw_author_name)
     return insert_signature(
         conn,
         source_publication_id,

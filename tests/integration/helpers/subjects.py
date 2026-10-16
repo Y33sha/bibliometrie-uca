@@ -2,6 +2,7 @@
 
 from sqlalchemy import Connection
 
+from domain.normalize import normalize_text
 from tests.integration.helpers.rows import insert_row
 
 
@@ -10,7 +11,14 @@ def insert_subject(
 ) -> int:
     """Insère un sujet et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma."""
     return insert_row(
-        conn, "subjects", {"label": label, "usage_count": usage_count, "language": language}
+        conn,
+        "subjects",
+        {
+            "label": label,
+            "label_normalized": normalize_text(label),
+            "usage_count": usage_count,
+            "language": language,
+        },
     )
 
 

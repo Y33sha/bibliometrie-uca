@@ -13,6 +13,7 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
+from domain.normalize import normalize_text
 from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 from pipeline.transformation.structures.countries.refresh_publication_countries import refresh
 from tests.integration.helpers.addresses import insert_address
@@ -34,9 +35,7 @@ def _insert_source_authorship(
     raw_author_name: str = "Jane Doe",
     position: int = 0,
 ) -> int:
-    normalized = conn.execute(
-        text("SELECT normalize_name_form(:name)"), {"name": raw_author_name}
-    ).scalar_one()
+    normalized = normalize_text(raw_author_name)
     return insert_signature(
         conn,
         source_publication_id,

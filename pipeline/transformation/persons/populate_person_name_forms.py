@@ -30,7 +30,7 @@ def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.
         ln = r.last_name.strip()
         for form in compute_person_name_forms(ln, fn):
             batch.append(
-                {"raw_text": form, "person_id": r.id, "source": CANONICAL_NAME_FORM_SOURCE}
+                {"name_form": form, "person_id": r.id, "source": CANONICAL_NAME_FORM_SOURCE}
             )
             n_persons_rows += 1
             if len(batch) >= BATCH_SIZE:

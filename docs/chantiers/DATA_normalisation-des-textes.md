@@ -17,12 +17,11 @@ Colonnes stockées issues de cette normalisation :
 | `source_publications`, `publications`, `journals`, `monographs` | `title_normalized` |
 | `author_identifying_keys` | `last_name_normalized`, `first_name_normalized`, `author_name_normalized`, `key_hash` |
 | `persons` | `last_name_normalized`, `first_name_normalized` |
-| `person_name_forms` | `name_form`, calculée par `normalize_name_form()` |
+| `person_name_forms` | `name_form` |
+| `subjects` | `label_normalized` |
 | `publishers`, `doi_prefixes` | `name_normalized`, `publisher_name_normalized`, `client_name_normalized` |
 | `journal_name_forms`, `publisher_name_forms`, `language_forms`, `place_name_forms` | `form_normalized` |
 | `addresses` | `normalized_text` |
-
-L'index `subjects_label_norm_trgm_idx` est défini sur `normalize_name_form(label)`.
 
 `addresses` est unique par texte brut. Des textes qui diffèrent par la ponctuation, la casse ou les accents donnent des lignes distinctes de même forme normalisée : 592 507 adresses pour 509 522 formes normalisées. Chaque jumelle reçoit ses structures et son pays séparément. 1 534 groupes de jumelles ont des pays différents. Dans un groupe, l'administration a confirmé un lien sur une jumelle et l'a infirmé sur l'autre. 35 adresses ont une forme normalisée vide.
 
@@ -30,7 +29,9 @@ L'index `subjects_label_norm_trgm_idx` est défini sur `normalize_name_form(labe
 
 **Écritures non latines conservées.** `normalize_text` garde les lettres et les chiffres de toutes les écritures. La ponctuation et les symboles deviennent des espaces. La règle vaut pour les titres, les noms et les adresses.
 
-**Diacritiques retirés sur les lettres latines et grecques.** é → e, ά → α, ё → е. Les autres marques restent : が reste が, й reste й. La règle reproduit `unaccent` sur la base (`fr_FR.UTF-8`). `normalize_name_form()` remplace `[^a-z0-9]` par `[^[:alnum:]]`.
+**Diacritiques retirés sur les lettres latines et grecques.** é → e, ά → α, ё → е. Les autres marques restent : が reste が, й reste й.
+
+**Normalisation calculée seulement en Python.** La fonction SQL est supprimée : les classes de caractères de PostgreSQL coupent les mots des écritures indiennes au virama, et ses regex ignorent les marques Unicode.
 
 **Une adresse par forme normalisée.** La forme normalisée est la clé d'unicité de `addresses`. Un texte brut se rattache à l'adresse de même forme normalisée. Un texte de forme normalisée vide est écarté.
 
@@ -38,15 +39,13 @@ L'index `subjects_label_norm_trgm_idx` est défini sur `normalize_name_form(labe
 
 ### 1. Fonctions de normalisation
 
-- [ ] `normalize_text` : écritures non latines conservées, diacritiques retirés sur les lettres latines et grecques.
-- [ ] Migration de `normalize_name_form()`.
-- [ ] Test d'alignement étendu aux écritures non latines.
+- [x] `normalize_text` : écritures non latines conservées, diacritiques retirés sur les lettres latines et grecques.
+- [x] Fonction SQL `normalize_name_form()` et test d'alignement supprimés. Les formes de noms des personnes arrivent normalisées par Python. La recherche dans les sujets lit `subjects.label_normalized`, indexée en trigram.
 
 ### 2. Valeurs stockées
 
 - [ ] Inventaire des sites d'écriture de chaque colonne, pour recalculer chaque valeur avec la fonction du pipeline.
 - [ ] Recalcul des lignes qui contiennent une écriture non latine. Identités d'auteur : clé recalculée, identités en collision fusionnées.
-- [ ] Reconstruction de l'index `subjects_label_norm_trgm_idx`.
 - [ ] Mesure : titres, noms et adresses dont la forme normalisée change ; publications et personnes dont le matching change.
 
 ### 3. Unicité des adresses

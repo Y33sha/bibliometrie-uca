@@ -57,11 +57,38 @@ class TestNormalizeText:
             ("<p>Un</p><p>Deux</p>", "un deux"),
             # Ponctuation → espaces
             ("Hello, World!", "hello world"),
-            # None-equivalent
+            # Décomposition de compatibilité qui produit une majuscule
+            ("№ 5", "no 5"),
+            # Écritures non latines conservées
+            ("島根大学生物資源科学部", "島根大学生物資源科学部"),
+            ("한국과학기술원", "한국과학기술원"),
+            ("Российский университет", "российский университет"),
+            ("جامعة 8 مايو 45، قالمة", "جامعة 8 مايو 45 قالمة"),
+            ("विश्वविद्यालय", "विश्वविद्यालय"),
+            ("มหาวิทยาลัย", "มหาวิทยาลัย"),
+            # Diacritiques retirés derrière une lettre grecque, ё → е
+            ("Ελληνικά Άθήνα", "ελληνικα αθηνα"),
+            ("Ёлка", "елка"),
+            # Ailleurs, le diacritique distingue une lettre
+            ("Йошкар-Ола", "йошкар ола"),
+            ("がっこう", "がっこう"),
         ],
     )
     def test_normalize_text(self, raw: str, expected: str) -> None:
         assert normalize_text(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw", ["Université Clermont Auvergne", "島根大学", "विश्वविद्यालय", "Йошкар-Ола", "½ x²"]
+    )
+    def test_idempotent(self, raw: str) -> None:
+        """Une forme normalisée, normalisée de nouveau, reste identique : les formes stockées se comparent aux formes recalculées."""
+        assert normalize_text(normalize_text(raw)) == normalize_text(raw)
+
+    def test_textes_non_latins_distincts_restent_distincts(self) -> None:
+        """Régression : deux adresses russes différentes se réduisaient à leurs seuls chiffres, et devenaient égales."""
+        assert normalize_text("Лаборатория математики, BP 401") != normalize_text(
+            "Университет, BP 401"
+        )
 
     def test_oeuvres_oe_ligature_match_oe(self) -> None:
         """Régression : deux formes équivalentes du même titre matchent après normalisation."""

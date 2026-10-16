@@ -30,7 +30,7 @@ class TestNormalizeName:
         assert normalize_name("DUPONT") == "dupont"
 
     def test_digits_kept(self):
-        # normalize_name conserve les chiffres (aligné sur normalize_name_form SQL)
+        # normalize_name conserve les chiffres
         assert normalize_name("Jean2") == "jean2"
 
     def test_multiple_spaces(self):
