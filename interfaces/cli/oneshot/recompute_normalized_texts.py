@@ -1,11 +1,11 @@
 # STATUS: oneshot (2026-10-16)
 """Recalcule les formes normalisées stockées avec `normalize_text`, qui conserve les écritures non latines.
 
-Seul un texte source qui contient un caractère non ASCII peut changer de forme normalisée. Le script relit ces textes, recalcule chaque valeur avec la fonction du pipeline et écrit celles qui diffèrent :
+Le script recalcule chaque valeur avec la fonction du pipeline et écrit celles qui diffèrent :
 
-- colonnes calculées d'une autre colonne de la même ligne : titres, noms d'éditeurs et de préfixes DOI, noms des personnes, adresses, libellés de sujets ;
-- formes de noms des revues et des éditeurs : la forme recalculée du titre ou du nom s'ajoute aux formes existantes, les formes vides sont supprimées ;
-- identités d'auteur : chaque signature concernée est rattachée à l'identité de son nom recalculé, puis les identités orphelines sont purgées.
+- colonnes calculées d'une autre colonne de la même ligne : titres, noms d'éditeurs et de préfixes DOI, noms des personnes, adresses, libellés de sujets. Toutes les lignes sont relues : une forme calculée d'un texte depuis assaini (`&amp;` devenu `&`) est périmée, même en ASCII ;
+- formes de noms des revues et des éditeurs : la forme recalculée d'un titre ou d'un nom non ASCII s'ajoute aux formes existantes, les formes vides sont supprimées ;
+- identités d'auteur : chaque signature dont le nom contient un caractère non ASCII est rattachée à l'identité de son nom recalculé, puis les identités orphelines sont purgées.
 
 La phase `persons` suivante resynchronise les formes de noms des personnes. Idempotent.
 
@@ -93,9 +93,8 @@ def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
     rows = conn.execute(
         text(
             f"SELECT {column.key} AS key, {column.source} AS source, {column.target} AS target"
-            f" FROM {column.table} WHERE {column.source} ~ :pattern"
-        ),
-        {"pattern": _NON_ASCII},
+            f" FROM {column.table} WHERE {column.source} IS NOT NULL"
+        )
     ).all()
     payload = [
         {"key": r.key, "value": value}
