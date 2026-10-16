@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SYIUJkmOiCPcbqMR03NRLq7E8jLD1emeEPpENodmeBHtk45UJwGnoJIt3RTykh0
+\restrict K05ajmMVzK33Re6qarMiJyyHm0ITJOepfZvEep5rkQqfmgJKC4gQeVlGlYIiuir
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -400,71 +400,6 @@ CREATE TYPE public.structure_type AS ENUM (
     'onr',
     'admin'
 );
-
-
---
--- Name: normalize_name_form(text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.normalize_name_form(input text) RETURNS text
-    LANGUAGE plpgsql IMMUTABLE
-    SET search_path TO 'public', 'pg_temp'
-    AS $$
-DECLARE
-    s text := input;
-BEGIN
-    IF s IS NULL THEN
-        RETURN NULL;
-    END IF;
-
-    -- Retrait des balises MathML/HTML. Une balise de mise en forme (<sub>, <i>, <mml:mi> …)
-    -- disparaît : CO<sub>2</sub> donne CO2. Les autres balises deviennent un espace.
-    -- Premier caractère = lettre ou '/' : les indices de Miller <111>/<110> (cristallographie)
-    -- restent dans le texte.
-    s := regexp_replace(s, '</?([A-Za-z][A-Za-z0-9.-]*:)?(sub|sup|i|b|em|strong|u|span|small|tt|sc|scp|italic|bold|underline|monospace|overline|roman|strike|math|mi|mn|mo|ms|mtext|mrow|msub|msup|msubsup|mfrac|msqrt|mroot|mover|munder|munderover|mstyle|mspace|mpadded|mphantom|mfenced|menclose|semantics|inline-formula)(\s[^>]*|/)?>', '', 'gi');
-    s := regexp_replace(s, '</?[A-Za-z][^>]*>', ' ', 'g');
-
-    -- I turc avec point : PG lower()+unaccent le perd ("İstanbul" → "stanbul").
-    s := replace(s, E'İ', 'i');
-
-    -- Fractions vulgaires → chiffres espacés (comme "1/4" tapé à la main).
-    s := replace(s, E'¼', '1 4');
-    s := replace(s, E'½', '1 2');
-    s := replace(s, E'¾', '3 4');
-    s := replace(s, E'⅐', '1 7');
-    s := replace(s, E'⅑', '1 9');
-    s := replace(s, E'⅒', '1 10');
-    s := replace(s, E'⅓', '1 3');
-    s := replace(s, E'⅔', '2 3');
-    s := replace(s, E'⅕', '1 5');
-    s := replace(s, E'⅖', '2 5');
-    s := replace(s, E'⅗', '3 5');
-    s := replace(s, E'⅘', '4 5');
-    s := replace(s, E'⅙', '1 6');
-    s := replace(s, E'⅚', '5 6');
-    s := replace(s, E'⅛', '1 8');
-    s := replace(s, E'⅜', '3 8');
-    s := replace(s, E'⅝', '5 8');
-    s := replace(s, E'⅞', '7 8');
-
-    s := translate(s,
-        E'‐‑‒–—―­‘’‚′“”',
-        E'-------\x27\x27\x27\x27""'
-    );
-
-    -- Chiffres exposants/indices → chiffres ASCII (attachés). L'exposant moins `⁻`
-    -- tombe dans le passage [^a-z0-9] → espace.
-    s := translate(s,
-        E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉',
-        '01234567890123456789'
-    );
-
-    RETURN trim(regexp_replace(
-        unaccent(lower(trim(s))),
-        '[^a-z0-9]+', ' ', 'g'
-    ));
-END;
-$$;
 
 
 --
@@ -1424,8 +1359,16 @@ CREATE TABLE publications.subjects (
     label text NOT NULL,
     language text,
     created_at timestamp with time zone DEFAULT now(),
-    usage_count integer DEFAULT 0 NOT NULL
+    usage_count integer DEFAULT 0 NOT NULL,
+    label_normalized text NOT NULL
 );
+
+
+--
+-- Name: COLUMN subjects.label_normalized; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.subjects.label_normalized IS 'Forme de recherche du libellé (normalize_text), servie par un index trigram.';
 
 
 --
@@ -3451,10 +3394,10 @@ CREATE UNIQUE INDEX subjects_label_key ON publications.subjects USING btree (low
 
 
 --
--- Name: subjects_label_norm_trgm_idx; Type: INDEX; Schema: publications; Owner: -
+-- Name: subjects_label_normalized_trgm_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE INDEX subjects_label_norm_trgm_idx ON publications.subjects USING gin (public.normalize_name_form(label) public.gin_trgm_ops);
+CREATE INDEX subjects_label_normalized_trgm_idx ON publications.subjects USING gin (label_normalized public.gin_trgm_ops);
 
 
 --
@@ -4482,5 +4425,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SYIUJkmOiCPcbqMR03NRLq7E8jLD1emeEPpENodmeBHtk45UJwGnoJIt3RTykh0
+\unrestrict K05ajmMVzK33Re6qarMiJyyHm0ITJOepfZvEep5rkQqfmgJKC4gQeVlGlYIiuir
 
