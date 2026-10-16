@@ -6,8 +6,10 @@ Chaque fonction insère une ligne, valeurs par défaut uniques quand la table l'
 import json
 import uuid
 
+from domain.normalize import normalize_text
 from tests.integration.helpers.authorships import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
+from tests.integration.helpers.persons import NORMALIZERS
 from tests.integration.helpers.rows import perimeter_evidence
 
 
@@ -146,12 +148,11 @@ def seed_config(key: str, value: object) -> None:
 
 
 def seed_publisher(name: str | None = None, *, name_normalized: str | None = None) -> int:
-    """Éditeur de nom unique par défaut, normalisé par `normalize_name_form` sauf `name_normalized`."""
+    """Éditeur de nom unique par défaut, normalisé par `normalize_text` sauf `name_normalized`."""
     name = name or uniq("Publisher")
     return _insert(
-        "INSERT INTO publishers (name, name_normalized) "
-        "VALUES (%s, COALESCE(%s, normalize_name_form(%s))) RETURNING id",
-        (name, name_normalized, name),
+        "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
+        (name, normalize_text(name) if name_normalized is None else name_normalized),
     )
 
 
@@ -162,13 +163,17 @@ def seed_journal(
     publisher_id: int | None = None,
     journal_type: str = "unknown",
 ) -> int:
-    """Revue de titre unique par défaut, normalisé par `normalize_name_form` sauf `title_normalized`. Le type par défaut est celui du schéma."""
+    """Revue de titre unique par défaut, normalisé par `normalize_text` sauf `title_normalized`. Le type par défaut est celui du schéma."""
     title = title or uniq("Journal")
     return _insert(
         "INSERT INTO journals (title, title_normalized, publisher_id, journal_type) "
-        "VALUES (%s, COALESCE(%s, normalize_name_form(%s)), %s, CAST(%s AS journal_type)) "
-        "RETURNING id",
-        (title, title_normalized, title, publisher_id, journal_type),
+        "VALUES (%s, %s, %s, CAST(%s AS journal_type)) RETURNING id",
+        (
+            title,
+            normalize_text(title) if title_normalized is None else title_normalized,
+            publisher_id,
+            journal_type,
+        ),
     )
 
 
@@ -189,11 +194,11 @@ def seed_journal_issn(
 
 
 def seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = None) -> int:
-    """Monographie de titre normalisé par `normalize_name_form`."""
+    """Monographie de titre normalisé par `normalize_text`."""
     return _insert(
         "INSERT INTO monographs (title, title_normalized, proceedings, isbn)"
-        " VALUES (%s, normalize_name_form(%s), %s, %s) RETURNING id",
-        (title, title, proceedings, isbn),
+        " VALUES (%s, %s, %s, %s) RETURNING id",
+        (title, normalize_text(title), proceedings, isbn),
     )
 
 
@@ -204,12 +209,17 @@ def seed_person(
     normalizer: str = "lower",
     first_name_normalized: str | None = None,
 ) -> int:
-    """Personne aux nom et prénom normalisés par la fonction SQL `normalizer` (`lower` ou `normalize_name_form`). `first_name_normalized` impose le prénom normalisé."""
-    assert normalizer in ("lower", "normalize_name_form"), normalizer
+    """Personne aux nom et prénom normalisés par `normalizer` (`lower` ou `normalize_text`). `first_name_normalized` impose le prénom normalisé."""
+    normalize = NORMALIZERS[normalizer]
     return _insert(
         "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-        f"VALUES (%s, %s, {normalizer}(%s), COALESCE(%s, {normalizer}(%s))) RETURNING id",
-        (last, first, last, first_name_normalized, first),
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (
+            last,
+            first,
+            normalize(last),
+            normalize(first) if first_name_normalized is None else first_name_normalized,
+        ),
     )
 
 
@@ -305,7 +315,7 @@ def seed_in_perimeter_authorships(journal_id: int) -> None:
             person_id = seed_person(
                 uniq("Author"),
                 "Jane",
-                normalizer="normalize_name_form",
+                normalizer="normalize_text",
                 first_name_normalized="jane",
             )
             seed_authorship(pid, person_id=person_id, in_perimeter=True, roles=["author"])
@@ -396,9 +406,10 @@ def seed_source_authorship(
 
 def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
     """Sujet de libellé unique par défaut. Le compte d'usage par défaut est celui du schéma."""
+    label = label or uniq("Subject")
     return _insert(
-        "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
-        (label or uniq("Subject"), usage_count),
+        "INSERT INTO subjects (label, label_normalized, usage_count) VALUES (%s, %s, %s) RETURNING id",
+        (label, normalize_text(label), usage_count),
     )
 
 

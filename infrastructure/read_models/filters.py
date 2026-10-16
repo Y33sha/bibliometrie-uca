@@ -212,7 +212,7 @@ def search_clause(search: str) -> WhereClause | None:
         "(p.title_normalized ILIKE :flt_search_pat "
         "OR p.id IN (SELECT ps.publication_id FROM publication_subjects ps "
         "JOIN subjects s ON s.id = ps.subject_id "
-        "WHERE normalize_name_form(s.label) ILIKE :flt_search_pat))",
+        "WHERE s.label_normalized ILIKE :flt_search_pat))",
         {"flt_search_pat": pattern},
     )
 

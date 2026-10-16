@@ -244,7 +244,7 @@ def batch_set_country(
 
     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
-    updated, propagated, all_ids = address_commands.batch_set_country(
+    modified_ids = address_commands.batch_set_country(
         conn,
         body.country_code,
         address_ids=body.address_ids,
@@ -255,8 +255,8 @@ def batch_set_country(
         repo=addr_repo,
         audit_repo=audit,
     )
-    bg.add_task(bg_propagate_countries, all_ids)
-    return BatchCountryResponse(updated=updated, propagated=propagated)
+    bg.add_task(bg_propagate_countries, modified_ids)
+    return BatchCountryResponse(updated=len(modified_ids))
 
 
 @router.post("/{addr_id}/country", response_model=OkResponse)

@@ -86,7 +86,7 @@ def test_single_person_single_batch(logger):
     rows = queries.batches[0]
     assert rows, "Au moins une forme calculée par personne"
     # Chaque ligne porte le contrat attendu par sync_from_raw_forms.
-    assert all(set(r.keys()) == {"raw_text", "person_id", "source"} for r in rows)
+    assert all(set(r.keys()) == {"name_form", "person_id", "source"} for r in rows)
     assert all(r["source"] == "persons" for r in rows)
     assert {r["person_id"] for r in rows} == {1, 2}
 
@@ -103,8 +103,8 @@ def test_strips_whitespace_in_names(logger):
     rows = queries.batches[0]
     # Les formes générées s'appuient sur le strip ; aucune ne contient le whitespace de bord.
     for r in rows:
-        assert not r["raw_text"].startswith(" ")
-        assert not r["raw_text"].endswith(" ")
+        assert not r["name_form"].startswith(" ")
+        assert not r["name_form"].endswith(" ")
 
 
 def test_handles_null_first_name(logger):

@@ -6,7 +6,7 @@ Rétablit l'invariant « aucune publication antérieure à l'ancre du pipeline �
 Critères de suppression :
   - publications : `pub_year < ancre` ET aucune source_publication `theses`
   - persons : aucune source_authorship `in_perimeter = TRUE` ET aucune fiche persons_rh
-  - addresses : aucun source_authorship_address ni address_structure
+  - addresses : aucun source_authorship_address (`delete_orphan_addresses`, comme la phase `normalize`)
 
 Cascade FK mobilisée :
   - `source_publications` → `source_authorships` → `source_authorship_addresses`, `source_authorship_structures`
@@ -27,6 +27,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
+from pipeline.ingestion.common.signature_queries import delete_orphan_addresses
 
 log = setup_logger("delete_publications_out_of_window", os.path.dirname(__file__))
 
@@ -106,19 +107,7 @@ def purge(conn: Connection, pub_ids: list[int]) -> None:
     ).rowcount
     log.info("DELETE persons orphelines : %d lignes", n_persons)
 
-    n_addresses = conn.execute(
-        text("""
-            DELETE FROM addresses a
-            WHERE NOT EXISTS (
-                SELECT 1 FROM source_authorship_addresses saa
-                WHERE saa.address_id = a.id
-            )
-            AND NOT EXISTS (
-                SELECT 1 FROM address_structures ast
-                WHERE ast.address_id = a.id
-            )
-        """)
-    ).rowcount
+    n_addresses = delete_orphan_addresses(conn)
     log.info("DELETE addresses orphelines : %d lignes", n_addresses)
 
 

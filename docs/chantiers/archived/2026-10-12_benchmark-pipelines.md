@@ -367,13 +367,6 @@ Les liens vers les dépôts sont en fin de document.
 - **Le code commun recopié dans chaque connecteur**, au lieu d'une bibliothèque partagée.
 - **Les corrections écrites dans les tables du moissonneur**, protégées seulement par le verrou.
 
-## Ce que ces exemples ne montrent pas
-
-- CRISalid et rialto n'ont pas de résolution lourde. Le premier s'appuie sur des identifiants alignés dans l'annuaire, le second trouve ses auteurs par ORCID.
-- ReCiter part d'un annuaire de personnes connues et cherche leurs articles. Il ne crée pas de personnes à partir des signatures, et ne traite ni les co-auteurs extérieurs ni le dédoublonnage des publications.
-- dnet-dedup dédoublonne des publications et des organisations. Son traitement des auteurs n'a pas été lu.
-- La forme commune à CRISalid, à dnet-dedup et à Splink : comparer des paires, ajouter les décisions humaines, calculer les groupes, stabiliser leur identifiant, construire l'entité.
-
 ## Dépôts
 
 ### Lus

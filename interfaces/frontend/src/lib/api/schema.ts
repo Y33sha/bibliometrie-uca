@@ -2799,13 +2799,11 @@ export interface components {
         };
         /**
          * BatchCountryResponse
-         * @description POST /api/addresses/batch-country : modifs directes + propagation.
+         * @description POST /api/addresses/batch-country : nombre d'adresses modifiées.
          */
         BatchCountryResponse: {
             /** Updated */
             updated: number;
-            /** Propagated */
-            propagated: number;
         };
         /** BatchReviewAction */
         BatchReviewAction: {

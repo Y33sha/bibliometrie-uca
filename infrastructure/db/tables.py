@@ -1322,6 +1322,7 @@ subjects = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("label", Text, nullable=False),
+    Column("label_normalized", Text, nullable=False),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),

@@ -70,14 +70,16 @@ def run(
     rows = queries.fetch_journal_by_doi_candidates(conn)
 
     updates = compute_updates(rows, namespaces)
-    attached = sum(1 for u in updates if u.journal_id is not None)
+    journals = [u.journal_id for u in updates if u.journal_id is not None]
+    detached = len(updates) - len(journals)
 
     persist_in_batches(conn, updates, queries.persist_journal_corrections)
     logger.info(
-        "%s%s %s (vers %s)",
+        "%s%s %s à %s%s",
         DERNIERE_BRANCHE,
-        accord(len(updates), "rattachement"),
-        forme(len(updates), "effectué"),
-        accord(attached, "revue"),
+        accord(len(journals), "notice"),
+        forme(len(journals), "rattachée"),
+        accord(len(set(journals)), "revue"),
+        f", {accord(detached, 'rattachement')} {forme(detached, 'retiré')}" if detached else "",
     )
-    return JournalByDoiStats(len(rows), attached)
+    return JournalByDoiStats(len(rows), len(journals))

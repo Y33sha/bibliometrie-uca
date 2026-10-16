@@ -86,6 +86,17 @@ def test_le_nettoyage_des_identites_suit_la_suppression_des_notices_disparues():
     assert "normalize.prune_disappeared" in deps
 
 
+def test_le_nettoyage_des_adresses_suit_la_normalisation_et_la_suppression_des_notices_disparues():
+    """Réécrire ou supprimer des signatures rend des adresses orphelines."""
+    deps = dependencies(NODES)["normalize.cleanup_orphan_addresses"]
+    assert {"normalize.hal", "normalize.prune_disappeared"} <= deps
+
+
+def test_la_resolution_des_adresses_suit_leur_nettoyage():
+    deps = dependencies(NODES)["affiliations.resolve_addresses"]
+    assert "normalize.cleanup_orphan_addresses" in deps
+
+
 def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
     deps = dependencies(NODES)["subjects.usage"]

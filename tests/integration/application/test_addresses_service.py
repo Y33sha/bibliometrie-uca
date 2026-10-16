@@ -8,7 +8,6 @@ from application.services.addresses.countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
     propagate_countries_to_publications,
-    propagate_countries_to_similar,
     set_country,
 )
 from application.services.addresses.structure_links import (
@@ -217,35 +216,6 @@ class TestSetCountry:
         set_country(sa_sync_conn, addr, None, repo=repo)
         assert _get_countries(sa_sync_conn, addr) is None
 
-    def test_propagates_to_same_normalized_text(self, sa_sync_conn, repo):
-        """Les adresses avec même normalized_text héritent des countries."""
-        ensure_country(sa_sync_conn, "FR")
-        a1 = insert_address(sa_sync_conn, "UCA A")
-        a2 = insert_address(sa_sync_conn, "UCA B")
-        # Forcer le même normalized_text (simule le pipeline de normalisation)
-        sa_sync_conn.execute(
-            text(
-                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
-                "WHERE id = ANY(:ids)"
-            ),
-            {"ids": [a1, a2]},
-        )
-        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
-        assert _get_countries(sa_sync_conn, a1) == ["FR"]
-        assert _get_countries(sa_sync_conn, a2) == ["FR"]  # propagé
-
-    def test_propagates_on_short_normalized(self, sa_sync_conn, repo):
-        """Deux adresses de même normalized_text court héritent aussi des countries."""
-        ensure_country(sa_sync_conn, "FR")
-        a1 = insert_address(sa_sync_conn, "Lyon A")
-        a2 = insert_address(sa_sync_conn, "Lyon B")
-        sa_sync_conn.execute(
-            text("UPDATE addresses SET normalized_text = 'lyon' WHERE id = ANY(:ids)"),
-            {"ids": [a1, a2]},
-        )
-        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
-        assert _get_countries(sa_sync_conn, a2) == ["FR"]
-
 
 # ── batch_set_country_by_ids ────────────────────────────────────────
 
@@ -320,61 +290,6 @@ class TestBatchSetCountryByFilter:
             batch_set_country_by_filter(sa_sync_conn, "FR", repo=repo)
 
 
-# ── propagate_countries_to_similar ──────────────────────────────────
-
-
-class TestPropagateCountriesToSimilar:
-    def test_propagates_divergent_values_from_modified_source(self, sa_sync_conn, repo):
-        """Deux adresses de même normalized_text avec countries différents :
-        la 2e reçoit les countries de la 1ère quand a1 est dans modified_ids."""
-        ensure_country(sa_sync_conn, "FR")
-        a1 = insert_address(sa_sync_conn, "UCA AA")
-        a2 = insert_address(sa_sync_conn, "UCA BB")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
-                "WHERE id = ANY(:ids)"
-            ),
-            {"ids": [a1, a2]},
-        )
-        # a1 a FR, a2 n'a rien
-        sa_sync_conn.execute(
-            text("UPDATE addresses SET countries = :c WHERE id = :id"),
-            {"c": ["FR"], "id": a1},
-        )
-
-        propagated = propagate_countries_to_similar(modified_ids=[a1], repo=repo)
-
-        assert a2 in propagated
-        assert _get_countries(sa_sync_conn, a2) == ["FR"]
-
-    def test_does_not_propagate_from_unmodified_sources(self, sa_sync_conn, repo):
-        """Seules les adresses passées en modified_ids servent de source de propagation : une adresse `a1` avec pays mais hors `modified_ids` ne doit PAS propager vers `a2` similaire. Régression : avant le ciblage, la propagation balayait toute la table et propageait depuis n'importe quelle adresse avec un pays, ce qui rendait la query O(n²) sur 475k lignes."""
-        ensure_country(sa_sync_conn, "FR")
-        a1 = insert_address(sa_sync_conn, "UCA CC")
-        a2 = insert_address(sa_sync_conn, "UCA DD")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
-                "WHERE id = ANY(:ids)"
-            ),
-            {"ids": [a1, a2]},
-        )
-        sa_sync_conn.execute(
-            text("UPDATE addresses SET countries = :c WHERE id = :id"),
-            {"c": ["FR"], "id": a1},
-        )
-
-        # On passe un id qui n'a aucun pays : pas de propagation depuis lui.
-        propagated = propagate_countries_to_similar(modified_ids=[a2], repo=repo)
-
-        assert propagated == []
-        assert _get_countries(sa_sync_conn, a2) is None
-
-    def test_empty_modified_ids_is_noop(self, sa_sync_conn, repo):
-        assert propagate_countries_to_similar(modified_ids=[], repo=repo) == []
-
-
 def _countries_dirty(conn, address_id):
     return conn.execute(
         text("SELECT countries_dirty FROM addresses WHERE id = :id"), {"id": address_id}
@@ -384,22 +299,13 @@ def _countries_dirty(conn, address_id):
 class TestCountriesDirty:
     """Une écriture de pays marque l'adresse : le run suivant reprend la propagation vers les publications si le recalcul ciblé a échoué."""
 
-    def test_set_country_marks_the_address_and_its_twins(self, sa_sync_conn, repo):
+    def test_set_country_marks_the_address(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
-        a1 = insert_address(sa_sync_conn, "UCA EE")
-        a2 = insert_address(sa_sync_conn, "UCA FF")
-        sa_sync_conn.execute(
-            text(
-                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
-                "WHERE id = ANY(:ids)"
-            ),
-            {"ids": [a1, a2]},
-        )
+        addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
-        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
+        set_country(sa_sync_conn, addr, ["FR"], repo=repo)
 
-        assert _countries_dirty(sa_sync_conn, a1) is True
-        assert _countries_dirty(sa_sync_conn, a2) is True
+        assert _countries_dirty(sa_sync_conn, addr) is True
 
     def test_batch_by_ids_marks_the_addresses(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")

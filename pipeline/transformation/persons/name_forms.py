@@ -18,9 +18,9 @@ class PersonNameRow(NamedTuple):
 
 
 class RawFormBatchItem(TypedDict):
-    """Ligne du batch executemany vers la table temp `_raw_forms`."""
+    """Ligne du batch vers la table temp `_raw_forms` : forme de nom normalisée."""
 
-    raw_text: str
+    name_form: str
     person_id: int
     source: str
 
@@ -54,18 +54,18 @@ class PersonNameFormsQueries:
     def create_temp_raw_forms_table(self, conn: Connection) -> None:
         """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes issues de `source_authorships` sont lues directement par la query d'agrégation, sans transiter par cette table."""
         conn.execute(
-            text("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)")
+            text("CREATE TEMP TABLE _raw_forms (name_form TEXT, person_id INT, source TEXT)")
         )
 
     def insert_raw_forms_batch(self, conn: Connection, rows: list[RawFormBatchItem]) -> None:
-        """Insert massif de formes brutes dans la table temporaire `_raw_forms`."""
+        """Insert massif de formes de nom dans la table temporaire `_raw_forms`."""
         if not rows:
             return
         conn.execute(
             text("""
-                INSERT INTO _raw_forms (raw_text, person_id, source)
-                SELECT raw_text, person_id, source
-                FROM jsonb_to_recordset(:payload) AS t(raw_text text, person_id int, source text)
+                INSERT INTO _raw_forms (name_form, person_id, source)
+                SELECT name_form, person_id, source
+                FROM jsonb_to_recordset(:payload) AS t(name_form text, person_id int, source text)
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": list(rows)},
         )
@@ -83,10 +83,8 @@ class PersonNameFormsQueries:
             text("""
                 CREATE TEMP TABLE _expected_pnf AS
                 WITH all_forms AS (
-                    SELECT normalize_name_form(raw_text) AS name_form,
-                           person_id, source
+                    SELECT name_form, person_id, source
                     FROM _raw_forms
-                    WHERE trim(raw_text) != ''
                     UNION
                     SELECT aik.author_name_normalized AS name_form,
                            sa.person_id, sa.source::text AS source

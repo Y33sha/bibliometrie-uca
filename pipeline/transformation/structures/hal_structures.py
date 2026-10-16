@@ -137,10 +137,10 @@ class HalStructuresQueries:
 
 @dataclass
 class HalStructuresLoad:
-    """Nombre de structures et d'alias lus dans `ref/structure`, et identifiants introuvables."""
+    """Identifiants cherchés dans `ref/structure`, parents compris, structures lues et identifiants introuvables."""
 
+    requested: int = 0
     structures: int = 0
-    aliases: int = 0
     not_found: set[int] = field(default_factory=set)
 
 
@@ -185,11 +185,11 @@ def fetch_hal_structures(
                 parents |= set(s.parent_ids)
             save_batch(list(structures.values()), aliases)
             load.structures += len(structures)
-            load.aliases += len(aliases)
             if avancement is not None:
                 avancement.avance(len(chunk))
         pending = parents - requested
         pending -= queries.known_ids(pending)
+    load.requested = len(requested)
     return load
 
 
@@ -229,16 +229,15 @@ def run_refresh_hal_structures(
     conn.commit()
     metrics.add(total=len(ids), updated=load.structures)
     metrics.details["hal_structures"] = {
-        "requested": len(ids),
+        "requested": load.requested,
         "loaded": load.structures,
-        "aliases": load.aliases,
         "not_found": len(load.not_found),
     }
     logger.info(
-        "%s%d structures chargées, %d alias, %d introuvables",
+        "%s%d structures cherchées : %d trouvées, %d introuvables",
         DERNIERE_BRANCHE,
-        load.structures,
-        load.aliases,
+        load.requested,
+        load.requested - len(load.not_found),
         len(load.not_found),
     )
     return metrics
