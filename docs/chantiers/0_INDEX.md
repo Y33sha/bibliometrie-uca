@@ -14,7 +14,6 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Monographies](DATA_monographies.md)
-- [Normalisation des textes : écritures non latines et unicité des adresses](DATA_normalisation-des-textes.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des signatures : candidats et résolution](DATA_pays-des-signatures.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
@@ -25,6 +24,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-16 — [Normalisation des textes : écritures non latines et unicité des adresses](archived/2026-10-16_DATA_normalisation-des-textes.md)
 - 2026-10-16 — [Appartenance et périmètre](archived/2026-10-16_DATA_perimetre.md)
 - 2026-10-15 — [Licences des publications](archived/2026-10-15_DATA_licences.md)
 - 2026-10-14 — [Import des paiements APC sans doublon](archived/2026-10-14_DATA_import-apc.md)
