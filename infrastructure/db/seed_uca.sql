@@ -7,9 +7,9 @@
 
 BEGIN;
 
--- structures (59 lignes)
+-- structures (65 lignes)
 DELETE FROM structures;
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (169, 'uca', 'Université Clermont Auvergne', 'UCA', 'universite', '01a8ajp46', NULL, 'PRES_CLERMONT', '{"wos": ["Univ Clermont Auvergne"], "scanr": ["130028061"], "theses": ["252404955", "196200032"], "openalex": ["I198244214", "I4210143836"]}');
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (169, 'uca', 'Université Clermont Auvergne', 'UCA', 'universite', '01a8ajp46', NULL, 'PRES_CLERMONT', '{"wos": ["Univ Clermont Auvergne"], "scanr": ["130028061"], "theses": ["252404955", "196200032"], "datacite": ["Clermont"], "openalex": ["I198244214", "I4210143836"]}');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (170, 'site_clermont', 'Site clermontois', NULL, 'site', NULL, NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (172, 'inp_clermont', 'Clermont Auvergne INP', 'INP', 'ecole', '001f39w38', NULL, 'CLERMONT-AUVERGNE-INP', '{"wos": ["Clermont Auvergne INP"], "scanr": ["S8ntZ"], "openalex": ["i4387154249"]}');
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (173, 'cnrs', 'Centre National de la Recherche Scientifique', 'CNRS', 'onr', '02feahw73', NULL, NULL, NULL);
@@ -21,7 +21,7 @@ INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (179, 'vetagro_sup', 'VetAgro Sup', NULL, 'ecole', '01c7wz417', NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (180, 'ens_lyon', 'École normale supérieure de Lyon', 'ENS Lyon', 'ecole', '04zmssz18', NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (181, 'universite_jean_moulin_lyon_3', 'Université Jean Moulin Lyon 3', NULL, 'universite', '05b5c0584', NULL, NULL, NULL);
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (182, 'universite_lumiere_lyon_2', 'Université Lumière Lyon 2', NULL, 'universite', '05b5c0584', NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (182, 'universite_lumiere_lyon_2', 'Université Lumière Lyon 2', NULL, 'universite', '03rth4p18', NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (183, 'emse', 'Mines Saint-Etienne', 'EMSE', 'ecole', '05a1dws80', NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (184, 'esc_clermont_business_school', 'ESC Clermont Business School', NULL, 'ecole', '02141gz69', NULL, NULL, NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (185, 'ensacf', 'Ecole nationale supérieure d''architecture de Clermont-Ferrand', 'ENSACF', 'ecole', '04dw8vw47', NULL, NULL, NULL);
@@ -66,11 +66,17 @@ INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (224, 'opgc', 'Observatoire de Physique du Globe de Clermont-Ferrand', 'OPGC', 'labo', '01bch8q67', NULL, 'OPGC', NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (225, 'umrh', 'UMR Herbivores', 'UMRH', 'labo', '03yvemy54', NULL, 'UMRH', NULL);
 INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (226, 'lisc', 'Laboratoire d''Ingénierie des Systèmes Complexes', 'LISC', 'labo', '01dfzdy43', NULL, 'LISC', NULL);
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (228, 'dsi', 'Direction des systèmes d''information', 'DSI', 'admin', NULL, NULL, NULL, NULL);
-INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (229, 'bu', 'Bibliothèque universitaire', 'BU', 'admin', NULL, NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (228, 'idem', 'Institut Droit, Economie, Management', 'IDEM', 'admin', NULL, NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (229, 'illshs', 'Institut Lettres, Langues, Sciences Humaines et Sociales', 'ILLSHS', 'admin', NULL, NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (230, 'is', 'Institut des Sciences', 'IS', 'admin', NULL, NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (231, 'isvsae', 'Institut Sciences de la Vie, Santé, Agronomie, Environnement', 'ISVSAE', 'admin', NULL, NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (232, 'cjp', 'Centre Jean Perrin', 'CJP', 'autre', '02pwnhd33', NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (235, 'sigma', 'Sigma Clermont', NULL, 'ecole', '02n5evf44', NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (236, 'cnrh', 'Centre de Recherche en Nutrition Humaine d''Auvergne', 'CNRH', 'autre', '03rzyjb72', NULL, NULL, NULL);
+INSERT INTO structures (id, code, name, acronym, structure_type, ror_id, rnsr_id, hal_collection, api_ids) VALUES (237, 'ujm', 'Université Jean Monnet', 'UJM', 'universite', '030bahv93', NULL, NULL, NULL);
 SELECT setval(pg_get_serial_sequence('structures', 'id'), (SELECT COALESCE(MAX(id), 0) FROM structures));
 
--- structure_tutelles (83 lignes)
+-- structure_tutelles (143 lignes)
 DELETE FROM structure_tutelles;
 INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (216, 169, 187);
 INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (217, 173, 187);
@@ -153,17 +159,77 @@ INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (294, 176, 207);
 INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (296, 169, 226);
 INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (297, 169, 223);
 INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (298, 169, 224);
-INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (302, 169, 228);
-INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (311, 169, 229);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (302, 228, 215);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (303, 228, 207);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (304, 228, 190);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (305, 169, 228);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (306, 169, 229);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (307, 229, 218);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (308, 229, 216);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (309, 229, 194);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (310, 229, 212);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (311, 229, 220);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (312, 229, 189);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (313, 229, 213);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (314, 229, 193);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (315, 229, 217);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (316, 229, 223);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (317, 229, 209);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (318, 229, 196);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (319, 229, 221);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (320, 169, 230);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (321, 230, 187);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (322, 230, 201);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (323, 230, 199);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (324, 230, 205);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (325, 230, 200);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (326, 230, 192);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (327, 230, 224);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (328, 169, 231);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (329, 231, 211);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (330, 231, 214);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (331, 231, 206);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (332, 231, 210);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (333, 231, 195);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (334, 231, 203);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (335, 231, 222);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (336, 231, 187);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (337, 231, 192);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (338, 231, 204);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (339, 231, 198);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (340, 231, 202);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (341, 231, 197);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (342, 231, 219);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (343, 231, 188);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (344, 231, 208);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (345, 169, 172);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (349, 172, 235);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (350, 173, 177);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (351, 173, 223);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (352, 173, 224);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (353, 177, 199);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (354, 177, 200);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (355, 224, 199);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (356, 224, 200);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (357, 174, 198);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (358, 174, 214);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (359, 186, 187);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (360, 186, 201);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (361, 235, 191);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (362, 169, 236);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (363, 186, 236);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (364, 174, 236);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (365, 175, 236);
+INSERT INTO structure_tutelles (id, parent_id, child_id) VALUES (366, 237, 194);
 SELECT setval(pg_get_serial_sequence('structure_tutelles', 'id'), (SELECT COALESCE(MAX(id), 0) FROM structure_tutelles));
 
 -- perimeters (2 lignes)
 DELETE FROM perimeters;
 INSERT INTO perimeters (id, code, name, root_structure_ids) VALUES (1, 'uca', 'UCA', '{169}');
-INSERT INTO perimeters (id, code, name, root_structure_ids) VALUES (2, 'alliance_uca', 'Alliance UCA', '{169, 172, 186, 179, 184}');
+INSERT INTO perimeters (id, code, name, root_structure_ids) VALUES (2, 'alliance_uca', 'Alliance UCA', '{169, 172, 186, 179, 232}');
 SELECT setval(pg_get_serial_sequence('perimeters', 'id'), (SELECT COALESCE(MAX(id), 0) FROM perimeters));
 
--- structure_name_forms (470 lignes)
+-- structure_name_forms (462 lignes)
 DELETE FROM structure_name_forms;
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1210, 170, 'clermont ferrand', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1212, 170, 'clermont fd', FALSE, NULL, FALSE);
@@ -181,13 +247,11 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1229, 170, 'aubiere', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1231, 169, 'universite clermont auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1232, 169, 'clermont auvergne university', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1236, 169, 'university of clermont auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1237, 169, 'univ clermont auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1240, 169, 'clermont auvergne univ', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1241, 169, 'universite de clermont auvergne', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1241, 169, 'universite de clermont', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1242, 169, 'universite d auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1243, 169, 'universite blaise pascal', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1244, 169, 'universite de clermont i', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1245, 169, 'universite clermont i', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1246, 169, 'universite clermont 1', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1247, 169, 'universite clermont 2', FALSE, NULL, FALSE);
@@ -249,9 +313,6 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1312, 185, 'ensacf', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1313, 185, 'ecole nationale superieure d architecture de clermont ferrand', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1315, 185, 'ecole natl super architecture clermont ferrand', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1316, 186, 'centre jean perrin', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1317, 186, 'center jean perrin', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1318, 186, 'ctr jean perrin', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1319, 186, 'crnh auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1320, 186, 'cic 501', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1321, 186, 'cic 1405', FALSE, NULL, FALSE);
@@ -276,6 +337,7 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1340, 187, 'pascal inst', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1341, 187, 'umr6602', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1342, 187, 'umr 6602', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1343, 187, 'ip', TRUE, '{169, 170}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1344, 187, 'u6602', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1345, 188, 'unh', TRUE, '{169, 174}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1346, 188, 'unite de nutrition humaine', FALSE, '{169, 174, 170}', FALSE);
@@ -283,8 +345,8 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1348, 188, 'human nutr unit', FALSE, '{169, 174}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1349, 188, 'un nutr humaine', FALSE, '{169, 174}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1350, 188, 'unite nutr humaine', FALSE, '{169, 174}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1351, 188, 'umr 1019', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1352, 188, 'umr1019', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1351, 188, 'umr 1019', FALSE, '{169, 174}', FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1352, 188, 'umr1019', FALSE, '{169, 174}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1353, 188, 'u1019', TRUE, '{169, 174}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1354, 189, 'geolab', TRUE, '{169, 170, 173}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1355, 189, 'laboratoire de geographie physique et environnementale', FALSE, NULL, FALSE);
@@ -427,7 +489,6 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1501, 207, 'umr6587', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1502, 207, 'u6587', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1503, 208, 'umrf', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1504, 208, 'umr f', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1505, 208, 'unite mixte de recherche sur le fromage', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1506, 208, 'umr fromage', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1507, 208, 'umr fromages', FALSE, NULL, FALSE);
@@ -499,7 +560,6 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1576, 218, 'u1001', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1577, 218, 'upr 1001', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1578, 219, 'chelter', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1579, 219, 'clonal heterogeneity leukemic environment therapy resistance of chronic leukemias', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1580, 219, 'clonal heterogene leukem environm therapy resistance chron leukemias', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1581, 219, 'ur 7453', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1582, 219, 'ur7453', TRUE, NULL, FALSE);
@@ -542,9 +602,8 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1623, 169, 'universitat clermont auvergne', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1624, 169, 'universite clermont ferrand', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1625, 224, 'opgc', TRUE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1626, 169, 'universite de clermont ferrand', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1627, 196, 'territoires territoires inrae', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1628, 169, 'university of clermont ferrand', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1628, 169, 'university of clermont', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1630, 196, 'umr terr', FALSE, '{169, 170}', FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1633, 169, 'clermont universit', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1634, 169, 'univeriste clermont auvergne', FALSE, NULL, FALSE);
@@ -610,31 +669,30 @@ INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary,
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1702, 190, 'crcgm', TRUE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1703, 190, 'centre de recherche clermontois en gestion et management', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1704, 195, 'laboratoire microorganismes genomes et environnement', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1705, 188, 'unh unite de nutrition humaine', FALSE, NULL, FALSE);
 INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1708, 199, 'lab magmas volcons', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1709, 218, 'c h e c', FALSE, '{169}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1710, 218, 'centre d histoire espaces cultures', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1711, 218, 'centre d histoire espace et cultures', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1712, 196, 'territoires environnement', FALSE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1713, 169, 'ecole doctorale', FALSE, '{170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1714, 187, 'encov ip', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1715, 187, 'tgi ip', TRUE, '{169}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1716, 187, 'ip inp clermont', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1717, 187, 'pascal inst chim', FALSE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1718, 187, 'pascal institute of chemistry', FALSE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1719, 187, 'pascal institut de chimie', FALSE, NULL, TRUE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1720, 228, 'dsi', TRUE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1721, 228, 'dosi', TRUE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1722, 228, 'direction des systemes d information', FALSE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1723, 228, 'batiment turing', TRUE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1724, 228, 'mesoctr', FALSE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1725, 228, 'mesocentre', FALSE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1727, 229, 'bu', TRUE, '{169, 170}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1728, 229, 'bu de l uca', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1729, 229, 'bu univege', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1730, 229, 'bibliotheque universitaire', FALSE, '{170, 169}', FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1731, 229, 'bibliotheque universite clermont auvergne', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1732, 170, 'clermont auvergne', FALSE, NULL, FALSE);
-INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1733, 188, 'unh unite de nutrition humaine', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1709, 204, 'department of mechanical engineering gdec', FALSE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1710, 219, 'clonal heterogeneity and leukemic environment in therapy resistance of chronic leukemias', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1711, 219, 'leukemic environment therapy resistance of chronic leukemias', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1712, 219, 'equipe d accueil 7453', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1713, 219, 'ue7453', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1714, 219, 'hemopaties chroniques heterogeneite intra clonale', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1715, 207, 'centre d etudes et de recherche en droit de l immateriel', FALSE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1716, 170, 'clermont auvergne', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1717, 232, 'ctr jean perrin', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1718, 232, 'centre jean perrin', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1719, 232, 'center jean perrin', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1734, 170, 'aubia re', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1735, 169, 'faculte', TRUE, '{170}', FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1736, 209, 'ressources', FALSE, '{185}', FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1737, 174, 'inra', TRUE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1738, 174, 'institut national de la recherche agronomique', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1740, 192, 'lpc clermont', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1741, 235, 'sigma clermont', FALSE, NULL, FALSE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1743, 206, 'gouvernance risque environnement developpement', FALSE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1745, 202, 'labs pharmaceut medis tunis', FALSE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1746, 196, 'physique pour la medecine', FALSE, NULL, TRUE);
+INSERT INTO structure_name_forms (id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding) VALUES (1747, 196, 'inserm', TRUE, NULL, TRUE);
 SELECT setval(pg_get_serial_sequence('structure_name_forms', 'id'), (SELECT COALESCE(MAX(id), 0) FROM structure_name_forms));
 
 -- config (2 lignes)

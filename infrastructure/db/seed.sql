@@ -12,8 +12,8 @@ DELETE FROM config WHERE key NOT IN ('perimeter_extraction', 'perimeter_persons'
 INSERT INTO config (key, value, description) VALUES ('doaj_refresh_after_days', '30', 'Délai, en jours, avant de télécharger de nouveau le fichier du DOAJ.');
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '10000', 'Nombre maximum de DOI interrogés par source cible à la phase fetch_missing, par run. 0 = illimité.');
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_retry_after_days', '30', 'Délai, en jours, avant de chercher de nouveau un identifiant introuvable dans une source. L''échec sur un identifiant natif de la source est définitif.');
-INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '90', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.');
-INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo", "admin"]', 'Types de structure affichés sur la page publique des laboratoires');
+INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '30', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.');
+INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo"]', 'Types de structure affichés sur la page publique des laboratoires');
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.');
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.');
 INSERT INTO config (key, value, description) VALUES ('unpaywall_recheck_after_days', '15', 'Délai, en jours, avant de vérifier de nouveau le statut open access d''une publication auprès d''Unpaywall.');
@@ -757,8 +757,8 @@ INSERT INTO language_forms (form_normalized, language_code) VALUES ('nno', 'nn')
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('no', 'no');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('nob', 'nb');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('nor', 'no');
-INSERT INTO language_forms (form_normalized, language_code) VALUES ('north ndebele', 'nd');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('northern sami', 'se');
+INSERT INTO language_forms (form_normalized, language_code) VALUES ('north ndebele', 'nd');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('norwegian', 'no');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('norwegian bokmål', 'nb');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('norwegian nynorsk', 'nn');
@@ -854,8 +854,8 @@ INSERT INTO language_forms (form_normalized, language_code) VALUES ('so', 'so');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('som', 'so');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('somali', 'so');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('sot', 'st');
-INSERT INTO language_forms (form_normalized, language_code) VALUES ('south ndebele', 'nr');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('southern sotho', 'st');
+INSERT INTO language_forms (form_normalized, language_code) VALUES ('south ndebele', 'nr');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('spa', 'es');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('spanish', 'es');
 INSERT INTO language_forms (form_normalized, language_code) VALUES ('sq', 'sq');
@@ -970,7 +970,6 @@ INSERT INTO language_forms (form_normalized, language_code) VALUES ('zulu', 'zu'
 -- place_name_forms (510 lignes)
 DELETE FROM place_name_forms WHERE kind <> 'institution';
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (1, 'fr', 'france', 'country');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (2, 'fr', 'france.', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (3, 'fr', 'fra', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (4, 'fr', 'francia', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (5, 'de', 'germany', 'country');
@@ -1211,7 +1210,6 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (239, 
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (240, 'cd', 'dr congo', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (241, 'cd', 'rdc', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (242, 'cg', 'republic of the congo', 'country');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (243, 'cg', 'congo', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (244, 'bf', 'burkina faso', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (245, 'ml', 'mali', 'country');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (246, 'ne', 'niger', 'country');
@@ -1289,7 +1287,6 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (317, 
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197738, 'hu', 'budapest', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197739, 'us', 'boston', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197740, 'it', 'roma', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197741, 'gb', 'london', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197742, 'nl', 'amsterdam', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197743, 'cz', 'prague', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197744, 'de', 'heidelberg', 'city');
@@ -1315,7 +1312,6 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (19776
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197764, 'us', 'santa barbara', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197766, 'it', 'rome italy', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197767, 'gb', 'sheffield', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197768, 'gb', 'bristol', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197769, 'gb', 'norwich', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197770, 'at', 'vienna austria', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197771, 'ma', 'oujda', 'city');
@@ -1353,13 +1349,11 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (19780
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197804, 'us', 'austin', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197805, 'dk', 'aarhus', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197806, 'gb', 'leeds', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197807, 'us', 'columbia', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197808, 'us', 'portland', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197809, 'ch', 'basel', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197810, 'gb', 'york uk', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197811, 'au', 'brisbane', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197812, 'it', 'brescia', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197813, 'gb', 'newcastle', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197814, 'de', 'freiburg', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197815, 'es', 'pamplona', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197816, 'ru', 'moscow', 'city');
@@ -1386,7 +1380,6 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (19783
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197837, 'tr', 'ankara', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197838, 'dz', 'sidi bel abbes', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197839, 'it', 'trieste', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197840, 'us', 'san francisco', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197841, 'in', 'bangalore', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197842, 'il', 'tel aviv', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197843, 'ch', 'dubendorf', 'city');
@@ -1415,12 +1408,10 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (19786
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197866, 'us', 'urbana', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197868, 'nl', 'eindhoven', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197869, 'it', 'roma italia', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197870, 'pt', 'porto', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197871, 'ca', 'waterloo', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197872, 'us', 'nashville', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197873, 'rs', 'belgrade', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197874, 'jp', 'sendai', 'city');
-INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197875, 'es', 'san sebastian', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197876, 'es', 'espainia', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197877, 'us', 'new haven', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (197878, 'au', 'hobart', 'city');
@@ -1479,6 +1470,15 @@ INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (23538
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235388, 'ca', 'montreal', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235390, 'fr', 'tourcoing', 'city');
 INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235391, 'fr', 'clermont ferrand', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235392, 'by', 'republic of belarus', 'country');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235393, 'cg', 'brazzaville', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235394, 'cg', 'pointe noire', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235395, 'cd', 'kinshasa', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235396, 'cd', 'lubumbashi', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235397, 'cd', 'bukavu', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235398, 'cd', 'goma', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235399, 'cd', 'kisangani', 'city');
+INSERT INTO place_name_forms (id, iso_code, form_normalized, kind) VALUES (235400, 'us', 'new mexico', 'country');
 SELECT setval(pg_get_serial_sequence('place_name_forms', 'id'), (SELECT COALESCE(MAX(id), 0) FROM place_name_forms));
 
 COMMIT;
