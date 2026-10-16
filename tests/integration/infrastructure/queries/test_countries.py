@@ -283,6 +283,27 @@ class TestDirtyDrivenSourceCountries:
 
         assert _sp_countries(sa_sync_conn, sd) == ["fr"]
 
+    def test_une_structure_hal_citee_par_un_alias_donne_son_pays(self, sa_sync_conn):
+        pub = insert_publication(sa_sync_conn)
+        sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-a")
+        sa = insert_signature(sa_sync_conn, sd, source="hal")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO hal_structures (hal_structure_id, name, structure_type, country_code, status)"
+                " VALUES (1, 'Laboratoire de Météorologie Physique', 'laboratory', 'fr', 'VALID');"
+                " INSERT INTO hal_structure_aliases (alias_id, hal_structure_id) VALUES (7, 1)"
+            )
+        )
+        sa_sync_conn.execute(
+            text("INSERT INTO source_authorship_hal_structures VALUES (:sa, 7)"), {"sa": sa}
+        )
+
+        _Q.refresh_signature_countries(sa_sync_conn)
+
+        assert sa_sync_conn.execute(
+            text("SELECT countries FROM source_authorships WHERE id = :sa"), {"sa": sa}
+        ).scalar_one() == ["fr"]
+
     def test_un_intervalle_d_identifiants_borne_le_recalcul_des_signatures(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
         sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-r")

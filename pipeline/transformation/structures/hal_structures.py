@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les signatures qui la citent sont marquées pour la phase `countries`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
@@ -76,7 +76,25 @@ class HalStructuresQueries:
         )
 
     def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
-        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté."""
+        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté. Marque `countries_dirty` les signatures qui citent une structure dont le pays change, ou un alias qui change de structure."""
+        previous_countries = dict(
+            self._conn.execute(
+                text(
+                    "SELECT hal_structure_id, country_code FROM hal_structures"
+                    " WHERE hal_structure_id = ANY(:ids)"
+                ),
+                {"ids": [s.hal_structure_id for s in structures]},
+            ).all()
+        )
+        previous_aliases = dict(
+            self._conn.execute(
+                text(
+                    "SELECT alias_id, hal_structure_id FROM hal_structure_aliases"
+                    " WHERE alias_id = ANY(:ids)"
+                ),
+                {"ids": list(aliases)},
+            ).all()
+        )
         if structures:
             self._conn.execute(
                 text("""
@@ -118,6 +136,35 @@ class HalStructuresQueries:
                 """),
                 [{"alias_id": a, "hal_structure_id": s} for a, s in aliases.items()],
             )
+        self._mark_signatures(
+            [
+                s.hal_structure_id
+                for s in structures
+                if previous_countries.get(s.hal_structure_id) != s.country_code
+            ],
+            [a for a, s in aliases.items() if previous_aliases.get(a) != s],
+        )
+
+    def _mark_signatures(self, structure_ids: list[int], alias_ids: list[int]) -> None:
+        """Marque `countries_dirty` les signatures qui citent une structure de `structure_ids`, directement ou par un alias, ou qui citent un alias de `alias_ids`."""
+        if not structure_ids and not alias_ids:
+            return
+        self._conn.execute(
+            text("""
+                UPDATE source_authorships SET countries_dirty = true
+                WHERE id IN (
+                    SELECT source_authorship_id FROM source_authorship_hal_structures
+                    WHERE hal_structure_id IN (
+                        SELECT unnest(CAST(:structures AS int[]) || CAST(:aliases AS int[]))
+                        UNION
+                        SELECT alias_id FROM hal_structure_aliases
+                        WHERE hal_structure_id = ANY(:structures)
+                    )
+                )
+                  AND NOT countries_dirty
+            """),
+            {"structures": structure_ids, "aliases": alias_ids},
+        )
 
     def rebuild_relations(self) -> None:
         """Reconstruit les relations parent/enfant depuis `parent_ids`, vers les parents présents dans le référentiel. Un parent alias est ramené à sa structure conservée."""

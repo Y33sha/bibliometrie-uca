@@ -37,7 +37,7 @@ class AddressCountryStatus(NamedTuple):
     none: int
 
 
-# CTE des signatures à recalculer : celles marquées `countries_dirty` (posé par normalize), ou liées à une adresse dont `countries` a changé. Dérivées par JOIN, sans marquage de masse ; seules celles qui changent sont réécrites.
+# CTE des signatures à recalculer : marquées `countries_dirty`, ou liées à une adresse marquée `countries_dirty`.
 _DIRTY_SA = """
     WITH dirty_sa AS (
         SELECT id FROM source_authorships WHERE countries_dirty
@@ -67,7 +67,8 @@ _SA_COUNTRIES_FROM_SCOPE = """,
         SELECT h.source_authorship_id, hs.country_code::text
         FROM scoped_sa s
         JOIN source_authorship_hal_structures h ON h.source_authorship_id = s.id
-        JOIN hal_structures hs ON hs.hal_structure_id = h.hal_structure_id
+        LEFT JOIN hal_structure_aliases al ON al.alias_id = h.hal_structure_id
+        JOIN hal_structures hs ON hs.hal_structure_id = coalesce(al.hal_structure_id, h.hal_structure_id)
         WHERE hs.country_code IS NOT NULL
     ),
     agg AS (
@@ -81,13 +82,6 @@ _SA_COUNTRIES_FROM_SCOPE = """,
     LEFT JOIN agg ON agg.sa_id = s.id
     WHERE sa.id = s.id
       AND sa.countries IS DISTINCT FROM agg.new_countries
-"""
-
-# Signatures à organisation ROR sans adresse ou à structure HAL : leur pays suit les référentiels.
-_REFERENTIAL_SA = """
-    SELECT source_authorship_id FROM source_authorship_rors WHERE address_id IS NULL
-    UNION
-    SELECT source_authorship_id FROM source_authorship_hal_structures
 """
 
 # Recalcul de `source_publications.countries` sur la CTE amont `scoped_sp(sp_id)` : union des pays des signatures.
@@ -169,16 +163,12 @@ class CountryQueries:
     def refresh_signature_countries(
         self, conn: Connection, *, id_range: tuple[int, int] | None = None
     ) -> int:
-        """Recalcule `source_authorships.countries` des signatures `countries_dirty` ou liées à une adresse marquée, et des signatures à organisation ROR sans adresse ou à structure HAL. Retourne le nombre de signatures modifiées.
+        """Recalcule `source_authorships.countries` des signatures de `_DIRTY_SA`. Retourne le nombre de signatures modifiées.
 
         `id_range` (bornes incluses) recalcule toutes les signatures de l'intervalle qui ont une adresse, un ROR sans adresse ou une structure HAL.
         """
         if id_range is None:
-            scope = (
-                _DIRTY_SA
-                + f""",
-                scoped_sa AS (SELECT id FROM dirty_sa UNION {_REFERENTIAL_SA})"""
-            )
+            scope = _DIRTY_SA + ", scoped_sa AS (SELECT id FROM dirty_sa)"
             params = {}
         else:
             scope = """

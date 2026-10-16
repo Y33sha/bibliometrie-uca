@@ -1,6 +1,8 @@
 """Référentiel ROR (`ror_organizations`, `ror_relations`, `ror_dump_imports`) : import de son dump, et rafraîchissement en tête de la phase `affiliations`.
 
 Le dump est importé seulement si sa version diffère de celle du dernier import. La version publiée se lit d'abord chez DataCite : Zenodo est interrogé seulement quand elle diffère, ou quand DataCite ne répond pas. Un dump inaccessible laisse le référentiel en l'état.
+
+Quand une organisation change de pays, l'import marque les signatures et les adresses qui la citent, pour la phase `countries`.
 """
 
 import logging
@@ -8,7 +10,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import batched
 
-from sqlalchemy import Connection, delete, func, insert, select
+from sqlalchemy import Connection, delete, func, insert, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.structures.identifiers import RorId
@@ -40,7 +42,12 @@ class RorDumpQueries:
         *,
         version: str,
     ) -> None:
-        """Vide les deux tables, y écrit les organisations et les couples `(parent, enfant)`, et inscrit `version` dans `ror_dump_imports`."""
+        """Vide les deux tables, y écrit les organisations et les couples `(parent, enfant)`, et inscrit `version` dans `ror_dump_imports`. Marque les dépendants des organisations dont le pays change (`_mark_country_changes`)."""
+        previous = dict(
+            self._conn.execute(
+                select(ror_organizations.c.ror_id, ror_organizations.c.country_code)
+            ).all()
+        )
         self._conn.execute(delete(ror_relations_table))
         self._conn.execute(delete(ror_organizations))
         for batch in batched(organizations, _BATCH_SIZE):
@@ -71,6 +78,39 @@ class RorDumpQueries:
             .on_conflict_do_update(
                 index_elements=["version"], set_={"imported_at": func.clock_timestamp()}
             )
+        )
+        current = {org.ror_id.value: org.country_code for org in organizations}
+        self._mark_country_changes(
+            [
+                ror_id
+                for ror_id in previous.keys() | current.keys()
+                if previous.get(ror_id) != current.get(ror_id)
+            ]
+        )
+
+    def _mark_country_changes(self, ror_ids: list[str]) -> None:
+        """Pour les organisations `ror_ids` : marque `countries_dirty` les signatures qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le nœud `countries.ror` recrée leurs candidats."""
+        if not ror_ids:
+            return
+        self._conn.execute(
+            text("""
+                WITH linked AS (
+                    SELECT source_authorship_id, address_id
+                    FROM source_authorship_rors WHERE ror_id = ANY(:ids)
+                ),
+                signatures AS (
+                    UPDATE source_authorships SET countries_dirty = true
+                    WHERE id IN (SELECT source_authorship_id FROM linked WHERE address_id IS NULL)
+                      AND NOT countries_dirty
+                ),
+                candidates AS (
+                    DELETE FROM address_country_candidates
+                    WHERE method = 'ror' AND address_id IN (SELECT address_id FROM linked)
+                )
+                UPDATE addresses SET candidates_dirty = true
+                WHERE id IN (SELECT address_id FROM linked) AND NOT candidates_dirty
+            """),
+            {"ids": ror_ids},
         )
 
     def last_imported_version(self) -> str | None:

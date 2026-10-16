@@ -331,8 +331,16 @@ NODES: tuple[Node, ...] = (
     _node(
         "affiliations.refresh_ror",
         "affiliations",
-        reads=("ror_dump_imports",),
-        writes=("ror_organizations", "ror_relations", "ror_dump_imports"),
+        reads=("ror_dump_imports", "source_authorship_rors"),
+        writes=(
+            "ror_organizations",
+            "ror_relations",
+            "ror_dump_imports",
+            # Dépendants d'une organisation qui change de pays.
+            "source_authorships.countries_dirty",
+            "address_country_candidates",
+            "addresses.candidates_dirty",
+        ),
         previous_run=("ror_dump_imports",),
         network="zenodo",
     ),
@@ -340,7 +348,13 @@ NODES: tuple[Node, ...] = (
         "affiliations.refresh_hal_structures",
         "affiliations",
         reads=("source_authorship_hal_structures",),
-        writes=("hal_structures", "hal_structure_relations", "hal_structure_aliases"),
+        writes=(
+            "hal_structures",
+            "hal_structure_relations",
+            "hal_structure_aliases",
+            # Signatures d'une structure qui change de pays.
+            "source_authorships.countries_dirty",
+        ),
         previous_run=("hal_structures", "hal_structure_aliases"),
         network="hal",
     ),
@@ -1061,6 +1075,7 @@ NODES: tuple[Node, ...] = (
             "source_authorship_hal_structures",
             "ror_organizations",
             "hal_structures",
+            "hal_structure_aliases",
             "addresses.countries",
             "addresses.countries_dirty",
             "source_publications.publication_id",
