@@ -57,7 +57,6 @@ class AddressReviewResponse(BaseModel):
 
 
 class BatchCountryResponse(BaseModel):
-    """POST /api/addresses/batch-country : modifs directes + propagation."""
+    """POST /api/addresses/batch-country : nombre d'adresses modifiées."""
 
     updated: int
-    propagated: int

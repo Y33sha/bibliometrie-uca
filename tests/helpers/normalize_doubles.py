@@ -85,7 +85,7 @@ class FakeAuthorshipsBatchQueries:
 
     def upsert_addresses_batch(self, conn, values) -> None: ...
 
-    def fetch_address_ids_by_raw_text(self, conn, raw_texts) -> dict[str, int]:
+    def fetch_address_ids_by_normalized_text(self, conn, normalized_texts) -> dict[str, int]:
         return {}
 
     def apply_address_countries_batch(self, conn, values) -> None: ...

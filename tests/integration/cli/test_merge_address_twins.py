@@ -14,6 +14,19 @@ from tests.integration.helpers.sources import (
 from tests.integration.helpers.structures import insert_structure
 
 
+@pytest.fixture
+def sa_sync_conn(sa_sync_conn_owner):
+    """Stock d'avant l'unicité des formes normalisées : index et contrainte retirés dans la transaction du test, que le rollback rétablit."""
+    sa_sync_conn_owner.execute(
+        text(
+            "DROP INDEX structures.addresses_normalized_text_key;"
+            " ALTER TABLE structures.addresses"
+            " DROP CONSTRAINT ck_addresses_normalized_text_not_empty"
+        )
+    )
+    return sa_sync_conn_owner
+
+
 def _signature(conn, source_id):
     return insert_signature(
         conn, insert_source_publication(conn, insert_publication(conn, "P"), source_id=source_id)

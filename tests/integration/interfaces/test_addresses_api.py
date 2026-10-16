@@ -321,7 +321,7 @@ class TestBatchSetCountry:
         )
         assert r.status_code == 200
         body = r.json()
-        assert "updated" in body and "propagated" in body
+        assert body == {"updated": 1}
 
     def test_ok_with_filter(self, auth_client):
         seed_address("Unique search target for batch")
