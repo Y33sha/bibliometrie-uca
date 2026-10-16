@@ -1052,18 +1052,6 @@ NODES: tuple[Node, ...] = (
         ),
     ),
     _node(
-        "countries.suggest",
-        "countries",
-        reads=(
-            "addresses.id",
-            "addresses.normalized_text",
-            "addresses.countries",
-            "addresses.suggested_countries",
-        ),
-        writes=("addresses.suggested_countries",),
-        previous_run=("addresses",),
-    ),
-    _node(
         "countries.refresh_publication_countries",
         "countries",
         reads=(

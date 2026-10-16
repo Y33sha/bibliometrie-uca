@@ -1,6 +1,6 @@
 """SQL de la phase `countries` : résoudre les pays d'une adresse, puis les recopier dans les caches dénormalisés.
 
-**Candidats et résolution** — chaque moyen de détection ajoute ses pays candidats à `address_country_candidates` (`insert_candidates`, `insert_ror_candidates`) et marque l'adresse `candidates_dirty`. La détection par le texte confronte les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) aux adresses marquées (`fetch_dirty_addresses_normalized`). `resolve_address_countries` compose ensuite `addresses.countries` par la préséance du domaine. Suggestion : les adresses déjà résolues forment un pool (`load_country_pool`) rapproché des cibles restantes (`fetch_suggest_targets_chunk`) pour alimenter `addresses.suggested_countries`. `count_address_country_status` et `count_suggest_eligible` en donnent le bilan.
+**Candidats et résolution** — chaque moyen de détection ajoute ses pays candidats à `address_country_candidates` (`insert_candidates`, `insert_ror_candidates`) et marque l'adresse `candidates_dirty`. La détection par le texte confronte les formes de `place_name_forms` (`load_country_forms`, `load_place_forms`) aux adresses marquées (`fetch_dirty_addresses_normalized`). `resolve_address_countries` compose ensuite `addresses.countries` par la préséance du domaine. `count_address_country_status` en donne le bilan.
 
 **Recopie** — recalcule trois caches en cascade :
 
@@ -21,20 +21,11 @@ from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod, retained_countries
 
 
-class SuggestEligibleCounts(NamedTuple):
-    """Compteurs des adresses sans pays qui bornent la passe de suggestion."""
-
-    eligible: int  # aucune suggestion tentée
-    empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
-
-
 class AddressCountryStatus(NamedTuple):
     """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
 
     total: int
     with_country: int
-    with_suggestion: int
-    none: int
 
 
 # CTE des signatures à recalculer : marquées `countries_dirty`, ou liées à une adresse marquée `countries_dirty`.
@@ -146,19 +137,12 @@ class CountryQueries:
             text("""
                 SELECT
                     count(*) AS total,
-                    count(*) FILTER (WHERE countries IS NOT NULL) AS with_country,
-                    count(*) FILTER (
-                        WHERE countries IS NULL AND cardinality(suggested_countries) > 0
-                    ) AS with_suggestion,
-                    count(*) FILTER (
-                        WHERE countries IS NULL
-                          AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)
-                    ) AS none
+                    count(*) FILTER (WHERE countries IS NOT NULL) AS with_country
                 FROM addresses
                 WHERE pub_count > 0
             """)
         ).one()
-        return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
+        return AddressCountryStatus(row.total, row.with_country)
 
     def refresh_signature_countries(
         self, conn: Connection, *, id_range: tuple[int, int] | None = None
@@ -351,74 +335,6 @@ class CountryQueries:
                 {"ids": ids},
             )
         return changed
-
-    def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
-        """Compte les adresses sans pays selon ce que la passe de suggestion en fait : à traiter, déjà suggérées, déjà tentées sans match. Les trois ensembles partitionnent les adresses sans pays."""
-        row = conn.execute(
-            text("""
-                SELECT
-                    COUNT(*) FILTER (WHERE suggested_countries IS NULL) AS eligible,
-                    COUNT(*) FILTER (
-                        WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
-                    ) AS empty_attempted
-                FROM addresses
-                WHERE countries IS NULL
-            """)
-        ).one()
-        return SuggestEligibleCounts(row.eligible, row.empty_attempted)
-
-    def fetch_suggest_targets_chunk(
-        self, conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
-    ) -> list[tuple[int, str]]:
-        """Tranche `(id, normalized_text)` des adresses à suggérer, paginée par keyset sur `after_id`. `retry_empty` y joint les adresses tentées sans match, au cas où le pool aurait grossi entre deux runs. Liste vide = parcours terminé."""
-        # `retry_empty` (mode full) réessaie aussi les échecs (`= []`), sans toucher aux suggestions positives (rares à changer, coûteuses à recalculer).
-        suggested_filter = (
-            "AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)"
-            if retry_empty
-            else "AND suggested_countries IS NULL"
-        )
-        rows = conn.execute(
-            text(f"""
-                SELECT id, normalized_text
-                FROM addresses
-                WHERE countries IS NULL
-                  {suggested_filter}
-                  AND id > :after
-                ORDER BY id
-                LIMIT :limit
-            """),
-            {"after": after_id, "limit": limit},
-        ).all()
-        return [(r.id, r.normalized_text) for r in rows]
-
-    def load_country_pool(self, conn: Connection) -> list[tuple[str, list[str]]]:
-        """Pool de référence de la suggestion : `(normalized_text, countries)` des adresses ayant un pays. Tenu en mémoire, rescanné à chaque batch de cibles."""
-        rows = conn.execute(
-            text("SELECT normalized_text, countries FROM addresses WHERE countries IS NOT NULL")
-        ).all()
-        return [(r.normalized_text, r.countries) for r in rows]
-
-    def write_suggested_countries(
-        self, conn: Connection, rows: list[tuple[int, list[str]]]
-    ) -> None:
-        """Écrit en bloc les `(address_id, codes ISO)` de `rows` dans `addresses.suggested_countries` (`[]` = tentée sans match). Idempotent."""
-        if not rows:
-            return
-        payload = json.dumps([{"id": addr_id, "c": countries} for addr_id, countries in rows])
-        conn.execute(
-            text("""
-                UPDATE addresses a
-                SET suggested_countries = d.cty
-                FROM (
-                    SELECT (e->>'id')::int AS id,
-                           ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[] AS cty
-                    FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
-                ) d
-                WHERE a.id = d.id
-                  AND a.suggested_countries IS DISTINCT FROM d.cty
-            """),
-            {"payload": payload},
-        )
 
     def refresh_source_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]

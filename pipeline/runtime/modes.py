@@ -1,6 +1,6 @@
 """Policies d'exécution du pipeline bibliométrique.
 
-Source unique de vérité pour les modes : quelles sources interroger, quelle stratégie d'années, et les bascules de coût (vacuum, rafraîchissement des documents périmés, retry des suggestions de pays vides).
+Référentiel unique des modes : quelles sources interroger, quelle stratégie d'années, et les bascules de coût (vacuum, rafraîchissement des documents périmés).
 
 Deux modes :
 - `daily` : HAL seul, notices modifiées depuis la dernière extraction quotidienne réussie, sans `fetch_stale` ni `extract_by_person` ;
@@ -30,8 +30,6 @@ class ModePolicy:
     extract_by_person: bool
     # True (mode full) : le référentiel des structures HAL relit aussi ses structures anciennes. False : seules les structures absentes sont chargées.
     refresh_hal_structures: bool
-    # True (mode full) : la passe suggest réessaie aussi les suggestions de pays vides (échecs précédents `= []`), au cas où le pool aurait grossi — sans recalculer les positives. False : nouvelles adresses seulement.
-    retry_empty_country_suggestions: bool
 
 
 MODES: dict[str, ModePolicy] = {
@@ -42,7 +40,6 @@ MODES: dict[str, ModePolicy] = {
         fetch_stale=False,
         extract_by_person=False,
         refresh_hal_structures=False,
-        retry_empty_country_suggestions=False,
     ),
     "full": ModePolicy(
         # WoS exclu par défaut (opt-in `--include-wos`) ; theses inclus.
@@ -52,7 +49,6 @@ MODES: dict[str, ModePolicy] = {
         fetch_stale=True,
         extract_by_person=True,
         refresh_hal_structures=True,
-        retry_empty_country_suggestions=True,
     ),
 }
 

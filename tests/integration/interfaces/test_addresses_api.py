@@ -262,9 +262,6 @@ class TestCountries:
         assert "proposal_facets" in r.json()
 
 
-# ── GET /api/addresses/suggest-countries ─────────────────────────
-
-
 # ── POST /api/addresses/{addr_id}/country ────────────────────────
 
 

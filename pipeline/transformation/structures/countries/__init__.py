@@ -1,1 +1,1 @@
-"""Pays des adresses et des publications : détection, suggestions, recalcul."""
+"""Pays des adresses et des publications : détection, résolution, recalcul."""

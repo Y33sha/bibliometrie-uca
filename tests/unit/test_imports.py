@@ -36,7 +36,6 @@ MODULES = [
     "pipeline.transformation.persons.populate_person_name_forms",
     "pipeline.transformation.structures.countries.detect_by_country_name",
     "pipeline.transformation.structures.countries.detect_by_place_name",
-    "pipeline.transformation.structures.countries.suggest_countries",
     "pipeline.transformation.publications.reconciliation.refresh",
     "pipeline.transformation.publishing.find_or_create",
     "pipeline.transformation.publishing.journals.journal_merge",

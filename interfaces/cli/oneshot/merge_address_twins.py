@@ -5,7 +5,7 @@ Prépare l'unicité de `addresses.normalized_text`. Chaque groupe de jumelles ga
 
 - ses signatures, ROR et liens aux structures réunissent ceux des jumelles ;
 - un lien à une structure confirmé sur une jumelle et infirmé sur une autre redevient à examiner ;
-- ses pays et pays suggérés réunissent ceux des jumelles, et `countries_dirty` est posé.
+- ses pays réunissent ceux des jumelles, et `countries_dirty` est posé.
 
 Les jumelles sont ensuite supprimées. Une adresse de forme normalisée vide (« ; », « ). ») est supprimée avec ses liens.
 
@@ -117,17 +117,13 @@ _STEPS = (
         "pays réunis",
         """
         UPDATE addresses a
-        SET countries = u.countries, suggested_countries = u.suggested, countries_dirty = TRUE
+        SET countries = u.countries, countries_dirty = TRUE
         FROM (
             SELECT g.keeper,
                    nullif(array(
                        SELECT DISTINCT c FROM addresses x, unnest(x.countries) c
                        WHERE x.id = g.keeper OR x.id = ANY(g.olds) ORDER BY c
-                   ), '{}') AS countries,
-                   nullif(array(
-                       SELECT DISTINCT c FROM addresses x, unnest(x.suggested_countries) c
-                       WHERE x.id = g.keeper OR x.id = ANY(g.olds) ORDER BY c
-                   ), '{}') AS suggested
+                   ), '{}') AS countries
             FROM (SELECT keeper, array_agg(old_id) AS olds FROM _twins GROUP BY keeper) g
         ) u
         WHERE a.id = u.keeper

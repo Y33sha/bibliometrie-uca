@@ -17,12 +17,11 @@ def test_l_executeur_mesure_la_duree_des_seuls_noeuds_executes(contexte):
     steps = {
         "countries.ror": NodeStep(lambda _ctx, _b: PhaseMetrics()),
         "countries.detect": NodeStep(lambda _ctx, _b: PhaseMetrics()),
-        "countries.resolve": NodeStep(lambda _ctx, _b: PhaseMetrics()),
-        "countries.suggest": NodeStep(lambda _ctx, _b: PhaseMetrics(), when=lambda _ctx: False),
+        "countries.resolve": NodeStep(lambda _ctx, _b: PhaseMetrics(), when=lambda _ctx: False),
         "countries.refresh_publication_countries": NodeStep(lambda _ctx, _b: PhaseMetrics()),
     }
 
     by_node = run_nodes("countries", steps, contexte())
 
     assert by_node["countries.detect"].duration_s is not None
-    assert by_node["countries.suggest"].duration_s is None
+    assert by_node["countries.resolve"].duration_s is None

@@ -12,7 +12,6 @@ def insert_address(
     row_id: int | None = None,
     normalized_text: str | None = None,
     countries: list[str] | None = None,
-    suggested_countries: list[str] | None = None,
     pub_count: int | None = None,
     reuse: bool = False,
 ) -> int:
@@ -31,7 +30,6 @@ def insert_address(
             "raw_text": raw_text,
             "normalized_text": normalized_text if normalized_text is not None else raw_text.lower(),
             "countries": countries,
-            "suggested_countries": suggested_countries,
             "pub_count": pub_count,
         },
     )

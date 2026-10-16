@@ -1,12 +1,11 @@
 """Orchestrateur de la phase `countries` : pays candidats des adresses, résolution, et recalcul en cascade.
 
-Cinq nœuds (`pipeline.graph`), chacun dans sa propre transaction :
+Quatre nœuds (`pipeline.graph`), chacun dans sa propre transaction :
 
 1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
 2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
 3. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
-4. `countries.suggest` — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
-5. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
+4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (signatures, source_publications, publications).
 
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
@@ -17,14 +16,12 @@ from dataclasses import dataclass
 
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.structures.countries import (
     detect_by_country_name,
     detect_by_place_name,
     refresh_publication_countries,
-    suggest_countries,
 )
 from pipeline.transformation.structures.countries.countries_queries import (
     AddressCountryStatus,
@@ -33,7 +30,7 @@ from pipeline.transformation.structures.countries.countries_queries import (
 
 
 def _etat_des_adresses(open_tx: OpenTransaction, queries: CountryQueries) -> AddressCountryStatus:
-    """Relève combien d'adresses portent un pays, une suggestion, ou rien."""
+    """Relève combien d'adresses ont un pays."""
     with open_tx() as conn:
         return queries.count_address_country_status(conn)
 
@@ -43,7 +40,7 @@ class CountriesPhase:
     queries: CountryQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les trois nœuds, borne l'entonnoir par les deux relevés et assemble les métriques."""
+        """Exécute les nœuds, borne l'entonnoir par les deux relevés et assemble les métriques."""
         open_tx, queries = ctx.open_tx, self.queries
         initial = _etat_des_adresses(open_tx, queries)
 
@@ -73,11 +70,6 @@ class CountriesPhase:
             )
             return PhaseMetrics(updated=changed)
 
-        def suggest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            retry_empty = MODES[ctx.options.mode].retry_empty_country_suggestions
-            with ctx.open_tx() as conn:
-                return suggest_countries.run(conn, queries, ctx.logger, retry_empty=retry_empty)
-
         def refresh(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 refresh_publication_countries.refresh(conn, queries, ctx.logger)
@@ -89,7 +81,6 @@ class CountriesPhase:
                 "countries.ror": NodeStep(ror),
                 "countries.detect": NodeStep(detect),
                 "countries.resolve": NodeStep(resolve),
-                "countries.suggest": NodeStep(suggest),
                 "countries.refresh_publication_countries": NodeStep(refresh),
             },
             ctx,
@@ -107,7 +98,6 @@ class CountriesPhase:
             "without_pct": round(100 * without_initial / total, 1) if total else 0,
             "newly_attached": final.with_country - initial.with_country,
             "remaining": total - final.with_country,
-            "with_suggestion": final.with_suggestion,
         }
         # Chaque sous-étape journalise ce qu'elle a résolu : une ligne de clôture les répéterait.
         metrics.resume = ""

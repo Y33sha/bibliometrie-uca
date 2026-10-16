@@ -614,7 +614,6 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("pub_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
-    Column("suggested_countries", ARRAY(CHAR(2))),
     # Refresh pays incrémental : True = `countries` vient de changer, les
     # `source_authorships` liés sont à recalculer. Posé gratuitement à l'écriture
     # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en

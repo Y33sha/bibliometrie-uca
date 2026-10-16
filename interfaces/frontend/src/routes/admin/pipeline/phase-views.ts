@@ -223,7 +223,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       "{total} adresses",
       "{without_initial} sans pays ({without_pct} %)",
       "{newly_attached} pays nouvellement rattachés",
-      "Reste {remaining}, dont {with_suggestion} avec suggestion",
+      "Reste {remaining} sans pays",
     ],
   },
   subjects: {
