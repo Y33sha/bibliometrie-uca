@@ -70,7 +70,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 **Le câblage dépend du gain mesuré.** Tant que la mesure ne montre pas de gain, rien ne change dans le schéma ni dans le pipeline.
 
 **Au câblage :**
-- les candidats du stock viennent des fichiers du script, et aucune colonne existante n'est reprise. Le stock n'a donc pas de candidat `manual` : le consensus entre moyens corrige les erreurs de `addresses.countries` ;
+- les candidats du stock viennent des fichiers du script, et aucune colonne existante n'est reprise. Le stock n'a donc pas de candidat `manual` : le consensus entre moyens corrige les erreurs de `addresses.countries`. Une adresse sans candidat perd son pays ;
 - `addresses.countries` demeure, comme cache dénormalisé lu par le calcul du pays des signatures et par les facettes de l'interface, dérivé des candidats par la seule fonction de préséance ;
 - `addresses.suggested_countries` disparaît : une suggestion est un candidat dont le moyen n'accède pas seul à l'ensemble retenu ;
 - le marqueur « tentée sans résultat » (`[]`) disparaît avec elle.
