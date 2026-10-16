@@ -51,11 +51,15 @@ address_country_candidates
   PRIMARY KEY (address_id, country_code, method)
 ```
 
-Les moyens tirés du texte deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `similarity`, `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres. La copie d'une saisie manuelle vers les adresses de même `normalized_text` est un candidat `manual`.
+Les moyens tirés du texte deviennent les valeurs de `method` : `source_scanr`, `source_openalex`, `country_name`, `institution`, `city`, `manual`. Une source n'a pas de statut particulier : elle est un moyen parmi les autres, mesurable comme les autres. La copie d'une saisie manuelle vers les adresses de même `normalized_text` est un candidat `manual`.
 
 Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
 
-**La préséance s'écrit à un seul endroit.** Une fonction du domaine lit les candidats d'une adresse et compose l'ensemble retenu. `manual` l'emporte sur tout. Le reste du classement est fixé par la mesure, non a priori.
+**Pays d'une adresse : lieu de l'affiliation.** L'École française de Rome est en Italie. Le ROR donne le pays de l'organisation : le Cirad à Rabat reçoit `fr`.
+
+**La préséance s'écrit à un seul endroit.** Une fonction du domaine lit les candidats d'une adresse et compose l'ensemble retenu. `manual` l'emporte sur tout. Suivent, d'après la revue à la main : `country_name`, puis `ror` et `source_openalex`, puis `institution`, `city` et `source_scanr`. `ror` et `source_openalex` comptent pour un seul moyen : le pays OpenAlex dérive en général du ROR. Le premier moyen qui propose un pays l'emporte, sauf si deux autres moyens proposent un même autre pays et aucun ne soutient le sien.
+
+**`similarity` écarté.** Sur la revue à la main, il se trompe une fois sur deux.
 
 **Pays d'une signature, affiliation par affiliation.** Une adresse donne son pays retenu, ou à défaut le pays des ROR de son affiliation. Un ROR sans adresse et une structure HAL donnent leur pays. Le pays de la signature réunit ces pays. La règle est conditionnée à la mesure des contradictions.
 
@@ -96,8 +100,21 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 ### 2. Mesure et fonction de préséance des adresses
 
 - [x] Par moyen : taux d'accord, de désaccord et de silence avec les autres moyens et avec `addresses.countries` (`interfaces/cli/oneshot/measure_address_country_agreement.py`, bca44eba5).
-- [ ] Revue à la main d'un échantillon de désaccords, qui sert de référence.
-- [ ] Trancher l'asymétrie OpenAlex / ScanR, et le sort de `similarity`.
+- [x] Revue à la main d'un échantillon de désaccords, qui sert de référence : 269 adresses en désaccord avec `addresses.countries`, 40 par moyen, 2026-10-16 (`data/measures/address_country_verdicts.csv`). Sur 265 adresses à pays déterminable, `addresses.countries` est faux 57 fois, la préséance retenue 21 fois. Le classement est tiré de ce même échantillon : ces chiffres sont optimistes.
+- [x] Trancher l'asymétrie OpenAlex / ScanR, et le sort de `similarity`.
+
+| Moyen | Juste | En partie faux | Faux | Silence |
+|---|---|---|---|---|
+| `addresses.countries` | 208 | 0 | 57 | 0 |
+| `country_name` | 207 | 0 | 21 | 37 |
+| `ror` | 170 | 1 | 24 | 70 |
+| `source_openalex` | 156 | 1 | 24 | 84 |
+| `institution` | 140 | 6 | 41 | 78 |
+| `city` | 67 | 0 | 25 | 173 |
+| `similarity` | 40 | 0 | 35 | 190 |
+| `source_scanr` | 39 | 0 | 20 | 206 |
+
+- [x] Formes de `place_name_forms` à l'origine de rattachements faux de l'échantillon retirées : 35 institutions génériques ou au pays faux, 6 villes homonymes (`porto`, `london`, `newcastle`, `san francisco`, `san sebastian`, `bristol`). « congo » retirée, villes des deux Congo ajoutées, « new mexico » rangée en `us`.
 - [ ] Fonction de préséance du domaine, testée. Le script l'applique au stock.
 - [ ] Bilan : adresses gagnées, perdues et changées par rapport à `addresses.countries`. Décision de câblage.
 
@@ -123,10 +140,7 @@ Une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deu
 
 ## Questions ouvertes
 
-- **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score a du sens seulement si un moyen produit des propositions de qualité inégale, ce que la mesure dira.
 - **Désaccords.** Une adresse dont les moyens se contredisent demande une décision humaine. Reste à décider si elle rejoint la file existante ou la sienne.
-- **ROR et OpenAlex.** Le pays de la structure OpenAlex dérive en général de son ROR. Les moyens `ror` et `source_openalex` sont-ils redondants pour les signatures OpenAlex ?
-- **Adresses dédoublonnées.** Stocker une adresse par `normalized_text` retirerait 72 946 lignes sur 507 902 (14,4 %) dans la base de test. Pour 1 262 textes normalisés, les lignes ont des pays différents.
 - **Villes.** `place_name_forms` compte 192 villes, cherchées dans tout le texte de l'adresse. Piste : les villes de GeoNames (`cities15000`, licence CC BY 4.0), sans les noms de villes présents dans plusieurs pays (Cambridge, Valencia), et sans ceux qui sont déjà une forme de pays ou d'institution. Mesure avant chargement, contre les verdicts de la revue à la main.
 - **Formes d'institutions.** `place_name_forms` compte 36 361 institutions. Le ROR et le référentiel HAL donnent le pays des organisations. Une partie des formes est bruitée : adresses complètes, parfois multiples, pays erronés (« goma volcano observatory » rangé en `cg`). Piste : retirer les institutions, après mesure de ce que le moyen `institution` apporte en plus du ROR et des structures HAL.
 - **Blocs d'adresses.** Une adresse contient parfois plusieurs affiliations, séparées par « ; » ou par les numéros d'affiliation des sites d'éditeurs. Parmi les 3 371 adresses à plusieurs pays retenus, au 2026-10-16 : 154 blocs à « ; » (OpenAlex 111, ScanR 45), 135 blocs numérotés (ScanR 131). Piste : découper ces blocs à la normalisation des sources concernées.
