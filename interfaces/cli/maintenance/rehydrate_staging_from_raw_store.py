@@ -13,13 +13,15 @@ Deux modes :
 Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline depuis la normalisation (qui réenchaîne toutes les phases aval) :
     run_pipeline --from normalize --sources <sources>
 
-`--doi-prefix` limite une source DOI-native (crossref, datacite) aux DOI d'un préfixe. La normalisation traite ensuite ces seuls documents.
+`--doi-prefix` limite une source DOI-native (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite ces seuls documents.
 
 Usage :
     python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources hal,openalex [--full] [--dry-run]
     python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources crossref --doi-prefix 10.70675
+    python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
+        --sources scanr --id-prefix nnt
 """
 
 from __future__ import annotations
@@ -100,6 +102,10 @@ def main() -> None:
         help="Limite la réhydratation aux DOI de ce préfixe (ex: 10.70675). Sources crossref et datacite seulement.",
     )
     parser.add_argument(
+        "--id-prefix",
+        help="Limite la réhydratation aux identifiants source de ce préfixe (ex: nnt pour les thèses scanR).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Compte les clés présentes au raw store sans rien écrire.",
@@ -108,11 +114,13 @@ def main() -> None:
     sources = _parse_sources(args.sources)
     if args.doi_prefix and not set(sources) <= _DOI_NATIVE_SOURCES:
         raise SystemExit("--doi-prefix s'applique seulement aux sources crossref et datacite.")
+    if args.doi_prefix and args.id_prefix:
+        raise SystemExit("--doi-prefix et --id-prefix s'excluent.")
 
     store = get_raw_store()
+    prefix = f"{args.doi_prefix}/" if args.doi_prefix else args.id_prefix or ""
 
     def keys(source: str) -> Iterator[str]:
-        prefix = f"{args.doi_prefix}/" if args.doi_prefix else ""
         return (k for k in store.iter_keys(source) if k.startswith(prefix))
 
     if args.dry_run:
