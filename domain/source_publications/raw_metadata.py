@@ -19,9 +19,48 @@ RAW = "raw"
 CORRECTED_BY = "corrected_by"
 
 
+REMOVED = "removed"
+BEFORE = "before"
+
+
 def stash_entry(raw: JsonValue, corrected_by: str) -> dict[str, JsonValue]:
     """Entrée `raw_metadata` pour un champ corrigé : la valeur source + sa provenance."""
     return {RAW: raw, CORRECTED_BY: corrected_by}
+
+
+def removal_entry(
+    before: dict[str, JsonValue], removed: dict[str, list[str]], corrected_by: str
+) -> dict[str, JsonValue]:
+    """Entrée `raw_metadata` pour des valeurs retirées d'une colonne JSONB à clés : la valeur de chaque clé touchée avant le retrait, les valeurs retirées, et la provenance."""
+    return {BEFORE: before, REMOVED: dict(removed), CORRECTED_BY: corrected_by}
+
+
+def without_values(mapping: dict[str, JsonValue], entry: JsonValue) -> dict[str, JsonValue]:
+    """`mapping` privé des valeurs que `entry` (`removal_entry`) retire. Une clé vidée disparaît."""
+    if not isinstance(entry, dict) or not isinstance(entry.get(REMOVED), dict):
+        return mapping
+    removed = entry[REMOVED]
+    result = dict(mapping)
+    for key, values in removed.items():
+        if not isinstance(values, list) or key not in result:
+            continue
+        current = result[key]
+        if isinstance(current, list):
+            kept = [v for v in current if v not in values]
+            if kept:
+                result[key] = kept
+            else:
+                del result[key]
+        elif current in values:
+            del result[key]
+    return result
+
+
+def with_values_restored(mapping: dict[str, JsonValue], entry: JsonValue) -> dict[str, JsonValue]:
+    """`mapping` où chaque clé que `entry` (`removal_entry`) a touchée reprend sa valeur d'avant le retrait."""
+    if not isinstance(entry, dict) or not isinstance(entry.get(BEFORE), dict):
+        return mapping
+    return {**mapping, **entry[BEFORE]}
 
 
 def raw_value[T](raw_metadata: dict[str, JsonValue] | None, field: str, current: T) -> T:

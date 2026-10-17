@@ -6,7 +6,7 @@ Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type
 
 Idempotent et auto-cicatrisant : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 
-Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`language`/`external_ids` ; cluster : `doi` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas.
+Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`language`/`external_ids` ; cluster : `doi`/`removed_external_ids` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas. La sous-étape unaire réapplique aux identifiants externes le retrait noté par la sous-étape cluster.
 """
 
 import logging
@@ -26,11 +26,13 @@ from domain.source_publications.metadata_correction.rules import (
     origin_doc_type_correction,
     strip_dissertation_keys,
 )
+from domain.source_publications.metadata_correction.shared_doi import REMOVED_EXTERNAL_IDS
 from domain.source_publications.raw_metadata import (
     CORRECTED_BY,
     hydrate_raw_view,
     raw_value,
     stash_entry,
+    without_values,
 )
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
@@ -42,7 +44,7 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 )
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
-# Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.
+# Les autres (`doi` et `removed_external_ids`, gérés par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.
 _UNARY_FIELDS = ("doc_type", "oa_status", "language", "external_ids")
 
 # Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping source→canonique a changé la valeur (aucune règle de correction n'a firé).
@@ -158,6 +160,8 @@ def compute_update(
             raw_metadata["external_ids"] = stash_entry(
                 raw_external_ids, MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE.value
             )
+    # Identifiants partagés avec une autre œuvre, retirés par la sous-étape cluster.
+    new_external_ids = without_values(new_external_ids, raw_metadata.get(REMOVED_EXTERNAL_IDS))
 
     if (
         new_doc_type == row.doc_type

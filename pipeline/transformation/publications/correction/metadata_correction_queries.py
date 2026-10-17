@@ -13,6 +13,7 @@ from domain.source_publications.metadata_correction.rules import MetadataForCorr
 from domain.source_publications.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
+    REMOVED_EXTERNAL_IDS,
     DoiClusterCase,
 )
 from domain.sources.registry import DOI_ORG, Source
@@ -122,14 +123,18 @@ class DoiClusterRow(NamedTuple):
     same_work_case: DoiClusterCase | None
     # `raw_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
+    external_ids: dict[str, JsonValue] = {}
+    source: str = ""
+    source_id: str = ""
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou substituée) + sidecar. Produite par la correction de DOI par cluster (convergence même-œuvre ou nullage de DOI partagé à tort), persistée via `persist_doi_corrections`."""
+    """Une mise à jour de la correction par cluster : colonne `doi` (nullée, restaurée ou substituée), sidecar, et identifiants externes (clés partagées avec une autre œuvre retirées ou restaurées). Persistée via `persist_doi_corrections`."""
 
     id: int
     doi: str | None
     raw_metadata: dict[str, JsonValue]
+    external_ids: dict[str, JsonValue]
 
 
 # Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
@@ -301,11 +306,12 @@ class PgMetadataCorrectionQueries:
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, et `source_publications` déjà corrigées (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, et `source_publications` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sp_eff AS (
-                    SELECT id, source, doc_type, doi, title_normalized, raw_metadata, meta,
+                    SELECT id, source, source_id, doc_type, doi, title_normalized, raw_metadata,
+                           meta, external_ids,
                            lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS eff_doi
                     FROM source_publications
                 ),
@@ -368,11 +374,13 @@ class PgMetadataCorrectionQueries:
                     WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
                       AND eff_doi IS NOT NULL
                     UNION
-                    SELECT eff_doi AS d FROM sp_eff WHERE raw_metadata ? 'doi'
+                    SELECT eff_doi AS d FROM sp_eff
+                    WHERE raw_metadata ?| ARRAY['doi', '{REMOVED_EXTERNAL_IDS}']
                     UNION
                     SELECT d FROM unresolved_dois
                 )
                 SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
+                       sp.external_ids, sp.source::text AS source, sp.source_id,
                        sp.eff_doi AS raw_doi,
                        sw.canonical_doi, sw.same_work_case,
                        sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved
@@ -392,15 +400,18 @@ class PgMetadataCorrectionQueries:
                 canonical_doi=row.canonical_doi,
                 same_work_case=_cluster_case(row.same_work_case),
                 unresolved=row.unresolved,
+                external_ids=row.external_ids,
+                source=row.source,
+                source_id=row.source_id,
             )
             for row in rows
         ]
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — le DOI est une clé de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes `doi`, `external_ids` et `raw_metadata`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],
-            set_columns=("doi", "raw_metadata"),
-            jsonb_params=("raw_metadata",),
+            set_columns=("doi", "external_ids", "raw_metadata"),
+            jsonb_params=("external_ids", "raw_metadata"),
         )

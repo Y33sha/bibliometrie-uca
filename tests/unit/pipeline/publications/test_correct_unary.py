@@ -140,6 +140,40 @@ def test_real_thesis_without_journal_id_untouched():
     assert _update(_sp(doc_type="thesis", journal_id=None)) is None
 
 
+def test_retrait_par_cluster_reapplique():
+    """L'étape unaire garde le retrait d'identifiants noté par l'étape cluster : aucune mise à jour."""
+    removal = {
+        "removed_external_ids": {
+            "before": {"hal_id": ["hal-1", "hal-2"]},
+            "removed": {"hal_id": ["hal-1"]},
+            "corrected_by": "ACTES_VS_COMMUNICATION",
+        }
+    }
+    assert _update(_sp(external_ids={"hal_id": ["hal-2"]}, raw_metadata=removal)) is None
+
+
+def test_retrait_par_cluster_compose_avec_la_conflation_these():
+    removal = {
+        "removed_external_ids": {
+            "before": {"hal_id": ["tel-01", "hal-99", "hal-5"]},
+            "removed": {"hal_id": ["hal-5"]},
+            "corrected_by": "ACTES_VS_COMMUNICATION",
+        }
+    }
+    upd = _update(
+        _sp(
+            doc_type="thesis",
+            journal_id=42,
+            doi="10.1016/j.ex.2020.01.001",
+            external_ids={"hal_id": ["tel-01", "hal-99", "hal-5"]},
+            raw_metadata=removal,
+        )
+    )
+    assert upd is not None
+    assert upd.external_ids == {"hal_id": ["hal-99"]}
+    assert upd.raw_metadata["removed_external_ids"] == removal["removed_external_ids"]
+
+
 def test_thesis_to_article_strips_dissertation_keys():
     # Conflation : la SP corrigée thèse→article perd le NNT et les hal_id tel-/dumas-,
     # garde les autres hal_id (article) et les autres clés. Brut stashé pour réversibilité.

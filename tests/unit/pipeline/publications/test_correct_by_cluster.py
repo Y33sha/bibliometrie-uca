@@ -21,12 +21,14 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 def test_tally_doi_corrections_par_cas():
     updates = [
         DoiCorrectionUpdate(
-            1, "10.9005/c", {"doi": stash_entry("10.9005/v1", "DATACITE_VERSION_TO_CONCEPT")}
+            1, "10.9005/c", {"doi": stash_entry("10.9005/v1", "DATACITE_VERSION_TO_CONCEPT")}, {}
         ),
         DoiCorrectionUpdate(
-            2, "10.9005/d", {"doi": stash_entry("10.9005/v2", "DATACITE_VERSION_TO_CONCEPT")}
+            2, "10.9005/d", {"doi": stash_entry("10.9005/v2", "DATACITE_VERSION_TO_CONCEPT")}, {}
         ),
-        DoiCorrectionUpdate(3, None, {"doi": stash_entry("10.9006/book", "OUVRAGE_VS_CHAPITRE")}),
+        DoiCorrectionUpdate(
+            3, None, {"doi": stash_entry("10.9006/book", "OUVRAGE_VS_CHAPITRE")}, {}
+        ),
     ]
     assert tally_doi_corrections(updates) == {
         "DATACITE_VERSION_TO_CONCEPT": 2,
@@ -43,9 +45,18 @@ def _row(
     raw_doi="10.1/x",
     canonical_doi=None,
     same_work_case=None,
+    external_ids=None,
 ) -> DoiClusterRow:
     return DoiClusterRow(
-        row_id, doc_type, doi, title, raw_metadata or {}, raw_doi, canonical_doi, same_work_case
+        row_id,
+        doc_type,
+        doi,
+        title,
+        raw_metadata or {},
+        raw_doi,
+        canonical_doi,
+        same_work_case,
+        external_ids=external_ids or {},
     )
 
 
@@ -395,6 +406,7 @@ def test_copie_de_l_article_prend_le_doi_publie():
             1,
             "10.1103/published",
             {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
+            {},
         )
     ]
 
@@ -415,7 +427,7 @@ def test_preprint_deja_substitue_retrouve_son_doi():
         canonical_doi="10.1007/jhep07(2023)066",
         same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
     )
-    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {})]
+    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {}, {})]
 
 
 def test_package_piece_substituted_to_parent():
@@ -432,6 +444,7 @@ def test_package_piece_substituted_to_parent():
             1,
             "10.15454/abc",
             {"doi": {"raw": "10.15454/abc/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
+            {},
         )
     ]
 
@@ -460,7 +473,7 @@ def test_self_heals_when_canonical_gone():
         },
         raw_doi="10.5281/zenodo.10",
     )
-    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.5281/zenodo.10", {})]
+    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.5281/zenodo.10", {}, {})]
 
 
 def test_chapter_doi_nulled_book_untouched():
@@ -468,7 +481,7 @@ def test_chapter_doi_nulled_book_untouched():
     chapter = _row(2, "book_chapter", "10.1/x")
     assert compute_updates([book, chapter]) == [
         DoiCorrectionUpdate(
-            2, None, {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
+            2, None, {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}, {}
         )
     ]
 
@@ -502,4 +515,92 @@ def test_self_heals_when_book_gone():
         None,
         raw_metadata={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
     )
-    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {})]
+    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, {})]
+
+
+# ── identifiants partagés avec une œuvre qui perd le DOI ──────────────────
+
+
+def test_volume_perd_le_hal_id_de_ses_communications():
+    """Le dépôt HAL d'une communication, recopié par la notice OpenAlex du volume, quitte cette notice."""
+    volume = _row(
+        1,
+        "proceedings",
+        "10.1/x",
+        title="eapc abstract book",
+        external_ids={"hal_id": ["hal-1", "hal-2"], "pmid": "99"},
+    )
+    communication = _row(
+        2, "poster", "10.1/x", title="total pain", external_ids={"hal_id": ["hal-1"]}
+    )
+    updates = {u.id: u for u in compute_updates([volume, communication])}
+
+    assert updates[1].doi == "10.1/x"
+    assert updates[1].external_ids == {"hal_id": ["hal-2"], "pmid": "99"}
+    assert updates[1].raw_metadata["removed_external_ids"] == {
+        "before": {"hal_id": ["hal-1", "hal-2"]},
+        "removed": {"hal_id": ["hal-1"]},
+        "corrected_by": "ACTES_VS_COMMUNICATION",
+    }
+    assert updates[2].doi is None
+    assert updates[2].external_ids == {"hal_id": ["hal-1"]}
+
+
+def test_ouvrage_perd_le_hal_id_de_son_chapitre():
+    book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-9"]})
+    chapter = _row(2, "book_chapter", "10.1/x", external_ids={"hal_id": ["hal-9"]})
+    updates = {u.id: u for u in compute_updates([book, chapter])}
+    assert updates[1].external_ids == {}
+
+
+def test_retrait_stable_d_un_run_a_l_autre():
+    volume = _row(
+        1, "proceedings", "10.1/x", title="eapc abstract book", external_ids={"hal_id": ["hal-1"]}
+    )
+    communication = _row(
+        2, "poster", "10.1/x", title="total pain", external_ids={"hal_id": ["hal-1"]}
+    )
+    first = {u.id: u for u in compute_updates([volume, communication])}
+    volume = volume._replace(external_ids=first[1].external_ids, raw_metadata=first[1].raw_metadata)
+    communication = communication._replace(doi=None, raw_metadata=first[2].raw_metadata)
+    assert compute_updates([volume, communication]) == []
+
+
+def test_identifiants_restaures_quand_la_divergence_disparait():
+    volume = _row(
+        1,
+        "proceedings",
+        "10.1/x",
+        title="eapc abstract book",
+        raw_metadata={
+            "removed_external_ids": {
+                "before": {"hal_id": ["hal-1", "hal-2"]},
+                "removed": {"hal_id": ["hal-1"]},
+                "corrected_by": "ACTES_VS_COMMUNICATION",
+            }
+        },
+        external_ids={"hal_id": ["hal-2"]},
+    )
+    assert compute_updates([volume]) == [
+        DoiCorrectionUpdate(1, "10.1/x", {}, {"hal_id": ["hal-1", "hal-2"]})
+    ]
+
+
+def test_identifiant_propre_d_une_notice_qui_garde_le_doi_reste_en_place():
+    """Le chapitre OpenAlex recopie le dépôt HAL de la notice qui garde le DOI : ce dépôt reste à elle."""
+    book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
+    hal = _row(
+        2,
+        "conference_paper",
+        "10.1/x",
+        external_ids={"hal_id": ["hal-01234567"]},
+    )._replace(source="hal", source_id="hal-01234567")
+    chapter = _row(3, "book_chapter", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
+    updates = {u.id: u for u in compute_updates([book, hal, chapter])}
+    assert set(updates) == {3}
+
+
+def test_sans_divergence_aucun_retrait():
+    a = _row(1, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
+    b = _row(2, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
+    assert compute_updates([a, b]) == []

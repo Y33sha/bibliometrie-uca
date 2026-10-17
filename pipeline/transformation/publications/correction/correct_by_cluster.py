@@ -7,7 +7,9 @@ Corrige le DOI de certaines source_publications afin de provoquer leur fusion en
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur toutes les notices qui le citent.
 
-`doc_type` lus = **canoniques** (la sous-étape unaire a déjà tourné). Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`), donc une `source_publication` dont la relation/le conflit a disparu récupère son DOI source au run suivant.
+Après une divergence, les notices qui gardent le DOI perdent les clés de confirmation qu'elles partagent avec les notices qui le perdent, par exemple le dépôt HAL d'une communication recopié par la notice OpenAlex du volume d'actes. Les valeurs retirées sont notées sous `raw_metadata.removed_external_ids`, que la sous-étape unaire réapplique.
+
+Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`) et des identifiants d'avant retrait, donc une `source_publication` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
 """
 
 import logging
@@ -18,11 +20,24 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.source_publications.metadata_correction.shared_doi import (
+    REMOVED_EXTERNAL_IDS,
+    ConfirmationIdRemoval,
     DoiClusterDecision,
     DoiClusterMember,
+    confirmation_id_removals,
+    confirmation_ids,
+    notice_own_ids,
     resolve_cluster_doi_corrections,
 )
-from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
+from domain.source_publications.raw_metadata import (
+    CORRECTED_BY,
+    raw_value,
+    removal_entry,
+    stash_entry,
+    with_values_restored,
+    without_values,
+)
+from domain.types import JsonValue
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
@@ -32,12 +47,21 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 )
 
 
+def _base_external_ids(row: DoiClusterRow) -> dict[str, JsonValue]:
+    """Identifiants externes de la notice avant le retrait par cluster : ceux que l'étape unaire a écrits, valeurs retirées au run précédent restaurées."""
+    return with_values_restored(row.external_ids, row.raw_metadata.get(REMOVED_EXTERNAL_IDS))
+
+
 def _compute_update(
-    row: DoiClusterRow, decision: DoiClusterDecision | None
+    row: DoiClusterRow,
+    decision: DoiClusterDecision | None,
+    removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_publication` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    """État cible d'une `source_publication` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
     raw_doi = raw_value(row.raw_metadata, "doi", row.doi)
-    raw_metadata = {k: v for k, v in row.raw_metadata.items() if k != "doi"}
+    raw_metadata = {
+        k: v for k, v in row.raw_metadata.items() if k not in ("doi", REMOVED_EXTERNAL_IDS)
+    }
 
     if decision is None or decision.target_doi == raw_doi:
         new_doi = raw_doi
@@ -45,9 +69,22 @@ def _compute_update(
         new_doi = decision.target_doi
         raw_metadata["doi"] = stash_entry(raw_doi, decision.case.value)
 
-    if new_doi == row.doi and raw_metadata == row.raw_metadata:
+    base = _base_external_ids(row)
+    new_external_ids = base
+    if removal is not None:
+        entry = removal_entry(
+            {k: base[k] for k in removal.removed if k in base}, removal.removed, removal.case.value
+        )
+        new_external_ids = without_values(base, entry)
+        raw_metadata[REMOVED_EXTERNAL_IDS] = entry
+
+    if (
+        new_doi == row.doi
+        and new_external_ids == row.external_ids
+        and raw_metadata == row.raw_metadata
+    ):
         return None
-    return DoiCorrectionUpdate(row.id, new_doi, raw_metadata)
+    return DoiCorrectionUpdate(row.id, new_doi, raw_metadata, new_external_ids)
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
@@ -60,21 +97,25 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
     updates: list[DoiCorrectionUpdate] = []
     for raw_doi, members in groups.items():
-        decision_by_id = {
-            d.id: d
-            for d in resolve_cluster_doi_corrections(
-                [
-                    DoiClusterMember(
-                        m.id, m.doc_type, m.title_normalized, m.canonical_doi, m.same_work_case
-                    )
-                    for m in members
-                ],
-                shared_doi=raw_doi,
-                unresolved=any(m.unresolved for m in members),
+        group = [
+            DoiClusterMember(
+                m.id,
+                m.doc_type,
+                m.title_normalized,
+                m.canonical_doi,
+                m.same_work_case,
+                confirmation_ids(_base_external_ids(m)),
+                notice_own_ids(m.source, m.source_id),
             )
-        }
+            for m in members
+        ]
+        decisions = resolve_cluster_doi_corrections(
+            group, shared_doi=raw_doi, unresolved=any(m.unresolved for m in members)
+        )
+        decision_by_id = {d.id: d for d in decisions}
+        removal_by_id = {r.id: r for r in confirmation_id_removals(group, decisions)}
         for m in members:
-            upd = _compute_update(m, decision_by_id.get(m.id))
+            upd = _compute_update(m, decision_by_id.get(m.id), removal_by_id.get(m.id))
             if upd is not None:
                 updates.append(upd)
     return updates
@@ -110,7 +151,13 @@ def run(
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
     updates = compute_updates(rows)
-    logger.info("%s%s de DOI à appliquer", BRANCHE, accord(len(updates), "correction"))
+    logger.info("%s%s à appliquer", BRANCHE, accord(len(updates), "correction"))
+    removals = sum(1 for u in updates if REMOVED_EXTERNAL_IDS in u.raw_metadata)
+    logger.info(
+        "%sidentifiants partagés avec une autre œuvre retirés de %s",
+        BRANCHE,
+        accord(removals, "notice"),
+    )
     case_counts = tally_doi_corrections(updates)
 
     persist_in_batches(conn, updates, queries.persist_doi_corrections)

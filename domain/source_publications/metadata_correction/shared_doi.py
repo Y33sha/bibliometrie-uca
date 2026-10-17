@@ -3,7 +3,7 @@
 Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_publications` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
 
 - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
-- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres.
+- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 
 Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
 
@@ -13,12 +13,18 @@ La décision est **agnostique de la source** : le caller applicatif regroupe par
 """
 
 import re
+from collections.abc import Mapping
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
-from domain.publications.identifiers import meme_registrant
+from domain.publications.identifiers import NNT, HALId, meme_registrant
+from domain.source_publications.external_ids import ExternalIdType
+from domain.source_publications.keys import CONFIRMATION_ID_TYPES
+from domain.sources.registry import Source
+from domain.sources.scanr import extract_hal_id_from_scanr_id
+from domain.types import JsonValue
 
 
 class DoiClusterCase(StrEnum):
@@ -88,6 +94,10 @@ class DoiClusterMember(NamedTuple):
     title_normalized: str | None
     canonical_doi: str | None = None
     same_work_case: DoiClusterCase | None = None
+    # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants externes, par type.
+    confirmation_ids: Mapping[str, tuple[str, ...]] = {}
+    # Identifiants propres de la notice, par type : le `hal_id` d'une notice HAL, le NNT d'une notice theses.fr.
+    own_ids: Mapping[str, tuple[str, ...]] = {}
 
 
 class DoiClusterDecision(NamedTuple):
@@ -96,6 +106,89 @@ class DoiClusterDecision(NamedTuple):
     id: int
     target_doi: str | None
     case: DoiClusterCase
+
+
+class ConfirmationIdRemoval(NamedTuple):
+    """Identifiants externes retirés d'un membre qui garde le DOI partagé : par type, les valeurs qu'il partage avec un membre qui perd le DOI."""
+
+    id: int
+    removed: dict[str, list[str]]
+    case: DoiClusterCase
+
+
+# Cas où des œuvres distinctes partagent un DOI : le membre qui le perd est une autre œuvre.
+DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
+    {
+        DoiClusterCase.OUVRAGE_VS_CHAPITRE,
+        DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
+        DoiClusterCase.ACTES_VS_COMMUNICATION,
+    }
+)
+
+# Clé de `raw_metadata` où la correction par cluster note les identifiants externes qu'elle retire.
+REMOVED_EXTERNAL_IDS = "removed_external_ids"
+
+
+def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[str, ...]]:
+    """Valeurs des clés de confirmation d'un `external_ids`, par type."""
+    out: dict[str, tuple[str, ...]] = {}
+    for id_type in CONFIRMATION_ID_TYPES:
+        value = external_ids.get(id_type)
+        values = value if isinstance(value, list) else [value]
+        if kept := tuple(v for v in values if isinstance(v, str)):
+            out[id_type.value] = kept
+    return out
+
+
+def notice_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
+    """Identifiants propres d'une notice, par type : le dépôt HAL d'une notice HAL ou d'une notice ScanR issue de HAL, le NNT d'une notice theses.fr."""
+    if source == Source.HAL:
+        hal_id = HALId.try_parse(source_id)
+    elif source == Source.SCANR:
+        hal_id = HALId.try_parse(extract_hal_id_from_scanr_id(source_id) or "")
+    elif source == Source.THESES:
+        nnt = NNT.try_parse(source_id)
+        return {ExternalIdType.NNT.value: (str(nnt),)} if nnt else {}
+    else:
+        return {}
+    return {ExternalIdType.HAL_ID.value: (str(hal_id),)} if hal_id else {}
+
+
+def confirmation_id_removals(
+    group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
+) -> list[ConfirmationIdRemoval]:
+    """Retraits d'identifiants externes après une divergence (`DIVERGENCE_CASES`).
+
+    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication que la notice OpenAlex du volume d'actes recopie. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
+    """
+    losers = {d.id: d.case for d in decisions if d.case in DIVERGENCE_CASES}
+    if not losers:
+        return []
+    kept_own: dict[str, set[str]] = {}
+    for m in group:
+        if m.id not in losers:
+            for id_type, values in m.own_ids.items():
+                kept_own.setdefault(id_type, set()).update(values)
+    lost: dict[str, set[str]] = {}
+    for m in group:
+        if m.id in losers:
+            for id_type, values in m.confirmation_ids.items():
+                lost.setdefault(id_type, set()).update(
+                    v for v in values if v not in kept_own.get(id_type, ())
+                )
+    case = next(iter(losers.values()))
+    removals: list[ConfirmationIdRemoval] = []
+    for m in group:
+        if m.id in losers:
+            continue
+        removed = {
+            id_type: shared
+            for id_type, values in m.confirmation_ids.items()
+            if (shared := [v for v in values if v in lost.get(id_type, ())])
+        }
+        if removed:
+            removals.append(ConfirmationIdRemoval(m.id, removed, case))
+    return removals
 
 
 # Marqueurs structurels de titre de chapitre, retirés avant comparaison : un chapitre est
