@@ -174,6 +174,22 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     assert _addresses(conn, sa_id) == ["Labo B"]
 
 
+def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _notice(conn)
+    _write(conn, sp, [_rec(0, "Big Lab"), _rec(1, "ATLAS Collaboration")])
+    _write(conn, sp, [_rec(0, "Big Lab", collective=True), _rec(1, "ATLAS Collaboration")])
+
+    rows = conn.execute(
+        text(
+            "SELECT author_position, collective FROM source_authorships "
+            "WHERE source_publication_id = :sp ORDER BY author_position"
+        ),
+        {"sp": sp},
+    ).all()
+    assert [tuple(r) for r in rows] == [(0, True), (1, True)]
+
+
 def _rors(conn, sa_id: int) -> list[str]:
     return (
         conn.execute(

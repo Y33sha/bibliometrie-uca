@@ -36,6 +36,17 @@ def test_identifiant_partage_neutralise_sur_chaque_signature():
     ]
 
 
+def test_collective_d_apres_la_source_ou_le_nom():
+    items = _items_written(
+        [
+            AuthorRecord(position=0, name=SignatureName(raw="Big Lab"), collective=True),
+            AuthorRecord(position=1, name=SignatureName(raw="ATLAS Collaboration")),
+            AuthorRecord(position=2, name=SignatureName(raw="Tony Affolder")),
+        ]
+    )
+    assert [i["collective"] for i in items] == [True, True, False]
+
+
 def test_identifiants_bruts_conserves_sur_l_identite():
     items = _items_written([_record(0, "S. Acharya", "X"), _record(1, "S. Das", "X")])
     assert [i["person_identifiers"] for i in items] == [{"orcid": "X"}, {"orcid": "X"}]

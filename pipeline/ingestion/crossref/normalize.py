@@ -287,6 +287,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
     """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
 
     - nom et prénom séparés (`family`, `given`) ;
+    - entrée à `name` seul : signature collective ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
     - identifiants ROR de chaque affiliation : sur son adresse, sur la signature pour une affiliation sans nom ;
@@ -309,6 +310,9 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
             continue
 
         name = _author_name(author)
+        collective = name is None
+        if name is None:
+            name = SignatureName.from_raw(as_str(author.get("name")))
         if name is None:
             continue
 
@@ -318,6 +322,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
             AuthorRecord(
                 position=position,
                 name=name,
+                collective=collective,
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=addresses,

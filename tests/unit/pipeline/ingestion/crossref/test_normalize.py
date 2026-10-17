@@ -404,6 +404,20 @@ class TestBuildCrossrefAuthorRecords:
         rec = build_crossref_author_records({"author": [{"family": "Dupont"}]})[0]
         assert rec.person_identifiers is None
 
+    def test_name_seul_est_collectif(self):
+        """Une entrée à `name` seul est une signature collective, à sa position dans la source."""
+        msg = {
+            "author": [
+                {"family": "Dupont", "given": "Jean"},
+                {"name": "for the PREDISTIM working group"},
+            ]
+        }
+        recs = build_crossref_author_records(msg)
+        assert [(r.position, r.name.display(), r.collective) for r in recs] == [
+            (0, "Jean Dupont", False),
+            (1, "for the PREDISTIM working group", True),
+        ]
+
     def test_shared_orcid_kept_on_each_record(self):
         """L'extracteur rend l'ORCID de chaque auteur tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
         msg = {

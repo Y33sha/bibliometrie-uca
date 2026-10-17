@@ -31,9 +31,9 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 ### 2. Normalisation
 
-- [ ] Crossref : les entrées à `name` seul deviennent des signatures collectives.
-- [ ] DataCite : les créateurs `Organizational` deviennent des signatures collectives.
-- [ ] Toutes les sources : le writer des signatures pose `collective` d'après le signal de la source, ou d'après la règle du nom.
+- [x] Crossref : les entrées à `name` seul deviennent des signatures collectives.
+- [x] DataCite : les créateurs `Organizational` deviennent des signatures collectives.
+- [x] Toutes les sources : le writer des signatures pose `collective` d'après le signal de la source, ou d'après la règle du nom. La marque entre dans l'empreinte de la signature.
 
 ### 3. Traitements en aval
 

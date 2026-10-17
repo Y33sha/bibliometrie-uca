@@ -2,7 +2,7 @@
 
 Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
-- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` (institutions comme auteur) sont ignorés — ce ne sont pas des personnes. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
+- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des signatures collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
 - `doc_type` : token brut issu de `types` (cf. `domain.sources.datacite.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
 - `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
@@ -200,7 +200,7 @@ def _creator_affiliations(
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
+    Un creator `Organizational` donne une signature collective. ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -215,8 +215,6 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
     for position, creator in enumerate(creators):
         if not isinstance(creator, dict):
             continue
-        if creator.get("nameType") == "Organizational":
-            continue
         name = _creator_name(creator)
         if name is None:
             continue
@@ -226,6 +224,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
             AuthorRecord(
                 position=position,
                 name=name,
+                collective=creator.get("nameType") == "Organizational",
                 roles=["author"],
                 person_identifiers=ids if ids else None,
                 addresses=addresses,

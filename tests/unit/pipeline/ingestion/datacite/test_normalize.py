@@ -123,7 +123,7 @@ class TestAuthorRecords:
             {"orcid": "0000-0002-1825-0097"},
         ]
 
-    def test_skips_organizational(self):
+    def test_organizational_est_collectif(self):
         attrs = {
             "creators": [
                 {"name": "Big Lab", "nameType": "Organizational"},
@@ -131,7 +131,10 @@ class TestAuthorRecords:
             ]
         }
         recs = build_datacite_author_records(attrs)
-        assert [r.name.display() for r in recs] == ["A B"]
+        assert [(r.position, r.name.display(), r.collective) for r in recs] == [
+            (0, "Big Lab", True),
+            (1, "A B", False),
+        ]
 
     def test_given_family_prioritaires(self):
         attrs = {"creators": [{"name": "Doe, Jane", "givenName": "Jane", "familyName": "Doe"}]}
@@ -277,7 +280,7 @@ class TestChampsIgnores:
 
 class TestProcessAuthorships:
     def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
-        """Les creators deviennent les signatures du document versé ; une institution n'en est pas une."""
+        """Les creators deviennent les signatures du document versé."""
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_datacite,
@@ -296,7 +299,7 @@ class TestProcessAuthorships:
         process_authorships(MagicMock(), MagicMock(), attrs, 555, sync_settings=SYNC_SETTINGS)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
-        assert [r.name.display() for r in vus["records"]] == ["Doe, J."]
+        assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
 
 
 class TestUpsertPublisher:

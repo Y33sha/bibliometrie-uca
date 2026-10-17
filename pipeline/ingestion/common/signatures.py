@@ -16,6 +16,7 @@ from sqlalchemy import Connection
 
 from domain.country_detection import SOURCE_COUNTRY_METHODS
 from domain.normalize import normalize_text, sanitize_raw_text
+from domain.persons.collective_names import is_collective_name
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
 from domain.source_publications.signature_sync import (
@@ -58,12 +59,13 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont portés par son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la signature (`structId`).
+    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la signature (`structId`). `collective` : la source déclare la signature collective. Le writer marque aussi collective une signature dont le nom désigne un collectif (`is_collective_name`).
     """
 
     position: int | None
     name: SignatureName
     is_corresponding: bool = False
+    collective: bool = False
     roles: list[str] | None = None
     person_identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
@@ -125,6 +127,7 @@ def write_source_authorships(
     neutralizations = shared_identifier_neutralizations([rec.person_identifiers for rec in records])
     items: list[SourceAuthorshipItem] = []
     for rec, neutralized in zip(records, neutralizations, strict=True):
+        collective = rec.collective or is_collective_name(rec.name.display())
         items.append(
             {
                 "source": source,
@@ -132,6 +135,7 @@ def write_source_authorships(
                 "author_position": rec.position,
                 **signature_name_fields(rec.name),
                 "is_corresponding": rec.is_corresponding,
+                "collective": collective,
                 "roles": rec.roles,
                 "person_identifiers": rec.person_identifiers,
                 "neutralized_identifiers": neutralized,
@@ -140,6 +144,7 @@ def write_source_authorships(
                         position=rec.position,
                         name=(rec.name.raw, rec.name.last_name, rec.name.first_name),
                         is_corresponding=rec.is_corresponding,
+                        collective=collective,
                         roles=rec.roles,
                         neutralized_identifiers=neutralized,
                         addresses=[

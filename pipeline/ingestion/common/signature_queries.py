@@ -42,6 +42,7 @@ class SourceAuthorshipItem(SignatureNameFields):
     source_publication_id: int
     author_position: int | None
     is_corresponding: bool
+    collective: bool
     roles: list[str] | None
     person_identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
@@ -163,6 +164,7 @@ class AuthorshipsBatchQueries:
                 "last_name_normalized": v["last_name_normalized"],
                 "first_name_normalized": v["first_name_normalized"],
                 "is_corresponding": v["is_corresponding"],
+                "collective": v["collective"],
                 "roles": v["roles"],
                 "raw_author_name": v["raw_author_name"],
                 "raw_last_name": v["raw_last_name"],
@@ -193,14 +195,14 @@ class AuthorshipsBatchQueries:
             """
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 is_corresponding, roles, raw_author_name, raw_last_name, raw_first_name,
-                 identity_id, neutralized_identifiers, content_hash)
+                 is_corresponding, collective, roles, raw_author_name, raw_last_name,
+                 raw_first_name, identity_id, neutralized_identifiers, content_hash)
             SELECT :source, :spid, t.author_position,
-                   t.is_corresponding, t.roles, t.raw_author_name, t.raw_last_name,
+                   t.is_corresponding, t.collective, t.roles, t.raw_author_name, t.raw_last_name,
                    t.raw_first_name, aik.id, t.neutralized_identifiers, t.content_hash
             FROM jsonb_to_recordset(:payload) AS t(
                 author_position smallint, last_name_normalized text, first_name_normalized text,
-                is_corresponding boolean, roles text[],
+                is_corresponding boolean, collective boolean, roles text[],
                 raw_author_name text, raw_last_name text, raw_first_name text,
                 person_identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
             JOIN author_identifying_keys aik
@@ -246,6 +248,7 @@ class AuthorshipsBatchQueries:
                 "id": v["id"],
                 "author_position": v["author_position"],
                 "is_corresponding": v["is_corresponding"],
+                "collective": v["collective"],
                 "roles": v["roles"],
                 "raw_author_name": v["raw_author_name"],
                 "raw_last_name": v["raw_last_name"],
@@ -260,6 +263,7 @@ class AuthorshipsBatchQueries:
                 UPDATE source_authorships sa
                 SET author_position = t.author_position,
                     is_corresponding = t.is_corresponding,
+                    collective = t.collective,
                     roles = t.roles,
                     raw_author_name = t.raw_author_name,
                     raw_last_name = t.raw_last_name,
@@ -269,7 +273,7 @@ class AuthorshipsBatchQueries:
                     countries_dirty = true
                 FROM jsonb_to_recordset(:payload) AS t(
                     id integer, author_position smallint, is_corresponding boolean,
-                    roles text[], raw_author_name text, raw_last_name text,
+                    collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
                 WHERE sa.id = t.id
             """).bindparams(bindparam("payload", type_=Jsonb)),
