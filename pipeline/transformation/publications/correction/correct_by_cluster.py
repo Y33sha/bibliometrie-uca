@@ -3,7 +3,7 @@
 Corrige le DOI de certaines source_publications afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
 
 - **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
-- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
+- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur toutes les notices qui le citent.
 
@@ -106,6 +106,8 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
                 m.same_work_case,
                 confirmation_ids(_base_external_ids(m)),
                 notice_own_ids(m.source, m.source_id),
+                m.source,
+                frozenset(m.author_names),
             )
             for m in members
         ]

@@ -604,3 +604,58 @@ def test_sans_divergence_aucun_retrait():
     a = _row(1, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
     b = _row(2, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
     assert compute_updates([a, b]) == []
+
+
+# ── dépôt HAL au DOI d'une autre œuvre ────────────────────────────────────
+
+
+def _notice(member_id, source, title, authors, doc_type="article"):
+    return DoiClusterMember(
+        member_id, doc_type, title, source=source, author_names=frozenset(authors)
+    )
+
+
+def test_depot_hal_d_une_autre_oeuvre_perd_le_doi():
+    group = [
+        _notice(1, "crossref", "a brief history of oleds emitter development", {"zhang", "li"}),
+        _notice(2, "hal", "synthesis of aromatic luminescent molecules", {"martin", "dupont"}),
+        _notice(3, "openalex", "a brief history of oleds emitter development", {"zhang"}),
+    ]
+    assert _resoudre(group) == [
+        DoiClusterDecision(2, None, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
+    ]
+
+
+def test_depot_hal_au_titre_proche_garde_le_doi():
+    """Liste d'auteurs réduite à la collaboration dans Crossref, titre au balisage près : même œuvre."""
+    group = [
+        _notice(
+            1,
+            "crossref",
+            "search for rm b s 0 oscillations using inclusive lepton events",
+            {"collaboration"},
+        ),
+        _notice(
+            2,
+            "hal",
+            "search for b 0 s oscillations using inclusive lepton events",
+            {"abreu", "adam"},
+        ),
+    ]
+    assert _resoudre(group) == []
+
+
+def test_depot_hal_avec_un_auteur_commun_garde_le_doi():
+    group = [
+        _notice(1, "crossref", "l encampement du monde", {"agier"}),
+        _notice(2, "hal", "sociopoetique des migrations introduction", {"agier", "durand"}),
+    ]
+    assert _resoudre(group) == []
+
+
+def test_notice_crossref_sans_auteur_aucune_decision():
+    group = [
+        _notice(1, "crossref", "comptes rendus de lecture", set()),
+        _notice(2, "hal", "jean chateauvert et gilles delavaud", {"martin"}),
+    ]
+    assert _resoudre(group) == []

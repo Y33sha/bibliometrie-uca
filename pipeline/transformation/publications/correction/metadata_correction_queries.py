@@ -126,6 +126,8 @@ class DoiClusterRow(NamedTuple):
     external_ids: dict[str, JsonValue] = {}
     source: str = ""
     source_id: str = ""
+    # Noms de famille normalisés des signatures individuelles, renseignés pour les groupes où un dépôt HAL et la notice Crossref n'ont aucun nom commun.
+    author_names: tuple[str, ...] = ()
 
 
 class DoiCorrectionUpdate(NamedTuple):
@@ -222,6 +224,13 @@ def _persist_updates(
     return len(rows)
 
 
+# La notice `{sp}` a au moins une signature individuelle.
+_HAS_INDIVIDUAL_SIGNATURE = (
+    "EXISTS (SELECT 1 FROM source_authorships s"
+    " WHERE s.source_publication_id = {sp} AND NOT s.collective)"
+)
+
+
 def _cluster_case(value: str | None) -> DoiClusterCase | None:
     """Convertit le cas rendu par le `CASE` SQL, dont les littéraux sont ceux de l'enum."""
     return DoiClusterCase(value) if value is not None else None
@@ -306,7 +315,7 @@ class PgMetadataCorrectionQueries:
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, et `source_publications` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref, et `source_publications` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sp_eff AS (
@@ -367,6 +376,30 @@ class PgMetadataCorrectionQueries:
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
                 ),
+                -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref,
+                -- les deux ayant des signatures individuelles.
+                hal_crossref AS MATERIALIZED (
+                    SELECT h.eff_doi AS d, h.id AS hal_id, c.id AS crossref_id
+                    FROM sp_eff h
+                    JOIN sp_eff c ON c.eff_doi = h.eff_doi AND c.source = '{Source.CROSSREF.value}'
+                    WHERE h.source = '{Source.HAL.value}' AND h.eff_doi IS NOT NULL
+                ),
+                foreign_hal_dois AS (
+                    SELECT DISTINCT hc.d FROM hal_crossref hc
+                    WHERE {_HAS_INDIVIDUAL_SIGNATURE.format(sp="hc.hal_id")}
+                      AND {_HAS_INDIVIDUAL_SIGNATURE.format(sp="hc.crossref_id")}
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM source_authorships a
+                          JOIN author_identifying_keys ka ON ka.id = a.identity_id
+                          JOIN author_identifying_keys kb
+                            ON kb.last_name_normalized = ka.last_name_normalized
+                          JOIN source_authorships b
+                            ON b.identity_id = kb.id AND b.source_publication_id = hc.crossref_id
+                          WHERE a.source_publication_id = hc.hal_id
+                            AND NOT a.collective AND NOT b.collective
+                      )
+                ),
                 candidate_dois AS (
                     SELECT secondary_doi AS d FROM same_work
                     UNION
@@ -378,12 +411,21 @@ class PgMetadataCorrectionQueries:
                     WHERE raw_metadata ?| ARRAY['doi', '{REMOVED_EXTERNAL_IDS}']
                     UNION
                     SELECT d FROM unresolved_dois
+                    UNION
+                    SELECT d FROM foreign_hal_dois
                 )
                 SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
                        sp.external_ids, sp.source::text AS source, sp.source_id,
                        sp.eff_doi AS raw_doi,
                        sw.canonical_doi, sw.same_work_case,
-                       sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved
+                       sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
+                       CASE WHEN sp.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
+                           SELECT DISTINCT aik.last_name_normalized
+                           FROM source_authorships sa
+                           JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                           WHERE sa.source_publication_id = sp.id AND NOT sa.collective
+                             AND aik.last_name_normalized <> ''
+                       ) ELSE ARRAY[]::text[] END AS author_names
                 FROM sp_eff sp
                 JOIN candidate_dois c ON c.d = sp.eff_doi
                 LEFT JOIN same_work sw ON sw.declarant_id = sp.id
@@ -403,6 +445,7 @@ class PgMetadataCorrectionQueries:
                 external_ids=row.external_ids,
                 source=row.source,
                 source_id=row.source_id,
+                author_names=tuple(row.author_names),
             )
             for row in rows
         ]

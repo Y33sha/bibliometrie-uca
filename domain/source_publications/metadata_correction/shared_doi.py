@@ -3,7 +3,7 @@
 Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_publications` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
 
 - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
-- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
+- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 
 Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
 
@@ -50,6 +50,10 @@ class DoiClusterCase(StrEnum):
     # Volume d'actes (`proceedings`) et documents de titres différents partageant son DOI : ce
     # sont des communications du volume → elles perdent le DOI.
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
+
+    # Dépôt HAL sans auteur ni titre commun avec la notice Crossref de son DOI : le DOI du dépôt
+    # est celui d'une autre œuvre → le dépôt le perd.
+    HAL_DOI_D_UNE_AUTRE_OEUVRE = "HAL_DOI_D_UNE_AUTRE_OEUVRE"
 
     # DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
@@ -98,6 +102,9 @@ class DoiClusterMember(NamedTuple):
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
     # Identifiants propres de la notice, par type : le `hal_id` d'une notice HAL, le NNT d'une notice theses.fr.
     own_ids: Mapping[str, tuple[str, ...]] = {}
+    source: str = ""
+    # Noms de famille normalisés de ses signatures individuelles.
+    author_names: frozenset[str] = frozenset()
 
 
 class DoiClusterDecision(NamedTuple):
@@ -122,6 +129,7 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.OUVRAGE_VS_CHAPITRE,
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
         DoiClusterCase.ACTES_VS_COMMUNICATION,
+        DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
 
@@ -234,6 +242,38 @@ def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMemb
     ]
 
 
+# Part des mots du titre le plus court retrouvés dans l'autre titre, en deçà de laquelle deux titres désignent deux œuvres. Mots de 3 lettres ou plus : les mots grammaticaux et les résidus de formules en sont exclus.
+FOREIGN_TITLE_OVERLAP_MAX = 0.35
+_TITLE_WORD_MIN_LENGTH = 3
+
+
+def _title_overlap(a: str | None, b: str | None) -> float | None:
+    """Part des mots du titre le plus court présents dans l'autre titre, `None` si l'un des titres est sans mot retenu."""
+    words_a = {w for w in (a or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
+    words_b = {w for w in (b or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
+    if not words_a or not words_b:
+        return None
+    return len(words_a & words_b) / min(len(words_a), len(words_b))
+
+
+def _foreign_hal_deposits(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
+    """Dépôts HAL du groupe sans nom d'auteur commun avec la notice Crossref du DOI, et de titre différent (`FOREIGN_TITLE_OVERLAP_MAX`). Vide sans notice Crossref à auteurs."""
+    registrations = [m for m in group if m.source == Source.CROSSREF and m.author_names]
+    if len(registrations) != 1:
+        return []
+    registration = registrations[0]
+    foreign: list[DoiClusterMember] = []
+    for m in group:
+        if m.source != Source.HAL or not m.author_names:
+            continue
+        if m.author_names & registration.author_names:
+            continue
+        overlap = _title_overlap(m.title_normalized, registration.title_normalized)
+        if overlap is not None and overlap < FOREIGN_TITLE_OVERLAP_MAX:
+            foreign.append(m)
+    return foreign
+
+
 def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
     """Vrai si la relation déclarée par `member` désigne la même œuvre que le DOI partagé (cf. `meme_oeuvre_declaree`)."""
     if member.same_work_case is None or member.canonical_doi is None:
@@ -253,6 +293,7 @@ def resolve_cluster_doi_corrections(
     - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
+    - **Dépôt HAL d'une autre œuvre** (`_foreign_hal_deposits`) : un dépôt HAL sans nom d'auteur commun avec la notice Crossref du DOI, et de titre différent, perd le DOI. S'ajoute aux cas précédents.
 
     Hors de ces cas, un membre partageant le DOI par accident ne reçoit aucune décision.
 
@@ -267,6 +308,17 @@ def resolve_cluster_doi_corrections(
         case = canonical.same_work_case
         return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
 
+    decisions = _divergence_decisions(group)
+    decided = {d.id for d in decisions}
+    return decisions + [
+        DoiClusterDecision(m.id, None, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
+        for m in _foreign_hal_deposits(group)
+        if m.id not in decided
+    ]
+
+
+def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecision]:
+    """Décisions des familles ouvrage/chapitre et volume d'actes/communication."""
     book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
     chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
     has_book = any(m.doc_type == DocType.BOOK for m in book_family)

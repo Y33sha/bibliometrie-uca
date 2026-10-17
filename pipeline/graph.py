@@ -750,7 +750,14 @@ NODES: tuple[Node, ...] = (
             )
         )
         # DOI que doi.org ne connaît pas.
-        + ("failed_lookups",),
+        + ("failed_lookups",)
+        # Noms des auteurs d'un dépôt HAL et de la notice Crossref de son DOI.
+        + (
+            "source_authorships.source_publication_id",
+            "source_authorships.identity_id",
+            "source_authorships.collective",
+            "author_identifying_keys",
+        ),
         writes=(
             "source_publications.doi",
             "source_publications.external_ids",
