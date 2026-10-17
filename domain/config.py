@@ -30,7 +30,7 @@ DELAY_KEYS: frozenset[str] = frozenset(
     {
         # Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source.
         "fetch_stale_after_days",
-        # Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. La recherche d'un identifiant natif de la source est définitive.
+        # Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. L'échec est définitif pour un identifiant absent de son registre (`REGISTRY_LOOKUPS`).
         "fetch_missing_retry_after_days",
         # Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall.
         "unpaywall_recheck_after_days",

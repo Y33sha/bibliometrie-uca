@@ -92,7 +92,7 @@ def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]
 
     Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_publications` du run précédent : les documents extraits pendant le run y entrent au run suivant.
 
-    Écarte les hal-ids cherchés en vain il y a moins de `retry_after_days` jours.
+    Écarte les hal-ids déjà cherchés en vain : HAL attribue les hal-ids, l'échec est définitif.
     """
     return list(
         conn.execute(_MISSING_HAL_IDS_SQL, {"retry_after_days": retry_after_days}).scalars()

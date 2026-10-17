@@ -1330,8 +1330,10 @@ failed_lookups = Table(
     ),
     comment=(
         "Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de "
-        "doi.org (source doi_org : DOI que doi.org ne connaît pas). La recherche reprend quand "
-        "not_found_at date de plus que le délai fetch_missing_retry_after_days."
+        "doi.org (source doi_org : DOI que doi.org ne connaît pas). L'échec est définitif pour un "
+        "identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de "
+        "doi.org). Les autres recherches reprennent quand not_found_at date de plus que le délai "
+        "fetch_missing_retry_after_days."
     ),
     schema="sources",
 )

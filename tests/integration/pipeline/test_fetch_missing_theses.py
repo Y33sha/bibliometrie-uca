@@ -34,15 +34,10 @@ def test_nnt_deja_dans_le_staging_theses_ecarte(sa_sync_conn):
     assert "2019AIXM0002" not in _missing(sa_sync_conn)
 
 
-def test_nnt_cherche_en_vain_recemment_ecarte(sa_sync_conn):
-    _carry(sa_sync_conn, "scanr", "nnt2019aixm0003", "2019AIXM0003")
-    insert_failed_lookup(sa_sync_conn, "theses", id_type="nnt", id_value="2019AIXM0003")
-    assert "2019AIXM0003" not in _missing(sa_sync_conn)
-
-
-def test_nnt_cherche_en_vain_il_y_a_longtemps_repris(sa_sync_conn):
+def test_nnt_absent_de_theses_fr_ecarte_apres_le_delai(sa_sync_conn):
+    """theses.fr attribue les NNT : l'échec de la recherche est définitif."""
     _carry(sa_sync_conn, "scanr", "nnt2019aixm0004", "2019AIXM0004")
     insert_failed_lookup(
         sa_sync_conn, "theses", id_type="nnt", id_value="2019AIXM0004", not_found_days_ago=60
     )
-    assert "2019AIXM0004" in _missing(sa_sync_conn)
+    assert "2019AIXM0004" not in _missing(sa_sync_conn)

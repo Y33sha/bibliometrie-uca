@@ -216,7 +216,7 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
 
     Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
-    Exclut les DOI dont la recherche dans la cible a échoué il y a moins de `retry_after_days` jours (`failed_lookups`). Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance du délai.
+    Exclut les DOI dont la recherche dans la cible a échoué il y a moins de `retry_after_days` jours (`failed_lookups`), et les DOI que doi.org ne connaît pas. Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance du délai, un DOI inexistant en sort définitivement.
 
     Pour les cibles présentes dans `_TARGET_RA`, retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
     """
@@ -230,6 +230,9 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
     # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + absent du staging du target + absent des DOI que la cible porte déjà. `NOT EXISTS` plutôt que `NOT IN` : un NULL dans la sous-requête viderait la sélection.
     prefix_filter = " AND dp.ra = :target_ra" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
+    unknown_to_doi_org = pending_failed_lookup_sql(
+        source_sql=f"'{DOI_ORG}'", id_type="doi", value_sql="c.doi"
+    )
     query = f"""
         WITH deja_connus AS (
             SELECT sp.doi
@@ -251,6 +254,7 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
               ){prefix_filter}
           AND NOT EXISTS (SELECT 1 FROM deja_connus k WHERE k.doi = c.doi)
           AND NOT {pending}
+          AND NOT {unknown_to_doi_org}
         ORDER BY c.doi
     """
     params: dict[str, str | int] = {"target": target, "retry_after_days": retry_after_days}
@@ -394,7 +398,7 @@ def build() -> Phase:
 
     La recherche dans HAL télécharge les documents présents dans HAL et absents du staging, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche dans theses.fr télécharge les thèses dont le NNT figure dans une autre source. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
-    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`.
+    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre.
     """
     from pipeline.ingestion.common.parallel import run_parallel
 

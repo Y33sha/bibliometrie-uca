@@ -76,7 +76,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `countries` | référentiel des pays | [ref](07-ref-et-ops.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](04-publishing.md) |
-| `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de la prochaine tentative | [sources](02-sources.md) |
+| `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de l'échec | [sources](02-sources.md) |
 | `journal_doi_namespaces` | espaces de noms DOI qui désignent une revue | [publishing](04-publishing.md) |
 | `journal_issns` | ISSN des revues | [publishing](04-publishing.md) |
 | `journal_name_forms` | formes de noms pour reconnaître une revue | [publishing](04-publishing.md) |

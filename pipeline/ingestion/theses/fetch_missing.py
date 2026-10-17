@@ -46,7 +46,7 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT que des documents d'autres sources contiennent, absents du staging theses.fr. Écarte ceux cherchés en vain il y a moins de `retry_after_days` jours."""
+    """NNT que des documents d'autres sources contiennent, absents du staging theses.fr. Écarte ceux déjà cherchés en vain : theses.fr attribue les NNT, l'échec est définitif."""
     return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
 
 

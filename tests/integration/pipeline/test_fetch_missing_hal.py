@@ -59,6 +59,14 @@ class TestFindMissingHalIds:
         insert_failed_lookup(sa_sync_conn, id_type="hal_id", id_value="hal-ggg")
         assert self._missing(sa_sync_conn) == []
 
+    def test_skips_hal_id_searched_in_vain_beyond_the_delay(self, sa_sync_conn):
+        """Régression : un hal-id absent de HAL était cherché de nouveau après le délai."""
+        self._carry(sa_sync_conn, "scanr", "scanr-1", ["hal-hhh"])
+        insert_failed_lookup(
+            sa_sync_conn, id_type="hal_id", id_value="hal-hhh", not_found_days_ago=365
+        )
+        assert self._missing(sa_sync_conn) == []
+
     def test_handles_missing_hal_id_key(self, sa_sync_conn):
         self._carry(sa_sync_conn, "scanr", "scanr-1", None)
         assert self._missing(sa_sync_conn) == []

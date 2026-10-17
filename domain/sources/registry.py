@@ -90,6 +90,11 @@ DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
 DOI_ORG = "doi_org"
 LOOKUP_SOURCES: tuple[str, ...] = (*ALL_SOURCES, DOI_ORG)
 
+# Couples (source, type d'identifiant) dont la source est le registre qui attribue l'identifiant. Un identifiant absent de son registre n'existe pas : l'échec de sa recherche est définitif.
+REGISTRY_LOOKUPS: frozenset[tuple[str, str]] = frozenset(
+    {(Source.HAL, "hal_id"), (Source.THESES, "nnt"), (DOI_ORG, "doi")}
+)
+
 
 # Sources avec des auteurs exploitables (noms, identifiants, affiliations)
 AUTHOR_SOURCES = ALL_SOURCES

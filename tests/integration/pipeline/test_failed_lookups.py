@@ -1,5 +1,6 @@
 """Journal des recherches infructueuses : inscription, délai de reprise, effacement."""
 
+import pytest
 from sqlalchemy import text
 
 from domain.sources.registry import DOI_ORG
@@ -38,6 +39,31 @@ class TestRecordFailedLookup:
     def test_doi_org_est_une_source_d_echec(self, sa_sync_conn):
         record_failed_lookup(sa_sync_conn, DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx")
         assert _pending(sa_sync_conn, DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx", 30) is True
+
+    @pytest.mark.parametrize(
+        ("source", "id_type", "id_value"),
+        [
+            ("hal", "hal_id", "hal-01234567"),
+            ("theses", "nnt", "2020UCFA0001"),
+            (DOI_ORG, "doi", "10.1364/ao.xx.xxxxxx"),
+        ],
+    )
+    def test_un_identifiant_absent_de_son_registre_n_est_plus_cherche(
+        self, sa_sync_conn, source, id_type, id_value
+    ):
+        """Régression : un hal-id introuvable dans HAL était cherché de nouveau après le délai."""
+        record_failed_lookup(sa_sync_conn, source, id_type, id_value)
+        sa_sync_conn.execute(
+            text("UPDATE failed_lookups SET not_found_at = now() - interval '365 days'")
+        )
+        assert _pending(sa_sync_conn, source, id_type, id_value, 30) is True
+
+    def test_un_nnt_absent_de_hal_est_repris_apres_le_delai(self, sa_sync_conn):
+        record_failed_lookup(sa_sync_conn, "hal", "nnt", "2020UCFA0001")
+        sa_sync_conn.execute(
+            text("UPDATE failed_lookups SET not_found_at = now() - interval '31 days'")
+        )
+        assert _pending(sa_sync_conn, "hal", "nnt", "2020UCFA0001", 30) is False
 
     def test_un_second_echec_redate_la_ligne_sans_doublon(self, sa_sync_conn):
         record_failed_lookup(sa_sync_conn, "hal", "doi", "10.1234/x")

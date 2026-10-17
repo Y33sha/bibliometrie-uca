@@ -1,6 +1,6 @@
 """Journal des recherches infructueuses de la phase `fetch_missing` (table `failed_lookups`).
 
-Une ligne par identifiant cherché en vain dans une source, ou auprès de doi.org (`DOI_ORG` : DOI que doi.org ne connaît pas). `record_failed_lookup` inscrit l'échec, `forget_failed_doi_lookups` efface les échecs démentis, `pending_failed_lookup_sql` écarte des sélections les identifiants en attente. Le commit est à la charge de l'appelant.
+Une ligne par identifiant cherché en vain dans une source, ou auprès de doi.org (`DOI_ORG` : DOI que doi.org ne connaît pas). `record_failed_lookup` inscrit l'échec, `forget_failed_doi_lookups` efface les échecs démentis, `pending_failed_lookup_sql` écarte des sélections les identifiants en attente ou absents de leur registre. Le commit est à la charge de l'appelant.
 """
 
 from collections.abc import Sequence
@@ -9,6 +9,7 @@ from typing import Literal
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
+from domain.sources.registry import REGISTRY_LOOKUPS
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]
 """Types d'identifiants cherchés par la phase `fetch_missing`, contraints par `failed_lookups_id_type_check`."""
@@ -51,14 +52,20 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:
-    """Condition SQL vraie quand la recherche de `value_sql` dans `source_sql` a échoué il y a moins de `:retry_after_days` jours.
+    """Condition SQL vraie quand la recherche de `value_sql` dans `source_sql` a échoué il y a moins de `:retry_after_days` jours, ou à jamais quand `source_sql` est le registre de `id_type` (`REGISTRY_LOOKUPS`).
 
     `source_sql` et `value_sql` sont des expressions SQL : paramètre lié, littéral ou colonne. La requête lie `retry_after_days`. Les sélections de la phase `fetch_missing` l'emploient sous `NOT` pour écarter ces identifiants.
     """
+    registries = sorted(str(source) for source, t in REGISTRY_LOOKUPS if t == id_type)
+    definitive = (
+        " OR fl.source::text IN (" + ", ".join(f"'{s}'" for s in registries) + ")"
+        if registries
+        else ""
+    )
     return (
         "EXISTS (SELECT 1 FROM failed_lookups fl"
         f" WHERE fl.source = CAST(CAST({source_sql} AS text) AS lookup_source)"
         f" AND fl.id_type = '{id_type}'"
         f" AND fl.id_value = {value_sql}"
-        " AND fl.not_found_at > now() - make_interval(days => :retry_after_days))"
+        f" AND (fl.not_found_at > now() - make_interval(days => :retry_after_days){definitive}))"
     )

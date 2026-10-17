@@ -289,6 +289,15 @@ class TestGetMissingDois:
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert result == ["10.1234/a"]
 
+    def test_exclut_les_doi_inconnus_de_doi_org(self, sa_sync_conn):
+        """Un DOI que doi.org ne connaît pas sort du pool de toutes les cibles, quelle que soit la date de l'échec."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
+        insert_failed_lookup(
+            sa_sync_conn, "doi_org", id_type="doi", id_value="10.1234/a", not_found_days_ago=365
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == ["10.1234/b"]
+
     def test_le_delai_configure_s_applique_aux_echecs_deja_inscrits(self, sa_sync_conn):
         """Le délai se lit à la sélection : le raccourcir libère les échecs déjà inscrits."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
