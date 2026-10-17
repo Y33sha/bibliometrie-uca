@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TqQVL0UqsllRjfesd052srdXakaZZOVVFCikDp2G7dwiAZyRrV3nxk2WSbyzm4e
+\restrict iYkfgir6DAYMVNc4M08lP8idPal16mke4Ph7BLIvngKcVLtk17SL8fLggKQ7x1W
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2115,7 +2115,7 @@ CREATE TABLE sources.staging (
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text, 'person_identifier'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_theses'::text])))
 );
 
 
@@ -4522,5 +4522,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TqQVL0UqsllRjfesd052srdXakaZZOVVFCikDp2G7dwiAZyRrV3nxk2WSbyzm4e
+\unrestrict iYkfgir6DAYMVNc4M08lP8idPal16mke4Ph7BLIvngKcVLtk17SL8fLggKQ7x1W
 
