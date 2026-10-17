@@ -1,6 +1,6 @@
 #  Normalisation
 
-*À jour le 2026-10-13.*
+*À jour le 2026-10-17.*
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,8 @@ Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son 
 
 Chaque normaliseur reporte dans `source_authorships` ce que sa source fournit pour chaque signature : identifiants de l'auteur (ORCID, IdRef…) et affiliations.
 
+Une signature collective (collaboration, consortium, groupe d'étude…) reste à sa position, marquée `collective`. La marque vient de la source quand elle distingue les collectifs : entrée Crossref à `name` seul, créateur DataCite `Organizational`. Sinon, une règle sur le nom décide (`domain/persons/collective_names.py`).
+
 Chaque normaliseur pose aussi la licence de la notice (`source_publications.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `meta`.
 
 En fin de phase, les `source_publications` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_authorships` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
@@ -29,7 +31,7 @@ Conservés en base, les payloads bruts la font grossir hors de proportion avec l
 
 ## Synchronisation des signatures
 
-Chaque signature entrante est rapprochée d'une signature en base de même identité (nom, prénom et identifiants normalisés), puis de même position si l'identité est répétée. Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
+Chaque signature entrante est rapprochée d'une signature en base de même identité (nom, prénom et identifiants normalisés, marque collective), puis de même position si l'identité est répétée. Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
 
 Une notice dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses signatures en l'état, sauf avec `--normalize-full`.
 

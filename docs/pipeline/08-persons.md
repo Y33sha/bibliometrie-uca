@@ -42,6 +42,10 @@ Une signature hors périmètre ne peut pas donner lieu à une création de perso
 
 Elle peut être rattachée à une personne existante, soit par identifiant, soit par sa présence dans une autre source. Le critère de similitude de nom ne vaut que pour les signatures du périmètre. 
 
+### Signatures collectives
+
+Une signature collective n'est rattachée à aucune personne, et ne compte pas dans l'arbitrage des identifiants.
+
 ## Indépendance de l'ordre d'ingestion
 
 Le résultat ne dépend pas de l'ordre dans lequel les sources ont été moissonnées. La phase ne fige aucun rattachement dérivé : à chaque exécution, elle les rejuge tous contre l'état ferme de tout le corpus.
@@ -50,4 +54,4 @@ Le résultat ne dépend pas de l'ordre dans lequel les sources ont été moisson
 
 Les saisies manuelles (épinglage d'une signature, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (notices du référentiel RH) sont des entrées fixes, jamais réinitialisées.
 
-Une personne qui perd toutes ses signatures est supprimée, sauf si elle est présente dans le référentiel RH.
+Une personne qui perd toutes ses signatures est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine.

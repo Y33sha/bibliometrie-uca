@@ -45,11 +45,11 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 - [x] Signatures existantes marquées d'après la règle du nom (`mark_collective_signatures`), 2026-10-17 : 7 230 signatures (OpenAlex 4 275, DataCite 2 097, ScanR 547, HAL 163, WoS 83, Crossref 65). 120 sont rattachées à 30 personnes. Ces personnes ont seulement des signatures collectives, aucune épinglée ni présente dans la base RH.
 - [x] Notices Crossref et DataCite rejouées depuis le raw store (`rehydrate_staging_from_raw_store`), pour retrouver les collectifs écartés.
-- [ ] Les 30 personnes collectives purgées : le passage de `persons` du 2026-10-17 détache leurs signatures marquées, puis supprime les personnes vidées.
+- [x] Les 30 personnes collectives purgées : le passage de `persons` du 2026-10-17 détache leurs signatures marquées, puis supprime 29 personnes vidées. La trentième, exclue par l'administration (`not_a_person`), reste sans signature.
 
 ### 5. Fin de chantier
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
