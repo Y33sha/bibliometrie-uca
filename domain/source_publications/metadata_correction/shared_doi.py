@@ -3,7 +3,7 @@
 Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_publications` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
 
 - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
-- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres.
+- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres.
 
 Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
 
@@ -40,6 +40,10 @@ class DoiClusterCase(StrEnum):
     # Plusieurs `book_chapter` partageant un DOI mais de titres réellement différents : le DOI
     # est celui de l'ouvrage hôte (absent du groupe), recopié sur ses chapitres → tous le perdent.
     CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
+
+    # Volume d'actes (`proceedings`) et documents de titres différents partageant son DOI : ce
+    # sont des communications du volume → elles perdent le DOI.
+    ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
 
     # DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
@@ -101,17 +105,40 @@ _CHAPTER_TITLE_MARKERS = re.compile(
 )
 
 
-def _clean_chapter_title(title_normalized: str | None) -> str:
-    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page, mots-marqueurs) et re-collapse les espaces, pour comparer des **chapitres** au résidu de leur titre. Déterministe (identité stricte, aucune similarité floue)."""
+def _clean_title(title_normalized: str | None) -> str:
+    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page, mots-marqueurs) et re-collapse les espaces, pour comparer des titres à leur résidu. Déterministe (identité stricte, aucune similarité floue)."""
     cleaned = re.sub(r"\d+", " ", title_normalized or "")
     cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
+def _same_title(a: str, b: str) -> bool:
+    """Deux résidus de titre désignent la même œuvre : égaux, ou l'un contenu dans l'autre (troncature de sous-titre)."""
+    return a == b or a in b or b in a
+
+
 def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
-    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres ni égaux ni l'un contenu dans l'autre (la containment couvre les troncatures de sous-titre). Identité stricte sur le résidu, sans seuil flou."""
-    cleaned = [c for c in (_clean_chapter_title(t) for t in titles) if c]
-    return any(a != b and a not in b and b not in a for a, b in combinations(cleaned, 2))
+    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne désignent pas la même œuvre (`_same_title`). Identité stricte sur le résidu, sans seuil flou."""
+    cleaned = [c for c in (_clean_title(t) for t in titles) if c]
+    return any(not _same_title(a, b) for a, b in combinations(cleaned, 2))
+
+
+def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
+    """Membres titrés d'un groupe à volume d'actes (`proceedings`) dont le titre diffère de celui de chaque volume. Vide sans volume titré."""
+    volumes = [
+        t
+        for m in group
+        if m.doc_type == DocType.PROCEEDINGS and (t := _clean_title(m.title_normalized))
+    ]
+    if not volumes:
+        return []
+    return [
+        m
+        for m in group
+        if m.doc_type != DocType.PROCEEDINGS
+        and (t := _clean_title(m.title_normalized))
+        and not any(_same_title(t, v) for v in volumes)
+    ]
 
 
 def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
@@ -132,8 +159,9 @@ def resolve_cluster_doi_corrections(
     - **Même œuvre DataCite** (un membre porte un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres convergent sur l'œuvre principale (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
     - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
+    - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
 
-    Les membres hors famille ouvrage (article partageant le DOI par accident) ne reçoivent aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
+    Hors de ces cas, un membre partageant le DOI par accident ne reçoit aucune décision.
 
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
     if unresolved:
@@ -162,4 +190,7 @@ def resolve_cluster_doi_corrections(
             DoiClusterDecision(m.id, None, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS)
             for m in chapters
         ]
-    return []
+    return [
+        DoiClusterDecision(m.id, None, DoiClusterCase.ACTES_VS_COMMUNICATION)
+        for m in _volume_communications(group)
+    ]

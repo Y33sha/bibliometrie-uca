@@ -385,6 +385,70 @@ class TestProceedingsVolumeRule:
         assert effective_doc_type_for_publication(view) is None
 
 
+class TestCrossrefVolumeRules:
+    def test_notice_sans_auteur_au_titre_de_congres_devient_volume(self):
+        view = _view(
+            source="crossref",
+            author_count=0,
+            doc_type="article",
+            title="31st European Congress on Obesity (ECO 2024)",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "proceedings"
+        assert (
+            corrected.rule == MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS
+        )
+
+    def test_volume_signe_par_son_editeur_devient_volume(self):
+        view = _view(
+            source="crossref",
+            author_count=1,
+            doc_type="conference_paper",
+            title="Proceedings of the 23rd International Conference of IFORS",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS
+
+    def test_article_signe_au_titre_de_congres_reste_article(self):
+        view = _view(
+            source="crossref",
+            author_count=1,
+            doc_type="article",
+            title="Presidential Address Presented at the 53rd AAGL Global Congress",
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_resume_isole_reste_article(self):
+        view = _view(
+            source="crossref",
+            author_count=12,
+            doc_type="article",
+            title="Abstract 4007: Evolutionary history of transformation",
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_autre_source_non_concernee(self):
+        view = _view(
+            source="openalex",
+            author_count=0,
+            doc_type="article",
+            title="EAPC2023 Abstract Book",
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_nombre_d_auteurs_inconnu_non_concerne(self):
+        view = _view(source="crossref", doc_type="article", title="Poster Abstracts")
+        assert effective_metadata(view).doc_type is None
+
+    def test_regles_ecartees_du_rejeu_canonique(self):
+        view = _view(
+            source="crossref", author_count=0, doc_type="article", title="Poster Abstracts"
+        )
+        assert effective_doc_type_for_publication(view) is None
+
+
 class TestJournalTypeProceedingsRule:
     def test_journal_type_proceedings_article_corrects(self):
         view = _view(doc_type="article", journal_type="proceedings")

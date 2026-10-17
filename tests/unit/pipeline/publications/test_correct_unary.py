@@ -95,6 +95,7 @@ def _sp(**overrides: object) -> UnaryCorrectionRow:
         "in_proceedings_volume": False,
         "group_title": None,
         "journal_diamond": False,
+        "author_count": 1,
     }
     base.update(overrides)
     return UnaryCorrectionRow(**base)  # type: ignore[arg-type]

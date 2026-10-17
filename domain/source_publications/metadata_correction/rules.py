@@ -30,7 +30,7 @@ class MetadataForCorrection:
 
     Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
-    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume` et `group_title` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication renseigne ceux que l'agrégation arbitre. `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume`, `group_title`, `source` et `author_count` sont des faits d'un enregistrement source, absents de la publication : les règles qui les lisent restent muettes à ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
@@ -61,6 +61,10 @@ class MetadataForCorrection:
     group_title: str | None = None
     # Joint à la lecture : la revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
     journal_diamond: bool = False
+    # Source de l'enregistrement.
+    source: str | None = None
+    # Calculé à la lecture : nombre de signatures de l'enregistrement.
+    author_count: int | None = None
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -79,6 +83,10 @@ class MetadataCorrectionRule(StrEnum):
     PRESENTATION_ORAL_TO_CONFERENCE = "PRESENTATION_ORAL_TO_CONFERENCE"
     PRESENTATION_DISPLAY_TO_POSTER = "PRESENTATION_DISPLAY_TO_POSTER"
     DOI_REGISTRANT_MEDIA_TO_MEDIA = "DOI_REGISTRANT_MEDIA_TO_MEDIA"
+    CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS = (
+        "CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS"
+    )
+    CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS = "CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
@@ -166,6 +174,17 @@ _YEAR_PAGES_END_PATTERN = re.compile(
 # `_RECENSION_TITLE_PATTERN` : titre commençant par « Recension » (« Recension : … », « Recension de … », « Recensions »), ou par « Compte(s) rendu(s) : » avec deux-points immédiat. Marqueurs univoques de recension d'ouvrage en usage académique français, souvent typés article/other/preprint par les sources. Le deux-points immédiat après « compte(s) rendu(s) » écarte les rapports (« Compte rendu de mission : … », « Compte rendu de la soutenance d'HDR … ») qui ne sont pas des recensions.
 _RECENSION_TITLE_PATTERN = re.compile(r"^\s*(recension|comptes?\s+rendus?\s*:)", re.IGNORECASE)
 
+# Vocabulaire d'un volume d'actes ou d'un recueil de résumés, n'importe où dans le titre. Seul, il désigne aussi des articles (discours présidentiel, introduction éditoriale) : la règle qui le lit exige un enregistrement sans auteur.
+_VOLUME_TITLE_PATTERN = re.compile(
+    r"\b(proceedings|abstracts?|congress|congrès|congres|meeting|symposium|conference|colloque"
+    r"|communications\s+affich[ée]es|poster\s+presentations|posters)\b",
+    re.IGNORECASE,
+)
+# Début de titre d'un volume. « Abstract » au singulier en est exclu : « Abstract 4007: … » est un résumé isolé.
+_VOLUME_TITLE_PREFIX_PATTERN = re.compile(
+    r"^\s*(proceedings|abstracts|book\s+of\s+abstracts|abstract\s+book)\b", re.IGNORECASE
+)
+
 # Préfixes DOI des registres de thèses : un DOI émis par ces registres est le DOI *propre* de la
 # thèse, pas celui d'une version publiée. `10.70675` = ABES (Agence Bibliographique de
 # l'Enseignement Supérieur), résolu via `doi_prefixes` (publisher « agence bibliographique de l
@@ -201,6 +220,8 @@ class _AppliesTo(TypedDict, total=False):
     - `in_proceedings_volume` : `bool` — `sp.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
     - `group_title` : `frozenset[str]` — `sp.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
     - `journal_diamond` : `bool` — `sp.journal_diamond` (joint à la lecture : la revue rattachée est diamant) vaut la valeur attendue.
+    - `source` : `str` — équivalence sur `sp.source`.
+    - `author_count_max` : `int` — `sp.author_count` est connu et au plus égal à la valeur.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -222,6 +243,8 @@ class _AppliesTo(TypedDict, total=False):
     in_proceedings_volume: bool
     group_title: frozenset[str]
     journal_diamond: bool
+    source: str
+    author_count_max: int
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -280,6 +303,25 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: {
         "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
+    },
+    # Notice Crossref d'un volume d'actes ou d'un recueil de résumés, sans auteur ou signée par son seul éditeur ⇒ `proceedings`.
+    MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: {
+        "applies_to": {
+            "source": "crossref",
+            "author_count_max": 0,
+            "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
+            "title_regex": _VOLUME_TITLE_PATTERN,
+        },
+        "applies_correction": {"doc_type": DocType.PROCEEDINGS},
+    },
+    MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS: {
+        "applies_to": {
+            "source": "crossref",
+            "author_count_max": 1,
+            "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
+            "title_regex": _VOLUME_TITLE_PREFIX_PATTERN,
+        },
+        "applies_correction": {"doc_type": DocType.PROCEEDINGS},
     },
     # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
     MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
@@ -485,6 +527,8 @@ _SOURCE_ONLY_PREDICATES = frozenset(
         "registrant_publisher_type",
         "in_proceedings_volume",
         "group_title",
+        "source",
+        "author_count_max",
     }
 )
 
@@ -510,8 +554,12 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         "declares_conference",
         "in_proceedings_volume",
         "journal_diamond",
+        "source",
     ):
         return bool(getattr(sp, key) == value)
+    if key == "author_count_max":
+        assert isinstance(value, int)
+        return sp.author_count is not None and sp.author_count <= value
     if key == "group_title":
         assert isinstance(value, frozenset)
         return (sp.group_title or "").lower() in value

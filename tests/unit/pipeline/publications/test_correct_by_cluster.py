@@ -1,5 +1,5 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
-chapitre/chapitre) + `compute_updates`."""
+chapitre/chapitre, volume d'actes/communication) + `compute_updates`."""
 
 from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterCase,
@@ -308,6 +308,40 @@ def test_chapters_typo_is_false_positive_left_to_admin():
         _m(2, "book_chapter", "les effets thermomecanqiues"),
     ]
     assert _resoudre(g) != []  # déterministe, pas de fuzzy
+
+
+# ── domaine pur : volume d'actes/communication ────────────────────────────
+
+
+def test_communications_d_un_volume_perdent_le_doi():
+    group = [
+        _m(1, "proceedings", "proceedings of the 23rd international conference of ifors"),
+        _m(2, "conference_paper", "proceedings of the 23rd international conference of ifors"),
+        _m(3, "conference_paper", "transshipment station location problem"),
+        _m(4, "poster", "total pain in palliative cancer patients"),
+    ]
+    assert _resoudre(group) == [
+        DoiClusterDecision(3, None, DoiClusterCase.ACTES_VS_COMMUNICATION),
+        DoiClusterDecision(4, None, DoiClusterCase.ACTES_VS_COMMUNICATION),
+    ]
+
+
+def test_titre_tronque_du_volume_garde_le_doi():
+    group = [
+        _m(1, "proceedings", "31st european congress on obesity eco 2024"),
+        _m(2, "article", "31st european congress on obesity eco 2024 abstracts"),
+    ]
+    assert _resoudre(group) == []
+
+
+def test_sans_volume_aucune_decision():
+    group = [_m(1, "conference_paper", "a"), _m(2, "conference_paper", "b")]
+    assert _resoudre(group) == []
+
+
+def test_communication_sans_titre_garde_le_doi():
+    group = [_m(1, "proceedings", "book of abstracts"), _m(2, "conference_paper", None)]
+    assert _resoudre(group) == []
 
 
 # ── compute_updates (orchestration mécanique) ────────────────────────────

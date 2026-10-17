@@ -3,7 +3,7 @@
 Corrige le DOI de certaines source_publications afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
 
 - **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
-- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
+- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur toutes les notices qui le citent.
 
@@ -82,7 +82,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 @dataclass
 class ClusterCorrectionStats:
-    """Bilan de la passe cluster : `source_publications` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt, ouvrage/chapitre, chapitres distincts)."""
+    """Bilan de la passe cluster : `source_publications` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt, ouvrage/chapitre, chapitres distincts, volume d'actes/communication)."""
 
     examined: int
     corrected: int
@@ -103,7 +103,7 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
-    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, et le DOI inconnu de doi.org."""
+    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, et le DOI inconnu de doi.org."""
     etape(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = queries.fetch_doi_cluster_candidates(conn)

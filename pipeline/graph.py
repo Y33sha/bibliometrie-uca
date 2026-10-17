@@ -711,6 +711,7 @@ NODES: tuple[Node, ...] = (
             "doi_prefixes.publisher_id",
             "publishers.publisher_type",
             "language_forms",
+            "source_authorships.source_publication_id",
         ),
         writes=(
             "source_publications.doc_type",

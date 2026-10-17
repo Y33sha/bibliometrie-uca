@@ -14,5 +14,5 @@ Les corrections sont écrites sur les colonnes des `source_publications` ; la va
 3. **`correct_by_cluster`** — rapproche les `source_publications` partageant un même DOI et déduit le DOI que doit porter chaque membre du groupe.
 
    - **Convergence** — un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le DOI concept est lu dans les métadonnées DataCite du dépôt (relation « est une version de »). Il remplace le DOI de version sur chaque `source_publication`, qui convergent ainsi vers une seule publication.
-   - **Divergence** — un même DOI porté par des documents en réalité distincts, comme un chapitre qui porte le DOI de l'ouvrage qui le contient. Le DOI est retiré des documents qui le portent à tort, pour éviter qu'ils fusionnent.
+   - **Divergence** — des documents distincts ont le même DOI : un chapitre a le DOI de son ouvrage, une communication celui de son volume d'actes. Le DOI est retiré des documents qui l'ont à tort, pour éviter qu'ils fusionnent.
    - **DOI inexistant** — un DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) est retiré de toutes les notices qui le citent. Il leur revient dès que doi.org le connaît.
