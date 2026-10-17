@@ -3,10 +3,12 @@ message: "Vocabulaire : préférer « %s » à « %s »."
 level: warning
 ignorecase: true
 # « forme canonique » est le vocabulaire standard de la normalisation d'un identifiant : le mot
-# y désigne une écriture unique, pas le référentiel.
+# y désigne une écriture unique, pas le référentiel. « porter sur » (intransitif) est correct ;
+# seul l'emploi transitif de « porter » est visé.
 exceptions:
   - forme canonique
   - source de vérité
+  - "port(e|es|ent|er|é|és|ant|ait|aient) sur"
 swap:
   "est en charge de": "gère"
   "est responsable de": "gère"
