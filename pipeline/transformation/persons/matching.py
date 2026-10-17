@@ -605,20 +605,6 @@ class PersonsMatchingQueries:
             """)
         ).rowcount
 
-    def detach_collective_signatures(self, conn: Connection) -> int:
-        """Détache de leur personne les signatures collectives non épinglées. Retourne le nombre de signatures détachées."""
-        return conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET person_id = NULL, resolution_mode = NULL
-                WHERE sa.collective
-                  AND sa.person_id IS NOT NULL
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
-                  )
-            """)
-        ).rowcount
-
     def detach_source_authorships(self, conn: Connection, source_authorship_ids: list[int]) -> int:
         """Sert aux liens cross-source devenus sans appui : une signature dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
         if not source_authorship_ids:

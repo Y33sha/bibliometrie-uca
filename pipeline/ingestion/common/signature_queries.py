@@ -59,7 +59,7 @@ class SourceAuthorshipUpdate(SourceAuthorshipItem):
 
 
 class StoredSourceAuthorship(NamedTuple):
-    """Une signature en base d'une notice : identifiant, position, identité et empreinte."""
+    """Une signature en base d'une notice : identifiant, position, identité, empreinte et marque collective."""
 
     id: int
     author_position: int | None
@@ -67,6 +67,7 @@ class StoredSourceAuthorship(NamedTuple):
     first_name_normalized: str | None
     person_identifiers: JsonValue
     content_hash: str | None
+    collective: bool
 
 
 class AddressBatchItem(TypedDict):
@@ -224,7 +225,8 @@ class AuthorshipsBatchQueries:
         rows = conn.execute(
             text("""
                 SELECT sa.id, sa.author_position, aik.last_name_normalized,
-                       aik.first_name_normalized, aik.person_identifiers, sa.content_hash
+                       aik.first_name_normalized, aik.person_identifiers, sa.content_hash,
+                       sa.collective
                 FROM source_authorships sa
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sa.source_publication_id = :spid

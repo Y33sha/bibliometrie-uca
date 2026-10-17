@@ -248,20 +248,28 @@ def signature_name_fields(name: SignatureName) -> SignatureNameFields:
 
 
 def _identity(
-    last_name_normalized: str | None, first_name_normalized: str | None, person_identifiers: object
+    last_name_normalized: str | None,
+    first_name_normalized: str | None,
+    person_identifiers: object,
+    collective: bool,
 ) -> Hashable:
-    """Clé d'identité d'une signature : nom et prénom normalisés, et identifiants, comme `author_identifying_keys`."""
+    """Clé d'appariement d'une signature : nom et prénom normalisés, identifiants, comme `author_identifying_keys`, et marque collective. Une signature qui devient collective est donc réinsérée sans personne."""
     ids = json.dumps(person_identifiers, sort_keys=True) if person_identifiers is not None else None
-    return (last_name_normalized, first_name_normalized, ids)
+    return (last_name_normalized, first_name_normalized, ids, collective)
 
 
 def _stored_identity(row: StoredSourceAuthorship) -> Hashable:
-    return _identity(row.last_name_normalized, row.first_name_normalized, row.person_identifiers)
+    return _identity(
+        row.last_name_normalized, row.first_name_normalized, row.person_identifiers, row.collective
+    )
 
 
 def _item_identity(item: SourceAuthorshipItem) -> Hashable:
     return _identity(
-        item["last_name_normalized"], item["first_name_normalized"], item["person_identifiers"]
+        item["last_name_normalized"],
+        item["first_name_normalized"],
+        item["person_identifiers"],
+        item["collective"],
     )
 
 

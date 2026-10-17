@@ -37,7 +37,7 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 ### 3. Traitements en aval
 
-- [x] Phase `persons` : aucune personne pour une signature collective. Les requêtes de sélection et le vote des identifiants les écartent. Une signature collective rattachée à une personne en est détachée, sauf épinglage.
+- [x] Phase `persons` : aucune personne pour une signature collective. Les requêtes de sélection et le vote des identifiants les écartent. La synchronisation des signatures apparie aussi sur la marque collective : une signature qui devient collective est réinsérée sans personne.
 - [x] Phase `authorships` : une signature collective sans personne ne produit aucune ligne d'`authorships`.
 - [x] Mesure de l'alignement des auteurs : les signatures collectives sont écartées.
 
@@ -45,7 +45,7 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 - [x] Signatures existantes marquées d'après la règle du nom (`mark_collective_signatures`), 2026-10-17 : 7 230 signatures (OpenAlex 4 275, DataCite 2 097, ScanR 547, HAL 163, WoS 83, Crossref 65). 120 sont rattachées à 30 personnes. Ces personnes ont seulement des signatures collectives, aucune épinglée ni présente dans la base RH.
 - [x] Notices Crossref et DataCite rejouées depuis le raw store (`rehydrate_staging_from_raw_store`), pour retrouver les collectifs écartés.
-- [ ] Les 30 personnes collectives purgées : la phase `persons` détache leurs signatures marquées, puis supprime les personnes vidées.
+- [ ] Les 30 personnes collectives purgées : le passage de `persons` du 2026-10-17 détache leurs signatures marquées, puis supprime les personnes vidées.
 
 ### 5. Fin de chantier
 

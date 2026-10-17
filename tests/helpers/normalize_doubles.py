@@ -80,6 +80,7 @@ class FakeAuthorshipsBatchQueries:
                     v["first_name_normalized"],
                     v["person_identifiers"],
                     v["content_hash"],
+                    v["collective"],
                 )
             )
 

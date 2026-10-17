@@ -190,6 +190,25 @@ def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):
     assert [tuple(r) for r in rows] == [(0, True), (1, True)]
 
 
+def test_signature_devenue_collective_reinseree_sans_personne(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _notice(conn)
+    _write(conn, sp, [_rec(0, "Big Lab")])
+    old_id = _signatures(conn, sp)[0][0]
+    _pin(conn, old_id)
+
+    _write(conn, sp, [_rec(0, "Big Lab", collective=True)])
+
+    new_id = _signatures(conn, sp)[0][0]
+    assert new_id != old_id
+    assert (
+        conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": new_id}
+        ).scalar_one()
+        is None
+    )
+
+
 def _rors(conn, sa_id: int) -> list[str]:
     return (
         conn.execute(
