@@ -51,8 +51,7 @@ class DoiClusterCase(StrEnum):
     # sont des communications du volume → elles perdent le DOI.
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
 
-    # Dépôt HAL sans auteur ni titre commun avec la notice Crossref de son DOI : le DOI du dépôt
-    # est celui d'une autre œuvre → le dépôt le perd.
+    # Dépôt HAL dont le DOI est celui d'une autre œuvre (`_depots_hal_d_une_autre_oeuvre`) → le dépôt le perd.
     HAL_DOI_D_UNE_AUTRE_OEUVRE = "HAL_DOI_D_UNE_AUTRE_OEUVRE"
 
     # DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
@@ -242,13 +241,12 @@ def _volume_communications(group: list[DoiClusterMember]) -> list[DoiClusterMemb
     ]
 
 
-# Part des mots du titre le plus court retrouvés dans l'autre titre, en deçà de laquelle deux titres désignent deux œuvres. Mots de 3 lettres ou plus : les mots grammaticaux et les résidus de formules en sont exclus.
-FOREIGN_TITLE_OVERLAP_MAX = 0.35
+SHARED_TITLE_WORDS_MIN = 0.35
 _TITLE_WORD_MIN_LENGTH = 3
 
 
-def _title_overlap(a: str | None, b: str | None) -> float | None:
-    """Part des mots du titre le plus court présents dans l'autre titre, `None` si l'un des titres est sans mot retenu."""
+def _shared_title_words(a: str | None, b: str | None) -> float | None:
+    """Part des mots du plus court des deux titres présents dans l'autre, mots de 3 lettres ou plus. `None` si l'un des titres n'a aucun mot retenu."""
     words_a = {w for w in (a or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
     words_b = {w for w in (b or "").split() if len(w) >= _TITLE_WORD_MIN_LENGTH}
     if not words_a or not words_b:
@@ -256,22 +254,29 @@ def _title_overlap(a: str | None, b: str | None) -> float | None:
     return len(words_a & words_b) / min(len(words_a), len(words_b))
 
 
-def _foreign_hal_deposits(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
-    """Dépôts HAL du groupe sans nom d'auteur commun avec la notice Crossref du DOI, et de titre différent (`FOREIGN_TITLE_OVERLAP_MAX`). Vide sans notice Crossref à auteurs."""
-    registrations = [m for m in group if m.source == Source.CROSSREF and m.author_names]
-    if len(registrations) != 1:
+def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
+    """Dépôts HAL dont le DOI est celui d'une autre œuvre.
+
+    Un dépôt HAL du groupe est retenu quand deux conditions sont réunies face à la notice Crossref du DOI :
+    - aucun nom de famille d'auteur commun ;
+    - moins de 35 % des mots du plus court des deux titres présents dans l'autre (`SHARED_TITLE_WORDS_MIN`).
+
+    Les titres sont les titres normalisés, réduits aux mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques ne comptent pas. Seules les signatures individuelles comptent. Un dépôt ou une notice Crossref sans signature individuelle n'est pas comparé.
+    """
+    crossref = [m for m in group if m.source == Source.CROSSREF and m.author_names]
+    if len(crossref) != 1:
         return []
-    registration = registrations[0]
-    foreign: list[DoiClusterMember] = []
-    for m in group:
-        if m.source != Source.HAL or not m.author_names:
-            continue
-        if m.author_names & registration.author_names:
-            continue
-        overlap = _title_overlap(m.title_normalized, registration.title_normalized)
-        if overlap is not None and overlap < FOREIGN_TITLE_OVERLAP_MAX:
-            foreign.append(m)
-    return foreign
+    reference = crossref[0]
+    return [
+        m
+        for m in group
+        if m.source == Source.HAL
+        and m.author_names
+        and not m.author_names & reference.author_names
+        and (shared := _shared_title_words(m.title_normalized, reference.title_normalized))
+        is not None
+        and shared < SHARED_TITLE_WORDS_MIN
+    ]
 
 
 def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
@@ -293,7 +298,7 @@ def resolve_cluster_doi_corrections(
     - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
-    - **Dépôt HAL d'une autre œuvre** (`_foreign_hal_deposits`) : un dépôt HAL sans nom d'auteur commun avec la notice Crossref du DOI, et de titre différent, perd le DOI. S'ajoute aux cas précédents.
+    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec la notice Crossref du DOI, et dont le titre partage moins de 35 % de ses mots avec elle, perd le DOI. S'ajoute aux cas précédents.
 
     Hors de ces cas, un membre partageant le DOI par accident ne reçoit aucune décision.
 
@@ -312,7 +317,7 @@ def resolve_cluster_doi_corrections(
     decided = {d.id for d in decisions}
     return decisions + [
         DoiClusterDecision(m.id, None, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
-        for m in _foreign_hal_deposits(group)
+        for m in _depots_hal_d_une_autre_oeuvre(group)
         if m.id not in decided
     ]
 
