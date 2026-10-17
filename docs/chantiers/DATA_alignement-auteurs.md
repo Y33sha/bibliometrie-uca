@@ -107,7 +107,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [x] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
 - [ ] Échantillon de désaccords relu à la main : `data/measures/author_alignment_disagreements.csv`, 5 000 lignes.
 - [x] Prénom incompatible à la même position : source qui s'écarte de la majorité, sur les publications à trois notices ou plus.
-- [ ] Échantillon des positions où HAL s'écarte, relu à la main. Hypothèse : HAL rattache automatiquement une signature à un mauvais compte.
+- [x] Échantillon des positions où HAL s'écarte, relu à la main : 100 cas, 2026-10-17. HAL a raison dans 38 cas : diminutif (Tony pour A. A. Affolder), initiale composée (Ch., Ph.), translittération (Ia), variante nationale (André pour Andrzej), erreur des autres sources. La liste HAL est décalée dans 31 cas. Le compte HAL est faux dans 20 cas, le plus souvent une faute de saisie sur un auteur sans compte ; parfois le bon compte a une forme différente (Joël J. Drevet pour Joël R. Drevet). 9 cas restent indéterminables.
 - [x] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
 - [x] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
 - [x] Doubles rattachements : signatures d'une même notice rattachées à la même personne.
