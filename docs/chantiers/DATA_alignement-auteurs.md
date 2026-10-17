@@ -123,12 +123,12 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Indéterminable : 9.
 - [x] Liens au périmètre établis par la seule signature scanR : 5 735 couples (publication, personne), dont 100 relus à la main, 2026-10-17.
 
-  | Indice de périmètre de scanR | Couples | À juste titre | À tort | Indéterminable |
-  |---|---|---|---|---|
-  | identité RH, autres sources présentes | 2 268 | 31 | 5 | 4 |
-  | identité RH, scanR seul | 1 815 | 19 | 0 | 1 |
-  | structure HAL ou ROR | 1 314 | 9 | 12 | 4 |
-  | adresse | 338 | 5 | 10 | 0 |
+  | Indice de périmètre de scanR | Couples | Relus | À juste titre | À tort | Indéterminable |
+  |---|---|---|---|---|---|
+  | identité RH, autres sources présentes | 2 268 | 40 | 31 | 5 | 4 |
+  | identité RH, scanR seul | 1 815 | 20 | 19 | 0 | 1 |
+  | structure HAL ou ROR | 1 314 | 25 | 9 | 12 | 4 |
+  | adresse | 338 | 15 | 5 | 10 | 0 |
 
   - Structure : 11 erreurs sur 12 sont des publications de collaborations de 1 000 à 3 000 auteurs. scanR y donne la structure ou le ROR à des auteurs extérieurs. La signature HAL de ces auteurs n'a aucune structure, dans les cas justes comme dans les cas faux.
   - Adresse : scanR attribue à l'auteur les adresses d'autres auteurs, jusqu'à 16 par signature, ou des blocs mal découpés.
@@ -137,11 +137,11 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Priorité simulée sur les signatures appariées par nom et position : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR. Strate adresse : 9 erreurs sur 10 retirées, aucun couple juste perdu. Strate structure : 6 erreurs sur 12 retirées, 1 couple juste perdu.
 - [x] IdRef attribués par la seule signature scanR : 3 660, comparés à leur notice IdRef, dont 100 relus à la main, 2026-10-17. 3 650 notices trouvées, 162 de nom incompatible avec la personne.
 
-  | Strate | Effectif | IdRef de la personne | Homonyme | Prénom différent | Indéterminable |
-  |---|---|---|---|---|---|
-  | nom incompatible | 162 | 0 | 3 | 27 | 0 |
-  | nom compatible | 3 488 | 54 | 4 | 2 | 0 |
-  | IdRef introuvable | 10 | 8 | 0 | 0 | 2 |
+  | Strate | IdRef | Relus | IdRef de la personne | Homonyme | Prénom différent | Indéterminable |
+  |---|---|---|---|---|---|---|
+  | nom incompatible | 162 | 30 | 0 | 3 | 27 | 0 |
+  | nom compatible | 3 488 | 60 | 54 | 4 | 2 | 0 |
+  | IdRef introuvable | 10 | 10 | 8 | 0 | 0 | 2 |
 
   - Un nom incompatible signale un IdRef faux. Un nom compatible laisse passer les homonymes, environ 10 %. Les prénoms différents de cette strate sont réduits à l'initiale dans la signature.
   - 9 des 10 IdRef introuvables sont fusionnés : la page IdRef redirige vers un autre numéro, la recherche Solr ne les rend pas. Le dernier est supprimé.
