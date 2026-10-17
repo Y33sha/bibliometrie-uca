@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iYkfgir6DAYMVNc4M08lP8idPal16mke4Ph7BLIvngKcVLtk17SL8fLggKQ7x1W
+\restrict fyGN6BZyHXmrfGEus9ZhutFMlsBv7ltk2pv3JhFqF5tyPub9yYsJFtCMeEumVam
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2035,7 +2035,7 @@ CREATE TABLE sources.failed_lookups (
 -- Name: TABLE failed_lookups; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de doi.org (source doi_org : DOI que doi.org ne connaît pas). La recherche reprend quand not_found_at date de plus que le délai fetch_missing_retry_after_days.';
+COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de doi.org (source doi_org : DOI que doi.org ne connaît pas). L''échec est définitif pour un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de doi.org). Les autres recherches reprennent quand not_found_at date de plus que le délai fetch_missing_retry_after_days.';
 
 
 --
@@ -4522,5 +4522,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iYkfgir6DAYMVNc4M08lP8idPal16mke4Ph7BLIvngKcVLtk17SL8fLggKQ7x1W
+\unrestrict fyGN6BZyHXmrfGEus9ZhutFMlsBv7ltk2pv3JhFqF5tyPub9yYsJFtCMeEumVam
 
