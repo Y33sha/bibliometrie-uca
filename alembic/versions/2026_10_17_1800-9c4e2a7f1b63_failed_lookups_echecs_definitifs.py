@@ -42,7 +42,7 @@ _DESCRIPTION_BEFORE = (
 def _apply(comment: str, description: str) -> None:
     op.execute(f"COMMENT ON TABLE sources.failed_lookups IS '{comment}'")
     op.execute(
-        f"UPDATE public.config SET description = '{description}'"
+        f"UPDATE ops.config SET description = '{description}'"
         " WHERE key = 'fetch_missing_retry_after_days'"
     )
 
