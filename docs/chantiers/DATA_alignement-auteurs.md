@@ -165,6 +165,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
 - [ ] Indices de périmètre par auteur aligné : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
+- [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles. La comparaison des listes d'auteurs entre sources (`SourceComparison.svelte`) quitte la page publique d'une publication pour le volet publication de l'UI admin.
 
 ### Phase 4 — Fin de chantier
 
