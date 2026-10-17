@@ -37,14 +37,15 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 ### 3. Traitements en aval
 
-- [ ] Phase `persons` : aucune personne pour une signature collective.
-- [ ] Phase `authorships` : les signatures collectives ne sont pas consolidées.
+- [x] Phase `persons` : aucune personne pour une signature collective. Les requêtes de sélection et le vote des identifiants les écartent. Une signature collective rattachée à une personne en est détachée, sauf épinglage.
+- [x] Phase `authorships` : une signature collective sans personne ne produit aucune ligne d'`authorships`.
+- [x] Mesure de l'alignement des auteurs : les signatures collectives sont écartées.
 
 ### 4. Reprise du stock
 
 - [ ] Signatures existantes marquées d'après la règle du nom.
 - [ ] Notices Crossref et DataCite rejouées depuis le raw store (`rehydrate_staging_from_raw_store`), pour retrouver les collectifs écartés.
-- [ ] Les 25 personnes collectives détachées de leurs signatures, puis purgées.
+- [ ] Les 25 personnes collectives purgées : la phase `persons` détache leurs signatures marquées, puis supprime les personnes vidées.
 
 ### 5. Fin de chantier
 

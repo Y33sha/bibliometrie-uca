@@ -106,7 +106,7 @@ type NoticeKey = tuple[int, str, bool]
 def _notices(
     conn: Connection, publication_ids: Sequence[int]
 ) -> Iterator[tuple[int, dict[NoticeKey, list[Signature]]]]:
-    """Notices de chaque publication : `(id de notice, source, issue de HAL)` → signatures d'auteur triées par position.
+    """Notices de chaque publication : `(id de notice, source, issue de HAL)` → signatures d'auteur individuelles triées par position.
 
     Une notice est issue de HAL quand elle recopie un dépôt HAL : notice scanR à identifiant `hal…`, notice OpenAlex dont la première URL, celle de la location principale, est une page HAL.
     """
@@ -127,6 +127,7 @@ def _notices(
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sp.publication_id = ANY(:ids) AND sp.source <> 'theses'
                   AND 'author' = ANY(sa.roles) AND sa.author_position IS NOT NULL
+                  AND NOT sa.collective
             """),
             {"ids": ids},
         )

@@ -99,6 +99,7 @@ def insert_signature(
     roles: list[str] | None = None,
     resolution_mode: str | None = None,
     neutralized_identifiers: dict[str, object] | None = None,
+    collective: bool = False,
 ) -> int:
     """Insère une signature et renvoie son `id`. `row_id` fixe l'`id`.
 
@@ -129,6 +130,7 @@ def insert_signature(
             "neutralized_identifiers": (
                 json.dumps(neutralized_identifiers) if neutralized_identifiers else None
             ),
+            "collective": collective,
         },
         {
             "resolution_mode": "resolution_mode",

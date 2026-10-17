@@ -129,11 +129,12 @@ _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     FALSE AS in_perimeter,
     NULL::integer AS current_person_id"""
 
-# Conditions communes à toutes les branches : SA orpheline hors-périmètre,
+# Conditions communes à toutes les branches : SA orpheline hors-périmètre, individuelle,
 # rattachée à une publication active (les hors périmètre ne sont pas matérialisées).
 _OOP_COMMON_WHERE = """
     sa_auth.person_id IS NULL
     AND sa_auth.in_perimeter = FALSE
+    AND NOT sa_auth.collective
     AND sd.publication_id IS NOT NULL
 """
 
@@ -168,6 +169,7 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
     JOIN publications pub ON pub.id = sd.publication_id
     WHERE linked.person_id IS NOT NULL
       AND linked.author_position IS NOT NULL
+      AND NOT linked.collective
       AND {_OOP_COMMON_WHERE}
 """
 
@@ -180,7 +182,7 @@ class PersonsMatchingQueries:
     """Requêtes du rattachement des signatures aux personnes."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
-        """Colonnes de la projection des `source_authorships` in-perimeter non liés :
+        """Colonnes de la projection des `source_authorships` in-perimeter, individuelles, non liées :
 
         - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` et `idhal` ne sont portés que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
         - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
@@ -196,6 +198,7 @@ class PersonsMatchingQueries:
                 JOIN publications pub ON pub.id = sd.publication_id
                 WHERE sa_auth.person_id IS NULL
                   AND sa_auth.in_perimeter = TRUE
+                  AND NOT sa_auth.collective
                   AND sd.publication_id IS NOT NULL
                 ORDER BY sa_auth.id
             """)
@@ -211,7 +214,7 @@ class PersonsMatchingQueries:
         return [_to_bare(r) for r in rows]
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
-        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre."""
+        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective n'ancre rien."""
         rows = conn.execute(
             text(f"""
                 SELECT sa_auth.person_id, sa_auth.author_position,
@@ -222,6 +225,7 @@ class PersonsMatchingQueries:
                 JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
                 WHERE sa_auth.person_id IS NOT NULL
                   AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
+                  AND NOT sa_auth.collective
                   AND sd.publication_id IS NOT NULL
             """)
         ).all()
@@ -249,6 +253,7 @@ class PersonsMatchingQueries:
                 JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
                 JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
                 WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
+                  AND NOT sa_auth.collective
                   AND sd.publication_id IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa_auth.id
@@ -358,7 +363,7 @@ class PersonsMatchingQueries:
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
         """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
 
-        Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
+        Une signature collective ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
         source_filter = (
             "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
         )
@@ -374,6 +379,7 @@ class PersonsMatchingQueries:
                 JOIN source_authorships sa ON sa.identity_id = aik.id
                 WHERE aik.person_identifiers ? :id_type
                   AND aik.author_name_normalized IS NOT NULL
+                  AND NOT sa.collective
                   AND NOT {_ID_TYPE_SHARED}
                   {source_filter}
                 GROUP BY 1, 2
@@ -596,6 +602,20 @@ class PersonsMatchingQueries:
                              OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
                         AND NOT {publication_rejected_for("sp.publication_id", "pnf.person_id")}
                   ) >= 2
+            """)
+        ).rowcount
+
+    def detach_collective_signatures(self, conn: Connection) -> int:
+        """Détache de leur personne les signatures collectives non épinglées. Retourne le nombre de signatures détachées."""
+        return conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET person_id = NULL, resolution_mode = NULL
+                WHERE sa.collective
+                  AND sa.person_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
+                  )
             """)
         ).rowcount
 

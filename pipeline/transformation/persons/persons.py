@@ -74,7 +74,7 @@ class PersonsPhase:
         return metrics
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        """Épinglages, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
+        """Épinglages, détachement des signatures collectives, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         persons_queries, logger = self.persons_queries, ctx.logger
         with ctx.open_tx() as conn:
             writes = self.writes_factory(conn)
@@ -86,6 +86,15 @@ class PersonsPhase:
                     "%s%s",
                     DERNIERE_BRANCHE,
                     accord(n_enforced, "signature recalée", "signatures recalées"),
+                )
+
+            n_collective = persons_queries.detach_collective_signatures(conn)
+            if n_collective:
+                etape(logger, "Signatures collectives détachées de leur personne")
+                logger.info(
+                    "%s%s",
+                    DERNIERE_BRANCHE,
+                    accord(n_collective, "signature détachée", "signatures détachées"),
                 )
 
             arbitration = arbitrate_identifier_conflicts(
@@ -133,7 +142,7 @@ class PersonsPhase:
 def build() -> Phase:
     """Rattachement des signatures aux personnes, et création des personnes inconnues.
 
-    Une transaction enchaîne la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
+    Une transaction enchaîne la réapplication des épinglages posés par l'administration, le détachement des signatures collectives, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
     """
     from pipeline.transformation.persons.matching import PersonsMatchingQueries
     from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
