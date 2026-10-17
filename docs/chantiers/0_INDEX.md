@@ -19,6 +19,7 @@
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution des entités avec Splink](DATA_resolution-splink.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
+- [Signatures collectives](DATA_signatures-collectives.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
