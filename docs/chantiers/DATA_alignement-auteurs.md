@@ -148,7 +148,13 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ### Phase 2 — Méthode et modèle
 
-- [ ] Méthode d'alignement, choisie d'après la mesure.
+- [ ] Méthode d'alignement, choisie d'après la mesure. Essai du 2026-10-17, dans `data/experiments/alignement-auteurs/` (non versionné).
+  - Modèle de Fellegi-Sunter (Splink). Les poids s'estiment par EM sur les paires de signatures d'une même publication. Comparaisons : nom, prénom, ORCID, IdRef, `hal_person_id` (égalité seule), position selon l'écart et la longueur de liste.
+  - Affectation hongroise entre chaque paire de notices. Un lien est retenu quand les preuves dépassent log2 de la longueur de liste.
+  - Le dernier auteur restant de chaque liste est lié quand les auteurs liés qui le précèdent sont les mêmes des deux côtés.
+  - Une notice scanR recopiée d'un dépôt HAL est exclue quand la publication a ce dépôt.
+  - Au-delà de 100 auteurs, un modèle distinct compare les seules paires de même position, de même identifiant ou aux noms de mêmes trois premières lettres.
+  - Résultat sur les 326 paires relues en phase 1 : 313 correctes. Erreurs : 4 noms fréquents (Kim, Zhang) liés à la même position malgré des prénoms différents, dans des listes de plus de 400 auteurs ; 3 paires d'un auteur en double dans une notice HAL ; 3 paires « autre personne » non liées ; 2 auteurs déplacés non liés ; 1 variante de nom non liée.
 - [ ] Modèle : table des auteurs alignés portant `person_id`, lien de chaque signature à son auteur, contraintes d'unicité.
 - [ ] Marquage à recalculer d'un auteur aligné dont une signature change d'identifiants.
 
