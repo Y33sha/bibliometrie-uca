@@ -105,14 +105,18 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [x] Publications à plusieurs notices : nombre de signatures par notice, écarts de longueur entre listes.
 - [x] Accord de la position : part des signatures dont le nom est compatible avec celui de la même position dans une autre notice, selon le nombre d'auteurs.
 - [x] Accord des identifiants : paires de signatures réunies ou séparées par un identifiant fort, confrontées à la position et au nom.
-- [ ] Échantillon de désaccords relu à la main : `data/measures/author_alignment_disagreements.csv`, 5 000 lignes.
+- [x] Échantillon de désaccords de position relu à la main : 100 cas tirés de `data/measures/author_alignment_disagreements.csv`, 2026-10-17. Même auteur à une autre position : 50. Fusion erronée de deux publications : 21 cas, sur 12 publications. Autre personne : 10. Nom écrit autrement : 8. Auteur absent de l'autre liste : 6. Collectif : 4. Indéterminable : 1.
+  - Les fusions erronées réunissent des communications d'un même volume d'actes ou de résumés sous le DOI du volume (IFORS 2023, ECO 2024, EAPC 2023), ou un dépôt HAL et la notice d'un autre article. Une publication réunit 9 dépôts HAL distincts (publication 14441). ScanR figure dans 14 des 21 cas.
 - [x] Prénom incompatible à la même position : source qui s'écarte de la majorité, sur les publications à trois notices ou plus.
 - [x] Échantillon des positions où HAL s'écarte, relu à la main : 100 cas, 2026-10-17. HAL a raison dans 38 cas : diminutif (Tony pour A. A. Affolder), initiale composée (Ch., Ph.), translittération (Ia), variante nationale (André pour Andrzej), erreur des autres sources. La liste HAL est décalée dans 31 cas. Le compte HAL est faux dans 20 cas, le plus souvent une faute de saisie sur un auteur sans compte ; parfois le bon compte a une forme différente (Joël J. Drevet pour Joël R. Drevet). 9 cas restent indéterminables.
 - [x] Sources dépendantes : accord mesuré sans les paires où une notice recopie l'autre (notice scanR issue d'un dépôt HAL, notice OpenAlex dont la location principale est HAL).
 - [x] Ambiguïté des appariements par nom : nombre de noms compatibles par signature décalée, dans les grandes listes.
 - [x] Doubles rattachements : signatures d'une même notice rattachées à la même personne.
 - [x] Identifiants contradictoires au sein d'un couple (publication, personne).
-- [ ] Échantillon des identifiants contradictoires entre sources, relu à la main : part des doublons d'identifiant légitimes.
+- [x] Échantillon des identifiants contradictoires entre sources, relu à la main : 78 paires ORCID et IdRef, 2026-10-17. Une différence de `hal_person_id` n'est pas une contradiction : une personne a souvent plusieurs comptes HAL.
+  - Identifiant erroné dans une source : 39 (ScanR 18, HAL 14, Crossref et OpenAlex 5, IdRef supprimé ou indéterminé 2). ScanR attribue l'identifiant d'un homonyme. Dans Crossref, l'ORCID erroné est celui d'un co-auteur.
+  - Même personne, deux identifiants : 30. Pour l'IdRef, un doublon, souvent redirigé. Pour l'ORCID, un compte vide ou désactivé.
+  - Indéterminable : 9.
 
 ### Phase 2 — Méthode et modèle
 
@@ -137,5 +141,5 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - **Identifiants différents entre sources.** Deux valeurs différentes d'un même type, à des signatures de sources différentes, séparent-elles deux signatures ? Une personne peut avoir deux IdRef ou deux comptes ORCID.
 - **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
-- **Auteurs collectifs** : noms de consortium dans la liste des auteurs.
+- **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
 - **Rapport avec `authorships`** : l'auteur aligné remplace-t-il la consolidation par paire (publication, personne) ?
