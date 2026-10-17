@@ -838,6 +838,8 @@ source_authorships = Table(
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     # Pays de la signature : adresses, organisations ROR sans adresse, structures HAL.
     Column("countries", ARRAY(Text)),
+    # Signature collective (collaboration, consortium…), d'après la source ou le nom.
+    Column("collective", Boolean, nullable=False, server_default="false"),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
     # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des

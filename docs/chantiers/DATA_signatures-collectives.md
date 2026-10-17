@@ -26,8 +26,8 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 ### 1. Schéma et règle
 
-- [ ] Migration : colonne `source_authorships.collective`, booléen, faux par défaut.
-- [ ] Règle du domaine qui reconnaît un collectif à son nom, testée sur les noms du stock.
+- [x] Migration : colonne `source_authorships.collective`, booléen, faux par défaut (`8b3f1c2e9d54`).
+- [x] Règle du domaine qui reconnaît un collectif à son nom (`domain/persons/collective_names.py`). Sur le stock, 2026-10-17 : 1 406 noms distincts, 7 182 signatures (OpenAlex 4 257, DataCite 2 089, ScanR 545, HAL 145, WoS 82, Crossref 64). Aucun nom de personne RH ne la déclenche. « Comite » en est exclu : c'est aussi un nom de famille.
 
 ### 2. Normalisation
 
