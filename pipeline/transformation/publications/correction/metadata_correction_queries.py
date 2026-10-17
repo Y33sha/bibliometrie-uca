@@ -15,7 +15,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
     DATACITE_PACKAGE_PIECE_RELATION,
     DoiClusterCase,
 )
-from domain.sources.registry import Source
+from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
@@ -117,6 +117,8 @@ class DoiClusterRow(NamedTuple):
     raw_doi: str
     canonical_doi: str | None
     same_work_case: DoiClusterCase | None
+    # `raw_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
+    unresolved: bool = False
 
 
 class DoiCorrectionUpdate(NamedTuple):
@@ -294,7 +296,7 @@ class PgMetadataCorrectionQueries:
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), et `source_publications` déjà corrigées (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, et `source_publications` déjà corrigées (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sp_eff AS (
@@ -350,6 +352,10 @@ class PgMetadataCorrectionQueries:
                              same_work_case = '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}' DESC,
                              canonical_doi
                 ),
+                unresolved_dois AS (
+                    SELECT id_value AS d FROM failed_lookups
+                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
+                ),
                 candidate_dois AS (
                     SELECT secondary_doi AS d FROM same_work
                     UNION
@@ -357,10 +363,13 @@ class PgMetadataCorrectionQueries:
                     WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}') AND eff_doi IS NOT NULL
                     UNION
                     SELECT eff_doi AS d FROM sp_eff WHERE raw_metadata ? 'doi'
+                    UNION
+                    SELECT d FROM unresolved_dois
                 )
                 SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
                        sp.eff_doi AS raw_doi,
-                       sw.canonical_doi, sw.same_work_case
+                       sw.canonical_doi, sw.same_work_case,
+                       sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved
                 FROM sp_eff sp
                 JOIN candidate_dois c ON c.d = sp.eff_doi
                 LEFT JOIN same_work sw ON sw.declarant_id = sp.id
@@ -376,6 +385,7 @@ class PgMetadataCorrectionQueries:
                 raw_doi=row.raw_doi,
                 canonical_doi=row.canonical_doi,
                 same_work_case=_cluster_case(row.same_work_case),
+                unresolved=row.unresolved,
             )
             for row in rows
         ]

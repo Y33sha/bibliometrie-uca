@@ -456,6 +456,40 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
     assert _apply_cluster(conn) == 0
 
 
+# ── Sous-étape cluster : DOI inconnu de doi.org ──
+
+
+def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
+    """Régression : un DOI factice (`10.1364/ao.xx.xxxxxx`) réunissait des notices sans rapport."""
+    conn = sa_sync_conn
+    first = _typed_notice(conn, source_id="h1", doi="10.1364/ao.xx.xxxxxx", doc_type="article")
+    second = _typed_notice(conn, source_id="h2", doi="10.1364/ao.xx.xxxxxx", doc_type="article")
+    conn.execute(
+        text(
+            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
+            " VALUES ('doi_org', 'doi', '10.1364/ao.xx.xxxxxx', now())"
+        )
+    )
+
+    assert _apply_cluster(conn) == 2
+    raw = conn.execute(
+        text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": first}
+    ).one()
+    assert raw.doi is None
+    assert raw.raw_metadata == {
+        "doi": {"raw": "10.1364/ao.xx.xxxxxx", "corrected_by": "UNRESOLVED_DOI_TO_NULL"}
+    }
+
+    # doi.org connaît le DOI au run suivant : les notices le retrouvent.
+    conn.execute(text("DELETE FROM failed_lookups"))
+    assert _apply_cluster(conn) == 2
+    dois = conn.execute(
+        text("SELECT doi FROM source_publications WHERE id IN (:a, :b)"),
+        {"a": first, "b": second},
+    ).scalars()
+    assert set(dois) == {"10.1364/ao.xx.xxxxxx"}
+
+
 # ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
 
 

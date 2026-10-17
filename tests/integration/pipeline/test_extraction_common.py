@@ -154,14 +154,14 @@ def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
 class TestGetMissingDois:
     def test_rejects_unknown_source(self):
         with pytest.raises(ValueError, match="Source inconnue"):
-            get_missing_dois(None, "unknown")
+            get_missing_dois(None, "unknown", retry_after_days=30)
 
     def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
         """Interroger la cible sur ce DOI rendrait un document déjà présent."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
         _add_inperim_sp(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
 
-        assert get_missing_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
         """La cible rend le même document pour son DOI principal comme pour ses DOI secondaires."""
@@ -174,7 +174,7 @@ class TestGetMissingDois:
             external_ids={"related_dois": ["10.1234/preprint"]},
         )
 
-        assert get_missing_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_un_doi_secondaire_nul_n_empeche_pas_la_selection(self, sa_sync_conn):
         """Un `null` parmi les DOI secondaires de la cible n'écarte pas les autres candidats."""
@@ -187,13 +187,13 @@ class TestGetMissingDois:
             external_ids={"related_dois": [None]},
         )
 
-        assert get_missing_dois(sa_sync_conn, "hal") == ["10.1234/manquant"]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == ["10.1234/manquant"]
 
     def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
         pub_id = _publication(sa_sync_conn, "T", in_perimeter=False)
         _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1", doi="10.1234/out")
-        assert get_missing_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
         """target='crossref' : seuls les DOI dont le préfixe est résolu vers Crossref ; un préfixe pas encore résolu attend `resolve_ra`."""
@@ -204,7 +204,7 @@ class TestGetMissingDois:
         _add_inperim_sp(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
         _add_inperim_sp(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
 
-        result = get_missing_dois(sa_sync_conn, "crossref")
+        result = get_missing_dois(sa_sync_conn, "crossref", retry_after_days=30)
 
         # DataCite éliminé, Crossref gardé, préfixe non résolu en attente.
         assert "10.5281/zenodo.1" not in result
@@ -220,20 +220,20 @@ class TestGetMissingDois:
             doi="10.1234/primary",
             external_ids={"related_dois": ["10.9999/preprint"]},
         )
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """Un arxiv_id d'un source_publication in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"})
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" in result
 
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
         """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
         _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids={"arxiv_id": "2605.02321"})
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" not in result
 
     def test_includes_relation_targets(self, sa_sync_conn):
@@ -246,7 +246,7 @@ class TestGetMissingDois:
             source="crossref",
             target_doi="10.9999/related",
         )
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.9999/related" in result
 
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
@@ -259,52 +259,51 @@ class TestGetMissingDois:
             source="crossref",
             target_doi="10.9999/related",
         )
-        assert get_missing_dois(sa_sync_conn, "hal") == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
 
         assert result == ["10.5281/zenodo.1"]
 
     def test_excludes_dois_in_backoff(self, sa_sync_conn):
-        """Un DOI dont la recherche a échoué et attend sa reprise (next_retry futur) sort du pool."""
+        """Un DOI cherché en vain depuis moins que le délai sort du pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
-        insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a", retry_in_days=30)
-        result = get_missing_dois(sa_sync_conn, "hal")
+        insert_failed_lookup(
+            sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
+        )
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
-        """Délai échu (next_retry passé) → le DOI repasse dans le pool."""
+        """Délai échu → le DOI repasse dans le pool."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         insert_failed_lookup(
-            sa_sync_conn,
-            id_type="doi",
-            id_value="10.1234/a",
-            not_found_days_ago=60,
-            retry_in_days=-1,
+            sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=60
         )
-        result = get_missing_dois(sa_sync_conn, "hal")
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert result == ["10.1234/a"]
+
+    def test_le_delai_configure_s_applique_aux_echecs_deja_inscrits(self, sa_sync_conn):
+        """Le délai se lit à la sélection : le raccourcir libère les échecs déjà inscrits."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        insert_failed_lookup(
+            sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=7) == ["10.1234/a"]
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
         """L'échec d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
         _add_inperim_sp(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
-        insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a", retry_in_days=30)
-        assert get_missing_dois(sa_sync_conn, "hal") == []
-        assert get_missing_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
-
-    def test_excludes_dois_with_permanent_miss(self, sa_sync_conn):
-        """Un DOI à l'échec définitif (`next_retry NULL`) sort du pool pour toujours."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a")
-        result = get_missing_dois(sa_sync_conn, "hal")
-        assert result == ["10.1234/b"]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30) == ["10.1234/a"]
 
 
 class TestGetStaleSourceIds:

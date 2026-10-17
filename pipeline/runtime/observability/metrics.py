@@ -59,6 +59,7 @@ LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
     ),
     "skipped": "sauté",
     "sudoc_found": ("présente dans le Sudoc", "présentes dans le Sudoc"),
+    "unknown_to_doi_org": ("DOI inconnu de doi.org", "DOI inconnus de doi.org"),
     "unmatched": "non rapproché",
     "unresolved": "non résolu",
 }

@@ -1,19 +1,23 @@
-"""Client doi.org/ra : agence d'enregistrement des préfixes DOI.
+"""Client doi.org : agence d'enregistrement des préfixes DOI, et existence d'un DOI.
 
-`doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`. Polite pool via header `User-Agent` (mailto).
+`doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`.
+
+`doi.org/api/handles/<doi>` répond 404 pour un DOI que le registre ne connaît pas. Interrogé par la phase `fetch_missing` pour un DOI que son agence d'enregistrement ne rend pas. Polite pool via header `User-Agent` (mailto).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import urllib.parse
 from collections.abc import Iterator, Sequence
 
 import httpx2
 
 from domain.types import as_mapping, as_sequence, as_str
 from pipeline.ingestion.http.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
-from pipeline.ingestion.http.http_retry import http_request_with_retry
+from pipeline.ingestion.http.http_retry import http_request_with_retry, lookup_json_async
+from pipeline.ingestion.http.lookup import NotFound, Unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +46,22 @@ def fetch_registration_agencies(
             prefix = as_str(answer.get("DOI"))
             if prefix in asked:
                 yield prefix, as_str(answer.get("RA")) or None
+
+
+async def doi_existence(
+    client: httpx2.AsyncClient, dois: Sequence[str], *, user_agent: str
+) -> tuple[list[str], list[str]]:
+    """Partage `dois` en DOI que doi.org connaît et DOI qu'il ne connaît pas. Un DOI sans réponse concluante n'est dans aucune des deux listes."""
+    headers = {"User-Agent": user_agent, "Accept": "application/json"}
+    known: list[str] = []
+    unknown: list[str] = []
+    for doi in dois:
+        url = f"{API_BASE_URLS['doi_org_handles']}/{urllib.parse.quote(doi, safe='/()')}"
+        outcome = await lookup_json_async(
+            client, "GET", url, headers=headers, timeout=15, label=f"DOI {doi}"
+        )
+        if isinstance(outcome, NotFound):
+            unknown.append(doi)
+        elif not isinstance(outcome, Unavailable):
+            known.append(doi)
+    return known, unknown

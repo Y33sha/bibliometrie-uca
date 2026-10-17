@@ -87,22 +87,24 @@ _MISSING_NNTS_SQL = text(
 )
 
 
-def get_missing_hal_ids(conn: Connection) -> list[str]:
+def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
     """hal-ids que des `source_publications` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
 
     Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_publications` du run précédent : les documents extraits pendant le run y entrent au run suivant.
 
-    Écarte les hal-ids déjà cherchés en vain : HAL est leur source native, l'échec est définitif.
+    Écarte les hal-ids cherchés en vain il y a moins de `retry_after_days` jours.
     """
-    return list(conn.execute(_MISSING_HAL_IDS_SQL).scalars())
+    return list(
+        conn.execute(_MISSING_HAL_IDS_SQL, {"retry_after_days": retry_after_days}).scalars()
+    )
 
 
-def get_missing_nnts(conn: Connection) -> list[str]:
+def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
     """NNT des `source_publications` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_publications` HAL.
 
-    Écarte les NNT qu'un document HAL porte déjà, et ceux dont la recherche a échoué et attend encore sa reprise.
+    Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """
-    return list(conn.execute(_MISSING_NNTS_SQL).scalars())
+    return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
 
 
 async def search_one(
@@ -146,7 +148,6 @@ async def _fetch_ids(
         [httpx2.AsyncClient, str], Awaitable[LookupOutcome[Mapping[str, JsonValue]]]
     ],
     id_type: LookupIdType,
-    retry_after_days: int,
 ) -> PhaseMetrics:
     """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`.
 
@@ -172,9 +173,7 @@ async def _fetch_ids(
             conn: Connection, identifier: str, result: LookupOutcome[Mapping[str, JsonValue]]
         ) -> None:
             if isinstance(result, NotFound):
-                record_failed_lookup(
-                    conn, "hal", id_type, identifier, retry_after_days=retry_after_days
-                )
+                record_failed_lookup(conn, "hal", id_type, identifier)
                 metrics.add(not_found=1)
             elif not isinstance(result, Unavailable) and extract_id(result):
                 if _stage(conn, result):
@@ -196,16 +195,15 @@ async def _fetch_ids(
 async def fetch_missing_hal_by_id(
     conn: Connection, log: logging.Logger, *, retry_after_days: int
 ) -> PhaseMetrics:
-    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging."""
+    """Cherche dans HAL les documents repérés par hal-id (OpenAlex, ScanR) et absents du staging. Un hal-id introuvable est cherché de nouveau après `retry_after_days` jours."""
     return await _fetch_ids(
         conn,
         log,
-        get_missing_hal_ids(conn),
+        get_missing_hal_ids(conn, retry_after_days=retry_after_days),
         fetch_one=lambda client, hal_id: search_one(
             client, f"halId_s:{hal_id}", label=f"halId {hal_id}"
         ),
         id_type="hal_id",
-        retry_after_days=retry_after_days,
     )
 
 
@@ -216,10 +214,9 @@ async def fetch_missing_hal_by_nnt(
     return await _fetch_ids(
         conn,
         log,
-        get_missing_nnts(conn),
+        get_missing_nnts(conn, retry_after_days=retry_after_days),
         fetch_one=lambda client, nnt: search_one(client, f"nntId_s:{nnt}", label=f"NNT {nnt}"),
         id_type="nnt",
-        retry_after_days=retry_after_days,
     )
 
 

@@ -745,7 +745,9 @@ NODES: tuple[Node, ...] = (
                 "raw_metadata",
                 "meta",
             )
-        ),
+        )
+        # DOI que doi.org ne connaît pas.
+        + ("failed_lookups",),
         writes=(
             "source_publications.doi",
             "source_publications.raw_metadata",

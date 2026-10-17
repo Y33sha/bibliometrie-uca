@@ -58,6 +58,23 @@ def _resoudre(group, shared_doi="10.1/x"):
     return resolve_cluster_doi_corrections(group, shared_doi=shared_doi)
 
 
+def test_un_doi_inconnu_de_doi_org_est_nulle_sur_tous_les_membres_avant_toute_autre_regle():
+    group = [
+        _m(1, "book"),
+        _m(2, "book_chapter"),
+        _m(
+            3,
+            "dataset",
+            canonical_doi="10.1/c",
+            same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
+        ),
+    ]
+    decisions = resolve_cluster_doi_corrections(group, shared_doi="10.1/x", unresolved=True)
+    assert decisions == [
+        DoiClusterDecision(i, None, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for i in (1, 2, 3)
+    ]
+
+
 # ── domaine pur : convergence même-œuvre ─────────────────────────────────
 
 

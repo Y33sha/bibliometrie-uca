@@ -16,6 +16,8 @@ API_BASE_URLS: dict[str, str] = {
     "datacite": "https://api.datacite.org",
     # doi.org : agence d'enregistrement, l'adapter compose `/<préfixe>,<préfixe>,…`.
     "doi_org": "https://doi.org/ra",
+    # doi.org : registre des DOI, l'adapter compose `/<doi>` ; un DOI inconnu répond 404.
+    "doi_org_handles": "https://doi.org/api/handles",
     # Endpoints secondaires
     "hal_structures": "https://api.archives-ouvertes.fr/ref/structure/",
     "openalex_sources": "https://api.openalex.org/sources",

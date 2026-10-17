@@ -86,17 +86,9 @@ DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
 )
 
-# Identifiant natif d'une source : celui dont elle est le registre. Une recherche infructueuse d'un identifiant natif dans sa source est définitive.
-NATIVE_IDENTIFIERS: dict[str, str] = {
-    Source.CROSSREF: "doi",
-    Source.DATACITE: "doi",
-    Source.HAL: "hal_id",
-}
-
-
-def is_native_identifier(source: str, id_type: str) -> bool:
-    """Vrai si `id_type` est l'identifiant natif de `source`."""
-    return NATIVE_IDENTIFIERS.get(source) == id_type
+# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans être une source de notices.
+DOI_ORG = "doi_org"
+LOOKUP_SOURCES: tuple[str, ...] = (*ALL_SOURCES, DOI_ORG)
 
 
 # Sources avec des auteurs exploitables (noms, identifiants, affiliations)

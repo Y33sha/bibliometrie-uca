@@ -71,21 +71,13 @@ def insert_failed_lookup(
     id_type: str,
     id_value: str,
     not_found_days_ago: int = 0,
-    retry_in_days: int | None = None,
 ) -> None:
-    """Inscrit une recherche infructueuse de `id_value`, datée de `not_found_days_ago` jours avant l'instant de la transaction. `retry_in_days` place la nouvelle tentative autant de jours après cet instant (négatif pour une date passée) ; sans lui, l'absence est définitive."""
-    next_retry = "now() + make_interval(days => :retry)" if retry_in_days is not None else "NULL"
+    """Inscrit une recherche infructueuse de `id_value`, datée de `not_found_days_ago` jours avant l'instant de la transaction."""
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at, next_retry) "
-            "VALUES (CAST(:source AS source_type), :id_type, :id_value, "
-            f"now() - make_interval(days => :ago), {next_retry})"
+            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at) "
+            "VALUES (CAST(:source AS lookup_source), :id_type, :id_value, "
+            "now() - make_interval(days => :ago))"
         ),
-        {
-            "source": source,
-            "id_type": id_type,
-            "id_value": id_value,
-            "ago": not_found_days_ago,
-            "retry": retry_in_days,
-        },
+        {"source": source, "id_type": id_type, "id_value": id_value, "ago": not_found_days_ago},
     )

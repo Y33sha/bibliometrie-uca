@@ -16,9 +16,11 @@ import pytest
 
 from pipeline.ingestion.common import fetch_missing
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult, fetch_missing_doi
+from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
 from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
+from pipeline.ingestion.http.api_params import API_BASE_URLS
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
@@ -72,12 +74,14 @@ class _FakeAdapter:
 async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) -> PhaseMetrics:
     """`fetch_missing_doi` sur une connexion simulée et la sélection `dois` ; les DOI inscrits absents s'ajoutent à `recorded`."""
 
-    def _record(conn, source, id_type, doi, *, retry_after_days):  # noqa: ARG001
+    def _record(conn, source, id_type, doi):  # noqa: ARG001
         if recorded is not None:
-            recorded.append((source, doi, retry_after_days))
+            recorded.append((source, doi))
 
     with (
-        patch.object(fetch_missing, "get_missing_dois", lambda conn, target: dois),
+        patch.object(
+            fetch_missing, "get_missing_dois", lambda conn, target, *, retry_after_days: dois
+        ),
         patch.object(fetch_missing, "record_failed_lookup", _record),
     ):
         return await fetch_missing_doi(
@@ -93,7 +97,9 @@ class TestRunAsyncOrchestrator:
     async def test_happy_path_returns_stats(self):
         adapter = _FakeAdapter()
         result = await _run(adapter, ["10.1/a", "10.1/b", "10.1/c"])
-        assert result == PhaseMetrics(seen=3, new=3, extras={"fetched": 3, "not_found": 0})
+        assert result == PhaseMetrics(
+            seen=3, new=3, extras={"fetched": 3, "not_found": 0, "unknown_to_doi_org": 0}
+        )
         assert len(adapter.inserted_records) == 3
 
     @pytest.mark.asyncio
@@ -102,9 +108,32 @@ class TestRunAsyncOrchestrator:
         recorded: list = []
         adapter = _FakeAdapter(absents=frozenset({"10.1/b"}))
         result = await _run(adapter, ["10.1/a", "10.1/b"], recorded=recorded)
-        assert recorded == [("fake", "10.1/b", 30)]
-        assert result.extras == {"fetched": 1, "not_found": 1}
+        assert recorded == [("fake", "10.1/b")]
+        assert result.extras == {"fetched": 1, "not_found": 1, "unknown_to_doi_org": 0}
         assert adapter.inserted_records == [{"doi": "10.1/a"}]
+
+    @pytest.mark.asyncio
+    async def test_l_agence_d_enregistrement_soumet_ses_absents_a_doi_org(self):
+        """Un DOI absent de son agence d'enregistrement est soumis à doi.org ; seul celui que doi.org ne connaît pas est inscrit sous `doi_org`."""
+        recorded: list = []
+        adapter = _FakeAdapter(absents=frozenset({"10.1/connu", "10.1/inconnu"}))
+        adapter.source_key = "crossref"
+
+        async def _existence(client, dois, *, user_agent):  # noqa: ARG001
+            return [d for d in dois if d == "10.1/connu"], [d for d in dois if d == "10.1/inconnu"]
+
+        with (
+            patch.object(fetch_missing, "doi_existence", _existence),
+            patch.object(fetch_missing, "_doi_org_user_agent", lambda: "test"),
+        ):
+            result = await _run(adapter, ["10.1/connu", "10.1/inconnu"], recorded=recorded)
+
+        assert sorted(recorded) == [
+            ("crossref", "10.1/connu"),
+            ("crossref", "10.1/inconnu"),
+            ("doi_org", "10.1/inconnu"),
+        ]
+        assert result.extras["unknown_to_doi_org"] == 1
 
     @pytest.mark.asyncio
     async def test_worker_pool_caps_concurrent_fetches(self):
@@ -318,6 +347,25 @@ class TestScanrFetchAsync:
 
 
 # ── recherche DataCite : fetch_async (batch query) via http_mock ───
+
+
+class TestDoiOrgExistence:
+    @pytest.mark.asyncio
+    async def test_range_les_doi_selon_doi_org(self, http_mock):
+        """200 : doi.org connaît le DOI ; 404 : il ne le connaît pas ; 503 : pas de conclusion."""
+        base = API_BASE_URLS["doi_org_handles"]
+        http_mock.get(f"{base}/10.1/connu").mock(
+            return_value=httpx2.Response(200, json={"responseCode": 1})
+        )
+        http_mock.get(f"{base}/10.1/inconnu").mock(
+            return_value=httpx2.Response(404, json={"responseCode": 100})
+        )
+        http_mock.get(f"{base}/10.1/muet").mock(return_value=httpx2.Response(503))
+        async with httpx2.AsyncClient() as client:
+            known, unknown = await doi_existence(
+                client, ["10.1/connu", "10.1/inconnu", "10.1/muet"], user_agent="test"
+            )
+        assert (known, unknown) == (["10.1/connu"], ["10.1/inconnu"])
 
 
 class TestDataciteFetchAsync:

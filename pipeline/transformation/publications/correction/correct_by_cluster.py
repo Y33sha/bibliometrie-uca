@@ -5,6 +5,8 @@ Corrige le DOI de certaines source_publications afin de provoquer leur fusion en
 - **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
+Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur toutes les notices qui le citent.
+
 `doc_type` lus = **canoniques** (la sous-étape unaire a déjà tourné). Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`), donc une `source_publication` dont la relation/le conflit a disparu récupère son DOI source au run suivant.
 """
 
@@ -68,6 +70,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
                     for m in members
                 ],
                 shared_doi=raw_doi,
+                unresolved=any(m.unresolved for m in members),
             )
         }
         for m in members:
@@ -100,7 +103,7 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
-    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI des chapitres portant le DOI de l'ouvrage."""
+    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, et le DOI inconnu de doi.org."""
     etape(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = queries.fetch_doi_cluster_candidates(conn)

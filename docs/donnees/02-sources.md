@@ -13,7 +13,7 @@ Tables sources : les *records* non dédupliqués, normalisés à partir des payl
 - **`source_authorship_rors`** : ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation, ou à la seule signature quand l'affiliation est sans texte.
 - **`candidate_dois`** : vue des DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement.
 - **`staging`** : une ligne par document moissonné. Contient le payload brut de la source, vidé après normalisation, et `disappeared_at` quand la source cesse de rendre le document. Son cycle de vie relève du [moissonnage](../pipeline/02-extract.md).
-- **`failed_lookups`** : identifiants (DOI, hal-id, NNT) cherchés en vain dans une source. `next_retry` donne la date de la prochaine tentative, NULL valant « plus jamais ».
+- **`failed_lookups`** : identifiants (DOI, hal-id, NNT) cherchés en vain dans une source, et DOI que doi.org ne connaît pas (source `doi_org`), avec la date de l'échec.
 
 ## Propriété des tables
 

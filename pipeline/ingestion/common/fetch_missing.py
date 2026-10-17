@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 import httpx2
@@ -19,12 +19,22 @@ from sqlalchemy import Connection, ScalarResult, text
 
 from domain.publications.identifiers import clean_doi
 from domain.source_publications.external_ids import ExternalIdType
-from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES, DOI_SEARCHABLE_SOURCES
+from domain.sources.registry import (
+    ALL_SOURCES_SET as VALID_SOURCES,
+    DOI_ORG,
+    DOI_SEARCHABLE_SOURCES,
+)
 from domain.types import JsonValue
-from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
+from pipeline.ingestion.common.failed_lookups import (
+    forget_failed_doi_lookups,
+    pending_failed_lookup_sql,
+    record_failed_lookup,
+)
 from pipeline.ingestion.common.parallel import RunParallel
+from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.http.fetch_pool import run_fetch_pool
+from pipeline.ingestion.http.polite_pool import build_user_agent
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
@@ -151,10 +161,14 @@ class DoiBatchResult:
     """Réponse d'une source à un lot de DOI : notices trouvées, et DOI dont la source a confirmé l'absence.
 
     Un DOI du lot présent dans aucune des deux listes attend le run suivant : la source était indisponible, ou sa réponse ne permet pas de conclure.
+
+    Pour une agence d'enregistrement, les DOI absents sont soumis à doi.org : `known_to_doi_org` et `unknown_to_doi_org` rangent ceux qu'il connaît et ceux qu'il ne connaît pas.
     """
 
     records: list[Mapping[str, JsonValue]] = field(default_factory=list)
     not_found: list[str] = field(default_factory=list)
+    known_to_doi_org: list[str] = field(default_factory=list)
+    unknown_to_doi_org: list[str] = field(default_factory=list)
 
 
 class DoiSearch(Protocol):
@@ -182,7 +196,7 @@ _TARGET_RA: dict[str, str] = {
 }
 
 
-def get_missing_dois(conn: Connection, target: str) -> list[str]:
+def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) -> list[str]:
     """DOI présents dans les autres sources et absents de la cible.
 
     Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne chercher que les DOI de publications in-périmètre évite de rapatrier des documents hors périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
@@ -191,7 +205,7 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
 
     Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
-    Exclut les DOI dont la recherche dans la cible a échoué et attend encore sa reprise (`failed_lookups`). Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance de son délai, ou définitivement quand il est l'identifiant natif de la cible.
+    Exclut les DOI dont la recherche dans la cible a échoué il y a moins de `retry_after_days` jours (`failed_lookups`). Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance du délai.
 
     Pour les cibles présentes dans `_TARGET_RA`, retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
     """
@@ -228,7 +242,7 @@ def get_missing_dois(conn: Connection, target: str) -> list[str]:
           AND NOT {pending}
         ORDER BY c.doi
     """
-    params: dict[str, str] = {"target": target}
+    params: dict[str, str | int] = {"target": target, "retry_after_days": retry_after_days}
     if target_ra:
         params["target_ra"] = target_ra
     rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
@@ -251,10 +265,12 @@ async def fetch_missing_doi(
 
     Un DOI confirmé absent est inscrit dans `failed_lookups`. Un DOI ni trouvé ni absent attend le run suivant. `limit` plafonne le nombre de DOI d'une exécution.
 
-    `total` = DOI traités, `new` = notices insérées, `extras["fetched"]` = notices reçues, `extras["not_found"]` = DOI confirmés absents.
+    Quand la source est l'agence d'enregistrement des DOI cherchés (`_TARGET_RA`), un DOI absent est soumis à doi.org. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG` ; un DOI qu'il connaît en est effacé.
+
+    `total` = DOI traités, `new` = notices insérées, `extras["fetched"]` = notices reçues, `extras["not_found"]` = DOI confirmés absents, `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
     """
     slog = scoped_logger(log, search.source_key)
-    dois = get_missing_dois(conn, search.source_key)
+    dois = get_missing_dois(conn, search.source_key, retry_after_days=retry_after_days)
 
     if limit and len(dois) > limit:
         slog.info(
@@ -267,12 +283,24 @@ async def fetch_missing_doi(
         return PhaseMetrics()
 
     batches = [dois[i : i + search.batch_size] for i in range(0, total, search.batch_size)]
-    progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
+    progress = {
+        "processed": 0,
+        "fetched": 0,
+        "inserted": 0,
+        "not_found": 0,
+        "unknown_to_doi_org": 0,
+    }
+    user_agent = _doi_org_user_agent() if search.source_key in _TARGET_RA else None
 
     async def _fetch(client: httpx2.AsyncClient, item: tuple[int, list[str]]) -> DoiBatchResult:
         batch_idx, batch = item
         try:
             result = await search.fetch_async(client, batch)
+            if user_agent is not None and result.not_found:
+                known, unknown = await doi_existence(
+                    client, result.not_found, user_agent=user_agent
+                )
+                result = replace(result, known_to_doi_org=known, unknown_to_doi_org=unknown)
         except Exception as e:
             slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
             result = DoiBatchResult()
@@ -296,10 +324,12 @@ async def fetch_missing_doi(
                     if search.insert(conn, record):
                         batch_inserted += 1
                 for doi in result.not_found:
-                    record_failed_lookup(
-                        conn, search.source_key, "doi", doi, retry_after_days=retry_after_days
-                    )
+                    record_failed_lookup(conn, search.source_key, "doi", doi)
+                for doi in result.unknown_to_doi_org:
+                    record_failed_lookup(conn, DOI_ORG, "doi", doi)
+                forget_failed_doi_lookups(conn, DOI_ORG, result.known_to_doi_org)
                 progress["inserted"] += batch_inserted
+                progress["unknown_to_doi_org"] += len(result.unknown_to_doi_org)
             except Exception as e:
                 conn.rollback()
                 slog.warning(
@@ -330,8 +360,19 @@ async def fetch_missing_doi(
     return PhaseMetrics(
         seen=total,
         new=progress["inserted"],
-        extras={"fetched": progress["fetched"], "not_found": progress["not_found"]},
+        extras={
+            "fetched": progress["fetched"],
+            "not_found": progress["not_found"],
+            "unknown_to_doi_org": progress["unknown_to_doi_org"],
+        },
     )
+
+
+def _doi_org_user_agent() -> str:
+    """User-Agent du polite pool pour doi.org."""
+    from pipeline.runtime.config import get_polite_pool_email
+
+    return build_user_agent(get_polite_pool_email())
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -342,7 +383,7 @@ def build() -> Phase:
 
     La recherche dans HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
-    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, avec un délai avant la prochaine tentative, ou définitivement quand il est natif de la source.
+    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`.
     """
     from pipeline.ingestion.common.parallel import run_parallel
 

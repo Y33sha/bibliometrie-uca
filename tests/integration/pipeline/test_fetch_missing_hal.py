@@ -38,7 +38,7 @@ class TestFindMissingHalIds:
 
     @staticmethod
     def _missing(conn) -> list[str]:
-        return sorted(get_missing_hal_ids(conn))
+        return sorted(get_missing_hal_ids(conn, retry_after_days=30))
 
     def test_returns_hal_ids_from_openalex_and_scanr(self, sa_sync_conn):
         self._carry(sa_sync_conn, "scanr", "scanr-1", ["hal-aaa"])
@@ -85,7 +85,7 @@ class TestFindMissingNnts:
 
     @staticmethod
     def _missing(conn) -> list[str]:
-        return get_missing_nnts(conn)
+        return get_missing_nnts(conn, retry_after_days=30)
 
     def test_returns_nnt_of_thesis_without_hal_record(self, sa_sync_conn):
         self._thesis(sa_sync_conn, "2024UCA0001")
@@ -105,12 +105,16 @@ class TestFindMissingNnts:
 
     def test_excludes_nnt_waiting_for_retry(self, sa_sync_conn):
         self._thesis(sa_sync_conn, "2024UCA0001")
-        insert_failed_lookup(sa_sync_conn, id_type="nnt", id_value="2024UCA0001", retry_in_days=30)
+        insert_failed_lookup(
+            sa_sync_conn, id_type="nnt", id_value="2024UCA0001", not_found_days_ago=10
+        )
         assert self._missing(sa_sync_conn) == []
 
     def test_retries_nnt_whose_delay_expired(self, sa_sync_conn):
         self._thesis(sa_sync_conn, "2024UCA0001")
-        insert_failed_lookup(sa_sync_conn, id_type="nnt", id_value="2024UCA0001", retry_in_days=-1)
+        insert_failed_lookup(
+            sa_sync_conn, id_type="nnt", id_value="2024UCA0001", not_found_days_ago=60
+        )
         assert self._missing(sa_sync_conn) == ["2024UCA0001"]
 
 

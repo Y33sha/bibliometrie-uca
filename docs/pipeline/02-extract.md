@@ -40,7 +40,7 @@ Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistr
 
 Boucle et sélection des DOI dans `pipeline/ingestion/common/fetch_missing.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`.
 
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, avec la date de la prochaine tentative, au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). L'échec est définitif quand l'identifiant est natif de la source : le hal-id pour HAL, le DOI pour Crossref et DataCite. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). Un DOI absent de son agence d'enregistrement (Crossref, DataCite) est soumis à doi.org ; un DOI que doi.org ne connaît pas est nullé par la phase `metadata_correction`. Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant.
 
 
 ## Documents périmés et disparus (`fetch_stale`)

@@ -48,11 +48,15 @@ class _HalSimule:
             self.ecrits.append(source_id)
             return source_id not in self.deja_en_staging, False
 
-        def record_failed_lookup(conn, source, id_type, id_value, *, retry_after_days):
+        def record_failed_lookup(conn, source, id_type, id_value):
             self.echecs.append((id_type, id_value))
 
-        monkeypatch.setattr(fetch_missing, "get_missing_hal_ids", lambda conn: list(ids))
-        monkeypatch.setattr(fetch_missing, "get_missing_nnts", lambda conn: list(ids))
+        monkeypatch.setattr(
+            fetch_missing, "get_missing_hal_ids", lambda conn, *, retry_after_days: list(ids)
+        )
+        monkeypatch.setattr(
+            fetch_missing, "get_missing_nnts", lambda conn, *, retry_after_days: list(ids)
+        )
         monkeypatch.setattr(fetch_missing, "search_one", search_one)
         monkeypatch.setattr(fetch_missing, "upsert_staging", upsert_staging)
         monkeypatch.setattr(fetch_missing, "record_failed_lookup", record_failed_lookup)

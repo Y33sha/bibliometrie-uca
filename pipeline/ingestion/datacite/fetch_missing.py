@@ -6,7 +6,7 @@ Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette
 
 Le pool de DOI candidats est filtré en amont par `get_missing_dois` : seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu) sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
 
-DataCite est la source native du DOI pour ses préfixes : un DOI absent de la réponse du batch est définitivement introuvable (DOI erroné ou non DataCite). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative.
+Un DOI absent de la réponse du batch est inscrit dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
+from domain.sources.registry import DOI_ORG
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
@@ -85,4 +86,5 @@ class DataciteDoiSearch:
             entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
         )
         forget_failed_doi_lookups(conn, "datacite", [doi])
+        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
         return inserted

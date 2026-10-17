@@ -4,7 +4,7 @@ CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre sour
 
 Polite pool obtenu via le header `User-Agent` qui inclut un mailto. Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). `record_failed_lookup` l'inscrit dans `failed_lookups` sans date de nouvelle tentative. Un DOI alias est redirigé par Crossref vers son DOI principal : le document principal est inséré, et l'alias inscrit de la même façon.
+Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org. Un DOI alias est redirigé par Crossref vers son DOI principal : le document principal est inséré, et l'alias inscrit comme introuvable.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
+from domain.sources.registry import DOI_ORG
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_str
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
@@ -57,7 +58,7 @@ class CrossrefDoiSearch:
         if not isinstance(message, dict):
             return DoiBatchResult()
         if clean_doi(as_str(message.get("DOI"))) != doi:
-            # DOI alias, que Crossref redirige vers son DOI principal : le document reçu porte ce dernier. L'alias n'est pas une œuvre de Crossref, source native du DOI : il est inscrit définitivement dans failed_lookups.
+            # DOI alias, que Crossref redirige vers son DOI principal : le document reçu a ce dernier pour DOI. L'alias est inscrit comme introuvable.
             return DoiBatchResult(records=[as_mapping(message)], not_found=[doi])
         return DoiBatchResult(records=[as_mapping(message)])
 
@@ -75,4 +76,5 @@ class CrossrefDoiSearch:
             entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
         )
         forget_failed_doi_lookups(conn, "crossref", [doi])
+        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
         return inserted

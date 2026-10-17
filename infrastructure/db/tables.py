@@ -46,7 +46,7 @@ from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
-from domain.sources.registry import ALL_SOURCES
+from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -585,6 +585,7 @@ identifier_origin_enum = PgEnum(
 )
 
 source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
+lookup_source_enum = PgEnum(*LOOKUP_SOURCES, name="lookup_source", create_type=False)
 
 # Tout statut open access est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
 oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
@@ -1316,21 +1317,19 @@ staging = Table(
 failed_lookups = Table(
     "failed_lookups",
     metadata,
-    Column("source", source_type_enum, nullable=False),
+    Column("source", lookup_source_enum, nullable=False),
     Column("id_type", Text, nullable=False),
     Column("id_value", Text, nullable=False),
     Column("not_found_at", DateTime(timezone=True), nullable=False),
-    Column("next_retry", DateTime(timezone=True)),
     PrimaryKeyConstraint("source", "id_type", "id_value"),
     CheckConstraint(
         "id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])",
         name="failed_lookups_id_type_check",
     ),
     comment=(
-        "Identifiants cherchés en vain dans une source par la phase fetch_missing. "
-        "next_retry porte la date de la prochaine tentative. Il est NULL quand l'identifiant "
-        "est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : "
-        "l'échec est alors définitif."
+        "Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de "
+        "doi.org (source doi_org : DOI que doi.org ne connaît pas). La recherche reprend quand "
+        "not_found_at date de plus que le délai fetch_missing_retry_after_days."
     ),
     schema="sources",
 )
