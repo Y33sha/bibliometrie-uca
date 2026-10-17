@@ -1,29 +1,21 @@
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
-* plafond d'interrogations sudoc
+* [ ] plafond d'interrogations sudoc
 ## Extraction
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
-* [ ] colonne next_retry de failed_lookups: remplacer par valeur paramétrable
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
-* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
-* [ ] suggested countries: jamais remis à null
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
 * [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer)
-* [ ] normalisation des caractères non-latins?
-
-# Code
-* [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
 
 # Données
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * [ ] place_name_forms n'a pas de clé étrangère vers countries
 * [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée) / Cf personne 62293
-* [ ] rejected_authorships: au niveau des source_authorships ou source_publications?
 * [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * [ ] titres de revues: OpenAlex zappe les apostrophes; corriger
 * [ ] conserver l'historique des structures
@@ -36,25 +28,17 @@
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
-* [ ] y a-t-il une API pour contrôler les ISSN?
 
 # UI
 ## Admin
-* [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes)
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
-* [ ] admin/countries: aligner les boutons à droite
-* [ ] runs pipeline: les messages d'erreur n'affichent aucune info utile (Can't reconnect until invalid transaction is rolled back. Please rollback() fully before proceeding (Background on this error at: https://sqlalche.me/e/20/8s2b))
-* [ ] admin/person: ne pas proposer d'absorber un homonyme si les deux ont une fiche RH
-* [ ] Référentiels: ajouter Monographies + Conférences
 * [ ] volet latéral pour Editeurs et Revues
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
-* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence; premier/dernier auteur (sur l'onglet publications de la page personne)
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
-* [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
+* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne)
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
@@ -81,9 +65,6 @@
 * collaborations nationales et internationales: identification des structures partenaires; évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * citation count / cité par... (DOI)
-* règles de correction de métadonnées et règles de déduplication de publications: actuellement logées dans le code; possibilité de les stocker en base et de les rendre configurables via l'UI?
 * OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Détails techniques
-* rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL (au moins pour labos et personnes)?
-* passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — "suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps"
