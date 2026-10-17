@@ -99,6 +99,27 @@ class TestNormalizeText:
         assert normalize_text("œuvres littéraires") == normalize_text("oeuvres littéraires")
 
 
+class TestLatex:
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("Search for ${\\rm B_s}^0$ oscillations", "search for b s 0 oscillations"),
+            ("$B^0_s-\\bar B^0_s$ mixing", "b 0 s b 0 s mixing"),
+            ("pp collisions at $\\sqrt{s} = 13$ TeV", "pp collisions at s 13 tev"),
+            # Une lettre grecque rejoint la graphie Unicode d'une autre source.
+            ("J/$\\psi$ production", "j ψ production"),
+            ("J/ψ production", "j ψ production"),
+            ("$\\Upsilon(1S)$ states", "υ 1s states"),
+            # Une lettre accentuée garde sa lettre, collée au mot.
+            ("Universit\\'e Clermont Auvergne", "universite clermont auvergne"),
+            ("Universit\\'{e} Fran\\c{c}aise", "universite francaise"),
+            ('M\\"uller', "muller"),
+        ],
+    )
+    def test_commandes_latex_retirees(self, raw, expected):
+        assert normalize_text(raw) == expected
+
+
 class TestSanitizeRawText:
     @pytest.mark.parametrize(
         "raw, expected",

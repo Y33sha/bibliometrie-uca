@@ -116,6 +116,37 @@ def strip_markup(text: str) -> str:
     return text
 
 
+_GREEK_LETTERS = (
+    "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho"
+    " sigma tau upsilon phi chi psi omega"
+).split()
+_GREEK_COMMANDS: dict[str, str] = {
+    **{name: chr(0x03B1 + i + (i > 16)) for i, name in enumerate(_GREEK_LETTERS)},
+    **{name.capitalize(): chr(0x0391 + i + (i > 16)) for i, name in enumerate(_GREEK_LETTERS)},
+    "varepsilon": "ε",
+    "vartheta": "θ",
+    "varpi": "π",
+    "varrho": "ρ",
+    "varsigma": "ς",
+    "varphi": "φ",
+    "ell": "ℓ",
+}
+
+# Accent LaTeX sur une lettre : `\'e`, `\'{e}`, `\c{c}`, `\v c`. La lettre seule reste, collée au mot.
+_LATEX_ACCENT_RE = re.compile(
+    r"\\(?:[`'^\"~=.]|[cvuHkr](?=[\s{]))(?:\{\s*([A-Za-z])\s*\}|\s*([A-Za-z]))"
+)
+_LATEX_COMMAND_RE = re.compile(r"\\([A-Za-z]+)")
+
+
+def strip_latex(text: str) -> str:
+    """Retire les commandes LaTeX d'un texte. Une lettre accentuée (`\\'e`) garde sa lettre, une lettre grecque (`\\psi`) devient le caractère grec, toute autre commande (`\\rm`, `\\sqrt`, `\\bar`) disparaît. Les arguments restent ; les délimiteurs (`$ { } ^ _`) sont laissés à l'appelant."""
+    if "\\" not in text:
+        return text
+    text = _LATEX_ACCENT_RE.sub(lambda m: m.group(1) or m.group(2), text)
+    return _LATEX_COMMAND_RE.sub(lambda m: _GREEK_COMMANDS.get(m.group(1), " "), text)
+
+
 def sanitize_raw_text(text: str) -> str:
     """Assainit un texte brut de son bruit invisible, sans le dénaturer.
 
@@ -172,11 +203,11 @@ def _is_word_character(ch: str) -> bool:
 def normalize_text(text: str) -> str:
     """Forme de comparaison d'un texte, pour le dédoublonnage et le matching.
 
-    Balises retirées (`strip_markup`), minuscules, décompositions de compatibilité (NFKD : ﬁ → fi, ² → 2), diacritiques retirés des lettres latines et grecques. Les lettres et chiffres de toutes les écritures restent. Tout autre caractère devient un espace.
+    Balises retirées (`strip_markup`), commandes LaTeX retirées (`strip_latex`), minuscules, décompositions de compatibilité (NFKD : ﬁ → fi, ² → 2), diacritiques retirés des lettres latines et grecques. Les lettres et chiffres de toutes les écritures restent. Tout autre caractère devient un espace.
     """
     if not text:
         return ""
-    text = strip_markup(text).lower()
+    text = strip_latex(strip_markup(text)).lower()
     if text.isascii():
         return " ".join(_ASCII_SEPARATORS_RE.sub(" ", text).split())
     # La décomposition produit des majuscules (№ → No) : seconde mise en minuscules.
