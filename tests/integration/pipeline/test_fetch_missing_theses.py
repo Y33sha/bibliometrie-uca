@@ -1,0 +1,48 @@
+"""Recherche dans theses.fr de la phase `fetch_missing` : sélection des NNT (`pipeline.ingestion.theses.fetch_missing`)."""
+
+from pipeline.ingestion.theses.fetch_missing import get_missing_nnts
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
+
+
+def _carry(conn, source, source_id, nnt):
+    """Notice `source` qui contient le NNT `nnt`, avec sa ligne staging."""
+    staging_id = insert_staging(conn, source, source_id=source_id)
+    insert_source_publication(
+        conn,
+        insert_publication(conn),
+        source=source,
+        source_id=source_id,
+        staging_id=staging_id,
+        external_ids={"nnt": nnt},
+    )
+
+
+def _missing(conn) -> list[str]:
+    return get_missing_nnts(conn, retry_after_days=30)
+
+
+def test_nnt_d_une_autre_source_absent_de_theses(sa_sync_conn):
+    _carry(sa_sync_conn, "scanr", "nnt2019aixm0001", "2019AIXM0001")
+    assert "2019AIXM0001" in _missing(sa_sync_conn)
+
+
+def test_nnt_deja_dans_le_staging_theses_ecarte(sa_sync_conn):
+    _carry(sa_sync_conn, "scanr", "nnt2019aixm0002", "2019AIXM0002")
+    insert_staging(sa_sync_conn, "theses", source_id="2019AIXM0002")
+    assert "2019AIXM0002" not in _missing(sa_sync_conn)
+
+
+def test_nnt_cherche_en_vain_recemment_ecarte(sa_sync_conn):
+    _carry(sa_sync_conn, "scanr", "nnt2019aixm0003", "2019AIXM0003")
+    insert_failed_lookup(sa_sync_conn, "theses", id_type="nnt", id_value="2019AIXM0003")
+    assert "2019AIXM0003" not in _missing(sa_sync_conn)
+
+
+def test_nnt_cherche_en_vain_il_y_a_longtemps_repris(sa_sync_conn):
+    _carry(sa_sync_conn, "scanr", "nnt2019aixm0004", "2019AIXM0004")
+    insert_failed_lookup(
+        sa_sync_conn, "theses", id_type="nnt", id_value="2019AIXM0004", not_found_days_ago=60
+    )
+    assert "2019AIXM0004" in _missing(sa_sync_conn)

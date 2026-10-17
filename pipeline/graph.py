@@ -212,6 +212,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("publications.doc_type",),
         network="hal",
     ),
+    _node("fetch_missing.theses_by_nnt", "fetch_missing", network="theses"),
     *(
         _node(
             f"fetch_missing.doi.{source}",

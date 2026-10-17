@@ -33,7 +33,10 @@ Le moissonnage interroge les sources sur le critère de l'affiliation : un docum
 **Étape 1 — `fetch_missing_hal` : HAL ids manquants.**
 Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging. Code dans `pipeline/ingestion/hal/fetch_missing.py`.
 
-**Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
+**Étape 2 — `fetch_missing.theses_by_nnt` : thèses manquantes.**
+Télécharge depuis theses.fr les thèses dont le NNT figure dans une autre source et qui sont absentes du staging theses.fr, par exemple une thèse soutenue dans un autre établissement. Code dans `pipeline/ingestion/theses/fetch_missing.py`.
+
+**Étape 3 — `fetch_missing_doi` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les sources Crossref et DataCite sont seulement interrogées ici : elles sont omises du moissonnage initial car non interrogeables par affiliation.
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.

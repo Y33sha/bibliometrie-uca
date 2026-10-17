@@ -1,7 +1,8 @@
 """Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Deux mécanismes, dans cet ordre :
 
 1. **Recherche dans HAL** (`pipeline.ingestion.hal.fetch_missing`) : par hal-id (repéré dans OpenAlex et ScanR), puis par NNT (thèses sans document HAL).
-2. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les nœuds `fetch_missing.doi.<source>` forment un lot exécuté en parallèle.
+2. **Recherche dans theses.fr** (`pipeline.ingestion.theses.fetch_missing`) : par NNT repéré dans une autre source.
+3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les nœuds `fetch_missing.doi.<source>` forment un lot exécuté en parallèle.
 
 Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`).
 """
@@ -51,6 +52,7 @@ FetchDoiOne = Callable[[str, SourceCircuitBreaker], PhaseMetrics]
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
+_THESES_BY_NNT = "fetch_missing.theses_by_nnt"
 
 
 def _doi_node(target: str) -> str:
@@ -71,6 +73,7 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 class FetchMissingPhase:
     fetch_hal_by_id: FetchChannel
     fetch_hal_by_nnt: FetchChannel
+    fetch_theses_by_nnt: FetchChannel
     fetch_doi_one: FetchDoiOne
     run_parallel: RunParallel
 
@@ -79,6 +82,7 @@ class FetchMissingPhase:
         options = ctx.options
         sources = options.sources or None
         hal = not sources or "hal" in sources
+        theses = not sources or "theses" in sources
         # WoS opt-in, filtre `--sources` optionnel.
         doi_targets = set(
             select_targets(DOI_SEARCHABLE_SOURCES, sources, include_wos=options.include_wos)
@@ -86,6 +90,7 @@ class FetchMissingPhase:
         retenus = {
             _HAL_BY_ID: hal,
             _HAL_BY_NNT: hal and options.mode == "full",
+            _THESES_BY_NNT: theses,
             **{_doi_node(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
         }
 
@@ -115,6 +120,11 @@ class FetchMissingPhase:
                     section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
                     when=quand(_HAL_BY_NNT),
                 ),
+                _THESES_BY_NNT: NodeStep(
+                    channel(self.fetch_theses_by_nnt),
+                    section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
+                    when=quand(_THESES_BY_NNT),
+                ),
                 **{
                     _doi_node(target): NodeStep(
                         doi(target),
@@ -138,6 +148,7 @@ class FetchMissingPhase:
         channels = {
             _HAL_BY_ID: "hal-id",
             _HAL_BY_NNT: "NNT",
+            _THESES_BY_NNT: "NNT theses.fr",
             **{_doi_node(target): target for target in DOI_SEARCHABLE_SOURCES},
         }
         for node, key in channels.items():
@@ -381,7 +392,7 @@ def _doi_org_user_agent() -> str:
 def build() -> Phase:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
-    La recherche dans HAL télécharge les documents que HAL détient et que le staging n'a pas, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
+    La recherche dans HAL télécharge les documents présents dans HAL et absents du staging, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche dans theses.fr télécharge les thèses dont le NNT figure dans une autre source. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
 
     Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`.
     """
@@ -390,6 +401,7 @@ def build() -> Phase:
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
+        fetch_theses_by_nnt=_run_fetch_missing_theses_by_nnt,
         fetch_doi_one=_run_fetch_missing_doi,
         run_parallel=run_parallel,
     )
@@ -413,6 +425,18 @@ def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     with open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         return asyncio.run(fetch_missing_hal_by_nnt(conn, log, retry_after_days=retry_after_days))
+
+
+def _run_fetch_missing_theses_by_nnt() -> PhaseMetrics:
+    """Recherche dans theses.fr par NNT : thèses trouvées dans d'autres sources, absentes du staging theses.fr."""
+    from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
+    from pipeline.runtime.config import get_fetch_missing_retry_after_days
+
+    with open_tx() as conn:
+        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        return asyncio.run(
+            fetch_missing_theses_by_nnt(conn, log, retry_after_days=retry_after_days)
+        )
 
 
 def _make_doi_search(target: str) -> DoiSearch:
