@@ -53,4 +53,4 @@ La phase `persons` en a fait des personnes : 25 personnes sont des collectifs (�
 
 ## Questions ouvertes
 
-- **Précision de la règle du nom.** « Network », « Team » ou « Society » peuvent figurer dans un nom de personne ou d'entreprise. La revue des signatures marquées le dira.
+- **Précision de la règle du nom.** Relecture du 2026-10-17 : 248 noms tirés par mot déclencheur, 244 sont des non-personnes. Les 2 personnes venaient de « co authors » (« A. Nedelcu plus co-authors »), locution retirée de la règle. 2 noms restent indéterminés.

@@ -33,7 +33,7 @@ COLLECTIVE_WORDS: frozenset[str] = frozenset(
     }
 )
 
-COLLECTIVE_PHRASES: tuple[str, ...] = ("on behalf of", "for the", "task force", "co authors")
+COLLECTIVE_PHRASES: tuple[str, ...] = ("on behalf of", "for the", "task force")
 
 
 def is_collective_name(name: str | None) -> bool:
