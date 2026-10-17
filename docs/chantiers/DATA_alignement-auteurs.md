@@ -36,6 +36,7 @@ Mesure du 2026-10-15 (`interfaces/cli/oneshot/measure_author_alignment.py`), sur
 - Désaccords relevés dans les listes courtes : ordre différent entre sources, collectif d'auteurs inséré dans la liste, prénom différent à la même position (« Maxime » / « Martine Tisserant »), faute de deux lettres (« Pereira » / « Peirrera »), listes sans rapport, signe d'une fusion de publications erronée.
 - Une notice scanR à identifiant `hal…` ou une notice OpenAlex dont la location principale est HAL recopie le dépôt HAL. Sans ces paires, l'accord de la position varie d'un point au plus par tranche.
 - Une signature décalée trouve plusieurs noms compatibles dans 1 à 4 % des cas, et dans 8 % des cas entre 51 et 100 auteurs.
+- Une notice scanR recopiée d'un dépôt HAL reprend sa liste entière dans 24 020 cas sur 24 372, mesure du 2026-10-17. Dans les 352 autres, la liste s'arrête à 51 auteurs (305 cas). Elle répète les 10 premiers auteurs aux positions 10 à 19 (346 cas), puis garde une partie des suivants. Au-delà du dixième auteur, scanR garde 39 % des auteurs qui ont un compte HAL et 1,7 % des autres (exemple : hal-05503063).
 
 | Source | Positions en désaccord | Source qui s'écarte |
 |---|---|---|
