@@ -36,6 +36,12 @@ class TestExtractNntFromScanrId:
     def test_thesis_prefix_uppercases_nnt(self):
         assert extract_nnt_from_scanr_id("these2021clfac030") == "2021CLFAC030"
 
+    def test_nnt_prefix_extracts_uppercase_nnt(self):
+        assert extract_nnt_from_scanr_id("nnt2019clfad020") == "2019CLFAD020"
+
+    def test_thesis_in_preparation_has_no_nnt(self):
+        assert extract_nnt_from_scanr_id("nnts104391") is None
+
     def test_other_prefix_returns_none(self):
         assert extract_nnt_from_scanr_id("hal2021abcd") is None
         assert extract_nnt_from_scanr_id("doi:10.1234/foo") is None

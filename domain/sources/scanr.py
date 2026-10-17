@@ -5,9 +5,10 @@ Interprétation des champs propres au schéma ScanR (élasticsearch dataesr) —
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé).
 """
 
+import re
 from collections.abc import Mapping
 
-from domain.publications.identifiers import HALId
+from domain.publications.identifiers import NNT, HALId
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, que ScanR détecte dans le texte, et les mots-clés sont des mots-clés libres.
@@ -28,14 +29,15 @@ def select_leaf_affiliations(
     return labo or affiliations
 
 
-def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
-    """Extrait le NNT d'un `scanr_id` quand celui-ci encode une thèse.
+# Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) n'a pas de NNT.
+_THESIS_ID_RE = re.compile(r"^(?:nnt|these)(\d{4}[A-Za-z0-9]+)$")
 
-    ScanR encode les thèses sous la forme `these<NNT>` (ex. `these2021CLFAC030` → NNT `2021CLFAC030`). Tout autre format = pas une thèse, on retourne None.
-    """
-    if scanr_id and scanr_id.startswith("these"):
-        return scanr_id[len("these") :].upper()
-    return None
+
+def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
+    """Extrait le NNT d'un `scanr_id` de thèse soutenue (`nnt2019clfad020` → `2019CLFAD020`). `None` pour tout autre identifiant."""
+    match = _THESIS_ID_RE.match(scanr_id or "")
+    nnt = NNT.try_parse(match.group(1)) if match else None
+    return str(nnt) if nnt else None
 
 
 def extract_hal_id_from_scanr_id(scanr_id: str | None) -> str | None:
