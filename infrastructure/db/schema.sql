@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict a3vLqTrKEXKrBSS0ssnbwHIxB3lrOank5AaPUH40aLfPf61yv6WwIJTGZgTik3e
+\restrict TqQVL0UqsllRjfesd052srdXakaZZOVVFCikDp2G7dwiAZyRrV3nxk2WSbyzm4e
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -238,6 +238,22 @@ CREATE TYPE public.license_type AS ENUM (
     'other-oa',
     'all-rights-reserved',
     'other'
+);
+
+
+--
+-- Name: lookup_source; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.lookup_source AS ENUM (
+    'hal',
+    'openalex',
+    'wos',
+    'scanr',
+    'theses',
+    'crossref',
+    'datacite',
+    'doi_org'
 );
 
 
@@ -934,6 +950,7 @@ CREATE TABLE sources.source_authorships (
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
     countries text[],
+    collective boolean DEFAULT false NOT NULL,
     CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
 ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
@@ -958,6 +975,13 @@ COMMENT ON COLUMN sources.source_authorships.content_hash IS 'Empreinte des cham
 --
 
 COMMENT ON COLUMN sources.source_authorships.countries IS 'Pays de la signature : pays retenus de ses adresses, de ses organisations ROR sans adresse et de ses structures HAL.';
+
+
+--
+-- Name: COLUMN source_authorships.collective; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_authorships.collective IS 'Signature collective (collaboration, consortium, groupe d''étude…), posée par la normalisation d''après le signal de la source ou d''après le nom.';
 
 
 --
@@ -1999,11 +2023,10 @@ UNION
 --
 
 CREATE TABLE sources.failed_lookups (
-    source public.source_type NOT NULL,
+    source public.lookup_source NOT NULL,
     id_type text NOT NULL,
     id_value text NOT NULL,
     not_found_at timestamp with time zone NOT NULL,
-    next_retry timestamp with time zone,
     CONSTRAINT failed_lookups_id_type_check CHECK ((id_type = ANY (ARRAY['doi'::text, 'hal_id'::text, 'nnt'::text])))
 );
 
@@ -2012,7 +2035,7 @@ CREATE TABLE sources.failed_lookups (
 -- Name: TABLE failed_lookups; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain dans une source par la phase fetch_missing. next_retry porte la date de la prochaine tentative. Il est NULL quand l''identifiant est natif de la source (le DOI pour Crossref et DataCite, le hal-id pour HAL) : l''échec est alors définitif.';
+COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de doi.org (source doi_org : DOI que doi.org ne connaît pas). La recherche reprend quand not_found_at date de plus que le délai fetch_missing_retry_after_days.';
 
 
 --
@@ -4499,5 +4522,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a3vLqTrKEXKrBSS0ssnbwHIxB3lrOank5AaPUH40aLfPf61yv6WwIJTGZgTik3e
+\unrestrict TqQVL0UqsllRjfesd052srdXakaZZOVVFCikDp2G7dwiAZyRrV3nxk2WSbyzm4e
 
