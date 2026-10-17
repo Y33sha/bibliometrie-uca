@@ -121,6 +121,30 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Identifiant erroné dans une source : 39 (ScanR 18, HAL 14, Crossref et OpenAlex 5, IdRef supprimé ou indéterminé 2). ScanR attribue l'identifiant d'un homonyme. Dans Crossref, l'ORCID erroné est celui d'un co-auteur.
   - Même personne, deux identifiants : 30. Pour l'IdRef, un doublon, souvent redirigé. Pour l'ORCID, un compte vide ou désactivé.
   - Indéterminable : 9.
+- [x] Liens au périmètre établis par la seule signature scanR : 5 735 couples (publication, personne), dont 100 relus à la main, 2026-10-17.
+
+  | Indice de périmètre de scanR | Couples | À juste titre | À tort | Indéterminable |
+  |---|---|---|---|---|
+  | identité RH, autres sources présentes | 2 268 | 31 | 5 | 4 |
+  | identité RH, scanR seul | 1 815 | 19 | 0 | 1 |
+  | structure HAL ou ROR | 1 314 | 9 | 12 | 4 |
+  | adresse | 338 | 5 | 10 | 0 |
+
+  - Structure : 11 erreurs sur 12 sont des publications de collaborations de 1 000 à 3 000 auteurs. scanR y donne la structure ou le ROR à des auteurs extérieurs. La signature HAL de ces auteurs n'a aucune structure, dans les cas justes comme dans les cas faux.
+  - Adresse : scanR attribue à l'auteur les adresses d'autres auteurs, jusqu'à 16 par signature, ou des blocs mal découpés.
+  - Identité RH : les 5 erreurs sont des signatures à l'initiale, rapprochées d'un homonyme RH de même initiale.
+  - 21 des 31 couples justes de la première strate ont une adresse OpenAlex au CHU de Clermont.
+  - Priorité simulée sur les signatures appariées par nom et position : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR. Strate adresse : 9 erreurs sur 10 retirées, aucun couple juste perdu. Strate structure : 6 erreurs sur 12 retirées, 1 couple juste perdu.
+- [x] IdRef attribués par la seule signature scanR : 3 660, comparés à leur notice IdRef, dont 100 relus à la main, 2026-10-17. 3 650 notices trouvées, 162 de nom incompatible avec la personne.
+
+  | Strate | Effectif | IdRef de la personne | Homonyme | Prénom différent | Indéterminable |
+  |---|---|---|---|---|---|
+  | nom incompatible | 162 | 0 | 3 | 27 | 0 |
+  | nom compatible | 3 488 | 54 | 4 | 2 | 0 |
+  | IdRef introuvable | 10 | 8 | 0 | 0 | 2 |
+
+  - Un nom incompatible signale un IdRef faux. Un nom compatible laisse passer les homonymes, environ 10 %. Les prénoms différents de cette strate sont réduits à l'initiale dans la signature.
+  - 9 des 10 IdRef introuvables sont fusionnés : la page IdRef redirige vers un autre numéro, la recherche Solr ne les rend pas. Le dernier est supprimé.
 
 ### Phase 2 — Méthode et modèle
 
@@ -130,10 +154,11 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ### Phase 3 — Usages
 
-- [ ] Identification des personnes par auteur aligné.
+- [ ] Identification des personnes par auteur aligné. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
 - [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
+- [ ] Indices de périmètre par auteur aligné : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
 
 ### Phase 4 — Fin de chantier
 
@@ -147,3 +172,4 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
 - **Rapport avec `authorships`** : l'auteur aligné remplace-t-il la consolidation par paire (publication, personne) ?
+- **Nom déclaré par IdRef et ORCID.** Les API d'IdRef et d'ORCID donnent le nom de la personne. Ce nom permettrait d'écarter les identifiants attribués à tort.
