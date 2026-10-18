@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IkDncbgHzhtLj1K6RDF6k3EnbSdBvAlTdFILZC7hOqagtkLaJhrqfRPANpj9LEJ
+\restrict grRk7TaPUeleQuEwL5RQZolgmK3EqxJss8otcu9UrWx43bUuLJFTzfHsL1Xvyez
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1035,6 +1035,8 @@ CREATE TABLE sources.source_publications (
     authors_hash text,
     impact jsonb,
     license public.license_type,
+    author_count integer DEFAULT 0 NOT NULL,
+    distinct_author_count integer DEFAULT 0 NOT NULL,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
@@ -1046,6 +1048,20 @@ CREATE TABLE sources.source_publications (
 --
 
 COMMENT ON COLUMN sources.source_publications.authors_hash IS 'Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.';
+
+
+--
+-- Name: COLUMN source_publications.author_count; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_publications.author_count IS 'Signatures de la notice qui ont le rôle author et ne sont pas collectives, telles que la source les donne.';
+
+
+--
+-- Name: COLUMN source_publications.distinct_author_count; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_publications.distinct_author_count IS 'Noms complets normalisés distincts parmi les signatures comptées par author_count.';
 
 
 --
@@ -1326,10 +1342,7 @@ CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
          SELECT g.publication_id,
             gs.group_id,
             gs.source_publication_id,
-            gs.method,
-            gs.margin,
-            count(*) OVER (PARTITION BY gs.group_id) AS group_size,
-            bool_or((gs.method = ANY (ARRAY['name'::public.grouping_method, 'identifier'::public.grouping_method, 'order'::public.grouping_method]))) OVER (PARTITION BY gs.group_id) AS rule_linked
+            count(*) OVER (PARTITION BY gs.group_id) AS group_size
            FROM ((publications.grouped_source_authorships gs
              JOIN publications.source_authorship_groups g ON ((g.id = gs.group_id)))
              JOIN sources.source_authorships sa ON ((sa.id = gs.source_authorship_id)))
@@ -1338,11 +1351,7 @@ CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
  SELECT publication_id,
     count(DISTINCT source_publication_id) AS notices,
     count(*) AS signatures,
-    count(DISTINCT group_id) AS groups,
-    count(*) FILTER (WHERE rule_linked) AS rule_aligned_signatures,
-    count(*) FILTER (WHERE (group_size = 1)) AS lone_signatures,
-    count(*) FILTER (WHERE (method = 'model'::public.grouping_method)) AS model_signatures,
-    min(margin) AS min_margin
+    count(*) FILTER (WHERE (group_size >= 2)) AS matched_signatures
    FROM author_members
   GROUP BY publication_id
  HAVING (count(DISTINCT source_publication_id) >= 2)
@@ -1353,7 +1362,7 @@ CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
 -- Name: MATERIALIZED VIEW publication_author_alignment; Type: COMMENT; Schema: publications; Owner: -
 --
 
-COMMENT ON MATERIALIZED VIEW publications.publication_author_alignment IS 'Recouvrement des listes d''auteurs des publications à plusieurs notices. rule_aligned_signatures : signatures d''auteur d''un groupe dont un membre est lié par la règle (nom, identifiant, ordre). lone_signatures : signatures d''auteur seules dans leur groupe. model_signatures : signatures d''auteur liées à leur groupe par le modèle ; min_margin : plus petite marge de ces liens, en bits.';
+COMMENT ON MATERIALIZED VIEW publications.publication_author_alignment IS 'Recouvrement des listes d''auteurs des publications à plusieurs notices. matched_signatures : signatures d''auteur qui ont un correspondant dans une autre notice.';
 
 
 --
@@ -4744,5 +4753,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IkDncbgHzhtLj1K6RDF6k3EnbSdBvAlTdFILZC7hOqagtkLaJhrqfRPANpj9LEJ
+\unrestrict grRk7TaPUeleQuEwL5RQZolgmK3EqxJss8otcu9UrWx43bUuLJFTzfHsL1Xvyez
 
